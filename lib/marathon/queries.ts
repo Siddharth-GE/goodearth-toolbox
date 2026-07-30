@@ -56,6 +56,39 @@ export async function getSavedEntry(bib: string): Promise<SavedEntry | null> {
   return data as unknown as SavedEntry | null;
 }
 
+export type AgentEntry = {
+  bib: string;
+  name: string;
+  created_at: string;
+  marathon_categories: { name: string; color: string } | null;
+  marathon_runs: { id: string; name: string } | null;
+};
+
+export async function getAgentEntries(agentId: string, runId?: string) {
+  const supabase = createAdminClient();
+
+  let query = supabase
+    .from("marathon_entries")
+    .select("bib, name, created_at, marathon_categories(name, color), marathon_runs(id, name)")
+    .eq("agent_id", agentId)
+    .order("created_at", { ascending: false });
+
+  if (runId) query = query.eq("run_id", runId);
+
+  const [{ data: entries }, { count: totalCount }] = await Promise.all([
+    query,
+    supabase
+      .from("marathon_entries")
+      .select("id", { count: "exact", head: true })
+      .eq("agent_id", agentId),
+  ]);
+
+  return {
+    entries: (entries ?? []) as unknown as AgentEntry[],
+    totalCount: totalCount ?? 0,
+  };
+}
+
 export async function getEntryFormData() {
   const supabase = createAdminClient();
 

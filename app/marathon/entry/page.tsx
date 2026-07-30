@@ -5,6 +5,7 @@ import { agentLogout } from "@/lib/marathon/actions";
 import { getEntryFormData, getSavedEntry } from "@/lib/marathon/queries";
 import { requireAgentSession } from "@/lib/marathon/session";
 import { createAdminClient } from "@/lib/supabase/admin";
+import Link from "next/link";
 
 export default async function MarathonEntryPage({
   searchParams,
@@ -35,7 +36,12 @@ export default async function MarathonEntryPage({
         </form>
       </div>
 
-      <p className="mb-5 text-sm text-muted">Signed in as {agent?.name}</p>
+      <div className="mb-5 flex items-center justify-between">
+        <p className="text-sm text-muted">Signed in as {agent?.name}</p>
+        <Link href="/marathon/list" className="text-sm font-medium text-accent">
+          My Entries
+        </Link>
+      </div>
 
       {savedEntry && (
         <BibCard

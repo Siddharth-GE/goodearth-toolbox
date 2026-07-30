@@ -16,7 +16,7 @@ checklist and a bookmark for picking work back up.
 - [x] 5. New entry form — full runner form with live category/bib preview,
       duplicate-mobile warning, saves via the atomic bib-assignment function
 - [x] 6. Success screen — colored "bib card" showing the assigned bib
-- [ ] 7. My list — an agent's own entries, filtered, with counts
+- [x] 7. My list — an agent's own entries, filtered, with counts
 - [ ] 8. Admin PIN gate + Members/Groups tabs — add agents, add groups
 - [ ] 9. Admin Entries tab — all entries across agents, filterable, with totals
 
@@ -41,11 +41,22 @@ the category. It's driven by a new `getSavedEntry(bib)` query
 rather than guessing from the bib prefix. Verified directly against the
 database (created a test Women's entry, confirmed the purple card
 rendered with the right details, then deleted it and reset that
-category's bib counter back to 1). Not yet clicked through by the
-founder in the browser.
+category's bib counter back to 1). Founder-tested and pushed.
 
-## What step 7 starts with
+Step 7 is also built: `app/marathon/list/page.tsx` shows an agent's own
+entries (most recent first), a total count, and filter tabs by run type
+(via a `?run=` query param, no client JS needed). A "My Entries" link was
+added to the entry page's header, and a "+ New Entry" button on the list
+screen goes back. Backed by a new `getAgentEntries(agentId, runId?)`
+query in `lib/marathon/queries.ts`. Verified directly: created two test
+entries under Test Agent (one per run), confirmed the unfiltered list
+showed both with the right count, and that filtering by run correctly
+showed only the matching one — then deleted both test entries.
 
-"My list" — an agent's own entries so far today, filtered, with counts.
-Likely a new `app/marathon/list/page.tsx` (or a tab on the entry page),
-querying `marathon_entries` filtered by `agent_id` from the session.
+## What step 8 starts with
+
+Admin PIN gate + Members/Groups tabs — a separate admin login (already
+has `requireAdminSession`/`verifyAdminPin` in `lib/marathon/session.ts`
+from step 2, unused until now) leading to screens for adding agents
+(name + PIN) and groups (schools/clubs), so real event setup doesn't
+require touching the database by hand.
