@@ -23,6 +23,12 @@ new migration by running its SQL against the project via the Supabase
 Studio SQL editor, in numbered order — there's no CLI/local-Postgres setup
 for this yet.
 
+## Deployment
+
+Deployed on Vercel, connected to the `master` branch — every push auto-deploys
+to production. Set the same 4 env vars from `.env.local.example` in the
+Vercel project settings.
+
 ## Scripts
 
 - `npm run dev` — start the dev server
