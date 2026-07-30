@@ -22,6 +22,12 @@ Internal tools platform for Goodearth, a design-led real estate company in Keral
 - All schema changes as numbered SQL files in supabase/migrations — never ad hoc
 - Keep it simple: no over-engineering, this serves ~200 users max
 
+## Documentation map
+
+This file is the entry point. Each tool keeps its own build plan/checklist
+colocated with its code at app/<tool>/PLAN.md (e.g. app/marathon/PLAN.md) —
+check the relevant one before starting or resuming work on that tool.
+
 @AGENTS.md
 
 ## Working with me (IMPORTANT — read every session)
