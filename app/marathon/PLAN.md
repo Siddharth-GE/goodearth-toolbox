@@ -50,7 +50,11 @@ Category (each option labelled with its race, e.g. "Men — 10.5 K Quarter
 Marathon") — any combination of which narrows the list via `?group=`,
 `?run=`, `?category=`. A "My Entries" link was added to the entry page's
 header, and a "+ New Entry" button on the list screen goes back. Backed
-by `getAgentEntries(agentId, filters)` in `lib/marathon/queries.ts`.
+by `getAgentEntries(agentId, filters)` in `lib/marathon/queries.ts`. The
+Category dropdown only offers categories belonging to the selected Race
+(Fun Run only ever has "Open"), so it can't offer choices that could
+never match anything.
+
 Verified directly against the database: created test entries across
 different groups/races/categories, confirmed each filter (and the "no
 filter" case) returned exactly the right rows, then deleted them.

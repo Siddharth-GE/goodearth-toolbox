@@ -22,11 +22,23 @@ export default async function MarathonListPage({
   const hasFilter = Boolean(runFilter || groupFilter || categoryFilter);
 
   const supabase = createAdminClient();
-  const [{ data: agent }, { groups, runs, categories }, { entries, totalCount }] = await Promise.all([
+  const [{ data: agent }, { groups, runs, categories: allCategories }] = await Promise.all([
     supabase.from("marathon_agents").select("name").eq("id", session.agentId).single(),
     getEntryFormData(),
-    getAgentEntries(session.agentId, { runId: runFilter, groupId: groupFilter, categoryId: categoryFilter }),
   ]);
+
+  // Only offer categories that belong to the selected race — every
+  // category under the Fun Run is "Open", so once a race is picked the
+  // rest would just be noise (and couldn't match anything anyway).
+  const categories = runFilter ? allCategories.filter((c) => c.run_id === runFilter) : allCategories;
+  const categoryFilterValid = categories.some((c) => c.id === categoryFilter);
+  const effectiveCategoryFilter = categoryFilterValid ? categoryFilter : undefined;
+
+  const { entries, totalCount } = await getAgentEntries(session.agentId, {
+    runId: runFilter,
+    groupId: groupFilter,
+    categoryId: effectiveCategoryFilter,
+  });
 
   const runsById = new Map(runs.map((r) => [r.id, r.name]));
 
@@ -66,11 +78,11 @@ export default async function MarathonListPage({
             </option>
           ))}
         </Select>
-        <Select name="category" defaultValue={categoryFilter ?? ""}>
+        <Select name="category" defaultValue={effectiveCategoryFilter ?? ""}>
           <option value="">All categories</option>
           {categories.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.name} — {runsById.get(c.run_id)}
+              {runFilter ? c.name : `${c.name} — ${runsById.get(c.run_id)}`}
             </option>
           ))}
         </Select>
