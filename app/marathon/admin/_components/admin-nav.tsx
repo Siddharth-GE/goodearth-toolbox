@@ -2,28 +2,30 @@ import { adminLogout } from "@/lib/marathon/actions";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
-export function AdminNav({ active }: { active: "members" | "groups" }) {
+const TABS = [
+  { key: "entries", href: "/marathon/admin/entries", label: "Entries" },
+  { key: "members", href: "/marathon/admin/members", label: "Members" },
+  { key: "groups", href: "/marathon/admin/groups", label: "Groups" },
+] as const;
+
+export function AdminNav({ active }: { active: "entries" | "members" | "groups" }) {
   return (
     <div className="mb-5 flex items-center justify-between">
       <div className="flex gap-2">
-        <Link
-          href="/marathon/admin/members"
-          className={cn(
-            "rounded-full border px-3.5 py-1.5 text-sm font-medium",
-            active === "members" ? "border-accent bg-accent text-accent-foreground" : "border-border text-foreground",
-          )}
-        >
-          Members
-        </Link>
-        <Link
-          href="/marathon/admin/groups"
-          className={cn(
-            "rounded-full border px-3.5 py-1.5 text-sm font-medium",
-            active === "groups" ? "border-accent bg-accent text-accent-foreground" : "border-border text-foreground",
-          )}
-        >
-          Groups
-        </Link>
+        {TABS.map((tab) => (
+          <Link
+            key={tab.key}
+            href={tab.href}
+            className={cn(
+              "rounded-full border px-3.5 py-1.5 text-sm font-medium",
+              active === tab.key
+                ? "border-accent bg-accent text-accent-foreground"
+                : "border-border text-foreground",
+            )}
+          >
+            {tab.label}
+          </Link>
+        ))}
       </div>
       <form action={adminLogout}>
         <button type="submit" className="text-sm font-medium text-accent">

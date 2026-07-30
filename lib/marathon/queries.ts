@@ -96,6 +96,49 @@ export async function getAgentEntries(agentId: string, filters: AgentEntryFilter
   };
 }
 
+export type AdminEntry = {
+  bib: string;
+  name: string;
+  created_at: string;
+  marathon_categories: { name: string; color: string } | null;
+  marathon_runs: { id: string; name: string } | null;
+  marathon_groups: { name: string } | null;
+  marathon_agents: { name: string } | null;
+};
+
+export type AdminEntryFilters = {
+  runId?: string;
+  groupId?: string;
+  categoryId?: string;
+  agentId?: string;
+};
+
+export async function getAdminEntries(filters: AdminEntryFilters = {}) {
+  const supabase = createAdminClient();
+
+  let query = supabase
+    .from("marathon_entries")
+    .select(
+      "bib, name, created_at, marathon_categories(name, color), marathon_runs(id, name), marathon_groups(name), marathon_agents(name)",
+    )
+    .order("created_at", { ascending: false });
+
+  if (filters.runId) query = query.eq("run_id", filters.runId);
+  if (filters.groupId) query = query.eq("group_id", filters.groupId);
+  if (filters.categoryId) query = query.eq("category_id", filters.categoryId);
+  if (filters.agentId) query = query.eq("agent_id", filters.agentId);
+
+  const [{ data: entries }, { count: grandTotal }] = await Promise.all([
+    query,
+    supabase.from("marathon_entries").select("id", { count: "exact", head: true }),
+  ]);
+
+  return {
+    entries: (entries ?? []) as unknown as AdminEntry[],
+    grandTotal: grandTotal ?? 0,
+  };
+}
+
 export async function getAdminAgents() {
   const supabase = createAdminClient();
   const { data } = await supabase.from("marathon_agents").select("id, name").order("name");

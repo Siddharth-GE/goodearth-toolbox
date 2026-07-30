@@ -18,7 +18,7 @@ checklist and a bookmark for picking work back up.
 - [x] 6. Success screen — colored "bib card" showing the assigned bib
 - [x] 7. My list — an agent's own entries, filtered, with counts
 - [x] 8. Admin PIN gate + Members/Groups tabs — add agents, add groups
-- [ ] 9. Admin Entries tab — all entries across agents, filterable, with totals
+- [x] 9. Admin Entries tab — all entries across agents, filterable, with totals
 
 ## Where we stopped (2026-07-30)
 
@@ -83,9 +83,23 @@ friendly error instead of a crash, and confirmed `/marathon/admin/members`
 redirects to the PIN screen when not logged in. Both test rows were then
 deleted. Not yet clicked through by the founder in an actual browser.
 
-## What step 9 starts with
+Step 9 is also built: a third admin tab, `/marathon/admin/entries`,
+listing every entry across all agents (most recent first), with the
+count of matches (and the grand total when a filter narrows it). Filters
+are Agent, Group, Race, and Category — the same live-narrowing,
+hidden-field-submits pattern as step 7's `ListFilters`, generalized into
+`app/marathon/admin/_components/admin-entry-filters.tsx` with an Agent
+dropdown added. Each row shows which agent registered that runner. This
+is now the admin section's landing tab (both the PIN page and admin
+login redirect here instead of Members). Backed by
+`getAdminEntries(filters)` in `lib/marathon/queries.ts`.
 
-Admin Entries tab — all entries across every agent, filterable (likely
-the same Group/Race/Category filter pattern as step 7's `ListFilters`,
-generalized to drop the `agent_id` restriction and add an agent filter),
-with totals. Probably a third admin tab alongside Members/Groups.
+Verified directly against the database and running server: confirmed
+unauthenticated access redirects to the PIN screen, created a test entry
+and confirmed it appeared with the correct agent attribution, confirmed
+the Agent filter narrowed correctly and the Race filter correctly
+excluded it when set to the wrong race, then deleted the test entry.
+
+This completes the full 9-step Marathon build plan from the original
+design session. Not yet clicked through by the founder in an actual
+browser — the founder has follow-up refinements planned after review.

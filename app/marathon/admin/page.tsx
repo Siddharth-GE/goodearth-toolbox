@@ -5,7 +5,7 @@ import { AdminPinPad } from "./_components/admin-pin-pad";
 
 export default async function MarathonAdminPage() {
   const session = await getAdminSession();
-  if (session) redirect("/marathon/admin/members");
+  if (session) redirect("/marathon/admin/entries");
 
   return (
     <div className="px-7 py-14 text-center">

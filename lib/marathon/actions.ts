@@ -52,7 +52,7 @@ export async function verifyAdminPinAction(_state: PinState, formData: FormData)
   }
 
   await createAdminSession();
-  redirect("/marathon/admin/members");
+  redirect("/marathon/admin/entries");
 }
 
 export async function adminLogout() {
