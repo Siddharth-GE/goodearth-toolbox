@@ -33,7 +33,7 @@ export function BibCard({
   return (
     <div
       className={cn(
-        "mb-5 overflow-hidden rounded-2xl text-white shadow-sm",
+        "mb-5 overflow-hidden rounded-2xl text-white shadow-sm [animation:card-in_200ms_ease-out]",
         CARD_COLOR_CLASSES[color] ?? FALLBACK,
       )}
     >

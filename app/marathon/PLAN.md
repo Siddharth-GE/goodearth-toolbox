@@ -101,5 +101,44 @@ the Agent filter narrowed correctly and the Race filter correctly
 excluded it when set to the wrong race, then deleted the test entry.
 
 This completes the full 9-step Marathon build plan from the original
-design session. Not yet clicked through by the founder in an actual
-browser — the founder has follow-up refinements planned after review.
+design session.
+
+## UX refinement pass (2026-07-30)
+
+After the 9 steps, the founder asked for a deliberate design pass:
+no layout jank as content appears/disappears, a decision on fixed
+headers, and a home screen that scales past a handful of agents
+(confirmed: expect 15–50+ agents on the shared kiosk device). Built:
+
+- **No more layout "shaking"**: the entry form's live category-preview
+  card, "no match" card, and duplicate-mobile warning now animate in
+  via a grid-rows-to-auto CSS transition instead of popping in/out
+  (`app/marathon/_components/entry-form.tsx`). Both PIN screens
+  (`pin-pad.tsx`, `admin-pin-pad.tsx`) reserve a fixed-height error slot
+  so the Continue button doesn't hop down on a wrong PIN.
+- **Sticky headers**: the entry form, My Entries, and every admin tab
+  now have a `sticky top-0` header (title/tabs + Exit) with a quiet
+  `bg-background/95 backdrop-blur` + hairline border treatment — stays
+  reachable while the rest of the page scrolls underneath, without a
+  heavy app-bar look.
+- **Sticky Save button**: the entry form's Save button (the single most
+  repeated action in the app) is now `sticky bottom-0`, always a thumb
+  reach away regardless of scroll position.
+- **Home screen search**: a new `app/marathon/_components/member-list.tsx`
+  client component adds a live, client-side substring filter above the
+  existing tap list — no separate search screen, no autocomplete, no
+  autofocus (this is a shared kiosk screen, the keyboard shouldn't pop
+  up uninvited). The admin Entries tab's Agent filter stays a plain
+  native `<select>` — those already scale fine on their own.
+- **One moment of delight**: the `BibCard` success banner now has a
+  brief fade+scale entrance (`@keyframes card-in` in `app/globals.css`)
+  — the payoff moment of the flow. Nowhere else was decorated further,
+  per "inviting without fluff."
+
+Verified directly against the running dev server and database (no
+browser available in this environment): confirmed the search input and
+both sticky elements render with the right classes on the actual pages,
+confirmed the CSS keyframe compiled into the real bundle (not just
+present in source), and exercised the bib-card animation end-to-end
+with a real saved entry before cleaning it up. Not yet clicked through
+by the founder in an actual browser.

@@ -36,59 +36,61 @@ export default async function MarathonAdminEntriesPage({
   });
 
   return (
-    <div className="px-5 pt-8 pb-16">
+    <div>
       <AdminNav active="entries" />
 
-      <p className="mb-1 text-sm text-muted">{hasFilter ? "Matching" : "Total"} entries</p>
-      <p className="mb-5 text-3xl font-extrabold tracking-tight text-foreground">
-        {entries.length}
-        {hasFilter && <span className="text-base font-medium text-muted"> of {grandTotal}</span>}
-      </p>
-
-      <AdminEntryFilters
-        groups={groups}
-        runs={runs}
-        categories={allCategories}
-        agents={agents}
-        initialGroup={groupFilter}
-        initialRun={runFilter}
-        initialCategory={effectiveCategoryFilter}
-        initialAgent={agentFilter}
-        hasFilter={hasFilter}
-      />
-
-      {entries.length === 0 ? (
-        <p className="rounded-2xl border border-border bg-surface p-6 text-center text-sm text-muted">
-          No entries {hasFilter ? "match this filter" : "yet"}.
+      <div className="px-5 pt-5 pb-16">
+        <p className="mb-1 text-sm text-muted">{hasFilter ? "Matching" : "Total"} entries</p>
+        <p className="mb-5 text-3xl font-extrabold tracking-tight text-foreground">
+          {entries.length}
+          {hasFilter && <span className="text-base font-medium text-muted"> of {grandTotal}</span>}
         </p>
-      ) : (
-        <ul className="space-y-2">
-          {entries.map((entry) => (
-            <li
-              key={entry.bib}
-              className="flex items-center justify-between rounded-2xl border border-border bg-surface p-3.5"
-            >
-              <div className="flex items-center gap-3">
-                <span className="w-16 shrink-0 font-mono text-sm font-bold text-foreground">{entry.bib}</span>
-                <div>
-                  <p className="text-sm font-medium text-foreground">{entry.name}</p>
-                  <p className="text-xs text-muted">
-                    {entry.marathon_runs?.name}
-                    {entry.marathon_groups?.name ? ` · ${entry.marathon_groups.name}` : ""}
-                    {entry.marathon_agents?.name ? ` · by ${entry.marathon_agents.name}` : ""}
-                  </p>
+
+        <AdminEntryFilters
+          groups={groups}
+          runs={runs}
+          categories={allCategories}
+          agents={agents}
+          initialGroup={groupFilter}
+          initialRun={runFilter}
+          initialCategory={effectiveCategoryFilter}
+          initialAgent={agentFilter}
+          hasFilter={hasFilter}
+        />
+
+        {entries.length === 0 ? (
+          <p className="rounded-2xl border border-border bg-surface p-6 text-center text-sm text-muted">
+            No entries {hasFilter ? "match this filter" : "yet"}.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {entries.map((entry) => (
+              <li
+                key={entry.bib}
+                className="flex items-center justify-between rounded-2xl border border-border bg-surface p-3.5"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="w-16 shrink-0 font-mono text-sm font-bold text-foreground">{entry.bib}</span>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{entry.name}</p>
+                    <p className="text-xs text-muted">
+                      {entry.marathon_runs?.name}
+                      {entry.marathon_groups?.name ? ` · ${entry.marathon_groups.name}` : ""}
+                      {entry.marathon_agents?.name ? ` · by ${entry.marathon_agents.name}` : ""}
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <div className="flex flex-col items-end gap-1">
-                {entry.marathon_categories && (
-                  <CategoryBadge name={entry.marathon_categories.name} color={entry.marathon_categories.color} />
-                )}
-                <span className="text-xs text-muted">{formatTime(entry.created_at)}</span>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+                <div className="flex flex-col items-end gap-1">
+                  {entry.marathon_categories && (
+                    <CategoryBadge name={entry.marathon_categories.name} color={entry.marathon_categories.color} />
+                  )}
+                  <span className="text-xs text-muted">{formatTime(entry.created_at)}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

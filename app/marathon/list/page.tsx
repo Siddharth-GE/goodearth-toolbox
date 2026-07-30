@@ -40,8 +40,8 @@ export default async function MarathonListPage({
   });
 
   return (
-    <div className="px-5 pt-8 pb-16">
-      <div className="mb-5 flex items-center justify-between">
+    <div>
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background/95 px-5 py-4 backdrop-blur">
         <div>
           <h1 className="text-lg font-bold text-foreground">{copy.myEntries.en}</h1>
           <p className="text-xs text-muted">{copy.myEntries.ml}</p>
@@ -53,56 +53,58 @@ export default async function MarathonListPage({
         </form>
       </div>
 
-      <p className="mb-1 text-sm text-muted">Signed in as {agent?.name}</p>
-      <p className="mb-5 text-3xl font-extrabold tracking-tight text-foreground">
-        {totalCount} <span className="text-base font-medium text-muted">registered by you</span>
-      </p>
-
-      <ListFilters
-        groups={groups}
-        runs={runs}
-        categories={allCategories}
-        initialGroup={groupFilter}
-        initialRun={runFilter}
-        initialCategory={effectiveCategoryFilter}
-        hasFilter={hasFilter}
-      />
-
-      {entries.length === 0 ? (
-        <p className="rounded-2xl border border-border bg-surface p-6 text-center text-sm text-muted">
-          No entries {hasFilter ? "match this filter" : "yet"}.
+      <div className="px-5 pt-5 pb-16">
+        <p className="mb-1 text-sm text-muted">Signed in as {agent?.name}</p>
+        <p className="mb-5 text-3xl font-extrabold tracking-tight text-foreground">
+          {totalCount} <span className="text-base font-medium text-muted">registered by you</span>
         </p>
-      ) : (
-        <ul className="space-y-2">
-          {entries.map((entry) => (
-            <li
-              key={entry.bib}
-              className="flex items-center justify-between rounded-2xl border border-border bg-surface p-3.5"
-            >
-              <div className="flex items-center gap-3">
-                <span className="w-16 shrink-0 font-mono text-sm font-bold text-foreground">{entry.bib}</span>
-                <div>
-                  <p className="text-sm font-medium text-foreground">{entry.name}</p>
-                  <p className="text-xs text-muted">
-                    {entry.marathon_runs?.name}
-                    {entry.marathon_groups?.name ? ` · ${entry.marathon_groups.name}` : ""}
-                  </p>
-                </div>
-              </div>
-              <div className="flex flex-col items-end gap-1">
-                {entry.marathon_categories && (
-                  <CategoryBadge name={entry.marathon_categories.name} color={entry.marathon_categories.color} />
-                )}
-                <span className="text-xs text-muted">{formatTime(entry.created_at)}</span>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
 
-      <LinkButton href="/marathon/entry" size="lg" className="mt-6 w-full">
-        + New Entry
-      </LinkButton>
+        <ListFilters
+          groups={groups}
+          runs={runs}
+          categories={allCategories}
+          initialGroup={groupFilter}
+          initialRun={runFilter}
+          initialCategory={effectiveCategoryFilter}
+          hasFilter={hasFilter}
+        />
+
+        {entries.length === 0 ? (
+          <p className="rounded-2xl border border-border bg-surface p-6 text-center text-sm text-muted">
+            No entries {hasFilter ? "match this filter" : "yet"}.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {entries.map((entry) => (
+              <li
+                key={entry.bib}
+                className="flex items-center justify-between rounded-2xl border border-border bg-surface p-3.5"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="w-16 shrink-0 font-mono text-sm font-bold text-foreground">{entry.bib}</span>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{entry.name}</p>
+                    <p className="text-xs text-muted">
+                      {entry.marathon_runs?.name}
+                      {entry.marathon_groups?.name ? ` · ${entry.marathon_groups.name}` : ""}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                  {entry.marathon_categories && (
+                    <CategoryBadge name={entry.marathon_categories.name} color={entry.marathon_categories.color} />
+                  )}
+                  <span className="text-xs text-muted">{formatTime(entry.created_at)}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <LinkButton href="/marathon/entry" size="lg" className="mt-6 w-full">
+          + New Entry
+        </LinkButton>
+      </div>
     </div>
   );
 }

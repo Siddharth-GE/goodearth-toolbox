@@ -10,7 +10,7 @@ const TABS = [
 
 export function AdminNav({ active }: { active: "entries" | "members" | "groups" }) {
   return (
-    <div className="mb-5 flex items-center justify-between">
+    <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background/95 px-5 py-4 backdrop-blur">
       <div className="flex gap-2">
         {TABS.map((tab) => (
           <Link

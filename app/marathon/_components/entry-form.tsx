@@ -174,26 +174,44 @@ export function EntryForm({
         </Select>
       </div>
 
-      {category && (
-        <Card className="p-4">
-          <CategoryBadge name={category.name} color={category.color} />
-          <p className="mt-2 text-sm text-muted">
-            Bib will start with <span className="font-bold text-foreground">{category.bib_prefix}</span> —
-            exact number assigned when you save.
-          </p>
-        </Card>
-      )}
-      {showNoMatch && (
-        <Card className="p-4">
-          <p className="text-sm text-muted">No matching category — check age and gender.</p>
-        </Card>
-      )}
+      {/*
+        Grid-rows-to-auto trick: the wrapper is always in the DOM (so its
+        height can animate) but collapses to 0 when there's nothing to
+        show, instead of the card popping in/out and shoving the Save
+        button around as the agent types.
+      */}
+      <div className={`grid transition-[grid-template-rows] duration-200 ${category ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+        <div className="overflow-hidden">
+          {category && (
+            <Card className="p-4">
+              <CategoryBadge name={category.name} color={category.color} />
+              <p className="mt-2 text-sm text-muted">
+                Bib will start with <span className="font-bold text-foreground">{category.bib_prefix}</span> —
+                exact number assigned when you save.
+              </p>
+            </Card>
+          )}
+        </div>
+      </div>
+      <div className={`grid transition-[grid-template-rows] duration-200 ${showNoMatch ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+        <div className="overflow-hidden">
+          {showNoMatch && (
+            <Card className="p-4">
+              <p className="text-sm text-muted">No matching category — check age and gender.</p>
+            </Card>
+          )}
+        </div>
+      </div>
 
-      {state?.error && (
-        <p className={`text-sm font-medium ${state.duplicate ? "text-amber-600" : "text-red-600"}`}>
-          {state.error}
-        </p>
-      )}
+      <div className={`grid transition-[grid-template-rows] duration-200 ${state?.error ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+        <div className="overflow-hidden">
+          {state?.error && (
+            <p className={`text-sm font-medium ${state.duplicate ? "text-amber-600" : "text-red-600"}`}>
+              {state.error}
+            </p>
+          )}
+        </div>
+      </div>
 
       {/*
         The four dropdowns above are display-only (no `name`) — what
@@ -209,9 +227,17 @@ export function EntryForm({
       <input type="hidden" name="run" value={runId} />
       {confirmed && <input type="hidden" name="confirmed" value="1" />}
 
-      <Button type="submit" disabled={pending} className="w-full">
-        {pending ? "Saving…" : confirmed ? "Yes, Save Anyway" : "Save & Get Bib"}
-      </Button>
+      {/*
+        Sticky, not fixed: stays pinned to the bottom of the viewport as
+        the form scrolls (registering a runner is the single most-repeated
+        action in the app), but still sits inside normal document flow so
+        it doesn't need extra bottom padding tricks elsewhere on the page.
+      */}
+      <div className="sticky bottom-0 -mx-5 border-t border-border bg-background/95 px-5 py-3 backdrop-blur">
+        <Button type="submit" disabled={pending} className="w-full">
+          {pending ? "Saving…" : confirmed ? "Yes, Save Anyway" : "Save & Get Bib"}
+        </Button>
+      </div>
     </form>
   );
 }

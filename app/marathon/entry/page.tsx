@@ -23,8 +23,8 @@ export default async function MarathonEntryPage({
   ]);
 
   return (
-    <div className="px-5 pt-8 pb-16">
-      <div className="mb-5 flex items-center justify-between">
+    <div>
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background/95 px-5 py-4 backdrop-blur">
         <div>
           <h1 className="text-lg font-bold text-foreground">{copy.newRunner.en}</h1>
           <p className="text-xs text-muted">{copy.newRunner.ml}</p>
@@ -36,25 +36,27 @@ export default async function MarathonEntryPage({
         </form>
       </div>
 
-      <div className="mb-5 flex items-center justify-between">
-        <p className="text-sm text-muted">Signed in as {agent?.name}</p>
-        <Link href="/marathon/list" className="text-sm font-medium text-accent">
-          My Entries
-        </Link>
+      <div className="px-5 pt-5 pb-16">
+        <div className="mb-5 flex items-center justify-between">
+          <p className="text-sm text-muted">Signed in as {agent?.name}</p>
+          <Link href="/marathon/list" className="text-sm font-medium text-accent">
+            My Entries
+          </Link>
+        </div>
+
+        {savedEntry && (
+          <BibCard
+            bib={savedEntry.bib}
+            runnerName={savedEntry.name}
+            categoryName={savedEntry.marathon_categories?.name ?? ""}
+            runName={savedEntry.marathon_runs?.name ?? ""}
+            teeSize={savedEntry.tee_size}
+            color={savedEntry.marathon_categories?.color ?? ""}
+          />
+        )}
+
+        <EntryForm groups={groups} runs={runs} categories={categories} />
       </div>
-
-      {savedEntry && (
-        <BibCard
-          bib={savedEntry.bib}
-          runnerName={savedEntry.name}
-          categoryName={savedEntry.marathon_categories?.name ?? ""}
-          runName={savedEntry.marathon_runs?.name ?? ""}
-          teeSize={savedEntry.tee_size}
-          color={savedEntry.marathon_categories?.color ?? ""}
-        />
-      )}
-
-      <EntryForm groups={groups} runs={runs} categories={categories} />
     </div>
   );
 }
