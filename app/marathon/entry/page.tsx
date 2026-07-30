@@ -1,8 +1,8 @@
-import { CategoryBadge } from "@/app/marathon/_components/category-badge";
+import { BibCard } from "@/app/marathon/_components/bib-card";
 import { EntryForm } from "@/app/marathon/_components/entry-form";
 import { copy } from "@/app/marathon/_lib/copy";
 import { agentLogout } from "@/lib/marathon/actions";
-import { getEntryFormData } from "@/lib/marathon/queries";
+import { getEntryFormData, getSavedEntry } from "@/lib/marathon/queries";
 import { requireAgentSession } from "@/lib/marathon/session";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -15,12 +15,11 @@ export default async function MarathonEntryPage({
   const { saved } = await searchParams;
 
   const supabase = createAdminClient();
-  const [{ data: agent }, { groups, runs, categories }] = await Promise.all([
+  const [{ data: agent }, { groups, runs, categories }, savedEntry] = await Promise.all([
     supabase.from("marathon_agents").select("name").eq("id", session.agentId).single(),
     getEntryFormData(),
+    saved ? getSavedEntry(saved) : Promise.resolve(null),
   ]);
-
-  const savedCategory = saved ? categories.find((c) => saved.startsWith(c.bib_prefix)) : undefined;
 
   return (
     <div className="px-5 pt-8 pb-16">
@@ -38,16 +37,15 @@ export default async function MarathonEntryPage({
 
       <p className="mb-5 text-sm text-muted">Signed in as {agent?.name}</p>
 
-      {saved && (
-        <div className="mb-5 rounded-2xl border border-border bg-surface p-4 text-center">
-          <p className="text-sm text-muted">Saved</p>
-          <p className="mt-1 text-2xl font-extrabold tracking-tight text-foreground">{saved}</p>
-          {savedCategory && (
-            <div className="mt-2 flex justify-center">
-              <CategoryBadge name={savedCategory.name} color={savedCategory.color} />
-            </div>
-          )}
-        </div>
+      {savedEntry && (
+        <BibCard
+          bib={savedEntry.bib}
+          runnerName={savedEntry.name}
+          categoryName={savedEntry.marathon_categories?.name ?? ""}
+          runName={savedEntry.marathon_runs?.name ?? ""}
+          teeSize={savedEntry.tee_size}
+          color={savedEntry.marathon_categories?.color ?? ""}
+        />
       )}
 
       <EntryForm groups={groups} runs={runs} categories={categories} />

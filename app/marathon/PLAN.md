@@ -15,7 +15,7 @@ checklist and a bookmark for picking work back up.
       protected placeholder page
 - [x] 5. New entry form — full runner form with live category/bib preview,
       duplicate-mobile warning, saves via the atomic bib-assignment function
-- [ ] 6. Success screen — colored "bib card" showing the assigned bib
+- [x] 6. Success screen — colored "bib card" showing the assigned bib
 - [ ] 7. My list — an agent's own entries, filtered, with counts
 - [ ] 8. Admin PIN gate + Members/Groups tabs — add agents, add groups
 - [ ] 9. Admin Entries tab — all entries across agents, filterable, with totals
@@ -33,11 +33,19 @@ always matches the live preview. All test entries created while trying
 this out were deleted and every category's bib counter was reset to 1, so
 the database is clean for real registrations.
 
-## What step 6 starts with
+Step 6 is also built: the plain text banner was replaced with a colored
+`BibCard` (`app/marathon/_components/bib-card.tsx`) showing the bib
+number, runner name, category, run, and t-shirt size, colored to match
+the category. It's driven by a new `getSavedEntry(bib)` query
+(`lib/marathon/queries.ts`) that looks up the entry's category/run by ID
+rather than guessing from the bib prefix. Verified directly against the
+database (created a test Women's entry, confirmed the purple card
+rendered with the right details, then deleted it and reset that
+category's bib counter back to 1). Not yet clicked through by the
+founder in the browser.
 
-Replace the plain "Saved — {bib}" text banner at the top of
-`app/marathon/entry/page.tsx` (added in step 5, driven by the `?saved=`
-query param) with a proper colored "bib card" — something that reads
-well as a physical hand-off to the runner, using the category's `color`
-via `CategoryBadge`/the new color-lookup table in
-`app/marathon/_components/category-badge.tsx`.
+## What step 7 starts with
+
+"My list" — an agent's own entries so far today, filtered, with counts.
+Likely a new `app/marathon/list/page.tsx` (or a tab on the entry page),
+querying `marathon_entries` filtered by `agent_id` from the session.

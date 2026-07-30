@@ -33,6 +33,29 @@ export async function getMarathonHome() {
   };
 }
 
+export type SavedEntry = {
+  bib: string;
+  name: string;
+  tee_size: string;
+  marathon_categories: { name: string; color: string } | null;
+  marathon_runs: { name: string } | null;
+};
+
+export async function getSavedEntry(bib: string): Promise<SavedEntry | null> {
+  const supabase = createAdminClient();
+
+  // The DB returns single objects here (each entry has exactly one
+  // category and one run), but supabase-js can't infer that without
+  // generated types and defaults to typing embeds as arrays.
+  const { data } = await supabase
+    .from("marathon_entries")
+    .select("bib, name, tee_size, marathon_categories(name, color), marathon_runs(name)")
+    .eq("bib", bib)
+    .single();
+
+  return data as unknown as SavedEntry | null;
+}
+
 export async function getEntryFormData() {
   const supabase = createAdminClient();
 
