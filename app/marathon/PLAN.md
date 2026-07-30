@@ -22,13 +22,16 @@ checklist and a bookmark for picking work back up.
 
 ## Where we stopped (2026-07-30)
 
-Steps 1–5 are built. Step 5's entry form is verified against the real
-database (a live `marathon_create_entry` call correctly returned bib
-`M0001` for a 30-year-old male on the 10.5K run, then the test row was
-deleted) and the page was confirmed to render correctly with the
-`Test Agent` session. Not yet clicked through in an actual browser by the
-founder — see the checklist in this session's summary before checking
-step 5 off as founder-approved. Not yet committed/pushed.
+Steps 1–5 are built, tested by the founder in the browser, committed, and
+pushed. Testing caught two real bugs along the way (both fixed, committed,
+pushed): the duplicate-mobile "Save Anyway" step was clearing the form,
+and — more seriously — the Run Type and T-Shirt Size dropdowns weren't
+reliably saving what was shown on screen (both silently fell back to the
+first item in the list). Root cause and fix: those two dropdowns now only
+drive an in-page value that's submitted via a hidden field, so what saves
+always matches the live preview. All test entries created while trying
+this out were deleted and every category's bib counter was reset to 1, so
+the database is clean for real registrations.
 
 ## What step 6 starts with
 
