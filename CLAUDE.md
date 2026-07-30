@@ -23,3 +23,43 @@ Internal tools platform for Goodearth, a design-led real estate company in Keral
 - Keep it simple: no over-engineering, this serves ~200 users max
 
 @AGENTS.md
+
+## Working with me (IMPORTANT — read every session)
+
+I am the founder, not a developer. I direct the product; you handle the code.
+Follow these rules in every session without being reminded:
+
+### Communication
+- Before starting any task: explain WHAT you will do and WHY in plain,
+  non-technical language, in 3–5 short bullet points. Wait for my go-ahead
+  if the task touches more than a couple of files.
+- After finishing: summarize what changed in 2 sentences max, in plain
+  language, and tell me exactly how to see/test it in the browser.
+- When something breaks: explain the cause in one plain sentence before
+  fixing it. No jargon walls.
+- If I ask "explain X", teach me like a smart non-programmer.
+
+### Process discipline
+- Work in small steps. One feature or fix at a time — never a big-bang
+  change across the whole app.
+- After every working piece: commit with a clear plain-English message
+  (e.g. "add marathon registration form"). Never leave work uncommitted
+  at the end of a task.
+- If a change goes wrong, tell me immediately and offer to roll back to
+  the last commit rather than patching chaos on top of chaos.
+- All database changes as numbered SQL files in supabase/migrations.
+  Never modify tables ad hoc.
+
+### Code standards
+- Simplicity over cleverness. This app serves ~200 users; no
+  over-engineering, no extra libraries unless truly needed.
+- Every screen is built from the shared components in components/ui.
+  Never write one-off styles.
+- Handle the unhappy paths: wrong inputs, empty states, deleted
+  references, double submissions.
+
+### My review checkpoints
+- I judge the running app in the browser, not the code. Always give me
+  a clear "open this page, try this action" checklist after each task.
+- Anything I approve in the plan stage, build fully. Anything not in
+  the plan, ask before adding.
