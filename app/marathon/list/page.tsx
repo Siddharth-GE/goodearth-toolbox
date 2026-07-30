@@ -1,11 +1,15 @@
 import { CategoryBadge } from "@/app/marathon/_components/category-badge";
+import { ExitButton } from "@/app/marathon/_components/exit-button";
 import { ListFilters } from "@/app/marathon/_components/list-filters";
 import { copy } from "@/app/marathon/_lib/copy";
 import { LinkButton } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
 import { agentLogout } from "@/lib/marathon/actions";
 import { getAgentEntries, getEntryFormData } from "@/lib/marathon/queries";
 import { requireAgentSession } from "@/lib/marathon/session";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { Inbox } from "lucide-react";
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
@@ -41,17 +45,11 @@ export default async function MarathonListPage({
 
   return (
     <div>
-      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background/95 px-5 py-4 backdrop-blur">
-        <div>
-          <h1 className="text-lg font-bold text-foreground">{copy.myEntries.en}</h1>
-          <p className="text-xs text-muted">{copy.myEntries.ml}</p>
-        </div>
-        <form action={agentLogout}>
-          <button type="submit" className="text-sm font-medium text-accent">
-            Exit
-          </button>
-        </form>
-      </div>
+      <PageHeader
+        title={copy.myEntries.en}
+        subtitle={copy.myEntries.ml}
+        actions={<ExitButton action={agentLogout} />}
+      />
 
       <div className="px-5 pt-5 pb-16">
         <p className="mb-1 text-sm text-muted">Signed in as {agent?.name}</p>
@@ -70,9 +68,11 @@ export default async function MarathonListPage({
         />
 
         {entries.length === 0 ? (
-          <p className="rounded-2xl border border-border bg-surface p-6 text-center text-sm text-muted">
-            No entries {hasFilter ? "match this filter" : "yet"}.
-          </p>
+          <EmptyState
+            icon={Inbox}
+            title={hasFilter ? "No entries match this filter" : "No entries yet"}
+            description={hasFilter ? undefined : "Runners you register will show up here."}
+          />
         ) : (
           <ul className="space-y-2">
             {entries.map((entry) => (

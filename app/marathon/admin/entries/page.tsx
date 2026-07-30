@@ -1,6 +1,8 @@
 import { CategoryBadge } from "@/app/marathon/_components/category-badge";
+import { EmptyState } from "@/components/ui/empty-state";
 import { getAdminAgents, getAdminEntries, getEntryFormData } from "@/lib/marathon/queries";
 import { requireAdminSession } from "@/lib/marathon/session";
+import { Inbox } from "lucide-react";
 import { AdminEntryFilters } from "../_components/admin-entry-filters";
 import { AdminNav } from "../_components/admin-nav";
 
@@ -59,9 +61,10 @@ export default async function MarathonAdminEntriesPage({
         />
 
         {entries.length === 0 ? (
-          <p className="rounded-2xl border border-border bg-surface p-6 text-center text-sm text-muted">
-            No entries {hasFilter ? "match this filter" : "yet"}.
-          </p>
+          <EmptyState
+            icon={Inbox}
+            title={hasFilter ? "No entries match this filter" : "No entries yet"}
+          />
         ) : (
           <ul className="space-y-2">
             {entries.map((entry) => (

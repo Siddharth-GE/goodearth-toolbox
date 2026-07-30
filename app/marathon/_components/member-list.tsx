@@ -2,6 +2,7 @@
 
 import { Avatar } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
+import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -37,7 +38,7 @@ export function MemberList({ agents }: { agents: Agent[] }) {
           >
             <Avatar name={agent.name} />
             <span className="font-semibold text-foreground">{agent.name}</span>
-            <span className="ml-auto text-muted">&rsaquo;</span>
+            <ChevronRight className="ml-auto size-4 shrink-0 text-muted" />
           </Link>
         ))}
         {filtered.length === 0 && agents.length > 0 && (

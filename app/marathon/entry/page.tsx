@@ -1,6 +1,8 @@
 import { BibCard } from "@/app/marathon/_components/bib-card";
 import { EntryForm } from "@/app/marathon/_components/entry-form";
+import { ExitButton } from "@/app/marathon/_components/exit-button";
 import { copy } from "@/app/marathon/_lib/copy";
+import { PageHeader } from "@/components/ui/page-header";
 import { agentLogout } from "@/lib/marathon/actions";
 import { getEntryFormData, getSavedEntry } from "@/lib/marathon/queries";
 import { requireAgentSession } from "@/lib/marathon/session";
@@ -24,17 +26,11 @@ export default async function MarathonEntryPage({
 
   return (
     <div>
-      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background/95 px-5 py-4 backdrop-blur">
-        <div>
-          <h1 className="text-lg font-bold text-foreground">{copy.newRunner.en}</h1>
-          <p className="text-xs text-muted">{copy.newRunner.ml}</p>
-        </div>
-        <form action={agentLogout}>
-          <button type="submit" className="text-sm font-medium text-accent">
-            Exit
-          </button>
-        </form>
-      </div>
+      <PageHeader
+        title={copy.newRunner.en}
+        subtitle={copy.newRunner.ml}
+        actions={<ExitButton action={agentLogout} />}
+      />
 
       <div className="px-5 pt-5 pb-16">
         <div className="mb-5 flex items-center justify-between">

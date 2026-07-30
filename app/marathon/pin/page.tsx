@@ -1,5 +1,7 @@
 import { Avatar } from "@/components/ui/avatar";
+import { verifyAgentPin } from "@/lib/marathon/actions";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PinPad } from "../_components/pin-pad";
@@ -29,9 +31,13 @@ export default async function MarathonPinPage({
       <h1 className="mt-4 text-xl font-bold text-foreground">{agent.name}</h1>
       <p className="mt-1 text-sm text-muted">Enter your PIN</p>
 
-      <PinPad agentId={agent.id} />
+      <PinPad action={verifyAgentPin.bind(null, agent.id)} />
 
-      <Link href="/marathon" className="mt-6 inline-block text-sm font-medium text-accent">
+      <Link
+        href="/marathon"
+        className="mt-6 inline-flex items-center gap-1.5 text-sm font-medium text-accent"
+      >
+        <ArrowLeft className="size-4" />
         Back
       </Link>
     </div>

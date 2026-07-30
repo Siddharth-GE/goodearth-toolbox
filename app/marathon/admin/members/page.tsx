@@ -1,6 +1,8 @@
 import { Avatar } from "@/components/ui/avatar";
+import { EmptyState } from "@/components/ui/empty-state";
 import { getAdminAgents } from "@/lib/marathon/queries";
 import { requireAdminSession } from "@/lib/marathon/session";
+import { Users } from "lucide-react";
 import { AddAgentForm } from "../_components/add-agent-form";
 import { AdminNav } from "../_components/admin-nav";
 
@@ -26,7 +28,7 @@ export default async function MarathonAdminMembersPage() {
               <span className="font-medium text-foreground">{agent.name}</span>
             </div>
           ))}
-          {agents.length === 0 && <p className="text-sm text-muted">No members yet.</p>}
+          {agents.length === 0 && <EmptyState icon={Users} title="No members yet" />}
         </div>
 
         <AddAgentForm />

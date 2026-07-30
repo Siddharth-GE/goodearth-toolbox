@@ -15,7 +15,7 @@ export function AddGroupForm() {
         <Label htmlFor="group-name">Group name</Label>
         <Input id="group-name" name="name" required maxLength={120} autoComplete="off" />
       </div>
-      {state?.error && <p className="text-sm font-medium text-red-600">{state.error}</p>}
+      {state?.error && <p className="text-sm font-medium text-danger">{state.error}</p>}
       <Button type="submit" disabled={pending} className="w-full">
         {pending ? "Adding…" : "Add Group"}
       </Button>

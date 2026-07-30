@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatedReveal } from "@/components/ui/animated-reveal";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -174,44 +175,32 @@ export function EntryForm({
         </Select>
       </div>
 
-      {/*
-        Grid-rows-to-auto trick: the wrapper is always in the DOM (so its
-        height can animate) but collapses to 0 when there's nothing to
-        show, instead of the card popping in/out and shoving the Save
-        button around as the agent types.
-      */}
-      <div className={`grid grid-cols-1 transition-[grid-template-rows] duration-200 ${category ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
-        <div className="min-w-0 overflow-hidden">
-          {category && (
-            <Card className="p-4">
-              <CategoryBadge name={category.name} color={category.color} />
-              <p className="mt-2 text-sm text-muted">
-                Bib will start with <span className="font-bold text-foreground">{category.bib_prefix}</span> —
-                exact number assigned when you save.
-              </p>
-            </Card>
-          )}
-        </div>
-      </div>
-      <div className={`grid grid-cols-1 transition-[grid-template-rows] duration-200 ${showNoMatch ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
-        <div className="min-w-0 overflow-hidden">
-          {showNoMatch && (
-            <Card className="p-4">
-              <p className="text-sm text-muted">No matching category — check age and gender.</p>
-            </Card>
-          )}
-        </div>
-      </div>
-
-      <div className={`grid grid-cols-1 transition-[grid-template-rows] duration-200 ${state?.error ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
-        <div className="min-w-0 overflow-hidden">
-          {state?.error && (
-            <p className={`text-sm font-medium ${state.duplicate ? "text-amber-600" : "text-red-600"}`}>
-              {state.error}
+      <AnimatedReveal show={Boolean(category)}>
+        {category && (
+          <Card className="p-4">
+            <CategoryBadge name={category.name} color={category.color} />
+            <p className="mt-2 text-sm text-muted">
+              Bib will start with <span className="font-bold text-foreground">{category.bib_prefix}</span> —
+              exact number assigned when you save.
             </p>
-          )}
-        </div>
-      </div>
+          </Card>
+        )}
+      </AnimatedReveal>
+      <AnimatedReveal show={Boolean(showNoMatch)}>
+        {showNoMatch && (
+          <Card className="p-4">
+            <p className="text-sm text-muted">No matching category — check age and gender.</p>
+          </Card>
+        )}
+      </AnimatedReveal>
+
+      <AnimatedReveal show={Boolean(state?.error)}>
+        {state?.error && (
+          <p className={`text-sm font-medium ${state.duplicate ? "text-warning" : "text-danger"}`}>
+            {state.error}
+          </p>
+        )}
+      </AnimatedReveal>
 
       {/*
         The four dropdowns above are display-only (no `name`) — what

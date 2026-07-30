@@ -1,6 +1,6 @@
 "use client";
 
-import { LinkButton } from "@/components/ui/button";
+import { Button, LinkButton } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { useState } from "react";
 
@@ -80,9 +80,9 @@ export function ListFilters({
       <input type="hidden" name="category" value={categoryId} />
 
       <div className="flex gap-2 pt-1">
-        <button type="submit" className="h-10 flex-1 rounded-xl bg-accent text-sm font-medium text-accent-foreground">
+        <Button type="submit" className="flex-1">
           Filter
-        </button>
+        </Button>
         {hasFilter && (
           <LinkButton href="/marathon/list" variant="secondary" className="h-10 px-4">
             Clear

@@ -20,6 +20,29 @@ checklist and a bookmark for picking work back up.
 - [x] 8. Admin PIN gate + Members/Groups tabs — add agents, add groups
 - [x] 9. Admin Entries tab — all entries across agents, filterable, with totals
 
+## Design system restyle (2026-07-30)
+
+Every Marathon screen was rebuilt on the toolbox-wide design system
+(see DESIGN.md at the repo root) rather than its own hand-rolled
+patterns: `PageHeader` replaces the 3 hand-copied sticky headers,
+`AnimatedReveal` replaces the entry form's 3 inline grid-rows blocks,
+`NavTabs` replaces the admin nav's hand-rolled pill tabs (same look,
+now a shared component), `EmptyState` replaces every ad hoc "No X yet"
+message, and hardcoded `red-600`/`amber-600` became the `danger`/
+`warning` tokens throughout. `PinPad` (agent + admin) and
+`ExitButton` (entry/list/admin) were de-duplicated into one shared
+version each. Lucide icons added throughout (Exit, Back, chevrons,
+empty-state icons). No logic changed — same tested behavior, same
+data flow, purely visual.
+
+Verified with a real headless browser across every screen (home
+search, PIN, entry form + live preview with no horizontal-overflow
+regression, My Entries + filters + empty state, admin PIN, and all
+three admin tabs) against real data already in the database — no
+console errors, no layout issues. This was read-only verification
+(navigated existing screens/data), so no test data needed cleanup.
+Not yet clicked through by the founder.
+
 ## Where we stopped (2026-07-30)
 
 Steps 1–5 are built, tested by the founder in the browser, committed, and
