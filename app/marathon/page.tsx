@@ -1,5 +1,6 @@
 import { Avatar } from "@/components/ui/avatar";
 import { getMarathonHome } from "@/lib/marathon/queries";
+import Link from "next/link";
 import { HeroCounter } from "./_components/hero-counter";
 import { copy } from "./_lib/copy";
 
@@ -41,13 +42,15 @@ export default async function MarathonHome() {
         </h2>
         <div className="space-y-2.5">
           {agents.map((agent) => (
-            <div
+            <Link
               key={agent.id}
-              className="flex items-center gap-3.5 rounded-2xl border border-border bg-surface px-4 py-3.5 shadow-sm"
+              href={`/marathon/pin?agent=${agent.id}`}
+              className="flex items-center gap-3.5 rounded-2xl border border-border bg-surface px-4 py-3.5 shadow-sm transition-transform active:scale-[0.98]"
             >
               <Avatar name={agent.name} />
               <span className="font-semibold text-foreground">{agent.name}</span>
-            </div>
+              <span className="ml-auto text-muted">&rsaquo;</span>
+            </Link>
           ))}
           {agents.length === 0 && (
             <p className="text-sm text-muted">No members yet. Ask an admin to add one.</p>
