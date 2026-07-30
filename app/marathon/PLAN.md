@@ -44,16 +44,21 @@ rendered with the right details, then deleted it and reset that
 category's bib counter back to 1). Founder-tested and pushed.
 
 Step 7 is also built: `app/marathon/list/page.tsx` shows an agent's own
-entries (most recent first) with a total count. Filtering is a plain GET
-form (no client JS) with three dropdowns — Group, Race, and the specific
-Category (each option labelled with its race, e.g. "Men — 10.5 K Quarter
-Marathon") — any combination of which narrows the list via `?group=`,
-`?run=`, `?category=`. A "My Entries" link was added to the entry page's
-header, and a "+ New Entry" button on the list screen goes back. Backed
-by `getAgentEntries(agentId, filters)` in `lib/marathon/queries.ts`. The
-Category dropdown only offers categories belonging to the selected Race
-(Fun Run only ever has "Open"), so it can't offer choices that could
-never match anything.
+entries (most recent first) with a total count. Filtering has three
+dropdowns — Group, Race, and the specific Category — any combination of
+which narrows the list via `?group=`, `?run=`, `?category=` on pressing
+Filter. A "My Entries" link was added to the entry page's header, and a
+"+ New Entry" button on the list screen goes back. Backed by
+`getAgentEntries(agentId, filters)` in `lib/marathon/queries.ts`.
+
+The filter dropdowns live in a client component,
+`app/marathon/_components/list-filters.tsx` — the Category list narrows
+to the selected Race *live*, before Filter is even tapped (Fun Run only
+ever has "Open", so the rest would be noise). It follows the same
+hidden-field pattern as the registration form's dropdowns: the visible
+`<select>`s are display-only, and hidden inputs mirrored from the same
+state are what actually submit, so a stray tap can't submit the wrong
+filter.
 
 Verified directly against the database: created test entries across
 different groups/races/categories, confirmed each filter (and the "no

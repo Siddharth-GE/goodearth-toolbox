@@ -1,12 +1,11 @@
 import { CategoryBadge } from "@/app/marathon/_components/category-badge";
+import { ListFilters } from "@/app/marathon/_components/list-filters";
 import { copy } from "@/app/marathon/_lib/copy";
 import { LinkButton } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
 import { agentLogout } from "@/lib/marathon/actions";
 import { getAgentEntries, getEntryFormData } from "@/lib/marathon/queries";
 import { requireAgentSession } from "@/lib/marathon/session";
 import { createAdminClient } from "@/lib/supabase/admin";
-import Link from "next/link";
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
@@ -40,8 +39,6 @@ export default async function MarathonListPage({
     categoryId: effectiveCategoryFilter,
   });
 
-  const runsById = new Map(runs.map((r) => [r.id, r.name]));
-
   return (
     <div className="px-5 pt-8 pb-16">
       <div className="mb-5 flex items-center justify-between">
@@ -61,48 +58,15 @@ export default async function MarathonListPage({
         {totalCount} <span className="text-base font-medium text-muted">registered by you</span>
       </p>
 
-      <form method="GET" className="mb-4 space-y-2 rounded-2xl border border-border bg-surface p-3.5">
-        <Select name="group" defaultValue={groupFilter ?? ""}>
-          <option value="">All groups</option>
-          {groups.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.name}
-            </option>
-          ))}
-        </Select>
-        <Select name="run" defaultValue={runFilter ?? ""}>
-          <option value="">All races</option>
-          {runs.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.name}
-            </option>
-          ))}
-        </Select>
-        <Select name="category" defaultValue={effectiveCategoryFilter ?? ""}>
-          <option value="">All categories</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {runFilter ? c.name : `${c.name} — ${runsById.get(c.run_id)}`}
-            </option>
-          ))}
-        </Select>
-        <div className="flex gap-2 pt-1">
-          <button
-            type="submit"
-            className="h-10 flex-1 rounded-xl bg-accent text-sm font-medium text-accent-foreground"
-          >
-            Filter
-          </button>
-          {hasFilter && (
-            <Link
-              href="/marathon/list"
-              className="flex h-10 items-center justify-center rounded-xl border border-border px-4 text-sm font-medium text-foreground"
-            >
-              Clear
-            </Link>
-          )}
-        </div>
-      </form>
+      <ListFilters
+        groups={groups}
+        runs={runs}
+        categories={allCategories}
+        initialGroup={groupFilter}
+        initialRun={runFilter}
+        initialCategory={effectiveCategoryFilter}
+        hasFilter={hasFilter}
+      />
 
       {entries.length === 0 ? (
         <p className="rounded-2xl border border-border bg-surface p-6 text-center text-sm text-muted">
