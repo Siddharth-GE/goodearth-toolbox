@@ -44,14 +44,16 @@ rendered with the right details, then deleted it and reset that
 category's bib counter back to 1). Founder-tested and pushed.
 
 Step 7 is also built: `app/marathon/list/page.tsx` shows an agent's own
-entries (most recent first), a total count, and filter tabs by run type
-(via a `?run=` query param, no client JS needed). A "My Entries" link was
-added to the entry page's header, and a "+ New Entry" button on the list
-screen goes back. Backed by a new `getAgentEntries(agentId, runId?)`
-query in `lib/marathon/queries.ts`. Verified directly: created two test
-entries under Test Agent (one per run), confirmed the unfiltered list
-showed both with the right count, and that filtering by run correctly
-showed only the matching one — then deleted both test entries.
+entries (most recent first) with a total count. Filtering is a plain GET
+form (no client JS) with three dropdowns — Group, Race, and the specific
+Category (each option labelled with its race, e.g. "Men — 10.5 K Quarter
+Marathon") — any combination of which narrows the list via `?group=`,
+`?run=`, `?category=`. A "My Entries" link was added to the entry page's
+header, and a "+ New Entry" button on the list screen goes back. Backed
+by `getAgentEntries(agentId, filters)` in `lib/marathon/queries.ts`.
+Verified directly against the database: created test entries across
+different groups/races/categories, confirmed each filter (and the "no
+filter" case) returned exactly the right rows, then deleted them.
 
 ## What step 8 starts with
 

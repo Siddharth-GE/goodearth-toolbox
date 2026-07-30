@@ -62,18 +62,25 @@ export type AgentEntry = {
   created_at: string;
   marathon_categories: { name: string; color: string } | null;
   marathon_runs: { id: string; name: string } | null;
+  marathon_groups: { name: string } | null;
 };
 
-export async function getAgentEntries(agentId: string, runId?: string) {
+export type AgentEntryFilters = { runId?: string; groupId?: string; categoryId?: string };
+
+export async function getAgentEntries(agentId: string, filters: AgentEntryFilters = {}) {
   const supabase = createAdminClient();
 
   let query = supabase
     .from("marathon_entries")
-    .select("bib, name, created_at, marathon_categories(name, color), marathon_runs(id, name)")
+    .select(
+      "bib, name, created_at, marathon_categories(name, color), marathon_runs(id, name), marathon_groups(name)",
+    )
     .eq("agent_id", agentId)
     .order("created_at", { ascending: false });
 
-  if (runId) query = query.eq("run_id", runId);
+  if (filters.runId) query = query.eq("run_id", filters.runId);
+  if (filters.groupId) query = query.eq("group_id", filters.groupId);
+  if (filters.categoryId) query = query.eq("category_id", filters.categoryId);
 
   const [{ data: entries }, { count: totalCount }] = await Promise.all([
     query,

@@ -1,9 +1,9 @@
 import { CategoryBadge } from "@/app/marathon/_components/category-badge";
 import { copy } from "@/app/marathon/_lib/copy";
 import { LinkButton } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Select } from "@/components/ui/select";
 import { agentLogout } from "@/lib/marathon/actions";
-import { getAgentEntries } from "@/lib/marathon/queries";
+import { getAgentEntries, getEntryFormData } from "@/lib/marathon/queries";
 import { requireAgentSession } from "@/lib/marathon/session";
 import { createAdminClient } from "@/lib/supabase/admin";
 import Link from "next/link";
@@ -15,17 +15,20 @@ function formatTime(iso: string) {
 export default async function MarathonListPage({
   searchParams,
 }: {
-  searchParams: Promise<{ run?: string }>;
+  searchParams: Promise<{ run?: string; group?: string; category?: string }>;
 }) {
   const session = await requireAgentSession();
-  const { run: runFilter } = await searchParams;
+  const { run: runFilter, group: groupFilter, category: categoryFilter } = await searchParams;
+  const hasFilter = Boolean(runFilter || groupFilter || categoryFilter);
 
   const supabase = createAdminClient();
-  const [{ data: agent }, { data: runs }, { entries, totalCount }] = await Promise.all([
+  const [{ data: agent }, { groups, runs, categories }, { entries, totalCount }] = await Promise.all([
     supabase.from("marathon_agents").select("name").eq("id", session.agentId).single(),
-    supabase.from("marathon_runs").select("id, name").order("sort_order"),
-    getAgentEntries(session.agentId, runFilter),
+    getEntryFormData(),
+    getAgentEntries(session.agentId, { runId: runFilter, groupId: groupFilter, categoryId: categoryFilter }),
   ]);
+
+  const runsById = new Map(runs.map((r) => [r.id, r.name]));
 
   return (
     <div className="px-5 pt-8 pb-16">
@@ -46,35 +49,52 @@ export default async function MarathonListPage({
         {totalCount} <span className="text-base font-medium text-muted">registered by you</span>
       </p>
 
-      <div className="mb-4 flex gap-2 overflow-x-auto">
-        <Link
-          href="/marathon/list"
-          className={cn(
-            "shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-medium",
-            !runFilter ? "border-accent bg-accent text-accent-foreground" : "border-border text-foreground",
-          )}
-        >
-          All
-        </Link>
-        {(runs ?? []).map((r) => (
-          <Link
-            key={r.id}
-            href={`/marathon/list?run=${r.id}`}
-            className={cn(
-              "shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-medium",
-              runFilter === r.id
-                ? "border-accent bg-accent text-accent-foreground"
-                : "border-border text-foreground",
-            )}
+      <form method="GET" className="mb-4 space-y-2 rounded-2xl border border-border bg-surface p-3.5">
+        <Select name="group" defaultValue={groupFilter ?? ""}>
+          <option value="">All groups</option>
+          {groups.map((g) => (
+            <option key={g.id} value={g.id}>
+              {g.name}
+            </option>
+          ))}
+        </Select>
+        <Select name="run" defaultValue={runFilter ?? ""}>
+          <option value="">All races</option>
+          {runs.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.name}
+            </option>
+          ))}
+        </Select>
+        <Select name="category" defaultValue={categoryFilter ?? ""}>
+          <option value="">All categories</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name} — {runsById.get(c.run_id)}
+            </option>
+          ))}
+        </Select>
+        <div className="flex gap-2 pt-1">
+          <button
+            type="submit"
+            className="h-10 flex-1 rounded-xl bg-accent text-sm font-medium text-accent-foreground"
           >
-            {r.name}
-          </Link>
-        ))}
-      </div>
+            Filter
+          </button>
+          {hasFilter && (
+            <Link
+              href="/marathon/list"
+              className="flex h-10 items-center justify-center rounded-xl border border-border px-4 text-sm font-medium text-foreground"
+            >
+              Clear
+            </Link>
+          )}
+        </div>
+      </form>
 
       {entries.length === 0 ? (
         <p className="rounded-2xl border border-border bg-surface p-6 text-center text-sm text-muted">
-          No entries yet.
+          No entries {hasFilter ? "match this filter" : "yet"}.
         </p>
       ) : (
         <ul className="space-y-2">
@@ -87,7 +107,10 @@ export default async function MarathonListPage({
                 <span className="w-16 shrink-0 font-mono text-sm font-bold text-foreground">{entry.bib}</span>
                 <div>
                   <p className="text-sm font-medium text-foreground">{entry.name}</p>
-                  <p className="text-xs text-muted">{entry.marathon_runs?.name}</p>
+                  <p className="text-xs text-muted">
+                    {entry.marathon_runs?.name}
+                    {entry.marathon_groups?.name ? ` · ${entry.marathon_groups.name}` : ""}
+                  </p>
                 </div>
               </div>
               <div className="flex flex-col items-end gap-1">
