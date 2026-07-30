@@ -78,13 +78,7 @@ export function EntryForm({
     <form action={formAction} className="space-y-4">
       <div className="space-y-1.5">
         <Label htmlFor="group">Group</Label>
-        <Select
-          id="group"
-          name="group"
-          required
-          value={groupId}
-          onChange={(e) => setGroupId(e.target.value)}
-        >
+        <Select id="group" required value={groupId} onChange={(e) => setGroupId(e.target.value)}>
           <option value="" disabled>
             Select a group
           </option>
@@ -142,13 +136,7 @@ export function EntryForm({
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="gender">Gender</Label>
-          <Select
-            id="gender"
-            name="gender"
-            required
-            value={gender}
-            onChange={(e) => setGender(e.target.value)}
-          >
+          <Select id="gender" required value={gender} onChange={(e) => setGender(e.target.value)}>
             <option value="" disabled>
               Select
             </option>
@@ -160,13 +148,7 @@ export function EntryForm({
 
       <div className="space-y-1.5">
         <Label htmlFor="teeSize">T-Shirt Size</Label>
-        <Select
-          id="teeSize"
-          name="teeSize"
-          required
-          value={teeSize}
-          onChange={(e) => setTeeSize(e.target.value)}
-        >
+        <Select id="teeSize" required value={teeSize} onChange={(e) => setTeeSize(e.target.value)}>
           <option value="" disabled>
             Select a size
           </option>
@@ -180,7 +162,7 @@ export function EntryForm({
 
       <div className="space-y-1.5">
         <Label htmlFor="run">Run Type</Label>
-        <Select id="run" name="run" required value={runId} onChange={(e) => setRunId(e.target.value)}>
+        <Select id="run" required value={runId} onChange={(e) => setRunId(e.target.value)}>
           <option value="" disabled>
             Select a run
           </option>
@@ -213,6 +195,18 @@ export function EntryForm({
         </p>
       )}
 
+      {/*
+        The four dropdowns above are display-only (no `name`) — what
+        actually gets submitted comes only from React state via these
+        hidden fields. That's deliberate: a stray tap or scroll on a
+        <select> right before saving must never change the bib category
+        that gets recorded. State already drives the live preview above,
+        so the agent sees exactly what these fields will submit.
+      */}
+      <input type="hidden" name="group" value={groupId} />
+      <input type="hidden" name="gender" value={gender} />
+      <input type="hidden" name="teeSize" value={teeSize} />
+      <input type="hidden" name="run" value={runId} />
       {confirmed && <input type="hidden" name="confirmed" value="1" />}
 
       <Button type="submit" disabled={pending} className="w-full">
