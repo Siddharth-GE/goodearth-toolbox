@@ -4,20 +4,43 @@
   --background: #fafaf9;
   --foreground: #1c1c1a;
   --surface: #ffffff;
+  --surface-raised: #ffffff;
   --border: #e7e5e2;
   --accent: #1f7a5c;
   --accent-foreground: #ffffff;
   --muted: #6b6b66;
+
+  /* Semantic status — the only fixed-meaning colors in the system.
+     Distinct from lib/color-hash.ts's 7-color identity palette (used
+     for avatars/category badges), which is arbitrary-by-hash, not
+     semantic, and stays a plain JS array rather than tokens here. */
+  --success: #16a34a;
+  --success-foreground: #ffffff;
+  --warning: #d97706;
+  --warning-foreground: #ffffff;
+  --danger: #dc2626;
+  --danger-foreground: #ffffff;
+  --info: #2563eb;
+  --info-foreground: #ffffff;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
   --color-border: var(--border);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-muted: var(--muted);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -27,10 +50,20 @@
     --background: #121210;
     --foreground: #f2f2ef;
     --surface: #1a1a17;
+    --surface-raised: #242420;
     --border: #2c2c28;
     --accent: #34a37a;
     --accent-foreground: #0a0a09;
     --muted: #9a9a92;
+
+    --success: #22c55e;
+    --success-foreground: #0a0a09;
+    --warning: #f59e0b;
+    --warning-foreground: #0a0a09;
+    --danger: #ef4444;
+    --danger-foreground: #0a0a09;
+    --info: #3b82f6;
+    --info-foreground: #0a0a09;
   }
 }
 

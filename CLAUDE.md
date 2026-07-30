@@ -15,7 +15,7 @@ Internal tools platform for Goodearth, a design-led real estate company in Keral
 ## Architecture principles
 
 - One Next.js app; each tool is a route group under app/
-- Shared component library in components/ui — build every screen from these, never one-off styles; visual direction: minimal, clean, Apple-like but colorful
+- Shared component library in components/ui — build every screen from these, never one-off styles; visual direction and full design system documented in DESIGN.md
 - Masters shared across tools: Projects, Plots, Items, Vendors, Stores
 - Every transaction links to a project/plot
 - Role-based access: users see only their team's tools in the sidebar
@@ -29,6 +29,7 @@ colocated with its code at app/<tool>/PLAN.md (e.g. app/marathon/PLAN.md) —
 check the relevant one before starting or resuming work on that tool.
 
 @AGENTS.md
+@DESIGN.md
 
 ## Working with me (IMPORTANT — read every session)
 
