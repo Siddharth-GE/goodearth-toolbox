@@ -3,8 +3,12 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   clearMarathonSession,
+  createAdminSession,
   createAgentSession,
+  hashPin,
+  requireAdminSession,
   requireAgentSession,
+  verifyAdminPin,
   verifyPinHash,
 } from "@/lib/marathon/session";
 import { redirect } from "next/navigation";
@@ -37,6 +41,68 @@ export async function verifyAgentPin(
 export async function agentLogout() {
   await clearMarathonSession();
   redirect("/marathon");
+}
+
+export async function verifyAdminPinAction(_state: PinState, formData: FormData): Promise<PinState> {
+  const pin = String(formData.get("pin") ?? "").trim();
+  if (!pin) return { error: "Enter the admin PIN." };
+
+  if (!(await verifyAdminPin(pin))) {
+    return { error: "Wrong PIN. Try again." };
+  }
+
+  await createAdminSession();
+  redirect("/marathon/admin/members");
+}
+
+export async function adminLogout() {
+  await clearMarathonSession();
+  redirect("/marathon");
+}
+
+export type CreateAgentState = { error?: string } | undefined;
+
+export async function createAgent(_state: CreateAgentState, formData: FormData): Promise<CreateAgentState> {
+  await requireAdminSession();
+
+  const name = String(formData.get("name") ?? "").trim();
+  const pin = String(formData.get("pin") ?? "").trim();
+
+  if (!name) return { error: "Enter a name." };
+  if (!/^[0-9]{4,6}$/.test(pin)) return { error: "PIN must be 4 to 6 digits." };
+
+  const { hash, salt } = hashPin(pin);
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from("marathon_agents")
+    .insert({ name, pin_hash: hash, pin_salt: salt });
+
+  if (error) {
+    console.error("createAgent failed:", error);
+    return { error: "Could not add member. Try again." };
+  }
+
+  redirect("/marathon/admin/members");
+}
+
+export type CreateGroupState = { error?: string } | undefined;
+
+export async function createGroup(_state: CreateGroupState, formData: FormData): Promise<CreateGroupState> {
+  await requireAdminSession();
+
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return { error: "Enter a group name." };
+
+  const supabase = createAdminClient();
+  const { error } = await supabase.from("marathon_groups").insert({ name });
+
+  if (error) {
+    if (error.code === "23505") return { error: "A group with this name already exists." };
+    console.error("createGroup failed:", error);
+    return { error: "Could not add group. Try again." };
+  }
+
+  redirect("/marathon/admin/groups");
 }
 
 export type EntryState = { error?: string; duplicate?: boolean } | undefined;

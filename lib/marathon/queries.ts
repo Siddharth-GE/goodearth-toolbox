@@ -96,6 +96,18 @@ export async function getAgentEntries(agentId: string, filters: AgentEntryFilter
   };
 }
 
+export async function getAdminAgents() {
+  const supabase = createAdminClient();
+  const { data } = await supabase.from("marathon_agents").select("id, name").order("name");
+  return data ?? [];
+}
+
+export async function getAdminGroups() {
+  const supabase = createAdminClient();
+  const { data } = await supabase.from("marathon_groups").select("id, name").order("name");
+  return data ?? [];
+}
+
 export async function getEntryFormData() {
   const supabase = createAdminClient();
 

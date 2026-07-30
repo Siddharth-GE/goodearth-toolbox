@@ -17,7 +17,7 @@ checklist and a bookmark for picking work back up.
       duplicate-mobile warning, saves via the atomic bib-assignment function
 - [x] 6. Success screen — colored "bib card" showing the assigned bib
 - [x] 7. My list — an agent's own entries, filtered, with counts
-- [ ] 8. Admin PIN gate + Members/Groups tabs — add agents, add groups
+- [x] 8. Admin PIN gate + Members/Groups tabs — add agents, add groups
 - [ ] 9. Admin Entries tab — all entries across agents, filterable, with totals
 
 ## Where we stopped (2026-07-30)
@@ -64,10 +64,28 @@ Verified directly against the database: created test entries across
 different groups/races/categories, confirmed each filter (and the "no
 filter" case) returned exactly the right rows, then deleted them.
 
-## What step 8 starts with
+Step 8 is also built: a separate admin PIN login at `/marathon/admin`
+(shared PIN, seeded to `2026` — see `supabase/migrations/0002_marathon.sql`)
+leading to two tabs, `/marathon/admin/members` and `/marathon/admin/groups`,
+each with a list and an "add" form. New agents get a name + a 4–6 digit
+PIN (hashed the same way as the seeded Test Agent); new groups just need
+a name, with a friendly "already exists" message on a duplicate rather
+than a crash. A small "Admin" link was added to the bottom of the home
+screen. New actions `verifyAdminPinAction`, `adminLogout`, `createAgent`,
+`createGroup` in `lib/marathon/actions.ts`; new reads `getAdminAgents`,
+`getAdminGroups` in `lib/marathon/queries.ts`.
 
-Admin PIN gate + Members/Groups tabs — a separate admin login (already
-has `requireAdminSession`/`verifyAdminPin` in `lib/marathon/session.ts`
-from step 2, unused until now) leading to screens for adding agents
-(name + PIN) and groups (schools/clubs), so real event setup doesn't
-require touching the database by hand.
+Verified directly end-to-end against the database and running server
+(no browser available in this environment): logged in with the real
+admin PIN, added a test agent and confirmed its PIN actually verifies,
+added a test group, confirmed a duplicate group name returns the
+friendly error instead of a crash, and confirmed `/marathon/admin/members`
+redirects to the PIN screen when not logged in. Both test rows were then
+deleted. Not yet clicked through by the founder in an actual browser.
+
+## What step 9 starts with
+
+Admin Entries tab — all entries across every agent, filterable (likely
+the same Group/Race/Category filter pattern as step 7's `ListFilters`,
+generalized to drop the `agent_id` restriction and add an agent filter),
+with totals. Probably a third admin tab alongside Members/Groups.

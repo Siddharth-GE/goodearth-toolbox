@@ -56,6 +56,12 @@ export default async function MarathonHome() {
             <p className="text-sm text-muted">No members yet. Ask an admin to add one.</p>
           )}
         </div>
+
+        <div className="mt-8 text-center">
+          <Link href="/marathon/admin" className="text-xs font-medium text-muted">
+            Admin
+          </Link>
+        </div>
       </div>
     </div>
   );
