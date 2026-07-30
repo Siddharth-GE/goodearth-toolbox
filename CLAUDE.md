@@ -6,6 +6,16 @@ Internal tools platform for Goodearth, a design-led real estate company in Keral
 
 Built: **Marathon** — event registration app: field agents with simple PIN logins register runners (name, age, gender, mobile, t-shirt size, run type); category auto-assigned from age+gender; bib numbers auto-generated with category prefix; groups (schools/clubs) and agents managed by admin; entries counter on agent home; filtered lists throughout. Agents have basic literacy — UI must be extremely simple.
 
+**Overview** (`/`, `app/(dashboard)/page.tsx`) — the shell's home page,
+not a `lib/tools.ts` entry (every signed-in user sees it, it's not
+team-gated). This already fulfills what the roadmap used to call
+"Dashboard" — a read-only overview across all tools — so that's no
+longer a separate planned tool. It's a mix of real data (the Marathon
+card, reusing `getMarathonHome()`) and clearly-static illustrative
+widgets for tools that don't exist yet (pipeline, KPIs, budget bars,
+PO table, approvals, people, activity) — swap each widget for a real
+query as its tool actually ships, same file, no restructuring needed.
+
 Planned, roughly in build order — **this list will keep growing**; the pattern below for adding a tool matters more than the exact names:
 
 - Indents — site teams request materials, every line tagged to project/plot
@@ -14,17 +24,36 @@ Planned, roughly in build order — **this list will keep growing**; the pattern
 - Bills — recording against POs and labour contracts
 - Budgets — budget vs actual per project
 - Site Tracker — (details TBD as it's scoped)
-- Dashboard — read-only overview across all tools
+- Directory, Training — people-side tools
+- Projects & Masters, Settings — admin-side tools
+
+Every tool above already has a sidebar entry and a route
+(`lib/tools.ts`, grouped Operations/Events/People/Admin) even before
+it's built — see "Coming Soon stubs" below.
 
 ## Project structure
+
+Two different tool-shell patterns — pick the one that fits, don't
+default to copying Marathon:
+
+- **Normal tools** (the vast majority) live *inside* the dashboard
+  shell, keeping the sidebar/topbar: `app/(dashboard)/<tool>/`.
+- **Kiosk-style tools** — a separate device, its own auth, no sidebar —
+  live top-level with their own layout, opting *out* of the dashboard
+  shell entirely: `app/<tool>/` (Marathon is the only one so far; its
+  `proxy.ts` exemption and separate PIN auth only make sense because
+  it's genuinely a standalone kiosk, not the default to reach for).
 
 ```
 app/
   (auth)/            unauthenticated shell — login
-  (dashboard)/        authenticated shell — sidebar + tool picker home
+  (dashboard)/        authenticated shell — sidebar + Overview home.
+                       Normal tools live here: app/(dashboard)/<tool>/
+    _components/       components used only by the Overview page today
   actions/            platform-level server actions (e.g. login/logout).
                        A tool's own actions do NOT go here — see below.
-  <tool>/              one route group per tool (e.g. app/marathon/)
+  <tool>/              kiosk-style tools only (see above) — own layout,
+                       opts out of the dashboard shell (e.g. app/marathon/)
     _components/       components used only by this tool
     _lib/               route-local helpers only this tool needs (e.g.
                         bilingual copy strings) — NOT the same thing as
@@ -77,22 +106,40 @@ alongside that tool's `queries.ts`. Don't add tool-specific actions to
 `app/actions/`, and don't move `login`/`logout` into a tool folder —
 they're genuinely shared across every tool.
 
+## Coming Soon stubs
+
+Every planned tool already has a `lib/tools.ts` entry with
+`built: false`, so it shows up in the grouped sidebar and has a real
+route today, even before any real work starts — it just renders the
+shared `app/(dashboard)/_components/coming-soon.tsx` (a thin wrapper
+around `components/ui/empty-state.tsx`) instead of a real screen. Each
+stub `page.tsx` looks the same: look up its own entry in `TOOLS` by
+`href`, pass its `name`/`description`/icon into `<ComingSoon>`. When a
+tool actually gets built, replace that one file's contents (and flip
+`built: true` in `lib/tools.ts`) — the route, sidebar entry, and group
+are already correct and don't need to change.
+
 ## Adding a new tool — checklist
 
-1. `app/<tool>/` route group, with its own `layout.tsx` if the tool
-   needs a different shell than the dashboard (Marathon does, because
-   it's a separate kiosk with no sidebar).
+1. Decide the shell: `app/(dashboard)/<tool>/` for a normal tool (the
+   default), or top-level `app/<tool>/` with its own `layout.tsx` only
+   if it's genuinely kiosk-style like Marathon — see "Two kinds of
+   shell" above. If it already exists as a Coming Soon stub, flip
+   `built: true` in `lib/tools.ts` and replace that route's `page.tsx`.
 2. `lib/<tool>/actions.ts` and `queries.ts` for its data layer. Reuse
    `lib/masters/*` for anything touching Projects/Plots/Items/Vendors/
    Stores — don't re-query or re-implement master data per tool.
 3. Build every screen from `components/ui/*` (and `components/masters/*`
    where relevant). Never one-off styles — see DESIGN.md.
-4. Add an entry to `lib/tools.ts` so it shows up in the sidebar for the
-   right team/role.
+4. Add (or update) its entry in `lib/tools.ts` — `group`, `team`,
+   `icon`, `built: true` — so it shows up correctly in the sidebar.
 5. Start `app/<tool>/PLAN.md` — that tool's own build checklist and
    bookmark, same pattern as `app/marathon/PLAN.md`.
 6. Any new tables as a numbered file in `supabase/migrations/` — see
    below. Every transactional table links to a project/plot.
+7. If the Overview page (`app/(dashboard)/page.tsx`) has a static
+   illustrative widget standing in for this tool, swap it for a real
+   query from step 2 — same file and component, not a rebuild.
 
 ## Shared masters (Projects, Plots, Items, Vendors, Stores)
 
