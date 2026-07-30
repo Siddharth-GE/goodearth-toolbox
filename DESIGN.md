@@ -89,15 +89,19 @@ rest of the system. Size icons to match the text they sit next to
 Tailwind-styled wrappers around Radix UI's headless primitives
 (`@radix-ui/react-*`) — same visual language as everything else, but
 correct focus-trapping/ESC/ARIA behavior for free instead of hand-rolled.
-Use `Tabs` for any pill-style tab nav (Marathon's admin nav is the
-reference implementation) rather than hand-rolling active-state classes
-again.
+
+`Tabs` is for switching between content panels on the *same page* —
+no navigation, no URL change. It is **not** what Marathon's admin nav
+needs, since Entries/Members/Groups are separate routes, not panels of
+one page. For pill-style *route* navigation, use `NavTabs` (same file,
+same visual pill styling, built from `next/link` instead of Radix) —
+Marathon's admin nav is the reference implementation.
 
 ## Component inventory
 
-Built: `avatar`, `badge` (+ status variants), `button`, `card`, `dialog`,
-`dropdown-menu`, `empty-state`, `input`, `label`, `page-header`, `select`,
-`tabs`, `tooltip`, `animated-reveal`.
+Built: `animated-reveal`, `avatar`, `badge` (+ status variants),
+`button`, `card`, `dialog`, `dropdown-menu`, `empty-state`, `input`,
+`label`, `page-header`, `select`, `tabs` (+ `NavTabs`), `tooltip`.
 
 Deliberately not built yet — add only when a real tool needs it, not
 speculatively: table, toast/notification, pagination, textarea,
