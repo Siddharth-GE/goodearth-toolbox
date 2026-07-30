@@ -4,4 +4,5 @@
 // on the agent-facing screens are English-only too.
 export const copy = {
   runnerRegistration: { en: "Runner Registration", ml: "റണ്ണർ രജിസ്ട്രേഷൻ" },
+  newRunner: { en: "New Runner", ml: "പുതിയ റണ്ണർ" },
 } as const;

@@ -32,3 +32,21 @@ export async function getMarathonHome() {
     agents: agents ?? [],
   };
 }
+
+export async function getEntryFormData() {
+  const supabase = createAdminClient();
+
+  const [{ data: groups }, { data: runs }, { data: categories }] = await Promise.all([
+    supabase.from("marathon_groups").select("id, name").order("name"),
+    supabase.from("marathon_runs").select("id, name, distance_km").order("sort_order"),
+    supabase
+      .from("marathon_categories")
+      .select("id, run_id, name, gender, min_age, max_age, bib_prefix, color"),
+  ]);
+
+  return {
+    groups: groups ?? [],
+    runs: runs ?? [],
+    categories: categories ?? [],
+  };
+}
