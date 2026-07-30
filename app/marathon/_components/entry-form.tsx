@@ -180,7 +180,7 @@ export function EntryForm({
         show, instead of the card popping in/out and shoving the Save
         button around as the agent types.
       */}
-      <div className={`grid transition-[grid-template-rows] duration-200 ${category ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+      <div className={`grid grid-cols-1 transition-[grid-template-rows] duration-200 ${category ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
         <div className="min-w-0 overflow-hidden">
           {category && (
             <Card className="p-4">
@@ -193,7 +193,7 @@ export function EntryForm({
           )}
         </div>
       </div>
-      <div className={`grid transition-[grid-template-rows] duration-200 ${showNoMatch ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+      <div className={`grid grid-cols-1 transition-[grid-template-rows] duration-200 ${showNoMatch ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
         <div className="min-w-0 overflow-hidden">
           {showNoMatch && (
             <Card className="p-4">
@@ -203,7 +203,7 @@ export function EntryForm({
         </div>
       </div>
 
-      <div className={`grid transition-[grid-template-rows] duration-200 ${state?.error ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+      <div className={`grid grid-cols-1 transition-[grid-template-rows] duration-200 ${state?.error ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
         <div className="min-w-0 overflow-hidden">
           {state?.error && (
             <p className={`text-sm font-medium ${state.duplicate ? "text-amber-600" : "text-red-600"}`}>
