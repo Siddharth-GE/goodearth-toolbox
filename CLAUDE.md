@@ -2,31 +2,139 @@
 
 Internal tools platform for Goodearth, a design-led real estate company in Kerala, India (~70 staff plus contractors). Replacing spreadsheet- and AppSheet-based workflows with one self-hosted platform: multiple tools, one per business function, used independently by different teams but connected through one shared Supabase (Postgres) database.
 
-## Planned tools (build order)
+## Tools
 
-1. Marathon — event registration app: field agents with simple PIN logins register runners (name, age, gender, mobile, t-shirt size, run type); category auto-assigned from age+gender; bib numbers auto-generated with category prefix; groups (schools/clubs) and agents managed by admin; entries counter on agent home; filtered lists throughout. Agents have basic literacy — UI must be extremely simple.
-2. Indents — site teams request materials, every line tagged to project/plot
-3. Purchase Orders — created from indent lines, split by vendor, with a well-designed PDF generator (company letterhead quality)
-4. Inventory — goods receipt against POs, stock by store, issue to manufacturing
-5. Bills — recording against POs and labour contracts
-6. Budgets — budget vs actual per project
-7. Dashboard — read-only overview across all tools
+Built: **Marathon** — event registration app: field agents with simple PIN logins register runners (name, age, gender, mobile, t-shirt size, run type); category auto-assigned from age+gender; bib numbers auto-generated with category prefix; groups (schools/clubs) and agents managed by admin; entries counter on agent home; filtered lists throughout. Agents have basic literacy — UI must be extremely simple.
 
-## Architecture principles
+Planned, roughly in build order — **this list will keep growing**; the pattern below for adding a tool matters more than the exact names:
 
-- One Next.js app; each tool is a route group under app/
-- Shared component library in components/ui — build every screen from these, never one-off styles; visual direction and full design system documented in DESIGN.md
-- Masters shared across tools: Projects, Plots, Items, Vendors, Stores
-- Every transaction links to a project/plot
+- Indents — site teams request materials, every line tagged to project/plot
+- Purchase Orders — created from indent lines, split by vendor, with a well-designed PDF generator (company letterhead quality)
+- Inventory / Store — goods receipt against POs, stock by store, issue to manufacturing
+- Bills — recording against POs and labour contracts
+- Budgets — budget vs actual per project
+- Site Tracker — (details TBD as it's scoped)
+- Dashboard — read-only overview across all tools
+
+## Project structure
+
+```
+app/
+  (auth)/            unauthenticated shell — login
+  (dashboard)/        authenticated shell — sidebar + tool picker home
+  actions/            platform-level server actions (e.g. login/logout).
+                       A tool's own actions do NOT go here — see below.
+  <tool>/              one route group per tool (e.g. app/marathon/)
+    _components/       components used only by this tool
+    _lib/               route-local helpers only this tool needs (e.g.
+                        bilingual copy strings) — NOT the same thing as
+                        the top-level lib/ below; see "Two kinds of lib"
+    PLAN.md            this tool's own build notes/checklist
+components/
+  ui/                 shared primitives — Button, Input, Card, Dialog,
+                       etc. Every screen in every tool is built from
+                       these. Never write one-off styles.
+  masters/             (once it exists) shared domain components used
+                       across multiple tools — a project picker, a
+                       vendor combobox. Not generic enough for ui/, not
+                       specific enough to belong to one tool.
+  layout/              shell-level components (e.g. the sidebar)
+lib/
+  <tool>/              each tool's own server data-layer: actions.ts,
+                       queries.ts, and anything else tool-specific
+                       (Marathon also has session.ts for its kiosk PIN
+                       auth). Mirrors app/<tool>/.
+  masters/             (once it exists) shared queries/mutations for
+                       Projects, Plots, Items, Vendors, Stores — one
+                       file per master, used by every tool that needs
+                       them. See "Shared masters" below.
+  auth/                platform auth helpers (current user, requireUser)
+  supabase/            Supabase client setup (admin/server/client/proxy)
+  tools.ts             the sidebar registry — every tool adds one entry
+                       here to become visible (see checklist below)
+supabase/
+  migrations/          numbered SQL files, applied in order — see
+                       "Database changes" below
+```
+
+### Two kinds of "lib"
+
+`app/<tool>/_lib/` and top-level `lib/<tool>/` are both real and both
+correct — they're different things that happen to share a word:
+
+- `app/<tool>/_lib/` — the underscore is a Next.js convention meaning
+  "not a route." Holds small things private to that tool's UI, like
+  Marathon's bilingual copy strings.
+- `lib/<tool>/` — the tool's actual server-side data layer: actions,
+  queries, session handling. This is where the real logic lives.
+
+### Where server actions live
+
+`app/actions/` is for platform-level concerns only (today: just
+login/logout). A tool's own actions — creating an entry, verifying a
+PIN, anything tool-specific — belong in `lib/<tool>/actions.ts`,
+alongside that tool's `queries.ts`. Don't add tool-specific actions to
+`app/actions/`, and don't move `login`/`logout` into a tool folder —
+they're genuinely shared across every tool.
+
+## Adding a new tool — checklist
+
+1. `app/<tool>/` route group, with its own `layout.tsx` if the tool
+   needs a different shell than the dashboard (Marathon does, because
+   it's a separate kiosk with no sidebar).
+2. `lib/<tool>/actions.ts` and `queries.ts` for its data layer. Reuse
+   `lib/masters/*` for anything touching Projects/Plots/Items/Vendors/
+   Stores — don't re-query or re-implement master data per tool.
+3. Build every screen from `components/ui/*` (and `components/masters/*`
+   where relevant). Never one-off styles — see DESIGN.md.
+4. Add an entry to `lib/tools.ts` so it shows up in the sidebar for the
+   right team/role.
+5. Start `app/<tool>/PLAN.md` — that tool's own build checklist and
+   bookmark, same pattern as `app/marathon/PLAN.md`.
+6. Any new tables as a numbered file in `supabase/migrations/` — see
+   below. Every transactional table links to a project/plot.
+
+## Shared masters (Projects, Plots, Items, Vendors, Stores)
+
+These don't exist yet — Marathon never touches them — but Indents (the
+next tool) will need them immediately, and every tool after that will
+too. Convention, decided now so two tools don't each invent a different
+answer:
+
+- Schema: a new numbered migration (e.g. `0003_masters.sql`) written
+  when the first tool that needs it actually starts — not speculatively
+  ahead of time.
+- Queries/mutations: `lib/masters/{projects,plots,items,vendors,stores}.ts`,
+  one file per master — the same shape as `lib/tools.ts`, which is
+  already the right model for "one small shared file, not per-tool
+  duplication."
+- Shared UI (a project picker, a vendor combobox): `components/masters/`,
+  sibling to `components/ui/`.
+
+## Database changes
+
+All schema changes are numbered SQL files in `supabase/migrations/` —
+never ad hoc. Apply a migration by running its SQL against the project
+via the Supabase Studio SQL editor, in numbered order (there's no CLI/
+local-Postgres setup for this today — see README.md).
+
+## Other architecture principles
+
 - Role-based access: users see only their team's tools in the sidebar
-- All schema changes as numbered SQL files in supabase/migrations — never ad hoc
-- Keep it simple: no over-engineering, this serves ~200 users max
+  (`lib/tools.ts` + `lib/auth/dal.ts`)
+- Keep it simple: no over-engineering, this serves ~200 users max. No
+  CI, no test framework, no Prettier/husky setup today — conscious
+  tradeoffs for this scale, not oversights. Worth revisiting once a
+  tool (Purchase Orders, Budgets) brings real calculation logic worth
+  unit-testing.
 
 ## Documentation map
 
-This file is the entry point. Each tool keeps its own build plan/checklist
-colocated with its code at app/<tool>/PLAN.md (e.g. app/marathon/PLAN.md) —
-check the relevant one before starting or resuming work on that tool.
+This file is the entry point. **DESIGN.md** covers the shared visual
+system — colors, type, spacing, components; read it before styling
+anything. Each tool keeps its own build plan/checklist colocated with
+its code at `app/<tool>/PLAN.md` (e.g. `app/marathon/PLAN.md`) — check
+the relevant one before starting or resuming work on that tool.
 
 @AGENTS.md
 @DESIGN.md

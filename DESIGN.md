@@ -34,6 +34,12 @@ are picked *by hashing a name*, not by meaning, so it stays a plain JS
 array rather than a token. Don't confuse it with the semantic colors
 above.
 
+`--gradient-hero-from/via/to` (also in `app/globals.css`) is a third,
+purely decorative system — the gradient behind a tool's hero number
+(Marathon's `HeroCounter`). Not brand, not semantic, but still a CSS
+variable rather than a hardcoded hex in the component, so it's one
+place to change rather than a silent exception to "colors are tokens."
+
 ## Typography
 
 Geist Sans throughout (already loaded in the root layout). No new font.
@@ -55,6 +61,13 @@ A named scale — use these combinations, not arbitrary sizes:
 - Cards and anything larger: `rounded-2xl`.
 - Page padding: `px-5`. Section rhythm: `space-y-4` inside forms,
   `space-y-2` / `space-y-2.5` between list rows.
+- Kiosk-width screens (Marathon's whole layout is one): `max-w-[480px]`
+  on the outer shell (`app/marathon/layout.tsx`), `max-w-[220px]` for a
+  centered PIN pad (`pin-pad.tsx`). These are deliberate — a phone-width
+  kiosk column, not arbitrary numbers — carry them forward for any other
+  tool that's genuinely a single-device kiosk rather than a desktop
+  dashboard screen (most future tools won't be; the `(dashboard)` shell's
+  wider `max-w-5xl` is the default for anything not kiosk-style).
 
 ## Motion
 

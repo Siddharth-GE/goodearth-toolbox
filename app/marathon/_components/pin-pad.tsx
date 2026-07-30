@@ -14,6 +14,8 @@ export function PinPad({
   const [state, formAction, pending] = useActionState<PinState, FormData>(action, undefined);
 
   return (
+    // max-w-[220px]: a deliberate narrow column for a centered PIN
+    // field, not an arbitrary number — see DESIGN.md.
     <form action={formAction} className="mx-auto mt-6 max-w-[220px]">
       <input
         name="pin"

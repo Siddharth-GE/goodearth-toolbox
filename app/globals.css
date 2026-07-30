@@ -22,6 +22,14 @@
   --danger-foreground: #ffffff;
   --info: #2563eb;
   --info-foreground: #ffffff;
+
+  /* Decorative only — the "one moment of delight" gradient used for a
+     tool's hero number (see Marathon's HeroCounter). Not a brand or
+     semantic color, so it's kept separate from the tokens above; still
+     a single place to change if the gradient itself ever needs to. */
+  --gradient-hero-from: #0071e3;
+  --gradient-hero-via: #af52de;
+  --gradient-hero-to: #ff2d55;
 }
 
 @theme inline {

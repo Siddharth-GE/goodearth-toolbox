@@ -1,5 +1,10 @@
 "use server";
 
+// app/actions/ is for platform-level concerns shared by every tool
+// (today: just login/logout) — not where a tool's own actions go.
+// Tool-specific actions belong in lib/<tool>/actions.ts instead,
+// alongside that tool's queries.ts (see lib/marathon/actions.ts).
+
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
