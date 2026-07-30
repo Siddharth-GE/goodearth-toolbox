@@ -1,5 +1,6 @@
+import { LinkButton } from "@/components/ui/button";
 import { getMarathonHome } from "@/lib/marathon/queries";
-import Link from "next/link";
+import { ShieldCheck } from "lucide-react";
 import { HeroCounter } from "./_components/hero-counter";
 import { MemberList } from "./_components/member-list";
 import { copy } from "./_lib/copy";
@@ -42,10 +43,11 @@ export default async function MarathonHome() {
         </h2>
         <MemberList agents={agents} />
 
-        <div className="mt-8 text-center">
-          <Link href="/marathon/admin" className="text-xs font-medium text-muted">
+        <div className="mt-8 flex justify-center">
+          <LinkButton href="/marathon/admin" variant="secondary" size="md">
+            <ShieldCheck className="size-4" />
             Admin
-          </Link>
+          </LinkButton>
         </div>
       </div>
     </div>
