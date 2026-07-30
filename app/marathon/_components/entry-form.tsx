@@ -45,9 +45,17 @@ export function EntryForm({
 }) {
   const [state, formAction, pending] = useActionState<EntryState, FormData>(createEntry, undefined);
 
+  // Every field is controlled: React resets a form's uncontrolled fields
+  // after any action submission (including a "duplicate, confirm?" reply
+  // that isn't really an error), so an uncontrolled field would visibly
+  // clear right when the agent needs to tap Save a second time.
+  const [groupId, setGroupId] = useState("");
+  const [name, setName] = useState("");
+  const [mobile, setMobile] = useState("");
   const [runId, setRunId] = useState("");
   const [age, setAge] = useState("");
   const [gender, setGender] = useState("");
+  const [teeSize, setTeeSize] = useState("");
 
   const [confirmed, setConfirmed] = useState(false);
   // Sync `confirmed` from the action's result without an Effect: react to
@@ -70,7 +78,13 @@ export function EntryForm({
     <form action={formAction} className="space-y-4">
       <div className="space-y-1.5">
         <Label htmlFor="group">Group</Label>
-        <Select id="group" name="group" required defaultValue="">
+        <Select
+          id="group"
+          name="group"
+          required
+          value={groupId}
+          onChange={(e) => setGroupId(e.target.value)}
+        >
           <option value="" disabled>
             Select a group
           </option>
@@ -84,7 +98,15 @@ export function EntryForm({
 
       <div className="space-y-1.5">
         <Label htmlFor="name">Full Name</Label>
-        <Input id="name" name="name" required maxLength={80} autoComplete="off" />
+        <Input
+          id="name"
+          name="name"
+          required
+          maxLength={80}
+          autoComplete="off"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
       </div>
 
       <div className="space-y-1.5">
@@ -96,7 +118,11 @@ export function EntryForm({
           maxLength={10}
           required
           autoComplete="off"
-          onChange={() => setConfirmed(false)}
+          value={mobile}
+          onChange={(e) => {
+            setMobile(e.target.value);
+            setConfirmed(false);
+          }}
         />
       </div>
 
@@ -134,7 +160,13 @@ export function EntryForm({
 
       <div className="space-y-1.5">
         <Label htmlFor="teeSize">T-Shirt Size</Label>
-        <Select id="teeSize" name="teeSize" required defaultValue="">
+        <Select
+          id="teeSize"
+          name="teeSize"
+          required
+          value={teeSize}
+          onChange={(e) => setTeeSize(e.target.value)}
+        >
           <option value="" disabled>
             Select a size
           </option>
