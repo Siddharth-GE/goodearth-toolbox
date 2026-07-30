@@ -1,8 +1,28 @@
 # Marathon tool — build plan
 
+**Status: SHIPPED — live on Vercel as of 2026-07-30.** All 9 planned
+steps, the toolbox-wide design system restyle, and a UX refinement pass
+are built, founder-tested in the browser, and deployed to production.
 Full design/decisions (routing, session design, database security, data
 model) were worked out and approved on 2026-07-30. This file is the build
 checklist and a bookmark for picking work back up.
+
+## Pending — before real event/race day
+
+Nothing left to *build*; these are launch-readiness items to revisit
+before agents rely on this for the actual event:
+
+- [ ] Change the admin PIN off the seeded default (`2026`) to something
+      not publicly guessable — see `supabase/migrations/0002_marathon.sql`
+      for how to update `marathon_config.admin_pin_hash/salt`.
+- [ ] Delete the seeded "Test Agent" (PIN `1234`) once real agents are
+      added via Admin → Members, so it doesn't show up on the kiosk.
+- [ ] The duplicate-mobile warning ("already registered, save anyway?")
+      is English-only — flagged during the design pass as needing a
+      native-speaker Malayalam translation, never done.
+- [ ] Do one final walkthrough on the actual devices/browsers agents
+      will use on the day (this session's testing was via headless
+      Chrome + the founder's own browser, not necessarily every device).
 
 ## Steps
 
@@ -165,3 +185,21 @@ confirmed the CSS keyframe compiled into the real bundle (not just
 present in source), and exercised the bib-card animation end-to-end
 with a real saved entry before cleaning it up. Not yet clicked through
 by the founder in an actual browser.
+
+## Deployed live (2026-07-30)
+
+Connected to Vercel, auto-deploying from `master` on every push. Agents
+can now reach the kiosk directly at `/marathon` on the live domain —
+no Toolbox login needed, same as local.
+
+Caught and fixed one real deploy-only bug: the kiosk home screen
+(`app/marathon/page.tsx`) doesn't read cookies or `searchParams`, so
+Next.js silently treated it as static and prerendered it once at
+build/deploy time — a newly-added agent (or updated counts) wouldn't
+show up until the *next* deploy. Invisible in local dev (dev mode
+always renders fresh regardless), only visible on the real deployment,
+which is how it was actually caught: a founder-added agent ("Mathew")
+wasn't showing up on the kiosk. Fixed with `export const dynamic =
+"force-dynamic"`; verified by adding a brand-new agent to the database
+while a local production build was already running (no rebuild) and
+confirming it appeared on the very next request.

@@ -2,9 +2,13 @@
 
 Internal tools platform for Goodearth, a design-led real estate company in Kerala, India (~70 staff plus contractors). Replacing spreadsheet- and AppSheet-based workflows with one self-hosted platform: multiple tools, one per business function, used independently by different teams but connected through one shared Supabase (Postgres) database.
 
+**Live on Vercel** (auto-deploys from `master` on every push — see
+README.md). Marathon is fully shipped and in production; every other
+tool below is a Coming Soon stub, sidebar-ready but not yet built.
+
 ## Tools
 
-Built: **Marathon** — event registration app: field agents with simple PIN logins register runners (name, age, gender, mobile, t-shirt size, run type); category auto-assigned from age+gender; bib numbers auto-generated with category prefix; groups (schools/clubs) and agents managed by admin; entries counter on agent home; filtered lists throughout. Agents have basic literacy — UI must be extremely simple.
+Built: **Marathon** — event registration app: field agents with simple PIN logins register runners (name, age, gender, mobile, t-shirt size, run type); category auto-assigned from age+gender; bib numbers auto-generated with category prefix; groups (schools/clubs) and agents managed by admin; entries counter on agent home; filtered lists throughout. Agents have basic literacy — UI must be extremely simple. Live at `/marathon` on the production domain, no Toolbox login needed — see `app/marathon/PLAN.md` for status and pending launch-readiness items.
 
 **Overview** (`/`, `app/(dashboard)/page.tsx`) — the shell's home page,
 not a `lib/tools.ts` entry (every signed-in user sees it, it's not
