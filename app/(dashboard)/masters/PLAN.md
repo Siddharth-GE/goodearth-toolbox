@@ -1,8 +1,7 @@
 # Masters — build plan (Phase 1 of the full business-system rebuild)
 
-**Status: Phase 1 of `PLATFORM-BUILD-PLAN.md.pdf` — awaiting founder's
-Gate 1 browser test.** Migration applied, all screens built, verifying
-before merge as of 2026-07-31.
+**Status: SHIPPED — merged to `master` 2026-07-31.** Gate 1 tested and
+approved by the founder in the browser. Phase 2 (Selections) is next.
 
 See the memory note `build_plan_selections_chain` (or the founder's own
 PDF) for the full 9-phase roadmap this is the foundation of.
