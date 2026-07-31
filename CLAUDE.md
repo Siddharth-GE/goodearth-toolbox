@@ -3,16 +3,23 @@
 Internal tools platform for Goodearth, a design-led real estate company in Kerala, India (~70 staff plus contractors). Replacing spreadsheet- and AppSheet-based workflows with one self-hosted platform: multiple tools, one per business function, used independently by different teams but connected through one shared Supabase (Postgres) database.
 
 **Live on Vercel** (auto-deploys from `master` on every push — see
-README.md). Marathon is fully shipped and in production; every other
-tool below is a Coming Soon stub, sidebar-ready but not yet built.
+README.md). Marathon and Settings are shipped; every other tool below
+is a Coming Soon stub, sidebar-ready but not yet built.
 
 ## Tools
 
 Built: **Marathon** — event registration app: field agents with simple PIN logins register runners (name, age, gender, mobile, t-shirt size, run type); category auto-assigned from age+gender; bib numbers auto-generated with category prefix; groups (schools/clubs) and agents managed by admin; entries counter on agent home; filtered lists throughout. Agents have basic literacy — UI must be extremely simple. Live at `/marathon` on the production domain, no Toolbox login needed — see `app/marathon/PLAN.md` for status and pending launch-readiness items.
 
+Built: **Settings** (`/settings`) — the admin console for per-user app
+access: one row per person, one checkbox per grantable tool. Admins
+always have every app and aren't shown checkboxes for it. This *is*
+the access-control mechanism (`user_apps` table +
+`lib/auth/access.ts`'s `requireApp`/`requireAdmin`), not just a sidebar
+filter — see "Other architecture principles" below.
+
 **Overview** (`/`, `app/(dashboard)/page.tsx`) — the shell's home page,
-not a `lib/tools.ts` entry (every signed-in user sees it, it's not
-team-gated). This already fulfills what the roadmap used to call
+not a `lib/tools.ts` entry (every signed-in user sees it, regardless of
+app grants). This already fulfills what the roadmap used to call
 "Dashboard" — a read-only overview across all tools — so that's no
 longer a separate planned tool. It's a mix of real data (the Marathon
 card, reusing `getMarathonHome()`) and clearly-static illustrative
@@ -29,7 +36,7 @@ Planned, roughly in build order — **this list will keep growing**; the pattern
 - Budgets — budget vs actual per project
 - Site Tracker — (details TBD as it's scoped)
 - Directory, Training — people-side tools
-- Projects & Masters, Settings — admin-side tools
+- Projects & Masters — admin-side tool
 
 Every tool above already has a sidebar entry and a route
 (`lib/tools.ts`, grouped Operations/Events/People/Admin) even before
@@ -81,7 +88,9 @@ lib/
                        Projects, Plots, Items, Vendors, Stores — one
                        file per master, used by every tool that needs
                        them. See "Shared masters" below.
-  auth/                platform auth helpers (current user, requireUser)
+  auth/                platform auth helpers: current user, requireUser
+                       (dal.ts), and requireApp/requireAdmin (access.ts)
+                       — the real access-control boundary, see below
   supabase/            Supabase client setup (admin/server/client/proxy)
   tools.ts             the sidebar registry — every tool adds one entry
                        here to become visible (see checklist below)
@@ -132,11 +141,21 @@ are already correct and don't need to change.
    `built: true` in `lib/tools.ts` and replace that route's `page.tsx`.
 2. `lib/<tool>/actions.ts` and `queries.ts` for its data layer. Reuse
    `lib/masters/*` for anything touching Projects/Plots/Items/Vendors/
-   Stores — don't re-query or re-implement master data per tool.
+   Stores — don't re-query or re-implement master data per tool. Every
+   action and query must call `requireApp(user, "<href>")`
+   (`lib/auth/access.ts`) first — sidebar visibility is only cosmetic,
+   this call is the real permission boundary, same principle as
+   Marathon's `requireAgentSession`/`requireAdminSession`. Dashboard
+   tools do this with the RLS-scoped server client
+   (`lib/supabase/server.ts`); Marathon's service-role bypass
+   (`lib/supabase/admin.ts`) is a kiosk-only exception, not the pattern
+   to copy.
 3. Build every screen from `components/ui/*` (and `components/masters/*`
    where relevant). Never one-off styles — see DESIGN.md.
-4. Add (or update) its entry in `lib/tools.ts` — `group`, `team`,
-   `icon`, `built: true` — so it shows up correctly in the sidebar.
+4. Add (or update) its entry in `lib/tools.ts` — `group`, `icon`,
+   `built: true` — so it shows up correctly in the sidebar. Then grant
+   it to whichever staff need it in Settings (`/settings`) — a tool
+   with no grants is invisible to everyone but admins.
 5. Start `app/<tool>/PLAN.md` — that tool's own build checklist and
    bookmark, same pattern as `app/marathon/PLAN.md`.
 6. Any new tables as a numbered file in `supabase/migrations/` — see
@@ -152,7 +171,7 @@ next tool) will need them immediately, and every tool after that will
 too. Convention, decided now so two tools don't each invent a different
 answer:
 
-- Schema: a new numbered migration (e.g. `0003_masters.sql`) written
+- Schema: a new numbered migration (e.g. `0004_masters.sql`) written
   when the first tool that needs it actually starts — not speculatively
   ahead of time.
 - Queries/mutations: `lib/masters/{projects,plots,items,vendors,stores}.ts`,
@@ -209,8 +228,16 @@ queries against the real schema — a typo'd column name now fails
 
 ## Other architecture principles
 
-- Role-based access: users see only their team's tools in the sidebar
-  (`lib/tools.ts` + `lib/auth/dal.ts`)
+- Per-user app access: a staff user's access is exactly the apps
+  they've been granted in Settings (`user_apps` table, see
+  `supabase/migrations/0003_user_apps.sql`); admins have every app
+  automatically. No roles beyond admin/staff, no field-level
+  permissions — the app boundary *is* the permission boundary.
+  `lib/tools.ts`'s `visibleTools()` decides sidebar visibility from
+  this, but that's cosmetic; `requireApp`/`requireAdmin`
+  (`lib/auth/access.ts`) are the real check every tool's own code must
+  call. `profiles.team` still exists in the schema but is no longer
+  read for access control.
 - Keep it simple: no over-engineering, this serves ~200 users max. No
   CI, no test framework, no Prettier/husky setup today — conscious
   tradeoffs for this scale, not oversights. Worth revisiting once a

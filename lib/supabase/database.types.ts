@@ -243,11 +243,47 @@ export type Database = {
         }
         Relationships: []
       }
+      user_apps: {
+        Row: {
+          app: string
+          granted_at: string
+          user_id: string
+        }
+        Insert: {
+          app: string
+          granted_at?: string
+          user_id: string
+        }
+        Update: {
+          app?: string
+          granted_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_apps_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      admin_list_users: {
+        Args: never
+        Returns: {
+          email: string
+          full_name: string
+          id: string
+          role: string
+          team: string
+        }[]
+      }
       marathon_create_entry: {
         Args: {
           p_age: number

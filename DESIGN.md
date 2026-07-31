@@ -113,12 +113,13 @@ Marathon's admin nav is the reference implementation.
 ## Component inventory
 
 Built: `animated-reveal`, `avatar`, `badge` (+ status variants),
-`button`, `card`, `dialog`, `dropdown-menu`, `empty-state`, `input`,
-`label`, `page-header`, `select`, `tabs` (+ `NavTabs`), `tooltip`.
+`button`, `card`, `checkbox`, `dialog`, `dropdown-menu`, `empty-state`,
+`input`, `label`, `page-header`, `select`, `table`, `tabs` (+ `NavTabs`),
+`tooltip`.
 
 Deliberately not built yet — add only when a real tool needs it, not
-speculatively: table, toast/notification, pagination, textarea,
-checkbox/radio, popover, combobox.
+speculatively: toast/notification, pagination, textarea, radio, popover,
+combobox.
 
 ## Status colors in practice
 
