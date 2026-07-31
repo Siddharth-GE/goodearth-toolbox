@@ -33,7 +33,12 @@ export async function listItems(filters: ItemFilters = {}): Promise<ItemRow[]> {
   let query = supabase.from("items").select("*").order("name");
   if (filters.kind) query = query.eq("kind", filters.kind);
   if (filters.categoryId) query = query.eq("category_id", filters.categoryId);
-  if (filters.search) query = query.ilike("name", `%${filters.search}%`);
+  if (filters.search) {
+    // `,` `(` `)` are PostgREST's or-filter delimiters — a stray comma in the
+    // search box would otherwise build a malformed filter, so strip them.
+    const search = filters.search.replace(/[,()]/g, " ").trim();
+    if (search) query = query.or(`name.ilike.%${search}%,code.ilike.%${search}%`);
+  }
   const { data } = await query;
   return (data ?? []) as ItemRow[];
 }

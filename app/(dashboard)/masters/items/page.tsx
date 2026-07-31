@@ -31,7 +31,7 @@ export default async function ItemsPage({
         <form action="/masters/items" className="flex items-end gap-2">
           <div className="space-y-1.5">
             <Label htmlFor="q">Search</Label>
-            <Input id="q" name="q" defaultValue={q ?? ""} placeholder="Search items…" autoComplete="off" />
+            <Input id="q" name="q" defaultValue={q ?? ""} placeholder="Search name or code…" autoComplete="off" />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="kind">Kind</Label>
@@ -54,6 +54,7 @@ export default async function ItemsPage({
         <Table>
           <TableHead>
             <TableRow>
+              <TableHeaderCell>Code</TableHeaderCell>
               <TableHeaderCell>Name</TableHeaderCell>
               <TableHeaderCell>Kind</TableHeaderCell>
               <TableHeaderCell>Category</TableHeaderCell>
@@ -65,6 +66,7 @@ export default async function ItemsPage({
           <TableBody>
             {items.map((item) => (
               <TableRow key={item.id}>
+                <TableCell className="text-muted">{item.code ?? "—"}</TableCell>
                 <TableCell className="font-medium text-foreground">{item.name}</TableCell>
                 <TableCell>
                   <Badge variant={item.kind === "catalogue" ? "info" : "default"} className="capitalize">

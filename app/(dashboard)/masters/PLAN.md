@@ -30,7 +30,7 @@ PDF) for the full 9-phase roadmap this is the foundation of.
       plain table + `Dialog`-based create/edit form (Categories & Brands
       use lightweight inline add-row forms instead, since they're
       simpler and grow continuously).
-- [ ] **Gate 1** (founder tests in the browser): create a project, plots,
+- [x] **Gate 1** (founder tests in the browser): create a project, plots,
       units, assign a client, add vendors, stores, and items of both
       kinds. See the plan file's "Gate 1 verification" section for the
       exact click-through.
@@ -48,3 +48,15 @@ PDF) for the full 9-phase roadmap this is the foundation of.
 - `item_categories`/`brands` do get a screen (unlike `space_types`)
   since Gate 1 itself needs a category to exist before an item can be
   created, and both will keep growing as real items get catalogued.
+- `items.code` is deliberately **optional and hand-typed** in Phase 1.
+  It's unique, editable at master level (the item dialog), and now
+  shown + searchable in the items list — but nothing generates it.
+  Auto-numbering is scheduled for **Phase 3**, alongside the catalogue
+  import: a `code_prefix` column on `item_categories` plus a row-lock
+  sequence function (same pattern as Marathon bib numbers), producing
+  category-prefixed codes like `GE-SOF-001` — the shape the seed items
+  already use. Deferred on purpose: Phase 3 dedupes the ~2,631-item
+  import **on code**, so the scheme has to be chosen against the
+  catalogue's real codes rather than clash with them. Editing a code is
+  always safe — every downstream table references `items.id`, never the
+  code.
