@@ -3,8 +3,12 @@
 Internal tools platform for Goodearth, a design-led real estate company in Kerala, India (~70 staff plus contractors). Replacing spreadsheet- and AppSheet-based workflows with one self-hosted platform: multiple tools, one per business function, used independently by different teams but connected through one shared Supabase (Postgres) database.
 
 **Live on Vercel** (auto-deploys from `master` on every push — see
-README.md). Marathon and Settings are shipped; every other tool below
-is a Coming Soon stub, sidebar-ready but not yet built.
+README.md). Marathon, Settings, and Masters are shipped; every other
+tool below is a Coming Soon stub, sidebar-ready but not yet built.
+Masters is Phase 1 of a full multi-phase rebuild of Goodearth's
+operational system (Selections → Budgets → Indents → Purchase Orders →
+Goods Receipt → Bills, replacing AppSheet) — see `app/(dashboard)/masters/PLAN.md`
+for that roadmap.
 
 ## Tools
 
@@ -16,6 +20,16 @@ always have every app and aren't shown checkboxes for it. This *is*
 the access-control mechanism (`user_apps` table +
 `lib/auth/access.ts`'s `requireApp`/`requireAdmin`), not just a sidebar
 filter — see "Other architecture principles" below.
+
+Built: **Masters** (`/masters`) — the shared foundation every later
+tool reads from: projects, plots, units, clients, vendors, stores,
+items (one table for both catalogue products and raw materials, via a
+`kind` column), item categories, brands, and space types. `NavTabs`
+across all of them; plain table + `Dialog` create/edit form per master.
+Read functions in `lib/masters/*.ts` have no `requireApp` gate (any
+future tool — Indents, Budgets, etc. — calls them directly under its
+own grant); only writes require the `/masters` grant. See
+`app/(dashboard)/masters/PLAN.md`.
 
 **Overview** (`/`, `app/(dashboard)/page.tsx`) — the shell's home page,
 not a `lib/tools.ts` entry (every signed-in user sees it, regardless of
@@ -36,7 +50,6 @@ Planned, roughly in build order — **this list will keep growing**; the pattern
 - Budgets — budget vs actual per project
 - Site Tracker — (details TBD as it's scoped)
 - Directory, Training — people-side tools
-- Projects & Masters — admin-side tool
 
 Every tool above already has a sidebar entry and a route
 (`lib/tools.ts`, grouped Operations/Events/People/Admin) even before
@@ -84,10 +97,13 @@ lib/
                        queries.ts, and anything else tool-specific
                        (Marathon also has session.ts for its kiosk PIN
                        auth). Mirrors app/<tool>/.
-  masters/             (once it exists) shared queries/mutations for
-                       Projects, Plots, Items, Vendors, Stores — one
-                       file per master, used by every tool that needs
-                       them. See "Shared masters" below.
+  masters/             shared queries/mutations for Projects, Plots,
+                       Units, Clients, Vendors, Stores, Items — one
+                       queries file (`<name>.ts`, reads, `server-only`)
+                       + one actions file (`<name>-actions.ts`, writes,
+                       file-level `"use server"`) per master, used by
+                       every tool that needs them. See "Shared masters"
+                       below for why writes need their own file.
   auth/                platform auth helpers: current user, requireUser
                        (dal.ts), and requireApp/requireAdmin (access.ts)
                        — the real access-control boundary, see below
@@ -164,20 +180,34 @@ are already correct and don't need to change.
    illustrative widget standing in for this tool, swap it for a real
    query from step 2 — same file and component, not a rebuild.
 
-## Shared masters (Projects, Plots, Items, Vendors, Stores)
+## Shared masters (Projects, Plots, Units, Clients, Vendors, Stores, Items)
 
-These don't exist yet — Marathon never touches them — but Indents (the
-next tool) will need them immediately, and every tool after that will
-too. Convention, decided now so two tools don't each invent a different
+Built in Phase 1 (`supabase/migrations/0004_masters.sql`) — Marathon
+never touches them, but every tool from Indents onward reads them
+constantly. Convention, so two tools don't each invent a different
 answer:
 
-- Schema: a new numbered migration (e.g. `0004_masters.sql`) written
-  when the first tool that needs it actually starts — not speculatively
-  ahead of time.
-- Queries/mutations: `lib/masters/{projects,plots,items,vendors,stores}.ts`,
-  one file per master — the same shape as `lib/tools.ts`, which is
-  already the right model for "one small shared file, not per-tool
-  duplication."
+- Schema: a new numbered migration written when the first tool that
+  needs a new master actually starts — not speculatively ahead of time.
+- **Two files per master, not one** — `lib/masters/<name>.ts` (types +
+  read functions, `import "server-only"`) and
+  `lib/masters/<name>-actions.ts` (writes, file-level `"use server"`,
+  no `server-only`). This split is required, not stylistic: a Client
+  Component (a create/edit dialog) needs to import the write functions
+  directly, and Next's bundler only fully strips a module's server-only
+  imports from the client bundle when `"use server"` is a *file-level*
+  directive — a file mixing per-function `"use server"` with plain
+  reads (and `import "server-only"`) fails the production build (not
+  `tsc`, only `next build` catches it). The actions file must not
+  import *values* from its queries file either (that reintroduces the
+  same transitive `server-only` chain through `lib/auth/access.ts`) —
+  `import type` is fine (erased before bundling), so re-declare any
+  validation constants (e.g. allowed enum values) privately in the
+  actions file rather than importing them as values.
+- Read functions have no `requireApp` call — any tool's own
+  (already-gated) queries/actions can call them directly. Write
+  functions each call `requireUser()` + `requireApp(user, "/masters")`
+  first, exactly like `lib/settings/actions.ts`.
 - Shared UI (a project picker, a vendor combobox): `components/masters/`,
   sibling to `components/ui/`.
 

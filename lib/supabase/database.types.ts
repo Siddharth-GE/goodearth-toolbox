@@ -14,6 +14,141 @@ export type Database = {
   }
   public: {
     Tables: {
+      brands: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      clients: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          mobile: string | null
+          name: string
+          notes: string | null
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          mobile?: string | null
+          name: string
+          notes?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          mobile?: string | null
+          name?: string
+          notes?: string | null
+        }
+        Relationships: []
+      }
+      item_categories: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      items: {
+        Row: {
+          brand_id: string | null
+          category_id: string
+          code: string | null
+          created_at: string
+          default_uom: string
+          description: string | null
+          id: string
+          image_url: string | null
+          indicative_price: number | null
+          is_active: boolean
+          kind: string
+          name: string
+          placement: string | null
+          source_url: string | null
+          thumb_url: string | null
+        }
+        Insert: {
+          brand_id?: string | null
+          category_id: string
+          code?: string | null
+          created_at?: string
+          default_uom: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          indicative_price?: number | null
+          is_active?: boolean
+          kind: string
+          name: string
+          placement?: string | null
+          source_url?: string | null
+          thumb_url?: string | null
+        }
+        Update: {
+          brand_id?: string | null
+          category_id?: string
+          code?: string | null
+          created_at?: string
+          default_uom?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          indicative_price?: number | null
+          is_active?: boolean
+          kind?: string
+          name?: string
+          placement?: string | null
+          source_url?: string | null
+          thumb_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "items_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "items_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "item_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       marathon_agents: {
         Row: {
           created_at: string
@@ -219,6 +354,41 @@ export type Database = {
         }
         Relationships: []
       }
+      plots: {
+        Row: {
+          area: number | null
+          created_at: string
+          id: string
+          name: string
+          project_id: string
+          status: string
+        }
+        Insert: {
+          area?: number | null
+          created_at?: string
+          id?: string
+          name: string
+          project_id: string
+          status?: string
+        }
+        Update: {
+          area?: number | null
+          created_at?: string
+          id?: string
+          name?: string
+          project_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plots_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -242,6 +412,180 @@ export type Database = {
           team?: string | null
         }
         Relationships: []
+      }
+      projects: {
+        Row: {
+          created_at: string
+          id: string
+          location: string | null
+          name: string
+          project_type: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          location?: string | null
+          name: string
+          project_type: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          location?: string | null
+          name?: string
+          project_type?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      space_types: {
+        Row: {
+          id: string
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          id?: string
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          id?: string
+          name?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      spaces: {
+        Row: {
+          id: string
+          label: string | null
+          sort_order: number
+          space_type_id: string
+          unit_id: string
+        }
+        Insert: {
+          id?: string
+          label?: string | null
+          sort_order?: number
+          space_type_id: string
+          unit_id: string
+        }
+        Update: {
+          id?: string
+          label?: string | null
+          sort_order?: number
+          space_type_id?: string
+          unit_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spaces_space_type_id_fkey"
+            columns: ["space_type_id"]
+            isOneToOne: false
+            referencedRelation: "space_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spaces_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stores: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          location: string | null
+          name: string
+          project_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          location?: string | null
+          name: string
+          project_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          location?: string | null
+          name?: string
+          project_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stores_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      units: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          id: string
+          name: string
+          plot_id: string | null
+          project_id: string
+          status: string
+          unit_type: string
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          plot_id?: string | null
+          project_id: string
+          status?: string
+          unit_type: string
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          plot_id?: string | null
+          project_id?: string
+          status?: string
+          unit_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "units_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "units_plot_id_fkey"
+            columns: ["plot_id"]
+            isOneToOne: false
+            referencedRelation: "plots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "units_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_apps: {
         Row: {
@@ -269,6 +613,39 @@ export type Database = {
           },
         ]
       }
+      vendors: {
+        Row: {
+          address: string | null
+          contact_name: string | null
+          created_at: string
+          gst_no: string | null
+          id: string
+          is_active: boolean
+          mobile: string | null
+          name: string
+        }
+        Insert: {
+          address?: string | null
+          contact_name?: string | null
+          created_at?: string
+          gst_no?: string | null
+          id?: string
+          is_active?: boolean
+          mobile?: string | null
+          name: string
+        }
+        Update: {
+          address?: string | null
+          contact_name?: string | null
+          created_at?: string
+          gst_no?: string | null
+          id?: string
+          is_active?: boolean
+          mobile?: string | null
+          name?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -284,6 +661,7 @@ export type Database = {
           team: string
         }[]
       }
+      is_admin: { Args: never; Returns: boolean }
       marathon_create_entry: {
         Args: {
           p_age: number

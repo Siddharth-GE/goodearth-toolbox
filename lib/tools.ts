@@ -122,7 +122,7 @@ export const TOOLS: Tool[] = [
     href: "/masters",
     icon: "Boxes",
     group: "Admin",
-    built: false,
+    built: true,
   },
   {
     name: "Settings",
