@@ -169,6 +169,22 @@ never ad hoc. Apply a migration by running its SQL against the project
 via the Supabase Studio SQL editor, in numbered order (there's no CLI/
 local-Postgres setup for this today — see README.md).
 
+## Git workflow
+
+- `master` is production — always deployable, auto-deploys to Vercel on
+  every push. No direct feature work on `master`.
+- Any tool or sizeable change gets its own `feature/<tool>` branch (e.g.
+  `feature/settings-access-model`). Small fixes to an already-live tool
+  can go straight to `master`.
+- Every push to a `feature/*` branch gets its own Vercel preview URL —
+  that's the staging link shared at each review gate, so testing never
+  touches production.
+- Merge to `master` only after a milestone has been tested in the
+  browser and approved — never mid-feature. Pushing a feature branch
+  (to get a preview link) is fine at any point; it's merging into
+  `master` that waits for sign-off.
+- Delete the branch once it's merged.
+
 ## Other architecture principles
 
 - Role-based access: users see only their team's tools in the sidebar
