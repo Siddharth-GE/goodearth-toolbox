@@ -183,6 +183,14 @@ deploy in between each step.
 Never edit a migration file that's already been applied, even for a
 typo fix — a correction is a new, later-numbered migration file.
 
+After every migration is applied in Studio, regenerate types and commit
+them together with the migration file: `npm run db:types` (one-time
+`npx supabase login` per machine, browser-based, no password needed).
+The generated `lib/supabase/database.types.ts` is what makes every
+Supabase client (`lib/supabase/{client,server,admin}.ts`) type-check
+queries against the real schema — a typo'd column name now fails
+`npx tsc --noEmit`, not silently at runtime.
+
 ## Git workflow
 
 - `master` is production — always deployable, auto-deploys to Vercel on

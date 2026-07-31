@@ -155,6 +155,17 @@ export async function getAdminGroups() {
   return data ?? [];
 }
 
+export type EntryFormCategory = {
+  id: string;
+  run_id: string;
+  name: string;
+  gender: "male" | "female" | null;
+  min_age: number | null;
+  max_age: number | null;
+  bib_prefix: string;
+  color: string;
+};
+
 export async function getEntryFormData() {
   const supabase = createAdminClient();
 
@@ -169,6 +180,10 @@ export async function getEntryFormData() {
   return {
     groups: groups ?? [],
     runs: runs ?? [],
-    categories: categories ?? [],
+    // gender is a free-text column with a DB check constraint, not a
+    // real Postgres enum, so generated types widen it to `string | null`
+    // — narrowed back here to match the DB's actual constraint, once,
+    // rather than in every component that consumes this data.
+    categories: (categories ?? []) as unknown as EntryFormCategory[],
   };
 }

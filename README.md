@@ -23,6 +23,11 @@ new migration by running its SQL against the project via the Supabase
 Studio SQL editor, in numbered order — there's no CLI/local-Postgres setup
 for this yet.
 
+After applying a migration, regenerate TypeScript types from the live
+schema and commit them alongside it: `npm run db:types` (needs a
+one-time `npx supabase login` per machine — opens your browser, no
+password typed anywhere).
+
 ## Deployment
 
 Deployed on Vercel, connected to the `master` branch — every push auto-deploys
