@@ -169,6 +169,20 @@ never ad hoc. Apply a migration by running its SQL against the project
 via the Supabase Studio SQL editor, in numbered order (there's no CLI/
 local-Postgres setup for this today — see README.md).
 
+Order matters: apply a migration in Supabase Studio's SQL editor
+**first**, then merge/deploy the code that depends on it — code that
+expects a new column or table must never reach production before that
+schema exists.
+
+Migrations are additive only: new tables and new columns, never
+renaming or dropping something still in use. A true rename is three
+steps across two migrations: add the new column/table → migrate the
+data → drop the old one in a **later**, separate migration, with a code
+deploy in between each step.
+
+Never edit a migration file that's already been applied, even for a
+typo fix — a correction is a new, later-numbered migration file.
+
 ## Git workflow
 
 - `master` is production — always deployable, auto-deploys to Vercel on
