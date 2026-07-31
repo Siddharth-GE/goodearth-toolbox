@@ -276,11 +276,16 @@ queries against the real schema — a typo'd column name now fails
 
 ## Documentation map
 
-This file is the entry point. **DESIGN.md** covers the shared visual
-system — colors, type, spacing, components; read it before styling
-anything. Each tool keeps its own build plan/checklist colocated with
-its code at `app/<tool>/PLAN.md` (e.g. `app/marathon/PLAN.md`) — check
-the relevant one before starting or resuming work on that tool.
+This file is the entry point. **PLAN.md** (repo root) is the living
+roadmap and session log — **read it first at the start of any session**
+to see what's shipped, what's next, and which decisions are already
+settled; it's updated at the end of every working session. **DESIGN.md**
+covers the shared visual system — colors, type, spacing, components;
+read it before styling anything. Each tool keeps its own build
+plan/checklist colocated with its code at `app/<tool>/PLAN.md` (e.g.
+`app/marathon/PLAN.md`) — check the relevant one before starting or
+resuming work on that tool. Root PLAN.md is the level above those: it
+tracks the whole multi-phase rebuild, they track one tool each.
 
 @AGENTS.md
 @DESIGN.md
