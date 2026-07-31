@@ -49,14 +49,30 @@ PDF) for the full 9-phase roadmap this is the foundation of.
   since Gate 1 itself needs a category to exist before an item can be
   created, and both will keep growing as real items get catalogued.
 - `items.code` is deliberately **optional and hand-typed** in Phase 1.
-  It's unique, editable at master level (the item dialog), and now
-  shown + searchable in the items list — but nothing generates it.
-  Auto-numbering is scheduled for **Phase 3**, alongside the catalogue
-  import: a `code_prefix` column on `item_categories` plus a row-lock
-  sequence function (same pattern as Marathon bib numbers), producing
-  category-prefixed codes like `GE-SOF-001` — the shape the seed items
-  already use. Deferred on purpose: Phase 3 dedupes the ~2,631-item
-  import **on code**, so the scheme has to be chosen against the
-  catalogue's real codes rather than clash with them. Editing a code is
-  always safe — every downstream table references `items.id`, never the
-  code.
+  It's unique, editable at master level (the item dialog), and shown +
+  searchable in the items list — but nothing generates it.
+  Auto-numbering stays deferred, and the real catalogue changed what it
+  should look like: Goodearth's actual codes are a **4-letter sub-type
+  prefix + 3-digit sequence** (`BENS001` bench, `SOFS…` sofa, `HANL…`
+  hanging light, `DINT…` dining table), which is *finer than category* —
+  the single "Seating" category spans `BENS`/`CHAS`/`ARMS`/`SOFS`. So a
+  `code_prefix` column on `item_categories` would NOT reproduce this;
+  whenever auto-numbering is built it needs its own sub-type lookup, and
+  it must follow this existing convention rather than invent a competing
+  `GE-SOF-001` style. Editing a code is always safe — every downstream
+  table references `items.id`, never the code.
+- The **catalogue import was pulled forward** out of Phase 3, ahead of
+  Selections: building the picker against 2,631 real items beats
+  designing it around 5 samples and discovering the truth later. See
+  `scripts/import-catalogue.ts` (dry run by default, re-runnable, skips
+  codes already present) and `supabase/migrations/0005_remove_catalogue_seed_demo.sql`,
+  which clears the three fictional catalogue seeds whose categories
+  (`Sofas`/`Dining Tables`/`Lighting`) would otherwise sit beside the
+  real `Seating`/`Tables`/`Lighting & Electrical Fixtures`.
+- Only **900 of the 2,631 items carry an image URL**, all on other
+  companies' Shopify CDNs. Decided architecture: copy *thumbnails* into
+  Supabase Storage (~14 MB, ours, can't rot) and leave full images
+  pointing at the source (~360 MB not worth storing for a rarely-opened
+  detail view); items with no image get a `lib/color-hash.ts` placeholder
+  tile rather than a broken-image icon. `thumb_url` is left null by the
+  import — a separate re-runnable pass fills it before the picker ships.
