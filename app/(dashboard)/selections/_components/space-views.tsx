@@ -10,6 +10,7 @@ import {
   uploadSpaceView,
 } from "@/lib/selections/views-actions";
 import { designView } from "@/lib/pdf/theme";
+import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
 import type { SpaceViewRow } from "@/lib/selections/views";
 import { ChevronLeft, ChevronRight, ImagePlus, Trash2 } from "lucide-react";
 import { useRef, useState, useTransition } from "react";
@@ -188,13 +189,13 @@ function ViewCard({
 }) {
   const [caption, setCaption] = useState(view.caption ?? "");
   const [busy, startTransition] = useTransition();
-  const saved = useRef(view.caption ?? "");
-
-  const saveCaption = () => {
-    if (caption === saved.current) return;
-    saved.current = caption;
-    void captionSpaceView(view.id, selectionId, caption);
-  };
+  // The shared hook, not a hand-rolled marker: it only advances its
+  // "already saved" state after the server confirms, so a failed save
+  // surfaces and the next blur retries it instead of short-circuiting.
+  const captionSave = useSaveOnBlur<string>({
+    initial: view.caption ?? "",
+    save: (value) => captionSpaceView(view.id, selectionId, value),
+  });
 
   return (
     <figure className={busy ? "opacity-50" : undefined}>
@@ -216,7 +217,7 @@ function ViewCard({
           <Input
             value={caption}
             onChange={(event) => setCaption(event.target.value)}
-            onBlur={saveCaption}
+            onBlur={() => captionSave.flush(caption)}
             placeholder="Caption"
             className="h-8 text-xs"
             aria-label="Caption"
@@ -254,6 +255,9 @@ function ViewCard({
         view.caption && (
           <figcaption className="text-muted mt-1.5 text-xs">{view.caption}</figcaption>
         )
+      )}
+      {editable && captionSave.error && (
+        <p className="text-danger mt-1 text-xs font-medium">{captionSave.error}</p>
       )}
     </figure>
   );
