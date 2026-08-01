@@ -14,18 +14,24 @@ and **what's next**.
 
 ## Where we are right now
 
-**Masters, the catalogue, Selections and design views are shipped.
-Budgets is built and awaiting the browser gate on `feature/budgets`.**
+**Masters, the catalogue, Selections, design views and Budgets are all
+shipped. Indents is next.**
+
+The Selections → Budgets chain now works end to end: a designer
+specifies a unit space by space, issues it, the budget team prices it,
+and a client quotation comes out the other side. That's the spine of the
+AppSheet replacement.
 
 | | |
 |---|---|
 | Last worked | 2026-08-01 |
-| Branch | `feature/budgets` — built, pushed, **not yet merged** (needs testing in the browser) |
+| Branch | everything merged to `master`, live on Vercel. Next: `feature/indents` |
 | Migrations applied | `0001`–`0012` (next new one is `0013`) |
 | Items in database | **2,633** (2,631 imported catalogue + 2 material seeds) |
 | Categories / brands | 14 / 21 |
 | Thumbnails | **897** in Supabase Storage; 3 dead vendor links, 1,733 items have no image |
-| Built tools | Marathon, Settings, Masters |
+| Built tools | Marathon, Settings, Masters, Selections, Budgets |
+| Tests | `npm test` — 17, covering `lib/budgets/` pricing and carry-forward |
 
 ---
 
@@ -39,8 +45,8 @@ Budgets is built and awaiting the browser gate on `feature/budgets`.**
 | 3b | **Thumbnail pass** — catalogue images into Supabase Storage | ✅ Done |
 | 2 | **Selections** — per-unit design workspace + the catalogue picker | ✅ Shipped, merged 2026-08-01 |
 | 2b | **Design views** — renders per space, in the design document | ✅ Shipped, merged 2026-08-01 |
-| 4 | **Budgets** — cost + margin → client rate, approval, two documents | 🔨 **Built (B1–B4), awaiting browser gate** |
-| 5 | Indents — pull-from-budget *and* direct site request | ⬜ Not started |
+| 4 | **Budgets** — cost + margin → client rate, approval, two documents | ✅ Shipped, merged 2026-08-01 |
+| 5 | Indents — pull-from-budget *and* direct site request | ⬜ **NEXT** |
 | 6 | Purchase Orders — vendor grouping + letterhead PDF | ⬜ Not started |
 | 7 | Inventory / Store — goods receipt, stock on hand, issues | ⬜ Not started |
 | 8 | Bills — against POs and labour contracts | ⬜ Not started |
@@ -224,7 +230,21 @@ failure mode is a compile error rather than a leaked margin.
 
 ## Session log
 
-### 2026-08-01 (later still) — Budgets built (Phase 4, B1–B3)
+### 2026-08-01 (later still) — Budgets shipped (Phase 4), merged
+
+**Approved in the browser and merged to `master`.** Two things to pick up
+next session, neither blocking:
+
+- **Layout and visual design** of the two documents — the founder's words
+  were "we'll get to designing the layout as we go." Structure and figures
+  are right; the typography isn't finished, and it still uses a
+  placeholder letterhead, Helvetica and stand-in terms text.
+- **Margin secrecy has not been verified as a non-budgets user.** The RLS
+  is written and only `lib/budgets/` touches those tables, but nobody has
+  signed in without the grant and confirmed zero rows. Do NOT verify this
+  with the service-role key — it bypasses exactly the rules being tested,
+  which is how the design-views bug got missed.
+
 
 Migration `0011`: `item_margins`, `budgets`, `budget_lines`. Then the
 inbox, the pricing screen, per-product margins, approval, both documents,
