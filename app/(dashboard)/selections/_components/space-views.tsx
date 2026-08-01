@@ -8,9 +8,51 @@ import {
   moveSpaceView,
   uploadSpaceView,
 } from "@/lib/selections/views-actions";
+import { designView } from "@/lib/pdf/theme";
 import type { SpaceViewRow } from "@/lib/selections/views";
 import { ChevronLeft, ChevronRight, ImagePlus, Loader2, Trash2 } from "lucide-react";
 import { useRef, useState, useTransition } from "react";
+
+/**
+ * Normalises an image to the document spec *before* it leaves the browser.
+ *
+ * Not an optimisation — a necessity. Server Actions cap the request body
+ * at 1MB, and hosting caps it not much higher, so an 8MB render never
+ * reaches the server at all. Resizing here sends ~300KB instead, which
+ * also makes uploads bearable on a site connection.
+ *
+ * The server re-normalises what arrives regardless: an action is a public
+ * endpoint, so nothing a browser sends can be trusted to already be the
+ * right shape.
+ */
+async function normaliseForUpload(file: File): Promise<Blob> {
+  const bitmap = await createImageBitmap(file);
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = designView.width;
+    canvas.height = designView.height;
+
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("no 2d context");
+
+    // Letterbox on white rather than crop — same rule as the server.
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    const scale = Math.min(canvas.width / bitmap.width, canvas.height / bitmap.height);
+    const width = bitmap.width * scale;
+    const height = bitmap.height * scale;
+    context.drawImage(bitmap, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height);
+
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, designView.contentType, designView.quality / 100),
+    );
+    if (!blob) throw new Error("encode failed");
+    return blob;
+  } finally {
+    bitmap.close();
+  }
+}
 
 /**
  * The renders and elevations for one space.
@@ -41,8 +83,18 @@ export function SpaceViews({
       // Sequential, not Promise.all: Server Actions dispatch one at a
       // time per client anyway, and this keeps the order predictable.
       for (const file of Array.from(files)) {
+        let normalised: Blob;
+        try {
+          normalised = await normaliseForUpload(file);
+        } catch {
+          // Usually a format the browser can't decode — HEIC straight off
+          // an iPhone is the common one.
+          setError(`Couldn't read “${file.name}”. Export it as JPG or PNG and try again.`);
+          break;
+        }
+
         const formData = new FormData();
-        formData.set("file", file);
+        formData.set("file", new File([normalised], file.name, { type: designView.contentType }));
         const outcome = await uploadSpaceView(spaceId, selectionId, formData);
         if (outcome?.error) {
           setError(outcome.error);

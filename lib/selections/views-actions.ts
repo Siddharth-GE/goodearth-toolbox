@@ -12,7 +12,11 @@ import sharp from "sharp";
 // the server-only chain into the client bundle (see CLAUDE.md).
 const BUCKET = "design-views";
 
-const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+// Server Actions cap the request body at 1MB by default (raised to 4mb in
+// next.config.ts for headroom), so this is not a policy choice — anything
+// larger never arrives. The browser normalises to ~300KB before sending;
+// this is the backstop for a request that didn't come from our UI.
+const MAX_UPLOAD_BYTES = 3 * 1024 * 1024;
 const ACCEPTED = ["image/jpeg", "image/png", "image/webp", "image/avif"];
 
 export type ViewActionState = { error?: string } | undefined;
@@ -41,7 +45,9 @@ export async function uploadSpaceView(
 
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) return { error: "Choose an image to upload." };
-  if (file.size > MAX_UPLOAD_BYTES) return { error: "That image is over 25MB. Export a smaller one." };
+  if (file.size > MAX_UPLOAD_BYTES) {
+    return { error: "That image is too large to upload. Export it at a smaller size and try again." };
+  }
   if (!ACCEPTED.includes(file.type)) {
     return { error: "Upload a JPG, PNG, WebP or AVIF." };
   }
