@@ -1,7 +1,8 @@
 import { Image, StyleSheet, Text, View } from "@react-pdf/renderer";
 import { Document } from "@react-pdf/renderer";
 import { DocumentPage, DocumentTable, type Column, type DocumentMeta } from "@/lib/pdf/document";
-import { designView, formatDate, formatQty, pdf } from "@/lib/pdf/theme";
+import { designView, pdf } from "@/lib/pdf/theme";
+import { formatDate, formatQuantity } from "@/lib/format";
 import type { BudgetHandoff, SelectionLineRow } from "./queries";
 
 /**
@@ -98,7 +99,7 @@ const columns: Column<SelectionLineRow>[] = [
   { header: "Code", width: 1.15, render: (row) => row.item_code ?? "—" },
   { header: "Item", width: 3.2, render: (row) => row.item_name },
   { header: "Brand", width: 1.5, render: (row) => row.item_brand ?? "—" },
-  { header: "Qty", width: 0.7, align: "right", render: (row) => formatQty(row.quantity) },
+  { header: "Qty", width: 0.7, align: "right", render: (row) => formatQuantity(row.quantity) },
   { header: "Unit", width: 0.7, render: (row) => row.uom },
   { header: "Notes", width: 2.4, render: (row) => row.designer_note ?? "" },
 ];

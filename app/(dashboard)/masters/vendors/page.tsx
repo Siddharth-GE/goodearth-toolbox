@@ -47,7 +47,7 @@ export default async function VendorsPage() {
                 <TableCell>{vendor.mobile || "—"}</TableCell>
                 <TableCell>{vendor.gst_no || "—"}</TableCell>
                 <TableCell>
-                  <Badge variant={vendor.is_active ? "success" : "default"}>
+                  <Badge variant={vendor.is_active ? "success" : "neutral"}>
                     {vendor.is_active ? "Active" : "Inactive"}
                   </Badge>
                 </TableCell>

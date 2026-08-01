@@ -7,6 +7,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ReopenButton } from "../_components/approve-button";
 import { PricingGrid } from "../_components/pricing-grid";
+import { formatDate } from "@/lib/format";
 
 export default async function BudgetPricingPage({
   params,
@@ -97,9 +98,7 @@ export default async function BudgetPricingPage({
           <p className="text-foreground text-sm">
             Approved{" "}
             {budget.approved_at && (
-              <span className="text-muted">
-                on {new Date(budget.approved_at).toLocaleDateString("en-IN")}
-              </span>
+              <span className="text-muted">on {formatDate(budget.approved_at)}</span>
             )}
             . Prices are locked — re-open it to correct one.
           </p>

@@ -9,6 +9,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { issueSelection } from "@/lib/selections/actions";
 import { Minus, Plus, RefreshCw } from "lucide-react";
 import { useState, useTransition } from "react";
@@ -108,7 +109,7 @@ export function IssueDialog({
 
           <div className="space-y-1.5">
             <Label htmlFor="issue-notes">Note for the budget team (optional)</Label>
-            <textarea
+            <Textarea
               id="issue-notes"
               rows={3}
               value={notes}
@@ -118,7 +119,6 @@ export function IssueDialog({
                   ? "Anything they should know before pricing this."
                   : "Why this revision exists — what the client changed."
               }
-              className="border-border bg-surface text-foreground placeholder:text-muted focus:ring-accent w-full rounded-xl border px-3.5 py-2.5 text-sm focus:ring-2 focus:outline-none"
             />
           </div>
 

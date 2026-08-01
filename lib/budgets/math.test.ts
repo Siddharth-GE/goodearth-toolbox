@@ -13,7 +13,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { clientRate, formatMoney, isFullyPriced, lineAmount, lineCost, rollUp } from "./math";
+import { clientRate, isFullyPriced, lineAmount, lineCost, rollUp } from "./math";
 
 test("client rate adds the margin to the cost", () => {
   assert.equal(clientRate(100, 25), 125);
@@ -96,7 +96,5 @@ test("a free line counts as priced", () => {
   assert.equal(rollUp([{ quantity: 4, unit_cost: 0, margin_pct: 50 }]).pendingCount, 0);
 });
 
-test("money formats as rupees, and missing money shows as a dash", () => {
-  assert.match(formatMoney(1234567), /12,34,567/);
-  assert.equal(formatMoney(null), "—");
-});
+// Formatting moved to lib/format.ts and is tested in lib/format.test.ts,
+// alongside the other ways the same figure gets written.

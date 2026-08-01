@@ -25,13 +25,13 @@ AppSheet replacement.
 |                     |                                                                             |
 | ------------------- | --------------------------------------------------------------------------- |
 | Last worked         | 2026-08-01                                                                  |
-| Branch              | everything merged to `master`, live on Vercel. Next: `feature/indents`      |
-| Migrations applied  | `0001`–`0014` (next new one is `0015`)                                      |
+| Branch              | `feature/stage-3-foundations` — audit stages 3–5, awaiting gate             |
+| Migrations applied  | `0001`–`0016` (next new one is `0017`)                                      |
 | Items in database   | **2,633** (2,631 imported catalogue + 2 material seeds)                     |
 | Categories / brands | 14 / 21                                                                     |
 | Thumbnails          | **897** in Supabase Storage; 3 dead vendor links, 1,733 items have no image |
 | Built tools         | Marathon, Settings, Masters, Selections, Budgets                            |
-| Tests               | `npm test` — 17, covering `lib/budgets/` pricing and carry-forward          |
+| Tests               | `npm test` — 25, covering pricing, carry-forward and formatting             |
 
 ---
 
@@ -126,43 +126,34 @@ appear in Selections or on a client-facing document.
 
 ## Next up
 
-### Phase 2 — Selections (branch `feature/selections`)
+### Phase 5 — Indents (branch `feature/indents`)
 
-The first phase that's a genuinely new tool. **Deserves its own plan
-before any code** — migration, new route, new sidebar entry, and the
-flagship UI of the whole system.
+Turning an approved budget into requests for the commercials team, who
+split them into purchase orders by vendor. This is why
+`budget_lines.expected_vendor_id` has existed since migration `0011`.
+
+Two sources feed it and the tool has to handle both: **pull from an
+approved budget** (the common path) and **a direct site request** for
+something nobody designed.
 
 **Context a cold start needs:**
 
-- **Selections has no Coming Soon stub**, unlike every other planned
-  tool. It needs a brand-new `lib/tools.ts` entry plus a route — follow
-  the "Adding a new tool" checklist in `CLAUDE.md`.
-- **Migration `0006`** adds `designs` and `selection_lines` (shape in the
-  founder's build-plan PDF §2.2). Apply in Studio **first**, then merge
-  code — never the other way round.
-- **`spaces` and `space_types` already exist** from migration `0004`
-  with RLS and 11 seeded space types (Living, Dining, Kitchen, …), but
-  have **no screen and no rows**. Selections is their first real
-  consumer — a unit's spaces are the sections of the design workspace.
-- **The catalogue picker is the flagship.** Real numbers to design
-  against: 2,633 items, but **1,400 are lighting** and 466 are hardware,
-  so category browsing is badly lopsided and the filters carry the
-  weight. Server-side filters (kind, category, placement, brand, text
-  search on name + code), ~30 per page. **Only 897 items have a
-  thumbnail** — two-thirds of tiles will be colour placeholders, so the
-  picker has to look right as a mostly-text grid, not a photo wall.
-- **Pagination is already solved** — `listItems()` in
-  `lib/masters/items.ts` does ranged, counted, stably-ordered paging;
-  reuse that pattern rather than reinventing it. Note the `id`
-  tiebreaker: hundreds of items share a name, and without a unique
-  second sort key rows repeat across pages.
-- **Snapshot the rate at pick time** into `selection_lines.indicative_rate`.
-  Later edits to the item master must never rewrite existing lines.
-- **The cascade rule ships from day one** (PDF §2.7): removing a line
-  sets `line_status = 'removed'`, never deletes. One server function,
-  not scattered triggers.
-- **Open decision to ask the founder:** can a design start on an unsold
-  unit (`client_id` null)?
+- Follow the "Adding a new tool" checklist in `CLAUDE.md`. The Coming
+  Soon stub, route and sidebar entry already exist — flip `built: true`
+  in `lib/tools.ts` and replace that route's `page.tsx`.
+- **Read `lib/budgets/` first, not Selections.** It's the newest and
+  cleanest data layer, and Indents consumes it exactly as Budgets
+  consumes Selections. Cross-stage reads belong to the DOWNSTREAM tool,
+  under its own grant — never call another tool's gated queries.
+- **Anchor on `line_key`**, as Budgets does. It is the only identifier
+  that survives a revision.
+- **Indents must not show cost or margin.** Reads on `budget_lines` are
+  gated to `/budgets` (migration `0011`), so an Indents query joining
+  that table returns nothing — by design, not by accident. Indents needs
+  quantity, item, space and vendor, none of which are secret. If a
+  screen genuinely needs a value from behind that boundary, that's a
+  conversation, not a policy edit.
+- **Every transactional table links to a project/plot**, per CLAUDE.md.
 
 ---
 
@@ -172,8 +163,15 @@ flagship UI of the whole system.
   by `kind`.
 - **Prices are snapshotted** onto lines at pick time; master price edits
   never rewrite existing lines.
-- **Lines are never deleted**, only marked removed; removal cascades
-  flags downstream and never alters an issued PO or a goods receipt.
+- **Lines in a DRAFT revision are deleted outright; an ISSUED revision is
+  immutable and its lines cannot be touched at all.** Corrected
+  2026-08-01 — this used to promise a soft delete via a `line_status`
+  column, which was never built and never needed. Immutability turned out
+  to be the stronger guarantee: a database trigger refuses every write to
+  an issued revision's lines (migration `0006`), so history is preserved
+  by the revision itself rather than by flags on rows. The audit log
+  keeps the rest. **Do not build downstream tools expecting soft
+  deletes.**
 - **Margin is Budgets-only** — `margin_pct` and `client_rate` may be
   selected only by `lib/budgets/queries.ts`. POs never show them.
 - **Access = per-user app grants.** `requireApp()` first in every action
@@ -297,7 +295,26 @@ commit so it never hides a real change.
 > It works on Windows and on CI's bash today. If tests ever appear not to
 > run, check that before assuming they pass.
 
-### Stage 3 — shared foundations ⬜ (biggest win for a new maintainer)
+### Stage 3 — shared foundations ✅ shipped
+
+What was done: **`lib/format.ts`** is now the single answer for money,
+quantities, percentages and dates, on screens and in PDFs alike (with its
+own tests). Four missing primitives added — `Textarea`, `Pagination`,
+`IconButton`, `FormMessage` — each of which was being hand-rolled two to
+four times. **`RecordFormDialog`** replaced the seven near-identical
+Masters dialogs. Two hooks, **`useDebouncedSearch`** and
+**`useSaveOnBlur`**, replaced three copies each; the save hook makes the
+retry bug that Stage 1 fixed structurally impossible rather than fixed in
+three places independently. `error.tsx` and `not-found.tsx` exist for the
+first time. Five dead modules deleted.
+
+**Two bugs found while doing it**, both invisible until looked for: the
+`npm test` glob was unquoted, so the shell expanded it and CI would have
+silently skipped any test file outside `lib/<dir>/`; and `disabled` had
+no visual effect on secondary or ghost buttons, so every disabled
+pagination control looked clickable.
+
+The original findings, for reference:
 
 Selections and Budgets currently solve the same problems three different
 ways each. Consolidate:
@@ -317,7 +334,7 @@ ways each. Consolidate:
   pages call `notFound()`. Selections and Marathon have no `loading.tsx`,
   which DESIGN.md requires.
 
-### Stage 4 — database patterns ⬜
+### Stage 4 — database patterns ✅ shipped (migration 0016)
 
 - `items` has no index on `is_active` or `name`, so every catalogue
   keystroke is a sequential scan and sort over 2,633 rows.
@@ -331,7 +348,7 @@ ways each. Consolidate:
   migration must be re-runnable, because they're applied by hand and a
   partial failure needs "run it again" to be a safe answer.
 
-### Stage 5 — maintainer handover ⬜
+### Stage 5 — maintainer handover ✅ shipped
 
 - CLAUDE.md still says Selections and Budgets aren't built, and describes
   Budgets as "budget vs actual per project".

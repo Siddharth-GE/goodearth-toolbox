@@ -5,10 +5,7 @@ import { requireAdminSession } from "@/lib/marathon/session";
 import { Inbox } from "lucide-react";
 import { AdminEntryFilters } from "../_components/admin-entry-filters";
 import { AdminNav } from "../_components/admin-nav";
-
-function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
-}
+import { formatTime } from "@/lib/format";
 
 export default async function MarathonAdminEntriesPage({
   searchParams,

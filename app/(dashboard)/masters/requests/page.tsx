@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth/dal";
 import { listItemRequests, type ItemRequestStatus } from "@/lib/masters/item-requests";
 import { Inbox } from "lucide-react";
 import { ResolveRequest } from "./_components/resolve-request";
+import { formatDate } from "@/lib/format";
 
 const TABS: { label: string; status: ItemRequestStatus }[] = [
   { label: "Pending", status: "pending" },
@@ -82,7 +83,7 @@ export default async function ItemRequestsPage({
                     {request.category_name ?? "No category"}
                     {request.brand_name && ` · ${request.brand_name}`}
                     {" · "}
-                    {new Date(request.created_at).toLocaleDateString("en-IN")}
+                    {formatDate(request.created_at)}
                   </p>
                   {request.spec_note && (
                     <p className="text-muted mt-2 max-w-prose text-sm">{request.spec_note}</p>

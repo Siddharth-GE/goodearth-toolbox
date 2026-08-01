@@ -17,10 +17,9 @@ import { listItemCategories } from "@/lib/masters/item-categories";
 import { listItems, type ItemKind } from "@/lib/masters/items";
 import { Package } from "lucide-react";
 import { ItemFormDialog } from "./_components/item-form-dialog";
+import { formatCount, formatMoney } from "@/lib/format";
 
 // Indian digit grouping (1,23,456) — the catalogue runs to lakh-scale prices.
-const inr = new Intl.NumberFormat("en-IN");
-
 export default async function ItemsPage({
   searchParams,
 }: {
@@ -132,7 +131,7 @@ export default async function ItemsPage({
                   <TableCell className="text-foreground font-medium">{item.name}</TableCell>
                   <TableCell>
                     <Badge
-                      variant={item.kind === "catalogue" ? "info" : "default"}
+                      variant={item.kind === "catalogue" ? "info" : "neutral"}
                       className="capitalize"
                     >
                       {item.kind}
@@ -141,7 +140,7 @@ export default async function ItemsPage({
                   <TableCell>{categoryName(item.category_id)}</TableCell>
                   <TableCell>{brandName(item.brand_id)}</TableCell>
                   <TableCell>
-                    {item.indicative_price != null ? inr.format(item.indicative_price) : "—"}
+                    {item.indicative_price != null ? formatMoney(item.indicative_price) : "—"}
                   </TableCell>
                   <TableCell>
                     <ItemFormDialog categories={categories} brands={brands} item={item} />
@@ -153,7 +152,7 @@ export default async function ItemsPage({
 
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-muted text-sm">
-              Showing {inr.format(firstOnPage)}–{inr.format(lastOnPage)} of {inr.format(total)}
+              Showing {formatCount(firstOnPage)}–{formatCount(lastOnPage)} of {formatCount(total)}
             </p>
             {pageCount > 1 && (
               <div className="flex items-center gap-2">

@@ -12,6 +12,7 @@ import { listInbox } from "@/lib/budgets/queries";
 import { PiggyBank } from "lucide-react";
 import Link from "next/link";
 import { StartPricingButton } from "./_components/start-pricing-button";
+import { formatDate } from "@/lib/format";
 
 export default async function BudgetsPage() {
   const rows = await listInbox();
@@ -55,9 +56,7 @@ export default async function BudgetsPage() {
                 <TableCell>{row.project_name}</TableCell>
                 <TableCell className="text-foreground font-medium">{row.unit_name}</TableCell>
                 <TableCell>R{row.revision_no}</TableCell>
-                <TableCell className="text-muted">
-                  {row.issued_at ? new Date(row.issued_at).toLocaleDateString("en-IN") : "—"}
-                </TableCell>
+                <TableCell className="text-muted">{formatDate(row.issued_at)}</TableCell>
                 <TableCell>
                   {row.budget_status === "approved" ? (
                     <Badge variant="success">Approved</Badge>

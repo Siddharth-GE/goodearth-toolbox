@@ -21,6 +21,7 @@ import { SpaceViews } from "../_components/space-views";
 import { listSpaceViews } from "@/lib/selections/views";
 import { listItemCategories } from "@/lib/masters/item-categories";
 import { listBrands } from "@/lib/masters/brands";
+import { formatDate } from "@/lib/format";
 
 export default async function SelectionEditorPage({
   params,
@@ -79,9 +80,7 @@ export default async function SelectionEditorPage({
           {isDraft ? (
             <Badge variant="warning">Draft</Badge>
           ) : selection.status === "superseded" ? (
-            <Badge variant="default" className="bg-muted/15 text-muted">
-              Superseded
-            </Badge>
+            <Badge variant="neutral">Superseded</Badge>
           ) : (
             <Badge variant="success">Issued</Badge>
           )}
@@ -143,10 +142,7 @@ export default async function SelectionEditorPage({
               ? "Issued to budgeting — this revision can no longer be changed."
               : `Superseded by a later revision. Kept as the record of what R${selection.revision_no} said.`}
             {selection.issued_at && (
-              <span className="text-muted">
-                {" "}
-                {new Date(selection.issued_at).toLocaleDateString("en-IN")}
-              </span>
+              <span className="text-muted"> {formatDate(selection.issued_at)}</span>
             )}
           </p>
           {selection.notes && <p className="text-muted mt-1 text-sm">“{selection.notes}”</p>}
