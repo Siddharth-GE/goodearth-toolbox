@@ -1,0 +1,23 @@
+# Line endings are LF everywhere, including in the working tree on
+# Windows.
+#
+# Without this, git's core.autocrlf rewrites files to CRLF on checkout
+# while storing them as LF, and Prettier — which expects LF — then reports
+# every file in the repo as badly formatted on a Windows machine while
+# passing on CI's Linux runner. The same `npm run format:check` has to
+# give the same answer on both, or nobody trusts it.
+#
+# `text=auto` still lets git detect binary files and leave them alone.
+* text=auto eol=lf
+
+# Genuinely binary: never touch these.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.ttf binary
+*.woff binary
+*.woff2 binary
