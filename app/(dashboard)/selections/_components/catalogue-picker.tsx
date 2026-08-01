@@ -5,23 +5,26 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { addLine, searchCatalogue, type CatalogueItem } from "@/lib/selections/actions";
-import { Check, Loader2, Search } from "lucide-react";
-import { useEffect, useState, useTransition } from "react";
+import { addLines } from "@/lib/selections/actions";
+import type { CatalogueItem, CatalogueSearchResult } from "@/lib/selections/catalogue";
+import { Loader2, Minus, Plus, Search } from "lucide-react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 
 const inr = new Intl.NumberFormat("en-IN");
+
+type Space = { id: string; label: string };
 
 export function CataloguePicker({
   selectionId,
   unitId,
-  spaceId,
-  spaceLabel,
+  spaces,
+  currentSpaceId,
   categories,
 }: {
   selectionId: string;
   unitId: string;
-  spaceId: string;
-  spaceLabel: string;
+  spaces: Space[];
+  currentSpaceId: string;
   categories: { id: string; name: string }[];
 }) {
   const [open, setOpen] = useState(false);
@@ -30,68 +33,137 @@ export function CataloguePicker({
   const [placement, setPlacement] = useState("");
   const [page, setPage] = useState(1);
 
-  const [items, setItems] = useState<CatalogueItem[]>([]);
-  const [total, setTotal] = useState(0);
-  const [pageCount, setPageCount] = useState(1);
+  const [result, setResult] = useState<CatalogueSearchResult>({ items: [], total: 0, pageCount: 1 });
   const [loading, setLoading] = useState(false);
-  // Item ids added during this session of the dialog, so the designer can
-  // see what they've already picked without closing it.
-  const [added, setAdded] = useState<Record<string, number>>({});
-  const [, startTransition] = useTransition();
 
-  // Debounced so typing "hanging light" is one query, not thirteen. The
-  // cancelled flag matters as much as the debounce: without it a slow
-  // earlier request can land after a newer one and show stale results.
+  // The basket lives entirely in the browser. Pressing + costs nothing —
+  // no network, no re-render of the page behind — and the whole lot is
+  // written in one call when the designer is done. It holds the item
+  // itself, not just a count, so the summary keeps working after the item
+  // scrolls out of the current search results.
+  const [basket, setBasket] = useState<Record<string, { item: CatalogueItem; quantity: number }>>({});
+  const [targetSpaces, setTargetSpaces] = useState<string[]>([currentSpaceId]);
+  const [error, setError] = useState<string>();
+  const [saving, startSaving] = useTransition();
+
   useEffect(() => {
     if (!open) return;
-    let cancelled = false;
+    const controller = new AbortController();
     const timer = setTimeout(async () => {
       setLoading(true);
-      const result = await searchCatalogue({ search, categoryId, placement, page });
-      if (cancelled) return;
-      setItems(result.items);
-      setTotal(result.total);
-      setPageCount(result.pageCount);
-      setLoading(false);
-    }, 250);
+      const params = new URLSearchParams({ page: String(page) });
+      if (search) params.set("q", search);
+      if (categoryId) params.set("category", categoryId);
+      if (placement) params.set("placement", placement);
+      try {
+        const response = await fetch(`/api/catalogue?${params}`, { signal: controller.signal });
+        if (!response.ok) throw new Error("search failed");
+        setResult((await response.json()) as CatalogueSearchResult);
+        setLoading(false);
+      } catch (fetchError) {
+        // An aborted request is the expected outcome of typing another
+        // character, not a failure worth showing.
+        if ((fetchError as Error).name !== "AbortError") setLoading(false);
+      }
+    }, 200);
     return () => {
-      cancelled = true;
+      controller.abort();
       clearTimeout(timer);
     };
   }, [open, search, categoryId, placement, page]);
 
-  // Changing a filter invalidates the page number, so it's reset where the
-  // change happens rather than in an effect reacting to it.
   const applyFilter = (apply: () => void) => {
     apply();
     setPage(1);
   };
 
-  const add = (item: CatalogueItem) => {
-    // Lands at quantity 1 and stays open. Adjusting quantities afterwards in
-    // the grid is far faster than a modal-per-item when specifying a room.
-    setAdded((current) => ({ ...current, [item.id]: (current[item.id] ?? 0) + 1 }));
-    startTransition(async () => {
-      const result = await addLine(selectionId, unitId, spaceId, item.id, 1);
-      if (result?.error) {
-        setAdded((current) => {
-          const next = { ...current };
-          const count = (next[item.id] ?? 1) - 1;
-          if (count <= 0) delete next[item.id];
-          else next[item.id] = count;
-          return next;
-        });
-      }
+  const step = (item: CatalogueItem, by: number) =>
+    setBasket((current) => {
+      const next = { ...current };
+      const quantity = (next[item.id]?.quantity ?? 0) + by;
+      if (quantity <= 0) delete next[item.id];
+      else next[item.id] = { item, quantity };
+      return next;
     });
+
+  const basketEntries = useMemo(() => Object.values(basket), [basket]);
+  const distinctItems = basketEntries.length;
+  const totalLines = distinctItems * targetSpaces.length;
+
+  const basketValue = useMemo(
+    () =>
+      basketEntries.reduce(
+        (sum, entry) => sum + (entry.item.indicative_price ?? 0) * entry.quantity,
+        0,
+      ) * targetSpaces.length,
+    [basketEntries, targetSpaces.length],
+  );
+
+  const reset = () => {
+    setBasket({});
+    setTargetSpaces([currentSpaceId]);
+    setError(undefined);
   };
 
+  const commit = () =>
+    startSaving(async () => {
+      const outcome = await addLines(
+        selectionId,
+        unitId,
+        targetSpaces,
+        basketEntries.map((entry) => ({ itemId: entry.item.id, quantity: entry.quantity })),
+      );
+      if (outcome?.error) {
+        setError(outcome.error);
+        return;
+      }
+      reset();
+      setOpen(false);
+    });
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) reset();
+      }}
+    >
       <Button onClick={() => setOpen(true)}>Add items</Button>
-      <DialogContent className="flex h-[85vh] max-w-5xl flex-col">
-        <DialogHeader>
-          <DialogTitle>Add to {spaceLabel}</DialogTitle>
+      <DialogContent className="flex h-[88vh] max-w-6xl flex-col gap-3">
+        <DialogHeader className="mb-0">
+          <DialogTitle>Add items</DialogTitle>
         </DialogHeader>
+
+        {/* Which spaces receive the basket. Defaults to the space you came
+            from; tick more to specify four identical bathrooms at once. */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs font-semibold uppercase tracking-widest text-muted">Add to</span>
+          {spaces.map((space) => {
+            const on = targetSpaces.includes(space.id);
+            return (
+              <button
+                key={space.id}
+                type="button"
+                onClick={() =>
+                  setTargetSpaces((current) =>
+                    current.includes(space.id)
+                      ? current.filter((id) => id !== space.id)
+                      : [...current, space.id],
+                  )
+                }
+                className={[
+                  "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                  on
+                    ? "border-accent bg-accent text-accent-foreground"
+                    : "border-border text-muted hover:text-foreground",
+                ].join(" ")}
+              >
+                {space.label}
+              </button>
+            );
+          })}
+        </div>
 
         <div className="flex flex-wrap gap-2">
           <div className="relative min-w-[200px] flex-1">
@@ -130,76 +202,166 @@ export function CataloguePicker({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {loading && items.length === 0 ? (
+          {loading && result.items.length === 0 ? (
             <div className="flex h-full items-center justify-center text-muted">
               <Loader2 className="size-5 animate-spin" />
             </div>
-          ) : items.length === 0 ? (
+          ) : result.items.length === 0 ? (
             <p className="py-12 text-center text-sm text-muted">
               Nothing matches that. Try a different search or clear the filters.
             </p>
           ) : (
             <div className="grid grid-cols-2 gap-3 pb-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-              {items.map((item) => {
-                const count = added[item.id] ?? 0;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => add(item)}
-                    className="group relative rounded-2xl border border-border bg-surface p-2 text-left transition-colors hover:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                  >
-                    <ItemThumb
-                      code={item.code}
-                      name={item.name}
-                      thumbUrl={item.thumb_url}
-                      sizes="(max-width: 640px) 45vw, 180px"
-                    />
-                    <p className="mt-2 line-clamp-2 text-xs font-medium text-foreground">{item.name}</p>
-                    <p className="mt-0.5 text-[11px] text-muted">
-                      {item.code ?? "—"}
-                      {item.indicative_price != null && (
-                        <span className="ml-1 opacity-70">₹{inr.format(item.indicative_price)}</span>
-                      )}
-                    </p>
-                    {count > 0 && (
-                      <span className="absolute top-3 right-3 inline-flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-[11px] font-semibold text-accent-foreground">
-                        <Check className="size-3" />
-                        {count}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
+              {result.items.map((item) => (
+                <ItemCard
+                  key={item.id}
+                  item={item}
+                  quantity={basket[item.id]?.quantity ?? 0}
+                  onStep={(by) => step(item, by)}
+                />
+              ))}
             </div>
           )}
         </div>
 
         <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
           <p className="text-xs text-muted">
-            {loading ? "Searching…" : `${inr.format(total)} ${total === 1 ? "item" : "items"}`}
+            {loading ? "Searching…" : `${inr.format(result.total)} ${result.total === 1 ? "item" : "items"}`}
           </p>
           <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              disabled={page <= 1 || loading}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
+            <Button variant="secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
               Previous
             </Button>
             <span className="text-xs text-muted tabular-nums">
-              {page} / {pageCount}
+              {page} / {result.pageCount}
             </span>
             <Button
               variant="secondary"
-              disabled={page >= pageCount || loading}
+              disabled={page >= result.pageCount}
               onClick={() => setPage((p) => p + 1)}
             >
               Next
             </Button>
           </div>
         </div>
+
+        {/* Nothing has been written yet — this bar is the commit point. */}
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3">
+          <div className="min-w-0">
+            {distinctItems === 0 ? (
+              <p className="text-sm text-muted">Use + to build up a list, then add it all at once.</p>
+            ) : (
+              <>
+                <p className="text-sm font-medium text-foreground">
+                  {distinctItems} {distinctItems === 1 ? "item" : "items"} × {targetSpaces.length}{" "}
+                  {targetSpaces.length === 1 ? "space" : "spaces"} = {totalLines}{" "}
+                  {totalLines === 1 ? "line" : "lines"}
+                </p>
+                {basketValue > 0 && (
+                  <p className="text-xs text-muted">indicative ₹{inr.format(Math.round(basketValue))}</p>
+                )}
+              </>
+            )}
+            {error && <p className="text-xs font-medium text-danger">{error}</p>}
+          </div>
+          <div className="flex items-center gap-2">
+            {distinctItems > 0 && (
+              <Button variant="ghost" onClick={reset} disabled={saving}>
+                Clear
+              </Button>
+            )}
+            <Button onClick={commit} disabled={saving || totalLines === 0}>
+              {saving ? "Adding…" : `Add ${totalLines || ""}`.trim()}
+            </Button>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function ItemCard({
+  item,
+  quantity,
+  onStep,
+}: {
+  item: CatalogueItem;
+  quantity: number;
+  onStep: (by: number) => void;
+}) {
+  const selected = quantity > 0;
+  return (
+    <div
+      className={[
+        "flex flex-col rounded-2xl border bg-surface p-2 transition-colors",
+        selected ? "border-accent" : "border-border",
+      ].join(" ")}
+    >
+      {/* The whole tile is the + target: one click to take one, which is
+          the overwhelmingly common case. */}
+      <button
+        type="button"
+        onClick={() => onStep(1)}
+        className="rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        aria-label={`Add one ${item.name}`}
+      >
+        <ItemThumb
+          code={item.code}
+          name={item.name}
+          thumbUrl={item.thumb_url}
+          sizes="(max-width: 640px) 45vw, 180px"
+        />
+        <p className="mt-2 line-clamp-2 text-xs font-medium text-foreground">{item.name}</p>
+        <p className="mt-0.5 text-[11px] text-muted">
+          {item.code ?? "—"}
+          {item.indicative_price != null && (
+            <span className="ml-1 opacity-70">₹{inr.format(item.indicative_price)}</span>
+          )}
+        </p>
+      </button>
+
+      <div className="mt-2 flex items-center justify-between gap-1">
+        <Stepper
+          direction="down"
+          disabled={!selected}
+          onClick={() => onStep(-1)}
+          label={`Remove one ${item.name}`}
+        />
+        <span
+          className={[
+            "min-w-8 text-center text-sm font-semibold tabular-nums",
+            selected ? "text-foreground" : "text-muted/40",
+          ].join(" ")}
+        >
+          {quantity}
+        </span>
+        <Stepper direction="up" onClick={() => onStep(1)} label={`Add one ${item.name}`} />
+      </div>
+    </div>
+  );
+}
+
+function Stepper({
+  direction,
+  onClick,
+  disabled,
+  label,
+}: {
+  direction: "up" | "down";
+  onClick: () => void;
+  disabled?: boolean;
+  label: string;
+}) {
+  const Icon = direction === "up" ? Plus : Minus;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      className="flex size-8 items-center justify-center rounded-lg border border-border text-foreground transition-colors hover:bg-black/[0.04] disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:hover:bg-white/[0.06]"
+    >
+      <Icon className="size-4" />
+    </button>
   );
 }

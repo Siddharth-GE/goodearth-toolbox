@@ -146,58 +146,88 @@ export async function removeSpace(spaceId: string): Promise<ActionState> {
 // Lines
 // ---------------------------------------------------------------------
 
+export type BasketEntry = { itemId: string; quantity: number };
+
 /**
- * Adds a catalogue item to a space.
+ * Adds a whole basket of items to one or more spaces in a single call.
+ *
+ * Deliberately batched. Server Actions dispatch one at a time per client
+ * and a revalidating action re-renders the entire route server-side, so
+ * adding twelve items as twelve calls meant twelve queued round trips,
+ * each re-running every query on the page. The designer now assembles the
+ * basket locally — which costs nothing — and this writes it in one go.
  *
  * `uom` and `indicative_rate_snapshot` are copied from the item master at
  * this moment on purpose: a price edited months later must never rewrite
  * what an issued revision was specified against.
  */
-export async function addLine(
+export async function addLines(
   selectionId: string,
   unitId: string,
-  spaceId: string,
-  itemId: string,
-  quantity: number,
-  note?: string,
+  spaceIds: string[],
+  entries: BasketEntry[],
 ): Promise<ActionState> {
   const user = await authorize();
-  if (!(quantity > 0)) return { error: "Quantity must be more than zero." };
+
+  const wanted = entries.filter((entry) => entry.quantity > 0);
+  if (spaceIds.length === 0) return { error: "Choose at least one space." };
+  if (wanted.length === 0) return { error: "Add at least one item." };
 
   const supabase = await createClient();
 
-  const { data: item, error: itemError } = await supabase
+  // One query for every item's uom and price, not one per line.
+  const { data: items, error: itemsError } = await supabase
     .from("items")
-    .select("default_uom, indicative_price")
-    .eq("id", itemId)
-    .single();
-  if (itemError || !item) return { error: "That item no longer exists." };
+    .select("id, default_uom, indicative_price")
+    .in(
+      "id",
+      wanted.map((entry) => entry.itemId),
+    );
+  if (itemsError || !items) {
+    console.error("addLines item lookup failed:", itemsError);
+    return { error: "Could not read those items. Try again." };
+  }
+  const itemById = new Map(items.map((item) => [item.id, item]));
 
-  const { data: last } = await supabase
+  // Existing sort_order high-water mark per space, so new lines append
+  // rather than interleave with what's already there.
+  const { data: existing } = await supabase
     .from("selection_lines")
-    .select("sort_order")
+    .select("unit_space_id, sort_order")
     .eq("selection_id", selectionId)
-    .eq("unit_space_id", spaceId)
-    .order("sort_order", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .in("unit_space_id", spaceIds);
 
-  const { error } = await supabase.from("selection_lines").insert({
-    selection_id: selectionId,
-    unit_id: unitId,
-    unit_space_id: spaceId,
-    item_id: itemId,
-    quantity,
-    uom: item.default_uom,
-    indicative_rate_snapshot: item.indicative_price,
-    designer_note: note?.trim() || null,
-    sort_order: (last?.sort_order ?? -1) + 1,
-    created_by: user.id,
-  });
+  const nextSort = new Map<string, number>();
+  for (const spaceId of spaceIds) nextSort.set(spaceId, 0);
+  for (const line of existing ?? []) {
+    nextSort.set(line.unit_space_id, Math.max(nextSort.get(line.unit_space_id) ?? 0, line.sort_order + 1));
+  }
 
+  const rows = [];
+  for (const spaceId of spaceIds) {
+    for (const entry of wanted) {
+      const item = itemById.get(entry.itemId);
+      if (!item) continue;
+      const sort = nextSort.get(spaceId) ?? 0;
+      nextSort.set(spaceId, sort + 1);
+      rows.push({
+        selection_id: selectionId,
+        unit_id: unitId,
+        unit_space_id: spaceId,
+        item_id: entry.itemId,
+        quantity: entry.quantity,
+        uom: item.default_uom,
+        indicative_rate_snapshot: item.indicative_price,
+        sort_order: sort,
+        created_by: user.id,
+      });
+    }
+  }
+
+  const { error } = await supabase.from("selection_lines").insert(rows);
   if (error) {
-    console.error("addLine failed:", error);
-    return { error: "Could not add the item. Try again." };
+    console.error("addLines failed:", error);
+    return { error: "Could not add those items. Try again." };
   }
 
   revalidatePath(`/selections/${selectionId}`);
@@ -226,7 +256,11 @@ export async function updateLine(
     return { error: "Could not save the change. Try again." };
   }
 
-  revalidatePath(`/selections/${selectionId}`);
+  // No revalidatePath on purpose. The row on screen already shows the new
+  // value, and nothing else on the page derives from a quantity — the rail
+  // counts lines, not amounts. Revalidating here would re-render the whole
+  // route (four queries) after every field a designer tabs out of.
+  void selectionId;
   return undefined;
 }
 
@@ -244,71 +278,7 @@ export async function removeLine(selectionId: string, lineId: string): Promise<A
   return undefined;
 }
 
-// ---------------------------------------------------------------------
-// Catalogue search (server action, not a query file)
-// ---------------------------------------------------------------------
-
-export type CatalogueItem = {
-  id: string;
-  code: string | null;
-  name: string;
-  thumb_url: string | null;
-  category_id: string;
-  indicative_price: number | null;
-  default_uom: string;
-  is_provisional: boolean;
-};
-
-export type CatalogueSearchResult = { items: CatalogueItem[]; total: number; pageCount: number };
-
-/**
- * Powers the picker. Lives here rather than in queries.ts because the
- * picker is a Client Component that calls it directly as a server action,
- * which a "server-only" module cannot be.
- */
-export async function searchCatalogue(params: {
-  search?: string;
-  categoryId?: string;
-  placement?: string;
-  page?: number;
-}): Promise<CatalogueSearchResult> {
-  await authorize();
-
-  const pageSize = 30;
-  const page = Math.max(1, Math.floor(params.page ?? 1));
-  const supabase = await createClient();
-
-  let query = supabase
-    .from("items")
-    .select("id, code, name, thumb_url, category_id, indicative_price, default_uom, is_provisional", {
-      count: "exact",
-    })
-    .eq("is_active", true)
-    // Names repeat in their hundreds ("Hanging Light"); without a unique
-    // tiebreaker the same row shows on two pages and another never shows.
-    .order("name")
-    .order("id")
-    .range((page - 1) * pageSize, page * pageSize - 1);
-
-  if (params.categoryId) query = query.eq("category_id", params.categoryId);
-  if (params.placement) query = query.eq("placement", params.placement);
-  if (params.search) {
-    // `,` `(` `)` delimit PostgREST's or-filter — strip them or a stray
-    // comma builds a malformed query.
-    const search = params.search.replace(/[,()]/g, " ").trim();
-    if (search) query = query.or(`name.ilike.%${search}%,code.ilike.%${search}%`);
-  }
-
-  const { data, count, error } = await query;
-  if (error) {
-    console.error("searchCatalogue failed:", error);
-    return { items: [], total: 0, pageCount: 1 };
-  }
-
-  const total = count ?? 0;
-  return {
-    items: (data ?? []) as CatalogueItem[],
-    total,
-    pageCount: Math.max(1, Math.ceil(total / pageSize)),
-  };
-}
+// Catalogue search deliberately lives in app/api/catalogue/route.ts, not
+// here. It is a read, and Server Actions are the wrong tool for reads:
+// they dispatch one at a time per client (so keystrokes queue) and a
+// revalidating action re-renders the whole route. See that file.

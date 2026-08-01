@@ -109,8 +109,10 @@ export default async function SelectionEditorPage({
                     <CataloguePicker
                       selectionId={selectionId}
                       unitId={selection.unit_id}
-                      spaceId={activeSpace.id}
-                      spaceLabel={activeSpace.label}
+                      // Every space, so one trip through the catalogue can
+                      // fill four identical bathrooms at once.
+                      spaces={spaces.map((s) => ({ id: s.id, label: s.label }))}
+                      currentSpaceId={activeSpace.id}
                       categories={categories.map((c) => ({ id: c.id, name: c.name }))}
                     />
                   )}

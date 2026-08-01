@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } fro
 import { removeLine, updateLine } from "@/lib/selections/actions";
 import type { SelectionLineRow } from "@/lib/selections/queries";
 import { PackageOpen, Trash2 } from "lucide-react";
-import { type ReactNode, useState, useTransition } from "react";
+import { type ReactNode, useRef, useState, useTransition } from "react";
 
 const inr = new Intl.NumberFormat("en-IN");
 
@@ -71,28 +71,35 @@ function LineRow({
   const [quantity, setQuantity] = useState(String(line.quantity));
   const [note, setNote] = useState(line.designer_note ?? "");
   const [error, setError] = useState<string>();
-  const [pending, startTransition] = useTransition();
+  const [removing, startTransition] = useTransition();
+  // What's actually persisted, so a second blur without a change doesn't
+  // fire another write.
+  const saved = useRef({ quantity: line.quantity, note: line.designer_note ?? "" });
 
   // Saves on blur rather than on every keystroke: a designer tabbing
-  // through 30 rows shouldn't generate 300 writes.
+  // through 30 rows shouldn't generate 300 writes. Fired outside a
+  // transition so it doesn't mark the row busy — the value is already on
+  // screen and updateLine deliberately doesn't revalidate the page.
   const save = () => {
     const parsed = Number(quantity);
-    const unchanged = parsed === line.quantity && note === (line.designer_note ?? "");
-    if (unchanged) return;
+    if (parsed === saved.current.quantity && note === saved.current.note) return;
     if (!(parsed > 0)) {
       setError("Must be more than 0");
-      setQuantity(String(line.quantity));
+      setQuantity(String(saved.current.quantity));
       return;
     }
     setError(undefined);
-    startTransition(async () => {
-      const result = await updateLine(selectionId, line.id, parsed, line.uom, note || null);
+    saved.current = { quantity: parsed, note };
+    void updateLine(selectionId, line.id, parsed, line.uom, note || null).then((result) => {
       if (result?.error) setError(result.error);
     });
   };
 
+  // Deliberately no pending/dimmed state on save: the input already shows
+  // what the designer typed, and flashing the row on every tab-out makes a
+  // fast edit feel slow. Only a failure is worth interrupting for.
   return (
-    <TableRow className={pending ? "opacity-60" : undefined}>
+    <TableRow className={removing ? "opacity-50" : undefined}>
       <TableCell>
         <ItemThumb code={line.item_code} name={line.item_name} thumbUrl={line.item_thumb_url} sizes="48px" className="w-10" />
       </TableCell>
