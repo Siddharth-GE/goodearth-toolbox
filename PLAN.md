@@ -25,7 +25,7 @@ AppSheet replacement.
 |                     |                                                                             |
 | ------------------- | --------------------------------------------------------------------------- |
 | Last worked         | 2026-08-01                                                                  |
-| Branch              | `feature/stage-3-foundations` — audit stages 3–5, awaiting gate             |
+| Branch              | `master` — all five audit stages merged (`0cc5f8c`)                         |
 | Migrations applied  | `0001`–`0016` (next new one is `0017`)                                      |
 | Items in database   | **2,633** (2,631 imported catalogue + 2 material seeds)                     |
 | Categories / brands | 14 / 21                                                                     |
@@ -77,8 +77,10 @@ What the picker needs to know:
   opened rarely.
 - **1,736 items need a placeholder** — 1,733 that never had an image,
   plus 3 whose vendor URLs are now dead (`HANL095`, `HANL114`,
-  `WALL337`, all 404). Use `lib/color-hash.ts` (already used for avatars
-  and Marathon badges): the item's code on a stable colour. Zero bytes,
+  `WALL337`, all 404). Use `lib/color-hash.ts` (already used for
+  avatars — Marathon's category badges have their own separate palette
+  keyed on a colour name in the database): the item's code on a stable
+  colour. Zero bytes,
   zero requests, and reads as deliberate rather than broken. **This is
   the majority case — design the tile for it first, not as a fallback.**
 - **`next.config.ts` already allows the Supabase Storage host** in
@@ -231,7 +233,8 @@ failure mode is a compile error rather than a leaked margin.
 A full audit (architecture, performance, docs, database) was run once
 Selections and Budgets began depending on each other, ahead of bringing
 a maintainer onto the project. Findings were sorted into five stages.
-**Stage 1 is shipped; Stages 2–5 are open work**, in priority order.
+**All five stages are shipped and merged to `master`.** The sections
+below record what each stage found and did.
 
 ### Stage 1 — security & correctness ✅ shipped (migrations `0013`, `0014`)
 
@@ -251,7 +254,7 @@ a maintainer onto the project. Findings were sorted into five stages.
 - A failed save in the Selections line grid marked the row saved before
   the write, so the edit was lost and could never be retried.
 
-### Stage 2 — remaining bugs 🔨 built, awaiting gate (migration `0015`)
+### Stage 2 — remaining bugs ✅ shipped (migration `0015`)
 
 All fixed. What they were:
 
@@ -364,8 +367,9 @@ ways each. Consolidate:
 - Dead code: `components/ui/tooltip.tsx`, three `components/masters/`
   pickers, `lib/masters/space-types.ts`, and five unused exports.
 
-**Deliberately not doing:** CI, Prettier, or pre-commit hooks (existing
-call, still right at this size); Marathon's service-role kiosk design;
+**Deliberately not doing:** pre-commit hooks (CI is the gate — CI and
+Prettier themselves _were_ added in Stage 2, reversing the earlier
+one-person-era call); Marathon's service-role kiosk design;
 per-project permissions — the app boundary _is_ the permission boundary,
 which is a real decision, just previously undocumented as a limit.
 

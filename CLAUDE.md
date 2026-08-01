@@ -27,7 +27,9 @@ filter — see "Other architecture principles" below.
 Built: **Masters** (`/masters`) — the shared foundation every later
 tool reads from: projects, plots, units, clients, vendors, stores,
 items (one table for both catalogue products and raw materials, via a
-`kind` column), item categories, brands, and space types. `NavTabs`
+`kind` column), item categories, and brands. (Space types exist in the
+schema and feed Selections' add-space flow, but have no Masters screen
+or route — schema-only, on purpose.) `NavTabs`
 across all of them; plain table + `Dialog` create/edit form per master.
 Read functions in `lib/masters/*.ts` have no `requireApp` gate (any
 future tool — Indents, Budgets, etc. — calls them directly under its
@@ -241,7 +243,7 @@ them together with the migration file: `npm run db:types` (one-time
 The generated `lib/supabase/database.types.ts` is what makes every
 Supabase client (`lib/supabase/{client,server,admin}.ts`) type-check
 queries against the real schema — a typo'd column name now fails
-`npx tsc --noEmit`, not silently at runtime.
+`npm run typecheck`, not silently at runtime.
 
 ## Git workflow
 
@@ -294,9 +296,10 @@ to see what's shipped, what's next, and which decisions are already
 settled; it's updated at the end of every working session. **DESIGN.md**
 covers the shared visual system — colors, type, spacing, components;
 read it before styling anything. Each tool keeps its own build
-plan/checklist colocated with its code at `app/<tool>/PLAN.md` (e.g.
-`app/marathon/PLAN.md`) — check the relevant one before starting or
-resuming work on that tool. Root PLAN.md is the level above those: it
+plan/checklist colocated with its code — `app/marathon/PLAN.md` for the
+kiosk, `app/(dashboard)/<tool>/PLAN.md` for every dashboard tool
+(Masters, Selections, Budgets, Settings) — check the relevant one
+before starting or resuming work on that tool. Root PLAN.md is the level above those: it
 tracks the whole multi-phase rebuild, they track one tool each.
 
 @AGENTS.md

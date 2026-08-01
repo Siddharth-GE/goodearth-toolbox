@@ -13,8 +13,9 @@ Nothing left to _build_; these are launch-readiness items to revisit
 before agents rely on this for the actual event:
 
 - [ ] Change the admin PIN off the seeded default (`2026`) to something
-      not publicly guessable — see `supabase/migrations/0002_marathon.sql`
-      for how to update `marathon_config.admin_pin_hash/salt`.
+      not publicly guessable — there's a form for this now on
+      Admin → Members (shipped in the 2026-08-01 hardening audit; no
+      SQL needed). Any agent's PIN can be reset from the same screen.
 - [ ] Delete the seeded "Test Agent" (PIN `1234`) once real agents are
       added via Admin → Members, so it doesn't show up on the kiosk.
 - [ ] The duplicate-mobile warning ("already registered, save anyway?")
@@ -23,6 +24,22 @@ before agents rely on this for the actual event:
 - [ ] Do one final walkthrough on the actual devices/browsers agents
       will use on the day (this session's testing was via headless
       Chrome + the founder's own browser, not necessarily every device).
+
+## Security & limits added after launch (2026-08-01 hardening audit)
+
+Two behaviours a maintainer will hit and should not be surprised by:
+
+- **PIN lockout.** The kiosk is a public URL, so PIN entry is
+  rate-limited: 10 wrong tries against the same target (an agent, or
+  the admin PIN) locks that target for 10 minutes, with a countdown
+  message. Lives in `lib/marathon/rate-limit.ts` backed by the
+  `marathon_pin_attempts` table (migration `0015`). A successful login
+  clears the counter.
+- **List cap.** Admin/agent entry lists show at most
+  `MARATHON_LIST_LIMIT` rows (`lib/marathon/queries.ts`) and say so
+  on screen when truncating; all _counts_ come from exact database
+  counts, never from counting fetched rows — so on race day the
+  totals stay right even when a list is capped.
 
 ## Steps
 
@@ -156,9 +173,9 @@ headers, and a home screen that scales past a handful of agents
 - **No more layout "shaking"**: the entry form's live category-preview
   card, "no match" card, and duplicate-mobile warning now animate in
   via a grid-rows-to-auto CSS transition instead of popping in/out
-  (`app/marathon/_components/entry-form.tsx`). Both PIN screens
-  (`pin-pad.tsx`, `admin-pin-pad.tsx`) reserve a fixed-height error slot
-  so the Continue button doesn't hop down on a wrong PIN.
+  (`app/marathon/_components/entry-form.tsx`). Both PIN screens (one
+  shared `pin-pad.tsx` serves agent and admin) reserve a fixed-height
+  error slot so the Continue button doesn't hop down on a wrong PIN.
 - **Sticky headers**: the entry form, My Entries, and every admin tab
   now have a `sticky top-0` header (title/tabs + Exit) with a quiet
   `bg-background/95 backdrop-blur` + hairline border treatment — stays

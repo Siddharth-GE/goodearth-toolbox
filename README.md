@@ -14,8 +14,9 @@ several tools, one per business function, on one shared Supabase
 3. **[DESIGN.md](./DESIGN.md)** — the shared visual system. Read before
    styling anything.
 
-Per-tool build notes live beside the code: `app/marathon/PLAN.md`,
-`app/(dashboard)/masters/PLAN.md`.
+Per-tool build notes live beside the code — every built tool has one:
+`app/marathon/PLAN.md`, and `app/(dashboard)/<tool>/PLAN.md` for
+Masters, Selections, Budgets and Settings.
 
 ## Running locally
 

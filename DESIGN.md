@@ -28,11 +28,15 @@ a component.
 | `accent` / `accent-foreground`                              | The one brand action color (green). Primary buttons, active states, links |
 | `success` / `warning` / `danger` / `info` (+ `-foreground`) | Fixed-meaning status colors — pills, inline messages, alerts              |
 
-`lib/color-hash.ts`'s 7-color palette (used for avatar initials and
-Marathon's category badges) is a separate, deliberate system — colors
-are picked _by hashing a name_, not by meaning, so it stays a plain JS
-array rather than a token. Don't confuse it with the semantic colors
-above.
+`lib/color-hash.ts`'s 7-color palette (used for avatar initials, the
+item thumbnails in `components/masters/item-thumb.tsx`, and the
+catalogue's no-image placeholder tiles) is a separate, deliberate
+system — colors are picked _by hashing a name_, not by meaning, so it
+stays a plain JS array rather than a token. Don't confuse it with the
+semantic colors above, or with Marathon's category badges — those carry
+a third, independent palette keyed on a colour name stored in the
+database (`category-badge.tsx`, `bib-card.tsx`), which must stay a
+static class lookup and does not use `color-hash`.
 
 `--gradient-hero-from/via/to` (also in `app/globals.css`) is a third,
 purely decorative system — the gradient behind a tool's hero number

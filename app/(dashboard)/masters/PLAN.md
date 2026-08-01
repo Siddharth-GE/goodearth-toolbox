@@ -3,8 +3,8 @@
 **Status: SHIPPED — merged to `master` 2026-07-31.** Gate 1 tested and
 approved by the founder in the browser. Phase 2 (Selections) is next.
 
-See the memory note `build_plan_selections_chain` (or the founder's own
-PDF) for the full 9-phase roadmap this is the foundation of.
+See the root `PLAN.md` for the full multi-phase roadmap this is the
+foundation of.
 
 ## Steps
 
@@ -21,10 +21,14 @@ PDF) for the full 9-phase roadmap this is the foundation of.
       call them); write functions are gated by
       `requireApp(user, "/masters")`, following
       `lib/settings/actions.ts`'s pattern.
-- [x] 3. Pickers in `components/masters/` — `project-picker`,
-      `unit-picker`, `item-picker`, `vendor-combobox` — plain
-      `<Select>`-based for now; upgrade to a real searchable combobox in
-      Phase 2 once the full catalogue (~2,631 items) is imported.
+- [x] 3. Pickers in `components/masters/` — originally `project-picker`,
+      `unit-picker`, `item-picker`, `vendor-combobox`, all plain
+      `<Select>`-based. **Only `project-picker` survives.** The other
+      three were deleted in the 2026-08-01 hardening audit: they still
+      had zero importers a phase later (Selections built its own
+      catalogue picker instead), and the planned "upgrade to a real
+      searchable combobox" never happened because nothing needed it.
+      Build the third real use into a shared component, not the first.
 - [x] 4. Masters screens: `NavTabs` across Projects / Plots / Units /
       Clients / Vendors / Stores / Items / Categories & Brands, each a
       plain table + `Dialog`-based create/edit form (Categories & Brands
