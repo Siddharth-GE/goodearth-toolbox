@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { FormMessage } from "@/components/ui/form-message";
 import type { PinState } from "@/lib/marathon/actions";
 import { useActionState } from "react";
 
@@ -26,11 +27,12 @@ export function PinPad({
         placeholder="••••"
         className="border-border bg-surface text-foreground focus:ring-accent w-full rounded-2xl border px-4 py-3 text-center text-2xl font-bold tracking-[0.5em] focus:ring-2 focus:outline-none"
       />
-      <p
-        className={`text-danger mt-3 min-h-[1.25rem] text-sm font-medium transition-opacity ${state?.error ? "opacity-100" : "opacity-0"}`}
-      >
-        {state?.error ?? " "}
-      </p>
+      {/* The wrapper reserves the line's height so the Continue button
+          doesn't hop down when an error appears; FormMessage inside it
+          brings the role="alert" a raw <p> never announced. */}
+      <div className="mt-3 min-h-[1.25rem]">
+        <FormMessage error={state?.error} />
+      </div>
       <Button type="submit" disabled={pending} className="mt-5 w-full">
         {pending ? "Checking…" : "Continue"}
       </Button>

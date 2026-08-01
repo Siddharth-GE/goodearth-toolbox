@@ -1,5 +1,6 @@
 "use client";
 
+import { FormMessage } from "@/components/ui/form-message";
 import { login } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +26,7 @@ export function LoginForm() {
           required
         />
       </div>
-      {state?.error && <p className="text-danger text-sm font-medium">{state.error}</p>}
+      <FormMessage error={state?.error} />
       <Button type="submit" disabled={pending} className="w-full">
         {pending ? "Signing in…" : "Sign in"}
       </Button>

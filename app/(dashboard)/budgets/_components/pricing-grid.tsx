@@ -272,7 +272,7 @@ function PricingRow({
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-foreground font-medium">{line.item_name}</span>
           {line.needs_review && <Badge variant="warning">Check</Badge>}
-          {saved && <span className="text-success text-xs">Saved</span>}
+          {saved && <FormMessage success="Saved" size="xs" />}
         </div>
         <div className="text-muted text-xs">
           {line.item_brand ? `${line.item_brand} · ` : ""}

@@ -1,5 +1,6 @@
 "use client";
 
+import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,7 +28,7 @@ export function BrandForm() {
           {pending ? "Adding…" : "Add"}
         </Button>
       </div>
-      {state?.error && <p className="text-danger text-sm font-medium">{state.error}</p>}
+      <FormMessage error={state?.error} />
     </form>
   );
 }

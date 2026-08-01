@@ -198,7 +198,14 @@ export function EntryForm({
 
       <AnimatedReveal show={Boolean(state?.error)}>
         {state?.error && (
-          <p className={`text-sm font-medium ${state.duplicate ? "text-warning" : "text-danger"}`}>
+          // Not FormMessage: this one message is amber for the "already
+          // registered, save anyway?" step and red otherwise, a dual tone
+          // the shared component deliberately doesn't offer. The role is
+          // what matters for a screen reader.
+          <p
+            role="alert"
+            className={`text-sm font-medium ${state.duplicate ? "text-warning" : "text-danger"}`}
+          >
             {state.error}
           </p>
         )}

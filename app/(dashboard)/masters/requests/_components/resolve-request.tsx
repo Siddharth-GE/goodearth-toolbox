@@ -1,5 +1,6 @@
 "use client";
 
+import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -162,7 +163,7 @@ export function ResolveRequest({
             Merging keeps the original line intact — issued revisions can never be rewritten, so the
             provisional item stays as an alias pointing at the real one.
           </p>
-          {error && <p className="text-danger text-sm font-medium">{error}</p>}
+          <FormMessage error={error} />
         </div>
       </DialogContent>
     </Dialog>

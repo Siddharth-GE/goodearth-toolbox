@@ -1,5 +1,6 @@
 "use client";
 
+import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
 import { approveBudget, reopenBudget } from "@/lib/budgets/actions";
 import { useState, useTransition } from "react";
@@ -45,7 +46,7 @@ export function ApproveButton({
           {pendingCount} {pendingCount === 1 ? "line" : "lines"} still to price
         </p>
       )}
-      {error && <p className="text-danger text-xs font-medium">{error}</p>}
+      <FormMessage error={error} size="xs" />
     </div>
   );
 }
@@ -68,7 +69,7 @@ export function ReopenButton({ budgetId }: { budgetId: string }) {
       >
         {pending ? "Re-opening…" : "Re-open for edits"}
       </Button>
-      {error && <p className="text-danger text-xs font-medium">{error}</p>}
+      <FormMessage error={error} size="xs" />
     </div>
   );
 }

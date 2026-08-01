@@ -1,5 +1,6 @@
 "use client";
 
+import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
 import { createNextRevision } from "@/lib/selections/actions";
 import { ArrowRight } from "lucide-react";
@@ -27,7 +28,7 @@ export function NextRevisionButton({ fromSelectionId }: { fromSelectionId: strin
         {pending ? "Creating…" : "Start next revision"}
         {!pending && <ArrowRight className="size-4" />}
       </Button>
-      {error && <p className="text-danger text-xs font-medium">{error}</p>}
+      <FormMessage error={error} size="xs" />
     </div>
   );
 }

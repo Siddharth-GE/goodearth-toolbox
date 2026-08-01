@@ -1,5 +1,6 @@
 "use client";
 
+import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
 import { startFirstRevision } from "@/lib/selections/actions";
 import { useState, useTransition } from "react";
@@ -25,7 +26,7 @@ export function StartRevisionButton({ unitId }: { unitId: string }) {
       >
         {pending ? "Starting…" : "Start R0"}
       </Button>
-      {error && <p className="text-danger text-xs font-medium">{error}</p>}
+      <FormMessage error={error} size="xs" />
     </div>
   );
 }

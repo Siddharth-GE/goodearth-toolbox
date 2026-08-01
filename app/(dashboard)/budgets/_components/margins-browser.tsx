@@ -198,7 +198,7 @@ function MarginRow({
       <TableCell>
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-foreground font-medium">{item.name}</span>
-          {saved && <span className="text-success text-xs">Saved</span>}
+          {saved && <FormMessage success="Saved" size="xs" />}
         </div>
         <div className="text-muted text-xs">
           {item.brand_name ? `${item.brand_name} · ` : ""}

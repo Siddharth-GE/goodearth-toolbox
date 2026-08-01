@@ -1,5 +1,6 @@
 "use client";
 
+import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -62,16 +63,7 @@ export function ChangeAdminPinForm() {
         />
       </div>
 
-      {state?.error && (
-        <p role="alert" className="text-danger text-sm font-medium">
-          {state.error}
-        </p>
-      )}
-      {state?.done && (
-        <p role="status" className="text-success text-sm font-medium">
-          {state.done}
-        </p>
-      )}
+      <FormMessage error={state?.error} success={state?.done} />
 
       <Button type="submit" disabled={pending} className="w-full">
         {pending ? "Changing…" : "Change admin PIN"}

@@ -1,5 +1,6 @@
 "use client";
 
+import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import {
@@ -215,7 +216,7 @@ export function AddSpaceDialog({
                 ? "Pick the rooms this unit has."
                 : `${total} ${total === 1 ? "space" : "spaces"}`}
             </p>
-            {error && <p className="text-danger text-xs font-medium">{error}</p>}
+            <FormMessage error={error} size="xs" />
           </div>
           <div className="flex items-center gap-2">
             {total > 0 && (

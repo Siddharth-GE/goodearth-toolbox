@@ -1,5 +1,6 @@
 "use client";
 
+import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
@@ -148,7 +149,7 @@ export function SpaceViews({
         )}
       </div>
 
-      {error && <p className="text-danger text-xs font-medium">{error}</p>}
+      <FormMessage error={error} size="xs" />
 
       {views.length === 0 ? (
         editable && (
@@ -260,9 +261,7 @@ function ViewCard({
           <figcaption className="text-muted mt-1.5 text-xs">{view.caption}</figcaption>
         )
       )}
-      {editable && captionSave.error && (
-        <p className="text-danger mt-1 text-xs font-medium">{captionSave.error}</p>
-      )}
+      {editable && <FormMessage error={captionSave.error} size="xs" className="mt-1" />}
     </figure>
   );
 }

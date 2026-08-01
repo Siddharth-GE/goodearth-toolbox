@@ -1,5 +1,6 @@
 "use client";
 
+import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -126,7 +127,7 @@ export function IssueDialog({
             Once issued, this revision can never be edited. A later change means a new revision.
           </p>
 
-          {error && <p className="text-danger text-sm font-medium">{error}</p>}
+          <FormMessage error={error} />
 
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setOpen(false)} disabled={saving}>
