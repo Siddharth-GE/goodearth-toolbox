@@ -14,9 +14,11 @@ import {
 } from "@/components/ui/table";
 import { saveLine } from "@/lib/budgets/actions";
 import { clientRate, lineAmount, rollUp } from "@/lib/budgets/math";
-import { formatMoney, formatQuantity } from "@/lib/format";
+import { formatMoney, formatPercent, formatQuantity } from "@/lib/format";
 import type { BudgetSpaceGroup } from "@/lib/budgets/queries";
-import { type ReactNode, useMemo, useRef, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
+import { FormMessage } from "@/components/ui/form-message";
+import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
 import { ApproveButton } from "./approve-button";
 
 /** What the team can change on a line, as strings — these are inputs. */
@@ -181,7 +183,7 @@ function SummaryBar({ totals, action }: { totals: ReturnType<typeof rollUp>; act
         <Figure
           label="Margin"
           value={formatMoney(totals.margin)}
-          hint={totals.marginPct === null ? undefined : `${totals.marginPct.toFixed(1)}%`}
+          hint={totals.marginPct === null ? undefined : formatPercent(totals.marginPct)}
         />
         <Figure
           label="Priced"
@@ -223,48 +225,33 @@ function PricingRow({
   editable: boolean;
   onChange: (patch: Partial<Draft>) => void;
 }) {
-  const [error, setError] = useState<string>();
-  const [saved, setSaved] = useState(false);
-  // What the database already holds, so tabbing through a row nobody
-  // edited doesn't fire a write.
-  const persisted = useRef(JSON.stringify(draft));
-
   const cost = toNumber(draft.unitCost);
   const margin = toNumber(draft.marginPct);
   const quantity = toNumber(draft.quantity);
   const rate = clientRate(cost, margin);
   const amount = lineAmount({ quantity: quantity ?? 0, unit_cost: cost, margin_pct: margin });
 
-  // Saves on blur, not per keystroke — the same reasoning as the
-  // Selections line grid, and saveLine deliberately doesn't revalidate.
+  // Saves on blur, not per keystroke — see the hook. saveLine
+  // deliberately doesn't revalidate the route.
+  const { flush, error, saved } = useSaveOnBlur<Draft>({
+    initial: draft,
+    validate: (value) => {
+      const parsed = toNumber(value.quantity);
+      return parsed !== null && parsed > 0 ? undefined : "Quantity must be more than 0";
+    },
+    save: (value) =>
+      saveLine(budgetId, selectionId, line.line_key, {
+        quantity: toNumber(value.quantity) ?? 0,
+        expectedVendorId: value.vendorId || null,
+        unitCost: toNumber(value.unitCost),
+        marginPct: toNumber(value.marginPct),
+        notes: value.notes || null,
+      }),
+  });
+
   const save = () => {
     if (!editable) return;
-    const snapshot = JSON.stringify(draft);
-    if (snapshot === persisted.current) return;
-
-    if (!(quantity !== null && quantity > 0)) {
-      setError("Quantity must be more than 0");
-      return;
-    }
-    setError(undefined);
-    persisted.current = snapshot;
-
-    void saveLine(budgetId, selectionId, line.line_key, {
-      quantity,
-      expectedVendorId: draft.vendorId || null,
-      unitCost: cost,
-      marginPct: margin,
-      notes: draft.notes || null,
-    }).then((result) => {
-      if (result?.error) {
-        setError(result.error);
-        // It didn't persist, so the next blur must try again.
-        persisted.current = "";
-        return;
-      }
-      setSaved(true);
-      setTimeout(() => setSaved(false), 1200);
-    });
+    flush(draft);
   };
 
   const quantityChanged = quantity !== null && quantity !== line.designer_quantity;
@@ -297,7 +284,7 @@ function PricingRow({
           )}
         </div>
         {line.designer_note && <p className="text-muted mt-0.5 text-xs">“{line.designer_note}”</p>}
-        {error && <p className="text-danger mt-1 text-xs font-medium">{error}</p>}
+        <FormMessage error={error} size="xs" className="mt-1" />
       </TableCell>
 
       <TableCell>
@@ -380,7 +367,7 @@ function PricingRow({
             aria-label={`Margin for ${line.item_name}`}
           />
         ) : (
-          (line.margin_pct?.toString() ?? "—")
+          formatPercent(line.margin_pct)
         )}
       </TableCell>
 

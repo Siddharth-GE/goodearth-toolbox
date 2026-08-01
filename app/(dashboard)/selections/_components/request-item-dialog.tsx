@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { requestItem } from "@/lib/selections/actions";
 import { useState, useTransition } from "react";
@@ -134,13 +135,12 @@ export function RequestItemDialog({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="req-note">Specification (optional)</Label>
-            <textarea
+            <Textarea
               id="req-note"
               rows={3}
               value={specNote}
               onChange={(event) => setSpecNote(event.target.value)}
               placeholder="Size, finish, supplier, anything that identifies it."
-              className="border-border bg-surface text-foreground placeholder:text-muted focus:ring-accent w-full rounded-xl border px-3.5 py-2.5 text-sm focus:ring-2 focus:outline-none"
             />
           </div>
 

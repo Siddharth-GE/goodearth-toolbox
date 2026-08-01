@@ -182,12 +182,7 @@ export function BudgetDocument({ budget }: { budget: BudgetDetail }) {
             label="Priced"
             value={`${budget.totals.pricedCount} of ${budget.totals.lineCount}`}
           />
-          <Meta
-            label="Blended margin"
-            value={
-              budget.totals.marginPct === null ? "—" : `${budget.totals.marginPct.toFixed(1)}%`
-            }
-          />
+          <Meta label="Blended margin" value={formatPercent(budget.totals.marginPct)} />
         </View>
 
         {budget.totals.pendingCount > 0 && (

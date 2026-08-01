@@ -11,11 +11,16 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/components/ui/table";
+import { EmptyState } from "@/components/ui/empty-state";
+import { FormMessage } from "@/components/ui/form-message";
+import { Pagination } from "@/components/ui/pagination";
 import { setItemMargin } from "@/lib/budgets/actions";
 import type { CatalogueSearchResult } from "@/lib/selections/catalogue";
 import { formatMoney } from "@/lib/format";
-import { Loader2, Search } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useDebouncedSearch } from "@/lib/hooks/use-debounced-search";
+import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
+import { Loader2, PackageOpen, Search } from "lucide-react";
+import { useState } from "react";
 
 /**
  * Search the catalogue and set a default margin per product.
@@ -40,38 +45,13 @@ export function MarginsBrowser({
   const [brandId, setBrandId] = useState("");
   const [page, setPage] = useState(1);
 
-  const [result, setResult] = useState<CatalogueSearchResult>({
-    items: [],
-    total: 0,
-    pageCount: 1,
-  });
-  const [loading, setLoading] = useState(false);
   const [margins, setMargins] = useState<Record<string, number>>(initialMargins);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    const timer = setTimeout(async () => {
-      setLoading(true);
-      const params = new URLSearchParams({ page: String(page) });
-      if (search) params.set("q", search);
-      if (categoryId) params.set("category", categoryId);
-      if (brandId) params.set("brand", brandId);
-      try {
-        const response = await fetch(`/api/catalogue?${params}`, { signal: controller.signal });
-        if (!response.ok) throw new Error("search failed");
-        setResult((await response.json()) as CatalogueSearchResult);
-        setLoading(false);
-      } catch (fetchError) {
-        // Aborting is what happens when another character is typed, not a
-        // failure worth reporting.
-        if ((fetchError as Error).name !== "AbortError") setLoading(false);
-      }
-    }, 200);
-    return () => {
-      controller.abort();
-      clearTimeout(timer);
-    };
-  }, [search, categoryId, brandId, page]);
+  const { result, loading } = useDebouncedSearch<CatalogueSearchResult>({
+    url: "/api/catalogue",
+    params: { page, q: search, category: categoryId, brand: brandId },
+    initial: { items: [], total: 0, pageCount: 1 },
+  });
 
   const applyFilter = (apply: () => void) => {
     apply();
@@ -117,68 +97,58 @@ export function MarginsBrowser({
         </Select>
       </div>
 
-      <div className="text-muted flex items-center justify-between text-xs">
-        <span>
-          {loading ? (
-            <span className="inline-flex items-center gap-1.5">
-              <Loader2 className="size-3.5 animate-spin" /> Searching…
-            </span>
-          ) : (
-            `${result.total.toLocaleString("en-IN")} ${result.total === 1 ? "product" : "products"}`
-          )}
-        </span>
-        {result.pageCount > 1 && (
-          <span className="flex items-center gap-3">
-            <button
-              type="button"
-              disabled={page <= 1}
-              onClick={() => setPage((current) => current - 1)}
-              className="text-accent font-medium disabled:opacity-40"
-            >
-              Previous
-            </button>
-            <span>
-              Page {page} of {result.pageCount}
-            </span>
-            <button
-              type="button"
-              disabled={page >= result.pageCount}
-              onClick={() => setPage((current) => current + 1)}
-              className="text-accent font-medium disabled:opacity-40"
-            >
-              Next
-            </button>
-          </span>
-        )}
-      </div>
+      {loading ? (
+        <p className="text-muted inline-flex items-center gap-1.5 text-xs">
+          <Loader2 className="size-3.5 animate-spin" /> Searching…
+        </p>
+      ) : (
+        <Pagination
+          page={page}
+          pageCount={result.pageCount}
+          onPageChange={setPage}
+          total={result.total}
+          unit="products"
+        />
+      )}
 
-      <Table>
-        <TableHead>
-          <TableRow>
-            <TableHeaderCell className="w-14"></TableHeaderCell>
-            <TableHeaderCell>Product</TableHeaderCell>
-            <TableHeaderCell className="w-32">Indicative</TableHeaderCell>
-            <TableHeaderCell className="w-32">Margin %</TableHeaderCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {result.items.map((item) => (
-            <MarginRow
-              key={item.id}
-              item={item}
-              margin={margins[item.id] ?? null}
-              onSaved={(value) =>
-                setMargins((current) => {
-                  const next = { ...current };
-                  if (value === null) delete next[item.id];
-                  else next[item.id] = value;
-                  return next;
-                })
-              }
-            />
-          ))}
-        </TableBody>
-      </Table>
+      {/* Was missing entirely: a search matching nothing rendered a table
+          header over an empty body, which reads as broken rather than as
+          "no results". */}
+      {!loading && result.items.length === 0 ? (
+        <EmptyState
+          icon={PackageOpen}
+          title="No products match that"
+          description="Try a different name, code or brand."
+        />
+      ) : (
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableHeaderCell className="w-14"></TableHeaderCell>
+              <TableHeaderCell>Product</TableHeaderCell>
+              <TableHeaderCell className="w-32">Indicative</TableHeaderCell>
+              <TableHeaderCell className="w-32">Margin %</TableHeaderCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {result.items.map((item) => (
+              <MarginRow
+                key={item.id}
+                item={item}
+                margin={margins[item.id] ?? null}
+                onSaved={(value) =>
+                  setMargins((current) => {
+                    const next = { ...current };
+                    if (value === null) delete next[item.id];
+                    else next[item.id] = value;
+                    return next;
+                  })
+                }
+              />
+            ))}
+          </TableBody>
+        </Table>
+      )}
     </div>
   );
 }
@@ -193,38 +163,25 @@ function MarginRow({
   onSaved: (value: number | null) => void;
 }) {
   const [value, setValue] = useState(margin === null ? "" : String(margin));
-  const [error, setError] = useState<string>();
-  const [saved, setSaved] = useState(false);
-  const persisted = useRef(margin === null ? "" : String(margin));
 
   // No re-sync when the search results change: each row is keyed on the
   // item id, so a different product is a different component instance with
   // its own fresh state rather than a stale one to reconcile.
-
-  const save = () => {
-    const trimmed = value.trim();
-    if (trimmed === persisted.current) return;
-
+  const { flush, error, saved } = useSaveOnBlur<string>({
+    initial: margin === null ? "" : String(margin),
     // Blank means "no default", which is not the same as 0%.
-    const parsed = trimmed === "" ? null : Number(trimmed);
-    if (parsed !== null && (!Number.isFinite(parsed) || parsed < 0)) {
-      setError("Zero or more");
-      return;
-    }
-    setError(undefined);
-    persisted.current = trimmed;
-
-    void setItemMargin(item.id, parsed).then((result) => {
-      if (result?.error) {
-        setError(result.error);
-        persisted.current = "";
-        return;
-      }
-      onSaved(parsed);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 1200);
-    });
-  };
+    validate: (raw) => {
+      if (raw.trim() === "") return undefined;
+      const parsed = Number(raw.trim());
+      return Number.isFinite(parsed) && parsed >= 0 ? undefined : "Zero or more";
+    },
+    save: async (raw) => {
+      const parsed = raw.trim() === "" ? null : Number(raw.trim());
+      const result = await setItemMargin(item.id, parsed);
+      if (!result?.error) onSaved(parsed);
+      return result;
+    },
+  });
 
   return (
     <TableRow>
@@ -246,7 +203,7 @@ function MarginRow({
           {item.brand_name ? `${item.brand_name} · ` : ""}
           {item.code ?? "—"}
         </div>
-        {error && <p className="text-danger mt-1 text-xs font-medium">{error}</p>}
+        <FormMessage error={error} size="xs" className="mt-1" />
       </TableCell>
       <TableCell className="text-muted">{formatMoney(item.indicative_price)}</TableCell>
       <TableCell>
@@ -257,7 +214,7 @@ function MarginRow({
           value={value}
           placeholder="—"
           onChange={(event) => setValue(event.target.value)}
-          onBlur={save}
+          onBlur={() => flush(value)}
           className="h-9"
           aria-label={`Margin for ${item.name}`}
         />

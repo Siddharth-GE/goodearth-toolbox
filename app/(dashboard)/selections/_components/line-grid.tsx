@@ -3,6 +3,8 @@
 import { ItemThumb } from "@/components/masters/item-thumb";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
+import { FormMessage } from "@/components/ui/form-message";
+import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -15,7 +17,8 @@ import {
 import { removeLine, updateLine } from "@/lib/selections/actions";
 import type { SelectionLineRow } from "@/lib/selections/queries";
 import { PackageOpen, Trash2 } from "lucide-react";
-import { type ReactNode, useRef, useState, useTransition } from "react";
+import { type ReactNode, useState, useTransition } from "react";
+import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
 import { formatMoney, formatQuantity } from "@/lib/format";
 
 export function LineGrid({
@@ -76,37 +79,28 @@ function LineRow({
 }) {
   const [quantity, setQuantity] = useState(String(line.quantity));
   const [note, setNote] = useState(line.designer_note ?? "");
-  const [error, setError] = useState<string>();
   const [removing, startTransition] = useTransition();
-  // What's actually persisted, so a second blur without a change doesn't
-  // fire another write.
-  const saved = useRef({ quantity: line.quantity, note: line.designer_note ?? "" });
 
   // Saves on blur rather than on every keystroke: a designer tabbing
-  // through 30 rows shouldn't generate 300 writes. Fired outside a
-  // transition so it doesn't mark the row busy — the value is already on
-  // screen and updateLine deliberately doesn't revalidate the page.
+  // through 30 rows shouldn't generate 300 writes. See the hook for why
+  // it isn't wrapped in a transition, and for the retry behaviour this
+  // grid used to get wrong on its own.
+  const { flush, error, setError } = useSaveOnBlur({
+    initial: { quantity: line.quantity, note: line.designer_note ?? "" },
+    validate: ({ quantity: value }) =>
+      Number.isFinite(value) && value > 0 ? undefined : "Quantity must be more than 0",
+    save: ({ quantity: value, note: text }) =>
+      updateLine(selectionId, line.id, value, line.uom, text || null),
+  });
+
   const save = () => {
     const parsed = Number(quantity.trim());
-    if (parsed === saved.current.quantity && note === saved.current.note) return;
     if (!Number.isFinite(parsed) || !(parsed > 0)) {
-      setError("Quantity must be more than 0");
-      setQuantity(String(saved.current.quantity));
-      return;
+      // Put the last good value back, so the row never sits showing a
+      // number that isn't what's stored.
+      setQuantity(String(line.quantity));
     }
-    setError(undefined);
-    saved.current = { quantity: parsed, note };
-    void updateLine(selectionId, line.id, parsed, line.uom, note || null).then((result) => {
-      if (result?.error) {
-        setError(result.error);
-        // It didn't persist, so the next blur has to try again. Without
-        // this the row is marked saved before the write is known to have
-        // worked, and the short-circuit above then blocks every retry —
-        // the designer's edit is silently lost. The pricing and margins
-        // grids already roll back this way.
-        saved.current = { quantity: NaN, note: "" };
-      }
-    });
+    flush({ quantity: parsed, note });
   };
 
   // Deliberately no pending/dimmed state on save: the input already shows
@@ -157,7 +151,7 @@ function LineRow({
         ) : (
           formatQuantity(line.quantity)
         )}
-        {error && <p className="text-danger mt-1 text-xs font-medium">{error}</p>}
+        <FormMessage error={error} size="xs" className="mt-1" />
       </TableCell>
       <TableCell className="text-muted">{line.uom}</TableCell>
       <TableCell>
@@ -176,13 +170,12 @@ function LineRow({
       </TableCell>
       {editable && (
         <TableCell>
-          <button
-            type="button"
+          <IconButton
             aria-label={`Remove ${line.item_name}`}
+            tone="danger"
             // Dimming the row isn't enough on its own: the button stayed
             // clickable, so a double-click fired removeLine twice.
             disabled={removing}
-            className="text-muted hover:bg-danger/10 hover:text-danger focus-visible:ring-accent rounded-lg p-1.5 transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-40"
             onClick={() =>
               startTransition(async () => {
                 const result = await removeLine(selectionId, line.id);
@@ -191,7 +184,7 @@ function LineRow({
             }
           >
             <Trash2 className="size-4" />
-          </button>
+          </IconButton>
         </TableCell>
       )}
     </TableRow>
