@@ -14,14 +14,14 @@ and **what's next**.
 
 ## Where we are right now
 
-**Masters, the catalogue, Selections and design views are all shipped.
-Budgets is next.**
+**Masters, the catalogue, Selections and design views are shipped.
+Budgets is built and awaiting the browser gate on `feature/budgets`.**
 
 | | |
 |---|---|
 | Last worked | 2026-08-01 |
-| Branch | everything merged to `master`, live on Vercel. Next: `feature/budgets` |
-| Migrations applied | `0001`–`0010` (next new one is `0011`) |
+| Branch | `feature/budgets` — built, pushed, **not yet merged** (needs testing in the browser) |
+| Migrations applied | `0001`–`0012` (next new one is `0013`) |
 | Items in database | **2,633** (2,631 imported catalogue + 2 material seeds) |
 | Categories / brands | 14 / 21 |
 | Thumbnails | **897** in Supabase Storage; 3 dead vendor links, 1,733 items have no image |
@@ -39,7 +39,7 @@ Budgets is next.**
 | 3b | **Thumbnail pass** — catalogue images into Supabase Storage | ✅ Done |
 | 2 | **Selections** — per-unit design workspace + the catalogue picker | ✅ Shipped, merged 2026-08-01 |
 | 2b | **Design views** — renders per space, in the design document | ✅ Shipped, merged 2026-08-01 |
-| 4 | **Budgets** — cost + margin → client rate, approval, two documents | ⬜ **NEXT** |
+| 4 | **Budgets** — cost + margin → client rate, approval, two documents | 🔨 **Built (B1–B4), awaiting browser gate** |
 | 5 | Indents — pull-from-budget *and* direct site request | ⬜ Not started |
 | 6 | Purchase Orders — vendor grouping + letterhead PDF | ⬜ Not started |
 | 7 | Inventory / Store — goods receipt, stock on hand, issues | ⬜ Not started |
@@ -85,9 +85,17 @@ What the picker needs to know:
 ## The Selections → Budgets handoff (settled)
 
 What the budget team receives when a designer presses **Issue**. Agreed
-before Budgets exists so both sides are built against the same contract —
-`lib/selections/queries.ts`'s `getBudgetHandoff()` is that contract in
-code, and Budgets calls it rather than re-querying these tables.
+before Budgets existed so both sides were built against the same contract.
+
+> **Corrected 2026-08-01, when Budgets was actually built.** This section
+> used to say Budgets calls `getBudgetHandoff()` in
+> `lib/selections/queries.ts`. It can't: every function in that module
+> opens with `requireApp(user, "/selections")`, so a budget-team member
+> without the design grant would be redirected off their own screen.
+> Budgets reads the selection tables **directly, under `/budgets`** —
+> the same rule that lets any tool read `lib/masters/*` without holding
+> `/masters`. The contract below is still exactly right; only who
+> assembles it changed.
 
 - **The revision** — unit, project, R-number, who issued it and when,
   plus the designer's note saying *why* this revision exists. That note
@@ -208,9 +216,69 @@ must never appear on C. That's why margin lives in a Budgets-owned table
 with its own RLS rather than on `items` — a mistake in the C template
 can't reach for a number it was never handed.
 
-A is built. B and C come with Budgets.
+**All three are now built.** The separation between B and C ended up
+stronger than "hide two columns": C renders from `QuoteData`
+(`lib/budgets/quote.ts`), a type that has **no cost or margin field at
+all**. A template can't print what its props don't contain, so the
+failure mode is a compile error rather than a leaked margin.
 
 ## Session log
+
+### 2026-08-01 (later still) — Budgets built (Phase 4, B1–B3)
+
+Migration `0011`: `item_margins`, `budgets`, `budget_lines`. Then the
+inbox, the pricing screen, per-product margins, approval, both documents,
+and carry-forward — B1 through B4, the whole tool.
+
+**Carry-forward finally cashes in `line_key`.** Starting a budget for R+1
+copies the previous revision's pricing across, matched on the key rather
+than the row id. An unchanged line arrives priced, keeping the budget
+team's own adjusted quantity; a line the designer resized takes the
+designer's new quantity, keeps its unit cost and is flagged for review;
+a new line arrives with only its default margin. Rules live in
+`lib/budgets/carry-forward.ts` — pure, and the most heavily tested code
+in the repo, including the 200-lines-two-touched case.
+
+**Reads are gated too, for the first time.** Every other table in the
+schema is readable by any authenticated staff member. These three require
+`/budgets` to *select*, not just to write — so a careless join from a
+future Indents or PO screen returns zero rows instead of leaking markup.
+
+**`client_rate` is a generated column**, computed by Postgres from cost
+and margin. The internal sheet and the client quote therefore cannot
+disagree; `lib/budgets/math.ts` reimplements the same formula only so the
+screen can show the figure live before saving.
+
+**The repo has tests now** — `npm test`, `node:test` via `tsx`, no new
+framework, covering `lib/budgets/math.ts` only. The cases that matter:
+an unpriced line never reads as free, a 0% margin charges exactly cost,
+and totals sum unrounded values so a column adds up to its own total.
+
+**Approval is reversible.** An approved budget locks its lines (trigger),
+but can be re-opened — a cost estimate is fallible in a way a design
+specification is not, and the alternative was a whole new revision to fix
+one wrong rate. Every re-opening is in the audit log.
+
+**Two numbering systems, and they mean different things** (migration
+`0012`). The **R-number** comes from the design and says what was
+specified. The **version** belongs to the budget and says which pricing of
+it — documents are stamped `R2-v1`, and re-opening starts v2. Added
+because reversible approval made references ambiguous: approve, send the
+quote, re-open, fix a rate, approve again, and both quotations said
+`QT/PLOT6/R2`. The version increments on **re-open**, not on approval, so
+the number on screen while pricing is the number that reaches the
+document. It can only go up, enforced by the guard trigger.
+
+Two smaller things worth keeping:
+
+- **`item_margins` needed a surrogate `id`.** The shared `audit_row()`
+  trigger records `new.id`; a table keyed only on `item_id` would have
+  raised at runtime on the first save. Any new audited table needs an
+  `id` column.
+- **Helvetica has no ₹ glyph.** react-pdf would print a blank box on
+  every amount, so `formatAmount()` in `lib/pdf/theme.ts` emits Indian-
+  grouped digits with no symbol, and documents state the currency once.
+  Don't reuse the app's `formatMoney()` in a PDF.
 
 ### 2026-08-01 (later) — Design views (Phase 2b)
 

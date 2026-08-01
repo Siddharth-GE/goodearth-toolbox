@@ -65,6 +65,163 @@ export type Database = {
         }
         Relationships: []
       }
+      budget_lines: {
+        Row: {
+          budget_id: string
+          budget_status: string | null
+          client_rate: number | null
+          created_at: string
+          expected_vendor_id: string | null
+          id: string
+          line_key: string
+          margin_pct: number | null
+          needs_review: boolean
+          notes: string | null
+          priced_at: string | null
+          priced_by: string | null
+          quantity: number
+          selection_id: string
+          unit_cost: number | null
+          updated_at: string
+        }
+        Insert: {
+          budget_id: string
+          budget_status?: string | null
+          client_rate?: number | null
+          created_at?: string
+          expected_vendor_id?: string | null
+          id?: string
+          line_key: string
+          margin_pct?: number | null
+          needs_review?: boolean
+          notes?: string | null
+          priced_at?: string | null
+          priced_by?: string | null
+          quantity: number
+          selection_id: string
+          unit_cost?: number | null
+          updated_at?: string
+        }
+        Update: {
+          budget_id?: string
+          budget_status?: string | null
+          client_rate?: number | null
+          created_at?: string
+          expected_vendor_id?: string | null
+          id?: string
+          line_key?: string
+          margin_pct?: number | null
+          needs_review?: boolean
+          notes?: string | null
+          priced_at?: string | null
+          priced_by?: string | null
+          quantity?: number
+          selection_id?: string
+          unit_cost?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_lines_budget_id_selection_id_fkey"
+            columns: ["budget_id", "selection_id"]
+            isOneToOne: false
+            referencedRelation: "budgets"
+            referencedColumns: ["id", "selection_id"]
+          },
+          {
+            foreignKeyName: "budget_lines_expected_vendor_id_fkey"
+            columns: ["expected_vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budget_lines_priced_by_fkey"
+            columns: ["priced_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budget_lines_selection_id_line_key_fkey"
+            columns: ["selection_id", "line_key"]
+            isOneToOne: false
+            referencedRelation: "selection_lines"
+            referencedColumns: ["selection_id", "line_key"]
+          },
+        ]
+      }
+      budgets: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          selection_id: string
+          status: string
+          unit_id: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          selection_id: string
+          status?: string
+          unit_id: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          selection_id?: string
+          status?: string
+          unit_id?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budgets_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budgets_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budgets_selection_id_fkey"
+            columns: ["selection_id"]
+            isOneToOne: true
+            referencedRelation: "selections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budgets_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           created_at: string
@@ -112,6 +269,45 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      item_margins: {
+        Row: {
+          id: string
+          item_id: string
+          margin_pct: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          item_id: string
+          margin_pct: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          item_id?: string
+          margin_pct?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "item_margins_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: true
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "item_margins_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       item_requests: {
         Row: {
@@ -1056,6 +1252,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      reopen_budget: { Args: { p_budget_id: string }; Returns: undefined }
     }
     Enums: {
       [_ in never]: never
