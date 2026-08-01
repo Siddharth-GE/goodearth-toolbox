@@ -2,6 +2,7 @@ import "server-only";
 
 import { requireApp } from "@/lib/auth/access";
 import { requireUser } from "@/lib/auth/dal";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { cache } from "react";
 
@@ -210,14 +211,29 @@ export const getBudget = cache(async (budgetId: string): Promise<BudgetDetail | 
     units: { name: string; projects: { name: string } | null } | null;
   } | null;
 
+  // Both line reads go through fetchAll: past 1,000 lines a truncated
+  // read wouldn't error — priced lines would render unpriced and the
+  // totals (and the budget-sheet PDF built from them) would under-report.
+  // The trailing .order("id") is the unique tiebreaker paging needs.
   const [linesResult, budgetLinesResult, spacesResult] = await Promise.all([
-    supabase
-      .from("selection_lines")
-      .select("*, items(name, code, thumb_url, brands(name))")
-      .eq("selection_id", budget.selection_id)
-      .order("sort_order")
-      .order("created_at"),
-    supabase.from("budget_lines").select("*").eq("budget_id", budgetId),
+    fetchAll((from, to) =>
+      supabase
+        .from("selection_lines")
+        .select("*, items(name, code, thumb_url, brands(name))")
+        .eq("selection_id", budget.selection_id)
+        .order("sort_order")
+        .order("created_at")
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAll((from, to) =>
+      supabase
+        .from("budget_lines")
+        .select("*")
+        .eq("budget_id", budgetId)
+        .order("id")
+        .range(from, to),
+    ),
     supabase
       .from("spaces")
       .select("id, label, sort_order, space_types(name)")
@@ -225,6 +241,10 @@ export const getBudget = cache(async (budgetId: string): Promise<BudgetDetail | 
       .order("sort_order")
       .order("label"),
   ]);
+
+  if (linesResult.error || budgetLinesResult.error) {
+    console.error("getBudget line read failed:", linesResult.error ?? budgetLinesResult.error);
+  }
 
   const budgetByKey = new Map((budgetLinesResult.data ?? []).map((line) => [line.line_key, line]));
 
