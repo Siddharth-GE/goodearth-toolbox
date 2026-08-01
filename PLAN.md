@@ -430,6 +430,26 @@ merging, per the git workflow.
 
 ## Session log
 
+### 2026-08-01 (after the audit) — pinned sidebar, phone layout, one hotfix
+
+The sidebar used to scroll away with the page; it's now pinned
+(`sticky top-0 h-screen`) and only the content scrolls. Below `md` the
+rail becomes a sticky top bar + slide-in drawer (Radix dialog, closes
+on tap/ESC/backdrop), content padding tightens, and `NavTabs` wrap —
+verified with Playwright screenshots at 1440px and 390px, zero
+horizontal overflow on Overview and the items list. Founder-tested and
+merged.
+
+**Hotfix found during that browser testing: Masters → Items was
+crashing on open, in production.** The audit's pagination consolidation
+passed the page's href-builder _function_ into the client `Pagination`
+component — a Server Component can't hand a function across, and it
+fails only at runtime, so `next build` and the Gate 3 walk both missed
+it. The pager now takes precomputed prev/next href _strings_, and its
+docstring says why. Lesson recorded: a consolidation that changes who
+renders a component needs its consumer opened in a browser, not just
+built.
+
 ### 2026-08-01 (second-pass audit) — dot the i's, cross the t's
 
 The audit-of-the-audit described above. Beyond the table: conventions
