@@ -52,6 +52,66 @@ export async function startFirstRevision(unitId: string): Promise<ActionState> {
   redirect(`/selections/${data.id}`);
 }
 
+/**
+ * Locks a revision and hands it to the budget team.
+ *
+ * The two-row update (this revision issued, the previous superseded) runs
+ * inside issue_selection() in the database so it cannot half-happen —
+ * a unit must never end up with two live issued revisions.
+ */
+export async function issueSelection(
+  selectionId: string,
+  notes: string | null,
+): Promise<ActionState> {
+  await authorize();
+  const supabase = await createClient();
+
+  // Written before issuing, while the row is still a draft — the guard
+  // trigger refuses edits to anything already issued.
+  if (notes?.trim()) {
+    const { error: notesError } = await supabase
+      .from("selections")
+      .update({ notes: notes.trim() })
+      .eq("id", selectionId);
+    if (notesError) {
+      console.error("issueSelection notes failed:", notesError);
+      return { error: "Could not save the note. Try again." };
+    }
+  }
+
+  const { error } = await supabase.rpc("issue_selection", { p_selection_id: selectionId });
+  if (error) {
+    console.error("issueSelection failed:", error);
+    // These come from RAISE EXCEPTION in the function and are already
+    // written for a person to read.
+    return { error: error.message.replace(/^.*?:\s*/, "") || "Could not issue this revision." };
+  }
+
+  revalidatePath("/selections", "layout");
+  return undefined;
+}
+
+/**
+ * Opens R+1 as a draft, copied forward from an issued revision.
+ * Line keys are carried over by the database function — that is what lets
+ * Budgets keep pricing on lines that didn't change.
+ */
+export async function createNextRevision(fromSelectionId: string): Promise<ActionState> {
+  await authorize();
+  const supabase = await createClient();
+
+  const { data, error } = await supabase.rpc("create_next_revision", {
+    p_from_selection_id: fromSelectionId,
+  });
+  if (error) {
+    console.error("createNextRevision failed:", error);
+    return { error: error.message.replace(/^.*?:\s*/, "") || "Could not create the next revision." };
+  }
+
+  revalidatePath("/selections", "layout");
+  redirect(`/selections/${data}`);
+}
+
 export async function deleteDraft(selectionId: string): Promise<ActionState> {
   await authorize();
   const supabase = await createClient();

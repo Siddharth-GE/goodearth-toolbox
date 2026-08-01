@@ -81,6 +81,34 @@ What the picker needs to know:
 - The script is re-runnable and skips anything already done, so it's
   safe to run again whenever new catalogue rows arrive.
 
+## The Selections → Budgets handoff (settled)
+
+What the budget team receives when a designer presses **Issue**. Agreed
+before Budgets exists so both sides are built against the same contract —
+`lib/selections/queries.ts`'s `getBudgetHandoff()` is that contract in
+code, and Budgets calls it rather than re-querying these tables.
+
+- **The revision** — unit, project, R-number, who issued it and when,
+  plus the designer's note saying *why* this revision exists. That note
+  is the first thing the budget team reads.
+- **Every line, grouped by space** — item, code, brand, quantity, unit,
+  and `indicative_rate_snapshot`: the figure the item carried the day it
+  was picked. Not an opinion about cost; it exists so an issued revision
+  doesn't silently re-price when a master price is edited later.
+- **What changed** — for R1 onward: added / removed / quantity-changed
+  against the previous issued revision.
+
+**That last part is the point of `line_key`.** `create_next_revision()`
+copies each line forward carrying its key, so Budgets keys pricing to the
+key rather than the row id. An unchanged sofa keeps the price it was
+already given; only new or changed lines enter the budget queue. Copy
+with fresh keys instead and issuing R1 quietly asks the team to re-price
+all 200 lines — which is how people abandon a tool.
+
+**Never crosses the boundary:** cost, margin, client rate. Those are
+Budgets' alone (`lib/budgets/queries.ts` when it exists), and they never
+appear in Selections or on a client-facing document.
+
 ## Next up
 
 ### Phase 2 — Selections (branch `feature/selections`)

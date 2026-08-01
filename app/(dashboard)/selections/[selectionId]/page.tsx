@@ -1,13 +1,22 @@
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button, LinkButton } from "@/components/ui/button";
-import { listActiveSpaceTypes, getSelection, listSelectionLines, listUnitSpaces } from "@/lib/selections/queries";
+import {
+  diffRevisions,
+  getPreviousIssued,
+  getSelection,
+  listActiveSpaceTypes,
+  listSelectionLines,
+  listUnitSpaces,
+} from "@/lib/selections/queries";
 import { LayoutGrid } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AddSpaceDialog } from "../_components/add-space-dialog";
 import { CataloguePicker } from "../_components/catalogue-picker";
+import { IssueDialog } from "../_components/issue-dialog";
 import { LineGrid } from "../_components/line-grid";
+import { NextRevisionButton } from "../_components/next-revision-button";
 import { listItemCategories } from "@/lib/masters/item-categories";
 import { listBrands } from "@/lib/masters/brands";
 
@@ -24,13 +33,18 @@ export default async function SelectionEditorPage({
   const selection = await getSelection(selectionId);
   if (!selection) notFound();
 
-  const [spaces, lines, spaceTypes, categories, brands] = await Promise.all([
+  const [spaces, lines, spaceTypes, categories, brands, previous] = await Promise.all([
     listUnitSpaces(selection.unit_id, selectionId),
     listSelectionLines(selectionId),
     listActiveSpaceTypes(),
     listItemCategories(),
     listBrands(),
+    getPreviousIssued(selection.unit_id, selection.revision_no),
   ]);
+
+  // What the budget team will be handed. Computed for a draft too, so the
+  // Issue dialog can state it before the click rather than after.
+  const diff = previous ? await diffRevisions(previous.id, selectionId, selection.unit_id) : null;
 
   // Land on the requested space, else the first one. A stale ?space from a
   // bookmark (or a space just deleted) falls back rather than 404s.
@@ -54,24 +68,63 @@ export default async function SelectionEditorPage({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {isDraft ? <Badge variant="warning">Draft</Badge> : <Badge variant="success">Issued</Badge>}
-          {isDraft && (
-            <AddSpaceDialog
-              unitId={selection.unit_id}
-              spaceTypes={spaceTypes}
-              // Passed so suggested names continue past what's already
-              // there — a second Bath becomes "Bath 2", not a clash.
-              existing={spaces.map((s) => ({ label: s.label, space_type_id: s.space_type_id }))}
-            />
+          {isDraft ? (
+            <Badge variant="warning">Draft</Badge>
+          ) : selection.status === "superseded" ? (
+            <Badge variant="default" className="bg-muted/15 text-muted">
+              Superseded
+            </Badge>
+          ) : (
+            <Badge variant="success">Issued</Badge>
           )}
+          {isDraft && (
+            <>
+              <AddSpaceDialog
+                unitId={selection.unit_id}
+                spaceTypes={spaceTypes}
+                // Passed so suggested names continue past what's already
+                // there — a second Bath becomes "Bath 2", not a clash.
+                existing={spaces.map((s) => ({ label: s.label, space_type_id: s.space_type_id }))}
+              />
+              {lines.length > 0 && (
+                <IssueDialog
+                  selectionId={selectionId}
+                  revisionNo={selection.revision_no}
+                  lineCount={lines.length}
+                  spaceCount={spaces.filter((s) => s.line_count > 0).length}
+                  previousRevisionNo={previous?.revision_no ?? null}
+                  added={diff?.added ?? 0}
+                  removed={diff?.removed ?? 0}
+                  changed={diff?.changed ?? 0}
+                  unchanged={diff?.unchanged ?? 0}
+                />
+              )}
+            </>
+          )}
+          {selection.status === "issued" && <NextRevisionButton fromSelectionId={selectionId} />}
         </div>
       </div>
 
       {!isDraft && (
-        <p className="rounded-xl border border-border bg-surface px-4 py-3 text-sm text-muted">
-          This revision has been issued and can no longer be changed. To make a change, create the next
-          revision.
-        </p>
+        <div className="rounded-xl border border-border bg-surface px-4 py-3">
+          <p className="text-sm text-foreground">
+            {selection.status === "issued"
+              ? "Issued to budgeting — this revision can no longer be changed."
+              : `Superseded by a later revision. Kept as the record of what R${selection.revision_no} said.`}
+            {selection.issued_at && (
+              <span className="text-muted"> {new Date(selection.issued_at).toLocaleDateString("en-IN")}</span>
+            )}
+          </p>
+          {selection.notes && <p className="mt-1 text-sm text-muted">“{selection.notes}”</p>}
+          {/* Says plainly what the budget team was handed, so a designer
+              can answer "what did they get?" without leaving the screen. */}
+          <p className="mt-2 text-xs text-muted">
+            Budgeting received {lines.length} {lines.length === 1 ? "line" : "lines"}
+            {diff && previous
+              ? ` — ${diff.added} added, ${diff.removed} removed and ${diff.changed} changed since R${previous.revision_no}; ${diff.unchanged} kept existing pricing.`
+              : " — all of it new to price."}
+          </p>
+        </div>
       )}
 
       {spaces.length === 0 ? (

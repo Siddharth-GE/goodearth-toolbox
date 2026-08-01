@@ -201,6 +201,168 @@ export async function listSelectionLines(selectionId: string): Promise<Selection
   });
 }
 
+/** Every revision of a unit, newest first — the unit's design history. */
+export async function listRevisions(unitId: string): Promise<SelectionRow[]> {
+  const user = await requireUser();
+  await requireApp(user, "/selections");
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("selections")
+    .select("*")
+    .eq("unit_id", unitId)
+    .order("revision_no", { ascending: false });
+  return (data ?? []) as SelectionRow[];
+}
+
+/** The revision this one replaced, if any. */
+export async function getPreviousIssued(unitId: string, revisionNo: number): Promise<SelectionRow | null> {
+  const user = await requireUser();
+  await requireApp(user, "/selections");
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("selections")
+    .select("*")
+    .eq("unit_id", unitId)
+    .in("status", ["issued", "superseded"])
+    .lt("revision_no", revisionNo)
+    .order("revision_no", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (data as SelectionRow) ?? null;
+}
+
+export type LineChange =
+  | { kind: "added"; line: SelectionLineRow; space: string }
+  | { kind: "removed"; line: SelectionLineRow; space: string }
+  | {
+      kind: "changed";
+      line: SelectionLineRow;
+      previous: SelectionLineRow;
+      space: string;
+      quantityChanged: boolean;
+      spaceChanged: boolean;
+    };
+
+export type RevisionDiff = {
+  added: number;
+  removed: number;
+  changed: number;
+  unchanged: number;
+  entries: LineChange[];
+};
+
+/**
+ * What changed between two revisions.
+ *
+ * Matched on `line_key`, never on row id — a line copied into the next
+ * revision is a different row but the same line, and that is precisely
+ * what lets Budgets carry pricing forward instead of re-pricing
+ * everything each time a revision is issued.
+ */
+export async function diffRevisions(
+  previousSelectionId: string,
+  currentSelectionId: string,
+  unitId: string,
+): Promise<RevisionDiff> {
+  const [previousLines, currentLines, spaces] = await Promise.all([
+    listSelectionLines(previousSelectionId),
+    listSelectionLines(currentSelectionId),
+    listUnitSpaces(unitId),
+  ]);
+
+  const spaceLabel = new Map(spaces.map((space) => [space.id, space.label]));
+  const previousByKey = new Map(previousLines.map((line) => [line.line_key, line]));
+  const currentByKey = new Map(currentLines.map((line) => [line.line_key, line]));
+
+  const entries: LineChange[] = [];
+  let unchanged = 0;
+
+  for (const line of currentLines) {
+    const previous = previousByKey.get(line.line_key);
+    if (!previous) {
+      entries.push({ kind: "added", line, space: spaceLabel.get(line.unit_space_id) ?? "—" });
+      continue;
+    }
+    const quantityChanged = previous.quantity !== line.quantity;
+    const spaceChanged = previous.unit_space_id !== line.unit_space_id;
+    if (quantityChanged || spaceChanged) {
+      entries.push({
+        kind: "changed",
+        line,
+        previous,
+        space: spaceLabel.get(line.unit_space_id) ?? "—",
+        quantityChanged,
+        spaceChanged,
+      });
+    } else {
+      unchanged++;
+    }
+  }
+
+  for (const line of previousLines) {
+    if (!currentByKey.has(line.line_key)) {
+      entries.push({ kind: "removed", line, space: spaceLabel.get(line.unit_space_id) ?? "—" });
+    }
+  }
+
+  return {
+    added: entries.filter((entry) => entry.kind === "added").length,
+    removed: entries.filter((entry) => entry.kind === "removed").length,
+    changed: entries.filter((entry) => entry.kind === "changed").length,
+    unchanged,
+    entries,
+  };
+}
+
+/**
+ * Everything the Budgets tool receives from an issued revision.
+ *
+ * Assembled here, in Selections, so the handoff is one documented shape
+ * rather than each downstream tool inventing its own joins. Budgets will
+ * call this (under its own grant) rather than re-querying these tables.
+ *
+ * Note what is NOT here: no cost, no margin, no client rate. Selections
+ * records what was specified; `indicative_rate_snapshot` is the figure
+ * the item carried the day it was picked, present so an issued revision
+ * doesn't silently re-price when a master price changes, not as an
+ * opinion about what anything should cost.
+ */
+export type BudgetHandoff = {
+  selection: SelectionDetail;
+  spaces: { space: UnitSpaceRow; lines: SelectionLineRow[] }[];
+  totalLines: number;
+  /** Null for R0 — there is nothing to compare a first revision against. */
+  diff: RevisionDiff | null;
+  previousRevisionNo: number | null;
+};
+
+export async function getBudgetHandoff(selectionId: string): Promise<BudgetHandoff | null> {
+  const selection = await getSelection(selectionId);
+  if (!selection) return null;
+
+  const [spaces, lines, previous] = await Promise.all([
+    listUnitSpaces(selection.unit_id, selectionId),
+    listSelectionLines(selectionId),
+    getPreviousIssued(selection.unit_id, selection.revision_no),
+  ]);
+
+  const diff = previous ? await diffRevisions(previous.id, selectionId, selection.unit_id) : null;
+
+  return {
+    selection,
+    // Spaces with nothing in them are dropped: the budget team is being
+    // handed work, and an empty room is not work.
+    spaces: spaces
+      .map((space) => ({ space, lines: lines.filter((line) => line.unit_space_id === space.id) }))
+      .filter((group) => group.lines.length > 0),
+    totalLines: lines.length,
+    diff,
+    previousRevisionNo: previous?.revision_no ?? null,
+  };
+}
+
 /** Space types a designer may pick from — proposals aren't offered until approved. */
 export async function listActiveSpaceTypes() {
   const user = await requireUser();

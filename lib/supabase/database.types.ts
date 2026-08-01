@@ -972,8 +972,13 @@ export type Database = {
           team: string
         }[]
       }
+      create_next_revision: {
+        Args: { p_from_selection_id: string }
+        Returns: string
+      }
       has_app: { Args: { slug: string }; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
+      issue_selection: { Args: { p_selection_id: string }; Returns: undefined }
       marathon_create_entry: {
         Args: {
           p_age: number

@@ -50,19 +50,39 @@ export default async function SelectionsPage() {
                     {!current ? (
                       <span className="text-muted">Not started</span>
                     ) : current.status === "draft" ? (
-                      <Badge variant="warning">Draft</Badge>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="warning">Draft</Badge>
+                        {/* Both can be live at once: R0 sitting with the
+                            budget team while R1 is being drafted. Hiding
+                            the issued one would misrepresent the unit. */}
+                        {unit.latestIssued && (
+                          <span className="text-xs text-muted">
+                            R{unit.latestIssued.revision_no} with budgeting
+                          </span>
+                        )}
+                      </div>
                     ) : (
-                      <Badge variant="success">Issued</Badge>
+                      <Badge variant="success">With budgeting</Badge>
                     )}
                   </TableCell>
                   <TableCell>
                     {current ? (
-                      <Link
-                        href={`/selections/${current.id}`}
-                        className="text-sm font-medium text-accent hover:underline"
-                      >
-                        {current.status === "draft" ? "Continue" : "View"}
-                      </Link>
+                      <div className="flex items-center gap-3">
+                        <Link
+                          href={`/selections/${current.id}`}
+                          className="text-sm font-medium text-accent hover:underline"
+                        >
+                          {current.status === "draft" ? "Continue" : "View"}
+                        </Link>
+                        {unit.draft && unit.latestIssued && (
+                          <Link
+                            href={`/selections/${unit.latestIssued.id}`}
+                            className="text-sm text-muted hover:text-foreground"
+                          >
+                            R{unit.latestIssued.revision_no}
+                          </Link>
+                        )}
+                      </div>
                     ) : (
                       <StartRevisionButton unitId={unit.unit_id} />
                     )}
