@@ -73,28 +73,21 @@ export async function uploadSpaceView(
 
   const supabase = await createClient();
 
-  const { data: buckets } = await supabase.storage.listBuckets();
-  if (!buckets?.some((bucket) => bucket.name === BUCKET)) {
-    // Private, unlike the public `catalogue` bucket: these are a specific
-    // client's design work, not vendor product photos.
-    const { error } = await supabase.storage.createBucket(BUCKET, {
-      public: false,
-      fileSizeLimit: "10MB",
-      allowedMimeTypes: [designView.contentType],
-    });
-    if (error) {
-      console.error("uploadSpaceView bucket failed:", error);
-      return { error: "Could not prepare storage. Try again." };
-    }
-  }
-
+  // The bucket and its storage policies are created by migration
+  // 0010_design_views_storage.sql, not here. Listing or creating a bucket
+  // needs privileges an ordinary signed-in user doesn't have, so trying it
+  // at upload time fails for everyone except the service role.
   const path = `spaces/${spaceId}/${crypto.randomUUID()}.${designView.extension}`;
   const { error: uploadError } = await supabase.storage
     .from(BUCKET)
     .upload(path, normalised, { contentType: designView.contentType });
   if (uploadError) {
     console.error("uploadSpaceView upload failed:", uploadError);
-    return { error: "Could not upload the image. Try again." };
+    // Storage refuses rather than explains, so name the most likely cause
+    // instead of leaving someone to guess.
+    return {
+      error: "Could not save the image — you may not have permission to upload design views.",
+    };
   }
 
   const { data: last } = await supabase
