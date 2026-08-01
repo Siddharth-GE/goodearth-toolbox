@@ -14,14 +14,14 @@ and **what's next**.
 
 ## Where we are right now
 
-**Phase 1 (Masters) and Phase 3 (Catalogue import) are done. Phase 2
-(Selections) is next and has not been started.**
+**Masters, the catalogue, Selections and design views are all shipped.
+Budgets is next.**
 
 | | |
 |---|---|
 | Last worked | 2026-08-01 |
 | Branch | everything merged to `master`, live on Vercel. Next: `feature/budgets` |
-| Migrations applied | `0001`–`0008` (next new one is `0009`) |
+| Migrations applied | `0001`–`0010` (next new one is `0011`) |
 | Items in database | **2,633** (2,631 imported catalogue + 2 material seeds) |
 | Categories / brands | 14 / 21 |
 | Thumbnails | **897** in Supabase Storage; 3 dead vendor links, 1,733 items have no image |
@@ -38,7 +38,8 @@ and **what's next**.
 | 3 | **Catalogue import** — the real 2,631-item catalogue | ✅ Done — **pulled forward, out of order** (see below) |
 | 3b | **Thumbnail pass** — catalogue images into Supabase Storage | ✅ Done |
 | 2 | **Selections** — per-unit design workspace + the catalogue picker | ✅ Shipped, merged 2026-08-01 |
-| 4 | Budgets — cost + margin → client rate, approval flow | ⬜ Not started |
+| 2b | **Design views** — renders per space, in the design document | ✅ Shipped, merged 2026-08-01 |
+| 4 | **Budgets** — cost + margin → client rate, approval, two documents | ⬜ **NEXT** |
 | 5 | Indents — pull-from-budget *and* direct site request | ⬜ Not started |
 | 6 | Purchase Orders — vendor grouping + letterhead PDF | ⬜ Not started |
 | 7 | Inventory / Store — goods receipt, stock on hand, issues | ⬜ Not started |
@@ -191,7 +192,54 @@ Goodearth actually talks about status.
 
 ---
 
+## The three documents
+
+The system's real output. Agreed 2026-08-01, and the reason Budgets is
+shaped the way it is.
+
+| | Produced by | Contains | Audience |
+|---|---|---|---|
+| **A · Design document** | Selections | Spaces view by view — uploaded renders — with the items specified in each. No prices. | Client, for design sign-off |
+| **B · Budget sheet** | Budgets | Every element with quantity, **cost, margin** and client rate | Internal only |
+| **C · Client quote** | Budgets | Views, items, quantity, **client rate and amount**, totals | Client |
+
+**B and C are the same data, filtered.** Cost and margin appear on B and
+must never appear on C. That's why margin lives in a Budgets-owned table
+with its own RLS rather than on `items` — a mistake in the C template
+can't reach for a number it was never handed.
+
+A is built. B and C come with Budgets.
+
 ## Session log
+
+### 2026-08-01 (later) — Design views (Phase 2b)
+
+Designers upload renders and elevations per space; they appear in the
+editor and at the top of each space's sheet in the design document.
+Migrations `0009`–`0010`.
+
+One spec in `lib/pdf/theme.ts` (`designView`) drives upload, editor
+preview and PDF: **16:9, 1600×900, JPEG, letterboxed not cropped**. Change
+it there and all three follow. JPEG specifically because
+`@react-pdf/renderer` embeds PNG and JPEG only — the catalogue thumbnails
+are WebP because they never leave the browser.
+
+The bucket is **private**, unlike the public `catalogue` one, with its own
+storage policies.
+
+Three things worth remembering, all learned by getting them wrong:
+
+- **Server Actions cap the request body at 1MB.** A real render never
+  reached the action; it failed inside the framework as an opaque server
+  error. The browser now normalises to ~300KB before sending, and the
+  server re-normalises since an action is a public endpoint.
+- **Supabase Storage has its own RLS**, in `storage.objects`, separate
+  from the table. A private bucket starts with *no* policies — rows exist
+  and every image 404s.
+- **Verifying with the service-role key proves nothing about a signed-in
+  user.** The upload probe passed while the feature was broken for
+  everyone, because service role bypasses exactly the rules that were
+  missing.
 
 ### 2026-08-01 — Selections built (Phase 2)
 
