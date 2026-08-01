@@ -3,6 +3,7 @@ import "server-only";
 import { requireApp } from "@/lib/auth/access";
 import { requireUser } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
+import { cache } from "react";
 
 export type SelectionStatus = "draft" | "issued" | "superseded";
 
@@ -102,7 +103,11 @@ export type SelectionDetail = SelectionRow & {
   superseded_by: string | null;
 };
 
-export async function getSelection(selectionId: string): Promise<SelectionDetail | null> {
+// The three functions below are request-cached. The editor screen asks for
+// the same revision's lines and spaces from more than one place — the page
+// itself, and again inside diffRevisions — and without this each one is a
+// separate round trip for identical data.
+export const getSelection = cache(async (selectionId: string): Promise<SelectionDetail | null> => {
   const user = await requireUser();
   await requireApp(user, "/selections");
 
@@ -128,9 +133,12 @@ export async function getSelection(selectionId: string): Promise<SelectionDetail
     unit_name: unit?.name ?? "—",
     project_name: unit?.projects?.name ?? "—",
   };
-}
+});
 
-export async function listUnitSpaces(unitId: string, selectionId?: string): Promise<UnitSpaceRow[]> {
+export const listUnitSpaces = cache(async function listUnitSpaces(
+  unitId: string,
+  selectionId?: string,
+): Promise<UnitSpaceRow[]> {
   const user = await requireUser();
   await requireApp(user, "/selections");
 
@@ -162,9 +170,11 @@ export async function listUnitSpaces(unitId: string, selectionId?: string): Prom
     sort_order: space.sort_order,
     line_count: counts.get(space.id) ?? 0,
   }));
-}
+});
 
-export async function listSelectionLines(selectionId: string): Promise<SelectionLineRow[]> {
+export const listSelectionLines = cache(async function listSelectionLines(
+  selectionId: string,
+): Promise<SelectionLineRow[]> {
   const user = await requireUser();
   await requireApp(user, "/selections");
 
@@ -202,7 +212,7 @@ export async function listSelectionLines(selectionId: string): Promise<Selection
       sort_order: line.sort_order,
     };
   });
-}
+});
 
 /** Every revision of a unit, newest first — the unit's design history. */
 export async function listRevisions(unitId: string): Promise<SelectionRow[]> {
@@ -271,8 +281,11 @@ export async function diffRevisions(
 ): Promise<RevisionDiff> {
   const [previousLines, currentLines, spaces] = await Promise.all([
     listSelectionLines(previousSelectionId),
+    // Same arguments the page itself used, so the request cache returns
+    // these rather than re-querying. Passing a different shape here would
+    // quietly double the work.
     listSelectionLines(currentSelectionId),
-    listUnitSpaces(unitId),
+    listUnitSpaces(unitId, currentSelectionId),
   ]);
 
   const spaceLabel = new Map(spaces.map((space) => [space.id, space.label]));

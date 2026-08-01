@@ -8,6 +8,7 @@ import { Select } from "@/components/ui/select";
 import { addLines } from "@/lib/selections/actions";
 import type { CatalogueItem, CatalogueSearchResult } from "@/lib/selections/catalogue";
 import { Loader2, Minus, Plus, Search } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
 const inr = new Intl.NumberFormat("en-IN");
@@ -29,6 +30,7 @@ export function CataloguePicker({
   categories: { id: string; name: string }[];
   brands: { id: string; name: string }[];
 }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState("");
@@ -45,6 +47,11 @@ export function CataloguePicker({
   // itself, not just a count, so the summary keeps working after the item
   // scrolls out of the current search results.
   const [basket, setBasket] = useState<Record<string, { item: CatalogueItem; quantity: number }>>({});
+  // Re-synced every time the dialog opens, never trusted from mount.
+  // Switching space in the rail is a client-side navigation, so this
+  // component is reused and a useState initial value would keep pointing
+  // at whichever space was open when the page first loaded — silently
+  // writing items into the wrong room.
   const [targetSpaces, setTargetSpaces] = useState<string[]>([currentSpaceId]);
   const [error, setError] = useState<string>();
   const [saving, startSaving] = useTransition();
@@ -111,10 +118,11 @@ export function CataloguePicker({
 
   const commit = () =>
     startSaving(async () => {
+      const targets = targetSpaces;
       const outcome = await addLines(
         selectionId,
         unitId,
-        targetSpaces,
+        targets,
         basketEntries.map((entry) => ({ itemId: entry.item.id, quantity: entry.quantity })),
       );
       if (outcome?.error) {
@@ -123,6 +131,12 @@ export function CataloguePicker({
       }
       reset();
       setOpen(false);
+      // Adding into spaces you aren't looking at is a normal thing to do
+      // here, but it leaves the screen unchanged and looks like nothing
+      // happened. Go to the first space that received the items.
+      if (!targets.includes(currentSpaceId)) {
+        router.push(`/selections/${selectionId}?space=${targets[0]}`);
+      }
     });
 
   return (
@@ -130,7 +144,10 @@ export function CataloguePicker({
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (!next) reset();
+        // Opening resets the target to the space you're actually looking
+        // at; closing clears the basket.
+        if (next) setTargetSpaces([currentSpaceId]);
+        else reset();
       }}
     >
       <Button onClick={() => setOpen(true)}>Add items</Button>

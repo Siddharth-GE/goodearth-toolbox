@@ -78,10 +78,10 @@ export default async function SelectionEditorPage({
             <Badge variant="success">Issued</Badge>
           )}
           {lines.length > 0 && (
-            // A plain link, not a Button click handler: the browser
-            // downloads it natively, which also means it works on a
-            // right-click "save as" and doesn't need JavaScript.
-            <LinkButton href={`/selections/${selectionId}/pdf`} variant="secondary">
+            // plain: a next/link would prefetch on hover and generate the
+            // entire PDF server-side just because the cursor passed over
+            // the button. A plain anchor also gives native "save as".
+            <LinkButton href={`/selections/${selectionId}/pdf`} variant="secondary" plain>
               <FileDown className="size-4" />
               PDF
             </LinkButton>
