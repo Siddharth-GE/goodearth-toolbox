@@ -46,7 +46,9 @@ export function NavTabs({
   active: string;
 }) {
   return (
-    <div className="flex gap-2">
+    // flex-wrap: Masters has eight of these, and on a phone an unwrapped
+    // pill row was wider than the screen.
+    <div className="flex flex-wrap gap-2">
       {tabs.map((tab) => (
         <Link
           key={tab.key}

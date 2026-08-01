@@ -10,9 +10,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { TOOL_ICONS, type Tool, type ToolGroup } from "@/lib/tools";
 import { cn } from "@/lib/utils";
-import { LayoutGrid, LogOut, Search } from "lucide-react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { LayoutGrid, LogOut, Menu, Search, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 
 const GROUP_ORDER: ToolGroup[] = ["Operations", "Events", "People", "Admin"];
 
@@ -21,15 +23,18 @@ function NavRow({
   active,
   icon: Icon,
   label,
+  onNavigate,
 }: {
   href: string;
   active: boolean;
   icon: typeof LayoutGrid;
   label: string;
+  onNavigate?: () => void;
 }) {
   return (
     <Link
       href={href}
+      onClick={onNavigate}
       className={cn(
         "flex h-10 items-center gap-2.5 rounded-xl px-2.5 text-sm font-medium transition-colors",
         active
@@ -43,23 +48,41 @@ function NavRow({
   );
 }
 
-export function Sidebar({ tools, userName }: { tools: Tool[]; userName: string }) {
-  const pathname = usePathname();
+function Brand() {
+  return (
+    <div className="flex items-center gap-2.5">
+      <span className="bg-accent text-accent-foreground flex size-7 shrink-0 items-center justify-center rounded-lg text-sm font-bold">
+        G
+      </span>
+      <span className="text-foreground text-base font-semibold tracking-tight">
+        Goodearth Toolbox
+      </span>
+    </div>
+  );
+}
 
+/** Everything inside the panel — shared by the desktop rail and the phone drawer. */
+function SidebarContent({
+  tools,
+  userName,
+  pathname,
+  onNavigate,
+}: {
+  tools: Tool[];
+  userName: string;
+  pathname: string;
+  /** The phone drawer closes itself when a link is tapped. */
+  onNavigate?: () => void;
+}) {
   const groups = GROUP_ORDER.map((group) => ({
     group,
     tools: tools.filter((t) => t.group === group),
   })).filter((g) => g.tools.length > 0);
 
   return (
-    <aside className="border-border bg-surface flex h-screen w-64 shrink-0 flex-col border-r">
-      <div className="flex items-center gap-2.5 px-5 py-5">
-        <span className="bg-accent text-accent-foreground flex size-7 shrink-0 items-center justify-center rounded-lg text-sm font-bold">
-          G
-        </span>
-        <span className="text-foreground text-base font-semibold tracking-tight">
-          Goodearth Toolbox
-        </span>
+    <>
+      <div className="px-5 py-5">
+        <Brand />
       </div>
 
       {/* Visual only for now — nothing to search across yet (no
@@ -70,7 +93,13 @@ export function Sidebar({ tools, userName }: { tools: Tool[]; userName: string }
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3">
-        <NavRow href="/" active={pathname === "/"} icon={LayoutGrid} label="Overview" />
+        <NavRow
+          href="/"
+          active={pathname === "/"}
+          icon={LayoutGrid}
+          label="Overview"
+          onNavigate={onNavigate}
+        />
 
         {groups.map(({ group, tools: groupTools }) => (
           <div key={group} className="mt-4">
@@ -85,6 +114,7 @@ export function Sidebar({ tools, userName }: { tools: Tool[]; userName: string }
                   active={pathname === tool.href || pathname.startsWith(`${tool.href}/`)}
                   icon={TOOL_ICONS[tool.icon]}
                   label={tool.name}
+                  onNavigate={onNavigate}
                 />
               ))}
             </div>
@@ -110,6 +140,74 @@ export function Sidebar({ tools, userName }: { tools: Tool[]; userName: string }
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-    </aside>
+    </>
+  );
+}
+
+/**
+ * The dashboard shell's navigation, in two forms.
+ *
+ * Desktop: a rail pinned with `sticky top-0 h-screen` — the PAGE scrolls,
+ * the rail doesn't. (It used to be a plain flex child, so it scrolled
+ * away with the content and ended mid-air.) Its nav has its own
+ * overflow-y for when the tool list outgrows the viewport.
+ *
+ * Phone: the rail is hidden; a slim sticky top bar carries the brand and
+ * a menu button that opens the same content as a slide-in drawer. Radix
+ * Dialog underneath, so focus-trapping, ESC and the backdrop click are
+ * correct for free. The drawer closes itself on navigation.
+ */
+export function Sidebar({ tools, userName }: { tools: Tool[]; userName: string }) {
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      {/* Desktop rail */}
+      <aside className="border-border bg-surface sticky top-0 hidden h-screen w-64 shrink-0 flex-col self-start border-r md:flex">
+        <SidebarContent tools={tools} userName={userName} pathname={pathname} />
+      </aside>
+
+      {/* Phone top bar */}
+      <header className="border-border bg-background/95 sticky top-0 z-40 flex items-center gap-2 border-b px-3 py-2.5 backdrop-blur md:hidden">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label="Open menu"
+          className="text-foreground focus-visible:ring-accent flex size-9 items-center justify-center rounded-xl hover:bg-black/[0.04] focus-visible:ring-2 focus-visible:outline-none dark:hover:bg-white/[0.06]"
+        >
+          <Menu className="size-5" />
+        </button>
+        <Brand />
+      </header>
+
+      {/* Phone drawer */}
+      <DialogPrimitive.Root open={open} onOpenChange={setOpen}>
+        <DialogPrimitive.Portal>
+          <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 md:hidden" />
+          <DialogPrimitive.Content
+            aria-describedby={undefined}
+            className="bg-surface fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col shadow-lg outline-none md:hidden"
+          >
+            <DialogPrimitive.Title className="sr-only">Navigation</DialogPrimitive.Title>
+            <DialogPrimitive.Close
+              aria-label="Close menu"
+              className="text-muted focus-visible:ring-accent absolute top-4 right-3 rounded-lg p-1.5 hover:bg-black/[0.04] focus-visible:ring-2 focus-visible:outline-none dark:hover:bg-white/[0.06]"
+            >
+              <X className="size-4" />
+            </DialogPrimitive.Close>
+            {/* Tapping a link navigates but keeps the drawer mounted —
+                onNavigate closes it, or the new page appears behind an
+                open menu. */}
+            <SidebarContent
+              tools={tools}
+              userName={userName}
+              pathname={pathname}
+              onNavigate={() => setOpen(false)}
+            />
+          </DialogPrimitive.Content>
+        </DialogPrimitive.Portal>
+      </DialogPrimitive.Root>
+    </>
   );
 }
