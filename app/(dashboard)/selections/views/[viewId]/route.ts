@@ -12,10 +12,7 @@ import { createClient } from "@/lib/supabase/server";
  * the public catalogue thumbnails — these are a specific client's design
  * work, not vendor product photos.
  */
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ viewId: string }> },
-) {
+export async function GET(_request: Request, { params }: { params: Promise<{ viewId: string }> }) {
   const user = await getCurrentUser();
   if (!user) return new Response("Unauthorized", { status: 401 });
 

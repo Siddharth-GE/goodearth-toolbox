@@ -43,7 +43,7 @@ export function GrantCheckbox({
         }}
       />
       {error && (
-        <span role="alert" className="text-[10px] font-medium leading-tight text-danger">
+        <span role="alert" className="text-danger text-[10px] leading-tight font-medium">
           {error}
         </span>
       )}

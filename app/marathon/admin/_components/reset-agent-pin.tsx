@@ -24,7 +24,7 @@ export function ResetAgentPin({ agentId, name }: { agentId: string; name: string
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-muted transition-colors hover:bg-black/[0.04] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:hover:bg-white/[0.06]"
+        className="text-muted hover:text-foreground focus-visible:ring-accent shrink-0 rounded-lg px-2 py-1 text-xs font-medium transition-colors hover:bg-black/[0.04] focus-visible:ring-2 focus-visible:outline-none dark:hover:bg-white/[0.06]"
       >
         Reset PIN
       </button>
@@ -50,17 +50,17 @@ export function ResetAgentPin({ agentId, name }: { agentId: string; name: string
       <button
         type="button"
         onClick={() => setOpen(false)}
-        className="rounded-lg px-2 py-1 text-xs text-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        className="text-muted hover:text-foreground focus-visible:ring-accent rounded-lg px-2 py-1 text-xs focus-visible:ring-2 focus-visible:outline-none"
       >
         Cancel
       </button>
       {state?.error && (
-        <span role="alert" className="text-xs font-medium text-danger">
+        <span role="alert" className="text-danger text-xs font-medium">
           {state.error}
         </span>
       )}
       {state?.done && (
-        <span role="status" className="text-xs font-medium text-success">
+        <span role="status" className="text-success text-xs font-medium">
           {state.done}
         </span>
       )}

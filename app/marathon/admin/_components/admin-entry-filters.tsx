@@ -47,7 +47,7 @@ export function AdminEntryFilters({
   }
 
   return (
-    <form method="GET" className="mb-4 space-y-2 rounded-2xl border border-border bg-surface p-3.5">
+    <form method="GET" className="border-border bg-surface mb-4 space-y-2 rounded-2xl border p-3.5">
       <Select value={agentId} onChange={(e) => setAgentId(e.target.value)}>
         <option value="">All agents</option>
         {agents.map((a) => (

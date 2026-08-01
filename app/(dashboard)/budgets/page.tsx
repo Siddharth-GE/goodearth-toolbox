@@ -1,6 +1,13 @@
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+} from "@/components/ui/table";
 import { listInbox } from "@/lib/budgets/queries";
 import { PiggyBank } from "lucide-react";
 import Link from "next/link";
@@ -13,13 +20,13 @@ export default async function BudgetsPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold tracking-tight text-foreground">Budgets</h1>
-          <p className="text-sm text-muted">
+          <h1 className="text-foreground text-lg font-bold tracking-tight">Budgets</h1>
+          <p className="text-muted text-sm">
             Every design revision handed over for pricing. Costs and margins here are visible only
             to this team.
           </p>
         </div>
-        <Link href="/budgets/margins" className="text-sm font-medium text-accent hover:underline">
+        <Link href="/budgets/margins" className="text-accent text-sm font-medium hover:underline">
           Product margins
         </Link>
       </div>
@@ -46,7 +53,7 @@ export default async function BudgetsPage() {
             {rows.map((row) => (
               <TableRow key={row.selection_id}>
                 <TableCell>{row.project_name}</TableCell>
-                <TableCell className="font-medium text-foreground">{row.unit_name}</TableCell>
+                <TableCell className="text-foreground font-medium">{row.unit_name}</TableCell>
                 <TableCell>R{row.revision_no}</TableCell>
                 <TableCell className="text-muted">
                   {row.issued_at ? new Date(row.issued_at).toLocaleDateString("en-IN") : "—"}
@@ -59,7 +66,7 @@ export default async function BudgetsPage() {
                       <Badge variant="warning">Pricing</Badge>
                       {/* The number that says whether this is nearly done or
                           barely started, without having to open it. */}
-                      <span className="text-xs text-muted">
+                      <span className="text-muted text-xs">
                         {row.priced_count} of {row.line_count} priced
                       </span>
                     </div>
@@ -73,7 +80,7 @@ export default async function BudgetsPage() {
                   {row.budget_id ? (
                     <Link
                       href={`/budgets/${row.budget_id}`}
-                      className="text-sm font-medium text-accent hover:underline"
+                      className="text-accent text-sm font-medium hover:underline"
                     >
                       {row.budget_status === "approved" ? "View" : "Continue"}
                     </Link>

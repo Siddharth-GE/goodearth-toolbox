@@ -5,16 +5,21 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export async function getMarathonHome() {
   const supabase = createAdminClient();
 
-  const [{ data: config }, { data: runs }, { count: groupCount }, { data: agents }, { count: totalEntries }] =
-    await Promise.all([
-      supabase.from("marathon_config").select("event_name").single(),
-      supabase.from("marathon_runs").select("id, name").order("sort_order"),
-      // A head-count, not the rows. Fetching every group just to read
-      // .length would silently stop at PostgREST's 1000-row ceiling.
-      supabase.from("marathon_groups").select("id", { count: "exact", head: true }),
-      supabase.from("marathon_agents").select("id, name").order("name"),
-      supabase.from("marathon_entries").select("id", { count: "exact", head: true }),
-    ]);
+  const [
+    { data: config },
+    { data: runs },
+    { count: groupCount },
+    { data: agents },
+    { count: totalEntries },
+  ] = await Promise.all([
+    supabase.from("marathon_config").select("event_name").single(),
+    supabase.from("marathon_runs").select("id, name").order("sort_order"),
+    // A head-count, not the rows. Fetching every group just to read
+    // .length would silently stop at PostgREST's 1000-row ceiling.
+    supabase.from("marathon_groups").select("id", { count: "exact", head: true }),
+    supabase.from("marathon_agents").select("id, name").order("name"),
+    supabase.from("marathon_entries").select("id", { count: "exact", head: true }),
+  ]);
 
   // One exact count per run rather than tallying every entry row in JS.
   // The old version fetched one row per entry, so on race day — the only

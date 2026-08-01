@@ -24,7 +24,9 @@ export type ItemRequestRow = {
  * tool that already gated its own entry point. Only the resolve actions
  * are restricted.
  */
-export async function listItemRequests(status: ItemRequestStatus = "pending"): Promise<ItemRequestRow[]> {
+export async function listItemRequests(
+  status: ItemRequestStatus = "pending",
+): Promise<ItemRequestRow[]> {
   const supabase = await createClient();
 
   const { data } = await supabase

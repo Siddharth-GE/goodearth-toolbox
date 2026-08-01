@@ -17,13 +17,13 @@ export default async function MarathonHome() {
   return (
     <div className="pb-12">
       <div className="px-6 pt-12 pb-6 text-center">
-        <span className="text-xs font-semibold uppercase tracking-widest text-muted">
+        <span className="text-muted text-xs font-semibold tracking-widest uppercase">
           {eventName}
         </span>
-        <h1 className="mt-3 text-2xl font-bold tracking-tight text-foreground">
+        <h1 className="text-foreground mt-3 text-2xl font-bold tracking-tight">
           {copy.runnerRegistration.en}
         </h1>
-        <p className="mt-0.5 text-sm text-muted">{copy.runnerRegistration.ml}</p>
+        <p className="text-muted mt-0.5 text-sm">{copy.runnerRegistration.ml}</p>
 
         <div className="mt-6">
           <HeroCounter total={totalEntries} label="runners registered so far" />
@@ -32,19 +32,19 @@ export default async function MarathonHome() {
         <div className="mt-4 flex justify-center gap-6">
           {runCounts.map((run) => (
             <div key={run.runId} className="text-center">
-              <div className="text-base font-bold text-foreground">{run.count}</div>
-              <div className="text-xs font-medium text-muted">{run.name}</div>
+              <div className="text-foreground text-base font-bold">{run.count}</div>
+              <div className="text-muted text-xs font-medium">{run.name}</div>
             </div>
           ))}
           <div className="text-center">
-            <div className="text-base font-bold text-foreground">{groupCount}</div>
-            <div className="text-xs font-medium text-muted">Schools &amp; clubs</div>
+            <div className="text-foreground text-base font-bold">{groupCount}</div>
+            <div className="text-muted text-xs font-medium">Schools &amp; clubs</div>
           </div>
         </div>
       </div>
 
       <div className="px-5">
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted">
+        <h2 className="text-muted mb-3 text-xs font-semibold tracking-widest uppercase">
           Members — tap your name
         </h2>
         <MemberList agents={agents} />

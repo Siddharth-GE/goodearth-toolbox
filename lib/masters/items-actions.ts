@@ -21,11 +21,16 @@ function readItemForm(formData: FormData) {
     brand_id: String(formData.get("brand_id") ?? "") || null,
     placement: (String(formData.get("placement") ?? "") || null) as Placement | null,
     default_uom: String(formData.get("default_uom") ?? "") as Uom,
-    indicative_price: formData.get("indicative_price") ? Number(formData.get("indicative_price")) : null,
+    indicative_price: formData.get("indicative_price")
+      ? Number(formData.get("indicative_price"))
+      : null,
   };
 }
 
-export async function createItem(_state: ItemFormState, formData: FormData): Promise<ItemFormState> {
+export async function createItem(
+  _state: ItemFormState,
+  formData: FormData,
+): Promise<ItemFormState> {
   const user = await requireUser();
   await requireApp(user, "/masters");
 
@@ -47,7 +52,11 @@ export async function createItem(_state: ItemFormState, formData: FormData): Pro
   return undefined;
 }
 
-export async function updateItem(id: string, _state: ItemFormState, formData: FormData): Promise<ItemFormState> {
+export async function updateItem(
+  id: string,
+  _state: ItemFormState,
+  formData: FormData,
+): Promise<ItemFormState> {
   const user = await requireUser();
   await requireApp(user, "/masters");
 

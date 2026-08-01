@@ -33,12 +33,12 @@ export function BibCard({
   return (
     <div
       className={cn(
-        "mb-5 overflow-hidden rounded-2xl text-white shadow-sm [animation:card-in_200ms_ease-out]",
+        "mb-5 [animation:card-in_200ms_ease-out] overflow-hidden rounded-2xl text-white shadow-sm",
         CARD_COLOR_CLASSES[color] ?? FALLBACK,
       )}
     >
       <div className="px-5 pt-5 pb-4 text-center">
-        <p className="text-xs font-medium uppercase tracking-wide text-white/70">Bib Number</p>
+        <p className="text-xs font-medium tracking-wide text-white/70 uppercase">Bib Number</p>
         <p className="mt-1 text-5xl font-extrabold tracking-tight">{bib}</p>
       </div>
       <div className="flex items-center justify-between border-t border-white/15 bg-black/10 px-5 py-3 text-sm">
@@ -48,7 +48,9 @@ export function BibCard({
             {categoryName} · {runName}
           </p>
         </div>
-        <span className="rounded-full bg-white/15 px-2.5 py-1 text-xs font-semibold">{teeSize}</span>
+        <span className="rounded-full bg-white/15 px-2.5 py-1 text-xs font-semibold">
+          {teeSize}
+        </span>
       </div>
     </div>
   );

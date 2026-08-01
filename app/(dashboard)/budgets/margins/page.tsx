@@ -14,11 +14,11 @@ export default async function MarginsPage() {
   return (
     <div className="space-y-4">
       <div>
-        <Link href="/budgets" className="text-xs font-medium text-muted hover:text-foreground">
+        <Link href="/budgets" className="text-muted hover:text-foreground text-xs font-medium">
           ← All budgets
         </Link>
-        <h1 className="mt-1 text-lg font-bold tracking-tight text-foreground">Product margins</h1>
-        <p className="text-sm text-muted">
+        <h1 className="text-foreground mt-1 text-lg font-bold tracking-tight">Product margins</h1>
+        <p className="text-muted text-sm">
           The default markup applied when a product is priced. Changing one here only affects
           pricing done from now on — budgets already priced keep their own figures.
         </p>

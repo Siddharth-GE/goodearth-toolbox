@@ -1,6 +1,13 @@
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+} from "@/components/ui/table";
 import { listUnitsForSelections } from "@/lib/selections/queries";
 import { Palette } from "lucide-react";
 import Link from "next/link";
@@ -12,8 +19,8 @@ export default async function SelectionsPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-lg font-bold tracking-tight text-foreground">Selections</h1>
-        <p className="text-sm text-muted">
+        <h1 className="text-foreground text-lg font-bold tracking-tight">Selections</h1>
+        <p className="text-muted text-sm">
           What goes into every space of a unit. Costs and rates are handled in Budgets.
         </p>
       </div>
@@ -44,7 +51,7 @@ export default async function SelectionsPage() {
               return (
                 <TableRow key={unit.unit_id}>
                   <TableCell>{unit.project_name}</TableCell>
-                  <TableCell className="font-medium text-foreground">{unit.unit_name}</TableCell>
+                  <TableCell className="text-foreground font-medium">{unit.unit_name}</TableCell>
                   <TableCell>{current ? `R${current.revision_no}` : "—"}</TableCell>
                   <TableCell>
                     {!current ? (
@@ -56,7 +63,7 @@ export default async function SelectionsPage() {
                             budget team while R1 is being drafted. Hiding
                             the issued one would misrepresent the unit. */}
                         {unit.latestIssued && (
-                          <span className="text-xs text-muted">
+                          <span className="text-muted text-xs">
                             R{unit.latestIssued.revision_no} with budgeting
                           </span>
                         )}
@@ -70,14 +77,14 @@ export default async function SelectionsPage() {
                       <div className="flex items-center gap-3">
                         <Link
                           href={`/selections/${current.id}`}
-                          className="text-sm font-medium text-accent hover:underline"
+                          className="text-accent text-sm font-medium hover:underline"
                         >
                           {current.status === "draft" ? "Continue" : "View"}
                         </Link>
                         {unit.draft && unit.latestIssued && (
                           <Link
                             href={`/selections/${unit.latestIssued.id}`}
-                            className="text-sm text-muted hover:text-foreground"
+                            className="text-muted hover:text-foreground text-sm"
                           >
                             R{unit.latestIssued.revision_no}
                           </Link>

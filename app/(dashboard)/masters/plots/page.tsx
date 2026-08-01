@@ -1,6 +1,13 @@
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+} from "@/components/ui/table";
 import { listPlots, type PlotStatus } from "@/lib/masters/plots";
 import { listProjects } from "@/lib/masters/projects";
 import { Boxes } from "lucide-react";
@@ -23,7 +30,11 @@ export default async function PlotsPage() {
       </div>
 
       {plots.length === 0 ? (
-        <EmptyState icon={Boxes} title="No plots yet" description="Create the first plot under a project." />
+        <EmptyState
+          icon={Boxes}
+          title="No plots yet"
+          description="Create the first plot under a project."
+        />
       ) : (
         <Table>
           <TableHead>
@@ -38,7 +49,7 @@ export default async function PlotsPage() {
           <TableBody>
             {plots.map((plot) => (
               <TableRow key={plot.id}>
-                <TableCell className="font-medium text-foreground">{plot.name}</TableCell>
+                <TableCell className="text-foreground font-medium">{plot.name}</TableCell>
                 <TableCell>{projectName(plot.project_id)}</TableCell>
                 <TableCell>{plot.area ?? "—"}</TableCell>
                 <TableCell>

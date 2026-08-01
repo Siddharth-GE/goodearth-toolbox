@@ -25,23 +25,27 @@ export default async function ItemRequestsPage({
   await requireApp(user, "/masters");
 
   const { status } = await searchParams;
-  const active = (TABS.find((tab) => tab.status === status)?.status ?? "pending") as ItemRequestStatus;
+  const active = (TABS.find((tab) => tab.status === status)?.status ??
+    "pending") as ItemRequestStatus;
   const requests = await listItemRequests(active);
 
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-sm font-semibold text-foreground">Item requests</h2>
-        <p className="text-sm text-muted">
-          Items designers added that weren&apos;t in the catalogue. Approving is tidying, not a gate — the
-          item is already in use.
+        <h2 className="text-foreground text-sm font-semibold">Item requests</h2>
+        <p className="text-muted text-sm">
+          Items designers added that weren&apos;t in the catalogue. Approving is tidying, not a gate
+          — the item is already in use.
         </p>
       </div>
 
       <NavTabs
         tabs={TABS.map((tab) => ({
           key: tab.status,
-          href: tab.status === "pending" ? "/masters/requests" : `/masters/requests?status=${tab.status}`,
+          href:
+            tab.status === "pending"
+              ? "/masters/requests"
+              : `/masters/requests?status=${tab.status}`,
           label: tab.label,
         }))}
         active={active}
@@ -60,28 +64,28 @@ export default async function ItemRequestsPage({
       ) : (
         <div className="space-y-3">
           {requests.map((request) => (
-            <div key={request.id} className="rounded-2xl border border-border bg-surface p-4">
+            <div key={request.id} className="border-border bg-surface rounded-2xl border p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium text-foreground">{request.requested_name}</p>
+                    <p className="text-foreground font-medium">{request.requested_name}</p>
                     {request.status === "pending" && <Badge variant="warning">Provisional</Badge>}
                     {/* Usage is what makes a merge consequential: this item
                         is already sitting on issued revisions. */}
                     {request.usage_count > 0 && (
-                      <span className="text-xs text-muted">
+                      <span className="text-muted text-xs">
                         used on {request.usage_count} {request.usage_count === 1 ? "line" : "lines"}
                       </span>
                     )}
                   </div>
-                  <p className="mt-0.5 text-xs text-muted">
+                  <p className="text-muted mt-0.5 text-xs">
                     {request.category_name ?? "No category"}
                     {request.brand_name && ` · ${request.brand_name}`}
                     {" · "}
                     {new Date(request.created_at).toLocaleDateString("en-IN")}
                   </p>
                   {request.spec_note && (
-                    <p className="mt-2 max-w-prose text-sm text-muted">{request.spec_note}</p>
+                    <p className="text-muted mt-2 max-w-prose text-sm">{request.spec_note}</p>
                   )}
                 </div>
 

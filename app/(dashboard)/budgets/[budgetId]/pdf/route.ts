@@ -10,7 +10,10 @@ import { createElement, type ReactElement } from "react";
  * redirected rather than a file. Generated on demand rather than stored,
  * so it can never drift from the figures it represents.
  */
-export async function GET(_request: Request, { params }: { params: Promise<{ budgetId: string }> }) {
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ budgetId: string }> },
+) {
   const { budgetId } = await params;
 
   const budget = await getBudget(budgetId);

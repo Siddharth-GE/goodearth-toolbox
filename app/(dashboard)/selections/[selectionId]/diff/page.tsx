@@ -1,6 +1,13 @@
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+} from "@/components/ui/table";
 import {
   diffRevisions,
   getPreviousIssued,
@@ -29,14 +36,16 @@ export default async function RevisionDiffPage({
       <div>
         <Link
           href={`/selections/${selectionId}`}
-          className="text-xs font-medium text-muted hover:text-foreground"
+          className="text-muted hover:text-foreground text-xs font-medium"
         >
           ← R{selection.revision_no}
         </Link>
-        <h1 className="mt-1 text-lg font-bold tracking-tight text-foreground">
-          {previous ? `R${selection.revision_no} compared with R${previous.revision_no}` : "Changes"}
+        <h1 className="text-foreground mt-1 text-lg font-bold tracking-tight">
+          {previous
+            ? `R${selection.revision_no} compared with R${previous.revision_no}`
+            : "Changes"}
         </h1>
-        <p className="text-sm text-muted">
+        <p className="text-muted text-sm">
           {selection.project_name} · {selection.unit_name}
         </p>
       </div>
@@ -114,8 +123,10 @@ function Summary({
   label: string;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-surface px-4 py-2.5">
-      <span className="text-sm font-semibold tabular-nums text-foreground">{inr.format(count)}</span>{" "}
+    <div className="border-border bg-surface rounded-xl border px-4 py-2.5">
+      <span className="text-foreground text-sm font-semibold tabular-nums">
+        {inr.format(count)}
+      </span>{" "}
       <Badge variant={tone} className="ml-1">
         {label}
       </Badge>
@@ -136,7 +147,7 @@ function Section({
 
   return (
     <div className="space-y-2">
-      <h2 className="text-xs font-semibold uppercase tracking-widest text-muted">
+      <h2 className="text-muted text-xs font-semibold tracking-widest uppercase">
         {title} ({entries.length})
       </h2>
       <Table>
@@ -153,24 +164,27 @@ function Section({
             <TableRow key={entry.line.line_key}>
               <TableCell className="text-muted">{entry.space}</TableCell>
               <TableCell className="text-muted">{entry.line.item_code ?? "—"}</TableCell>
-              <TableCell className="font-medium text-foreground">{entry.line.item_name}</TableCell>
+              <TableCell className="text-foreground font-medium">{entry.line.item_name}</TableCell>
               <TableCell>
                 {entry.kind === "changed" ? (
                   <span className="tabular-nums">
-                    <span className="text-muted line-through">{inr.format(entry.previous.quantity)}</span>{" "}
-                    <span className="font-semibold text-foreground">
+                    <span className="text-muted line-through">
+                      {inr.format(entry.previous.quantity)}
+                    </span>{" "}
+                    <span className="text-foreground font-semibold">
                       {inr.format(entry.line.quantity)}
                     </span>{" "}
                     <span className="text-muted">{entry.line.uom}</span>
                     {entry.spaceChanged && (
-                      <span className="ml-2 text-xs text-muted">moved from another space</span>
+                      <span className="text-muted ml-2 text-xs">moved from another space</span>
                     )}
                   </span>
                 ) : (
                   <span className="tabular-nums">
-                    {inr.format(entry.line.quantity)} <span className="text-muted">{entry.line.uom}</span>
+                    {inr.format(entry.line.quantity)}{" "}
+                    <span className="text-muted">{entry.line.uom}</span>
                     {entry.kind === "removed" && (
-                      <span className="ml-2 text-xs text-muted">was in R{previousRevisionNo}</span>
+                      <span className="text-muted ml-2 text-xs">was in R{previousRevisionNo}</span>
                     )}
                   </span>
                 )}

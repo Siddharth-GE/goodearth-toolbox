@@ -46,7 +46,9 @@ export async function uploadSpaceView(
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) return { error: "Choose an image to upload." };
   if (file.size > MAX_UPLOAD_BYTES) {
-    return { error: "That image is too large to upload. Export it at a smaller size and try again." };
+    return {
+      error: "That image is too large to upload. Export it at a smaller size and try again.",
+    };
   }
   if (!ACCEPTED.includes(file.type)) {
     return { error: "Upload a JPG, PNG, WebP or AVIF." };

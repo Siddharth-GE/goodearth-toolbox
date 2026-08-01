@@ -25,7 +25,7 @@ export function StartPricingButton({ selectionId }: { selectionId: string }) {
       >
         {pending ? "Starting…" : "Start pricing"}
       </Button>
-      {error && <p className="text-xs font-medium text-danger">{error}</p>}
+      {error && <p className="text-danger text-xs font-medium">{error}</p>}
     </div>
   );
 }

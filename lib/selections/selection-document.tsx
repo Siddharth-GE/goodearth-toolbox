@@ -38,7 +38,12 @@ const styles = StyleSheet.create({
   },
   metaValue: { fontSize: pdf.size.body, marginTop: 2 },
 
-  noteBlock: { marginTop: pdf.space.block, borderLeftWidth: 2, borderLeftColor: pdf.color.accent, paddingLeft: 10 },
+  noteBlock: {
+    marginTop: pdf.space.block,
+    borderLeftWidth: 2,
+    borderLeftColor: pdf.color.accent,
+    paddingLeft: 10,
+  },
   noteLabel: {
     fontSize: pdf.size.tiny,
     letterSpacing: 0.6,
@@ -65,7 +70,12 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
 
-  spaceHeading: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 10 },
+  spaceHeading: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
   spaceName: { fontFamily: pdf.fontBold, fontSize: pdf.size.title },
   spaceType: { fontSize: pdf.size.small, color: pdf.color.muted, marginTop: 2 },
   spaceCount: { fontSize: pdf.size.small, color: pdf.color.muted },
@@ -135,7 +145,13 @@ export function SelectionDocument({
           <Meta label="Revision" value={`R${selection.revision_no}`} />
           <Meta
             label="Status"
-            value={isDraft ? "Draft — not issued" : selection.status === "issued" ? "Issued" : "Superseded"}
+            value={
+              isDraft
+                ? "Draft — not issued"
+                : selection.status === "issued"
+                  ? "Issued"
+                  : "Superseded"
+            }
           />
           <Meta label="Issued" value={formatDate(selection.issued_at)} />
           <Meta label="Reference" value={reference} />

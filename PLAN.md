@@ -22,35 +22,35 @@ specifies a unit space by space, issues it, the budget team prices it,
 and a client quotation comes out the other side. That's the spine of the
 AppSheet replacement.
 
-| | |
-|---|---|
-| Last worked | 2026-08-01 |
-| Branch | everything merged to `master`, live on Vercel. Next: `feature/indents` |
-| Migrations applied | `0001`–`0014` (next new one is `0015`) |
-| Items in database | **2,633** (2,631 imported catalogue + 2 material seeds) |
-| Categories / brands | 14 / 21 |
-| Thumbnails | **897** in Supabase Storage; 3 dead vendor links, 1,733 items have no image |
-| Built tools | Marathon, Settings, Masters, Selections, Budgets |
-| Tests | `npm test` — 17, covering `lib/budgets/` pricing and carry-forward |
+|                     |                                                                             |
+| ------------------- | --------------------------------------------------------------------------- |
+| Last worked         | 2026-08-01                                                                  |
+| Branch              | everything merged to `master`, live on Vercel. Next: `feature/indents`      |
+| Migrations applied  | `0001`–`0014` (next new one is `0015`)                                      |
+| Items in database   | **2,633** (2,631 imported catalogue + 2 material seeds)                     |
+| Categories / brands | 14 / 21                                                                     |
+| Thumbnails          | **897** in Supabase Storage; 3 dead vendor links, 1,733 items have no image |
+| Built tools         | Marathon, Settings, Masters, Selections, Budgets                            |
+| Tests               | `npm test` — 17, covering `lib/budgets/` pricing and carry-forward          |
 
 ---
 
 ## Phase status
 
-| # | Phase | Status |
-|---|---|---|
-| 0 | Platform hardening — `user_apps` grants, `requireApp()`, generated Supabase types, migration rules | ✅ Done |
-| 1 | **Masters** — projects, plots, units, clients, vendors, stores, items, categories, brands, space types | ✅ Shipped, Gate 1 approved |
-| 3 | **Catalogue import** — the real 2,631-item catalogue | ✅ Done — **pulled forward, out of order** (see below) |
-| 3b | **Thumbnail pass** — catalogue images into Supabase Storage | ✅ Done |
-| 2 | **Selections** — per-unit design workspace + the catalogue picker | ✅ Shipped, merged 2026-08-01 |
-| 2b | **Design views** — renders per space, in the design document | ✅ Shipped, merged 2026-08-01 |
-| 4 | **Budgets** — cost + margin → client rate, approval, two documents | ✅ Shipped, merged 2026-08-01 |
-| 5 | Indents — pull-from-budget *and* direct site request | ⬜ **NEXT** |
-| 6 | Purchase Orders — vendor grouping + letterhead PDF | ⬜ Not started |
-| 7 | Inventory / Store — goods receipt, stock on hand, issues | ⬜ Not started |
-| 8 | Bills — against POs and labour contracts | ⬜ Not started |
-| 9 | Overview wired to real data + one real project end-to-end | ⬜ Not started |
+| #   | Phase                                                                                                  | Status                                                 |
+| --- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------ |
+| 0   | Platform hardening — `user_apps` grants, `requireApp()`, generated Supabase types, migration rules     | ✅ Done                                                |
+| 1   | **Masters** — projects, plots, units, clients, vendors, stores, items, categories, brands, space types | ✅ Shipped, Gate 1 approved                            |
+| 3   | **Catalogue import** — the real 2,631-item catalogue                                                   | ✅ Done — **pulled forward, out of order** (see below) |
+| 3b  | **Thumbnail pass** — catalogue images into Supabase Storage                                            | ✅ Done                                                |
+| 2   | **Selections** — per-unit design workspace + the catalogue picker                                      | ✅ Shipped, merged 2026-08-01                          |
+| 2b  | **Design views** — renders per space, in the design document                                           | ✅ Shipped, merged 2026-08-01                          |
+| 4   | **Budgets** — cost + margin → client rate, approval, two documents                                     | ✅ Shipped, merged 2026-08-01                          |
+| 5   | Indents — pull-from-budget _and_ direct site request                                                   | ⬜ **NEXT**                                            |
+| 6   | Purchase Orders — vendor grouping + letterhead PDF                                                     | ⬜ Not started                                         |
+| 7   | Inventory / Store — goods receipt, stock on hand, issues                                               | ⬜ Not started                                         |
+| 8   | Bills — against POs and labour contracts                                                               | ⬜ Not started                                         |
+| 9   | Overview wired to real data + one real project end-to-end                                              | ⬜ Not started                                         |
 
 **Why 3 came before 2:** the original plan built the catalogue picker on
 5 sample items and imported the real catalogue afterwards. We flipped
@@ -104,7 +104,7 @@ before Budgets existed so both sides were built against the same contract.
 > assembles it changed.
 
 - **The revision** — unit, project, R-number, who issued it and when,
-  plus the designer's note saying *why* this revision exists. That note
+  plus the designer's note saying _why_ this revision exists. That note
   is the first thing the budget team reads.
 - **Every line, grouped by space** — item, code, brand, quantity, unit,
   and `indicative_rate_snapshot`: the figure the item carried the day it
@@ -178,7 +178,7 @@ flagship UI of the whole system.
   selected only by `lib/budgets/queries.ts`. POs never show them.
 - **Access = per-user app grants.** `requireApp()` first in every action
   and query; sidebar visibility is cosmetic only.
-- **Item codes:** Goodearth's real convention is a 4-letter *sub-type*
+- **Item codes:** Goodearth's real convention is a 4-letter _sub-type_
   prefix + 3-digit sequence (`BENS001`, `SOFS…`, `HANL…`) — finer than
   category, since one "Seating" category spans BENS/CHAS/ARMS/SOFS.
   Nothing auto-generates codes today; whenever that's built it must
@@ -191,12 +191,12 @@ flagship UI of the whole system.
 
 ## Open decisions — ask at the phase that needs them
 
-| Phase | Question |
-|---|---|
-| 2 | Can a design start on an unsold unit (`client_id` null)? |
-| 4 | Default margin prefill — global, per category, or none? |
-| 6 | PO / indent numbering format; letterhead assets (logo, address, terms) |
-| 8 | Does bill approval need a different person than the recorder? |
+| Phase | Question                                                               |
+| ----- | ---------------------------------------------------------------------- |
+| 2     | Can a design start on an unsold unit (`client_id` null)?               |
+| 4     | Default margin prefill — global, per category, or none?                |
+| 6     | PO / indent numbering format; letterhead assets (logo, address, terms) |
+| 8     | Does bill approval need a different person than the recorder?          |
 
 Also still unconfirmed from Phase 1: the `status` value lists for
 projects (`planning`/`active`/`completed`) and plots/units
@@ -211,11 +211,11 @@ Goodearth actually talks about status.
 The system's real output. Agreed 2026-08-01, and the reason Budgets is
 shaped the way it is.
 
-| | Produced by | Contains | Audience |
-|---|---|---|---|
-| **A · Design document** | Selections | Spaces view by view — uploaded renders — with the items specified in each. No prices. | Client, for design sign-off |
-| **B · Budget sheet** | Budgets | Every element with quantity, **cost, margin** and client rate | Internal only |
-| **C · Client quote** | Budgets | Views, items, quantity, **client rate and amount**, totals | Client |
+|                         | Produced by | Contains                                                                              | Audience                    |
+| ----------------------- | ----------- | ------------------------------------------------------------------------------------- | --------------------------- |
+| **A · Design document** | Selections  | Spaces view by view — uploaded renders — with the items specified in each. No prices. | Client, for design sign-off |
+| **B · Budget sheet**    | Budgets     | Every element with quantity, **cost, margin** and client rate                         | Internal only               |
+| **C · Client quote**    | Budgets     | Views, items, quantity, **client rate and amount**, totals                            | Client                      |
 
 **B and C are the same data, filtered.** Cost and margin appear on B and
 must never appear on C. That's why margin lives in a Budgets-owned table
@@ -246,7 +246,7 @@ a maintainer onto the project. Findings were sorted into five stages.
   database demanded `is_admin()`. Every non-admin write failed as
   "Could not create project. Try again." Unnoticed because the only user
   was an admin.
-- `sharp` was undeclared and resolving only as one of Next's *optional*
+- `sharp` was undeclared and resolving only as one of Next's _optional_
   dependencies — design-view uploads were one install away from breaking.
 - The `x-user-id` header was forwardable on paths the proxy matcher
   skipped (anything ending `.png`, which a dynamic route can).
@@ -320,7 +320,7 @@ ways each. Consolidate:
 
 **Deliberately not doing:** CI, Prettier, or pre-commit hooks (existing
 call, still right at this size); Marathon's service-role kiosk design;
-per-project permissions — the app boundary *is* the permission boundary,
+per-project permissions — the app boundary _is_ the permission boundary,
 which is a real decision, just previously undocumented as a limit.
 
 ## Session log
@@ -340,7 +340,6 @@ next session, neither blocking:
   with the service-role key — it bypasses exactly the rules being tested,
   which is how the design-views bug got missed.
 
-
 Migration `0011`: `item_margins`, `budgets`, `budget_lines`. Then the
 inbox, the pricing screen, per-product margins, approval, both documents,
 and carry-forward — B1 through B4, the whole tool.
@@ -356,7 +355,7 @@ in the repo, including the 200-lines-two-touched case.
 
 **Reads are gated too, for the first time.** Every other table in the
 schema is readable by any authenticated staff member. These three require
-`/budgets` to *select*, not just to write — so a careless join from a
+`/budgets` to _select_, not just to write — so a careless join from a
 future Indents or PO screen returns zero rows instead of leaking markup.
 
 **`client_rate` is a generated column**, computed by Postgres from cost
@@ -417,7 +416,7 @@ Three things worth remembering, all learned by getting them wrong:
   error. The browser now normalises to ~300KB before sending, and the
   server re-normalises since an action is a public endpoint.
 - **Supabase Storage has its own RLS**, in `storage.objects`, separate
-  from the table. A private bucket starts with *no* policies — rows exist
+  from the table. A private bucket starts with _no_ policies — rows exist
   and every image 404s.
 - **Verifying with the service-role key proves nothing about a signed-in
   user.** The upload probe passed while the feature was broken for
@@ -431,7 +430,7 @@ in the founder's Selections spec is built except paste-from-Excel.
 
 - **Spaces** set up several at a time, with names suggested per type
   (`Bedroom 1`, `Bedroom 2`) and editable before committing.
-- **The picker** over all 2,633 items — search on name, code *and* brand,
+- **The picker** over all 2,633 items — search on name, code _and_ brand,
   filters for category, brand and placement, tiles designed around the
   fact that two-thirds have no photo. The basket is local, so clicking
   costs nothing and one action writes the lot; spaces are chosen as chips

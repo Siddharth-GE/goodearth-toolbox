@@ -226,9 +226,7 @@ export const getBudget = cache(async (budgetId: string): Promise<BudgetDetail | 
       .order("label"),
   ]);
 
-  const budgetByKey = new Map(
-    (budgetLinesResult.data ?? []).map((line) => [line.line_key, line]),
-  );
+  const budgetByKey = new Map((budgetLinesResult.data ?? []).map((line) => [line.line_key, line]));
 
   // The product's default markup, shown on lines nobody has priced yet so
   // the field arrives filled in rather than blank. Saving the line copies
@@ -276,13 +274,18 @@ export const getBudget = cache(async (budgetId: string): Promise<BudgetDetail | 
       // shows a sensible quantity and can be priced without editing it.
       quantity: priced ? Number(priced.quantity) : designerQuantity,
       expected_vendor_id: priced?.expected_vendor_id ?? null,
-      unit_cost: priced?.unit_cost === null || priced?.unit_cost === undefined ? null : Number(priced.unit_cost),
+      unit_cost:
+        priced?.unit_cost === null || priced?.unit_cost === undefined
+          ? null
+          : Number(priced.unit_cost),
       margin_pct:
         priced?.margin_pct === null || priced?.margin_pct === undefined
           ? (defaultMargin.get(line.item_id) ?? null)
           : Number(priced.margin_pct),
       client_rate:
-        priced?.client_rate === null || priced?.client_rate === undefined ? null : Number(priced.client_rate),
+        priced?.client_rate === null || priced?.client_rate === undefined
+          ? null
+          : Number(priced.client_rate),
       needs_review: priced?.needs_review ?? false,
       notes: priced?.notes ?? null,
       sort_order: line.sort_order,

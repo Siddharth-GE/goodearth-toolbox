@@ -177,10 +177,15 @@ export function BudgetDocument({ budget }: { budget: BudgetDetail }) {
           <Meta label="Reference" value={reference} />
           <Meta label="Spaces" value={String(budget.spaces.length)} />
           <Meta label="Lines" value={String(budget.totals.lineCount)} />
-          <Meta label="Priced" value={`${budget.totals.pricedCount} of ${budget.totals.lineCount}`} />
+          <Meta
+            label="Priced"
+            value={`${budget.totals.pricedCount} of ${budget.totals.lineCount}`}
+          />
           <Meta
             label="Blended margin"
-            value={budget.totals.marginPct === null ? "—" : `${budget.totals.marginPct.toFixed(1)}%`}
+            value={
+              budget.totals.marginPct === null ? "—" : `${budget.totals.marginPct.toFixed(1)}%`
+            }
           />
         </View>
 
@@ -201,8 +206,12 @@ export function BudgetDocument({ budget }: { budget: BudgetDetail }) {
               {space.totals.lineCount}
             </Text>
             <Text style={{ flex: 1.4, textAlign: "right" }}>{formatAmount(space.totals.cost)}</Text>
-            <Text style={{ flex: 1.4, textAlign: "right" }}>{formatAmount(space.totals.margin)}</Text>
-            <Text style={{ flex: 1.6, textAlign: "right" }}>{formatAmount(space.totals.client)}</Text>
+            <Text style={{ flex: 1.4, textAlign: "right" }}>
+              {formatAmount(space.totals.margin)}
+            </Text>
+            <Text style={{ flex: 1.6, textAlign: "right" }}>
+              {formatAmount(space.totals.client)}
+            </Text>
           </View>
         ))}
         <View style={styles.grandRow}>

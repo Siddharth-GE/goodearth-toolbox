@@ -17,17 +17,19 @@ export default async function MarathonAdminMembersPage() {
       <AdminNav active="members" />
 
       <div className="px-5 pt-5 pb-16">
-        <h1 className="mb-1 text-lg font-bold text-foreground">Members</h1>
-        <p className="mb-5 text-sm text-muted">{agents.length} agent{agents.length === 1 ? "" : "s"}</p>
+        <h1 className="text-foreground mb-1 text-lg font-bold">Members</h1>
+        <p className="text-muted mb-5 text-sm">
+          {agents.length} agent{agents.length === 1 ? "" : "s"}
+        </p>
 
         <div className="mb-5 space-y-2">
           {agents.map((agent) => (
             <div
               key={agent.id}
-              className="flex items-center gap-3 rounded-2xl border border-border bg-surface px-3.5 py-3"
+              className="border-border bg-surface flex items-center gap-3 rounded-2xl border px-3.5 py-3"
             >
               <Avatar name={agent.name} size={36} />
-              <span className="min-w-0 flex-1 truncate font-medium text-foreground">
+              <span className="text-foreground min-w-0 flex-1 truncate font-medium">
                 {agent.name}
               </span>
               <ResetAgentPin agentId={agent.id} name={agent.name} />

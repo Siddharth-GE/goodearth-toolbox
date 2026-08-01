@@ -16,10 +16,10 @@ export function EmptyState({
   className?: string;
 }) {
   return (
-    <div className={cn("rounded-2xl border border-border bg-surface p-6 text-center", className)}>
-      {Icon && <Icon className="mx-auto mb-3 size-8 text-muted" />}
-      <p className="text-sm font-medium text-foreground">{title}</p>
-      {description && <p className="mt-1 text-sm text-muted">{description}</p>}
+    <div className={cn("border-border bg-surface rounded-2xl border p-6 text-center", className)}>
+      {Icon && <Icon className="text-muted mx-auto mb-3 size-8" />}
+      <p className="text-foreground text-sm font-medium">{title}</p>
+      {description && <p className="text-muted mt-1 text-sm">{description}</p>}
       {action && <div className="mt-4">{action}</div>}
     </div>
   );

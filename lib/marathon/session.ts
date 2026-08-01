@@ -38,9 +38,7 @@ function verify(token: string): MarathonSession | null {
   }
 
   try {
-    const payload = JSON.parse(
-      Buffer.from(payloadB64, "base64url").toString(),
-    ) as MarathonSession;
+    const payload = JSON.parse(Buffer.from(payloadB64, "base64url").toString()) as MarathonSession;
     if (typeof payload.exp !== "number" || payload.exp < Date.now()) return null;
     return payload;
   } catch {

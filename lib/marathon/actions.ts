@@ -58,7 +58,10 @@ export async function agentLogout() {
   redirect("/marathon");
 }
 
-export async function verifyAdminPinAction(_state: PinState, formData: FormData): Promise<PinState> {
+export async function verifyAdminPinAction(
+  _state: PinState,
+  formData: FormData,
+): Promise<PinState> {
   const pin = String(formData.get("pin") ?? "").trim();
   if (!pin) return { error: "Enter the admin PIN." };
 
@@ -84,7 +87,10 @@ export async function adminLogout() {
 
 export type CreateAgentState = { error?: string } | undefined;
 
-export async function createAgent(_state: CreateAgentState, formData: FormData): Promise<CreateAgentState> {
+export async function createAgent(
+  _state: CreateAgentState,
+  formData: FormData,
+): Promise<CreateAgentState> {
   await requireAdminSession();
 
   const name = String(formData.get("name") ?? "").trim();
@@ -109,7 +115,10 @@ export async function createAgent(_state: CreateAgentState, formData: FormData):
 
 export type CreateGroupState = { error?: string } | undefined;
 
-export async function createGroup(_state: CreateGroupState, formData: FormData): Promise<CreateGroupState> {
+export async function createGroup(
+  _state: CreateGroupState,
+  formData: FormData,
+): Promise<CreateGroupState> {
   await requireAdminSession();
 
   const name = String(formData.get("name") ?? "").trim();
@@ -221,7 +230,8 @@ export async function createEntry(_state: EntryState, formData: FormData): Promi
   if (!groupId) return { error: "Choose a group." };
   if (!name) return { error: "Enter the runner's name." };
   if (!/^[0-9]{10}$/.test(mobile)) return { error: "Enter a valid 10-digit mobile number." };
-  if (!Number.isInteger(age) || age < 3 || age > 99) return { error: "Enter an age between 3 and 99." };
+  if (!Number.isInteger(age) || age < 3 || age > 99)
+    return { error: "Enter an age between 3 and 99." };
   if (gender !== "male" && gender !== "female") return { error: "Choose a gender." };
   if (!TEE_SIZES.includes(teeSize)) return { error: "Choose a t-shirt size." };
   if (!runId) return { error: "Choose a run type." };

@@ -68,7 +68,9 @@ export function planCarryForward({
   currentSelectionLines: KeyedQuantity[];
 }): CarryForwardPlan {
   const previousBudget = new Map(previousBudgetLines.map((line) => [line.line_key, line]));
-  const previousDesign = new Map(previousSelectionLines.map((line) => [line.line_key, line.quantity]));
+  const previousDesign = new Map(
+    previousSelectionLines.map((line) => [line.line_key, line.quantity]),
+  );
 
   const lines: CarriedLine[] = [];
   let carried = 0;

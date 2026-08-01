@@ -9,7 +9,7 @@ checklist and a bookmark for picking work back up.
 
 ## Pending — before real event/race day
 
-Nothing left to *build*; these are launch-readiness items to revisit
+Nothing left to _build_; these are launch-readiness items to revisit
 before agents rely on this for the actual event:
 
 - [ ] Change the admin PIN off the seeded default (`2026`) to something
@@ -96,7 +96,7 @@ Filter. A "My Entries" link was added to the entry page's header, and a
 
 The filter dropdowns live in a client component,
 `app/marathon/_components/list-filters.tsx` — the Category list narrows
-to the selected Race *live*, before Filter is even tapped (Fun Run only
+to the selected Race _live_, before Filter is even tapped (Fun Run only
 ever has "Open", so the rest would be noise). It follows the same
 hidden-field pattern as the registration form's dropdowns: the visible
 `<select>`s are display-only, and hidden inputs mirrored from the same
@@ -196,7 +196,7 @@ Caught and fixed one real deploy-only bug: the kiosk home screen
 (`app/marathon/page.tsx`) doesn't read cookies or `searchParams`, so
 Next.js silently treated it as static and prerendered it once at
 build/deploy time — a newly-added agent (or updated counts) wouldn't
-show up until the *next* deploy. Invisible in local dev (dev mode
+show up until the _next_ deploy. Invisible in local dev (dev mode
 always renders fresh regardless), only visible on the real deployment,
 which is how it was actually caught: a founder-added agent ("Mathew")
 wasn't showing up on the kiosk. Fixed with `export const dynamic =

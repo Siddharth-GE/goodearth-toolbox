@@ -2,7 +2,8 @@ import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
 
-export type ProjectType = "apartment_villa_community" | "eco_village" | "mixed_residential_commercial";
+export type ProjectType =
+  "apartment_villa_community" | "eco_village" | "mixed_residential_commercial";
 export type ProjectStatus = "planning" | "active" | "completed";
 
 export type ProjectRow = {

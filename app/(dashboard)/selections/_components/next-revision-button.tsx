@@ -27,7 +27,7 @@ export function NextRevisionButton({ fromSelectionId }: { fromSelectionId: strin
         {pending ? "Creating…" : "Start next revision"}
         {!pending && <ArrowRight className="size-4" />}
       </Button>
-      {error && <p className="text-xs font-medium text-danger">{error}</p>}
+      {error && <p className="text-danger text-xs font-medium">{error}</p>}
     </div>
   );
 }

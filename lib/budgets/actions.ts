@@ -125,7 +125,12 @@ export async function startPricing(selectionId: string): Promise<ActionState> {
  */
 async function carryForward(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  { budgetId, selectionId, unitId, revisionNo }: {
+  {
+    budgetId,
+    selectionId,
+    unitId,
+    revisionNo,
+  }: {
     budgetId: string;
     selectionId: string;
     unitId: string;
@@ -158,12 +163,18 @@ async function carryForward(
       .from("budget_lines")
       .select("line_key, quantity, expected_vendor_id, unit_cost, margin_pct, notes")
       .eq("budget_id", previous.id),
-    supabase.from("selection_lines").select("line_key, quantity").eq("selection_id", previous.selection_id),
+    supabase
+      .from("selection_lines")
+      .select("line_key, quantity")
+      .eq("selection_id", previous.selection_id),
     supabase.from("selection_lines").select("line_key, quantity").eq("selection_id", selectionId),
   ]);
 
   if (previousBudgetLines.error || previousSelectionLines.error || currentSelectionLines.error) {
-    console.error("carryForward read failed:", previousBudgetLines.error ?? currentSelectionLines.error);
+    console.error(
+      "carryForward read failed:",
+      previousBudgetLines.error ?? currentSelectionLines.error,
+    );
     return "Could not read the previous budget. Try again.";
   }
 
@@ -249,7 +260,8 @@ export async function saveLine(
 
   if (!(input.quantity > 0)) return { error: "Quantity must be more than zero." };
   if (input.unitCost !== null && input.unitCost < 0) return { error: "Cost cannot be negative." };
-  if (input.marginPct !== null && input.marginPct < 0) return { error: "Margin cannot be negative." };
+  if (input.marginPct !== null && input.marginPct < 0)
+    return { error: "Margin cannot be negative." };
 
   const supabase = await createClient();
   const { error } = await supabase.from("budget_lines").upsert(
@@ -315,7 +327,9 @@ export async function approveBudget(budgetId: string): Promise<ActionState> {
   ]);
 
   const priced = new Set(
-    (budgetLines ?? []).filter((line) => line.budget_status === "priced").map((line) => line.line_key),
+    (budgetLines ?? [])
+      .filter((line) => line.budget_status === "priced")
+      .map((line) => line.line_key),
   );
   const total = (selectionLines ?? []).length;
   if (total === 0) return { error: "There is nothing to approve — this revision has no items." };
@@ -388,7 +402,10 @@ export async function reopenBudget(budgetId: string): Promise<ActionState> {
  * it is priced and keeps its own copy, so changing this never re-prices
  * work that has already been done — least of all an approved budget.
  */
-export async function setItemMargin(itemId: string, marginPct: number | null): Promise<ActionState> {
+export async function setItemMargin(
+  itemId: string,
+  marginPct: number | null,
+): Promise<ActionState> {
   const user = await authorize();
   const supabase = await createClient();
 

@@ -108,7 +108,11 @@ export function RequestItemDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="req-brand">Brand (optional)</Label>
-              <Select id="req-brand" value={brandId} onChange={(event) => setBrandId(event.target.value)}>
+              <Select
+                id="req-brand"
+                value={brandId}
+                onChange={(event) => setBrandId(event.target.value)}
+              >
                 <option value="">No brand</option>
                 {brands.map((brand) => (
                   <option key={brand.id} value={brand.id}>
@@ -136,16 +140,16 @@ export function RequestItemDialog({
               value={specNote}
               onChange={(event) => setSpecNote(event.target.value)}
               placeholder="Size, finish, supplier, anything that identifies it."
-              className="w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
+              className="border-border bg-surface text-foreground placeholder:text-muted focus:ring-accent w-full rounded-xl border px-3.5 py-2.5 text-sm focus:ring-2 focus:outline-none"
             />
           </div>
 
-          <p className="text-sm text-muted">
-            It&apos;s usable straight away and marked provisional. Masters will confirm it or merge it with
-            an existing item later.
+          <p className="text-muted text-sm">
+            It&apos;s usable straight away and marked provisional. Masters will confirm it or merge
+            it with an existing item later.
           </p>
 
-          {error && <p className="text-sm font-medium text-danger">{error}</p>}
+          {error && <p className="text-danger text-sm font-medium">{error}</p>}
 
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setOpen(false)} disabled={saving}>

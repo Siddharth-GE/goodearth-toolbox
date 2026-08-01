@@ -105,7 +105,9 @@ export async function createNextRevision(fromSelectionId: string): Promise<Actio
   });
   if (error) {
     console.error("createNextRevision failed:", error);
-    return { error: error.message.replace(/^.*?:\s*/, "") || "Could not create the next revision." };
+    return {
+      error: error.message.replace(/^.*?:\s*/, "") || "Could not create the next revision.",
+    };
   }
 
   revalidatePath("/selections", "layout");
@@ -165,7 +167,8 @@ export async function addSpaces(unitId: string, spaces: NewSpace[]): Promise<Act
   const seen = new Set<string>();
   for (const space of cleaned) {
     const key = space.label.toLowerCase();
-    if (seen.has(key)) return { error: `Two spaces are both called “${space.label}”. Names must differ.` };
+    if (seen.has(key))
+      return { error: `Two spaces are both called “${space.label}”. Names must differ.` };
     seen.add(key);
   }
 
@@ -283,7 +286,10 @@ export async function addLines(
   // identical product, never two similar ones.
   const currentLine = new Map<string, { id: string; quantity: number }>();
   for (const line of existing ?? []) {
-    nextSort.set(line.unit_space_id, Math.max(nextSort.get(line.unit_space_id) ?? 0, line.sort_order + 1));
+    nextSort.set(
+      line.unit_space_id,
+      Math.max(nextSort.get(line.unit_space_id) ?? 0, line.sort_order + 1),
+    );
     currentLine.set(`${line.unit_space_id}:${line.item_id}`, {
       id: line.id,
       quantity: Number(line.quantity),
@@ -340,7 +346,9 @@ export async function addLines(
     const failed = results.find((result) => result.error);
     if (failed?.error) {
       console.error("addLines merge failed:", failed.error);
-      return { error: "Some items were added, but a quantity could not be updated. Check the list." };
+      return {
+        error: "Some items were added, but a quantity could not be updated. Check the list.",
+      };
     }
   }
 

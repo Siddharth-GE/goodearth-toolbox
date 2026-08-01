@@ -1,6 +1,13 @@
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+} from "@/components/ui/table";
 import { listProjects, type ProjectStatus, type ProjectType } from "@/lib/masters/projects";
 import { Boxes } from "lucide-react";
 import { ProjectFormDialog } from "./_components/project-form-dialog";
@@ -27,7 +34,11 @@ export default async function ProjectsPage() {
       </div>
 
       {projects.length === 0 ? (
-        <EmptyState icon={Boxes} title="No projects yet" description="Create the first project to get started." />
+        <EmptyState
+          icon={Boxes}
+          title="No projects yet"
+          description="Create the first project to get started."
+        />
       ) : (
         <Table>
           <TableHead>
@@ -42,7 +53,7 @@ export default async function ProjectsPage() {
           <TableBody>
             {projects.map((project) => (
               <TableRow key={project.id}>
-                <TableCell className="font-medium text-foreground">{project.name}</TableCell>
+                <TableCell className="text-foreground font-medium">{project.name}</TableCell>
                 <TableCell>{project.location || "—"}</TableCell>
                 <TableCell>{TYPE_LABELS[project.project_type]}</TableCell>
                 <TableCell>

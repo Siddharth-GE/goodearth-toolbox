@@ -2,11 +2,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { requireUser } from "@/lib/auth/dal";
 import { visibleTools } from "@/lib/tools";
 
-export default async function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
   // Admins ignore grantedApps entirely — the sidebar's admin bypass
   // never depends on user_apps, so a bug there can't lock out an

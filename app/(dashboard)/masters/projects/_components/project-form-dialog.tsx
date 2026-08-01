@@ -32,7 +32,9 @@ export function ProjectFormDialog({ project }: { project?: ProjectRow }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant={isEdit ? "secondary" : "primary"}>{isEdit ? "Edit" : "New Project"}</Button>
+        <Button variant={isEdit ? "secondary" : "primary"}>
+          {isEdit ? "Edit" : "New Project"}
+        </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
@@ -45,11 +47,21 @@ export function ProjectFormDialog({ project }: { project?: ProjectRow }) {
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="location">Location</Label>
-            <Input id="location" name="location" defaultValue={project?.location ?? ""} autoComplete="off" />
+            <Input
+              id="location"
+              name="location"
+              defaultValue={project?.location ?? ""}
+              autoComplete="off"
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="project_type">Project type</Label>
-            <Select id="project_type" name="project_type" defaultValue={project?.project_type ?? ""} required>
+            <Select
+              id="project_type"
+              name="project_type"
+              defaultValue={project?.project_type ?? ""}
+              required
+            >
               <option value="" disabled>
                 Select a type
               </option>
@@ -66,7 +78,7 @@ export function ProjectFormDialog({ project }: { project?: ProjectRow }) {
               <option value="completed">Completed</option>
             </Select>
           </div>
-          {state?.error && <p className="text-sm font-medium text-danger">{state.error}</p>}
+          {state?.error && <p className="text-danger text-sm font-medium">{state.error}</p>}
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="secondary">

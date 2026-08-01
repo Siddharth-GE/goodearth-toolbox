@@ -1,6 +1,13 @@
 import { GrantCheckbox } from "./_components/grant-checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+} from "@/components/ui/table";
 import { requireAdmin } from "@/lib/auth/access";
 import { requireUser } from "@/lib/auth/dal";
 import { listAllGrants, listUsersForAdmin } from "@/lib/settings/queries";
@@ -15,8 +22,8 @@ export default async function SettingsPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-lg font-bold tracking-tight text-foreground">Settings</h1>
-        <p className="text-sm text-muted">
+        <h1 className="text-foreground text-lg font-bold tracking-tight">Settings</h1>
+        <p className="text-muted text-sm">
           Choose which apps each person can open. Admins always have every app.
         </p>
       </div>
@@ -36,8 +43,8 @@ export default async function SettingsPage() {
             return (
               <TableRow key={row.id}>
                 <TableCell>
-                  <p className="font-medium text-foreground">{row.full_name || row.email}</p>
-                  <p className="text-xs text-muted">{row.email}</p>
+                  <p className="text-foreground font-medium">{row.full_name || row.email}</p>
+                  <p className="text-muted text-xs">{row.email}</p>
                 </TableCell>
                 {row.role === "admin" ? (
                   <TableCell colSpan={GRANTABLE_TOOLS.length}>
@@ -46,7 +53,11 @@ export default async function SettingsPage() {
                 ) : (
                   GRANTABLE_TOOLS.map((tool) => (
                     <TableCell key={tool.href}>
-                      <GrantCheckbox userId={row.id} app={tool.href} granted={userGrants.has(tool.href)} />
+                      <GrantCheckbox
+                        userId={row.id}
+                        app={tool.href}
+                        granted={userGrants.has(tool.href)}
+                      />
                     </TableCell>
                   ))
                 )}

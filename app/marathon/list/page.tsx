@@ -33,7 +33,9 @@ export default async function MarathonListPage({
   // Only offer categories that belong to the selected race — every
   // category under the Fun Run is "Open", so once a race is picked the
   // rest would just be noise (and couldn't match anything anyway).
-  const categories = runFilter ? allCategories.filter((c) => c.run_id === runFilter) : allCategories;
+  const categories = runFilter
+    ? allCategories.filter((c) => c.run_id === runFilter)
+    : allCategories;
   const categoryFilterValid = categories.some((c) => c.id === categoryFilter);
   const effectiveCategoryFilter = categoryFilterValid ? categoryFilter : undefined;
 
@@ -52,9 +54,9 @@ export default async function MarathonListPage({
       />
 
       <div className="px-5 pt-5 pb-16">
-        <p className="mb-1 text-sm text-muted">Signed in as {agent?.name}</p>
-        <p className="mb-5 text-3xl font-extrabold tracking-tight text-foreground">
-          {totalCount} <span className="text-base font-medium text-muted">registered by you</span>
+        <p className="text-muted mb-1 text-sm">Signed in as {agent?.name}</p>
+        <p className="text-foreground mb-5 text-3xl font-extrabold tracking-tight">
+          {totalCount} <span className="text-muted text-base font-medium">registered by you</span>
         </p>
 
         <ListFilters
@@ -78,13 +80,15 @@ export default async function MarathonListPage({
             {entries.map((entry) => (
               <li
                 key={entry.bib}
-                className="flex items-center justify-between rounded-2xl border border-border bg-surface p-3.5"
+                className="border-border bg-surface flex items-center justify-between rounded-2xl border p-3.5"
               >
                 <div className="flex items-center gap-3">
-                  <span className="w-16 shrink-0 font-mono text-sm font-bold text-foreground">{entry.bib}</span>
+                  <span className="text-foreground w-16 shrink-0 font-mono text-sm font-bold">
+                    {entry.bib}
+                  </span>
                   <div>
-                    <p className="text-sm font-medium text-foreground">{entry.name}</p>
-                    <p className="text-xs text-muted">
+                    <p className="text-foreground text-sm font-medium">{entry.name}</p>
+                    <p className="text-muted text-xs">
                       {entry.marathon_runs?.name}
                       {entry.marathon_groups?.name ? ` · ${entry.marathon_groups.name}` : ""}
                     </p>
@@ -92,9 +96,12 @@ export default async function MarathonListPage({
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   {entry.marathon_categories && (
-                    <CategoryBadge name={entry.marathon_categories.name} color={entry.marathon_categories.color} />
+                    <CategoryBadge
+                      name={entry.marathon_categories.name}
+                      color={entry.marathon_categories.color}
+                    />
                   )}
-                  <span className="text-xs text-muted">{formatTime(entry.created_at)}</span>
+                  <span className="text-muted text-xs">{formatTime(entry.created_at)}</span>
                 </div>
               </li>
             ))}

@@ -45,25 +45,45 @@ export function VendorFormDialog({ vendor }: { vendor?: VendorRow }) {
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="contact_name">Contact person</Label>
-            <Input id="contact_name" name="contact_name" defaultValue={vendor?.contact_name ?? ""} autoComplete="off" />
+            <Input
+              id="contact_name"
+              name="contact_name"
+              defaultValue={vendor?.contact_name ?? ""}
+              autoComplete="off"
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="mobile">Mobile</Label>
-            <Input id="mobile" name="mobile" defaultValue={vendor?.mobile ?? ""} autoComplete="off" />
+            <Input
+              id="mobile"
+              name="mobile"
+              defaultValue={vendor?.mobile ?? ""}
+              autoComplete="off"
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="gst_no">GST number</Label>
-            <Input id="gst_no" name="gst_no" defaultValue={vendor?.gst_no ?? ""} autoComplete="off" />
+            <Input
+              id="gst_no"
+              name="gst_no"
+              defaultValue={vendor?.gst_no ?? ""}
+              autoComplete="off"
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="address">Address</Label>
-            <Input id="address" name="address" defaultValue={vendor?.address ?? ""} autoComplete="off" />
+            <Input
+              id="address"
+              name="address"
+              defaultValue={vendor?.address ?? ""}
+              autoComplete="off"
+            />
           </div>
-          <label className="flex items-center gap-2 text-sm text-foreground">
+          <label className="text-foreground flex items-center gap-2 text-sm">
             <Checkbox name="is_active" value="1" defaultChecked={vendor?.is_active ?? true} />
             Active
           </label>
-          {state?.error && <p className="text-sm font-medium text-danger">{state.error}</p>}
+          {state?.error && <p className="text-danger text-sm font-medium">{state.error}</p>}
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="secondary">

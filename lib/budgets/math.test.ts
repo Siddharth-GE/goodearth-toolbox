@@ -13,14 +13,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import {
-  clientRate,
-  formatMoney,
-  isFullyPriced,
-  lineAmount,
-  lineCost,
-  rollUp,
-} from "./math";
+import { clientRate, formatMoney, isFullyPriced, lineAmount, lineCost, rollUp } from "./math";
 
 test("client rate adds the margin to the cost", () => {
   assert.equal(clientRate(100, 25), 125);

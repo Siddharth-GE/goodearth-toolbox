@@ -16,7 +16,7 @@ Built: **Marathon** — event registration app: field agents with simple PIN log
 
 Built: **Settings** (`/settings`) — the admin console for per-user app
 access: one row per person, one checkbox per grantable tool. Admins
-always have every app and aren't shown checkboxes for it. This *is*
+always have every app and aren't shown checkboxes for it. This _is_
 the access-control mechanism (`user_apps` table +
 `lib/auth/access.ts`'s `requireApp`/`requireAdmin`), not just a sidebar
 filter — see "Other architecture principles" below.
@@ -60,10 +60,10 @@ it's built — see "Coming Soon stubs" below.
 Two different tool-shell patterns — pick the one that fits, don't
 default to copying Marathon:
 
-- **Normal tools** (the vast majority) live *inside* the dashboard
+- **Normal tools** (the vast majority) live _inside_ the dashboard
   shell, keeping the sidebar/topbar: `app/(dashboard)/<tool>/`.
 - **Kiosk-style tools** — a separate device, its own auth, no sidebar —
-  live top-level with their own layout, opting *out* of the dashboard
+  live top-level with their own layout, opting _out_ of the dashboard
   shell entirely: `app/<tool>/` (Marathon is the only one so far; its
   `proxy.ts` exemption and separate PIN auth only make sense because
   it's genuinely a standalone kiosk, not the default to reach for).
@@ -195,11 +195,11 @@ answer:
   no `server-only`). This split is required, not stylistic: a Client
   Component (a create/edit dialog) needs to import the write functions
   directly, and Next's bundler only fully strips a module's server-only
-  imports from the client bundle when `"use server"` is a *file-level*
+  imports from the client bundle when `"use server"` is a _file-level_
   directive — a file mixing per-function `"use server"` with plain
   reads (and `import "server-only"`) fails the production build (not
   `tsc`, only `next build` catches it). The actions file must not
-  import *values* from its queries file either (that reintroduces the
+  import _values_ from its queries file either (that reintroduces the
   same transitive `server-only` chain through `lib/auth/access.ts`) —
   `import type` is fine (erased before bundling), so re-declare any
   validation constants (e.g. allowed enum values) privately in the
@@ -262,7 +262,7 @@ queries against the real schema — a typo'd column name now fails
   they've been granted in Settings (`user_apps` table, see
   `supabase/migrations/0003_user_apps.sql`); admins have every app
   automatically. No roles beyond admin/staff, no field-level
-  permissions — the app boundary *is* the permission boundary.
+  permissions — the app boundary _is_ the permission boundary.
   `lib/tools.ts`'s `visibleTools()` decides sidebar visibility from
   this, but that's cosmetic; `requireApp`/`requireAdmin`
   (`lib/auth/access.ts`) are the real check every tool's own code must
@@ -296,6 +296,7 @@ I am the founder, not a developer. I direct the product; you handle the code.
 Follow these rules in every session without being reminded:
 
 ### Communication
+
 - Before starting any task: explain WHAT you will do and WHY in plain,
   non-technical language, in 3–5 short bullet points. Wait for my go-ahead
   if the task touches more than a couple of files.
@@ -306,6 +307,7 @@ Follow these rules in every session without being reminded:
 - If I ask "explain X", teach me like a smart non-programmer.
 
 ### Process discipline
+
 - Work in small steps. One feature or fix at a time — never a big-bang
   change across the whole app.
 - After every working piece: commit with a clear plain-English message
@@ -317,6 +319,7 @@ Follow these rules in every session without being reminded:
   Never modify tables ad hoc.
 
 ### Code standards
+
 - Simplicity over cleverness. This app serves ~200 users; no
   over-engineering, no extra libraries unless truly needed.
 - Every screen is built from the shared components in components/ui.
@@ -325,6 +328,7 @@ Follow these rules in every session without being reminded:
   references, double submissions.
 
 ### My review checkpoints
+
 - I judge the running app in the browser, not the code. Always give me
   a clear "open this page, try this action" checklist after each task.
 - Anything I approve in the plan stage, build fully. Anything not in

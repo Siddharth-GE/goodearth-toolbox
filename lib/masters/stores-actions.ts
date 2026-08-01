@@ -16,7 +16,10 @@ function readStoreForm(formData: FormData) {
   };
 }
 
-export async function createStore(_state: StoreFormState, formData: FormData): Promise<StoreFormState> {
+export async function createStore(
+  _state: StoreFormState,
+  formData: FormData,
+): Promise<StoreFormState> {
   const user = await requireUser();
   await requireApp(user, "/masters");
 
@@ -34,7 +37,11 @@ export async function createStore(_state: StoreFormState, formData: FormData): P
   return undefined;
 }
 
-export async function updateStore(id: string, _state: StoreFormState, formData: FormData): Promise<StoreFormState> {
+export async function updateStore(
+  id: string,
+  _state: StoreFormState,
+  formData: FormData,
+): Promise<StoreFormState> {
   const user = await requireUser();
   await requireApp(user, "/masters");
 

@@ -12,11 +12,11 @@ const EVENTS = [
 export function ActivityFeed() {
   return (
     <Card className="p-5">
-      <h2 className="mb-3 text-sm font-semibold text-foreground">Activity</h2>
+      <h2 className="text-foreground mb-3 text-sm font-semibold">Activity</h2>
       <div className="space-y-3">
         {EVENTS.map((event) => (
           <div key={event.time + event.text} className="flex gap-3 text-sm">
-            <span className="w-11 shrink-0 font-mono text-xs text-muted">{event.time}</span>
+            <span className="text-muted w-11 shrink-0 font-mono text-xs">{event.time}</span>
             <p className="text-muted">{event.text}</p>
           </div>
         ))}

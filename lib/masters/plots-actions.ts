@@ -19,7 +19,10 @@ function readPlotForm(formData: FormData) {
   };
 }
 
-export async function createPlot(_state: PlotFormState, formData: FormData): Promise<PlotFormState> {
+export async function createPlot(
+  _state: PlotFormState,
+  formData: FormData,
+): Promise<PlotFormState> {
   const user = await requireUser();
   await requireApp(user, "/masters");
 
@@ -39,7 +42,11 @@ export async function createPlot(_state: PlotFormState, formData: FormData): Pro
   return undefined;
 }
 
-export async function updatePlot(id: string, _state: PlotFormState, formData: FormData): Promise<PlotFormState> {
+export async function updatePlot(
+  id: string,
+  _state: PlotFormState,
+  formData: FormData,
+): Promise<PlotFormState> {
   const user = await requireUser();
   await requireApp(user, "/masters");
 
@@ -49,7 +56,10 @@ export async function updatePlot(id: string, _state: PlotFormState, formData: Fo
   if (!PLOT_STATUSES.includes(status)) return { error: "Choose a status." };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("plots").update({ project_id, name, area, status }).eq("id", id);
+  const { error } = await supabase
+    .from("plots")
+    .update({ project_id, name, area, status })
+    .eq("id", id);
   if (error) {
     console.error("updatePlot failed:", error);
     return { error: "Could not update plot. Try again." };

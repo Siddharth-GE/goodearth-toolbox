@@ -78,7 +78,12 @@ export function UnitFormDialog({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="plot_id">Plot (optional)</Label>
-            <Select id="plot_id" name="plot_id" defaultValue={unit?.plot_id ?? ""} disabled={!projectId}>
+            <Select
+              id="plot_id"
+              name="plot_id"
+              defaultValue={unit?.plot_id ?? ""}
+              disabled={!projectId}
+            >
               <option value="">No plot</option>
               {filteredPlots.map((plot) => (
                 <option key={plot.id} value={plot.id}>
@@ -89,7 +94,14 @@ export function UnitFormDialog({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="name">Name</Label>
-            <Input id="name" name="name" defaultValue={unit?.name} required autoComplete="off" placeholder="e.g. Villa 3" />
+            <Input
+              id="name"
+              name="name"
+              defaultValue={unit?.name}
+              required
+              autoComplete="off"
+              placeholder="e.g. Villa 3"
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="unit_type">Unit type</Label>
@@ -121,7 +133,7 @@ export function UnitFormDialog({
               <option value="sold">Sold</option>
             </Select>
           </div>
-          {state?.error && <p className="text-sm font-medium text-danger">{state.error}</p>}
+          {state?.error && <p className="text-danger text-sm font-medium">{state.error}</p>}
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="secondary">

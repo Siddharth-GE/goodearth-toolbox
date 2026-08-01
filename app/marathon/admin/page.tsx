@@ -11,14 +11,14 @@ export default async function MarathonAdminPage() {
 
   return (
     <div className="px-7 py-14 text-center">
-      <h1 className="text-xl font-bold text-foreground">Admin</h1>
-      <p className="mt-1 text-sm text-muted">Enter the admin PIN</p>
+      <h1 className="text-foreground text-xl font-bold">Admin</h1>
+      <p className="text-muted mt-1 text-sm">Enter the admin PIN</p>
 
       <PinPad action={verifyAdminPinAction} />
 
       <Link
         href="/marathon"
-        className="mt-6 inline-flex items-center gap-1.5 text-sm font-medium text-accent"
+        className="text-accent mt-6 inline-flex items-center gap-1.5 text-sm font-medium"
       >
         <ArrowLeft className="size-4" />
         Back

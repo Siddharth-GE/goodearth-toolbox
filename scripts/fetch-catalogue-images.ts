@@ -66,7 +66,11 @@ async function main() {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  console.log(commit ? "\n=== COMMIT RUN — this writes to storage and the database ===\n" : "\n=== DRY RUN — nothing will be written ===\n");
+  console.log(
+    commit
+      ? "\n=== COMMIT RUN — this writes to storage and the database ===\n"
+      : "\n=== DRY RUN — nothing will be written ===\n",
+  );
 
   // --- What's outstanding -------------------------------------------------
   const { count: needThumb } = await supabase
@@ -85,10 +89,14 @@ async function main() {
 
   console.log(`Items needing a thumbnail : ${needThumb ?? 0}`);
   console.log(`Items already done        : ${haveThumb ?? 0}`);
-  console.log(`Items with no image at all: ${noImage ?? 0}  (these get a colour placeholder in the UI, not a fetch)`);
+  console.log(
+    `Items with no image at all: ${noImage ?? 0}  (these get a colour placeholder in the UI, not a fetch)`,
+  );
 
   if (!commit) {
-    console.log(`\nWould download, resize to ${THUMB_PX}px WebP, and upload ${Math.min(needThumb ?? 0, limit)} thumbnail(s)`);
+    console.log(
+      `\nWould download, resize to ${THUMB_PX}px WebP, and upload ${Math.min(needThumb ?? 0, limit)} thumbnail(s)`,
+    );
     console.log(`into the "${BUCKET}" storage bucket, writing items.thumb_url back.`);
     console.log("\nDry run complete. Nothing was written.");
     console.log("Re-run with --commit to apply (add --limit 10 to try a few first).\n");
@@ -168,19 +176,26 @@ async function main() {
             succeeded++;
             succeededThisBatch++;
           } catch (error) {
-            failures.push({ code: item.code, reason: error instanceof Error ? error.message : String(error) });
+            failures.push({
+              code: item.code,
+              reason: error instanceof Error ? error.message : String(error),
+            });
             failedIds.push(item.id);
           }
         }),
       );
       processed += slice.length;
-      process.stdout.write(`\r  processed ${processed}  ok ${succeeded}  failed ${failures.length}   `);
+      process.stdout.write(
+        `\r  processed ${processed}  ok ${succeeded}  failed ${failures.length}   `,
+      );
     }
 
     // Belt-and-braces: failedIds already stops the same rows coming back, but
     // if a whole batch fails the source is probably down, so stop hammering it.
     if (succeededThisBatch === 0) {
-      console.log("\n\nEvery item in this batch failed — stopping rather than hammering the source.");
+      console.log(
+        "\n\nEvery item in this batch failed — stopping rather than hammering the source.",
+      );
       break;
     }
   }
@@ -188,7 +203,8 @@ async function main() {
   console.log(`\n\nDone. ${succeeded} thumbnail(s) uploaded, ${failures.length} failed.`);
   if (failures.length > 0) {
     console.log("\nFailures (re-run the script to retry these — successes are skipped):");
-    for (const failure of failures.slice(0, 30)) console.log(`  ${failure.code ?? "(no code)"}: ${failure.reason}`);
+    for (const failure of failures.slice(0, 30))
+      console.log(`  ${failure.code ?? "(no code)"}: ${failure.reason}`);
     if (failures.length > 30) console.log(`  …and ${failures.length - 30} more`);
   }
   console.log();

@@ -34,18 +34,18 @@ export function MemberList({ agents }: { agents: Agent[] }) {
           <Link
             key={agent.id}
             href={`/marathon/pin?agent=${agent.id}`}
-            className="flex items-center gap-3.5 rounded-2xl border border-border bg-surface px-4 py-3.5 shadow-sm transition-transform active:scale-[0.98]"
+            className="border-border bg-surface flex items-center gap-3.5 rounded-2xl border px-4 py-3.5 shadow-sm transition-transform active:scale-[0.98]"
           >
             <Avatar name={agent.name} />
-            <span className="font-semibold text-foreground">{agent.name}</span>
-            <ChevronRight className="ml-auto size-4 shrink-0 text-muted" />
+            <span className="text-foreground font-semibold">{agent.name}</span>
+            <ChevronRight className="text-muted ml-auto size-4 shrink-0" />
           </Link>
         ))}
         {filtered.length === 0 && agents.length > 0 && (
-          <p className="text-sm text-muted">No one matches &ldquo;{query}&rdquo;.</p>
+          <p className="text-muted text-sm">No one matches &ldquo;{query}&rdquo;.</p>
         )}
         {agents.length === 0 && (
-          <p className="text-sm text-muted">No members yet. Ask an admin to add one.</p>
+          <p className="text-muted text-sm">No members yet. Ask an admin to add one.</p>
         )}
       </div>
     </div>

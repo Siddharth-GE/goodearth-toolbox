@@ -14,13 +14,15 @@ export default async function MarathonAdminGroupsPage() {
       <AdminNav active="groups" />
 
       <div className="px-5 pt-5 pb-16">
-        <h1 className="mb-1 text-lg font-bold text-foreground">Groups</h1>
-        <p className="mb-5 text-sm text-muted">{groups.length} group{groups.length === 1 ? "" : "s"}</p>
+        <h1 className="text-foreground mb-1 text-lg font-bold">Groups</h1>
+        <p className="text-muted mb-5 text-sm">
+          {groups.length} group{groups.length === 1 ? "" : "s"}
+        </p>
 
         <div className="mb-5 space-y-2">
           {groups.map((group) => (
-            <div key={group.id} className="rounded-2xl border border-border bg-surface px-3.5 py-3">
-              <span className="font-medium text-foreground">{group.name}</span>
+            <div key={group.id} className="border-border bg-surface rounded-2xl border px-3.5 py-3">
+              <span className="text-foreground font-medium">{group.name}</span>
             </div>
           ))}
           {groups.length === 0 && <EmptyState icon={Building2} title="No groups yet" />}

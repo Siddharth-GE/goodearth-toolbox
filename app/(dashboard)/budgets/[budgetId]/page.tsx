@@ -25,25 +25,29 @@ export default async function BudgetPricingPage({
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <Link href="/budgets" className="text-xs font-medium text-muted hover:text-foreground">
+          <Link href="/budgets" className="text-muted hover:text-foreground text-xs font-medium">
             ← All budgets
           </Link>
-          <h1 className="mt-1 text-lg font-bold tracking-tight text-foreground">
+          <h1 className="text-foreground mt-1 text-lg font-bold tracking-tight">
             {budget.unit_name} · R{budget.revision_no}
             {/* Only shown once there's been more than one pricing — on a
                 first budget the version is noise, not information. */}
             {budget.version > 1 && (
-              <span className="ml-1.5 font-medium text-muted">v{budget.version}</span>
+              <span className="text-muted ml-1.5 font-medium">v{budget.version}</span>
             )}
           </h1>
-          <p className="text-sm text-muted">
+          <p className="text-muted text-sm">
             {budget.project_name} · {budget.totals.lineCount}{" "}
             {budget.totals.lineCount === 1 ? "line" : "lines"} across {budget.spaces.length}{" "}
             {budget.spaces.length === 1 ? "space" : "spaces"}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {editable ? <Badge variant="warning">Pricing</Badge> : <Badge variant="success">Approved</Badge>}
+          {editable ? (
+            <Badge variant="warning">Pricing</Badge>
+          ) : (
+            <Badge variant="success">Approved</Badge>
+          )}
           {budget.spaces.length > 0 && (
             <>
               {/* plain: next/link prefetches on hover, which would render a
@@ -66,11 +70,11 @@ export default async function BudgetPricingPage({
         // Carried-forward lines the designer has since resized. They have
         // a price, so nothing is blocked — but saying it here means the
         // team doesn't have to scroll hunting for amber rows.
-        <div className="rounded-xl border border-warning/40 bg-warning/5 px-4 py-3">
-          <p className="text-sm text-foreground">
+        <div className="border-warning/40 bg-warning/5 rounded-xl border px-4 py-3">
+          <p className="text-foreground text-sm">
             <span className="font-medium">
-              {budget.needsReviewCount} {budget.needsReviewCount === 1 ? "line needs" : "lines need"}{" "}
-              a check
+              {budget.needsReviewCount}{" "}
+              {budget.needsReviewCount === 1 ? "line needs" : "lines need"} a check
             </span>{" "}
             — priced in the previous revision, but the designer has changed the quantity since. The
             unit cost has been kept; the new quantity is already in.
@@ -81,17 +85,16 @@ export default async function BudgetPricingPage({
       {budget.spaces.length > 0 && (
         // Said plainly on screen, because the difference between these two
         // files is the difference between a quote and a leaked margin.
-        <p className="text-xs text-muted">
-          <span className="font-medium text-foreground">Budget sheet</span> is internal — it shows
-          cost and margin.{" "}
-          <span className="font-medium text-foreground">Client quote</span> shows only the client
-          price, with the design views.
+        <p className="text-muted text-xs">
+          <span className="text-foreground font-medium">Budget sheet</span> is internal — it shows
+          cost and margin. <span className="text-foreground font-medium">Client quote</span> shows
+          only the client price, with the design views.
         </p>
       )}
 
       {!editable && (
-        <div className="rounded-xl border border-border bg-surface px-4 py-3">
-          <p className="text-sm text-foreground">
+        <div className="border-border bg-surface rounded-xl border px-4 py-3">
+          <p className="text-foreground text-sm">
             Approved{" "}
             {budget.approved_at && (
               <span className="text-muted">
@@ -100,9 +103,9 @@ export default async function BudgetPricingPage({
             )}
             . Prices are locked — re-open it to correct one.
           </p>
-          <p className="mt-1 text-xs text-muted">
+          <p className="text-muted mt-1 text-xs">
             Documents from this budget are stamped{" "}
-            <span className="font-medium text-foreground">
+            <span className="text-foreground font-medium">
               R{budget.revision_no}-v{budget.version}
             </span>
             . Re-opening starts v{budget.version + 1}, so a corrected quotation is never confused

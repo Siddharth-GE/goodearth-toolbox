@@ -73,7 +73,8 @@ export function EntryForm({
     runId && gender && Number.isInteger(ageNum) && ageNum >= 3 && ageNum <= 99
       ? matchCategory(categories, runId, ageNum, gender)
       : null;
-  const showNoMatch = runId && gender && Number.isInteger(ageNum) && ageNum >= 3 && ageNum <= 99 && !category;
+  const showNoMatch =
+    runId && gender && Number.isInteger(ageNum) && ageNum >= 3 && ageNum <= 99 && !category;
 
   return (
     <form action={formAction} className="space-y-4">
@@ -179,9 +180,10 @@ export function EntryForm({
         {category && (
           <Card className="p-4">
             <CategoryBadge name={category.name} color={category.color} />
-            <p className="mt-2 text-sm text-muted">
-              Bib will start with <span className="font-bold text-foreground">{category.bib_prefix}</span> —
-              exact number assigned when you save.
+            <p className="text-muted mt-2 text-sm">
+              Bib will start with{" "}
+              <span className="text-foreground font-bold">{category.bib_prefix}</span> — exact
+              number assigned when you save.
             </p>
           </Card>
         )}
@@ -189,7 +191,7 @@ export function EntryForm({
       <AnimatedReveal show={Boolean(showNoMatch)}>
         {showNoMatch && (
           <Card className="p-4">
-            <p className="text-sm text-muted">No matching category — check age and gender.</p>
+            <p className="text-muted text-sm">No matching category — check age and gender.</p>
           </Card>
         )}
       </AnimatedReveal>
@@ -222,7 +224,7 @@ export function EntryForm({
         action in the app), but still sits inside normal document flow so
         it doesn't need extra bottom padding tricks elsewhere on the page.
       */}
-      <div className="sticky bottom-0 -mx-5 border-t border-border bg-background/95 px-5 py-3 backdrop-blur">
+      <div className="border-border bg-background/95 sticky bottom-0 -mx-5 border-t px-5 py-3 backdrop-blur">
         <Button type="submit" disabled={pending} className="w-full">
           {pending ? "Saving…" : confirmed ? "Yes, Save Anyway" : "Save & Get Bib"}
         </Button>

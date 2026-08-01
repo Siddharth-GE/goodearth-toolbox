@@ -13,10 +13,13 @@ export function ChangeAdminPinForm() {
   );
 
   return (
-    <form action={formAction} className="space-y-3 rounded-2xl border border-border bg-surface p-3.5">
+    <form
+      action={formAction}
+      className="border-border bg-surface space-y-3 rounded-2xl border p-3.5"
+    >
       <div>
-        <h2 className="text-sm font-semibold text-foreground">Admin PIN</h2>
-        <p className="text-xs text-muted">
+        <h2 className="text-foreground text-sm font-semibold">Admin PIN</h2>
+        <p className="text-muted text-xs">
           Opens every admin screen. Everyone who needs it shares it, so change it whenever someone
           leaves the team.
         </p>
@@ -60,12 +63,12 @@ export function ChangeAdminPinForm() {
       </div>
 
       {state?.error && (
-        <p role="alert" className="text-sm font-medium text-danger">
+        <p role="alert" className="text-danger text-sm font-medium">
           {state.error}
         </p>
       )}
       {state?.done && (
-        <p role="status" className="text-sm font-medium text-success">
+        <p role="status" className="text-success text-sm font-medium">
           {state.done}
         </p>
       )}

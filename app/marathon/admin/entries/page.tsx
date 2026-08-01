@@ -16,8 +16,12 @@ export default async function MarathonAdminEntriesPage({
   searchParams: Promise<{ run?: string; group?: string; category?: string; agent?: string }>;
 }) {
   await requireAdminSession();
-  const { run: runFilter, group: groupFilter, category: categoryFilter, agent: agentFilter } =
-    await searchParams;
+  const {
+    run: runFilter,
+    group: groupFilter,
+    category: categoryFilter,
+    agent: agentFilter,
+  } = await searchParams;
   const hasFilter = Boolean(runFilter || groupFilter || categoryFilter || agentFilter);
 
   const [{ groups, runs, categories: allCategories }, agents] = await Promise.all([
@@ -27,8 +31,12 @@ export default async function MarathonAdminEntriesPage({
 
   // Drop a category filter that no longer belongs to the selected race
   // (e.g. left over from before the race filter changed).
-  const categories = runFilter ? allCategories.filter((c) => c.run_id === runFilter) : allCategories;
-  const effectiveCategoryFilter = categories.some((c) => c.id === categoryFilter) ? categoryFilter : undefined;
+  const categories = runFilter
+    ? allCategories.filter((c) => c.run_id === runFilter)
+    : allCategories;
+  const effectiveCategoryFilter = categories.some((c) => c.id === categoryFilter)
+    ? categoryFilter
+    : undefined;
 
   const { entries, matchingCount, grandTotal, truncated } = await getAdminEntries({
     runId: runFilter,
@@ -42,16 +50,16 @@ export default async function MarathonAdminEntriesPage({
       <AdminNav active="entries" />
 
       <div className="px-5 pt-5 pb-16">
-        <p className="mb-1 text-sm text-muted">{hasFilter ? "Matching" : "Total"} entries</p>
+        <p className="text-muted mb-1 text-sm">{hasFilter ? "Matching" : "Total"} entries</p>
         {/* The real count, not how many rows fitted on this page — the
             list is capped, and a headline that quietly stops climbing on
             race day would be worse than no headline at all. */}
-        <p className="mb-1 text-3xl font-extrabold tracking-tight text-foreground">
+        <p className="text-foreground mb-1 text-3xl font-extrabold tracking-tight">
           {matchingCount}
-          {hasFilter && <span className="text-base font-medium text-muted"> of {grandTotal}</span>}
+          {hasFilter && <span className="text-muted text-base font-medium"> of {grandTotal}</span>}
         </p>
         {truncated && (
-          <p className="mb-5 text-xs text-muted">
+          <p className="text-muted mb-5 text-xs">
             Showing the {entries.length} most recent. Filter to narrow this down.
           </p>
         )}
@@ -79,13 +87,15 @@ export default async function MarathonAdminEntriesPage({
             {entries.map((entry) => (
               <li
                 key={entry.bib}
-                className="flex items-center justify-between rounded-2xl border border-border bg-surface p-3.5"
+                className="border-border bg-surface flex items-center justify-between rounded-2xl border p-3.5"
               >
                 <div className="flex items-center gap-3">
-                  <span className="w-16 shrink-0 font-mono text-sm font-bold text-foreground">{entry.bib}</span>
+                  <span className="text-foreground w-16 shrink-0 font-mono text-sm font-bold">
+                    {entry.bib}
+                  </span>
                   <div>
-                    <p className="text-sm font-medium text-foreground">{entry.name}</p>
-                    <p className="text-xs text-muted">
+                    <p className="text-foreground text-sm font-medium">{entry.name}</p>
+                    <p className="text-muted text-xs">
                       {entry.marathon_runs?.name}
                       {entry.marathon_groups?.name ? ` · ${entry.marathon_groups.name}` : ""}
                       {entry.marathon_agents?.name ? ` · by ${entry.marathon_agents.name}` : ""}
@@ -94,9 +104,12 @@ export default async function MarathonAdminEntriesPage({
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   {entry.marathon_categories && (
-                    <CategoryBadge name={entry.marathon_categories.name} color={entry.marathon_categories.color} />
+                    <CategoryBadge
+                      name={entry.marathon_categories.name}
+                      color={entry.marathon_categories.color}
+                    />
                   )}
-                  <span className="text-xs text-muted">{formatTime(entry.created_at)}</span>
+                  <span className="text-muted text-xs">{formatTime(entry.created_at)}</span>
                 </div>
               </li>
             ))}

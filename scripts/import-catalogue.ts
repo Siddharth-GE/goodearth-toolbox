@@ -91,7 +91,11 @@ async function main() {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  console.log(commit ? "\n=== COMMIT RUN — this writes to the database ===\n" : "\n=== DRY RUN — nothing will be written ===\n");
+  console.log(
+    commit
+      ? "\n=== COMMIT RUN — this writes to the database ===\n"
+      : "\n=== DRY RUN — nothing will be written ===\n",
+  );
 
   // --- Read ---------------------------------------------------------------
   const csvCategories = readCsv<CategoryCsvRow>("item_categories.csv");
@@ -121,12 +125,15 @@ async function main() {
     if (placement && !PLACEMENTS.includes(placement as (typeof PLACEMENTS)[number]))
       errors.push(`${where}: placement "${placement}" is not one of ${PLACEMENTS.join(", ")}`);
     const price = orNull(row.indicative_price);
-    if (price && !/^\d+(\.\d+)?$/.test(price)) errors.push(`${where}: price "${price}" is not a number`);
+    if (price && !/^\d+(\.\d+)?$/.test(price))
+      errors.push(`${where}: price "${price}" is not a number`);
     const category = orNull(row.category);
     if (!category) errors.push(`${where}: blank category`);
-    else if (!categoryNames.has(category)) errors.push(`${where}: category "${category}" is not in item_categories.csv`);
+    else if (!categoryNames.has(category))
+      errors.push(`${where}: category "${category}" is not in item_categories.csv`);
     const brand = orNull(row.brand);
-    if (brand && !brandNames.has(brand)) errors.push(`${where}: brand "${brand}" is not in brands.csv`);
+    if (brand && !brandNames.has(brand))
+      errors.push(`${where}: brand "${brand}" is not in brands.csv`);
   });
 
   if (errors.length > 0) {
@@ -169,7 +176,9 @@ async function main() {
 
   const categoryIdByName = new Map((existingCategories.data ?? []).map((c) => [c.name, c.id]));
   const brandIdByName = new Map((existingBrands.data ?? []).map((b) => [b.name, b.id]));
-  const codesInDb = new Set((existingCodes.data ?? []).map((i) => i.code).filter(Boolean) as string[]);
+  const codesInDb = new Set(
+    (existingCodes.data ?? []).map((i) => i.code).filter(Boolean) as string[],
+  );
 
   const categoriesToCreate = csvCategories.filter((c) => !categoryIdByName.has(c.name.trim()));
   const brandsToCreate = csvBrands.filter((b) => !brandIdByName.has(b.name.trim()));
@@ -178,21 +187,30 @@ async function main() {
 
   // --- Report -------------------------------------------------------------
   console.log("\n--- Plan ---");
-  console.log(`  Categories to create : ${categoriesToCreate.length} (${existingCategories.data?.length ?? 0} already in DB)`);
-  if (categoriesToCreate.length > 0) console.log(`      ${categoriesToCreate.map((c) => c.name).join(", ")}`);
-  console.log(`  Brands to create     : ${brandsToCreate.length} (${existingBrands.data?.length ?? 0} already in DB)`);
-  if (brandsToCreate.length > 0) console.log(`      ${brandsToCreate.map((b) => b.name).join(", ")}`);
+  console.log(
+    `  Categories to create : ${categoriesToCreate.length} (${existingCategories.data?.length ?? 0} already in DB)`,
+  );
+  if (categoriesToCreate.length > 0)
+    console.log(`      ${categoriesToCreate.map((c) => c.name).join(", ")}`);
+  console.log(
+    `  Brands to create     : ${brandsToCreate.length} (${existingBrands.data?.length ?? 0} already in DB)`,
+  );
+  if (brandsToCreate.length > 0)
+    console.log(`      ${brandsToCreate.map((b) => b.name).join(", ")}`);
   console.log(`  Items to insert      : ${itemsToInsert.length}`);
   console.log(`  Items already in DB  : ${alreadyPresent} (skipped)`);
 
   const perCategory = new Map<string, number>();
-  for (const row of itemsToInsert) perCategory.set(row.category, (perCategory.get(row.category) ?? 0) + 1);
+  for (const row of itemsToInsert)
+    perCategory.set(row.category, (perCategory.get(row.category) ?? 0) + 1);
   console.log("\n  Items per category:");
   for (const [name, count] of [...perCategory].sort((a, b) => b[1] - a[1])) {
     console.log(`      ${String(count).padStart(5)}  ${name}`);
   }
   const withImage = itemsToInsert.filter((row) => orNull(row.image_url)).length;
-  console.log(`\n  With an image URL    : ${withImage} of ${itemsToInsert.length} (thumbnails handled by a later pass)`);
+  console.log(
+    `\n  With an image URL    : ${withImage} of ${itemsToInsert.length} (thumbnails handled by a later pass)`,
+  );
 
   if (!commit) {
     console.log("\nDry run complete. Nothing was written.");
@@ -213,7 +231,9 @@ async function main() {
   }
 
   if (brandsToCreate.length > 0) {
-    const { error } = await supabase.from("brands").insert(brandsToCreate.map((b) => ({ name: b.name.trim() })));
+    const { error } = await supabase
+      .from("brands")
+      .insert(brandsToCreate.map((b) => ({ name: b.name.trim() })));
     if (error) {
       console.error("Creating brands failed:", error.message);
       process.exit(1);
@@ -231,7 +251,10 @@ async function main() {
 
   const rows: ItemInsert[] = itemsToInsert.map((row) => {
     const categoryId = catId.get(row.category.trim());
-    if (!categoryId) throw new Error(`No category id for "${row.category}" — should be impossible after validation`);
+    if (!categoryId)
+      throw new Error(
+        `No category id for "${row.category}" — should be impossible after validation`,
+      );
     const brand = orNull(row.brand);
     const price = orNull(row.indicative_price);
     return {
@@ -256,7 +279,9 @@ async function main() {
     const { error } = await supabase.from("items").insert(batch);
     if (error) {
       console.error(`\nBatch ${index + 1} failed after ${inserted} rows:`, error.message);
-      console.error("Re-run the script — already-inserted codes are skipped, so it will resume cleanly.");
+      console.error(
+        "Re-run the script — already-inserted codes are skipped, so it will resume cleanly.",
+      );
       process.exit(1);
     }
     inserted += batch.length;

@@ -28,14 +28,14 @@ export default async function MarathonPinPage({
       <div className="flex justify-center">
         <Avatar name={agent.name} size={64} />
       </div>
-      <h1 className="mt-4 text-xl font-bold text-foreground">{agent.name}</h1>
-      <p className="mt-1 text-sm text-muted">Enter your PIN</p>
+      <h1 className="text-foreground mt-4 text-xl font-bold">{agent.name}</h1>
+      <p className="text-muted mt-1 text-sm">Enter your PIN</p>
 
       <PinPad action={verifyAgentPin.bind(null, agent.id)} />
 
       <Link
         href="/marathon"
-        className="mt-6 inline-flex items-center gap-1.5 text-sm font-medium text-accent"
+        className="text-accent mt-6 inline-flex items-center gap-1.5 text-sm font-medium"
       >
         <ArrowLeft className="size-4" />
         Back

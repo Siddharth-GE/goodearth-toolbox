@@ -16,7 +16,10 @@ function readClientForm(formData: FormData) {
   };
 }
 
-export async function createClientRecord(_state: ClientFormState, formData: FormData): Promise<ClientFormState> {
+export async function createClientRecord(
+  _state: ClientFormState,
+  formData: FormData,
+): Promise<ClientFormState> {
   const user = await requireUser();
   await requireApp(user, "/masters");
 
@@ -46,7 +49,10 @@ export async function updateClientRecord(
   if (!name) return { error: "Enter the client's name." };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("clients").update({ name, mobile, email, notes }).eq("id", id);
+  const { error } = await supabase
+    .from("clients")
+    .update({ name, mobile, email, notes })
+    .eq("id", id);
   if (error) {
     console.error("updateClientRecord failed:", error);
     return { error: "Could not update client. Try again." };
