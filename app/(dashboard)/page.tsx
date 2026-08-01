@@ -1,5 +1,6 @@
 import { Spinner } from "@/components/ui/spinner";
 import { requireUser } from "@/lib/auth/dal";
+import { formatLongDate } from "@/lib/format";
 import { Suspense } from "react";
 import { ActivityFeed } from "./_components/activity-feed";
 import { BudgetVsActual } from "./_components/budget-vs-actual";
@@ -20,12 +21,7 @@ function greeting() {
 export default async function DashboardHome() {
   const user = await requireUser();
   const firstName = user.profile?.full_name?.split(" ")[0];
-  const today = new Date().toLocaleDateString("en-IN", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  const today = formatLongDate(new Date());
 
   return (
     <div>

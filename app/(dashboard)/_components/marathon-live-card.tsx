@@ -1,4 +1,5 @@
 import { getMarathonHome } from "@/lib/marathon/queries";
+import { formatCount } from "@/lib/format";
 import { Footprints } from "lucide-react";
 import Link from "next/link";
 
@@ -21,17 +22,19 @@ export async function MarathonLiveCard() {
         </span>
       </div>
       <div className="p-5">
-        <p className="font-mono text-4xl font-semibold tracking-tight">{totalEntries}</p>
+        <p className="font-mono text-4xl font-semibold tracking-tight">
+          {formatCount(totalEntries)}
+        </p>
         <p className="text-accent-foreground/80 mt-1 text-xs">total registrations</p>
         <div className="mt-4 flex gap-2">
           {runCounts.map((run) => (
             <div key={run.runId} className="bg-accent-foreground/10 flex-1 rounded-xl px-3 py-2">
-              <p className="font-mono text-base">{run.count}</p>
+              <p className="font-mono text-base">{formatCount(run.count)}</p>
               <p className="text-accent-foreground/80 mt-0.5 text-[11px]">{run.name}</p>
             </div>
           ))}
           <div className="bg-accent-foreground/10 flex-1 rounded-xl px-3 py-2">
-            <p className="font-mono text-base">{groupCount}</p>
+            <p className="font-mono text-base">{formatCount(groupCount)}</p>
             <p className="text-accent-foreground/80 mt-0.5 text-[11px]">schools / clubs</p>
           </div>
         </div>

@@ -1,8 +1,10 @@
+import { formatCount } from "@/lib/format";
+
 export function HeroCounter({ total, label }: { total: number; label: string }) {
   return (
     <div className="text-center">
       <div className="bg-gradient-to-r from-[var(--gradient-hero-from)] via-[var(--gradient-hero-via)] to-[var(--gradient-hero-to)] bg-clip-text text-7xl font-extrabold tracking-tight text-transparent tabular-nums">
-        {total}
+        {formatCount(total)}
       </div>
       <p className="text-muted mt-1 text-sm font-semibold">{label}</p>
     </div>

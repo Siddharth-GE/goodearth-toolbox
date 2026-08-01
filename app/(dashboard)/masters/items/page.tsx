@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { Pagination } from "@/components/ui/pagination";
 import { Button, LinkButton } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
@@ -17,7 +18,7 @@ import { listItemCategories } from "@/lib/masters/item-categories";
 import { listItems, type ItemKind } from "@/lib/masters/items";
 import { Package } from "lucide-react";
 import { ItemFormDialog } from "./_components/item-form-dialog";
-import { formatCount, formatMoney } from "@/lib/format";
+import { formatMoney } from "@/lib/format";
 
 // Indian digit grouping (1,23,456) — the catalogue runs to lakh-scale prices.
 export default async function ItemsPage({
@@ -53,9 +54,6 @@ export default async function ItemsPage({
     const query = params.toString();
     return query ? `/masters/items?${query}` : "/masters/items";
   };
-
-  const firstOnPage = (currentPage - 1) * pageSize + 1;
-  const lastOnPage = Math.min(currentPage * pageSize, total);
 
   return (
     <div className="space-y-4">
@@ -150,36 +148,13 @@ export default async function ItemsPage({
             </TableBody>
           </Table>
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-muted text-sm">
-              Showing {formatCount(firstOnPage)}–{formatCount(lastOnPage)} of {formatCount(total)}
-            </p>
-            {pageCount > 1 && (
-              <div className="flex items-center gap-2">
-                {currentPage > 1 ? (
-                  <LinkButton href={hrefForPage(currentPage - 1)} variant="secondary">
-                    Previous
-                  </LinkButton>
-                ) : (
-                  <Button variant="secondary" disabled>
-                    Previous
-                  </Button>
-                )}
-                <span className="text-muted text-sm tabular-nums">
-                  Page {currentPage} of {pageCount}
-                </span>
-                {currentPage < pageCount ? (
-                  <LinkButton href={hrefForPage(currentPage + 1)} variant="secondary">
-                    Next
-                  </LinkButton>
-                ) : (
-                  <Button variant="secondary" disabled>
-                    Next
-                  </Button>
-                )}
-              </div>
-            )}
-          </div>
+          <Pagination
+            page={currentPage}
+            pageCount={pageCount}
+            hrefForPage={hrefForPage}
+            total={total}
+            pageSize={pageSize}
+          />
         </>
       )}
     </div>
