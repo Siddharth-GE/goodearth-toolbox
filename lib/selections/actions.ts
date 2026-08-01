@@ -2,6 +2,7 @@
 
 import { requireApp } from "@/lib/auth/access";
 import { requireUser } from "@/lib/auth/dal";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -271,12 +272,24 @@ export async function addLines(
   const itemById = new Map(items.map((item) => [item.id, item]));
 
   // What's already in these spaces: needed both to append new lines after
-  // the existing ones, and to consolidate rather than duplicate.
-  const { data: existing } = await supabase
-    .from("selection_lines")
-    .select("id, unit_space_id, item_id, quantity, sort_order")
-    .eq("selection_id", selectionId)
-    .in("unit_space_id", spaceIds);
+  // the existing ones, and to consolidate rather than duplicate. Read to
+  // completion (fetchAll) and never silently on error — a partial or
+  // missing view of the existing lines would break exactly the merge
+  // promise this function makes, duplicating lines instead of raising
+  // their quantity.
+  const { data: existing, error: existingError } = await fetchAll((from, to) =>
+    supabase
+      .from("selection_lines")
+      .select("id, unit_space_id, item_id, quantity, sort_order")
+      .eq("selection_id", selectionId)
+      .in("unit_space_id", spaceIds)
+      .order("id")
+      .range(from, to),
+  );
+  if (existingError) {
+    console.error("addLines existing read failed:", existingError);
+    return { error: "Could not read the current lines. Try again." };
+  }
 
   const nextSort = new Map<string, number>();
   for (const spaceId of spaceIds) nextSort.set(spaceId, 0);
