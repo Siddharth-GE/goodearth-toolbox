@@ -19,9 +19,9 @@ and **what's next**.
 
 | | |
 |---|---|
-| Last worked | 2026-07-31 |
-| Branch | everything merged and pushed to `master`, live on Vercel |
-| Migrations applied | `0001`–`0005` (next new one is `0006`) |
+| Last worked | 2026-08-01 |
+| Branch | `feature/selections` — Phase 2 built, awaiting the browser gate before merging |
+| Migrations applied | `0001`–`0008` (next new one is `0009`) |
 | Items in database | **2,633** (2,631 imported catalogue + 2 material seeds) |
 | Categories / brands | 14 / 21 |
 | Thumbnails | **897** in Supabase Storage; 3 dead vendor links, 1,733 items have no image |
@@ -37,7 +37,7 @@ and **what's next**.
 | 1 | **Masters** — projects, plots, units, clients, vendors, stores, items, categories, brands, space types | ✅ Shipped, Gate 1 approved |
 | 3 | **Catalogue import** — the real 2,631-item catalogue | ✅ Done — **pulled forward, out of order** (see below) |
 | 3b | **Thumbnail pass** — catalogue images into Supabase Storage | ✅ Done |
-| 2 | **Selections** — per-unit design workspace + the catalogue picker | ⬜ **NEXT** |
+| 2 | **Selections** — per-unit design workspace + the catalogue picker | 🟡 **Built on `feature/selections`, awaiting the gate** |
 | 4 | Budgets — cost + margin → client rate, approval flow | ⬜ Not started |
 | 5 | Indents — pull-from-budget *and* direct site request | ⬜ Not started |
 | 6 | Purchase Orders — vendor grouping + letterhead PDF | ⬜ Not started |
@@ -192,6 +192,46 @@ Goodearth actually talks about status.
 ---
 
 ## Session log
+
+### 2026-08-01 — Selections built (Phase 2)
+
+Branch `feature/selections`, migrations `0006`–`0008` applied. Everything
+in the founder's Selections spec is built except paste-from-Excel.
+
+- **Spaces** set up several at a time, with names suggested per type
+  (`Bedroom 1`, `Bedroom 2`) and editable before committing.
+- **The picker** over all 2,633 items — search on name, code *and* brand,
+  filters for category, brand and placement, tiles designed around the
+  fact that two-thirds have no photo. The basket is local, so clicking
+  costs nothing and one action writes the lot; spaces are chosen as chips
+  so four identical bathrooms fill in one pass. An item already in a
+  space has its quantity raised rather than being duplicated.
+- **Revisions** — issue (irreversible, guarded in the database), branch
+  R+1 carrying `line_key`, and a line-by-line diff.
+- **Item requests** — a designer creates a missing item from inside the
+  picker and keeps working; Masters resolves it later, with a catalogue
+  search seeded on the requested name so duplicates surface first.
+  Merging never repoints existing lines: the provisional item survives as
+  an alias, because issued revisions are immutable.
+- **PDF and CSV** — A4, one sheet per space, drafts watermarked, no rates
+  anywhere.
+
+Two things learned the hard way, both worth remembering:
+
+- **Server Actions are the wrong tool for reads.** They dispatch one at a
+  time per client, and a revalidating action re-renders the whole route —
+  so the picker's search queued behind itself and re-ran four unrelated
+  page queries per keystroke. Moved to a Route Handler, which the Next
+  docs recommend for exactly this.
+- **`useState(prop)` is a bug waiting to happen** in a component that
+  survives navigation. The picker's target space was seeded that way and
+  kept pointing at whichever space was open when the page first loaded,
+  so items silently landed in the wrong room.
+
+Still open: paste-from-Excel; the PDF's real letterhead (logo, address,
+GST, terms) and a Geist `.ttf` to replace Helvetica; and the wider
+admins-only RLS mismatch on the other master tables (see the note in
+migration `0008`).
 
 ### 2026-07-31 — Masters shipped, catalogue loaded
 
