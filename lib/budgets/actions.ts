@@ -2,6 +2,7 @@
 
 import { requireApp } from "@/lib/auth/access";
 import { requireUser } from "@/lib/auth/dal";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -158,22 +159,41 @@ async function carryForward(
   // A first budget for the unit. Nothing to carry, and not an error.
   if (!previous) return null;
 
+  // Read to COMPLETION, not to PostgREST's silent 1,000-row cap. A
+  // truncated read here doesn't fail — it quietly hands the budget team a
+  // blank sheet for lines they already priced, which is the single most
+  // likely reason they'd abandon the tool for a spreadsheet.
   const [previousBudgetLines, previousSelectionLines, currentSelectionLines] = await Promise.all([
-    supabase
-      .from("budget_lines")
-      .select("line_key, quantity, expected_vendor_id, unit_cost, margin_pct, notes")
-      .eq("budget_id", previous.id),
-    supabase
-      .from("selection_lines")
-      .select("line_key, quantity")
-      .eq("selection_id", previous.selection_id),
-    supabase.from("selection_lines").select("line_key, quantity").eq("selection_id", selectionId),
+    fetchAll((from, to) =>
+      supabase
+        .from("budget_lines")
+        .select("line_key, quantity, expected_vendor_id, unit_cost, margin_pct, notes")
+        .eq("budget_id", previous.id)
+        .order("line_key")
+        .range(from, to),
+    ),
+    fetchAll((from, to) =>
+      supabase
+        .from("selection_lines")
+        .select("line_key, quantity")
+        .eq("selection_id", previous.selection_id)
+        .order("line_key")
+        .range(from, to),
+    ),
+    fetchAll((from, to) =>
+      supabase
+        .from("selection_lines")
+        .select("line_key, quantity")
+        .eq("selection_id", selectionId)
+        .order("line_key")
+        .range(from, to),
+    ),
   ]);
 
   if (previousBudgetLines.error || previousSelectionLines.error || currentSelectionLines.error) {
     console.error(
       "carryForward read failed:",
-      previousBudgetLines.error ?? currentSelectionLines.error,
+      previousBudgetLines.error ?? previousSelectionLines.error ?? currentSelectionLines.error,
     );
     return "Could not read the previous budget. Try again.";
   }
