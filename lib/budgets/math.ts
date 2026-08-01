@@ -82,14 +82,19 @@ export function rollUp(lines: PricedLine[]): Totals {
 
   for (const line of lines) {
     const lineTotal = lineCost(line);
-    if (lineTotal === null) continue;
+    const amount = lineAmount(line);
+    // A line counts only when BOTH cost and margin are present. A saved
+    // line always has both (migration 0017 forbids a cost without a
+    // margin — "no margin" is stored as 0), so this case is only a line
+    // still being typed in the grid, and it stays pending rather than
+    // entering one total but not the other. The old fallback here charged
+    // such a line to the client at cost, invisibly — a quote whose
+    // printed column didn't add up to its own total.
+    if (lineTotal === null || amount === null) continue;
 
     pricedCount++;
     cost += lineTotal;
-    // A priced line with no margin still costs us money, so it belongs in
-    // the cost total either way; it only reaches the client total once
-    // there is a rate to charge.
-    client += lineAmount(line) ?? lineTotal;
+    client += amount;
   }
 
   return {

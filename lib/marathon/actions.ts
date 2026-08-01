@@ -168,9 +168,10 @@ export async function changeAdminPin(
   const { data: config } = await supabase.from("marathon_config").select("id").single();
   if (!config) return { error: "Could not read the event settings. Try again." };
 
+  // updated_at is the set_updated_at trigger's job (migration 0016).
   const { error } = await supabase
     .from("marathon_config")
-    .update({ admin_pin_hash: hash, admin_pin_salt: salt, updated_at: new Date().toISOString() })
+    .update({ admin_pin_hash: hash, admin_pin_salt: salt })
     .eq("id", config.id);
 
   if (error) {

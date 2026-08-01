@@ -58,6 +58,24 @@ test("roll-ups skip unpriced lines instead of counting them as free", () => {
   assert.equal(totals.pendingCount, 1);
 });
 
+test("a cost without a margin stays pending, in both totals or neither", () => {
+  // Only reachable while a line is being typed — migration 0017 forbids
+  // saving a cost without a margin. The old behaviour entered the cost
+  // total but charged the client at cost invisibly; now the line simply
+  // isn't counted until it's complete.
+  const totals = rollUp([
+    { quantity: 2, unit_cost: 100, margin_pct: 10 },
+    { quantity: 5, unit_cost: 300, margin_pct: null },
+  ]);
+
+  assert.equal(totals.cost, 2 * 100);
+  // Same computation path as rollUp, not a hand-reduced literal — full
+  // precision means the float epsilon is part of the expected value.
+  assert.equal(totals.client, 2 * clientRate(100, 10)!);
+  assert.equal(totals.pricedCount, 1);
+  assert.equal(totals.pendingCount, 1);
+});
+
 test("an empty budget has no margin percentage rather than zero", () => {
   const totals = rollUp([]);
   assert.equal(totals.cost, 0);

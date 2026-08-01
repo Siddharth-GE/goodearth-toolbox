@@ -292,14 +292,19 @@ export async function saveLine(
       quantity: input.quantity,
       expected_vendor_id: input.expectedVendorId,
       unit_cost: input.unitCost,
-      margin_pct: input.marginPct,
+      // A blank margin on a priced line means 0% — charged exactly cost,
+      // and said so. Migration 0017 forbids the ambiguous state (a cost
+      // with a NULL margin printed an empty rate on the client quote while
+      // its at-cost value hid inside the total); the coalesce here is what
+      // keeps clearing the margin field a valid way to say "no markup".
+      margin_pct: input.unitCost === null ? input.marginPct : (input.marginPct ?? 0),
       notes: input.notes?.trim() || null,
       // Clearing the flag is the point of editing a carried-forward line:
       // someone has now looked at it.
       needs_review: false,
       priced_by: user.id,
       priced_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      // updated_at is the set_updated_at trigger's job (migration 0016).
     },
     { onConflict: "budget_id,line_key" },
   );
@@ -323,11 +328,11 @@ export async function saveLine(
 /**
  * Locks the budget's prices.
  *
- * The "every line priced" rule is checked here rather than in the database
- * because it is a question about lines that may not exist yet — an
- * untouched line has no budget row at all, so no constraint could see it.
- * The database still enforces the consequence: once approved, its trigger
- * refuses every write to the lines.
+ * The "every line priced" rule is checked twice on purpose. Here, so an
+ * incomplete budget gets a message that says how many lines are missing;
+ * and in budgets_guard() (migration 0017), which compares the budget's
+ * row count against the revision's line count under the row lock — the
+ * backstop that holds even for a write this function never sees.
  */
 export async function approveBudget(budgetId: string): Promise<ActionState> {
   const user = await authorize();
@@ -379,7 +384,6 @@ export async function approveBudget(budgetId: string): Promise<ActionState> {
       status: "approved",
       approved_by: user.id,
       approved_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
     })
     .eq("id", budgetId);
 
@@ -460,7 +464,6 @@ export async function setItemMargin(
       item_id: itemId,
       margin_pct: marginPct,
       updated_by: user.id,
-      updated_at: new Date().toISOString(),
     },
     { onConflict: "item_id" },
   );
