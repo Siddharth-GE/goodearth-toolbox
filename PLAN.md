@@ -26,7 +26,7 @@ AppSheet replacement.
 |---|---|
 | Last worked | 2026-08-01 |
 | Branch | everything merged to `master`, live on Vercel. Next: `feature/indents` |
-| Migrations applied | `0001`–`0012` (next new one is `0013`) |
+| Migrations applied | `0001`–`0014` (next new one is `0015`) |
 | Items in database | **2,633** (2,631 imported catalogue + 2 material seeds) |
 | Categories / brands | 14 / 21 |
 | Thumbnails | **897** in Supabase Storage; 3 dead vendor links, 1,733 items have no image |
@@ -227,6 +227,101 @@ stronger than "hide two columns": C renders from `QuoteData`
 (`lib/budgets/quote.ts`), a type that has **no cost or margin field at
 all**. A template can't print what its props don't contain, so the
 failure mode is a compile error rather than a leaked margin.
+
+## Codebase hardening — audit of 2026-08-01
+
+A full audit (architecture, performance, docs, database) was run once
+Selections and Budgets began depending on each other, ahead of bringing
+a maintainer onto the project. Findings were sorted into five stages.
+**Stage 1 is shipped; Stages 2–5 are open work**, in priority order.
+
+### Stage 1 — security & correctness ✅ shipped (migrations `0013`, `0014`)
+
+- **Any staff user could make themselves an admin.** `profiles` lets you
+  edit your own row and `role` lives on it, with the anon key in every
+  browser. One request bought every app grant, including `/budgets` —
+  the one boundary the schema treats as secret. Roles are now an
+  admin-only change, enforced by a trigger.
+- **Granting `/masters` never worked.** The app checked the grant; the
+  database demanded `is_admin()`. Every non-admin write failed as
+  "Could not create project. Try again." Unnoticed because the only user
+  was an admin.
+- `sharp` was undeclared and resolving only as one of Next's *optional*
+  dependencies — design-view uploads were one install away from breaking.
+- The `x-user-id` header was forwardable on paths the proxy matcher
+  skipped (anything ending `.png`, which a dynamic route can).
+- A failed save in the Selections line grid marked the row saved before
+  the write, so the edit was lost and could never be retried.
+
+### Stage 2 — remaining bugs ⬜
+
+- Silent 1,000-row truncation (the catalogue bug again) in
+  `lib/marathon/queries.ts` entry counts and `lib/budgets/queries.ts`
+  `listInbox` line counts; `item_margins` is read whole on every budget
+  render. All need explicit ranges or counts.
+- `startPricing` discards the error from its own cleanup delete, so a
+  failed carry-forward can leave a zombie budget that blocks every retry.
+- `lib/settings/actions.ts` throws instead of returning `ActionState`;
+  `grant-checkbox.tsx` swallows the result, so a failed permission change
+  looks like it worked.
+- Marathon PINs are still the seeded defaults (`2026` / `1234`),
+  published in git, on a page reachable with no login and no rate limit.
+  Needs a change-PIN screen and throttling.
+
+### Stage 3 — shared foundations ⬜ (biggest win for a new maintainer)
+
+Selections and Budgets currently solve the same problems three different
+ways each. Consolidate:
+
+- **One `lib/format.ts`.** `items.indicative_price` renders as `₹12,345`,
+  `₹12,345` and `12,345` in three different screens today, and
+  `formatQty` in `lib/pdf/theme.ts` doesn't group digits despite its own
+  comment saying it should — so PDFs and screens disagree.
+- Missing primitives being hand-rolled: `Textarea` (2 copies), pagination
+  (3 incompatible versions), icon button (4), inline error text (20+).
+  `Button`'s `secondary`/`ghost` variants have no disabled style;
+  `Badge`'s `default` variant renders as bare text.
+- Two shared hooks would delete ~150 lines: debounced abortable search
+  (3 copies) and save-on-blur (3 copies, one of which had the Stage 1 bug
+  the other two had already fixed).
+- **No `error.tsx` or `not-found.tsx` exists anywhere**, though four
+  pages call `notFound()`. Selections and Marathon have no `loading.tsx`,
+  which DESIGN.md requires.
+
+### Stage 4 — database patterns ⬜
+
+- `items` has no index on `is_active` or `name`, so every catalogue
+  keystroke is a sequential scan and sort over 2,633 rows.
+- Unindexed foreign keys across most tables; four redundant indexes
+  fully covered by a unique constraint.
+- `updated_at` exists on five tables and is maintained by hand on three —
+  no trigger. A maintainer cannot trust the column.
+- `audit_log` stores whole rows as jsonb on every write to six tables,
+  with no retention policy. It will become the largest table.
+- **Write the conventions down**, including the one learned here: a
+  migration must be re-runnable, because they're applied by hand and a
+  partial failure needs "run it again" to be a safe answer.
+
+### Stage 5 — maintainer handover ⬜
+
+- CLAUDE.md still says Selections and Budgets aren't built, and describes
+  Budgets as "budget vs actual per project".
+- PLAN.md's "Decisions locked in" promises soft-deleted lines via
+  `line_status` — a column that has never existed; the code hard-deletes.
+- No `PLAN.md` for Selections, Budgets or Settings, though CLAUDE.md's
+  own checklist requires one per tool.
+- No documented path for: creating the first admin, what
+  `MARATHON_SESSION_SECRET` is, running the import scripts, or recovering
+  from a bad migration.
+- `REPO-MAP.md` is gitignored and two phases stale — it exists only on
+  one machine, where it actively misleads. Delete it.
+- Dead code: `components/ui/tooltip.tsx`, three `components/masters/`
+  pickers, `lib/masters/space-types.ts`, and five unused exports.
+
+**Deliberately not doing:** CI, Prettier, or pre-commit hooks (existing
+call, still right at this size); Marathon's service-role kiosk design;
+per-project permissions — the app boundary *is* the permission boundary,
+which is a real decision, just previously undocumented as a limit.
 
 ## Session log
 
