@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -30,6 +31,10 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
         {children}
+        {/* Real-user page-load timings, reported to Vercel. Sits in the root
+            layout so it covers the kiosk routes (app/marathon) too, not just
+            the dashboard shell. No-op outside a Vercel deployment. */}
+        <SpeedInsights />
       </body>
     </html>
   );
