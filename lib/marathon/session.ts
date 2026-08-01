@@ -1,10 +1,15 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
+
+// The hashing primitives live in ./pin (pure, tested); re-exported here
+// so existing importers keep one place to look for "PIN things".
+import { verifyPinHash } from "./pin";
+export { hashPin, verifyPinHash } from "./pin";
 
 const COOKIE_NAME = "marathon_session";
 const SESSION_TTL_SECONDS = 8 * 60 * 60; // one event-day shift
@@ -108,19 +113,6 @@ export async function requireAdminSession() {
 }
 
 // PIN hashing ---------------------------------------------------------------
-
-export function hashPin(pin: string) {
-  const salt = randomBytes(16).toString("hex");
-  const hash = scryptSync(pin, salt, 64).toString("hex");
-  return { hash, salt };
-}
-
-export function verifyPinHash(pin: string, hash: string, salt: string) {
-  const candidate = scryptSync(pin, salt, 64);
-  const stored = Buffer.from(hash, "hex");
-  if (candidate.length !== stored.length) return false;
-  return timingSafeEqual(candidate, stored);
-}
 
 export async function verifyAdminPin(pin: string) {
   const supabase = createAdminClient();

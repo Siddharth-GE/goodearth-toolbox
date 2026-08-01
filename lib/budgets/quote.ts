@@ -4,6 +4,7 @@ import { downloadSpaceView, listSpaceViews } from "@/lib/selections/views";
 
 import { getBudget } from "./queries";
 import { lineAmount } from "./math";
+import { quoteReference } from "./reference";
 
 /**
  * The client quote's data — and, just as importantly, the shape of what
@@ -118,12 +119,7 @@ export async function getQuote(budgetId: string): Promise<QuoteData | null> {
     unit_name: budget.unit_name,
     revision_no: budget.revision_no,
     version: budget.version,
-    // Includes the version, so re-opening an approved budget to correct a
-    // rate produces a quotation a client can tell apart from the one they
-    // already have. Without it both would say QT/PLOT6/R2.
-    reference: `QT/${budget.unit_name}/R${budget.revision_no}-V${budget.version}`
-      .toUpperCase()
-      .replace(/\s+/g, ""),
+    reference: quoteReference(budget.unit_name, budget.revision_no, budget.version),
     approved_at: budget.approved_at,
     isDraft: budget.status !== "approved",
     spaces,

@@ -5,6 +5,12 @@ import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { cache } from "react";
 
+import {
+  diffLines,
+  type LineChange as GenericLineChange,
+  type RevisionDiff as GenericRevisionDiff,
+} from "./diff";
+
 export type SelectionStatus = "draft" | "issued" | "superseded";
 
 export type SelectionRow = {
@@ -235,34 +241,13 @@ export async function getPreviousIssued(
   return (data as SelectionRow) ?? null;
 }
 
-export type LineChange =
-  | { kind: "added"; line: SelectionLineRow; space: string }
-  | { kind: "removed"; line: SelectionLineRow; space: string }
-  | {
-      kind: "changed";
-      line: SelectionLineRow;
-      previous: SelectionLineRow;
-      space: string;
-      quantityChanged: boolean;
-      spaceChanged: boolean;
-    };
+// The diff rules live in ./diff (pure, tested); these aliases pin the
+// generic types to the concrete line shape this module returns, so
+// consumers keep importing them from here.
+export type LineChange = GenericLineChange<SelectionLineRow>;
+export type RevisionDiff = GenericRevisionDiff<SelectionLineRow>;
 
-export type RevisionDiff = {
-  added: number;
-  removed: number;
-  changed: number;
-  unchanged: number;
-  entries: LineChange[];
-};
-
-/**
- * What changed between two revisions.
- *
- * Matched on `line_key`, never on row id — a line copied into the next
- * revision is a different row but the same line, and that is precisely
- * what lets Budgets carry pricing forward instead of re-pricing
- * everything each time a revision is issued.
- */
+/** What changed between two revisions — fetch here, decide in ./diff. */
 export async function diffRevisions(
   previousSelectionId: string,
   currentSelectionId: string,
@@ -277,48 +262,11 @@ export async function diffRevisions(
     listUnitSpaces(unitId, currentSelectionId),
   ]);
 
-  const spaceLabel = new Map(spaces.map((space) => [space.id, space.label]));
-  const previousByKey = new Map(previousLines.map((line) => [line.line_key, line]));
-  const currentByKey = new Map(currentLines.map((line) => [line.line_key, line]));
-
-  const entries: LineChange[] = [];
-  let unchanged = 0;
-
-  for (const line of currentLines) {
-    const previous = previousByKey.get(line.line_key);
-    if (!previous) {
-      entries.push({ kind: "added", line, space: spaceLabel.get(line.unit_space_id) ?? "—" });
-      continue;
-    }
-    const quantityChanged = previous.quantity !== line.quantity;
-    const spaceChanged = previous.unit_space_id !== line.unit_space_id;
-    if (quantityChanged || spaceChanged) {
-      entries.push({
-        kind: "changed",
-        line,
-        previous,
-        space: spaceLabel.get(line.unit_space_id) ?? "—",
-        quantityChanged,
-        spaceChanged,
-      });
-    } else {
-      unchanged++;
-    }
-  }
-
-  for (const line of previousLines) {
-    if (!currentByKey.has(line.line_key)) {
-      entries.push({ kind: "removed", line, space: spaceLabel.get(line.unit_space_id) ?? "—" });
-    }
-  }
-
-  return {
-    added: entries.filter((entry) => entry.kind === "added").length,
-    removed: entries.filter((entry) => entry.kind === "removed").length,
-    changed: entries.filter((entry) => entry.kind === "changed").length,
-    unchanged,
-    entries,
-  };
+  return diffLines(
+    previousLines,
+    currentLines,
+    new Map(spaces.map((space) => [space.id, space.label])),
+  );
 }
 
 /**

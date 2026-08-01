@@ -13,6 +13,7 @@ import {
   formatAmount,
   formatCount,
   formatDate,
+  formatLongDate,
   formatMoney,
   formatPercent,
   formatQuantity,
@@ -75,6 +76,17 @@ test("dates are day-first and unambiguous", () => {
   assert.match(formatted, /2026/);
   assert.equal(formatDate(null), "—");
   assert.equal(formatDate("not a date"), "—");
+});
+
+test("long dates spell out the weekday and month", () => {
+  // The Overview greeting — previously the one formatter with no caller
+  // and no test, while the page hand-rolled the identical thing.
+  const formatted = formatLongDate("2026-08-01T10:30:00Z");
+  assert.match(formatted, /Saturday/);
+  assert.match(formatted, /August/);
+  assert.match(formatted, /2026/);
+  assert.equal(formatLongDate(null), "—");
+  assert.equal(formatLongDate("not a date"), "—");
 });
 
 test("times show hour and minute", () => {

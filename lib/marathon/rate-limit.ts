@@ -87,11 +87,7 @@ export async function clearFailures(target: string) {
   await supabase.from("marathon_pin_attempts").delete().eq("target", target);
 }
 
-/**
- * Wording for a locked-out agent, in the plain language the rest of the
- * kiosk uses. Rounded up, so "1 minute" never means "any second now".
- */
-export function lockoutMessage({ lockedUntil }: { lockedUntil: Date }) {
-  const minutes = Math.max(1, Math.ceil((lockedUntil.getTime() - Date.now()) / 60_000));
-  return `Too many wrong PINs. Try again in ${minutes} minute${minutes === 1 ? "" : "s"}.`;
-}
+// The lockout wording lives in ./pin (pure, tested); re-exported here so
+// the rate-limit module remains the one place callers look for lockout
+// behaviour.
+export { lockoutMessage } from "./pin";
