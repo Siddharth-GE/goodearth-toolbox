@@ -12,6 +12,7 @@ const TABS = [
   { key: "stores", href: "/masters/stores", label: "Stores" },
   { key: "items", href: "/masters/items", label: "Items" },
   { key: "categories", href: "/masters/categories", label: "Categories & Brands" },
+  { key: "requests", href: "/masters/requests", label: "Requests" },
 ] as const;
 
 export function MastersNav() {

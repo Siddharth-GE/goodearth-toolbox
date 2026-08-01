@@ -392,6 +392,75 @@ export async function removeLine(selectionId: string, lineId: string): Promise<A
   return undefined;
 }
 
+// ---------------------------------------------------------------------
+// Item requests
+// ---------------------------------------------------------------------
+
+/**
+ * Creates a provisional item and raises a request for it, without the
+ * designer leaving the editor.
+ *
+ * The item lands in `items` immediately, flagged provisional, so the
+ * selection line has a real foreign key from the start — there is no
+ * parallel "custom line" concept to reconcile later. Approval is a
+ * tidying step for Masters, never a gate on the designer's work.
+ */
+export async function requestItem(input: {
+  name: string;
+  categoryId: string;
+  brandId: string | null;
+  specNote: string | null;
+  uom: string;
+}): Promise<{ error?: string; itemId?: string }> {
+  const user = await authorize();
+
+  const name = input.name.trim();
+  if (!name) return { error: "Give the item a name." };
+  if (!input.categoryId) return { error: "Choose a category." };
+  if (!UOMS.includes(input.uom)) return { error: "Choose a unit of measure." };
+
+  const supabase = await createClient();
+
+  const { data: item, error: itemError } = await supabase
+    .from("items")
+    .insert({
+      name,
+      kind: "catalogue",
+      category_id: input.categoryId,
+      brand_id: input.brandId,
+      default_uom: input.uom,
+      description: input.specNote?.trim() || null,
+      is_provisional: true,
+      // No code: codes follow the catalogue's own convention and are
+      // assigned when Masters accepts the item.
+    })
+    .select("id")
+    .single();
+
+  if (itemError || !item) {
+    console.error("requestItem item failed:", itemError);
+    return { error: "Could not create the item. Try again." };
+  }
+
+  const { error: requestError } = await supabase.from("item_requests").insert({
+    provisional_item_id: item.id,
+    requested_name: name,
+    category_id: input.categoryId,
+    brand_id: input.brandId,
+    spec_note: input.specNote?.trim() || null,
+    requested_by: user.id,
+  });
+
+  if (requestError) {
+    // The item exists and is usable, so this is not worth blocking the
+    // designer over — but Masters won't see it in their queue.
+    console.error("requestItem request failed:", requestError);
+    return { error: "Item created, but the request could not be logged. Tell an admin." };
+  }
+
+  return { itemId: item.id };
+}
+
 // Catalogue search deliberately lives in app/api/catalogue/route.ts, not
 // here. It is a read, and Server Actions are the wrong tool for reads:
 // they dispatch one at a time per client (so keystrokes queue) and a

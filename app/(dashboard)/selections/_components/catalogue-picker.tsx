@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { addLines } from "@/lib/selections/actions";
 import type { CatalogueItem, CatalogueSearchResult } from "@/lib/selections/catalogue";
+import { RequestItemDialog } from "./request-item-dialog";
 import { Loader2, Minus, Plus, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
@@ -87,6 +88,29 @@ export function CataloguePicker({
     apply();
     setPage(1);
   };
+
+  /**
+   * A just-created provisional item goes straight into the basket. It
+   * won't be in the current search results, which is exactly why the
+   * basket stores the item itself rather than looking it up.
+   */
+  const addProvisional = (itemId: string, name: string) =>
+    setBasket((current) => ({
+      ...current,
+      [itemId]: {
+        item: {
+          id: itemId,
+          code: null,
+          name,
+          brand_name: null,
+          thumb_url: null,
+          indicative_price: null,
+          default_uom: "each",
+          is_provisional: true,
+        },
+        quantity: 1,
+      },
+    }));
 
   const step = (item: CatalogueItem, by: number) =>
     setBasket((current) => {
@@ -240,9 +264,17 @@ export function CataloguePicker({
               <Loader2 className="size-5 animate-spin" />
             </div>
           ) : result.items.length === 0 ? (
-            <p className="py-12 text-center text-sm text-muted">
-              Nothing matches that. Try a different search or clear the filters.
-            </p>
+            <div className="flex flex-col items-center gap-3 py-12">
+              <p className="text-center text-sm text-muted">
+                Nothing matches that. Try a different search, or add it as a new item.
+              </p>
+              <RequestItemDialog
+                categories={categories}
+                brands={brands}
+                prefillName={search}
+                onCreated={addProvisional}
+              />
+            </div>
           ) : (
             <div className="grid grid-cols-2 gap-3 pb-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
               {result.items.map((item) => (
@@ -258,9 +290,23 @@ export function CataloguePicker({
         </div>
 
         <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
-          <p className="text-xs text-muted">
-            {loading ? "Searching…" : `${inr.format(result.total)} ${result.total === 1 ? "item" : "items"}`}
-          </p>
+          <div className="flex items-center gap-3">
+            <p className="text-xs text-muted">
+              {loading
+                ? "Searching…"
+                : `${inr.format(result.total)} ${result.total === 1 ? "item" : "items"}`}
+            </p>
+            {/* Also here, not only in the empty state: a designer often
+                knows something isn't in the catalogue without searching. */}
+            {result.items.length > 0 && (
+              <RequestItemDialog
+                categories={categories}
+                brands={brands}
+                prefillName={search}
+                onCreated={addProvisional}
+              />
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <Button variant="secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
               Previous

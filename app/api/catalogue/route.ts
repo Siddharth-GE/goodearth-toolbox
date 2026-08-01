@@ -1,4 +1,4 @@
-import { requireApp } from "@/lib/auth/access";
+import { hasApp } from "@/lib/auth/access";
 import { getCurrentUser } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
 
@@ -20,8 +20,11 @@ import { createClient } from "@/lib/supabase/server";
 export async function GET(request: Request) {
   const user = await getCurrentUser();
   if (!user) return new Response("Unauthorized", { status: 401 });
-  // Redirects for a page, but here it just means "no".
-  await requireApp(user, "/selections");
+  // Two tools browse the catalogue: designers picking items, and Masters
+  // checking a request against what already exists. hasApp rather than
+  // requireApp because a redirect is meaningless in a fetch response.
+  const allowed = (await hasApp(user, "/selections")) || (await hasApp(user, "/masters"));
+  if (!allowed) return new Response("Forbidden", { status: 403 });
 
   const { searchParams } = new URL(request.url);
   const search = (searchParams.get("q") ?? "").replace(/[,()]/g, " ").trim();

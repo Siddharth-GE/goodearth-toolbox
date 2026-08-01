@@ -9,7 +9,7 @@ import {
   listSelectionLines,
   listUnitSpaces,
 } from "@/lib/selections/queries";
-import { FileDown, LayoutGrid } from "lucide-react";
+import { FileDown, GitCompare, LayoutGrid, Sheet } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AddSpaceDialog } from "../_components/add-space-dialog";
@@ -77,6 +77,14 @@ export default async function SelectionEditorPage({
           ) : (
             <Badge variant="success">Issued</Badge>
           )}
+          {previous && (
+            // Available on a draft too, so a designer can review exactly
+            // what they're about to hand over before pressing Issue.
+            <LinkButton href={`/selections/${selectionId}/diff`} variant="secondary">
+              <GitCompare className="size-4" />
+              Changes
+            </LinkButton>
+          )}
           {lines.length > 0 && (
             // plain: a next/link would prefetch on hover and generate the
             // entire PDF server-side just because the cursor passed over
@@ -84,6 +92,12 @@ export default async function SelectionEditorPage({
             <LinkButton href={`/selections/${selectionId}/pdf`} variant="secondary" plain>
               <FileDown className="size-4" />
               PDF
+            </LinkButton>
+          )}
+          {lines.length > 0 && (
+            <LinkButton href={`/selections/${selectionId}/csv`} variant="secondary" plain>
+              <Sheet className="size-4" />
+              Excel
             </LinkButton>
           )}
           {isDraft && (
@@ -132,6 +146,14 @@ export default async function SelectionEditorPage({
             {diff && previous
               ? ` — ${diff.added} added, ${diff.removed} removed and ${diff.changed} changed since R${previous.revision_no}; ${diff.unchanged} kept existing pricing.`
               : " — all of it new to price."}
+            {previous && (
+              <>
+                {" "}
+                <Link href={`/selections/${selectionId}/diff`} className="font-medium text-accent hover:underline">
+                  See what changed
+                </Link>
+              </>
+            )}
           </p>
         </div>
       )}
