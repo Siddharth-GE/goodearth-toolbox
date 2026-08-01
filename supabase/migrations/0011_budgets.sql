@@ -30,7 +30,12 @@
 -- without rewriting this default — so changing a product's margin never
 -- silently re-prices an approved budget.
 create table item_margins (
-  item_id uuid primary key references items (id) on delete cascade,
+  -- A surrogate key rather than item_id as the primary key, because
+  -- audit_row() from 0006 records new.id — a table without an `id` column
+  -- raises at runtime the first time anyone saves. The uniqueness that
+  -- matters is on item_id, below.
+  id uuid primary key default gen_random_uuid(),
+  item_id uuid not null unique references items (id) on delete cascade,
   margin_pct numeric not null check (margin_pct >= 0),
   updated_by uuid references profiles (id),
   updated_at timestamptz not null default now()
@@ -235,4 +240,3 @@ create policy "budget_lines updatable by budgets app"
   using (has_app('/budgets')) with check (has_app('/budgets'));
 create policy "budget_lines deletable by budgets app"
   on budget_lines for delete to authenticated using (has_app('/budgets'));
-</content>
