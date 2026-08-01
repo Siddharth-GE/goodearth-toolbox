@@ -10,9 +10,10 @@ import {
   mergeItemRequest,
   rejectItemRequest,
 } from "@/lib/masters/item-requests-actions";
+import { useDebouncedSearch } from "@/lib/hooks/use-debounced-search";
 import type { CatalogueSearchResult } from "@/lib/selections/catalogue";
 import { Search } from "lucide-react";
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 
 /**
  * Resolving a request.
@@ -33,37 +34,20 @@ export function ResolveRequest({
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState(requestedName);
-  const [result, setResult] = useState<CatalogueSearchResult>({
-    items: [],
-    total: 0,
-    pageCount: 1,
-  });
-  const [loading, setLoading] = useState(false);
   const [code, setCode] = useState("");
   const [error, setError] = useState<string>();
   const [saving, startSaving] = useTransition();
 
-  useEffect(() => {
-    if (!open) return;
-    const controller = new AbortController();
-    const timer = setTimeout(async () => {
-      setLoading(true);
-      try {
-        const response = await fetch(`/api/catalogue?q=${encodeURIComponent(search)}`, {
-          signal: controller.signal,
-        });
-        if (!response.ok) throw new Error("search failed");
-        setResult((await response.json()) as CatalogueSearchResult);
-        setLoading(false);
-      } catch (fetchError) {
-        if ((fetchError as Error).name !== "AbortError") setLoading(false);
-      }
-    }, 200);
-    return () => {
-      controller.abort();
-      clearTimeout(timer);
-    };
-  }, [open, search]);
+  // The shared hook, not this file's own copy — the hand-rolled version
+  // here had already drifted (it flashed "Nothing similar found" for
+  // 200ms before the first search returned, the exact symptom the hook's
+  // docstring warns about).
+  const { result, loading } = useDebouncedSearch<CatalogueSearchResult>({
+    url: "/api/catalogue",
+    params: { q: search },
+    enabled: open,
+    initial: { items: [], total: 0, pageCount: 1 },
+  });
 
   const run = (work: () => Promise<{ error?: string } | undefined>) =>
     startSaving(async () => {

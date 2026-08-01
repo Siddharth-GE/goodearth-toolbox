@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import {
@@ -223,7 +224,8 @@ function ViewCard({
             aria-label="Caption"
           />
           <IconButton
-            label="Move earlier"
+            aria-label="Move earlier"
+            bordered
             disabled={isFirst || busy}
             onClick={() =>
               startTransition(async () => void (await moveSpaceView(view.id, selectionId, "up")))
@@ -232,7 +234,8 @@ function ViewCard({
             <ChevronLeft className="size-3.5" />
           </IconButton>
           <IconButton
-            label="Move later"
+            aria-label="Move later"
+            bordered
             disabled={isLast || busy}
             onClick={() =>
               startTransition(async () => void (await moveSpaceView(view.id, selectionId, "down")))
@@ -241,9 +244,10 @@ function ViewCard({
             <ChevronRight className="size-3.5" />
           </IconButton>
           <IconButton
-            label="Remove this view"
+            aria-label="Remove this view"
+            tone="danger"
+            bordered
             disabled={busy}
-            danger
             onClick={() =>
               startTransition(async () => void (await deleteSpaceView(view.id, selectionId)))
             }
@@ -260,37 +264,5 @@ function ViewCard({
         <p className="text-danger mt-1 text-xs font-medium">{captionSave.error}</p>
       )}
     </figure>
-  );
-}
-
-function IconButton({
-  label,
-  onClick,
-  disabled,
-  danger,
-  children,
-}: {
-  label: string;
-  onClick: () => void;
-  disabled?: boolean;
-  danger?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-      disabled={disabled}
-      className={[
-        "border-border focus-visible:ring-accent flex size-8 shrink-0 items-center justify-center rounded-lg border transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:opacity-30",
-        danger
-          ? "text-muted hover:bg-danger/10 hover:text-danger"
-          : "text-foreground hover:bg-black/[0.04] dark:hover:bg-white/[0.06]",
-      ].join(" ")}
-    >
-      {children}
-    </button>
   );
 }

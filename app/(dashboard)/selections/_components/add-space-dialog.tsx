@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
 import {
   Dialog,
   DialogContent,
@@ -153,12 +154,15 @@ export function AddSpaceDialog({
                       <span className="text-foreground block truncate text-sm">{type.name}</span>
                     </button>
                     <div className="flex shrink-0 items-center gap-1">
-                      <StepButton
-                        icon="minus"
+                      <IconButton
+                        aria-label={`Remove one ${type.name}`}
+                        size="sm"
+                        bordered
                         disabled={count === 0}
                         onClick={() => step(type.id, -1)}
-                        label={`Remove one ${type.name}`}
-                      />
+                      >
+                        <Minus className="size-3.5" />
+                      </IconButton>
                       <span
                         className={[
                           "min-w-5 text-center text-sm font-semibold tabular-nums",
@@ -167,11 +171,14 @@ export function AddSpaceDialog({
                       >
                         {count}
                       </span>
-                      <StepButton
-                        icon="plus"
+                      <IconButton
+                        aria-label={`Add one ${type.name}`}
+                        size="sm"
+                        bordered
                         onClick={() => step(type.id, 1)}
-                        label={`Add one ${type.name}`}
-                      />
+                      >
+                        <Plus className="size-3.5" />
+                      </IconButton>
                     </div>
                   </div>
                 );
@@ -223,30 +230,5 @@ export function AddSpaceDialog({
         </div>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function StepButton({
-  icon,
-  onClick,
-  disabled,
-  label,
-}: {
-  icon: "plus" | "minus";
-  onClick: () => void;
-  disabled?: boolean;
-  label: string;
-}) {
-  const Icon = icon === "plus" ? Plus : Minus;
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={label}
-      className="border-border text-foreground focus-visible:ring-accent flex size-7 items-center justify-center rounded-lg border transition-colors hover:bg-black/[0.04] focus-visible:ring-2 focus-visible:outline-none disabled:opacity-30 dark:hover:bg-white/[0.06]"
-    >
-      <Icon className="size-3.5" />
-    </button>
   );
 }

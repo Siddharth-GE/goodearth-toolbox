@@ -14,12 +14,13 @@ import {
 import { EmptyState } from "@/components/ui/empty-state";
 import { FormMessage } from "@/components/ui/form-message";
 import { Pagination } from "@/components/ui/pagination";
+import { Spinner } from "@/components/ui/spinner";
 import { setItemMargin } from "@/lib/budgets/actions";
 import type { CatalogueSearchResult } from "@/lib/selections/catalogue";
 import { formatMoney } from "@/lib/format";
 import { useDebouncedSearch } from "@/lib/hooks/use-debounced-search";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
-import { Loader2, PackageOpen, Search } from "lucide-react";
+import { PackageOpen, Search } from "lucide-react";
 import { useState } from "react";
 
 /**
@@ -99,7 +100,7 @@ export function MarginsBrowser({
 
       {loading ? (
         <p className="text-muted inline-flex items-center gap-1.5 text-xs">
-          <Loader2 className="size-3.5 animate-spin" /> Searching…
+          <Spinner className="size-3.5 border-2" /> Searching…
         </p>
       ) : (
         <Pagination
