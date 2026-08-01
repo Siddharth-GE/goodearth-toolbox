@@ -119,21 +119,18 @@ export async function deleteDraft(selectionId: string): Promise<ActionState> {
   await authorize();
   const supabase = await createClient();
 
-  // Lines first: the immutability trigger checks the parent's status, and
-  // the parent must still exist and still be a draft when it does.
-  const { error: linesError } = await supabase
-    .from("selection_lines")
-    .delete()
-    .eq("selection_id", selectionId);
-  if (linesError) {
-    console.error("deleteDraft lines failed:", linesError);
-    return { error: "Could not discard this draft. Try again." };
-  }
-
-  const { error } = await supabase.from("selections").delete().eq("id", selectionId);
+  // One database function, one transaction (migration 0017). This used
+  // to be two requests — delete the lines, then the draft — and a
+  // failure between them (someone issuing the draft at that moment)
+  // stranded a draft with every line permanently gone.
+  const { error } = await supabase.rpc("delete_draft_selection", {
+    p_selection_id: selectionId,
+  });
   if (error) {
     console.error("deleteDraft failed:", error);
-    return { error: "Could not discard this draft. Try again." };
+    return {
+      error: error.message.replace(/^.*?:\s*/, "") || "Could not discard this draft. Try again.",
+    };
   }
 
   revalidatePath("/selections");
@@ -433,7 +430,7 @@ export async function requestItem(input: {
   specNote: string | null;
   uom: string;
 }): Promise<{ error?: string; itemId?: string }> {
-  const user = await authorize();
+  await authorize();
 
   const name = input.name.trim();
   if (!name) return { error: "Give the item a name." };
@@ -442,44 +439,32 @@ export async function requestItem(input: {
 
   const supabase = await createClient();
 
-  const { data: item, error: itemError } = await supabase
-    .from("items")
-    .insert({
-      name,
-      kind: "catalogue",
-      category_id: input.categoryId,
-      brand_id: input.brandId,
-      default_uom: input.uom,
-      description: input.specNote?.trim() || null,
-      is_provisional: true,
-      // No code: codes follow the catalogue's own convention and are
-      // assigned when Masters accepts the item.
-    })
-    .select("id")
-    .single();
+  // One database function, one transaction (migration 0017). This used
+  // to be two inserts — the provisional item, then the request — and
+  // when the second failed, the item survived alone: pickable in the
+  // catalogue, invisible to Masters' queue, with each retry minting
+  // another orphan. Designers have no delete right on items (correctly),
+  // so only a transaction could clean up after itself. No code is set:
+  // codes follow the catalogue's own convention and are assigned when
+  // Masters accepts the item.
+  const { data: itemId, error } = await supabase.rpc("create_item_request", {
+    p_name: name,
+    p_category_id: input.categoryId,
+    // The casts paper over a typegen limitation: it types every function
+    // argument non-null, but these two columns are nullable and the
+    // function handles null fine — "no brand" and "no note" are real
+    // inputs, and PostgREST passes the JSON null straight through.
+    p_brand_id: input.brandId as unknown as string,
+    p_spec_note: (input.specNote?.trim() || null) as unknown as string,
+    p_uom: input.uom,
+  });
 
-  if (itemError || !item) {
-    console.error("requestItem item failed:", itemError);
+  if (error || !itemId) {
+    console.error("requestItem failed:", error);
     return { error: "Could not create the item. Try again." };
   }
 
-  const { error: requestError } = await supabase.from("item_requests").insert({
-    provisional_item_id: item.id,
-    requested_name: name,
-    category_id: input.categoryId,
-    brand_id: input.brandId,
-    spec_note: input.specNote?.trim() || null,
-    requested_by: user.id,
-  });
-
-  if (requestError) {
-    // The item exists and is usable, so this is not worth blocking the
-    // designer over — but Masters won't see it in their queue.
-    console.error("requestItem request failed:", requestError);
-    return { error: "Item created, but the request could not be logged. Tell an admin." };
-  }
-
-  return { itemId: item.id };
+  return { itemId };
 }
 
 // Catalogue search deliberately lives in app/api/catalogue/route.ts, not
