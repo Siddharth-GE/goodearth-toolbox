@@ -364,10 +364,20 @@ export type MarginRow = {
   margin_pct: number | null;
 };
 
-/** The per-product margins already set, keyed by item. */
+/**
+ * The per-product margins already set, keyed by item.
+ *
+ * A lookup map, not a list — the margins browser shows whichever items a
+ * search returns and reads their margin from here. So it must be read to
+ * completion: truncated at the 1,000-row cap, a configured margin shows
+ * as blank, and a blank margin saved from that screen is a line sold at
+ * cost. (getBudget has its own scoped read for the same reason.)
+ */
 export async function listMargins(): Promise<Map<string, number>> {
   await authorize();
   const supabase = await createClient();
-  const { data } = await supabase.from("item_margins").select("item_id, margin_pct");
+  const { data } = await fetchAll((from, to) =>
+    supabase.from("item_margins").select("item_id, margin_pct").order("item_id").range(from, to),
+  );
   return new Map((data ?? []).map((row) => [row.item_id, Number(row.margin_pct)]));
 }
