@@ -341,20 +341,32 @@ export async function approveBudget(budgetId: string): Promise<ActionState> {
   if (!budget) return { error: "Could not find that budget." };
   if (budget.status === "approved") return { error: "This budget is already approved." };
 
-  const [{ data: selectionLines }, { data: budgetLines }] = await Promise.all([
-    supabase.from("selection_lines").select("line_key").eq("selection_id", budget.selection_id),
-    supabase.from("budget_lines").select("line_key, budget_status").eq("budget_id", budgetId),
+  // Exact database counts, never rows.length — an un-ranged read caps at
+  // 1,000 rows, and deriving this check from one could approve a budget
+  // with unpriced lines and then lock the trigger against fixing them.
+  // Every priced budget line references a line of this same revision
+  // (composite FK, migration 0011), so priced is a subset of total and
+  // the subtraction is safe.
+  const [totalResult, pricedResult] = await Promise.all([
+    supabase
+      .from("selection_lines")
+      .select("id", { count: "exact", head: true })
+      .eq("selection_id", budget.selection_id),
+    supabase
+      .from("budget_lines")
+      .select("id", { count: "exact", head: true })
+      .eq("budget_id", budgetId)
+      .eq("budget_status", "priced"),
   ]);
+  if (totalResult.error || pricedResult.error) {
+    console.error("approveBudget count failed:", totalResult.error ?? pricedResult.error);
+    return { error: "Could not check this budget's lines. Try again." };
+  }
 
-  const priced = new Set(
-    (budgetLines ?? [])
-      .filter((line) => line.budget_status === "priced")
-      .map((line) => line.line_key),
-  );
-  const total = (selectionLines ?? []).length;
+  const total = totalResult.count ?? 0;
   if (total === 0) return { error: "There is nothing to approve — this revision has no items." };
 
-  const missing = (selectionLines ?? []).filter((line) => !priced.has(line.line_key)).length;
+  const missing = total - (pricedResult.count ?? 0);
   if (missing > 0) {
     return {
       error: `${missing} of ${total} ${missing === 1 ? "line still needs" : "lines still need"} a cost before this can be approved.`,
