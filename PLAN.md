@@ -25,8 +25,8 @@ AppSheet replacement.
 |                     |                                                                                                 |
 | ------------------- | ----------------------------------------------------------------------------------------------- |
 | Last worked         | 2026-08-01                                                                                      |
-| Branch              | Second-pass audit: 4 stacked `feature/audit2-*` branches awaiting gates                         |
-| Migrations applied  | `0001`–`0016`; **`0017`–`0018` written, NOT yet applied** (see below)                           |
+| Branch              | `master` — second-pass audit fully merged, all four gates approved                              |
+| Migrations applied  | `0001`–`0018` (next new one is `0019`)                                                          |
 | Items in database   | **2,633** (2,631 imported catalogue + 2 material seeds)                                         |
 | Categories / brands | 14 / 21                                                                                         |
 | Thumbnails          | **897** in Supabase Storage; 3 dead vendor links, 1,733 items have no image                     |
@@ -383,24 +383,19 @@ approval), database guards that could be bypassed with a raw API call,
 two survivors of already-"fixed" UI bug classes, and doc contradictions.
 Shipped as four stacked branches, each with its own gate:
 
-| Stage | Branch                       | What                                                                  | Status                            |
-| ----- | ---------------------------- | --------------------------------------------------------------------- | --------------------------------- |
-| 0     | direct to `master`           | Docs that contradicted reality fixed                                  | ✅ merged                         |
-| 1     | `feature/audit2-correctness` | Truncation bugs (fetchAll), approval counts, caption save, waterfalls | 🔨 awaiting Gate 1                |
-| 2     | `feature/audit2-db`          | Migrations `0017`+`0018` + dependent code                             | 🔨 awaiting Studio apply + Gate 2 |
-| 3     | `feature/audit2-consistency` | Shared plumbing, FormMessage/PageTitle/Pagination sweeps, boundaries  | 🔨 awaiting Gate 3                |
-| 4     | `feature/audit2-handover`    | Pure-logic extraction + 13 tests, conventions written down            | 🔨 light gate                     |
+| Stage | Branch                       | What                                                                  | Status                                        |
+| ----- | ---------------------------- | --------------------------------------------------------------------- | --------------------------------------------- |
+| 0     | direct to `master`           | Docs that contradicted reality fixed                                  | ✅ merged                                     |
+| 1     | `feature/audit2-correctness` | Truncation bugs (fetchAll), approval counts, caption save, waterfalls | ✅ Gate 1 approved, merged                    |
+| 2     | `feature/audit2-db`          | Migrations `0017`+`0018` + dependent code                             | ✅ applied in Studio, Gate 2 approved, merged |
+| 3     | `feature/audit2-consistency` | Shared plumbing, FormMessage/PageTitle/Pagination sweeps, boundaries  | ✅ Gate 3 approved, merged                    |
+| 4     | `feature/audit2-handover`    | Pure-logic extraction + 13 tests, conventions written down            | ✅ Gate 4 approved, merged                    |
 
-**To apply `0017`/`0018`** (before merging the `audit2-db` branch or any
-after it): run the four commented PREFLIGHT queries at the top of
-`0017_integrity_guards.sql` in Supabase Studio — each must return zero
-rows — then run `0017`, then `0018`, then tell the assistant so
-`npm run db:types` regenerates types and the two remaining conversions
-(draft delete and item request moving onto the new atomic database
-functions) land. Everything in both migrations only tightens; live code
-keeps working while they're applied. One caveat: between applying `0017`
-and merging `audit2-db`, saving a budget line with a cost but a blank
-margin will error on the old code — apply and merge in the same sitting.
+All four gates were founder-tested in the browser on 2026-08-01.
+`0017`/`0018` were applied in Studio (preflights clean) and the
+dependent code merged in the same sitting, so the blank-margin window
+noted in the migration never reached users. Branches deleted after
+merging, per the git workflow.
 
 ### Decided, not done — with the trigger for revisiting
 
