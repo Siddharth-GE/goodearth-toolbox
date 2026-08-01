@@ -1164,16 +1164,19 @@ export type Database = {
         Row: {
           app: string
           granted_at: string
+          id: string
           user_id: string
         }
         Insert: {
           app: string
           granted_at?: string
+          id?: string
           user_id: string
         }
         Update: {
           app?: string
           granted_at?: string
+          id?: string
           user_id?: string
         }
         Relationships: [
@@ -1234,9 +1237,23 @@ export type Database = {
           team: string
         }[]
       }
+      create_item_request: {
+        Args: {
+          p_brand_id: string
+          p_category_id: string
+          p_name: string
+          p_spec_note: string
+          p_uom: string
+        }
+        Returns: string
+      }
       create_next_revision: {
         Args: { p_from_selection_id: string }
         Returns: string
+      }
+      delete_draft_selection: {
+        Args: { p_selection_id: string }
+        Returns: undefined
       }
       has_app: { Args: { slug: string }; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
@@ -1274,6 +1291,8 @@ export type Database = {
         }
       }
       reopen_budget: { Args: { p_budget_id: string }; Returns: undefined }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
       [_ in never]: never
