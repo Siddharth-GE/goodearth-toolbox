@@ -1,7 +1,7 @@
-import { StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Image, StyleSheet, Text, View } from "@react-pdf/renderer";
 import { Document } from "@react-pdf/renderer";
 import { DocumentPage, DocumentTable, type Column, type DocumentMeta } from "@/lib/pdf/document";
-import { formatDate, formatQty, pdf } from "@/lib/pdf/theme";
+import { designView, formatDate, formatQty, pdf } from "@/lib/pdf/theme";
 import type { BudgetHandoff, SelectionLineRow } from "./queries";
 
 /**
@@ -70,6 +70,12 @@ const styles = StyleSheet.create({
   spaceType: { fontSize: pdf.size.small, color: pdf.color.muted, marginTop: 2 },
   spaceCount: { fontSize: pdf.size.small, color: pdf.color.muted },
 
+  // Views are already normalised to 16:9 on upload, so the document never
+  // has to reason about shape — it only decides how many sit in a row.
+  viewGrid: { flexDirection: "row", flexWrap: "wrap", marginBottom: 14 },
+  viewImage: { width: "100%", borderRadius: 2, objectFit: "cover" },
+  viewCaption: { fontSize: pdf.size.tiny, color: pdf.color.muted, marginTop: 3 },
+
   signatureRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 44 },
   signatureBox: { width: "42%" },
   signatureRule: { borderTopWidth: 0.5, borderTopColor: pdf.color.ruleStrong, paddingTop: 4 },
@@ -87,7 +93,17 @@ const columns: Column<SelectionLineRow>[] = [
   { header: "Notes", width: 2.4, render: (row) => row.designer_note ?? "" },
 ];
 
-export function SelectionDocument({ handoff }: { handoff: BudgetHandoff }) {
+/** A space's views, already fetched as bytes — the bucket is private, so
+ *  there is no URL react-pdf could fetch on its own. */
+export type ViewImage = { data: Buffer; caption: string | null };
+
+export function SelectionDocument({
+  handoff,
+  viewsBySpace = new Map(),
+}: {
+  handoff: BudgetHandoff;
+  viewsBySpace?: Map<string, ViewImage[]>;
+}) {
   const { selection, spaces, totalLines } = handoff;
   const isDraft = selection.status === "draft";
 
@@ -182,10 +198,50 @@ export function SelectionDocument({ handoff }: { handoff: BudgetHandoff }) {
               {group.space.description}
             </Text>
           )}
+          <SpaceViewGrid views={viewsBySpace.get(group.space.id) ?? []} />
           <DocumentTable columns={columns} rows={group.lines} />
         </DocumentPage>
       ))}
     </Document>
+  );
+}
+
+/**
+ * The space's renders above its item list.
+ *
+ * A single view runs full width — it's the hero of the page. Two or more
+ * go side by side, because a page of stacked full-width images pushes the
+ * actual specification onto another sheet.
+ */
+function SpaceViewGrid({ views }: { views: ViewImage[] }) {
+  if (views.length === 0) return null;
+  const twoUp = views.length >= designView.twoUpFrom;
+
+  return (
+    <View style={styles.viewGrid}>
+      {views.map((view, index) => (
+        <View
+          key={index}
+          // wrap={false} keeps an image and its caption together rather
+          // than letting a page break land between them.
+          wrap={false}
+          style={{
+            width: twoUp ? "50%" : "100%",
+            paddingRight: twoUp && index % 2 === 0 ? 6 : 0,
+            paddingLeft: twoUp && index % 2 === 1 ? 6 : 0,
+            marginBottom: 8,
+          }}
+        >
+          {/* react-pdf's Image is a PDF primitive, not an <img> — it has
+              no alt concept, so the a11y rule doesn't apply. The explicit
+              {data, format} form avoids relying on its magic-byte
+              sniffing. */}
+          {/* eslint-disable-next-line jsx-a11y/alt-text */}
+          <Image src={{ data: view.data, format: "jpg" }} style={styles.viewImage} />
+          {view.caption && <Text style={styles.viewCaption}>{view.caption}</Text>}
+        </View>
+      ))}
+    </View>
   );
 }
 

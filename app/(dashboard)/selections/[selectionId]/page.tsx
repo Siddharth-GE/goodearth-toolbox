@@ -17,6 +17,8 @@ import { CataloguePicker } from "../_components/catalogue-picker";
 import { IssueDialog } from "../_components/issue-dialog";
 import { LineGrid } from "../_components/line-grid";
 import { NextRevisionButton } from "../_components/next-revision-button";
+import { SpaceViews } from "../_components/space-views";
+import { listSpaceViews } from "@/lib/selections/views";
 import { listItemCategories } from "@/lib/masters/item-categories";
 import { listBrands } from "@/lib/masters/brands";
 
@@ -41,6 +43,10 @@ export default async function SelectionEditorPage({
     listBrands(),
     getPreviousIssued(selection.unit_id, selection.revision_no),
   ]);
+
+  // Views belong to the space, not the revision — a render of Bedroom 1
+  // is still a render of Bedroom 1 in R3.
+  const viewsBySpace = await listSpaceViews(spaces.map((space) => space.id));
 
   // What the budget team will be handed. Computed for a draft too, so the
   // Issue dialog can state it before the click rather than after.
@@ -222,6 +228,13 @@ export default async function SelectionEditorPage({
                     />
                   )}
                 </div>
+
+                <SpaceViews
+                  spaceId={activeSpace.id}
+                  selectionId={selectionId}
+                  views={viewsBySpace.get(activeSpace.id) ?? []}
+                  editable={isDraft}
+                />
 
                 <LineGrid
                   selectionId={selectionId}
