@@ -285,14 +285,17 @@ export function CataloguePicker({
               <p className="text-sm text-muted">Use + to build up a list, then add it all at once.</p>
             ) : (
               <>
+                {/* No line count promised: an item already in one of these
+                    spaces raises that line's quantity instead of adding a
+                    second one, so the number of lines isn't knowable here. */}
                 <p className="text-sm font-medium text-foreground">
-                  {distinctItems} {distinctItems === 1 ? "item" : "items"} × {targetSpaces.length}{" "}
-                  {targetSpaces.length === 1 ? "space" : "spaces"} = {totalLines}{" "}
-                  {totalLines === 1 ? "line" : "lines"}
+                  {distinctItems} {distinctItems === 1 ? "item" : "items"} into {targetSpaces.length}{" "}
+                  {targetSpaces.length === 1 ? "space" : "spaces"}
                 </p>
-                {basketValue > 0 && (
-                  <p className="text-xs text-muted">indicative ₹{inr.format(Math.round(basketValue))}</p>
-                )}
+                <p className="text-xs text-muted">
+                  Anything already there has its quantity increased
+                  {basketValue > 0 && ` · indicative ₹${inr.format(Math.round(basketValue))}`}
+                </p>
               </>
             )}
             {error && <p className="text-xs font-medium text-danger">{error}</p>}
@@ -304,7 +307,7 @@ export function CataloguePicker({
               </Button>
             )}
             <Button onClick={commit} disabled={saving || totalLines === 0}>
-              {saving ? "Adding…" : `Add ${totalLines || ""}`.trim()}
+              {saving ? "Adding…" : "Add"}
             </Button>
           </div>
         </div>

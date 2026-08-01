@@ -267,25 +267,43 @@ export async function addLines(
   }
   const itemById = new Map(items.map((item) => [item.id, item]));
 
-  // Existing sort_order high-water mark per space, so new lines append
-  // rather than interleave with what's already there.
+  // What's already in these spaces: needed both to append new lines after
+  // the existing ones, and to consolidate rather than duplicate.
   const { data: existing } = await supabase
     .from("selection_lines")
-    .select("unit_space_id, sort_order")
+    .select("id, unit_space_id, item_id, quantity, sort_order")
     .eq("selection_id", selectionId)
     .in("unit_space_id", spaceIds);
 
   const nextSort = new Map<string, number>();
   for (const spaceId of spaceIds) nextSort.set(spaceId, 0);
+  // The same item in the same space is one line, not two — adding a
+  // second Aluminium Profile to the Living raises the quantity on the
+  // line already there. Keyed on item id, so it only merges a genuinely
+  // identical product, never two similar ones.
+  const currentLine = new Map<string, { id: string; quantity: number }>();
   for (const line of existing ?? []) {
     nextSort.set(line.unit_space_id, Math.max(nextSort.get(line.unit_space_id) ?? 0, line.sort_order + 1));
+    currentLine.set(`${line.unit_space_id}:${line.item_id}`, {
+      id: line.id,
+      quantity: Number(line.quantity),
+    });
   }
 
   const rows = [];
+  const merges: { id: string; quantity: number }[] = [];
+
   for (const spaceId of spaceIds) {
     for (const entry of wanted) {
       const item = itemById.get(entry.itemId);
       if (!item) continue;
+
+      const already = currentLine.get(`${spaceId}:${entry.itemId}`);
+      if (already) {
+        merges.push({ id: already.id, quantity: already.quantity + entry.quantity });
+        continue;
+      }
+
       const sort = nextSort.get(spaceId) ?? 0;
       nextSort.set(spaceId, sort + 1);
       rows.push({
@@ -302,10 +320,28 @@ export async function addLines(
     }
   }
 
-  const { error } = await supabase.from("selection_lines").insert(rows);
-  if (error) {
-    console.error("addLines failed:", error);
-    return { error: "Could not add those items. Try again." };
+  if (rows.length > 0) {
+    const { error } = await supabase.from("selection_lines").insert(rows);
+    if (error) {
+      console.error("addLines insert failed:", error);
+      return { error: "Could not add those items. Try again." };
+    }
+  }
+
+  // Each merge is a different quantity on a different row, so they can't
+  // be one statement. They're independent, so they go in parallel — this
+  // is server-side, with none of the client's one-at-a-time dispatch.
+  if (merges.length > 0) {
+    const results = await Promise.all(
+      merges.map((merge) =>
+        supabase.from("selection_lines").update({ quantity: merge.quantity }).eq("id", merge.id),
+      ),
+    );
+    const failed = results.find((result) => result.error);
+    if (failed?.error) {
+      console.error("addLines merge failed:", failed.error);
+      return { error: "Some items were added, but a quantity could not be updated. Check the list." };
+    }
   }
 
   revalidatePath(`/selections/${selectionId}`);
