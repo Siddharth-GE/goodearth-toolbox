@@ -1,3 +1,4 @@
+import { PageTitle } from "@/components/ui/page-title";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
@@ -15,7 +16,6 @@ import {
   type LineChange,
 } from "@/lib/selections/queries";
 import { GitCompare } from "lucide-react";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatCount, formatQuantity } from "@/lib/format";
 
@@ -32,22 +32,14 @@ export default async function RevisionDiffPage({
 
   return (
     <div className="space-y-4">
-      <div>
-        <Link
-          href={`/selections/${selectionId}`}
-          className="text-muted hover:text-foreground text-xs font-medium"
-        >
-          ← R{selection.revision_no}
-        </Link>
-        <h1 className="text-foreground mt-1 text-lg font-bold tracking-tight">
-          {previous
-            ? `R${selection.revision_no} compared with R${previous.revision_no}`
-            : "Changes"}
-        </h1>
-        <p className="text-muted text-sm">
-          {selection.project_name} · {selection.unit_name}
-        </p>
-      </div>
+      <PageTitle
+        title={
+          previous ? `R${selection.revision_no} compared with R${previous.revision_no}` : "Changes"
+        }
+        backHref={`/selections/${selectionId}`}
+        backLabel={`R${selection.revision_no}`}
+        description={`${selection.project_name} · ${selection.unit_name}`}
+      />
 
       {!previous ? (
         <EmptyState

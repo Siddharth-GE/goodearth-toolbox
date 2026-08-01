@@ -1,3 +1,4 @@
+import { PageTitle } from "@/components/ui/page-title";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
@@ -19,18 +20,15 @@ export default async function BudgetsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-foreground text-lg font-bold tracking-tight">Budgets</h1>
-          <p className="text-muted text-sm">
-            Every design revision handed over for pricing. Costs and margins here are visible only
-            to this team.
-          </p>
-        </div>
-        <Link href="/budgets/margins" className="text-accent text-sm font-medium hover:underline">
-          Product margins
-        </Link>
-      </div>
+      <PageTitle
+        title="Budgets"
+        description="Every design revision handed over for pricing. Costs and margins here are visible only to this team."
+        actions={
+          <Link href="/budgets/margins" className="text-accent text-sm font-medium hover:underline">
+            Product margins
+          </Link>
+        }
+      />
 
       {rows.length === 0 ? (
         <EmptyState

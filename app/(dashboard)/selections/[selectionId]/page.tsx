@@ -1,3 +1,4 @@
+import { PageTitle } from "@/components/ui/page-title";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button, LinkButton } from "@/components/ui/button";
@@ -65,77 +66,76 @@ export default async function SelectionEditorPage({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <Link href="/selections" className="text-muted hover:text-foreground text-xs font-medium">
-            ← All units
-          </Link>
-          <h1 className="text-foreground mt-1 text-lg font-bold tracking-tight">
-            {selection.unit_name} · R{selection.revision_no}
-          </h1>
-          <p className="text-muted text-sm">
+      <PageTitle
+        title={`${selection.unit_name} · R${selection.revision_no}`}
+        backHref="/selections"
+        backLabel="All units"
+        description={
+          <>
             {selection.project_name} · {lines.length} {lines.length === 1 ? "item" : "items"} across{" "}
             {spaces.length} {spaces.length === 1 ? "space" : "spaces"}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {isDraft ? (
-            <Badge variant="warning">Draft</Badge>
-          ) : selection.status === "superseded" ? (
-            <Badge variant="neutral">Superseded</Badge>
-          ) : (
-            <Badge variant="success">Issued</Badge>
-          )}
-          {previous && (
-            // Available on a draft too, so a designer can review exactly
-            // what they're about to hand over before pressing Issue.
-            <LinkButton href={`/selections/${selectionId}/diff`} variant="secondary">
-              <GitCompare className="size-4" />
-              Changes
-            </LinkButton>
-          )}
-          {lines.length > 0 && (
-            // plain: a next/link would prefetch on hover and generate the
-            // entire PDF server-side just because the cursor passed over
-            // the button. A plain anchor also gives native "save as".
-            <LinkButton href={`/selections/${selectionId}/pdf`} variant="secondary" plain>
-              <FileDown className="size-4" />
-              PDF
-            </LinkButton>
-          )}
-          {lines.length > 0 && (
-            <LinkButton href={`/selections/${selectionId}/csv`} variant="secondary" plain>
-              <Sheet className="size-4" />
-              Excel
-            </LinkButton>
-          )}
-          {isDraft && (
-            <>
-              <AddSpaceDialog
-                unitId={selection.unit_id}
-                spaceTypes={spaceTypes}
-                // Passed so suggested names continue past what's already
-                // there — a second Bath becomes "Bath 2", not a clash.
-                existing={spaces.map((s) => ({ label: s.label, space_type_id: s.space_type_id }))}
-              />
-              {lines.length > 0 && (
-                <IssueDialog
-                  selectionId={selectionId}
-                  revisionNo={selection.revision_no}
-                  lineCount={lines.length}
-                  spaceCount={spaces.filter((s) => s.line_count > 0).length}
-                  previousRevisionNo={previous?.revision_no ?? null}
-                  added={diff?.added ?? 0}
-                  removed={diff?.removed ?? 0}
-                  changed={diff?.changed ?? 0}
-                  unchanged={diff?.unchanged ?? 0}
+          </>
+        }
+        actions={
+          <>
+            {isDraft ? (
+              <Badge variant="warning">Draft</Badge>
+            ) : selection.status === "superseded" ? (
+              <Badge variant="neutral">Superseded</Badge>
+            ) : (
+              <Badge variant="success">Issued</Badge>
+            )}
+            {previous && (
+              // Available on a draft too, so a designer can review exactly
+              // what they're about to hand over before pressing Issue.
+              <LinkButton href={`/selections/${selectionId}/diff`} variant="secondary">
+                <GitCompare className="size-4" />
+                Changes
+              </LinkButton>
+            )}
+            {lines.length > 0 && (
+              // plain: a next/link would prefetch on hover and generate the
+              // entire PDF server-side just because the cursor passed over
+              // the button. A plain anchor also gives native "save as".
+              <LinkButton href={`/selections/${selectionId}/pdf`} variant="secondary" plain>
+                <FileDown className="size-4" />
+                PDF
+              </LinkButton>
+            )}
+            {lines.length > 0 && (
+              <LinkButton href={`/selections/${selectionId}/csv`} variant="secondary" plain>
+                <Sheet className="size-4" />
+                Excel
+              </LinkButton>
+            )}
+            {isDraft && (
+              <>
+                <AddSpaceDialog
+                  unitId={selection.unit_id}
+                  spaceTypes={spaceTypes}
+                  // Passed so suggested names continue past what's already
+                  // there — a second Bath becomes "Bath 2", not a clash.
+                  existing={spaces.map((s) => ({ label: s.label, space_type_id: s.space_type_id }))}
                 />
-              )}
-            </>
-          )}
-          {selection.status === "issued" && <NextRevisionButton fromSelectionId={selectionId} />}
-        </div>
-      </div>
+                {lines.length > 0 && (
+                  <IssueDialog
+                    selectionId={selectionId}
+                    revisionNo={selection.revision_no}
+                    lineCount={lines.length}
+                    spaceCount={spaces.filter((s) => s.line_count > 0).length}
+                    previousRevisionNo={previous?.revision_no ?? null}
+                    added={diff?.added ?? 0}
+                    removed={diff?.removed ?? 0}
+                    changed={diff?.changed ?? 0}
+                    unchanged={diff?.unchanged ?? 0}
+                  />
+                )}
+              </>
+            )}
+            {selection.status === "issued" && <NextRevisionButton fromSelectionId={selectionId} />}
+          </>
+        }
+      />
 
       {!isDraft && (
         <div className="border-border bg-surface rounded-xl border px-4 py-3">

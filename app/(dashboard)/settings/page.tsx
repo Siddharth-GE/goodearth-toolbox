@@ -1,3 +1,4 @@
+import { PageTitle } from "@/components/ui/page-title";
 import { GrantCheckbox } from "./_components/grant-checkbox";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -21,12 +22,10 @@ export default async function SettingsPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-foreground text-lg font-bold tracking-tight">Settings</h1>
-        <p className="text-muted text-sm">
-          Choose which apps each person can open. Admins always have every app.
-        </p>
-      </div>
+      <PageTitle
+        title="Settings"
+        description="Choose which apps each person can open. Admins always have every app."
+      />
 
       <Table>
         <TableHead>

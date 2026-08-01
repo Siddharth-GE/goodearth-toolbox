@@ -1,9 +1,9 @@
+import { PageTitle } from "@/components/ui/page-title";
 import { Badge } from "@/components/ui/badge";
 import { LinkButton } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getBudget, listVendorOptions } from "@/lib/budgets/queries";
 import { FileDown, Lock, PackageOpen } from "lucide-react";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ReopenButton } from "../_components/approve-button";
 import { PricingGrid } from "../_components/pricing-grid";
@@ -25,48 +25,51 @@ export default async function BudgetPricingPage({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <Link href="/budgets" className="text-muted hover:text-foreground text-xs font-medium">
-            ← All budgets
-          </Link>
-          <h1 className="text-foreground mt-1 text-lg font-bold tracking-tight">
+      <PageTitle
+        title={
+          <>
             {budget.unit_name} · R{budget.revision_no}
             {/* Only shown once there's been more than one pricing — on a
                 first budget the version is noise, not information. */}
             {budget.version > 1 && (
               <span className="text-muted ml-1.5 font-medium">v{budget.version}</span>
             )}
-          </h1>
-          <p className="text-muted text-sm">
+          </>
+        }
+        backHref="/budgets"
+        backLabel="All budgets"
+        description={
+          <>
             {budget.project_name} · {budget.totals.lineCount}{" "}
             {budget.totals.lineCount === 1 ? "line" : "lines"} across {budget.spaces.length}{" "}
             {budget.spaces.length === 1 ? "space" : "spaces"}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {editable ? (
-            <Badge variant="warning">Pricing</Badge>
-          ) : (
-            <Badge variant="success">Approved</Badge>
-          )}
-          {budget.spaces.length > 0 && (
-            <>
-              {/* plain: next/link prefetches on hover, which would render a
-                  whole PDF just because the cursor passed over the button. */}
-              <LinkButton href={`/budgets/${budgetId}/pdf`} variant="secondary" plain>
-                <Lock className="size-4" />
-                Budget sheet
-              </LinkButton>
-              <LinkButton href={`/budgets/${budgetId}/quote`} variant="secondary" plain>
-                <FileDown className="size-4" />
-                Client quote
-              </LinkButton>
-            </>
-          )}
-          {!editable && <ReopenButton budgetId={budgetId} />}
-        </div>
-      </div>
+          </>
+        }
+        actions={
+          <>
+            {editable ? (
+              <Badge variant="warning">Pricing</Badge>
+            ) : (
+              <Badge variant="success">Approved</Badge>
+            )}
+            {budget.spaces.length > 0 && (
+              <>
+                {/* plain: next/link prefetches on hover, which would render a
+                    whole PDF just because the cursor passed over the button. */}
+                <LinkButton href={`/budgets/${budgetId}/pdf`} variant="secondary" plain>
+                  <Lock className="size-4" />
+                  Budget sheet
+                </LinkButton>
+                <LinkButton href={`/budgets/${budgetId}/quote`} variant="secondary" plain>
+                  <FileDown className="size-4" />
+                  Client quote
+                </LinkButton>
+              </>
+            )}
+            {!editable && <ReopenButton budgetId={budgetId} />}
+          </>
+        }
+      />
 
       {budget.needsReviewCount > 0 && (
         // Carried-forward lines the designer has since resized. They have

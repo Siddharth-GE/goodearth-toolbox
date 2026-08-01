@@ -1,3 +1,4 @@
+import { PageTitle } from "@/components/ui/page-title";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
@@ -18,12 +19,10 @@ export default async function SelectionsPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-foreground text-lg font-bold tracking-tight">Selections</h1>
-        <p className="text-muted text-sm">
-          What goes into every space of a unit. Costs and rates are handled in Budgets.
-        </p>
-      </div>
+      <PageTitle
+        title="Selections"
+        description="What goes into every space of a unit. Costs and rates are handled in Budgets."
+      />
 
       {units.length === 0 ? (
         <EmptyState

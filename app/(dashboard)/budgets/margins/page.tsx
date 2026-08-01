@@ -1,7 +1,7 @@
+import { PageTitle } from "@/components/ui/page-title";
 import { listBrands } from "@/lib/masters/brands";
 import { listItemCategories } from "@/lib/masters/item-categories";
 import { listMargins } from "@/lib/budgets/queries";
-import Link from "next/link";
 import { MarginsBrowser } from "../_components/margins-browser";
 
 export default async function MarginsPage() {
@@ -13,16 +13,12 @@ export default async function MarginsPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <Link href="/budgets" className="text-muted hover:text-foreground text-xs font-medium">
-          ← All budgets
-        </Link>
-        <h1 className="text-foreground mt-1 text-lg font-bold tracking-tight">Product margins</h1>
-        <p className="text-muted text-sm">
-          The default markup applied when a product is priced. Changing one here only affects
-          pricing done from now on — budgets already priced keep their own figures.
-        </p>
-      </div>
+      <PageTitle
+        title="Product margins"
+        backHref="/budgets"
+        backLabel="All budgets"
+        description="The default markup applied when a product is priced. Changing one here only affects pricing done from now on — budgets already priced keep their own figures."
+      />
 
       <MarginsBrowser
         // Only products that already have a margin are sent up front; the
