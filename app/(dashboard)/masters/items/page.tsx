@@ -151,7 +151,10 @@ export default async function ItemsPage({
           <Pagination
             page={currentPage}
             pageCount={pageCount}
-            hrefForPage={hrefForPage}
+            // Precomputed strings, not the function itself — a function
+            // can't cross into a Client Component.
+            prevHref={currentPage > 1 ? hrefForPage(currentPage - 1) : null}
+            nextHref={currentPage < pageCount ? hrefForPage(currentPage + 1) : null}
             total={total}
             pageSize={pageSize}
           />

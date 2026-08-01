@@ -24,7 +24,8 @@ export function Pagination({
   page,
   pageCount,
   onPageChange,
-  hrefForPage,
+  prevHref,
+  nextHref,
   total,
   pageSize,
   unit = "items",
@@ -32,10 +33,17 @@ export function Pagination({
 }: {
   page: number;
   pageCount: number;
-  /** State-driven lists. Provide this or `hrefForPage`. */
+  /** State-driven lists. Provide this or the hrefs. */
   onPageChange?: (page: number) => void;
-  /** URL-driven lists — Previous/Next render as real links. */
-  hrefForPage?: (page: number) => string;
+  /**
+   * URL-driven lists — Previous/Next render as real links. Plain strings
+   * (null at either end), NOT a callback: this is a Client Component and
+   * a Server Component page cannot pass it a function — that fails at
+   * runtime ("Functions cannot be passed to Client Components"), which
+   * `next build` does not catch.
+   */
+  prevHref?: string | null;
+  nextHref?: string | null;
   /** Optional row count, shown alongside so the numbers mean something. */
   total?: number;
   /** With `total`, upgrades the label to "Showing a–b of N". */
@@ -58,9 +66,9 @@ export function Pagination({
     }
   }
 
-  const step = (target: number, text: string, enabled: boolean) =>
-    hrefForPage && enabled ? (
-      <LinkButton href={hrefForPage(target)} variant="secondary" size="sm">
+  const step = (target: number, href: string | null | undefined, text: string, enabled: boolean) =>
+    href && enabled ? (
+      <LinkButton href={href} variant="secondary" size="sm">
         {text}
       </LinkButton>
     ) : (
@@ -80,11 +88,11 @@ export function Pagination({
 
       {pageCount > 1 && (
         <div className="flex items-center gap-2">
-          {step(page - 1, "Previous", page > 1)}
+          {step(page - 1, prevHref, "Previous", page > 1)}
           <span className="text-muted px-1 text-xs tabular-nums">
             Page {page} of {pageCount}
           </span>
-          {step(page + 1, "Next", page < pageCount)}
+          {step(page + 1, nextHref, "Next", page < pageCount)}
         </div>
       )}
     </div>
