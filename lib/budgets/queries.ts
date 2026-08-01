@@ -51,55 +51,35 @@ export async function listInbox(): Promise<InboxRow[]> {
   await authorize();
   const supabase = await createClient();
 
+  // The line counts ride along as embedded count aggregates, so the whole
+  // inbox is two requests however many revisions are issued. Counts are
+  // still computed by the database — never derived from fetched rows,
+  // which cap at 1,000 — but the previous shape did it as one exact-count
+  // request per revision plus one per budget: correct, and ~180 round
+  // trips by the hundredth issued revision.
   const { data: selections } = await supabase
     .from("selections")
-    .select("id, unit_id, revision_no, issued_at, units(name, projects(name))")
+    .select(
+      "id, unit_id, revision_no, issued_at, units(name, projects(name)), selection_lines(count)",
+    )
     .eq("status", "issued")
     .order("issued_at", { ascending: false });
 
   const selectionIds = (selections ?? []).map((row) => row.id);
   if (selectionIds.length === 0) return [];
 
-  // One exact count per revision rather than fetching every line of every
-  // issued revision and tallying in JS. At ~200 lines a revision that hit
-  // PostgREST's 1000-row ceiling by the sixth one, after which every
-  // further revision reported "0 lines waiting" — an inbox quietly
-  // telling the budget team there was no work to do.
-  const [countResults, budgetsResult] = await Promise.all([
-    Promise.all(
-      selectionIds.map(async (selectionId) => {
-        const { count } = await supabase
-          .from("selection_lines")
-          .select("id", { count: "exact", head: true })
-          .eq("selection_id", selectionId);
-        return [selectionId, count ?? 0] as const;
-      }),
-    ),
-    supabase.from("budgets").select("id, selection_id, status").in("selection_id", selectionIds),
-  ]);
+  // The filter on the embedded table scopes the count to priced lines
+  // only — how much of each budget is already done.
+  const { data: budgets } = await supabase
+    .from("budgets")
+    .select("id, selection_id, status, budget_lines(count)")
+    .in("selection_id", selectionIds)
+    .eq("budget_lines.budget_status", "priced");
 
-  const lineCount = new Map(countResults);
+  const budgetBySelection = new Map((budgets ?? []).map((budget) => [budget.selection_id, budget]));
 
-  const budgetBySelection = new Map(
-    (budgetsResult.data ?? []).map((budget) => [budget.selection_id, budget]),
-  );
-
-  // How much of each budget is done, so the inbox can show progress rather
-  // than just "in progress". One query for every budget, not one each.
-  // Counted per budget, for the same reason as the line counts above.
-  const budgetIds = (budgetsResult.data ?? []).map((budget) => budget.id);
-  const pricedCount = new Map(
-    await Promise.all(
-      budgetIds.map(async (budgetId) => {
-        const { count } = await supabase
-          .from("budget_lines")
-          .select("id", { count: "exact", head: true })
-          .eq("budget_id", budgetId)
-          .eq("budget_status", "priced");
-        return [budgetId, count ?? 0] as const;
-      }),
-    ),
-  );
+  const embeddedCount = (embed: unknown): number =>
+    (embed as { count: number }[] | null)?.[0]?.count ?? 0;
 
   return (selections ?? []).map((selection) => {
     const unit = selection.units as { name: string; projects: { name: string } | null } | null;
@@ -111,10 +91,10 @@ export async function listInbox(): Promise<InboxRow[]> {
       project_name: unit?.projects?.name ?? "—",
       revision_no: selection.revision_no,
       issued_at: selection.issued_at,
-      line_count: lineCount.get(selection.id) ?? 0,
+      line_count: embeddedCount(selection.selection_lines),
       budget_id: budget?.id ?? null,
       budget_status: (budget?.status as BudgetStatus | undefined) ?? null,
-      priced_count: budget ? (pricedCount.get(budget.id) ?? 0) : 0,
+      priced_count: budget ? embeddedCount(budget.budget_lines) : 0,
     };
   });
 }
