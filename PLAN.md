@@ -24,6 +24,7 @@ and **what's next**.
 | Migrations applied | `0001`–`0005` (next new one is `0006`) |
 | Items in database | **2,633** (2,631 imported catalogue + 2 material seeds) |
 | Categories / brands | 14 / 21 |
+| Thumbnails | **897** in Supabase Storage; 3 dead vendor links, 1,733 items have no image |
 | Built tools | Marathon, Settings, Masters |
 
 ---
@@ -35,6 +36,7 @@ and **what's next**.
 | 0 | Platform hardening — `user_apps` grants, `requireApp()`, generated Supabase types, migration rules | ✅ Done |
 | 1 | **Masters** — projects, plots, units, clients, vendors, stores, items, categories, brands, space types | ✅ Shipped, Gate 1 approved |
 | 3 | **Catalogue import** — the real 2,631-item catalogue | ✅ Done — **pulled forward, out of order** (see below) |
+| 3b | **Thumbnail pass** — catalogue images into Supabase Storage | ✅ Done |
 | 2 | **Selections** — per-unit design workspace + the catalogue picker | ⬜ **NEXT** |
 | 4 | Budgets — cost + margin → client rate, approval flow | ⬜ Not started |
 | 5 | Indents — pull-from-budget *and* direct site request | ⬜ Not started |
@@ -51,44 +53,37 @@ better order.
 
 ---
 
+## Images — settled, nothing left to do
+
+`scripts/fetch-catalogue-images.ts` has run. **897 thumbnails** are in
+the public `catalogue` Supabase Storage bucket at
+`items/<item id>.webp`, with `items.thumb_url` pointing at each.
+Roughly 5 KB apiece (a 218 KB, 1920px vendor JPEG becomes a 4.8 KB,
+300px WebP — a 45× saving), so the whole set is about 4.5 MB.
+
+What the picker needs to know:
+
+- **Grid tiles load `thumb_url` only.** Never `image_url` — 30 full
+  vendor images per page is ~15 MB against ~150 KB of thumbs.
+- **`image_url` stays a link to the vendor's CDN**, for a detail/zoom
+  view only. Not stored, because ~360 MB isn't worth it for something
+  opened rarely.
+- **1,736 items need a placeholder** — 1,733 that never had an image,
+  plus 3 whose vendor URLs are now dead (`HANL095`, `HANL114`,
+  `WALL337`, all 404). Use `lib/color-hash.ts` (already used for avatars
+  and Marathon badges): the item's code on a stable colour. Zero bytes,
+  zero requests, and reads as deliberate rather than broken. **This is
+  the majority case — design the tile for it first, not as a fallback.**
+- **`next.config.ts` already allows the Supabase Storage host** in
+  `images.remotePatterns`. If a detail view later renders the full
+  vendor image, `cdn.shopify.com` has to be added there too — it isn't
+  yet, deliberately, since nothing renders it.
+- The script is re-runnable and skips anything already done, so it's
+  safe to run again whenever new catalogue rows arrive.
+
 ## Next up
 
-### 1. Thumbnail pass — do this *before* the picker
-
-**Why first:** the picker's whole feel depends on how fast tiles load.
-Building it against real thumbnails beats retrofitting them.
-
-**The situation:** only **900 of 2,633 items have an image**, and every
-one points at *another company's* Shopify CDN (`homeworkliving.in` and
-similar). If a vendor deletes a product, our catalogue goes blank.
-
-**Decided architecture** (do not re-litigate):
-
-- **Thumbnails → copied into Supabase Storage.** ~900 × ~15 KB ≈ 14 MB.
-  Ours, small, can't rot. This is the only thing the grid ever loads.
-- **Full images → keep pointing at the source URL.** ~360 MB isn't worth
-  storing for a detail view almost nobody opens. If one rots we lose a
-  zoom on one item, not the grid.
-- **The 1,731 items with no image** get a generated placeholder tile
-  using `lib/color-hash.ts` (already used for avatars and Marathon
-  badges) — the item's code on a stable colour. Zero bytes, zero
-  requests, and reads as deliberate rather than broken.
-- **Never bundle image fetching into a data import.** ~900 fetches off
-  other people's servers *will* produce timeouts and 404s; that must
-  never be able to wreck a clean data load.
-
-**The work:** `scripts/fetch-catalogue-images.ts` — walk the 900 rows
-with an `image_url`, download, resize to ~300px WebP, upload to Supabase
-Storage, write the public URL back to `items.thumb_url`. Skip any row
-that already has a `thumb_url` so it's re-runnable after failures. Dry
-run by default, same as the import script.
-
-**Prerequisites:** a public Supabase Storage bucket (created in Studio —
-a manual step, like migrations). `sharp` is already in `node_modules`
-via Next, so no new dependency. `next.config.ts` needs `remotePatterns`
-before any remote image renders — it's currently empty.
-
-### 2. Phase 2 — Selections (branch `feature/selections`)
+### Phase 2 — Selections (branch `feature/selections`)
 
 The first phase that's a genuinely new tool. **Deserves its own plan
 before any code** — migration, new route, new sidebar entry, and the
@@ -110,7 +105,9 @@ flagship UI of the whole system.
   against: 2,633 items, but **1,400 are lighting** and 466 are hardware,
   so category browsing is badly lopsided and the filters carry the
   weight. Server-side filters (kind, category, placement, brand, text
-  search on name + code), ~30 per page.
+  search on name + code), ~30 per page. **Only 897 items have a
+  thumbnail** — two-thirds of tiles will be colour placeholders, so the
+  picker has to look right as a mostly-text grid, not a photo wall.
 - **Pagination is already solved** — `listItems()` in
   `lib/masters/items.ts` does ranged, counted, stably-ordered paging;
   reuse that pattern rather than reinventing it. Note the `id`
@@ -143,7 +140,11 @@ flagship UI of the whole system.
   category, since one "Seating" category spans BENS/CHAS/ARMS/SOFS.
   Nothing auto-generates codes today; whenever that's built it must
   follow this convention and cannot key off `item_categories`.
-- **Images:** see the thumbnail section above.
+- **Images:** thumbnails are ours (Supabase Storage), full images stay
+  borrowed links, image-less items get a colour placeholder. Image
+  fetching is never bundled into a data import — ~900 fetches against
+  other people's servers produce timeouts and 404s, and that must not be
+  able to damage a clean data load. See the images section above.
 
 ## Open decisions — ask at the phase that needs them
 
@@ -190,6 +191,16 @@ Shipped, tested and pushed to `master`:
   an honest count, a Category filter, and Indian digit grouping on
   prices. Verified by walking all 53 pages: 2,633 distinct rows, zero
   duplicates.
+
+- **Thumbnail pass run** — 897 of 900 uploaded to the `catalogue`
+  storage bucket. The 3 that failed (`HANL095`, `HANL114`, `WALL337`)
+  return 404 from the vendor's CDN; the source images are simply gone,
+  so they fall back to the colour placeholder like any other image-less
+  item. This is exactly the link-rot the "store our own thumbnails"
+  decision was made to guard against — it showed up on day one.
+- **`next.config.ts`** now allows the Supabase Storage host for
+  `next/image`, derived from the env var so preview and production each
+  resolve to their own project.
 
 Notes for next time:
 
