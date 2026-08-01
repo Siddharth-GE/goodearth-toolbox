@@ -96,11 +96,11 @@ export const TOOLS: Tool[] = [
   },
   {
     name: "Budgets",
-    description: "Budget vs actual per project.",
+    description: "Price an issued design revision, space by space.",
     href: "/budgets",
     icon: "PiggyBank",
     group: "Operations",
-    built: false,
+    built: true,
   },
   {
     name: "Marathon",

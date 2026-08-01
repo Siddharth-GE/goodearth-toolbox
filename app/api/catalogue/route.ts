@@ -20,10 +20,18 @@ import { createClient } from "@/lib/supabase/server";
 export async function GET(request: Request) {
   const user = await getCurrentUser();
   if (!user) return new Response("Unauthorized", { status: 401 });
-  // Two tools browse the catalogue: designers picking items, and Masters
-  // checking a request against what already exists. hasApp rather than
-  // requireApp because a redirect is meaningless in a fetch response.
-  const allowed = (await hasApp(user, "/selections")) || (await hasApp(user, "/masters"));
+  // Three tools browse the catalogue: designers picking items, Masters
+  // checking a request against what already exists, and Budgets setting a
+  // product's default margin. hasApp rather than requireApp because a
+  // redirect is meaningless in a fetch response.
+  //
+  // Note what this returns: name, code, brand, thumbnail and the
+  // indicative price. No cost and no margin — those live in tables only
+  // /budgets can read, and this endpoint never touches them.
+  const allowed =
+    (await hasApp(user, "/selections")) ||
+    (await hasApp(user, "/masters")) ||
+    (await hasApp(user, "/budgets"));
   if (!allowed) return new Response("Forbidden", { status: 403 });
 
   const { searchParams } = new URL(request.url);
