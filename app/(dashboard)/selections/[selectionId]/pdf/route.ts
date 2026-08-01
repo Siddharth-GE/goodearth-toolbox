@@ -1,6 +1,7 @@
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import { getBudgetHandoff } from "@/lib/selections/queries";
-import { SelectionDocument } from "@/lib/selections/selection-document";
+import { SelectionDocument, type ViewImage } from "@/lib/selections/selection-document";
+import { downloadSpaceView, listSpaceViews } from "@/lib/selections/views";
 import { createElement, type ReactElement } from "react";
 
 /**
@@ -18,12 +19,29 @@ export async function GET(
   const handoff = await getBudgetHandoff(selectionId);
   if (!handoff) return new Response("Not found", { status: 404 });
 
+  // The views bucket is private, so react-pdf can't fetch by URL — the
+  // bytes are downloaded here and handed to the document directly.
+  const viewRows = await listSpaceViews(handoff.spaces.map((group) => group.space.id));
+  const viewsBySpace = new Map<string, ViewImage[]>();
+  for (const [spaceId, views] of viewRows) {
+    const images = await Promise.all(
+      views.map(async (view) => {
+        const data = await downloadSpaceView(view.storage_path);
+        return data ? { data, caption: view.caption } : null;
+      }),
+    );
+    // A view whose file has gone missing is skipped rather than failing
+    // the whole document — a client still needs the specification.
+    const present = images.filter((image): image is ViewImage => image !== null);
+    if (present.length > 0) viewsBySpace.set(spaceId, present);
+  }
+
   // createElement rather than JSX: a Route Handler must be route.ts, which
   // doesn't compile JSX. The cast is because renderToBuffer is typed for a
   // <Document> element specifically, and it can't see through the wrapper
   // component to know that's exactly what SelectionDocument returns.
   const buffer = await renderToBuffer(
-    createElement(SelectionDocument, { handoff }) as ReactElement<DocumentProps>,
+    createElement(SelectionDocument, { handoff, viewsBySpace }) as ReactElement<DocumentProps>,
   );
 
   // Filename built from real identifiers so a folder of these stays
