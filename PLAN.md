@@ -253,20 +253,49 @@ a maintainer onto the project. Findings were sorted into five stages.
 - A failed save in the Selections line grid marked the row saved before
   the write, so the edit was lost and could never be retried.
 
-### Stage 2 — remaining bugs ⬜
+### Stage 2 — remaining bugs 🔨 built, awaiting gate (migration `0015`)
 
-- Silent 1,000-row truncation (the catalogue bug again) in
-  `lib/marathon/queries.ts` entry counts and `lib/budgets/queries.ts`
-  `listInbox` line counts; `item_margins` is read whole on every budget
-  render. All need explicit ranges or counts.
-- `startPricing` discards the error from its own cleanup delete, so a
+All fixed. What they were:
+
+- **Silent 1,000-row truncation, the catalogue bug a third time.** Marathon
+  tallied every entry row in JS to get per-run counts, so on race day the
+  breakdown would have frozen at 1000 while the total beside it kept
+  climbing — two numbers on one screen contradicting each other. The
+  Budgets inbox did the same and would have reported "0 lines waiting"
+  from about the sixth issued revision. Both now use exact database
+  counts; lists carry an explicit `MARATHON_LIST_LIMIT` and say when
+  they're showing a subset. **The rule: never derive a count from
+  `rows.length`** — ask the database, and make any cap a decision the
+  code states rather than one the transport imposes silently.
+- `item_margins` was read whole on every budget render; now scoped to the
+  items on that budget. Past 1000 configured margins, lines would have
+  silently arrived blank — and a blank margin that gets saved is a line
+  sold at cost.
+- **Marathon PIN guessing.** A public kiosk URL with no limit on attempts
+  against a 4-digit PIN. Now locks a target for 10 minutes after 10 wrong
+  tries (`marathon_pin_attempts`, migration `0015`), and the admin PIN
+  and any agent's PIN can be changed from the Members screen — both
+  shipped as defaults published in git.
+- `startPricing` discarded the error from its own cleanup delete, so a
   failed carry-forward can leave a zombie budget that blocks every retry.
-- `lib/settings/actions.ts` throws instead of returning `ActionState`;
-  `grant-checkbox.tsx` swallows the result, so a failed permission change
-  looks like it worked.
-- Marathon PINs are still the seeded defaults (`2026` / `1234`),
-  published in git, on a page reachable with no login and no rate limit.
-  Needs a change-PIN screen and throttling.
+- `lib/settings/actions.ts` threw instead of returning `ActionState`, and
+  `grant-checkbox.tsx` swallowed the result, so a failed permission change
+  left the box ticked and an admin believing someone had access they
+  didn't. Now returns like every other tool's actions, and the checkbox is
+  controlled and rolls back.
+
+**Also added here, since a maintainer is joining:** CI
+(`.github/workflows/ci.yml`) running format, lint, types, tests and build
+on every push to `master` and every pull request, and Prettier
+(`npm run format`). Both were previously declined as over-engineering for
+one person — what changed is a second developer plus `master`
+auto-deploying to production, which meant the only gate was remembering
+to run four commands. The whole repo was reformatted in a single separate
+commit so it never hides a real change.
+
+> **The `npm test` glob is shell-dependent** (`tsx --test lib/**/*.test.ts`).
+> It works on Windows and on CI's bash today. If tests ever appear not to
+> run, check that before assuming they pass.
 
 ### Stage 3 — shared foundations ⬜ (biggest win for a new maintainer)
 
