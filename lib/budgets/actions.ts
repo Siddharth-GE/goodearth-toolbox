@@ -6,6 +6,10 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+// Safe to import as a value from a "use server" file: carry-forward.ts is
+// pure and imports nothing, so it drags no server-only chain behind it.
+import { planCarryForward } from "./carry-forward";
+
 export type ActionState = { error?: string } | undefined;
 
 async function authorize() {
@@ -25,11 +29,14 @@ async function authorize() {
  * and that one-way coupling is what lets later tools consume a revision
  * without Selections ever being touched again.
  *
- * Only the header is written. Budget lines are created the moment someone
- * actually prices a line (see saveLine), because the pricing screen takes
- * its spine from the revision's own lines: every line shows up whether or
- * not it has a budget row yet. That means there is no half-created state
- * to clean up if this is interrupted.
+ * For a first revision only the header is written: the pricing screen
+ * takes its spine from the revision's own lines, so every line shows up
+ * whether or not it has a budget row yet, and lines are created the moment
+ * someone prices one (see saveLine).
+ *
+ * For R+1 onward this also CARRIES PRICING FORWARD from the previous
+ * revision's budget — the point of the whole line_key design. See
+ * carryForward below.
  */
 export async function startPricing(selectionId: string): Promise<ActionState> {
   const user = await authorize();
@@ -37,7 +44,7 @@ export async function startPricing(selectionId: string): Promise<ActionState> {
 
   const { data: selection, error: selectionError } = await supabase
     .from("selections")
-    .select("id, unit_id, status")
+    .select("id, unit_id, revision_no, status")
     .eq("id", selectionId)
     .maybeSingle();
 
@@ -75,8 +82,123 @@ export async function startPricing(selectionId: string): Promise<ActionState> {
     return { error: "Could not start this budget. Try again." };
   }
 
+  const carryError = await carryForward(supabase, {
+    budgetId: data.id,
+    selectionId,
+    unitId: selection.unit_id,
+    revisionNo: selection.revision_no,
+  });
+  if (carryError) {
+    // Leaving the budget behind would be worse than failing: it would
+    // look like a revision nobody has priced, and the team would redo
+    // work they had already done. Removing it makes this retryable.
+    await supabase.from("budgets").delete().eq("id", data.id);
+    return { error: carryError };
+  }
+
   revalidatePath("/budgets");
   redirect(`/budgets/${data.id}`);
+}
+
+/**
+ * Copies the previous revision's pricing into a new budget.
+ *
+ * Matched on `line_key`, which `create_next_revision()` carries forward
+ * when a designer branches R+1 (migration 0007). Without this, issuing R3
+ * with one changed quantity would hand the budget team a blank sheet for
+ * all 200 lines — the single most likely reason they'd stop using this
+ * and go back to a spreadsheet.
+ *
+ * The decision rules live in carry-forward.ts, pure and tested. This
+ * function only fetches and writes.
+ */
+async function carryForward(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  { budgetId, selectionId, unitId, revisionNo }: {
+    budgetId: string;
+    selectionId: string;
+    unitId: string;
+    revisionNo: number;
+  },
+): Promise<string | null> {
+  // Every budget this unit already has, with the revision it prices.
+  // Filtered and sorted here rather than in the query: a unit has a
+  // handful of revisions, and ordering by an embedded column is more
+  // trouble in PostgREST than it's worth.
+  const { data: priorBudgets } = await supabase
+    .from("budgets")
+    .select("id, selection_id, selections(revision_no)")
+    .eq("unit_id", unitId);
+
+  const previous = (priorBudgets ?? [])
+    .map((budget) => ({
+      id: budget.id,
+      selection_id: budget.selection_id,
+      revision_no: (budget.selections as { revision_no: number } | null)?.revision_no ?? -1,
+    }))
+    .filter((budget) => budget.revision_no >= 0 && budget.revision_no < revisionNo)
+    .sort((a, b) => b.revision_no - a.revision_no)[0];
+
+  // A first budget for the unit. Nothing to carry, and not an error.
+  if (!previous) return null;
+
+  const [previousBudgetLines, previousSelectionLines, currentSelectionLines] = await Promise.all([
+    supabase
+      .from("budget_lines")
+      .select("line_key, quantity, expected_vendor_id, unit_cost, margin_pct, notes")
+      .eq("budget_id", previous.id),
+    supabase.from("selection_lines").select("line_key, quantity").eq("selection_id", previous.selection_id),
+    supabase.from("selection_lines").select("line_key, quantity").eq("selection_id", selectionId),
+  ]);
+
+  if (previousBudgetLines.error || previousSelectionLines.error || currentSelectionLines.error) {
+    console.error("carryForward read failed:", previousBudgetLines.error ?? currentSelectionLines.error);
+    return "Could not read the previous budget. Try again.";
+  }
+
+  const plan = planCarryForward({
+    previousBudgetLines: (previousBudgetLines.data ?? []).map((line) => ({
+      line_key: line.line_key,
+      quantity: Number(line.quantity),
+      expected_vendor_id: line.expected_vendor_id,
+      unit_cost: line.unit_cost === null ? null : Number(line.unit_cost),
+      margin_pct: line.margin_pct === null ? null : Number(line.margin_pct),
+      notes: line.notes,
+    })),
+    previousSelectionLines: (previousSelectionLines.data ?? []).map((line) => ({
+      line_key: line.line_key,
+      quantity: Number(line.quantity),
+    })),
+    currentSelectionLines: (currentSelectionLines.data ?? []).map((line) => ({
+      line_key: line.line_key,
+      quantity: Number(line.quantity),
+    })),
+  });
+
+  if (plan.lines.length === 0) return null;
+
+  const { error } = await supabase.from("budget_lines").insert(
+    plan.lines.map((line) => ({
+      budget_id: budgetId,
+      selection_id: selectionId,
+      line_key: line.line_key,
+      quantity: line.quantity,
+      expected_vendor_id: line.expected_vendor_id,
+      unit_cost: line.unit_cost,
+      margin_pct: line.margin_pct,
+      notes: line.notes,
+      needs_review: line.needs_review,
+      // priced_by stays null: nobody priced these in this budget. The
+      // budget they came from still records who did.
+    })),
+  );
+
+  if (error) {
+    console.error("carryForward insert failed:", error);
+    return "Could not carry the previous pricing forward. Try again.";
+  }
+
+  return null;
 }
 
 // ---------------------------------------------------------------------

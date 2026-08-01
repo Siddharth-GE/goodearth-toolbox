@@ -57,6 +57,22 @@ export default async function BudgetPricingPage({
         </div>
       </div>
 
+      {budget.needsReviewCount > 0 && (
+        // Carried-forward lines the designer has since resized. They have
+        // a price, so nothing is blocked — but saying it here means the
+        // team doesn't have to scroll hunting for amber rows.
+        <div className="rounded-xl border border-warning/40 bg-warning/5 px-4 py-3">
+          <p className="text-sm text-foreground">
+            <span className="font-medium">
+              {budget.needsReviewCount} {budget.needsReviewCount === 1 ? "line needs" : "lines need"}{" "}
+              a check
+            </span>{" "}
+            — priced in the previous revision, but the designer has changed the quantity since. The
+            unit cost has been kept; the new quantity is already in.
+          </p>
+        </div>
+      )}
+
       {budget.spaces.length > 0 && (
         // Said plainly on screen, because the difference between these two
         // files is the difference between a quote and a leaked margin.

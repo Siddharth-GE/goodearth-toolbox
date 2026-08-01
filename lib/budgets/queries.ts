@@ -157,6 +157,12 @@ export type BudgetDetail = {
   issued_at: string | null;
   spaces: BudgetSpaceGroup[];
   totals: Totals;
+  /**
+   * Lines carried forward from the previous revision whose quantity the
+   * designer has since changed. Priced, but worth a second look — the
+   * screen says so rather than leaving it to be noticed.
+   */
+  needsReviewCount: number;
 };
 
 /**
@@ -285,6 +291,7 @@ export const getBudget = cache(async (budgetId: string): Promise<BudgetDetail | 
     // Rolled from every line, not by summing the space totals — same
     // numbers, but one source of truth rather than two.
     totals: rollUp(lines),
+    needsReviewCount: lines.filter((line) => line.needs_review).length,
   };
 });
 

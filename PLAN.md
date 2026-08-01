@@ -39,7 +39,7 @@ Budgets is built and awaiting the browser gate on `feature/budgets`.**
 | 3b | **Thumbnail pass** — catalogue images into Supabase Storage | ✅ Done |
 | 2 | **Selections** — per-unit design workspace + the catalogue picker | ✅ Shipped, merged 2026-08-01 |
 | 2b | **Design views** — renders per space, in the design document | ✅ Shipped, merged 2026-08-01 |
-| 4 | **Budgets** — cost + margin → client rate, approval, two documents | 🔨 **Built, awaiting gate** (B1–B3 done; B4 carry-forward left) |
+| 4 | **Budgets** — cost + margin → client rate, approval, two documents | 🔨 **Built (B1–B4), awaiting browser gate** |
 | 5 | Indents — pull-from-budget *and* direct site request | ⬜ Not started |
 | 6 | Purchase Orders — vendor grouping + letterhead PDF | ⬜ Not started |
 | 7 | Inventory / Store — goods receipt, stock on hand, issues | ⬜ Not started |
@@ -227,8 +227,17 @@ failure mode is a compile error rather than a leaked margin.
 ### 2026-08-01 (later still) — Budgets built (Phase 4, B1–B3)
 
 Migration `0011`: `item_margins`, `budgets`, `budget_lines`. Then the
-inbox, the pricing screen, per-product margins, approval, and both
-documents. Left for next session: **B4, carry-forward across revisions**.
+inbox, the pricing screen, per-product margins, approval, both documents,
+and carry-forward — B1 through B4, the whole tool.
+
+**Carry-forward finally cashes in `line_key`.** Starting a budget for R+1
+copies the previous revision's pricing across, matched on the key rather
+than the row id. An unchanged line arrives priced, keeping the budget
+team's own adjusted quantity; a line the designer resized takes the
+designer's new quantity, keeps its unit cost and is flagged for review;
+a new line arrives with only its default margin. Rules live in
+`lib/budgets/carry-forward.ts` — pure, and the most heavily tested code
+in the repo, including the 200-lines-two-touched case.
 
 **Reads are gated too, for the first time.** Every other table in the
 schema is readable by any authenticated staff member. These three require
