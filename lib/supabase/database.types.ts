@@ -163,6 +163,7 @@ export type Database = {
           status: string
           unit_id: string
           updated_at: string
+          version: number
         }
         Insert: {
           approved_at?: string | null
@@ -175,6 +176,7 @@ export type Database = {
           status?: string
           unit_id: string
           updated_at?: string
+          version?: number
         }
         Update: {
           approved_at?: string | null
@@ -187,6 +189,7 @@ export type Database = {
           status?: string
           unit_id?: string
           updated_at?: string
+          version?: number
         }
         Relationships: [
           {
@@ -1249,6 +1252,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      reopen_budget: { Args: { p_budget_id: string }; Returns: undefined }
     }
     Enums: {
       [_ in never]: never

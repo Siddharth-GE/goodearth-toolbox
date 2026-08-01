@@ -134,12 +134,17 @@ const columns: Column<BudgetLineRow>[] = [
 
 export function BudgetDocument({ budget }: { budget: BudgetDetail }) {
   const isDraft = budget.status === "pricing";
-  const reference = `BUD/${budget.unit_name}/R${budget.revision_no}`.toUpperCase().replace(/\s+/g, "");
+  // R-number = what was designed. Version = which pricing of it. Both are
+  // needed: re-opening an approved budget to fix a rate produces a second
+  // document against the same design.
+  const reference = `BUD/${budget.unit_name}/R${budget.revision_no}-V${budget.version}`
+    .toUpperCase()
+    .replace(/\s+/g, "");
 
   const meta: DocumentMeta = {
     documentType: "BUDGET · INTERNAL",
     reference,
-    footerLeft: `INTERNAL — not for client circulation · ${budget.unit_name} R${budget.revision_no}`,
+    footerLeft: `INTERNAL — not for client circulation · ${budget.unit_name} R${budget.revision_no}-v${budget.version}`,
     // A budget still being priced is watermarked DRAFT: its totals are
     // incomplete, and nobody should mistake it for a settled figure.
     isDraft,
@@ -154,7 +159,7 @@ export function BudgetDocument({ budget }: { budget: BudgetDetail }) {
       <DocumentPage meta={meta}>
         <Text style={styles.h1}>{budget.unit_name}</Text>
         <Text style={styles.subtitle}>
-          {budget.project_name} · Budget against Selections R{budget.revision_no}
+          {budget.project_name} · Budget v{budget.version} against Selections R{budget.revision_no}
         </Text>
 
         <View style={styles.confidential}>
@@ -165,7 +170,8 @@ export function BudgetDocument({ budget }: { budget: BudgetDetail }) {
         </View>
 
         <View style={styles.metaBlock}>
-          <Meta label="Revision" value={`R${budget.revision_no}`} />
+          <Meta label="Design revision" value={`R${budget.revision_no}`} />
+          <Meta label="Budget version" value={`v${budget.version}`} />
           <Meta label="Status" value={isDraft ? "Pricing in progress" : "Approved"} />
           <Meta label="Approved" value={formatDate(budget.approved_at)} />
           <Meta label="Reference" value={reference} />

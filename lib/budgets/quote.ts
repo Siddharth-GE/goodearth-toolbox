@@ -48,6 +48,9 @@ export type QuoteData = {
   project_name: string;
   unit_name: string;
   revision_no: number;
+  /** Which pricing of that design revision this quotation represents. */
+  version: number;
+  /** Unique per document sent: QT/PLOT6/R2-V2. */
   reference: string;
   approved_at: string | null;
   /** True until the budget is approved — the document watermarks itself. */
@@ -115,7 +118,13 @@ export async function getQuote(budgetId: string): Promise<QuoteData | null> {
     project_name: budget.project_name,
     unit_name: budget.unit_name,
     revision_no: budget.revision_no,
-    reference: `QT/${budget.unit_name}/R${budget.revision_no}`.toUpperCase().replace(/\s+/g, ""),
+    version: budget.version,
+    // Includes the version, so re-opening an approved budget to correct a
+    // rate produces a quotation a client can tell apart from the one they
+    // already have. Without it both would say QT/PLOT6/R2.
+    reference: `QT/${budget.unit_name}/R${budget.revision_no}-V${budget.version}`
+      .toUpperCase()
+      .replace(/\s+/g, ""),
     approved_at: budget.approved_at,
     isDraft: budget.status !== "approved",
     spaces,

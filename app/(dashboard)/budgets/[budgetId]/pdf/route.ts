@@ -25,7 +25,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ bud
   // someone reads before deciding what to attach to an email.
   const filename = `Goodearth-Budget-INTERNAL-${safe(budget.project_name)}-${safe(
     budget.unit_name,
-  )}-R${budget.revision_no}.pdf`;
+  )}-R${budget.revision_no}-v${budget.version}.pdf`;
 
   return new Response(new Uint8Array(buffer), {
     headers: {

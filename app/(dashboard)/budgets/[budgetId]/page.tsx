@@ -30,6 +30,11 @@ export default async function BudgetPricingPage({
           </Link>
           <h1 className="mt-1 text-lg font-bold tracking-tight text-foreground">
             {budget.unit_name} · R{budget.revision_no}
+            {/* Only shown once there's been more than one pricing — on a
+                first budget the version is noise, not information. */}
+            {budget.version > 1 && (
+              <span className="ml-1.5 font-medium text-muted">v{budget.version}</span>
+            )}
           </h1>
           <p className="text-sm text-muted">
             {budget.project_name} · {budget.totals.lineCount}{" "}
@@ -94,6 +99,14 @@ export default async function BudgetPricingPage({
               </span>
             )}
             . Prices are locked — re-open it to correct one.
+          </p>
+          <p className="mt-1 text-xs text-muted">
+            Documents from this budget are stamped{" "}
+            <span className="font-medium text-foreground">
+              R{budget.revision_no}-v{budget.version}
+            </span>
+            . Re-opening starts v{budget.version + 1}, so a corrected quotation is never confused
+            with the one already sent.
           </p>
         </div>
       )}

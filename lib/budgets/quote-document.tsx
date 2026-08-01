@@ -130,6 +130,9 @@ export function QuoteDocument({ quote }: { quote: QuoteData }) {
         <View style={styles.metaBlock}>
           <Meta label="Reference" value={quote.reference} />
           <Meta label="Date" value={formatDate(quote.approved_at)} />
+          {/* Stated on the client's copy too: if a revised quotation
+              follows, both sides can say which one they mean. */}
+          <Meta label="Version" value={String(quote.version)} />
           <Meta label="Spaces" value={String(quote.spaces.length)} />
           <Meta
             label="Items"

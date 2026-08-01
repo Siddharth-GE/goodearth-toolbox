@@ -21,9 +21,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ bud
   );
 
   const safe = (value: string) => value.replace(/[^\w-]+/g, "-").replace(/^-|-$/g, "");
+  // The version is in the filename too: a folder of these must not have
+  // two different quotations sharing a name.
   const filename = `Goodearth-Quotation-${safe(quote.project_name)}-${safe(quote.unit_name)}-R${
     quote.revision_no
-  }.pdf`;
+  }-v${quote.version}.pdf`;
 
   return new Response(new Uint8Array(buffer), {
     headers: {

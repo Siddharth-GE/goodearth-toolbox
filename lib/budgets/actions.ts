@@ -336,31 +336,30 @@ export async function approveBudget(budgetId: string): Promise<ActionState> {
 }
 
 /**
- * Unlocks an approved budget so a genuine pricing error can be corrected.
+ * Unlocks an approved budget so a genuine pricing error can be corrected,
+ * and starts the next version of it.
  *
  * Deliberately possible, unlike un-issuing a design revision: a cost
  * estimate is fallible in a way a specification is not, and the
  * alternative — a whole new revision to fix one wrong rate — would be
- * worse. Every re-opening is recorded in the audit log by the trigger in
- * migration 0011.
+ * worse. The version bump is what keeps that from being lossy: the
+ * quotation already sent stays identified as v1, and everything priced
+ * from here becomes v2.
+ *
+ * Runs as a database function because the version increments from its own
+ * current value; doing that as a read-then-write would let two people
+ * re-opening at once both produce v2. See migration 0012.
  */
 export async function reopenBudget(budgetId: string): Promise<ActionState> {
   await authorize();
   const supabase = await createClient();
 
-  const { error } = await supabase
-    .from("budgets")
-    .update({
-      status: "pricing",
-      approved_by: null,
-      approved_at: null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", budgetId);
+  const { error } = await supabase.rpc("reopen_budget", { p_budget_id: budgetId });
 
   if (error) {
     console.error("reopenBudget failed:", error);
-    return { error: "Could not re-open this budget. Try again." };
+    // Written for a person to read by the RAISE EXCEPTION in the function.
+    return { error: error.message.replace(/^.*?:\s*/, "") || "Could not re-open this budget." };
   }
 
   revalidatePath("/budgets", "layout");

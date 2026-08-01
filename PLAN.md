@@ -21,7 +21,7 @@ Budgets is built and awaiting the browser gate on `feature/budgets`.**
 |---|---|
 | Last worked | 2026-08-01 |
 | Branch | `feature/budgets` — built, pushed, **not yet merged** (needs testing in the browser) |
-| Migrations applied | `0001`–`0011` (next new one is `0012`) |
+| Migrations applied | `0001`–`0012` (next new one is `0013`) |
 | Items in database | **2,633** (2,631 imported catalogue + 2 material seeds) |
 | Categories / brands | 14 / 21 |
 | Thumbnails | **897** in Supabase Storage; 3 dead vendor links, 1,733 items have no image |
@@ -258,6 +258,16 @@ and totals sum unrounded values so a column adds up to its own total.
 but can be re-opened — a cost estimate is fallible in a way a design
 specification is not, and the alternative was a whole new revision to fix
 one wrong rate. Every re-opening is in the audit log.
+
+**Two numbering systems, and they mean different things** (migration
+`0012`). The **R-number** comes from the design and says what was
+specified. The **version** belongs to the budget and says which pricing of
+it — documents are stamped `R2-v1`, and re-opening starts v2. Added
+because reversible approval made references ambiguous: approve, send the
+quote, re-open, fix a rate, approve again, and both quotations said
+`QT/PLOT6/R2`. The version increments on **re-open**, not on approval, so
+the number on screen while pricing is the number that reaches the
+document. It can only go up, enforced by the guard trigger.
 
 Two smaller things worth keeping:
 

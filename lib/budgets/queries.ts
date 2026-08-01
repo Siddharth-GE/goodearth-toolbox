@@ -147,6 +147,13 @@ export type BudgetSpaceGroup = {
 export type BudgetDetail = {
   id: string;
   status: BudgetStatus;
+  /**
+   * Which pricing of this design revision it is. R2-v1 is the first
+   * quotation against design revision 2; re-opening it to fix a rate
+   * starts v2. The R-number says what was designed, this says what was
+   * quoted — see migration 0012.
+   */
+  version: number;
   notes: string | null;
   approved_at: string | null;
   selection_id: string;
@@ -279,6 +286,7 @@ export const getBudget = cache(async (budgetId: string): Promise<BudgetDetail | 
   return {
     id: budget.id,
     status: budget.status as BudgetStatus,
+    version: budget.version,
     notes: budget.notes,
     approved_at: budget.approved_at,
     selection_id: budget.selection_id,
