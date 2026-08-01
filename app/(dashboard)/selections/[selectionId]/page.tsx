@@ -45,13 +45,15 @@ export default async function SelectionEditorPage({
     getPreviousIssued(selection.unit_id, selection.revision_no),
   ]);
 
-  // Views belong to the space, not the revision — a render of Bedroom 1
-  // is still a render of Bedroom 1 in R3.
-  const viewsBySpace = await listSpaceViews(spaces.map((space) => space.id));
-
-  // What the budget team will be handed. Computed for a draft too, so the
-  // Issue dialog can state it before the click rather than after.
-  const diff = previous ? await diffRevisions(previous.id, selectionId, selection.unit_id) : null;
+  // Two more reads that depend on the batch above but not on each other:
+  // views belong to the space, not the revision (a render of Bedroom 1 is
+  // still a render of Bedroom 1 in R3), and the diff is what the budget
+  // team will be handed — computed for a draft too, so the Issue dialog
+  // can state it before the click rather than after.
+  const [viewsBySpace, diff] = await Promise.all([
+    listSpaceViews(spaces.map((space) => space.id)),
+    previous ? diffRevisions(previous.id, selectionId, selection.unit_id) : null,
+  ]);
 
   // Land on the requested space, else the first one. A stale ?space from a
   // bookmark (or a space just deleted) falls back rather than 404s.

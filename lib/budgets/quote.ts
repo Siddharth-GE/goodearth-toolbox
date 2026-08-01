@@ -69,50 +69,49 @@ export async function getQuote(budgetId: string): Promise<QuoteData | null> {
 
   const viewRows = await listSpaceViews(budget.spaces.map((space) => space.space_id));
 
-  const spaces: QuoteSpace[] = [];
-  let total = 0;
-  let unpricedCount = 0;
-
-  for (const space of budget.spaces) {
-    const lines: QuoteLine[] = space.lines.map((line) => {
-      const amount = lineAmount(line);
-      if (amount === null) unpricedCount++;
-      return {
+  // All spaces at once, not one after another — the downloads are the
+  // slow part, and a ten-space quote was ten sequential batches of them.
+  const spaces: QuoteSpace[] = await Promise.all(
+    budget.spaces.map(async (space) => {
+      const lines: QuoteLine[] = space.lines.map((line) => ({
         item_name: line.item_name,
         item_code: line.item_code,
         item_brand: line.item_brand,
         quantity: line.quantity,
         uom: line.uom,
         rate: line.client_rate,
-        amount,
+        amount: lineAmount(line),
+      }));
+
+      // The bucket is private, so there is no URL react-pdf could fetch —
+      // the bytes come down here, exactly as the design document does it.
+      const views = await Promise.all(
+        (viewRows.get(space.space_id) ?? []).map(async (view) => {
+          const data = await downloadSpaceView(view.storage_path);
+          return data ? { data, caption: view.caption } : null;
+        }),
+      );
+
+      return {
+        space_id: space.space_id,
+        label: space.label,
+        space_type_name: space.space_type_name,
+        lines,
+        // A view whose file has gone missing is dropped rather than
+        // failing the whole quote.
+        views: views.filter((view): view is QuoteView => view !== null),
+        // The space's own full-precision sum, so the column adds up to
+        // the total printed under it.
+        total: space.totals.client,
       };
-    });
+    }),
+  );
 
-    // The bucket is private, so there is no URL react-pdf could fetch —
-    // the bytes come down here, exactly as the design document does it.
-    const views = await Promise.all(
-      (viewRows.get(space.space_id) ?? []).map(async (view) => {
-        const data = await downloadSpaceView(view.storage_path);
-        return data ? { data, caption: view.caption } : null;
-      }),
-    );
-
-    // Summed from the space's own lines at full precision, not from
-    // rounded figures, so the column adds up to the total printed under it.
-    const spaceTotal = space.totals.client;
-    total += spaceTotal;
-
-    spaces.push({
-      space_id: space.space_id,
-      label: space.label,
-      space_type_name: space.space_type_name,
-      lines,
-      // A view whose file has gone missing is dropped rather than failing
-      // the whole quote.
-      views: views.filter((view): view is QuoteView => view !== null),
-      total: spaceTotal,
-    });
-  }
+  const total = spaces.reduce((sum, space) => sum + space.total, 0);
+  const unpricedCount = spaces.reduce(
+    (sum, space) => sum + space.lines.filter((line) => line.amount === null).length,
+    0,
+  );
 
   return {
     project_name: budget.project_name,

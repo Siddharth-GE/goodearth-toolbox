@@ -16,10 +16,11 @@ export default async function BudgetPricingPage({
 }) {
   const { budgetId } = await params;
 
-  const budget = await getBudget(budgetId);
+  // Independent reads, one round trip — getBudget is the heaviest query
+  // in the app, so a serial vendor fetch behind it was a full extra hop.
+  const [budget, vendors] = await Promise.all([getBudget(budgetId), listVendorOptions()]);
   if (!budget) notFound();
 
-  const vendors = await listVendorOptions();
   const editable = budget.status === "pricing";
 
   return (

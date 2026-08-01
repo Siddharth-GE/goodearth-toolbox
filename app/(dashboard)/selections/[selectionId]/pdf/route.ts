@@ -23,18 +23,22 @@ export async function GET(
   // bytes are downloaded here and handed to the document directly.
   const viewRows = await listSpaceViews(handoff.spaces.map((group) => group.space.id));
   const viewsBySpace = new Map<string, ViewImage[]>();
-  for (const [spaceId, views] of viewRows) {
-    const images = await Promise.all(
-      views.map(async (view) => {
-        const data = await downloadSpaceView(view.storage_path);
-        return data ? { data, caption: view.caption } : null;
-      }),
-    );
-    // A view whose file has gone missing is skipped rather than failing
-    // the whole document — a client still needs the specification.
-    const present = images.filter((image): image is ViewImage => image !== null);
-    if (present.length > 0) viewsBySpace.set(spaceId, present);
-  }
+  // All spaces' downloads at once — they were one sequential batch per
+  // space, which is what made a many-space document slow to generate.
+  await Promise.all(
+    [...viewRows].map(async ([spaceId, views]) => {
+      const images = await Promise.all(
+        views.map(async (view) => {
+          const data = await downloadSpaceView(view.storage_path);
+          return data ? { data, caption: view.caption } : null;
+        }),
+      );
+      // A view whose file has gone missing is skipped rather than failing
+      // the whole document — a client still needs the specification.
+      const present = images.filter((image): image is ViewImage => image !== null);
+      if (present.length > 0) viewsBySpace.set(spaceId, present);
+    }),
+  );
 
   // createElement rather than JSX: a Route Handler must be route.ts, which
   // doesn't compile JSX. The cast is because renderToBuffer is typed for a
