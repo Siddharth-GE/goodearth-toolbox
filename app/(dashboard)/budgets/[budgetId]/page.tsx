@@ -1,7 +1,8 @@
 import { Badge } from "@/components/ui/badge";
+import { LinkButton } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getBudget, listVendorOptions } from "@/lib/budgets/queries";
-import { PackageOpen } from "lucide-react";
+import { FileDown, Lock, PackageOpen } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ReopenButton } from "../_components/approve-button";
@@ -36,11 +37,36 @@ export default async function BudgetPricingPage({
             {budget.spaces.length === 1 ? "space" : "spaces"}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {editable ? <Badge variant="warning">Pricing</Badge> : <Badge variant="success">Approved</Badge>}
+          {budget.spaces.length > 0 && (
+            <>
+              {/* plain: next/link prefetches on hover, which would render a
+                  whole PDF just because the cursor passed over the button. */}
+              <LinkButton href={`/budgets/${budgetId}/pdf`} variant="secondary" plain>
+                <Lock className="size-4" />
+                Budget sheet
+              </LinkButton>
+              <LinkButton href={`/budgets/${budgetId}/quote`} variant="secondary" plain>
+                <FileDown className="size-4" />
+                Client quote
+              </LinkButton>
+            </>
+          )}
           {!editable && <ReopenButton budgetId={budgetId} />}
         </div>
       </div>
+
+      {budget.spaces.length > 0 && (
+        // Said plainly on screen, because the difference between these two
+        // files is the difference between a quote and a leaked margin.
+        <p className="text-xs text-muted">
+          <span className="font-medium text-foreground">Budget sheet</span> is internal — it shows
+          cost and margin.{" "}
+          <span className="font-medium text-foreground">Client quote</span> shows only the client
+          price, with the design views.
+        </p>
+      )}
 
       {!editable && (
         <div className="rounded-xl border border-border bg-surface px-4 py-3">
