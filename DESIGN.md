@@ -67,7 +67,8 @@ A named scale — use these combinations, not arbitrary sizes:
   kiosk column, not arbitrary numbers — carry them forward for any other
   tool that's genuinely a single-device kiosk rather than a desktop
   dashboard screen (most future tools won't be; the `(dashboard)` shell's
-  wider `max-w-5xl` is the default for anything not kiosk-style).
+  wider `max-w-6xl` is the default for anything not kiosk-style — see
+  `app/(dashboard)/layout.tsx`).
 
 ## Motion
 
@@ -116,7 +117,7 @@ rest of the system. Size icons to match the text they sit next to
 
 ## Interactive primitives
 
-`Dialog`, `DropdownMenu`, `Tabs`, `Tooltip` in `components/ui/` are thin,
+`Dialog`, `DropdownMenu` and `Tabs` in `components/ui/` are thin,
 Tailwind-styled wrappers around Radix UI's headless primitives
 (`@radix-ui/react-*`) — same visual language as everything else, but
 correct focus-trapping/ESC/ARIA behavior for free instead of hand-rolled.
@@ -132,12 +133,27 @@ Marathon's admin nav is the reference implementation.
 
 Built: `animated-reveal`, `avatar`, `badge` (+ status variants),
 `button`, `card`, `checkbox`, `dialog`, `dropdown-menu`, `empty-state`,
-`input`, `label`, `page-header`, `select`, `spinner`, `table`, `tabs`
-(+ `NavTabs`), `tooltip`.
+`form-message`, `icon-button`, `input`, `label`, `page-header`,
+`pagination`, `select`, `spinner`, `table`, `tabs` (+ `NavTabs`),
+`textarea`.
+
+Shared domain components live in `components/masters/`: `item-thumb`,
+`project-picker`, and `record-form-dialog` — the create/edit shell every
+Masters record uses.
+
+**Formatting is not a component.** Money, quantities, percentages and
+dates all go through `lib/format.ts`, on screens and in PDFs alike.
+Never write `new Intl.NumberFormat` in a screen; that's how the same
+price ended up rendering three different ways.
 
 Deliberately not built yet — add only when a real tool needs it, not
-speculatively: toast/notification, pagination, textarea, radio, popover,
-combobox.
+speculatively: toast/notification, radio, popover, combobox.
+
+Four were **deleted** once the audit found them with zero importers:
+`tooltip`, `item-picker`, `unit-picker`, `vendor-combobox`. Speculative
+components rot; the two that were meant to become "a real searchable
+combobox in Phase 2" were still plain selects a phase later and unused by
+anything. Build the third copy into a shared component, not the first.
 
 ## Status colors in practice
 

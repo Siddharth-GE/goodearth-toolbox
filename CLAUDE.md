@@ -3,12 +3,15 @@
 Internal tools platform for Goodearth, a design-led real estate company in Kerala, India (~70 staff plus contractors). Replacing spreadsheet- and AppSheet-based workflows with one self-hosted platform: multiple tools, one per business function, used independently by different teams but connected through one shared Supabase (Postgres) database.
 
 **Live on Vercel** (auto-deploys from `master` on every push — see
-README.md). Marathon, Settings, and Masters are shipped; every other
-tool below is a Coming Soon stub, sidebar-ready but not yet built.
-Masters is Phase 1 of a full multi-phase rebuild of Goodearth's
-operational system (Selections → Budgets → Indents → Purchase Orders →
-Goods Receipt → Bills, replacing AppSheet) — see `app/(dashboard)/masters/PLAN.md`
-for that roadmap.
+README.md). **Shipped: Marathon, Settings, Masters, Selections,
+Budgets.** Every other tool below is a Coming Soon stub, sidebar-ready
+but not yet built.
+
+These are phases 1, 2 and 4 of a multi-phase rebuild of Goodearth's
+operational system (Masters → Selections → Budgets → Indents → Purchase
+Orders → Inventory → Bills, replacing AppSheet). **Read `PLAN.md` at the
+repo root first** — it's the live roadmap and session log, and says what
+shipped, what's next, and which decisions are already settled.
 
 ## Tools
 
@@ -47,7 +50,6 @@ Planned, roughly in build order — **this list will keep growing**; the pattern
 - Purchase Orders — created from indent lines, split by vendor, with a well-designed PDF generator (company letterhead quality)
 - Inventory / Store — goods receipt against POs, stock by store, issue to manufacturing
 - Bills — recording against POs and labour contracts
-- Budgets — budget vs actual per project
 - Site Tracker — (details TBD as it's scoped)
 - Directory, Training — people-side tools
 
@@ -87,10 +89,11 @@ components/
   ui/                 shared primitives — Button, Input, Card, Dialog,
                        etc. Every screen in every tool is built from
                        these. Never write one-off styles.
-  masters/             (once it exists) shared domain components used
-                       across multiple tools — a project picker, a
-                       vendor combobox. Not generic enough for ui/, not
-                       specific enough to belong to one tool.
+  masters/             shared domain components used across multiple
+                       tools — item-thumb, project-picker, and
+                       record-form-dialog (the create/edit shell every
+                       Masters record uses). Not generic enough for ui/,
+                       not specific enough to belong to one tool.
   layout/              shell-level components (e.g. the sidebar)
 lib/
   <tool>/              each tool's own server data-layer: actions.ts,
@@ -268,11 +271,20 @@ queries against the real schema — a typo'd column name now fails
   (`lib/auth/access.ts`) are the real check every tool's own code must
   call. `profiles.team` still exists in the schema but is no longer
   read for access control.
-- Keep it simple: no over-engineering, this serves ~200 users max. No
-  CI, no test framework, no Prettier/husky setup today — conscious
-  tradeoffs for this scale, not oversights. Worth revisiting once a
-  tool (Purchase Orders, Budgets) brings real calculation logic worth
-  unit-testing.
+- Keep it simple: no over-engineering, this serves ~200 users max.
+- **Tests cover pure logic only** — `npm test`, `node:test` via `tsx`, no
+  framework. Today that's `lib/budgets/math.ts`, `carry-forward.ts` and
+  `lib/format.ts`: money, quantities and the rules that decide what a
+  client is charged. Don't add tests that need a database or a browser;
+  do add them when a tool brings calculation worth being sure about.
+- **CI and Prettier exist** (`.github/workflows/ci.yml`), added when a
+  second developer joined. They were deliberately declined while this was
+  one person — what changed is that `master` auto-deploys to production,
+  so "remembering to run four commands" stopped being a safe gate. Still
+  no pre-commit hooks; CI is the gate.
+- **Formatting goes through `lib/format.ts`** — money, quantities,
+  percentages, dates, on screens and in PDFs alike. Never
+  `new Intl.NumberFormat` in a component.
 
 ## Documentation map
 

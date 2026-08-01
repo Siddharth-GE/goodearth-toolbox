@@ -126,43 +126,34 @@ appear in Selections or on a client-facing document.
 
 ## Next up
 
-### Phase 2 — Selections (branch `feature/selections`)
+### Phase 5 — Indents (branch `feature/indents`)
 
-The first phase that's a genuinely new tool. **Deserves its own plan
-before any code** — migration, new route, new sidebar entry, and the
-flagship UI of the whole system.
+Turning an approved budget into requests for the commercials team, who
+split them into purchase orders by vendor. This is why
+`budget_lines.expected_vendor_id` has existed since migration `0011`.
+
+Two sources feed it and the tool has to handle both: **pull from an
+approved budget** (the common path) and **a direct site request** for
+something nobody designed.
 
 **Context a cold start needs:**
 
-- **Selections has no Coming Soon stub**, unlike every other planned
-  tool. It needs a brand-new `lib/tools.ts` entry plus a route — follow
-  the "Adding a new tool" checklist in `CLAUDE.md`.
-- **Migration `0006`** adds `designs` and `selection_lines` (shape in the
-  founder's build-plan PDF §2.2). Apply in Studio **first**, then merge
-  code — never the other way round.
-- **`spaces` and `space_types` already exist** from migration `0004`
-  with RLS and 11 seeded space types (Living, Dining, Kitchen, …), but
-  have **no screen and no rows**. Selections is their first real
-  consumer — a unit's spaces are the sections of the design workspace.
-- **The catalogue picker is the flagship.** Real numbers to design
-  against: 2,633 items, but **1,400 are lighting** and 466 are hardware,
-  so category browsing is badly lopsided and the filters carry the
-  weight. Server-side filters (kind, category, placement, brand, text
-  search on name + code), ~30 per page. **Only 897 items have a
-  thumbnail** — two-thirds of tiles will be colour placeholders, so the
-  picker has to look right as a mostly-text grid, not a photo wall.
-- **Pagination is already solved** — `listItems()` in
-  `lib/masters/items.ts` does ranged, counted, stably-ordered paging;
-  reuse that pattern rather than reinventing it. Note the `id`
-  tiebreaker: hundreds of items share a name, and without a unique
-  second sort key rows repeat across pages.
-- **Snapshot the rate at pick time** into `selection_lines.indicative_rate`.
-  Later edits to the item master must never rewrite existing lines.
-- **The cascade rule ships from day one** (PDF §2.7): removing a line
-  sets `line_status = 'removed'`, never deletes. One server function,
-  not scattered triggers.
-- **Open decision to ask the founder:** can a design start on an unsold
-  unit (`client_id` null)?
+- Follow the "Adding a new tool" checklist in `CLAUDE.md`. The Coming
+  Soon stub, route and sidebar entry already exist — flip `built: true`
+  in `lib/tools.ts` and replace that route's `page.tsx`.
+- **Read `lib/budgets/` first, not Selections.** It's the newest and
+  cleanest data layer, and Indents consumes it exactly as Budgets
+  consumes Selections. Cross-stage reads belong to the DOWNSTREAM tool,
+  under its own grant — never call another tool's gated queries.
+- **Anchor on `line_key`**, as Budgets does. It is the only identifier
+  that survives a revision.
+- **Indents must not show cost or margin.** Reads on `budget_lines` are
+  gated to `/budgets` (migration `0011`), so an Indents query joining
+  that table returns nothing — by design, not by accident. Indents needs
+  quantity, item, space and vendor, none of which are secret. If a
+  screen genuinely needs a value from behind that boundary, that's a
+  conversation, not a policy edit.
+- **Every transactional table links to a project/plot**, per CLAUDE.md.
 
 ---
 
@@ -172,8 +163,15 @@ flagship UI of the whole system.
   by `kind`.
 - **Prices are snapshotted** onto lines at pick time; master price edits
   never rewrite existing lines.
-- **Lines are never deleted**, only marked removed; removal cascades
-  flags downstream and never alters an issued PO or a goods receipt.
+- **Lines in a DRAFT revision are deleted outright; an ISSUED revision is
+  immutable and its lines cannot be touched at all.** Corrected
+  2026-08-01 — this used to promise a soft delete via a `line_status`
+  column, which was never built and never needed. Immutability turned out
+  to be the stronger guarantee: a database trigger refuses every write to
+  an issued revision's lines (migration `0006`), so history is preserved
+  by the revision itself rather than by flags on rows. The audit log
+  keeps the rest. **Do not build downstream tools expecting soft
+  deletes.**
 - **Margin is Budgets-only** — `margin_pct` and `client_rate` may be
   selected only by `lib/budgets/queries.ts`. POs never show them.
 - **Access = per-user app grants.** `requireApp()` first in every action
