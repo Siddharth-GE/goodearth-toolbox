@@ -1,0 +1,138 @@
+import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { LinkButton } from "@/components/ui/button";
+import { listActiveSpaceTypes, getSelection, listSelectionLines, listUnitSpaces } from "@/lib/selections/queries";
+import { LayoutGrid } from "lucide-react";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { AddSpaceDialog } from "../_components/add-space-dialog";
+import { CataloguePicker } from "../_components/catalogue-picker";
+import { LineGrid } from "../_components/line-grid";
+import { listItemCategories } from "@/lib/masters/item-categories";
+
+export default async function SelectionEditorPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ selectionId: string }>;
+  searchParams: Promise<{ space?: string }>;
+}) {
+  const { selectionId } = await params;
+  const { space } = await searchParams;
+
+  const selection = await getSelection(selectionId);
+  if (!selection) notFound();
+
+  const [spaces, lines, spaceTypes, categories] = await Promise.all([
+    listUnitSpaces(selection.unit_id, selectionId),
+    listSelectionLines(selectionId),
+    listActiveSpaceTypes(),
+    listItemCategories(),
+  ]);
+
+  // Land on the requested space, else the first one. A stale ?space from a
+  // bookmark (or a space just deleted) falls back rather than 404s.
+  const activeSpace = spaces.find((s) => s.id === space) ?? spaces[0] ?? null;
+  const activeLines = activeSpace ? lines.filter((line) => line.unit_space_id === activeSpace.id) : [];
+  const isDraft = selection.status === "draft";
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <Link href="/selections" className="text-xs font-medium text-muted hover:text-foreground">
+            ← All units
+          </Link>
+          <h1 className="mt-1 text-lg font-bold tracking-tight text-foreground">
+            {selection.unit_name} · R{selection.revision_no}
+          </h1>
+          <p className="text-sm text-muted">
+            {selection.project_name} · {lines.length} {lines.length === 1 ? "item" : "items"} across{" "}
+            {spaces.length} {spaces.length === 1 ? "space" : "spaces"}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {isDraft ? <Badge variant="warning">Draft</Badge> : <Badge variant="success">Issued</Badge>}
+          {isDraft && <AddSpaceDialog unitId={selection.unit_id} spaceTypes={spaceTypes} />}
+        </div>
+      </div>
+
+      {!isDraft && (
+        <p className="rounded-xl border border-border bg-surface px-4 py-3 text-sm text-muted">
+          This revision has been issued and can no longer be changed. To make a change, create the next
+          revision.
+        </p>
+      )}
+
+      {spaces.length === 0 ? (
+        <EmptyState
+          icon={LayoutGrid}
+          title="No spaces yet"
+          description="Add the rooms and areas of this unit — a Living, a Kitchen, Bedroom 1 — then start specifying items into them."
+        />
+      ) : (
+        <div className="grid gap-4 md:grid-cols-[220px_1fr]">
+          {/* Space rail. Plain links rather than client state so the chosen
+              space survives a refresh and can be linked to directly. */}
+          <nav className="space-y-1">
+            {spaces.map((s) => {
+              const active = s.id === activeSpace?.id;
+              return (
+                <Link
+                  key={s.id}
+                  href={`/selections/${selectionId}?space=${s.id}`}
+                  className={[
+                    "flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-sm transition-colors",
+                    active
+                      ? "bg-accent text-accent-foreground font-medium"
+                      : "text-foreground hover:bg-black/[0.04] dark:hover:bg-white/[0.06]",
+                  ].join(" ")}
+                >
+                  <span className="min-w-0 truncate">{s.label}</span>
+                  <span className={active ? "text-accent-foreground/70 text-xs" : "text-muted text-xs"}>
+                    {s.line_count}
+                  </span>
+                </Link>
+              );
+            })}
+          </nav>
+
+          <div className="min-w-0 space-y-3">
+            {activeSpace && (
+              <>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h2 className="text-sm font-semibold text-foreground">{activeSpace.label}</h2>
+                    <p className="text-xs text-muted">{activeSpace.space_type_name}</p>
+                  </div>
+                  {isDraft && (
+                    <CataloguePicker
+                      selectionId={selectionId}
+                      unitId={selection.unit_id}
+                      spaceId={activeSpace.id}
+                      spaceLabel={activeSpace.label}
+                      categories={categories.map((c) => ({ id: c.id, name: c.name }))}
+                    />
+                  )}
+                </div>
+
+                <LineGrid
+                  selectionId={selectionId}
+                  lines={activeLines}
+                  editable={isDraft}
+                  emptyAction={
+                    isDraft ? undefined : (
+                      <LinkButton href="/selections" variant="secondary">
+                        Back to units
+                      </LinkButton>
+                    )
+                  }
+                />
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
