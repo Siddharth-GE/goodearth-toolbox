@@ -22,16 +22,16 @@ specifies a unit space by space, issues it, the budget team prices it,
 and a client quotation comes out the other side. That's the spine of the
 AppSheet replacement.
 
-|                     |                                                                             |
-| ------------------- | --------------------------------------------------------------------------- |
-| Last worked         | 2026-08-01                                                                  |
-| Branch              | `master` — all five audit stages merged (`0cc5f8c`)                         |
-| Migrations applied  | `0001`–`0016` (next new one is `0017`)                                      |
-| Items in database   | **2,633** (2,631 imported catalogue + 2 material seeds)                     |
-| Categories / brands | 14 / 21                                                                     |
-| Thumbnails          | **897** in Supabase Storage; 3 dead vendor links, 1,733 items have no image |
-| Built tools         | Marathon, Settings, Masters, Selections, Budgets                            |
-| Tests               | `npm test` — 25, covering pricing, carry-forward and formatting             |
+|                     |                                                                                                 |
+| ------------------- | ----------------------------------------------------------------------------------------------- |
+| Last worked         | 2026-08-01                                                                                      |
+| Branch              | Second-pass audit: 4 stacked `feature/audit2-*` branches awaiting gates                         |
+| Migrations applied  | `0001`–`0016`; **`0017`–`0018` written, NOT yet applied** (see below)                           |
+| Items in database   | **2,633** (2,631 imported catalogue + 2 material seeds)                                         |
+| Categories / brands | 14 / 21                                                                                         |
+| Thumbnails          | **897** in Supabase Storage; 3 dead vendor links, 1,733 items have no image                     |
+| Built tools         | Marathon, Settings, Masters, Selections, Budgets                                                |
+| Tests               | `npm test` — 39, covering pricing, carry-forward, the revision diff, PIN hashing and formatting |
 
 ---
 
@@ -373,7 +373,78 @@ one-person-era call); Marathon's service-role kiosk design;
 per-project permissions — the app boundary _is_ the permission boundary,
 which is a real decision, just previously undocumented as a limit.
 
+## Second-pass audit — 2026-08-01 (after the first audit merged)
+
+A fresh review specifically hunting what the first audit missed, run
+because Selections and Budgets now depend on each other and a maintainer
+is joining. It found four more instances of the exact 1,000-row
+truncation bug the first audit set out to kill (one inside budget
+approval), database guards that could be bypassed with a raw API call,
+two survivors of already-"fixed" UI bug classes, and doc contradictions.
+Shipped as four stacked branches, each with its own gate:
+
+| Stage | Branch                       | What                                                                  | Status                            |
+| ----- | ---------------------------- | --------------------------------------------------------------------- | --------------------------------- |
+| 0     | direct to `master`           | Docs that contradicted reality fixed                                  | ✅ merged                         |
+| 1     | `feature/audit2-correctness` | Truncation bugs (fetchAll), approval counts, caption save, waterfalls | 🔨 awaiting Gate 1                |
+| 2     | `feature/audit2-db`          | Migrations `0017`+`0018` + dependent code                             | 🔨 awaiting Studio apply + Gate 2 |
+| 3     | `feature/audit2-consistency` | Shared plumbing, FormMessage/PageTitle/Pagination sweeps, boundaries  | 🔨 awaiting Gate 3                |
+| 4     | `feature/audit2-handover`    | Pure-logic extraction + 13 tests, conventions written down            | 🔨 light gate                     |
+
+**To apply `0017`/`0018`** (before merging the `audit2-db` branch or any
+after it): run the four commented PREFLIGHT queries at the top of
+`0017_integrity_guards.sql` in Supabase Studio — each must return zero
+rows — then run `0017`, then `0018`, then tell the assistant so
+`npm run db:types` regenerates types and the two remaining conversions
+(draft delete and item request moving onto the new atomic database
+functions) land. Everything in both migrations only tightens; live code
+keeps working while they're applied. One caveat: between applying `0017`
+and merging `audit2-db`, saving a budget line with a cost but a blank
+margin will error on the old code — apply and merge in the same sitting.
+
+### Decided, not done — with the trigger for revisiting
+
+- **`audit_log` retention**: it will become the biggest table, and that
+  is fine for years at this scale. Revisit (monthly partitioning on
+  `at`, or pruning `old_data`/`new_data` beyond ~12 months) when it
+  passes a few million rows or Studio queries on it feel slow.
+- **Actions trust the relationships in their inputs** (e.g. saveLine
+  doesn't verify the line_key belongs to that budget's revision beyond
+  the FK): the DB constraints are the boundary; ~200 trusted staff is
+  the threat model. Revisit only if the platform ever faces outsiders.
+- **Actor foreign keys** (12 of them: `created_by`, `issued_by`,
+  `priced_by`…) are `NO ACTION`, so a staff member who ever touched
+  anything cannot be deleted from auth. Fix as one migration flipping
+  them to `on delete set null` — next phase, or whenever offboarding
+  first actually needs it.
+- **Audit triggers on `items`/`vendors`/`item_requests`**: none today.
+  Must land **before Purchase Orders ship** — vendors become
+  counterparties on money documents then.
+- **`space_views` storage orphans**: deleting a space cascades its view
+  rows but nothing deletes the JPEGs from the private bucket. Cheap
+  disk, invisible; fix by `on delete restrict` or a reaper, next phase.
+- **Two accepted small races**: `moveSpaceView`'s sort swap can
+  transiently duplicate a sort_order (self-heals on next save), and
+  Marathon's `recordFailure` is read-then-write so a scripted attacker
+  gets a couple of extra guesses before lockout. Both documented,
+  neither worth machinery now; the marathon one rides the next Marathon
+  migration as a DB-side increment.
+- **`lib/selections/views.ts` stays where it is** (shared surface,
+  documented in the file and CLAUDE.md) rather than moving to its own
+  folder — move it only if a third consumer appears.
+
 ## Session log
+
+### 2026-08-01 (second-pass audit) — dot the i's, cross the t's
+
+The audit-of-the-audit described above. Beyond the table: conventions
+now written into CLAUDE.md (fetchAll vs stated-limit reads; the
+`(budget_id, line_key)` composite-FK rule Indents must follow; new tools
+must extend the `user_apps_app_known` CHECK), pure logic extracted so it
+could be tested (`lib/selections/diff.ts`, `lib/marathon/pin.ts`,
+`lib/budgets/reference.ts` — 39 tests total now), and the shared action
+plumbing (`ActionState`, `requireTool`, `lib/masters/constants.ts`)
+replacing ~26 duplicated declarations.
 
 ### 2026-08-01 (later still) — Budgets shipped (Phase 4), merged
 

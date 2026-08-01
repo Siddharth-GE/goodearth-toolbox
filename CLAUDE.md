@@ -163,14 +163,23 @@ are already correct and don't need to change.
 2. `lib/<tool>/actions.ts` and `queries.ts` for its data layer. Reuse
    `lib/masters/*` for anything touching Projects/Plots/Items/Vendors/
    Stores — don't re-query or re-implement master data per tool. Every
-   action and query must call `requireApp(user, "<href>")`
+   action and query must call `requireTool("<href>")`
    (`lib/auth/access.ts`) first — sidebar visibility is only cosmetic,
    this call is the real permission boundary, same principle as
-   Marathon's `requireAgentSession`/`requireAdminSession`. Dashboard
-   tools do this with the RLS-scoped server client
+   Marathon's `requireAgentSession`/`requireAdminSession`. Actions
+   return the shared `ActionState` (`lib/action-state.ts`), never throw.
+   Dashboard tools use the RLS-scoped server client
    (`lib/supabase/server.ts`); Marathon's service-role bypass
    (`lib/supabase/admin.ts`) is a kiosk-only exception, not the pattern
    to copy.
+   **Reads come in two kinds — pick deliberately.** PostgREST silently
+   caps any un-ranged select at 1,000 rows. A read whose correctness
+   depends on completeness (a merge, a carry-forward, a lookup map, an
+   access-control grid) goes through `fetchAll`
+   (`lib/supabase/fetch-all.ts`); a list on screen states its own limit
+   and shows "N of M" from an exact database count (the
+   `MARATHON_LIST_LIMIT` pattern). Never derive a count from
+   `rows.length`.
 3. Build every screen from `components/ui/*` (and `components/masters/*`
    where relevant). Never one-off styles — see DESIGN.md.
 4. Add (or update) its entry in `lib/tools.ts` — `group`, `icon`,
@@ -180,10 +189,18 @@ are already correct and don't need to change.
 5. Start `app/<tool>/PLAN.md` — that tool's own build checklist and
    bookmark, same pattern as `app/marathon/PLAN.md`.
 6. Any new tables as a numbered file in `supabase/migrations/` — see
-   below. Every transactional table links to a project/plot.
+   below. Every transactional table links to a project/plot. In the same
+   migration, **extend the `user_apps_app_known` CHECK constraint**
+   (added in `0017`) with the new tool's slug — without that, granting
+   the tool in Settings fails at the database.
 7. If the Overview page (`app/(dashboard)/page.tsx`) has a static
    illustrative widget standing in for this tool, swap it for a real
    query from step 2 — same file and component, not a rebuild.
+
+For tools consuming Budgets (Indents, POs): anchor lines on
+**`(budget_id, line_key)` with a composite foreign key** to
+`budget_lines`' existing unique — never a bare `line_key`, which is only
+unique within one revision and can't be FK-enforced alone.
 
 ## Shared masters (Projects, Plots, Units, Clients, Vendors, Stores, Items)
 
@@ -206,13 +223,19 @@ answer:
   `tsc`, only `next build` catches it). The actions file must not
   import _values_ from its queries file either (that reintroduces the
   same transitive `server-only` chain through `lib/auth/access.ts`) —
-  `import type` is fine (erased before bundling), so re-declare any
-  validation constants (e.g. allowed enum values) privately in the
-  actions file rather than importing them as values.
-- Read functions have no `requireApp` call — any tool's own
-  (already-gated) queries/actions can call them directly. Write
-  functions each call `requireUser()` + `requireApp(user, "/masters")`
-  first, exactly like `lib/settings/actions.ts`.
+  `import type` is fine (erased before bundling). Validation constants
+  an actions file needs as values live in **import-free** modules built
+  for exactly this: `lib/masters/constants.ts` (UOMs, item kinds) and
+  `lib/action-state.ts` (the shared `ActionState`). Add to those rather
+  than re-declaring per file.
+- Read functions have no gate call — any tool's own (already-gated)
+  queries/actions can call them directly. Write functions call
+  `requireTool("/masters")` first, exactly like every other tool's
+  actions.
+- One more deliberately shared read module lives outside `lib/masters/`:
+  `lib/selections/views.ts` (design views). Budgets renders those into
+  the client quote under its own grant — see the note at the top of that
+  file before moving or gating it.
 - Shared UI (a project picker, a vendor combobox): `components/masters/`,
   sibling to `components/ui/`.
 
@@ -276,9 +299,12 @@ queries against the real schema — a typo'd column name now fails
 - Keep it simple: no over-engineering, this serves ~200 users max.
 - **Tests cover pure logic only** — `npm test`, `node:test` via `tsx`, no
   framework. Today that's `lib/budgets/math.ts`, `carry-forward.ts` and
-  `lib/format.ts`: money, quantities and the rules that decide what a
-  client is charged. Don't add tests that need a database or a browser;
-  do add them when a tool brings calculation worth being sure about.
+  `reference.ts`, `lib/selections/diff.ts`, `lib/marathon/pin.ts` and
+  `lib/format.ts`: money, quantities, the revision diff, PIN hashing and
+  the rules that decide what a client is charged. Don't add tests that
+  need a database or a browser; when logic worth testing is trapped in a
+  module with server imports, extract it into a pure module first (the
+  pattern all of the above follow).
 - **CI and Prettier exist** (`.github/workflows/ci.yml`), added when a
   second developer joined. They were deliberately declined while this was
   one person — what changed is that `master` auto-deploys to production,
