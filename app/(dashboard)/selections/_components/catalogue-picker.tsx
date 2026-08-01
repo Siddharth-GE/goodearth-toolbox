@@ -3,7 +3,10 @@
 import { ItemThumb } from "@/components/masters/item-thumb";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { FormMessage } from "@/components/ui/form-message";
+import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
+import { Pagination } from "@/components/ui/pagination";
 import { Select } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { addLines } from "@/lib/selections/actions";
@@ -11,7 +14,8 @@ import type { CatalogueItem, CatalogueSearchResult } from "@/lib/selections/cata
 import { RequestItemDialog } from "./request-item-dialog";
 import { Minus, Plus, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
+import { useDebouncedSearch } from "@/lib/hooks/use-debounced-search";
 import { formatCount, formatMoney } from "@/lib/format";
 
 type Space = { id: string; label: string };
@@ -39,12 +43,14 @@ export function CataloguePicker({
   const [placement, setPlacement] = useState("");
   const [page, setPage] = useState(1);
 
-  const [result, setResult] = useState<CatalogueSearchResult>({
-    items: [],
-    total: 0,
-    pageCount: 1,
+  const { result, loading } = useDebouncedSearch<CatalogueSearchResult>({
+    url: "/api/catalogue",
+    params: { page, q: search, category: categoryId, brand: brandId, placement },
+    // Idle until the dialog opens: no reason to search a catalogue nobody
+    // is looking at.
+    enabled: open,
+    initial: { items: [], total: 0, pageCount: 1 },
   });
-  const [loading, setLoading] = useState(false);
 
   // The basket lives entirely in the browser. Pressing + costs nothing —
   // no network, no re-render of the page behind — and the whole lot is
@@ -62,33 +68,6 @@ export function CataloguePicker({
   const [targetSpaces, setTargetSpaces] = useState<string[]>([currentSpaceId]);
   const [error, setError] = useState<string>();
   const [saving, startSaving] = useTransition();
-
-  useEffect(() => {
-    if (!open) return;
-    const controller = new AbortController();
-    const timer = setTimeout(async () => {
-      setLoading(true);
-      const params = new URLSearchParams({ page: String(page) });
-      if (search) params.set("q", search);
-      if (categoryId) params.set("category", categoryId);
-      if (brandId) params.set("brand", brandId);
-      if (placement) params.set("placement", placement);
-      try {
-        const response = await fetch(`/api/catalogue?${params}`, { signal: controller.signal });
-        if (!response.ok) throw new Error("search failed");
-        setResult((await response.json()) as CatalogueSearchResult);
-        setLoading(false);
-      } catch (fetchError) {
-        // An aborted request is the expected outcome of typing another
-        // character, not a failure worth showing.
-        if ((fetchError as Error).name !== "AbortError") setLoading(false);
-      }
-    }, 200);
-    return () => {
-      controller.abort();
-      clearTimeout(timer);
-    };
-  }, [open, search, categoryId, brandId, placement, page]);
 
   const applyFilter = (apply: () => void) => {
     apply();
@@ -313,21 +292,7 @@ export function CataloguePicker({
               />
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-              Previous
-            </Button>
-            <span className="text-muted text-xs tabular-nums">
-              {page} / {result.pageCount}
-            </span>
-            <Button
-              variant="secondary"
-              disabled={page >= result.pageCount}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Next
-            </Button>
-          </div>
+          <Pagination page={page} pageCount={result.pageCount} onPageChange={setPage} />
         </div>
 
         {/* Nothing has been written yet — this bar is the commit point. */}
@@ -352,7 +317,7 @@ export function CataloguePicker({
                 </p>
               </>
             )}
-            {error && <p className="text-danger text-xs font-medium">{error}</p>}
+            <FormMessage error={error} size="xs" />
           </div>
           <div className="flex items-center gap-2">
             {distinctItems > 0 && (
@@ -449,14 +414,8 @@ function Stepper({
 }) {
   const Icon = direction === "up" ? Plus : Minus;
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={label}
-      className="border-border text-foreground focus-visible:ring-accent flex size-8 items-center justify-center rounded-lg border transition-colors hover:bg-black/[0.04] focus-visible:ring-2 focus-visible:outline-none disabled:opacity-30 dark:hover:bg-white/[0.06]"
-    >
+    <IconButton onClick={onClick} disabled={disabled} aria-label={label} bordered>
       <Icon className="size-4" />
-    </button>
+    </IconButton>
   );
 }

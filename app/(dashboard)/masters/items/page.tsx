@@ -131,7 +131,7 @@ export default async function ItemsPage({
                   <TableCell className="text-foreground font-medium">{item.name}</TableCell>
                   <TableCell>
                     <Badge
-                      variant={item.kind === "catalogue" ? "info" : "default"}
+                      variant={item.kind === "catalogue" ? "info" : "neutral"}
                       className="capitalize"
                     >
                       {item.kind}

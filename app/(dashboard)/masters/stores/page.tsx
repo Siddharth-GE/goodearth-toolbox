@@ -48,7 +48,7 @@ export default async function StoresPage() {
                 <TableCell>{projectName(store.project_id)}</TableCell>
                 <TableCell>{store.location || "—"}</TableCell>
                 <TableCell>
-                  <Badge variant={store.is_active ? "success" : "default"}>
+                  <Badge variant={store.is_active ? "success" : "neutral"}>
                     {store.is_active ? "Active" : "Inactive"}
                   </Badge>
                 </TableCell>

@@ -80,9 +80,7 @@ export default async function SelectionEditorPage({
           {isDraft ? (
             <Badge variant="warning">Draft</Badge>
           ) : selection.status === "superseded" ? (
-            <Badge variant="default" className="bg-muted/15 text-muted">
-              Superseded
-            </Badge>
+            <Badge variant="neutral">Superseded</Badge>
           ) : (
             <Badge variant="success">Issued</Badge>
           )}
