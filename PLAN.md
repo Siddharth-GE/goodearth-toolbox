@@ -20,7 +20,7 @@ and **what's next**.
 | | |
 |---|---|
 | Last worked | 2026-08-01 |
-| Branch | `feature/selections` — Phase 2 built, awaiting the browser gate before merging |
+| Branch | everything merged to `master`, live on Vercel. Next: `feature/budgets` |
 | Migrations applied | `0001`–`0008` (next new one is `0009`) |
 | Items in database | **2,633** (2,631 imported catalogue + 2 material seeds) |
 | Categories / brands | 14 / 21 |
@@ -37,7 +37,7 @@ and **what's next**.
 | 1 | **Masters** — projects, plots, units, clients, vendors, stores, items, categories, brands, space types | ✅ Shipped, Gate 1 approved |
 | 3 | **Catalogue import** — the real 2,631-item catalogue | ✅ Done — **pulled forward, out of order** (see below) |
 | 3b | **Thumbnail pass** — catalogue images into Supabase Storage | ✅ Done |
-| 2 | **Selections** — per-unit design workspace + the catalogue picker | 🟡 **Built on `feature/selections`, awaiting the gate** |
+| 2 | **Selections** — per-unit design workspace + the catalogue picker | ✅ Shipped, merged 2026-08-01 |
 | 4 | Budgets — cost + margin → client rate, approval flow | ⬜ Not started |
 | 5 | Indents — pull-from-budget *and* direct site request | ⬜ Not started |
 | 6 | Purchase Orders — vendor grouping + letterhead PDF | ⬜ Not started |
