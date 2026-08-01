@@ -2,6 +2,7 @@ import "server-only";
 
 import { requireApp } from "@/lib/auth/access";
 import { requireUser } from "@/lib/auth/dal";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { cache } from "react";
 
@@ -71,13 +72,18 @@ export async function listUnitsForSelections(projectId?: string): Promise<UnitSe
   await requireApp(user, "/selections");
 
   const supabase = await createClient();
-  let query = supabase
-    .from("units")
-    .select("id, name, unit_type, project_id, projects(name), selections(*)")
-    .order("name");
-  if (projectId) query = query.eq("project_id", projectId);
-
-  const { data } = await query;
+  // fetchAll: every unit must be visible here to be startable, and a
+  // capped read would silently hide real units as projects grow.
+  const { data } = await fetchAll((from, to) => {
+    let query = supabase
+      .from("units")
+      .select("id, name, unit_type, project_id, projects(name), selections(*)")
+      .order("name")
+      .order("id")
+      .range(from, to);
+    if (projectId) query = query.eq("project_id", projectId);
+    return query;
+  });
 
   return (data ?? []).map((unit) => {
     const revisions = ((unit.selections ?? []) as SelectionRow[])
