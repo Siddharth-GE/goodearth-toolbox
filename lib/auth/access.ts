@@ -1,24 +1,16 @@
 import "server-only";
 
-import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { cache } from "react";
 import type { getCurrentUser } from "./dal";
 
 type CurrentUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
 
-// Cached per request, like getCurrentUser. A screen built from several
-// gated queries calls requireApp once per query; without this that's one
-// user_apps round trip each, for an answer that cannot change mid-render.
-export const getGrantedApps = cache(async (userId: string): Promise<string[]> => {
-  const supabase = await createClient();
-  const { data } = await supabase.from("user_apps").select("app").eq("user_id", userId);
-  return (data ?? []).map((row) => row.app);
-});
-
+// getCurrentUser() now fetches user_apps in the same query as the
+// profile (see dal.ts), so this is just a lookup on data already in
+// hand — no separate round trip, and no need for its own cache().
 export async function hasApp(user: CurrentUser, slug: string) {
   if (user.profile?.role === "admin") return true;
-  return (await getGrantedApps(user.id)).includes(slug);
+  return user.grantedApps.includes(slug);
 }
 
 // Every tool's own actions/queries call this first — the sidebar only

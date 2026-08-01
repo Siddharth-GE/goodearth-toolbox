@@ -1,4 +1,6 @@
+import { Spinner } from "@/components/ui/spinner";
 import { requireUser } from "@/lib/auth/dal";
+import { Suspense } from "react";
 import { ActivityFeed } from "./_components/activity-feed";
 import { BudgetVsActual } from "./_components/budget-vs-actual";
 import { KpiRow } from "./_components/kpi-row";
@@ -49,7 +51,15 @@ export default async function DashboardHome() {
           </div>
           <div className="space-y-5">
             <PendingApprovals />
-            <MarathonLiveCard />
+            <Suspense
+              fallback={
+                <div className="flex h-[164px] items-center justify-center rounded-2xl bg-surface">
+                  <Spinner />
+                </div>
+              }
+            >
+              <MarathonLiveCard />
+            </Suspense>
             <PeopleOverview />
             <ActivityFeed />
           </div>

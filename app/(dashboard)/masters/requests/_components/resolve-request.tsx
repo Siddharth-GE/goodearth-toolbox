@@ -4,13 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Spinner } from "@/components/ui/spinner";
 import {
   approveItemRequest,
   mergeItemRequest,
   rejectItemRequest,
 } from "@/lib/masters/item-requests-actions";
 import type { CatalogueSearchResult } from "@/lib/selections/catalogue";
-import { Loader2, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 
 /**
@@ -110,7 +111,7 @@ export function ResolveRequest({
         <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-border">
           {loading && candidates.length === 0 ? (
             <div className="flex h-24 items-center justify-center text-muted">
-              <Loader2 className="size-5 animate-spin" />
+              <Spinner className="size-5 border-2" />
             </div>
           ) : candidates.length === 0 ? (
             <p className="p-4 text-sm text-muted">

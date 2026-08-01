@@ -5,10 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
 import { addLines } from "@/lib/selections/actions";
 import type { CatalogueItem, CatalogueSearchResult } from "@/lib/selections/catalogue";
 import { RequestItemDialog } from "./request-item-dialog";
-import { Loader2, Minus, Plus, Search } from "lucide-react";
+import { Minus, Plus, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
@@ -261,7 +262,7 @@ export function CataloguePicker({
         <div className="min-h-0 flex-1 overflow-y-auto">
           {loading && result.items.length === 0 ? (
             <div className="flex h-full items-center justify-center text-muted">
-              <Loader2 className="size-5 animate-spin" />
+              <Spinner className="size-5 border-2" />
             </div>
           ) : result.items.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-12">
