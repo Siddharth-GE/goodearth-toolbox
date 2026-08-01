@@ -81,22 +81,36 @@ export async function deleteDraft(selectionId: string): Promise<ActionState> {
 // Spaces
 // ---------------------------------------------------------------------
 
-export async function addSpace(
-  unitId: string,
-  _state: ActionState,
-  formData: FormData,
-): Promise<ActionState> {
+export type NewSpace = { spaceTypeId: string; label: string };
+
+/**
+ * Creates a unit's spaces in one call.
+ *
+ * Setting up a villa means eight or nine spaces, and doing that as eight
+ * separate dialogs was the slowest part of starting a design. Labels
+ * arrive already resolved from the client (auto-suggested, then editable
+ * before committing) rather than being generated here, so what the
+ * designer approved on screen is exactly what gets written.
+ */
+export async function addSpaces(unitId: string, spaces: NewSpace[]): Promise<ActionState> {
   await authorize();
 
-  const spaceTypeId = String(formData.get("space_type_id") ?? "");
-  const label = String(formData.get("label") ?? "").trim();
-  const description = String(formData.get("description") ?? "").trim() || null;
-  if (!spaceTypeId) return { error: "Choose a space type." };
-  if (!label) return { error: "Give this space a name, e.g. “Bedroom 1”." };
+  const cleaned = spaces
+    .map((space) => ({ spaceTypeId: space.spaceTypeId, label: space.label.trim() }))
+    .filter((space) => space.spaceTypeId && space.label);
+  if (cleaned.length === 0) return { error: "Choose at least one space." };
+
+  // Catch collisions within the batch itself before the database does —
+  // the unique constraint would report only the first one.
+  const seen = new Set<string>();
+  for (const space of cleaned) {
+    const key = space.label.toLowerCase();
+    if (seen.has(key)) return { error: `Two spaces are both called “${space.label}”. Names must differ.` };
+    seen.add(key);
+  }
 
   const supabase = await createClient();
 
-  // Append to the end of the unit's existing spaces.
   const { data: last } = await supabase
     .from("spaces")
     .select("sort_order")
@@ -105,18 +119,22 @@ export async function addSpace(
     .limit(1)
     .maybeSingle();
 
-  const { error } = await supabase.from("spaces").insert({
-    unit_id: unitId,
-    space_type_id: spaceTypeId,
-    label,
-    description,
-    sort_order: (last?.sort_order ?? -1) + 1,
-  });
+  let sortOrder = (last?.sort_order ?? -1) + 1;
+  const { error } = await supabase.from("spaces").insert(
+    cleaned.map((space) => ({
+      unit_id: unitId,
+      space_type_id: space.spaceTypeId,
+      label: space.label,
+      sort_order: sortOrder++,
+    })),
+  );
 
   if (error) {
-    if (error.code === "23505") return { error: `This unit already has a space called “${label}”.` };
-    console.error("addSpace failed:", error);
-    return { error: "Could not add the space. Try again." };
+    if (error.code === "23505") {
+      return { error: "One of those names is already used in this unit. Rename it and try again." };
+    }
+    console.error("addSpaces failed:", error);
+    return { error: "Could not add the spaces. Try again." };
   }
 
   revalidatePath("/selections", "layout");

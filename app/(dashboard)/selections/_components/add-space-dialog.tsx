@@ -1,110 +1,244 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { addSpace } from "@/lib/selections/actions";
-import { useActionState, useEffect, useRef, useState } from "react";
+import { addSpaces } from "@/lib/selections/actions";
+import { Minus, Plus } from "lucide-react";
+import { useMemo, useState, useTransition } from "react";
 
 type SpaceType = { id: string; code: string; name: string };
+type ExistingSpace = { label: string; space_type_id: string };
 
-export function AddSpaceDialog({ unitId, spaceTypes }: { unitId: string; spaceTypes: SpaceType[] }) {
+/**
+ * Sets up several spaces at once.
+ *
+ * A villa is eight or nine spaces, and adding them one dialog at a time
+ * was the slowest part of starting a design. Same stepper idea as the
+ * catalogue picker: build the list locally, review it, write it in one go.
+ */
+export function AddSpaceDialog({
+  unitId,
+  spaceTypes,
+  existing,
+  trigger,
+}: {
+  unitId: string;
+  spaceTypes: SpaceType[];
+  existing: ExistingSpace[];
+  trigger?: React.ReactNode;
+}) {
   const [open, setOpen] = useState(false);
-  const [state, formAction, pending] = useActionState(addSpace.bind(null, unitId), undefined);
-  const wasPending = useRef(false);
-  // Mirrors the chosen type into the label so "Bedroom" arrives pre-filled
-  // and the designer only types the number. Editable, never overwritten
-  // once they've touched it.
-  const [label, setLabel] = useState("");
-  const [labelTouched, setLabelTouched] = useState(false);
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  // Labels the designer has overridden, keyed by their position in the
+  // generated list. Anything untouched keeps following the suggestion.
+  const [overrides, setOverrides] = useState<Record<string, string>>({});
+  const [error, setError] = useState<string>();
+  const [saving, startSaving] = useTransition();
 
-  useEffect(() => {
-    if (wasPending.current && !pending && !state?.error) {
-      setOpen(false);
-      setLabel("");
-      setLabelTouched(false);
+  /**
+   * Suggested names. One of a type is just "Kitchen"; several become
+   * "Bedroom 1", "Bedroom 2". Numbering continues past whatever the unit
+   * already has, and skips any name that's taken.
+   */
+  const planned = useMemo(() => {
+    const taken = new Set(existing.map((space) => space.label.toLowerCase()));
+    const rows: { key: string; spaceTypeId: string; suggestion: string }[] = [];
+
+    for (const type of spaceTypes) {
+      const count = counts[type.id] ?? 0;
+      if (count === 0) continue;
+      const alreadyOfType = existing.filter((space) => space.space_type_id === type.id).length;
+      let n = alreadyOfType;
+
+      for (let i = 0; i < count; i++) {
+        let suggestion: string;
+        if (alreadyOfType === 0 && count === 1) {
+          suggestion = type.name;
+        } else {
+          do {
+            n += 1;
+            suggestion = `${type.name} ${n}`;
+          } while (taken.has(suggestion.toLowerCase()));
+        }
+        // Guard the un-numbered case too, in case another type used it.
+        while (taken.has(suggestion.toLowerCase())) suggestion = `${suggestion} +`;
+        taken.add(suggestion.toLowerCase());
+        rows.push({ key: `${type.id}:${i}`, spaceTypeId: type.id, suggestion });
+      }
     }
-    wasPending.current = pending;
-  }, [pending, state]);
+    return rows;
+  }, [counts, existing, spaceTypes]);
+
+  const total = planned.length;
+
+  const step = (typeId: string, by: number) =>
+    setCounts((current) => {
+      const next = { ...current };
+      const value = (next[typeId] ?? 0) + by;
+      if (value <= 0) delete next[typeId];
+      else next[typeId] = value;
+      return next;
+    });
+
+  const reset = () => {
+    setCounts({});
+    setOverrides({});
+    setError(undefined);
+  };
+
+  const commit = () =>
+    startSaving(async () => {
+      const outcome = await addSpaces(
+        unitId,
+        planned.map((row) => ({
+          spaceTypeId: row.spaceTypeId,
+          label: overrides[row.key]?.trim() || row.suggestion,
+        })),
+      );
+      if (outcome?.error) {
+        setError(outcome.error);
+        return;
+      }
+      reset();
+      setOpen(false);
+    });
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <Button variant="secondary" onClick={() => setOpen(true)}>
-        Add space
-      </Button>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Add a space</DialogTitle>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) reset();
+      }}
+    >
+      {/* asChild so the caller's own button keeps its focus and keyboard
+          behaviour rather than being wrapped in a non-focusable element. */}
+      <DialogTrigger asChild>
+        {trigger ?? <Button variant="secondary">Add spaces</Button>}
+      </DialogTrigger>
+      <DialogContent className="flex max-h-[88vh] max-w-3xl flex-col gap-4">
+        <DialogHeader className="mb-0">
+          <DialogTitle>Add spaces</DialogTitle>
         </DialogHeader>
-        <form action={formAction} className="space-y-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="space_type_id">Type</Label>
-            <Select
-              id="space_type_id"
-              name="space_type_id"
-              required
-              defaultValue=""
-              onChange={(event) => {
-                if (labelTouched) return;
-                const chosen = spaceTypes.find((t) => t.id === event.target.value);
-                if (chosen) setLabel(chosen.name);
-              }}
-            >
-              <option value="" disabled>
-                Choose a space type
-              </option>
-              {spaceTypes.map((type) => (
-                <option key={type.id} value={type.id}>
-                  {type.name}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="label">Name in this unit</Label>
-            <Input
-              id="label"
-              name="label"
-              value={label}
-              onChange={(event) => {
-                setLabel(event.target.value);
-                setLabelTouched(true);
-              }}
-              placeholder="Bedroom 1"
-              autoComplete="off"
-              required
-            />
-            <p className="text-xs text-muted">
-              Three bedrooms are three spaces — name them so they can be told apart.
+
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-muted">
+              How many of each
             </p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {spaceTypes.map((type) => {
+                const count = counts[type.id] ?? 0;
+                return (
+                  <div
+                    key={type.id}
+                    className={[
+                      "flex items-center justify-between gap-2 rounded-xl border px-3 py-2 transition-colors",
+                      count > 0 ? "border-accent" : "border-border",
+                    ].join(" ")}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => step(type.id, 1)}
+                      className="min-w-0 flex-1 text-left focus-visible:outline-none"
+                      aria-label={`Add one ${type.name}`}
+                    >
+                      <span className="block truncate text-sm text-foreground">{type.name}</span>
+                    </button>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <StepButton
+                        icon="minus"
+                        disabled={count === 0}
+                        onClick={() => step(type.id, -1)}
+                        label={`Remove one ${type.name}`}
+                      />
+                      <span
+                        className={[
+                          "min-w-5 text-center text-sm font-semibold tabular-nums",
+                          count > 0 ? "text-foreground" : "text-muted/40",
+                        ].join(" ")}
+                      >
+                        {count}
+                      </span>
+                      <StepButton
+                        icon="plus"
+                        onClick={() => step(type.id, 1)}
+                        label={`Add one ${type.name}`}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="description">Description (optional)</Label>
-            <Textarea id="description" name="description" rows={2} placeholder="Notes for the client document" />
+
+          {total > 0 && (
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-muted">
+                Names — edit any of these
+              </p>
+              <div className="space-y-2">
+                {planned.map((row) => (
+                  <Input
+                    key={row.key}
+                    value={overrides[row.key] ?? row.suggestion}
+                    onChange={(event) =>
+                      setOverrides((current) => ({ ...current, [row.key]: event.target.value }))
+                    }
+                    className="h-10"
+                    aria-label={`Name for ${row.suggestion}`}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
+          <div className="min-w-0">
+            <p className="text-sm text-muted">
+              {total === 0 ? "Pick the rooms this unit has." : `${total} ${total === 1 ? "space" : "spaces"}`}
+            </p>
+            {error && <p className="text-xs font-medium text-danger">{error}</p>}
           </div>
-          {state?.error && <p className="text-sm font-medium text-danger">{state.error}</p>}
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button type="button" variant="secondary">
-                Cancel
+          <div className="flex items-center gap-2">
+            {total > 0 && (
+              <Button variant="ghost" onClick={reset} disabled={saving}>
+                Clear
               </Button>
-            </DialogClose>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Adding…" : "Add space"}
+            )}
+            <Button onClick={commit} disabled={saving || total === 0}>
+              {saving ? "Adding…" : `Add ${total || ""}`.trim()}
             </Button>
-          </DialogFooter>
-        </form>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function StepButton({
+  icon,
+  onClick,
+  disabled,
+  label,
+}: {
+  icon: "plus" | "minus";
+  onClick: () => void;
+  disabled?: boolean;
+  label: string;
+}) {
+  const Icon = icon === "plus" ? Plus : Minus;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      className="flex size-7 items-center justify-center rounded-lg border border-border text-foreground transition-colors hover:bg-black/[0.04] disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:hover:bg-white/[0.06]"
+    >
+      <Icon className="size-3.5" />
+    </button>
   );
 }

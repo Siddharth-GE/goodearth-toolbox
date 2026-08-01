@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { LinkButton } from "@/components/ui/button";
+import { Button, LinkButton } from "@/components/ui/button";
 import { listActiveSpaceTypes, getSelection, listSelectionLines, listUnitSpaces } from "@/lib/selections/queries";
 import { LayoutGrid } from "lucide-react";
 import Link from "next/link";
@@ -53,7 +53,15 @@ export default async function SelectionEditorPage({
         </div>
         <div className="flex items-center gap-2">
           {isDraft ? <Badge variant="warning">Draft</Badge> : <Badge variant="success">Issued</Badge>}
-          {isDraft && <AddSpaceDialog unitId={selection.unit_id} spaceTypes={spaceTypes} />}
+          {isDraft && (
+            <AddSpaceDialog
+              unitId={selection.unit_id}
+              spaceTypes={spaceTypes}
+              // Passed so suggested names continue past what's already
+              // there — a second Bath becomes "Bath 2", not a clash.
+              existing={spaces.map((s) => ({ label: s.label, space_type_id: s.space_type_id }))}
+            />
+          )}
         </div>
       </div>
 
@@ -68,7 +76,17 @@ export default async function SelectionEditorPage({
         <EmptyState
           icon={LayoutGrid}
           title="No spaces yet"
-          description="Add the rooms and areas of this unit — a Living, a Kitchen, Bedroom 1 — then start specifying items into them."
+          description="Set up the rooms and areas of this unit — pick how many of each and they're named for you — then start specifying items into them."
+          action={
+            isDraft ? (
+              <AddSpaceDialog
+                unitId={selection.unit_id}
+                spaceTypes={spaceTypes}
+                existing={[]}
+                trigger={<Button>Set up spaces</Button>}
+              />
+            ) : undefined
+          }
         />
       ) : (
         <div className="grid gap-4 md:grid-cols-[220px_1fr]">
