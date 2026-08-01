@@ -9,7 +9,7 @@ import {
   listSelectionLines,
   listUnitSpaces,
 } from "@/lib/selections/queries";
-import { LayoutGrid } from "lucide-react";
+import { FileDown, LayoutGrid } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AddSpaceDialog } from "../_components/add-space-dialog";
@@ -76,6 +76,15 @@ export default async function SelectionEditorPage({
             </Badge>
           ) : (
             <Badge variant="success">Issued</Badge>
+          )}
+          {lines.length > 0 && (
+            // A plain link, not a Button click handler: the browser
+            // downloads it natively, which also means it works on a
+            // right-click "save as" and doesn't need JavaScript.
+            <LinkButton href={`/selections/${selectionId}/pdf`} variant="secondary">
+              <FileDown className="size-4" />
+              PDF
+            </LinkButton>
           )}
           {isDraft && (
             <>

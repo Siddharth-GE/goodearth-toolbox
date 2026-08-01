@@ -48,6 +48,7 @@ export type SelectionLineRow = {
   item_id: string;
   item_name: string;
   item_code: string | null;
+  item_brand: string | null;
   item_thumb_url: string | null;
   item_is_provisional: boolean;
   quantity: number;
@@ -170,7 +171,7 @@ export async function listSelectionLines(selectionId: string): Promise<Selection
   const supabase = await createClient();
   const { data } = await supabase
     .from("selection_lines")
-    .select("*, items(name, code, thumb_url, is_provisional)")
+    .select("*, items(name, code, thumb_url, is_provisional, brands(name))")
     .eq("selection_id", selectionId)
     .order("sort_order")
     .order("created_at");
@@ -181,6 +182,7 @@ export async function listSelectionLines(selectionId: string): Promise<Selection
       code: string | null;
       thumb_url: string | null;
       is_provisional: boolean;
+      brands: { name: string } | null;
     } | null;
     return {
       id: line.id,
@@ -189,6 +191,7 @@ export async function listSelectionLines(selectionId: string): Promise<Selection
       item_id: line.item_id,
       item_name: item?.name ?? "(deleted item)",
       item_code: item?.code ?? null,
+      item_brand: item?.brands?.name ?? null,
       item_thumb_url: item?.thumb_url ?? null,
       item_is_provisional: item?.is_provisional ?? false,
       quantity: Number(line.quantity),
