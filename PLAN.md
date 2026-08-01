@@ -128,6 +128,22 @@ appear in Selections or on a client-facing document.
 
 ## Next up
 
+### First: load the founder's master data (before Indents)
+
+Agreed 2026-08-01: the founder will supply lists to load into Masters —
+clients, plots, units, and whatever else is ready (spreadsheet/CSV
+preferred, one per master). Do it the way `scripts/import-catalogue.ts`
+did: a re-runnable script, dry-run by default, skip rows already
+present, verify counts and spot-checks after. Things to watch:
+
+- Plots and units need their project named per row, and
+  `unique (project_id, name)` (migration `0017`) will refuse duplicates
+  within a project — clean the list rather than the constraint.
+- Status value lists (`planning/active/completed`,
+  `available/reserved/sold`) are still my defaults, never confirmed —
+  ask whether they match how Goodearth actually talks before importing.
+- Source files go in `data/` (git-ignored, like the catalogue CSVs).
+
 ### Phase 5 — Indents (branch `feature/indents`)
 
 Turning an approved budget into requests for the commercials team, who
