@@ -1,5 +1,6 @@
 import "server-only";
 
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 
 export type ItemRequestStatus = "pending" | "approved" | "merged" | "rejected";
@@ -39,14 +40,21 @@ export async function listItemRequests(
   if (requests.length === 0) return [];
 
   // How widely each provisional item is already used — the thing that
-  // makes a merge consequential rather than housekeeping.
-  const { data: lines } = await supabase
-    .from("selection_lines")
-    .select("item_id")
-    .in(
-      "item_id",
-      requests.map((request) => request.provisional_item_id),
-    );
+  // makes a merge consequential rather than housekeeping. Read to
+  // completion: a count derived from a capped read would report a
+  // heavily-used item as barely used, and it could be merged on that
+  // basis.
+  const { data: lines } = await fetchAll((from, to) =>
+    supabase
+      .from("selection_lines")
+      .select("item_id")
+      .in(
+        "item_id",
+        requests.map((request) => request.provisional_item_id),
+      )
+      .order("id")
+      .range(from, to),
+  );
 
   const usage = new Map<string, number>();
   for (const line of lines ?? []) usage.set(line.item_id, (usage.get(line.item_id) ?? 0) + 1);
