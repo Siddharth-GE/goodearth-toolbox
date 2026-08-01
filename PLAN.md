@@ -25,13 +25,13 @@ AppSheet replacement.
 |                     |                                                                             |
 | ------------------- | --------------------------------------------------------------------------- |
 | Last worked         | 2026-08-01                                                                  |
-| Branch              | everything merged to `master`, live on Vercel. Next: `feature/indents`      |
-| Migrations applied  | `0001`–`0014` (next new one is `0015`)                                      |
+| Branch              | `feature/stage-3-foundations` — audit stages 3–5, awaiting gate             |
+| Migrations applied  | `0001`–`0016` (next new one is `0017`)                                      |
 | Items in database   | **2,633** (2,631 imported catalogue + 2 material seeds)                     |
 | Categories / brands | 14 / 21                                                                     |
 | Thumbnails          | **897** in Supabase Storage; 3 dead vendor links, 1,733 items have no image |
 | Built tools         | Marathon, Settings, Masters, Selections, Budgets                            |
-| Tests               | `npm test` — 17, covering `lib/budgets/` pricing and carry-forward          |
+| Tests               | `npm test` — 25, covering pricing, carry-forward and formatting             |
 
 ---
 
@@ -295,7 +295,26 @@ commit so it never hides a real change.
 > It works on Windows and on CI's bash today. If tests ever appear not to
 > run, check that before assuming they pass.
 
-### Stage 3 — shared foundations ⬜ (biggest win for a new maintainer)
+### Stage 3 — shared foundations ✅ shipped
+
+What was done: **`lib/format.ts`** is now the single answer for money,
+quantities, percentages and dates, on screens and in PDFs alike (with its
+own tests). Four missing primitives added — `Textarea`, `Pagination`,
+`IconButton`, `FormMessage` — each of which was being hand-rolled two to
+four times. **`RecordFormDialog`** replaced the seven near-identical
+Masters dialogs. Two hooks, **`useDebouncedSearch`** and
+**`useSaveOnBlur`**, replaced three copies each; the save hook makes the
+retry bug that Stage 1 fixed structurally impossible rather than fixed in
+three places independently. `error.tsx` and `not-found.tsx` exist for the
+first time. Five dead modules deleted.
+
+**Two bugs found while doing it**, both invisible until looked for: the
+`npm test` glob was unquoted, so the shell expanded it and CI would have
+silently skipped any test file outside `lib/<dir>/`; and `disabled` had
+no visual effect on secondary or ghost buttons, so every disabled
+pagination control looked clickable.
+
+The original findings, for reference:
 
 Selections and Budgets currently solve the same problems three different
 ways each. Consolidate:
@@ -315,7 +334,7 @@ ways each. Consolidate:
   pages call `notFound()`. Selections and Marathon have no `loading.tsx`,
   which DESIGN.md requires.
 
-### Stage 4 — database patterns ⬜
+### Stage 4 — database patterns ✅ shipped (migration 0016)
 
 - `items` has no index on `is_active` or `name`, so every catalogue
   keystroke is a sequential scan and sort over 2,633 rows.
@@ -329,7 +348,7 @@ ways each. Consolidate:
   migration must be re-runnable, because they're applied by hand and a
   partial failure needs "run it again" to be a safe answer.
 
-### Stage 5 — maintainer handover ⬜
+### Stage 5 — maintainer handover ✅ shipped
 
 - CLAUDE.md still says Selections and Budgets aren't built, and describes
   Budgets as "budget vs actual per project".
