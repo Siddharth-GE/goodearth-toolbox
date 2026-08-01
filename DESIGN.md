@@ -17,20 +17,20 @@ Defined as CSS variables in `app/globals.css`, registered in
 handled there via `prefers-color-scheme` — never hardcode a hex value in
 a component.
 
-| Token | Meaning |
-|---|---|
-| `background` | Page canvas |
-| `surface` | Cards, inputs, anything sitting on the canvas |
-| `surface-raised` | One layer above `surface` — modals, popovers, dropdown panels |
-| `border` | Hairlines, card/input borders |
-| `foreground` | Primary text |
-| `muted` | Secondary text, captions, placeholders |
-| `accent` / `accent-foreground` | The one brand action color (green). Primary buttons, active states, links |
-| `success` / `warning` / `danger` / `info` (+ `-foreground`) | Fixed-meaning status colors — pills, inline messages, alerts |
+| Token                                                       | Meaning                                                                   |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `background`                                                | Page canvas                                                               |
+| `surface`                                                   | Cards, inputs, anything sitting on the canvas                             |
+| `surface-raised`                                            | One layer above `surface` — modals, popovers, dropdown panels             |
+| `border`                                                    | Hairlines, card/input borders                                             |
+| `foreground`                                                | Primary text                                                              |
+| `muted`                                                     | Secondary text, captions, placeholders                                    |
+| `accent` / `accent-foreground`                              | The one brand action color (green). Primary buttons, active states, links |
+| `success` / `warning` / `danger` / `info` (+ `-foreground`) | Fixed-meaning status colors — pills, inline messages, alerts              |
 
 `lib/color-hash.ts`'s 7-color palette (used for avatar initials and
 Marathon's category badges) is a separate, deliberate system — colors
-are picked *by hashing a name*, not by meaning, so it stays a plain JS
+are picked _by hashing a name_, not by meaning, so it stays a plain JS
 array rather than a token. Don't confuse it with the semantic colors
 above.
 
@@ -45,14 +45,14 @@ place to change rather than a silent exception to "colors are tokens."
 Geist Sans throughout (already loaded in the root layout). No new font.
 A named scale — use these combinations, not arbitrary sizes:
 
-| Purpose | Classes |
-|---|---|
-| Display (hero numbers, big greetings) | `text-4xl md:text-5xl font-extrabold tracking-tight` |
-| Page Title | `text-lg font-bold tracking-tight text-foreground` |
-| Section Label | `text-xs font-semibold uppercase tracking-widest text-muted` |
-| Body | `text-sm text-foreground` |
-| Body Muted | `text-sm text-muted` |
-| Caption | `text-xs text-muted` |
+| Purpose                               | Classes                                                      |
+| ------------------------------------- | ------------------------------------------------------------ |
+| Display (hero numbers, big greetings) | `text-4xl md:text-5xl font-extrabold tracking-tight`         |
+| Page Title                            | `text-lg font-bold tracking-tight text-foreground`           |
+| Section Label                         | `text-xs font-semibold uppercase tracking-widest text-muted` |
+| Body                                  | `text-sm text-foreground`                                    |
+| Body Muted                            | `text-sm text-muted`                                         |
+| Caption                               | `text-xs text-muted`                                         |
 
 ## Spacing & radius
 
@@ -121,10 +121,10 @@ Tailwind-styled wrappers around Radix UI's headless primitives
 (`@radix-ui/react-*`) — same visual language as everything else, but
 correct focus-trapping/ESC/ARIA behavior for free instead of hand-rolled.
 
-`Tabs` is for switching between content panels on the *same page* —
+`Tabs` is for switching between content panels on the _same page_ —
 no navigation, no URL change. It is **not** what Marathon's admin nav
 needs, since Entries/Members/Groups are separate routes, not panels of
-one page. For pill-style *route* navigation, use `NavTabs` (same file,
+one page. For pill-style _route_ navigation, use `NavTabs` (same file,
 same visual pill styling, built from `next/link` instead of Radix) —
 Marathon's admin nav is the reference implementation.
 

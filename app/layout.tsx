@@ -29,7 +29,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col" suppressHydrationWarning>
+      <body className="flex min-h-full flex-col" suppressHydrationWarning>
         {children}
         {/* Real-user page-load timings, reported to Vercel. Sits in the root
             layout so it covers the kiosk routes (app/marathon) too, not just

@@ -21,10 +21,10 @@ PDF) for the full 9-phase roadmap this is the foundation of.
       call them); write functions are gated by
       `requireApp(user, "/masters")`, following
       `lib/settings/actions.ts`'s pattern.
-- [x] 3. `components/masters/{project-picker,unit-picker,item-picker,
-      vendor-combobox}.tsx` — plain `<Select>`-based for now; upgrade to
-      a real searchable combobox in Phase 2 once the full catalogue
-      (~2,631 items) is imported.
+- [x] 3. Pickers in `components/masters/` — `project-picker`,
+      `unit-picker`, `item-picker`, `vendor-combobox` — plain
+      `<Select>`-based for now; upgrade to a real searchable combobox in
+      Phase 2 once the full catalogue (~2,631 items) is imported.
 - [x] 4. Masters screens: `NavTabs` across Projects / Plots / Units /
       Clients / Vendors / Stores / Items / Categories & Brands, each a
       plain table + `Dialog`-based create/edit form (Categories & Brands
@@ -54,7 +54,7 @@ PDF) for the full 9-phase roadmap this is the foundation of.
   Auto-numbering stays deferred, and the real catalogue changed what it
   should look like: Goodearth's actual codes are a **4-letter sub-type
   prefix + 3-digit sequence** (`BENS001` bench, `SOFS…` sofa, `HANL…`
-  hanging light, `DINT…` dining table), which is *finer than category* —
+  hanging light, `DINT…` dining table), which is _finer than category_ —
   the single "Seating" category spans `BENS`/`CHAS`/`ARMS`/`SOFS`. So a
   `code_prefix` column on `item_categories` would NOT reproduce this;
   whenever auto-numbering is built it needs its own sub-type lookup, and
@@ -70,7 +70,7 @@ PDF) for the full 9-phase roadmap this is the foundation of.
   (`Sofas`/`Dining Tables`/`Lighting`) would otherwise sit beside the
   real `Seating`/`Tables`/`Lighting & Electrical Fixtures`.
 - Only **900 of the 2,631 items carry an image URL**, all on other
-  companies' Shopify CDNs. Decided architecture: copy *thumbnails* into
+  companies' Shopify CDNs. Decided architecture: copy _thumbnails_ into
   Supabase Storage (~14 MB, ours, can't rot) and leave full images
   pointing at the source (~360 MB not worth storing for a rarely-opened
   detail view); items with no image get a `lib/color-hash.ts` placeholder

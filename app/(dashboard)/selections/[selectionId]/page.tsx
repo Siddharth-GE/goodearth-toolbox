@@ -55,20 +55,22 @@ export default async function SelectionEditorPage({
   // Land on the requested space, else the first one. A stale ?space from a
   // bookmark (or a space just deleted) falls back rather than 404s.
   const activeSpace = spaces.find((s) => s.id === space) ?? spaces[0] ?? null;
-  const activeLines = activeSpace ? lines.filter((line) => line.unit_space_id === activeSpace.id) : [];
+  const activeLines = activeSpace
+    ? lines.filter((line) => line.unit_space_id === activeSpace.id)
+    : [];
   const isDraft = selection.status === "draft";
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <Link href="/selections" className="text-xs font-medium text-muted hover:text-foreground">
+          <Link href="/selections" className="text-muted hover:text-foreground text-xs font-medium">
             ← All units
           </Link>
-          <h1 className="mt-1 text-lg font-bold tracking-tight text-foreground">
+          <h1 className="text-foreground mt-1 text-lg font-bold tracking-tight">
             {selection.unit_name} · R{selection.revision_no}
           </h1>
-          <p className="text-sm text-muted">
+          <p className="text-muted text-sm">
             {selection.project_name} · {lines.length} {lines.length === 1 ? "item" : "items"} across{" "}
             {spaces.length} {spaces.length === 1 ? "space" : "spaces"}
           </p>
@@ -135,19 +137,22 @@ export default async function SelectionEditorPage({
       </div>
 
       {!isDraft && (
-        <div className="rounded-xl border border-border bg-surface px-4 py-3">
-          <p className="text-sm text-foreground">
+        <div className="border-border bg-surface rounded-xl border px-4 py-3">
+          <p className="text-foreground text-sm">
             {selection.status === "issued"
               ? "Issued to budgeting — this revision can no longer be changed."
               : `Superseded by a later revision. Kept as the record of what R${selection.revision_no} said.`}
             {selection.issued_at && (
-              <span className="text-muted"> {new Date(selection.issued_at).toLocaleDateString("en-IN")}</span>
+              <span className="text-muted">
+                {" "}
+                {new Date(selection.issued_at).toLocaleDateString("en-IN")}
+              </span>
             )}
           </p>
-          {selection.notes && <p className="mt-1 text-sm text-muted">“{selection.notes}”</p>}
+          {selection.notes && <p className="text-muted mt-1 text-sm">“{selection.notes}”</p>}
           {/* Says plainly what the budget team was handed, so a designer
               can answer "what did they get?" without leaving the screen. */}
-          <p className="mt-2 text-xs text-muted">
+          <p className="text-muted mt-2 text-xs">
             Budgeting received {lines.length} {lines.length === 1 ? "line" : "lines"}
             {diff && previous
               ? ` — ${diff.added} added, ${diff.removed} removed and ${diff.changed} changed since R${previous.revision_no}; ${diff.unchanged} kept existing pricing.`
@@ -155,7 +160,10 @@ export default async function SelectionEditorPage({
             {previous && (
               <>
                 {" "}
-                <Link href={`/selections/${selectionId}/diff`} className="font-medium text-accent hover:underline">
+                <Link
+                  href={`/selections/${selectionId}/diff`}
+                  className="text-accent font-medium hover:underline"
+                >
                   See what changed
                 </Link>
               </>
@@ -199,7 +207,9 @@ export default async function SelectionEditorPage({
                   ].join(" ")}
                 >
                   <span className="min-w-0 truncate">{s.label}</span>
-                  <span className={active ? "text-accent-foreground/70 text-xs" : "text-muted text-xs"}>
+                  <span
+                    className={active ? "text-accent-foreground/70 text-xs" : "text-muted text-xs"}
+                  >
                     {s.line_count}
                   </span>
                 </Link>
@@ -212,8 +222,8 @@ export default async function SelectionEditorPage({
               <>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <h2 className="text-sm font-semibold text-foreground">{activeSpace.label}</h2>
-                    <p className="text-xs text-muted">{activeSpace.space_type_name}</p>
+                    <h2 className="text-foreground text-sm font-semibold">{activeSpace.label}</h2>
+                    <p className="text-muted text-xs">{activeSpace.space_type_name}</p>
                   </div>
                   {isDraft && (
                     <CataloguePicker

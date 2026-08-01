@@ -44,17 +44,28 @@ export function ClientFormDialog({ client }: { client?: ClientRow }) {
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="mobile">Mobile</Label>
-            <Input id="mobile" name="mobile" defaultValue={client?.mobile ?? ""} autoComplete="off" />
+            <Input
+              id="mobile"
+              name="mobile"
+              defaultValue={client?.mobile ?? ""}
+              autoComplete="off"
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" name="email" type="email" defaultValue={client?.email ?? ""} autoComplete="off" />
+            <Input
+              id="email"
+              name="email"
+              type="email"
+              defaultValue={client?.email ?? ""}
+              autoComplete="off"
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="notes">Notes</Label>
             <Input id="notes" name="notes" defaultValue={client?.notes ?? ""} autoComplete="off" />
           </div>
-          {state?.error && <p className="text-sm font-medium text-danger">{state.error}</p>}
+          {state?.error && <p className="text-danger text-sm font-medium">{state.error}</p>}
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="secondary">

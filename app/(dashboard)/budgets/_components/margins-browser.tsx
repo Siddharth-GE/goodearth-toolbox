@@ -3,7 +3,14 @@
 import { ItemThumb } from "@/components/masters/item-thumb";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+} from "@/components/ui/table";
 import { setItemMargin } from "@/lib/budgets/actions";
 import type { CatalogueSearchResult } from "@/lib/selections/catalogue";
 import { formatMoney } from "@/lib/budgets/math";
@@ -33,7 +40,11 @@ export function MarginsBrowser({
   const [brandId, setBrandId] = useState("");
   const [page, setPage] = useState(1);
 
-  const [result, setResult] = useState<CatalogueSearchResult>({ items: [], total: 0, pageCount: 1 });
+  const [result, setResult] = useState<CatalogueSearchResult>({
+    items: [],
+    total: 0,
+    pageCount: 1,
+  });
   const [loading, setLoading] = useState(false);
   const [margins, setMargins] = useState<Record<string, number>>(initialMargins);
 
@@ -71,7 +82,7 @@ export function MarginsBrowser({
     <div className="space-y-3">
       <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
         <div className="relative">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
+          <Search className="text-muted pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2" />
           <Input
             value={search}
             onChange={(event) => applyFilter(() => setSearch(event.target.value))}
@@ -106,7 +117,7 @@ export function MarginsBrowser({
         </Select>
       </div>
 
-      <div className="flex items-center justify-between text-xs text-muted">
+      <div className="text-muted flex items-center justify-between text-xs">
         <span>
           {loading ? (
             <span className="inline-flex items-center gap-1.5">
@@ -122,7 +133,7 @@ export function MarginsBrowser({
               type="button"
               disabled={page <= 1}
               onClick={() => setPage((current) => current - 1)}
-              className="font-medium text-accent disabled:opacity-40"
+              className="text-accent font-medium disabled:opacity-40"
             >
               Previous
             </button>
@@ -133,7 +144,7 @@ export function MarginsBrowser({
               type="button"
               disabled={page >= result.pageCount}
               onClick={() => setPage((current) => current + 1)}
-              className="font-medium text-accent disabled:opacity-40"
+              className="text-accent font-medium disabled:opacity-40"
             >
               Next
             </button>
@@ -228,14 +239,14 @@ function MarginRow({
       </TableCell>
       <TableCell>
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="font-medium text-foreground">{item.name}</span>
-          {saved && <span className="text-xs text-success">Saved</span>}
+          <span className="text-foreground font-medium">{item.name}</span>
+          {saved && <span className="text-success text-xs">Saved</span>}
         </div>
-        <div className="text-xs text-muted">
+        <div className="text-muted text-xs">
           {item.brand_name ? `${item.brand_name} · ` : ""}
           {item.code ?? "—"}
         </div>
-        {error && <p className="mt-1 text-xs font-medium text-danger">{error}</p>}
+        {error && <p className="text-danger mt-1 text-xs font-medium">{error}</p>}
       </TableCell>
       <TableCell className="text-muted">{formatMoney(item.indicative_price)}</TableCell>
       <TableCell>

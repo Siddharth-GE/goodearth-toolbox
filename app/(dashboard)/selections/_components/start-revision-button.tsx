@@ -25,7 +25,7 @@ export function StartRevisionButton({ unitId }: { unitId: string }) {
       >
         {pending ? "Starting…" : "Start R0"}
       </Button>
-      {error && <p className="text-xs font-medium text-danger">{error}</p>}
+      {error && <p className="text-danger text-xs font-medium">{error}</p>}
     </div>
   );
 }

@@ -57,13 +57,18 @@ export function StoreFormDialog({ projects, store }: { projects: ProjectRow[]; s
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="location">Location</Label>
-            <Input id="location" name="location" defaultValue={store?.location ?? ""} autoComplete="off" />
+            <Input
+              id="location"
+              name="location"
+              defaultValue={store?.location ?? ""}
+              autoComplete="off"
+            />
           </div>
-          <label className="flex items-center gap-2 text-sm text-foreground">
+          <label className="text-foreground flex items-center gap-2 text-sm">
             <Checkbox name="is_active" value="1" defaultChecked={store?.is_active ?? true} />
             Active
           </label>
-          {state?.error && <p className="text-sm font-medium text-danger">{state.error}</p>}
+          {state?.error && <p className="text-danger text-sm font-medium">{state.error}</p>}
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="secondary">

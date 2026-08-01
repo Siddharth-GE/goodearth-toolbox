@@ -663,6 +663,27 @@ export type Database = {
         }
         Relationships: []
       }
+      marathon_pin_attempts: {
+        Row: {
+          failed_count: number
+          locked_until: string | null
+          target: string
+          window_started_at: string
+        }
+        Insert: {
+          failed_count?: number
+          locked_until?: string | null
+          target: string
+          window_started_at?: string
+        }
+        Update: {
+          failed_count?: number
+          locked_until?: string | null
+          target?: string
+          window_started_at?: string
+        }
+        Relationships: []
+      }
       marathon_runs: {
         Row: {
           distance_km: number | null

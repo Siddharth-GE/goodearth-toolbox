@@ -6,8 +6,7 @@ type Variant = "primary" | "secondary" | "ghost";
 type Size = "md" | "lg";
 
 const variantClasses: Record<Variant, string> = {
-  primary:
-    "bg-accent text-accent-foreground hover:opacity-90 disabled:opacity-50",
+  primary: "bg-accent text-accent-foreground hover:opacity-90 disabled:opacity-50",
   secondary:
     "bg-surface text-foreground border border-border hover:bg-black/[0.03] dark:hover:bg-white/[0.04]",
   ghost: "text-foreground hover:bg-black/[0.04] dark:hover:bg-white/[0.06]",
@@ -26,12 +25,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: Size;
 }
 
-export function Button({
-  className,
-  variant = "primary",
-  size = "md",
-  ...props
-}: ButtonProps) {
+export function Button({ className, variant = "primary", size = "md", ...props }: ButtonProps) {
   return (
     <button
       className={cn(base, variantClasses[variant], sizeClasses[size], className)}

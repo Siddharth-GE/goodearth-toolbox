@@ -24,10 +24,10 @@ export function PinPad({
         maxLength={6}
         autoFocus
         placeholder="••••"
-        className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-center text-2xl font-bold tracking-[0.5em] text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+        className="border-border bg-surface text-foreground focus:ring-accent w-full rounded-2xl border px-4 py-3 text-center text-2xl font-bold tracking-[0.5em] focus:ring-2 focus:outline-none"
       />
       <p
-        className={`mt-3 min-h-[1.25rem] text-sm font-medium text-danger transition-opacity ${state?.error ? "opacity-100" : "opacity-0"}`}
+        className={`text-danger mt-3 min-h-[1.25rem] text-sm font-medium transition-opacity ${state?.error ? "opacity-100" : "opacity-0"}`}
       >
         {state?.error ?? " "}
       </p>

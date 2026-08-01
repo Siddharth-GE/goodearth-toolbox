@@ -38,7 +38,12 @@ const styles = StyleSheet.create({
   wordmark: { fontFamily: pdf.fontBold, fontSize: pdf.size.title, letterSpacing: 1.5 },
   wordmarkRule: { color: pdf.color.accent },
   companyLine: { fontSize: pdf.size.tiny, color: pdf.color.muted, marginTop: 2 },
-  docType: { fontFamily: pdf.fontBold, fontSize: pdf.size.small, letterSpacing: 1.2, textAlign: "right" },
+  docType: {
+    fontFamily: pdf.fontBold,
+    fontSize: pdf.size.small,
+    letterSpacing: 1.2,
+    textAlign: "right",
+  },
   docRef: { fontSize: pdf.size.tiny, color: pdf.color.muted, textAlign: "right", marginTop: 2 },
 
   footer: {

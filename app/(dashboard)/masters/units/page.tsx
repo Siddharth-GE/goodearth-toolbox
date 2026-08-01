@@ -1,6 +1,13 @@
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+} from "@/components/ui/table";
 import { listClients } from "@/lib/masters/clients";
 import { listPlots } from "@/lib/masters/plots";
 import { listProjects } from "@/lib/masters/projects";
@@ -22,7 +29,8 @@ export default async function UnitsPage() {
     listClients(),
   ]);
   const projectName = (id: string) => projects.find((p) => p.id === id)?.name ?? "—";
-  const clientName = (id: string | null) => (id ? clients.find((c) => c.id === id)?.name ?? "—" : "—");
+  const clientName = (id: string | null) =>
+    id ? (clients.find((c) => c.id === id)?.name ?? "—") : "—";
 
   return (
     <div className="space-y-4">
@@ -31,7 +39,11 @@ export default async function UnitsPage() {
       </div>
 
       {units.length === 0 ? (
-        <EmptyState icon={Boxes} title="No units yet" description="Create the first unit under a project." />
+        <EmptyState
+          icon={Boxes}
+          title="No units yet"
+          description="Create the first unit under a project."
+        />
       ) : (
         <Table>
           <TableHead>
@@ -47,7 +59,7 @@ export default async function UnitsPage() {
           <TableBody>
             {units.map((unit) => (
               <TableRow key={unit.id}>
-                <TableCell className="font-medium text-foreground">{unit.name}</TableCell>
+                <TableCell className="text-foreground font-medium">{unit.name}</TableCell>
                 <TableCell>{projectName(unit.project_id)}</TableCell>
                 <TableCell className="capitalize">{unit.unit_type.replace(/_/g, " ")}</TableCell>
                 <TableCell>{clientName(unit.client_id)}</TableCell>

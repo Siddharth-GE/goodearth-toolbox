@@ -34,8 +34,8 @@ export default async function MarathonEntryPage({
 
       <div className="px-5 pt-5 pb-16">
         <div className="mb-5 flex items-center justify-between">
-          <p className="text-sm text-muted">Signed in as {agent?.name}</p>
-          <Link href="/marathon/list" className="text-sm font-medium text-accent">
+          <p className="text-muted text-sm">Signed in as {agent?.name}</p>
+          <Link href="/marathon/list" className="text-accent text-sm font-medium">
             My Entries
           </Link>
         </div>

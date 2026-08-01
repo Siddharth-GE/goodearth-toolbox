@@ -229,7 +229,10 @@ export async function listRevisions(unitId: string): Promise<SelectionRow[]> {
 }
 
 /** The revision this one replaced, if any. */
-export async function getPreviousIssued(unitId: string, revisionNo: number): Promise<SelectionRow | null> {
+export async function getPreviousIssued(
+  unitId: string,
+  revisionNo: number,
+): Promise<SelectionRow | null> {
   const user = await requireUser();
   await requireApp(user, "/selections");
 

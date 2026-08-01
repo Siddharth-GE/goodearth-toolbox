@@ -60,9 +60,12 @@ export async function GET(request: Request) {
 
   let query = supabase
     .from("items")
-    .select("id, code, name, thumb_url, indicative_price, default_uom, is_provisional, brands(name)", {
-      count: "exact",
-    })
+    .select(
+      "id, code, name, thumb_url, indicative_price, default_uom, is_provisional, brands(name)",
+      {
+        count: "exact",
+      },
+    )
     .eq("is_active", true)
     // Hundreds of items share a name ("Hanging Light"); without a unique
     // tiebreaker rows repeat across pages while others never appear.

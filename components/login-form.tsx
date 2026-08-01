@@ -25,7 +25,7 @@ export function LoginForm() {
           required
         />
       </div>
-      {state?.error && <p className="text-sm font-medium text-danger">{state.error}</p>}
+      {state?.error && <p className="text-danger text-sm font-medium">{state.error}</p>}
       <Button type="submit" disabled={pending} className="w-full">
         {pending ? "Signing in…" : "Sign in"}
       </Button>

@@ -29,15 +29,17 @@ export default async function DashboardHome() {
 
   return (
     <div>
-      <div className="mb-1 text-xs text-muted">
-        Toolbox <span className="mx-1 text-border">/</span> <span className="text-foreground">Overview</span>
+      <div className="text-muted mb-1 text-xs">
+        Toolbox <span className="text-border mx-1">/</span>{" "}
+        <span className="text-foreground">Overview</span>
       </div>
 
-      <div className="mb-6 mt-4">
-        <h1 className="text-4xl font-extrabold tracking-tight text-foreground md:text-5xl">
-          {greeting()}{firstName ? `, ${firstName}.` : "."}
+      <div className="mt-4 mb-6">
+        <h1 className="text-foreground text-4xl font-extrabold tracking-tight md:text-5xl">
+          {greeting()}
+          {firstName ? `, ${firstName}.` : "."}
         </h1>
-        <p className="mt-1 text-sm text-muted">{today}</p>
+        <p className="text-muted mt-1 text-sm">{today}</p>
       </div>
 
       <div className="space-y-5">
@@ -53,7 +55,7 @@ export default async function DashboardHome() {
             <PendingApprovals />
             <Suspense
               fallback={
-                <div className="flex h-[164px] items-center justify-center rounded-2xl bg-surface">
+                <div className="bg-surface flex h-[164px] items-center justify-center rounded-2xl">
                   <Spinner />
                 </div>
               }

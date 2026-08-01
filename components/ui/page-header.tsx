@@ -17,12 +17,12 @@ export function PageHeader({
   children?: ReactNode;
 }) {
   return (
-    <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background/95 px-5 py-4 backdrop-blur">
+    <div className="border-border bg-background/95 sticky top-0 z-10 flex items-center justify-between border-b px-5 py-4 backdrop-blur">
       <div>
         {children ?? (
           <>
-            {title && <h1 className="text-lg font-bold text-foreground">{title}</h1>}
-            {subtitle && <p className="text-xs text-muted">{subtitle}</p>}
+            {title && <h1 className="text-foreground text-lg font-bold">{title}</h1>}
+            {subtitle && <p className="text-muted text-xs">{subtitle}</p>}
           </>
         )}
       </div>

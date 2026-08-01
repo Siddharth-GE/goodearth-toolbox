@@ -7,7 +7,10 @@ import { revalidatePath } from "next/cache";
 
 export type BrandFormState = { error?: string } | undefined;
 
-export async function createBrand(_state: BrandFormState, formData: FormData): Promise<BrandFormState> {
+export async function createBrand(
+  _state: BrandFormState,
+  formData: FormData,
+): Promise<BrandFormState> {
   const user = await requireUser();
   await requireApp(user, "/masters");
 

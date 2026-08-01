@@ -9,7 +9,10 @@ export function Spinner({ className, ...props }: HTMLAttributes<HTMLDivElement>)
     <div
       role="status"
       aria-label="Loading"
-      className={cn("size-10 animate-spin rounded-full border-4 border-border border-t-accent", className)}
+      className={cn(
+        "border-border border-t-accent size-10 animate-spin rounded-full border-4",
+        className,
+      )}
       {...props}
     />
   );

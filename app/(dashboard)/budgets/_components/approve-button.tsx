@@ -41,11 +41,11 @@ export function ApproveButton({
         {pending ? "Approving…" : "Approve budget"}
       </Button>
       {blocked && lineCount > 0 && (
-        <p className="text-xs text-muted">
+        <p className="text-muted text-xs">
           {pendingCount} {pendingCount === 1 ? "line" : "lines"} still to price
         </p>
       )}
-      {error && <p className="text-xs font-medium text-danger">{error}</p>}
+      {error && <p className="text-danger text-xs font-medium">{error}</p>}
     </div>
   );
 }
@@ -68,7 +68,7 @@ export function ReopenButton({ budgetId }: { budgetId: string }) {
       >
         {pending ? "Re-opening…" : "Re-open for edits"}
       </Button>
-      {error && <p className="text-xs font-medium text-danger">{error}</p>}
+      {error && <p className="text-danger text-xs font-medium">{error}</p>}
     </div>
   );
 }

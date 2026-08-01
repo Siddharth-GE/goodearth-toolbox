@@ -4,7 +4,14 @@ import { ItemThumb } from "@/components/masters/item-thumb";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+} from "@/components/ui/table";
 import { removeLine, updateLine } from "@/lib/selections/actions";
 import type { SelectionLineRow } from "@/lib/selections/queries";
 import { PackageOpen, Trash2 } from "lucide-react";
@@ -109,19 +116,27 @@ function LineRow({
   return (
     <TableRow className={removing ? "opacity-50" : undefined}>
       <TableCell>
-        <ItemThumb code={line.item_code} name={line.item_name} thumbUrl={line.item_thumb_url} sizes="48px" className="w-10" />
+        <ItemThumb
+          code={line.item_code}
+          name={line.item_name}
+          thumbUrl={line.item_thumb_url}
+          sizes="48px"
+          className="w-10"
+        />
       </TableCell>
       <TableCell>
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="font-medium text-foreground">{line.item_name}</span>
+          <span className="text-foreground font-medium">{line.item_name}</span>
           {line.item_is_provisional && <Badge variant="warning">Provisional</Badge>}
         </div>
-        <div className="text-xs text-muted">
+        <div className="text-muted text-xs">
           {line.item_code ?? "—"}
           {/* The snapshot is shown, never editable: what it cost when it was
               specified is Budgets' input, not a designer's decision. */}
           {line.indicative_rate_snapshot != null && (
-            <span className="ml-2 opacity-60">indicative ₹{inr.format(line.indicative_rate_snapshot)}</span>
+            <span className="ml-2 opacity-60">
+              indicative ₹{inr.format(line.indicative_rate_snapshot)}
+            </span>
           )}
         </div>
       </TableCell>
@@ -143,7 +158,7 @@ function LineRow({
         ) : (
           inr.format(line.quantity)
         )}
-        {error && <p className="mt-1 text-xs font-medium text-danger">{error}</p>}
+        {error && <p className="text-danger mt-1 text-xs font-medium">{error}</p>}
       </TableCell>
       <TableCell className="text-muted">{line.uom}</TableCell>
       <TableCell>
@@ -168,7 +183,7 @@ function LineRow({
             // Dimming the row isn't enough on its own: the button stayed
             // clickable, so a double-click fired removeLine twice.
             disabled={removing}
-            className="rounded-lg p-1.5 text-muted transition-colors hover:bg-danger/10 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:pointer-events-none disabled:opacity-40"
+            className="text-muted hover:bg-danger/10 hover:text-danger focus-visible:ring-accent rounded-lg p-1.5 transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-40"
             onClick={() =>
               startTransition(async () => {
                 const result = await removeLine(selectionId, line.id);

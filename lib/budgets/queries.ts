@@ -59,15 +59,25 @@ export async function listInbox(): Promise<InboxRow[]> {
   const selectionIds = (selections ?? []).map((row) => row.id);
   if (selectionIds.length === 0) return [];
 
-  const [linesResult, budgetsResult] = await Promise.all([
-    supabase.from("selection_lines").select("selection_id").in("selection_id", selectionIds),
+  // One exact count per revision rather than fetching every line of every
+  // issued revision and tallying in JS. At ~200 lines a revision that hit
+  // PostgREST's 1000-row ceiling by the sixth one, after which every
+  // further revision reported "0 lines waiting" — an inbox quietly
+  // telling the budget team there was no work to do.
+  const [countResults, budgetsResult] = await Promise.all([
+    Promise.all(
+      selectionIds.map(async (selectionId) => {
+        const { count } = await supabase
+          .from("selection_lines")
+          .select("id", { count: "exact", head: true })
+          .eq("selection_id", selectionId);
+        return [selectionId, count ?? 0] as const;
+      }),
+    ),
     supabase.from("budgets").select("id, selection_id, status").in("selection_id", selectionIds),
   ]);
 
-  const lineCount = new Map<string, number>();
-  for (const line of linesResult.data ?? []) {
-    lineCount.set(line.selection_id, (lineCount.get(line.selection_id) ?? 0) + 1);
-  }
+  const lineCount = new Map(countResults);
 
   const budgetBySelection = new Map(
     (budgetsResult.data ?? []).map((budget) => [budget.selection_id, budget]),
@@ -75,18 +85,20 @@ export async function listInbox(): Promise<InboxRow[]> {
 
   // How much of each budget is done, so the inbox can show progress rather
   // than just "in progress". One query for every budget, not one each.
+  // Counted per budget, for the same reason as the line counts above.
   const budgetIds = (budgetsResult.data ?? []).map((budget) => budget.id);
-  const pricedCount = new Map<string, number>();
-  if (budgetIds.length > 0) {
-    const { data: budgetLines } = await supabase
-      .from("budget_lines")
-      .select("budget_id, budget_status")
-      .in("budget_id", budgetIds);
-    for (const line of budgetLines ?? []) {
-      if (line.budget_status !== "priced") continue;
-      pricedCount.set(line.budget_id, (pricedCount.get(line.budget_id) ?? 0) + 1);
-    }
-  }
+  const pricedCount = new Map(
+    await Promise.all(
+      budgetIds.map(async (budgetId) => {
+        const { count } = await supabase
+          .from("budget_lines")
+          .select("id", { count: "exact", head: true })
+          .eq("budget_id", budgetId)
+          .eq("budget_status", "priced");
+        return [budgetId, count ?? 0] as const;
+      }),
+    ),
+  );
 
   return (selections ?? []).map((selection) => {
     const unit = selection.units as { name: string; projects: { name: string } | null } | null;
@@ -198,7 +210,7 @@ export const getBudget = cache(async (budgetId: string): Promise<BudgetDetail | 
     units: { name: string; projects: { name: string } | null } | null;
   } | null;
 
-  const [linesResult, budgetLinesResult, spacesResult, marginsResult] = await Promise.all([
+  const [linesResult, budgetLinesResult, spacesResult] = await Promise.all([
     supabase
       .from("selection_lines")
       .select("*, items(name, code, thumb_url, brands(name))")
@@ -212,18 +224,26 @@ export const getBudget = cache(async (budgetId: string): Promise<BudgetDetail | 
       .eq("unit_id", budget.unit_id)
       .order("sort_order")
       .order("label"),
-    supabase.from("item_margins").select("item_id, margin_pct"),
   ]);
 
-  const budgetByKey = new Map(
-    (budgetLinesResult.data ?? []).map((line) => [line.line_key, line]),
-  );
+  const budgetByKey = new Map((budgetLinesResult.data ?? []).map((line) => [line.line_key, line]));
+
   // The product's default markup, shown on lines nobody has priced yet so
   // the field arrives filled in rather than blank. Saving the line copies
   // it onto the budget line, which is what makes a later change to the
   // default unable to re-price work already done.
+  //
+  // Scoped to the items actually on this budget. Reading the whole table
+  // would have meant that once margins were set on more than 1000 of the
+  // 2,633 catalogue items, some lines would silently arrive with a blank
+  // margin instead of the configured one — and a blank margin that gets
+  // saved is a line sold at cost.
+  const itemIds = [...new Set((linesResult.data ?? []).map((line) => line.item_id))];
+  const { data: margins } = itemIds.length
+    ? await supabase.from("item_margins").select("item_id, margin_pct").in("item_id", itemIds)
+    : { data: [] };
   const defaultMargin = new Map(
-    (marginsResult.data ?? []).map((row) => [row.item_id, Number(row.margin_pct)]),
+    (margins ?? []).map((row) => [row.item_id, Number(row.margin_pct)]),
   );
 
   const lines: BudgetLineRow[] = (linesResult.data ?? []).map((line) => {
@@ -254,13 +274,18 @@ export const getBudget = cache(async (budgetId: string): Promise<BudgetDetail | 
       // shows a sensible quantity and can be priced without editing it.
       quantity: priced ? Number(priced.quantity) : designerQuantity,
       expected_vendor_id: priced?.expected_vendor_id ?? null,
-      unit_cost: priced?.unit_cost === null || priced?.unit_cost === undefined ? null : Number(priced.unit_cost),
+      unit_cost:
+        priced?.unit_cost === null || priced?.unit_cost === undefined
+          ? null
+          : Number(priced.unit_cost),
       margin_pct:
         priced?.margin_pct === null || priced?.margin_pct === undefined
           ? (defaultMargin.get(line.item_id) ?? null)
           : Number(priced.margin_pct),
       client_rate:
-        priced?.client_rate === null || priced?.client_rate === undefined ? null : Number(priced.client_rate),
+        priced?.client_rate === null || priced?.client_rate === undefined
+          ? null
+          : Number(priced.client_rate),
       needs_review: priced?.needs_review ?? false,
       notes: priced?.notes ?? null,
       sort_order: line.sort_order,

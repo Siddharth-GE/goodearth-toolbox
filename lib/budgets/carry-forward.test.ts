@@ -10,7 +10,10 @@ import { test } from "node:test";
 
 import { planCarryForward, type PreviousBudgetLine } from "./carry-forward";
 
-const priced = (line_key: string, overrides: Partial<PreviousBudgetLine> = {}): PreviousBudgetLine => ({
+const priced = (
+  line_key: string,
+  overrides: Partial<PreviousBudgetLine> = {},
+): PreviousBudgetLine => ({
   line_key,
   quantity: 10,
   expected_vendor_id: "vendor-1",
@@ -110,7 +113,9 @@ test("the realistic case: 200 lines, two of them touched", () => {
     line_key: `line-${index}`,
     quantity: 5,
   }));
-  const previousBudgetLines = previousSelectionLines.map((line) => priced(line.line_key, { quantity: 5 }));
+  const previousBudgetLines = previousSelectionLines.map((line) =>
+    priced(line.line_key, { quantity: 5 }),
+  );
 
   const currentSelectionLines = [
     ...previousSelectionLines.slice(0, 199),
@@ -119,7 +124,11 @@ test("the realistic case: 200 lines, two of them touched", () => {
     { line_key: "brand-new", quantity: 1 },
   ];
 
-  const plan = planCarryForward({ previousBudgetLines, previousSelectionLines, currentSelectionLines });
+  const plan = planCarryForward({
+    previousBudgetLines,
+    previousSelectionLines,
+    currentSelectionLines,
+  });
 
   assert.equal(plan.carried, 199);
   assert.equal(plan.needsReview, 1);

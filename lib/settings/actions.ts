@@ -6,16 +6,26 @@ import { createClient } from "@/lib/supabase/server";
 import { GRANTABLE_TOOLS } from "@/lib/tools";
 import { revalidatePath } from "next/cache";
 
-function assertGrantable(app: string) {
-  if (!GRANTABLE_TOOLS.some((tool) => tool.href === app)) {
-    throw new Error(`"${app}" is not a grantable app.`);
-  }
+/**
+ * Same shape every other tool's actions return.
+ *
+ * These used to throw instead. A thrown Server Action escapes to the
+ * error boundary rather than coming back to the caller, and the caller
+ * here is a checkbox — so a failed permission change left the box
+ * visually ticked while nothing had been granted. An admin would have
+ * had no way to know, and the person they thought they'd given access to
+ * would simply not have it.
+ */
+export type ActionState = { error?: string } | undefined;
+
+function isGrantable(app: string) {
+  return GRANTABLE_TOOLS.some((tool) => tool.href === app);
 }
 
-export async function grantApp(userId: string, app: string) {
+export async function grantApp(userId: string, app: string): Promise<ActionState> {
   const user = await requireUser();
   await requireAdmin(user);
-  assertGrantable(app);
+  if (!isGrantable(app)) return { error: `"${app}" is not an app that can be granted.` };
 
   const supabase = await createClient();
   const { error } = await supabase.from("user_apps").insert({ user_id: userId, app });
@@ -23,13 +33,14 @@ export async function grantApp(userId: string, app: string) {
   // a harmless no-op from the admin's point of view.
   if (error && error.code !== "23505") {
     console.error("grantApp failed:", error);
-    throw new Error("Could not grant access. Try again.");
+    return { error: "Could not grant access. Try again." };
   }
 
   revalidatePath("/settings");
+  return undefined;
 }
 
-export async function revokeApp(userId: string, app: string) {
+export async function revokeApp(userId: string, app: string): Promise<ActionState> {
   const user = await requireUser();
   await requireAdmin(user);
 
@@ -37,8 +48,9 @@ export async function revokeApp(userId: string, app: string) {
   const { error } = await supabase.from("user_apps").delete().eq("user_id", userId).eq("app", app);
   if (error) {
     console.error("revokeApp failed:", error);
-    throw new Error("Could not revoke access. Try again.");
+    return { error: "Could not revoke access. Try again." };
   }
 
   revalidatePath("/settings");
+  return undefined;
 }

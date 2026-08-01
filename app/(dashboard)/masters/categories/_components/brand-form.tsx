@@ -27,7 +27,7 @@ export function BrandForm() {
           {pending ? "Adding…" : "Add"}
         </Button>
       </div>
-      {state?.error && <p className="text-sm font-medium text-danger">{state.error}</p>}
+      {state?.error && <p className="text-danger text-sm font-medium">{state.error}</p>}
     </form>
   );
 }

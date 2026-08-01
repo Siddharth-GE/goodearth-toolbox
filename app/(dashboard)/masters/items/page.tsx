@@ -4,7 +4,14 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+} from "@/components/ui/table";
 import { listBrands } from "@/lib/masters/brands";
 import { listItemCategories } from "@/lib/masters/item-categories";
 import { listItems, type ItemKind } from "@/lib/masters/items";
@@ -33,7 +40,8 @@ export default async function ItemsPage({
   const { items, total, page: currentPage, pageSize, pageCount } = result;
 
   const categoryName = (id: string) => categories.find((c) => c.id === id)?.name ?? "—";
-  const brandName = (id: string | null) => (id ? brands.find((b) => b.id === id)?.name ?? "—" : "—");
+  const brandName = (id: string | null) =>
+    id ? (brands.find((b) => b.id === id)?.name ?? "—") : "—";
 
   // Carries the active filters onto the pager links, so paging never
   // silently drops the search you're in the middle of.
@@ -58,7 +66,13 @@ export default async function ItemsPage({
         <form action="/masters/items" className="flex flex-wrap items-end gap-2">
           <div className="space-y-1.5">
             <Label htmlFor="q">Search</Label>
-            <Input id="q" name="q" defaultValue={q ?? ""} placeholder="Search name or code…" autoComplete="off" />
+            <Input
+              id="q"
+              name="q"
+              defaultValue={q ?? ""}
+              placeholder="Search name or code…"
+              autoComplete="off"
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="kind">Kind</Label>
@@ -92,7 +106,11 @@ export default async function ItemsPage({
       </div>
 
       {items.length === 0 ? (
-        <EmptyState icon={Package} title="No items found" description="Try a different search, or add a new item." />
+        <EmptyState
+          icon={Package}
+          title="No items found"
+          description="Try a different search, or add a new item."
+        />
       ) : (
         <>
           <Table>
@@ -111,15 +129,20 @@ export default async function ItemsPage({
               {items.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell className="text-muted">{item.code ?? "—"}</TableCell>
-                  <TableCell className="font-medium text-foreground">{item.name}</TableCell>
+                  <TableCell className="text-foreground font-medium">{item.name}</TableCell>
                   <TableCell>
-                    <Badge variant={item.kind === "catalogue" ? "info" : "default"} className="capitalize">
+                    <Badge
+                      variant={item.kind === "catalogue" ? "info" : "default"}
+                      className="capitalize"
+                    >
                       {item.kind}
                     </Badge>
                   </TableCell>
                   <TableCell>{categoryName(item.category_id)}</TableCell>
                   <TableCell>{brandName(item.brand_id)}</TableCell>
-                  <TableCell>{item.indicative_price != null ? inr.format(item.indicative_price) : "—"}</TableCell>
+                  <TableCell>
+                    {item.indicative_price != null ? inr.format(item.indicative_price) : "—"}
+                  </TableCell>
                   <TableCell>
                     <ItemFormDialog categories={categories} brands={brands} item={item} />
                   </TableCell>
@@ -129,7 +152,7 @@ export default async function ItemsPage({
           </Table>
 
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-muted">
+            <p className="text-muted text-sm">
               Showing {inr.format(firstOnPage)}–{inr.format(lastOnPage)} of {inr.format(total)}
             </p>
             {pageCount > 1 && (
@@ -143,7 +166,7 @@ export default async function ItemsPage({
                     Previous
                   </Button>
                 )}
-                <span className="text-sm text-muted tabular-nums">
+                <span className="text-muted text-sm tabular-nums">
                   Page {currentPage} of {pageCount}
                 </span>
                 {currentPage < pageCount ? (

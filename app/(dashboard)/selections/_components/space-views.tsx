@@ -43,7 +43,13 @@ async function normaliseForUpload(file: File): Promise<Blob> {
     const scale = Math.min(canvas.width / bitmap.width, canvas.height / bitmap.height);
     const width = bitmap.width * scale;
     const height = bitmap.height * scale;
-    context.drawImage(bitmap, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height);
+    context.drawImage(
+      bitmap,
+      (canvas.width - width) / 2,
+      (canvas.height - height) / 2,
+      width,
+      height,
+    );
 
     const blob = await new Promise<Blob | null>((resolve) =>
       canvas.toBlob(resolve, designView.contentType, designView.quality / 100),
@@ -111,7 +117,7 @@ export function SpaceViews({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-widest text-muted">
+        <p className="text-muted text-xs font-semibold tracking-widest uppercase">
           Views {views.length > 0 && `(${views.length})`}
         </p>
         {editable && (
@@ -129,20 +135,24 @@ export function SpaceViews({
               disabled={uploading}
               onClick={() => inputRef.current?.click()}
             >
-              {uploading ? <Spinner className="size-4 border-2" /> : <ImagePlus className="size-4" />}
+              {uploading ? (
+                <Spinner className="size-4 border-2" />
+              ) : (
+                <ImagePlus className="size-4" />
+              )}
               {uploading ? "Uploading…" : "Add views"}
             </Button>
           </>
         )}
       </div>
 
-      {error && <p className="text-xs font-medium text-danger">{error}</p>}
+      {error && <p className="text-danger text-xs font-medium">{error}</p>}
 
       {views.length === 0 ? (
         editable && (
-          <p className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted">
-            Renders and elevations for this space. They appear on the client&apos;s document, and are
-            cropped to a consistent landscape shape so every page reads the same.
+          <p className="border-border text-muted rounded-xl border border-dashed px-4 py-6 text-center text-sm">
+            Renders and elevations for this space. They appear on the client&apos;s document, and
+            are cropped to a consistent landscape shape so every page reads the same.
           </p>
         )
       ) : (
@@ -188,7 +198,7 @@ function ViewCard({
 
   return (
     <figure className={busy ? "opacity-50" : undefined}>
-      <div className="overflow-hidden rounded-xl border border-border bg-surface">
+      <div className="border-border bg-surface overflow-hidden rounded-xl border">
         {/* Plain <img>: the route handler is same-origin and already
             returns a normalised 16:9 JPEG, so there is nothing for
             next/image to optimise. */}
@@ -214,7 +224,9 @@ function ViewCard({
           <IconButton
             label="Move earlier"
             disabled={isFirst || busy}
-            onClick={() => startTransition(async () => void (await moveSpaceView(view.id, selectionId, "up")))}
+            onClick={() =>
+              startTransition(async () => void (await moveSpaceView(view.id, selectionId, "up")))
+            }
           >
             <ChevronLeft className="size-3.5" />
           </IconButton>
@@ -231,13 +243,17 @@ function ViewCard({
             label="Remove this view"
             disabled={busy}
             danger
-            onClick={() => startTransition(async () => void (await deleteSpaceView(view.id, selectionId)))}
+            onClick={() =>
+              startTransition(async () => void (await deleteSpaceView(view.id, selectionId)))
+            }
           >
             <Trash2 className="size-3.5" />
           </IconButton>
         </div>
       ) : (
-        view.caption && <figcaption className="mt-1.5 text-xs text-muted">{view.caption}</figcaption>
+        view.caption && (
+          <figcaption className="text-muted mt-1.5 text-xs">{view.caption}</figcaption>
+        )
       )}
     </figure>
   );
@@ -264,7 +280,7 @@ function IconButton({
       onClick={onClick}
       disabled={disabled}
       className={[
-        "flex size-8 shrink-0 items-center justify-center rounded-lg border border-border transition-colors disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+        "border-border focus-visible:ring-accent flex size-8 shrink-0 items-center justify-center rounded-lg border transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:opacity-30",
         danger
           ? "text-muted hover:bg-danger/10 hover:text-danger"
           : "text-foreground hover:bg-black/[0.04] dark:hover:bg-white/[0.06]",

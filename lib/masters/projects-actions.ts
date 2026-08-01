@@ -20,7 +20,10 @@ function readProjectForm(formData: FormData) {
   };
 }
 
-export async function createProject(_state: ProjectFormState, formData: FormData): Promise<ProjectFormState> {
+export async function createProject(
+  _state: ProjectFormState,
+  formData: FormData,
+): Promise<ProjectFormState> {
   const user = await requireUser();
   await requireApp(user, "/masters");
 
@@ -30,7 +33,9 @@ export async function createProject(_state: ProjectFormState, formData: FormData
   if (!PROJECT_STATUSES.includes(status)) return { error: "Choose a status." };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("projects").insert({ name, location, project_type, status });
+  const { error } = await supabase
+    .from("projects")
+    .insert({ name, location, project_type, status });
   if (error) {
     console.error("createProject failed:", error);
     return { error: "Could not create project. Try again." };
@@ -54,7 +59,10 @@ export async function updateProject(
   if (!PROJECT_STATUSES.includes(status)) return { error: "Choose a status." };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("projects").update({ name, location, project_type, status }).eq("id", id);
+  const { error } = await supabase
+    .from("projects")
+    .update({ name, location, project_type, status })
+    .eq("id", id);
   if (error) {
     console.error("updateProject failed:", error);
     return { error: "Could not update project. Try again." };

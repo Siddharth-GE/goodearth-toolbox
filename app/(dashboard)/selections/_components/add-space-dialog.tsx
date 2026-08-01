@@ -1,7 +1,13 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { addSpaces } from "@/lib/selections/actions";
 import { Minus, Plus } from "lucide-react";
@@ -124,7 +130,7 @@ export function AddSpaceDialog({
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
           <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-muted">
+            <p className="text-muted mb-2 text-xs font-semibold tracking-widest uppercase">
               How many of each
             </p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -144,7 +150,7 @@ export function AddSpaceDialog({
                       className="min-w-0 flex-1 text-left focus-visible:outline-none"
                       aria-label={`Add one ${type.name}`}
                     >
-                      <span className="block truncate text-sm text-foreground">{type.name}</span>
+                      <span className="text-foreground block truncate text-sm">{type.name}</span>
                     </button>
                     <div className="flex shrink-0 items-center gap-1">
                       <StepButton
@@ -175,7 +181,7 @@ export function AddSpaceDialog({
 
           {total > 0 && (
             <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-muted">
+              <p className="text-muted mb-2 text-xs font-semibold tracking-widest uppercase">
                 Names — edit any of these
               </p>
               <div className="space-y-2">
@@ -195,12 +201,14 @@ export function AddSpaceDialog({
           )}
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
+        <div className="border-border flex flex-wrap items-center justify-between gap-3 border-t pt-3">
           <div className="min-w-0">
-            <p className="text-sm text-muted">
-              {total === 0 ? "Pick the rooms this unit has." : `${total} ${total === 1 ? "space" : "spaces"}`}
+            <p className="text-muted text-sm">
+              {total === 0
+                ? "Pick the rooms this unit has."
+                : `${total} ${total === 1 ? "space" : "spaces"}`}
             </p>
-            {error && <p className="text-xs font-medium text-danger">{error}</p>}
+            {error && <p className="text-danger text-xs font-medium">{error}</p>}
           </div>
           <div className="flex items-center gap-2">
             {total > 0 && (
@@ -236,7 +244,7 @@ function StepButton({
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
-      className="flex size-7 items-center justify-center rounded-lg border border-border text-foreground transition-colors hover:bg-black/[0.04] disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:hover:bg-white/[0.06]"
+      className="border-border text-foreground focus-visible:ring-accent flex size-7 items-center justify-center rounded-lg border transition-colors hover:bg-black/[0.04] focus-visible:ring-2 focus-visible:outline-none disabled:opacity-30 dark:hover:bg-white/[0.06]"
     >
       <Icon className="size-3.5" />
     </button>

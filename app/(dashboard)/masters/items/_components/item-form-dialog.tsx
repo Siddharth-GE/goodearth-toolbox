@@ -65,7 +65,12 @@ export function ItemFormDialog({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="category_id">Category</Label>
-            <Select id="category_id" name="category_id" defaultValue={item?.category_id ?? ""} required>
+            <Select
+              id="category_id"
+              name="category_id"
+              defaultValue={item?.category_id ?? ""}
+              required
+            >
               <option value="" disabled>
                 Select a category
               </option>
@@ -98,7 +103,12 @@ export function ItemFormDialog({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="default_uom">Unit of measure</Label>
-            <Select id="default_uom" name="default_uom" defaultValue={item?.default_uom ?? ""} required>
+            <Select
+              id="default_uom"
+              name="default_uom"
+              defaultValue={item?.default_uom ?? ""}
+              required
+            >
               <option value="" disabled>
                 Select a unit
               </option>
@@ -128,9 +138,14 @@ export function ItemFormDialog({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="description">Description (optional)</Label>
-            <Input id="description" name="description" defaultValue={item?.description ?? ""} autoComplete="off" />
+            <Input
+              id="description"
+              name="description"
+              defaultValue={item?.description ?? ""}
+              autoComplete="off"
+            />
           </div>
-          {state?.error && <p className="text-sm font-medium text-danger">{state.error}</p>}
+          {state?.error && <p className="text-danger text-sm font-medium">{state.error}</p>}
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="secondary">

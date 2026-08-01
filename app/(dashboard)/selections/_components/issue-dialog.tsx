@@ -74,19 +74,21 @@ export function IssueDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="rounded-xl border border-border bg-surface p-4">
-            <p className="text-sm text-foreground">
-              <span className="font-semibold">{lineCount}</span> {lineCount === 1 ? "line" : "lines"} across{" "}
-              <span className="font-semibold">{spaceCount}</span> {spaceCount === 1 ? "space" : "spaces"}
+          <div className="border-border bg-surface rounded-xl border p-4">
+            <p className="text-foreground text-sm">
+              <span className="font-semibold">{lineCount}</span>{" "}
+              {lineCount === 1 ? "line" : "lines"} across{" "}
+              <span className="font-semibold">{spaceCount}</span>{" "}
+              {spaceCount === 1 ? "space" : "spaces"}
             </p>
 
             {previousRevisionNo === null ? (
-              <p className="mt-1 text-sm text-muted">
+              <p className="text-muted mt-1 text-sm">
                 This is the first revision — the budget team prices all of it.
               </p>
             ) : (
               <>
-                <p className="mt-3 text-xs font-semibold uppercase tracking-widest text-muted">
+                <p className="text-muted mt-3 text-xs font-semibold tracking-widest uppercase">
                   Since R{previousRevisionNo}
                 </p>
                 <ul className="mt-2 space-y-1.5 text-sm">
@@ -96,9 +98,9 @@ export function IssueDialog({
                 </ul>
                 {/* The reassuring half of the message: the budget team is
                     not being asked to start over. */}
-                <p className="mt-2 text-xs text-muted">
-                  {unchanged} unchanged {unchanged === 1 ? "line keeps" : "lines keep"} the pricing already
-                  given.
+                <p className="text-muted mt-2 text-xs">
+                  {unchanged} unchanged {unchanged === 1 ? "line keeps" : "lines keep"} the pricing
+                  already given.
                 </p>
               </>
             )}
@@ -116,15 +118,15 @@ export function IssueDialog({
                   ? "Anything they should know before pricing this."
                   : "Why this revision exists — what the client changed."
               }
-              className="w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
+              className="border-border bg-surface text-foreground placeholder:text-muted focus:ring-accent w-full rounded-xl border px-3.5 py-2.5 text-sm focus:ring-2 focus:outline-none"
             />
           </div>
 
-          <p className="text-sm text-muted">
+          <p className="text-muted text-sm">
             Once issued, this revision can never be edited. A later change means a new revision.
           </p>
 
-          {error && <p className="text-sm font-medium text-danger">{error}</p>}
+          {error && <p className="text-danger text-sm font-medium">{error}</p>}
 
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setOpen(false)} disabled={saving}>
@@ -167,4 +169,3 @@ function ChangeLine({
     </li>
   );
 }
-

@@ -19,13 +19,13 @@ export function DialogContent({
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40" />
       <DialogPrimitive.Content
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 w-[calc(100%-2.5rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-surface-raised p-5 shadow-lg focus:outline-none",
+          "border-border bg-surface-raised fixed top-1/2 left-1/2 z-50 w-[calc(100%-2.5rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-2xl border p-5 shadow-lg focus:outline-none",
           className,
         )}
         {...props}
       >
         {children}
-        <DialogPrimitive.Close className="absolute top-4 right-4 rounded-lg p-1 text-muted hover:bg-black/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:hover:bg-white/[0.06]">
+        <DialogPrimitive.Close className="text-muted focus-visible:ring-accent absolute top-4 right-4 rounded-lg p-1 hover:bg-black/[0.04] focus-visible:ring-2 focus-visible:outline-none dark:hover:bg-white/[0.06]">
           <X className="size-4" />
           <span className="sr-only">Close</span>
         </DialogPrimitive.Close>
@@ -39,14 +39,19 @@ export function DialogHeader({ className, ...props }: HTMLAttributes<HTMLDivElem
 }
 
 export function DialogTitle({ className, ...props }: ComponentProps<typeof DialogPrimitive.Title>) {
-  return <DialogPrimitive.Title className={cn("text-lg font-bold text-foreground", className)} {...props} />;
+  return (
+    <DialogPrimitive.Title
+      className={cn("text-foreground text-lg font-bold", className)}
+      {...props}
+    />
+  );
 }
 
 export function DialogDescription({
   className,
   ...props
 }: ComponentProps<typeof DialogPrimitive.Description>) {
-  return <DialogPrimitive.Description className={cn("text-sm text-muted", className)} {...props} />;
+  return <DialogPrimitive.Description className={cn("text-muted text-sm", className)} {...props} />;
 }
 
 export function DialogFooter({ className, ...props }: HTMLAttributes<HTMLDivElement>) {

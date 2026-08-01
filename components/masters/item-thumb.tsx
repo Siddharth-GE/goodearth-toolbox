@@ -33,7 +33,7 @@ export function ItemThumb({
   return (
     <div
       className={cn(
-        "relative aspect-square overflow-hidden rounded-xl border border-border bg-surface",
+        "border-border bg-surface relative aspect-square overflow-hidden rounded-xl border",
         className,
       )}
     >
@@ -54,7 +54,7 @@ export function ItemThumb({
           style={{ backgroundColor: `${color}14` }}
         >
           <span
-            className="px-1.5 text-center text-[11px] font-semibold uppercase tracking-wider"
+            className="px-1.5 text-center text-[11px] font-semibold tracking-wider uppercase"
             style={{ color }}
           >
             {code ?? name.slice(0, 12)}

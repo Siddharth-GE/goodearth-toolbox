@@ -9,8 +9,10 @@ export default async function MastersLayout({ children }: { children: React.Reac
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-lg font-bold tracking-tight text-foreground">Masters</h1>
-        <p className="text-sm text-muted">Projects, plots, units, clients, vendors, stores, and items.</p>
+        <h1 className="text-foreground text-lg font-bold tracking-tight">Masters</h1>
+        <p className="text-muted text-sm">
+          Projects, plots, units, clients, vendors, stores, and items.
+        </p>
       </div>
       <MastersNav />
       {children}

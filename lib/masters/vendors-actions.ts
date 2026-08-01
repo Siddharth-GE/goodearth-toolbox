@@ -18,7 +18,10 @@ function readVendorForm(formData: FormData) {
   };
 }
 
-export async function createVendor(_state: VendorFormState, formData: FormData): Promise<VendorFormState> {
+export async function createVendor(
+  _state: VendorFormState,
+  formData: FormData,
+): Promise<VendorFormState> {
   const user = await requireUser();
   await requireApp(user, "/masters");
 

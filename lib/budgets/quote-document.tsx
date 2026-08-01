@@ -89,7 +89,12 @@ const styles = StyleSheet.create({
   spaceTotalLabel: { fontSize: pdf.size.small, color: pdf.color.muted, marginRight: 12 },
   spaceTotalValue: { fontFamily: pdf.fontBold, fontSize: pdf.size.title },
 
-  terms: { marginTop: pdf.space.block * 1.4, borderTopWidth: 0.5, borderTopColor: pdf.color.rule, paddingTop: 8 },
+  terms: {
+    marginTop: pdf.space.block * 1.4,
+    borderTopWidth: 0.5,
+    borderTopColor: pdf.color.rule,
+    paddingTop: 8,
+  },
   termsText: { fontSize: pdf.size.tiny, color: pdf.color.muted, lineHeight: 1.5 },
 
   signatureRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 40 },

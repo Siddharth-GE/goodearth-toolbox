@@ -1,6 +1,13 @@
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+} from "@/components/ui/table";
 import { listVendors } from "@/lib/masters/vendors";
 import { ShoppingCart } from "lucide-react";
 import { VendorFormDialog } from "./_components/vendor-form-dialog";
@@ -15,7 +22,11 @@ export default async function VendorsPage() {
       </div>
 
       {vendors.length === 0 ? (
-        <EmptyState icon={ShoppingCart} title="No vendors yet" description="Add the first vendor." />
+        <EmptyState
+          icon={ShoppingCart}
+          title="No vendors yet"
+          description="Add the first vendor."
+        />
       ) : (
         <Table>
           <TableHead>
@@ -31,7 +42,7 @@ export default async function VendorsPage() {
           <TableBody>
             {vendors.map((vendor) => (
               <TableRow key={vendor.id}>
-                <TableCell className="font-medium text-foreground">{vendor.name}</TableCell>
+                <TableCell className="text-foreground font-medium">{vendor.name}</TableCell>
                 <TableCell>{vendor.contact_name || "—"}</TableCell>
                 <TableCell>{vendor.mobile || "—"}</TableCell>
                 <TableCell>{vendor.gst_no || "—"}</TableCell>

@@ -22,7 +22,10 @@ function readUnitForm(formData: FormData) {
   };
 }
 
-export async function createUnit(_state: UnitFormState, formData: FormData): Promise<UnitFormState> {
+export async function createUnit(
+  _state: UnitFormState,
+  formData: FormData,
+): Promise<UnitFormState> {
   const user = await requireUser();
   await requireApp(user, "/masters");
 
@@ -47,7 +50,11 @@ export async function createUnit(_state: UnitFormState, formData: FormData): Pro
 
 // Also how "assign a client" happens — the edit form just includes the
 // client picker, no separate action needed.
-export async function updateUnit(id: string, _state: UnitFormState, formData: FormData): Promise<UnitFormState> {
+export async function updateUnit(
+  id: string,
+  _state: UnitFormState,
+  formData: FormData,
+): Promise<UnitFormState> {
   const user = await requireUser();
   await requireApp(user, "/masters");
 

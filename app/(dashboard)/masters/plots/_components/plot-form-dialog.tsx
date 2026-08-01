@@ -57,7 +57,13 @@ export function PlotFormDialog({ projects, plot }: { projects: ProjectRow[]; plo
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="area">Area</Label>
-            <Input id="area" name="area" type="number" step="0.01" defaultValue={plot?.area ?? ""} />
+            <Input
+              id="area"
+              name="area"
+              type="number"
+              step="0.01"
+              defaultValue={plot?.area ?? ""}
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="status">Status</Label>
@@ -67,7 +73,7 @@ export function PlotFormDialog({ projects, plot }: { projects: ProjectRow[]; plo
               <option value="sold">Sold</option>
             </Select>
           </div>
-          {state?.error && <p className="text-sm font-medium text-danger">{state.error}</p>}
+          {state?.error && <p className="text-danger text-sm font-medium">{state.error}</p>}
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="secondary">

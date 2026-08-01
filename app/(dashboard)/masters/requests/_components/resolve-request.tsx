@@ -33,7 +33,11 @@ export function ResolveRequest({
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState(requestedName);
-  const [result, setResult] = useState<CatalogueSearchResult>({ items: [], total: 0, pageCount: 1 });
+  const [result, setResult] = useState<CatalogueSearchResult>({
+    items: [],
+    total: 0,
+    pageCount: 1,
+  });
   const [loading, setLoading] = useState(false);
   const [code, setCode] = useState("");
   const [error, setError] = useState<string>();
@@ -93,11 +97,11 @@ export function ResolveRequest({
         </DialogHeader>
 
         <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-muted">
+          <p className="text-muted mb-2 text-xs font-semibold tracking-widest uppercase">
             Is it already in the catalogue?
           </p>
           <div className="relative">
-            <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" />
+            <Search className="text-muted absolute top-1/2 left-3 size-4 -translate-y-1/2" />
             <Input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
@@ -108,22 +112,22 @@ export function ResolveRequest({
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-border">
+        <div className="border-border min-h-0 flex-1 overflow-y-auto rounded-xl border">
           {loading && candidates.length === 0 ? (
-            <div className="flex h-24 items-center justify-center text-muted">
+            <div className="text-muted flex h-24 items-center justify-center">
               <Spinner className="size-5 border-2" />
             </div>
           ) : candidates.length === 0 ? (
-            <p className="p-4 text-sm text-muted">
+            <p className="text-muted p-4 text-sm">
               Nothing similar found — this looks genuinely new.
             </p>
           ) : (
-            <ul className="divide-y divide-border">
+            <ul className="divide-border divide-y">
               {candidates.map((item) => (
                 <li key={item.id} className="flex items-center justify-between gap-3 p-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-foreground">{item.name}</p>
-                    <p className="text-xs text-muted">
+                    <p className="text-foreground truncate text-sm font-medium">{item.name}</p>
+                    <p className="text-muted text-xs">
                       {item.code ?? "—"}
                       {item.brand_name && ` · ${item.brand_name}`}
                     </p>
@@ -131,7 +135,9 @@ export function ResolveRequest({
                   <Button
                     variant="secondary"
                     disabled={saving}
-                    onClick={() => run(() => mergeItemRequest(requestId, provisionalItemId, item.id))}
+                    onClick={() =>
+                      run(() => mergeItemRequest(requestId, provisionalItemId, item.id))
+                    }
                   >
                     Same as this
                   </Button>
@@ -141,7 +147,7 @@ export function ResolveRequest({
           )}
         </div>
 
-        <div className="space-y-2 border-t border-border pt-3">
+        <div className="border-border space-y-2 border-t pt-3">
           <Label htmlFor="approve-code">Or accept it as a new catalogue item</Label>
           <div className="flex flex-wrap items-center gap-2">
             <Input
@@ -154,7 +160,9 @@ export function ResolveRequest({
             />
             <Button
               disabled={saving}
-              onClick={() => run(() => approveItemRequest(requestId, provisionalItemId, code || null))}
+              onClick={() =>
+                run(() => approveItemRequest(requestId, provisionalItemId, code || null))
+              }
             >
               Accept
             </Button>
@@ -166,11 +174,11 @@ export function ResolveRequest({
               Reject
             </Button>
           </div>
-          <p className="text-xs text-muted">
+          <p className="text-muted text-xs">
             Merging keeps the original line intact — issued revisions can never be rewritten, so the
             provisional item stays as an alias pointing at the real one.
           </p>
-          {error && <p className="text-sm font-medium text-danger">{error}</p>}
+          {error && <p className="text-danger text-sm font-medium">{error}</p>}
         </div>
       </DialogContent>
     </Dialog>

@@ -40,7 +40,11 @@ export function CataloguePicker({
   const [placement, setPlacement] = useState("");
   const [page, setPage] = useState(1);
 
-  const [result, setResult] = useState<CatalogueSearchResult>({ items: [], total: 0, pageCount: 1 });
+  const [result, setResult] = useState<CatalogueSearchResult>({
+    items: [],
+    total: 0,
+    pageCount: 1,
+  });
   const [loading, setLoading] = useState(false);
 
   // The basket lives entirely in the browser. Pressing + costs nothing —
@@ -48,7 +52,9 @@ export function CataloguePicker({
   // written in one call when the designer is done. It holds the item
   // itself, not just a count, so the summary keeps working after the item
   // scrolls out of the current search results.
-  const [basket, setBasket] = useState<Record<string, { item: CatalogueItem; quantity: number }>>({});
+  const [basket, setBasket] = useState<Record<string, { item: CatalogueItem; quantity: number }>>(
+    {},
+  );
   // Re-synced every time the dialog opens, never trusted from mount.
   // Switching space in the rail is a client-side navigation, so this
   // component is reused and a useState initial value would keep pointing
@@ -184,7 +190,7 @@ export function CataloguePicker({
         {/* Which spaces receive the basket. Defaults to the space you came
             from; tick more to specify four identical bathrooms at once. */}
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-xs font-semibold uppercase tracking-widest text-muted">Add to</span>
+          <span className="text-muted text-xs font-semibold tracking-widest uppercase">Add to</span>
           {spaces.map((space) => {
             const on = targetSpaces.includes(space.id);
             return (
@@ -213,7 +219,7 @@ export function CataloguePicker({
 
         <div className="flex flex-wrap gap-2">
           <div className="relative min-w-[200px] flex-1">
-            <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" />
+            <Search className="text-muted absolute top-1/2 left-3 size-4 -translate-y-1/2" />
             <Input
               value={search}
               onChange={(event) => applyFilter(() => setSearch(event.target.value))}
@@ -261,12 +267,12 @@ export function CataloguePicker({
 
         <div className="min-h-0 flex-1 overflow-y-auto">
           {loading && result.items.length === 0 ? (
-            <div className="flex h-full items-center justify-center text-muted">
+            <div className="text-muted flex h-full items-center justify-center">
               <Spinner className="size-5 border-2" />
             </div>
           ) : result.items.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-12">
-              <p className="text-center text-sm text-muted">
+              <p className="text-muted text-center text-sm">
                 Nothing matches that. Try a different search, or add it as a new item.
               </p>
               <RequestItemDialog
@@ -290,9 +296,9 @@ export function CataloguePicker({
           )}
         </div>
 
-        <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
+        <div className="border-border flex items-center justify-between gap-3 border-t pt-3">
           <div className="flex items-center gap-3">
-            <p className="text-xs text-muted">
+            <p className="text-muted text-xs">
               {loading
                 ? "Searching…"
                 : `${inr.format(result.total)} ${result.total === 1 ? "item" : "items"}`}
@@ -312,7 +318,7 @@ export function CataloguePicker({
             <Button variant="secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
               Previous
             </Button>
-            <span className="text-xs text-muted tabular-nums">
+            <span className="text-muted text-xs tabular-nums">
               {page} / {result.pageCount}
             </span>
             <Button
@@ -326,26 +332,28 @@ export function CataloguePicker({
         </div>
 
         {/* Nothing has been written yet — this bar is the commit point. */}
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3">
+        <div className="border-border bg-surface flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3">
           <div className="min-w-0">
             {distinctItems === 0 ? (
-              <p className="text-sm text-muted">Use + to build up a list, then add it all at once.</p>
+              <p className="text-muted text-sm">
+                Use + to build up a list, then add it all at once.
+              </p>
             ) : (
               <>
                 {/* No line count promised: an item already in one of these
                     spaces raises that line's quantity instead of adding a
                     second one, so the number of lines isn't knowable here. */}
-                <p className="text-sm font-medium text-foreground">
-                  {distinctItems} {distinctItems === 1 ? "item" : "items"} into {targetSpaces.length}{" "}
-                  {targetSpaces.length === 1 ? "space" : "spaces"}
+                <p className="text-foreground text-sm font-medium">
+                  {distinctItems} {distinctItems === 1 ? "item" : "items"} into{" "}
+                  {targetSpaces.length} {targetSpaces.length === 1 ? "space" : "spaces"}
                 </p>
-                <p className="text-xs text-muted">
+                <p className="text-muted text-xs">
                   Anything already there has its quantity increased
                   {basketValue > 0 && ` · indicative ₹${inr.format(Math.round(basketValue))}`}
                 </p>
               </>
             )}
-            {error && <p className="text-xs font-medium text-danger">{error}</p>}
+            {error && <p className="text-danger text-xs font-medium">{error}</p>}
           </div>
           <div className="flex items-center gap-2">
             {distinctItems > 0 && (
@@ -376,7 +384,7 @@ function ItemCard({
   return (
     <div
       className={[
-        "flex flex-col rounded-2xl border bg-surface p-2 transition-colors",
+        "bg-surface flex flex-col rounded-2xl border p-2 transition-colors",
         selected ? "border-accent" : "border-border",
       ].join(" ")}
     >
@@ -385,7 +393,7 @@ function ItemCard({
       <button
         type="button"
         onClick={() => onStep(1)}
-        className="rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        className="focus-visible:ring-accent rounded-xl text-left focus-visible:ring-2 focus-visible:outline-none"
         aria-label={`Add one ${item.name}`}
       >
         <ItemThumb
@@ -394,13 +402,13 @@ function ItemCard({
           thumbUrl={item.thumb_url}
           sizes="(max-width: 640px) 45vw, 180px"
         />
-        <p className="mt-2 line-clamp-2 text-xs font-medium text-foreground">{item.name}</p>
+        <p className="text-foreground mt-2 line-clamp-2 text-xs font-medium">{item.name}</p>
         {/* Brand is shown so a brand search visibly explains its results,
             rather than returning items whose names never mention it. */}
         {item.brand_name && (
-          <p className="mt-0.5 truncate text-[11px] font-medium text-muted">{item.brand_name}</p>
+          <p className="text-muted mt-0.5 truncate text-[11px] font-medium">{item.brand_name}</p>
         )}
-        <p className="mt-0.5 text-[11px] text-muted">
+        <p className="text-muted mt-0.5 text-[11px]">
           {item.code ?? "—"}
           {item.indicative_price != null && (
             <span className="ml-1 opacity-70">₹{inr.format(item.indicative_price)}</span>
@@ -447,7 +455,7 @@ function Stepper({
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
-      className="flex size-8 items-center justify-center rounded-lg border border-border text-foreground transition-colors hover:bg-black/[0.04] disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:hover:bg-white/[0.06]"
+      className="border-border text-foreground focus-visible:ring-accent flex size-8 items-center justify-center rounded-lg border transition-colors hover:bg-black/[0.04] focus-visible:ring-2 focus-visible:outline-none disabled:opacity-30 dark:hover:bg-white/[0.06]"
     >
       <Icon className="size-4" />
     </button>
