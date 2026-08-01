@@ -3,9 +3,9 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { FileQuestion } from "lucide-react";
 
 /**
- * Four pages call notFound() — a selection, a budget, a revision diff, a
- * marathon agent — and every one of them fell through to Next's default
- * unstyled 404 until this existed.
+ * The dashboard's 404 — a selection, a budget, a revision diff. It CANNOT
+ * serve /marathon (a route group boundary only covers its own group);
+ * the kiosk has its own app/marathon/not-found.tsx.
  *
  * Deliberately says "or you don't have access to it": the most likely
  * reason a real staff member lands here is a link shared by a colleague

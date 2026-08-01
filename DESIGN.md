@@ -138,8 +138,13 @@ Marathon's admin nav is the reference implementation.
 Built: `animated-reveal`, `avatar`, `badge` (+ status variants),
 `button`, `card`, `checkbox`, `dialog`, `dropdown-menu`, `empty-state`,
 `form-message`, `icon-button`, `input`, `label`, `page-header`,
-`pagination`, `select`, `spinner`, `table`, `tabs` (+ `NavTabs`),
-`textarea`.
+`page-title`, `pagination`, `select`, `spinner`, `table`, `tabs`
+(+ `NavTabs`), `textarea`.
+
+`PageTitle` vs `PageHeader`: `PageTitle` is the static h1/description/
+back-link block every dashboard screen starts with; `PageHeader` is the
+sticky, backdrop-blurred bar for kiosk screens with real scroll length
+(Marathon). Don't hand-roll either.
 
 Shared domain components live in `components/masters/`: `item-thumb`,
 `project-picker`, and `record-form-dialog` — the create/edit shell every

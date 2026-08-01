@@ -1,5 +1,13 @@
 import "server-only";
 
+// SHARED SURFACE — the one module in a tool's folder other tools import.
+// Budgets renders design views into the client quote (lib/budgets/
+// quote.ts), so everything here is deliberately un-gated, exactly like
+// lib/masters/* reads: callers gate themselves under their own grant,
+// and space_views' RLS read policy is open to authenticated staff.
+// It stays in lib/selections/ because Selections owns the writes
+// (views-actions.ts); if a third consumer appears (Indents?), move the
+// reads to their own lib/design-views/ instead of importing from here.
 import { createClient } from "@/lib/supabase/server";
 
 export const DESIGN_VIEWS_BUCKET = "design-views";

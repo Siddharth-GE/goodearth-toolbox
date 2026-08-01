@@ -41,7 +41,10 @@ export async function startFirstRevision(unitId: string): Promise<ActionState> {
     return { error: "Could not start a revision. Try again." };
   }
 
-  revalidatePath("/selections");
+  // "layout" everywhere a revision's status or structure changes: the
+  // list page and any open editor screen both derive from it, so the
+  // whole segment revalidates — same rule Budgets follows.
+  revalidatePath("/selections", "layout");
   redirect(`/selections/${data.id}`);
 }
 
@@ -128,7 +131,7 @@ export async function deleteDraft(selectionId: string): Promise<ActionState> {
     return { error: "Could not discard this draft. Try again." };
   }
 
-  revalidatePath("/selections");
+  revalidatePath("/selections", "layout");
   redirect("/selections");
 }
 

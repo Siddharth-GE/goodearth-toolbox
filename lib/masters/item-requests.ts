@@ -71,12 +71,3 @@ export async function listItemRequests(
     usage_count: usage.get(request.provisional_item_id) ?? 0,
   }));
 }
-
-export async function countPendingItemRequests(): Promise<number> {
-  const supabase = await createClient();
-  const { count } = await supabase
-    .from("item_requests")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "pending");
-  return count ?? 0;
-}

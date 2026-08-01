@@ -1,4 +1,5 @@
 import { hasApp } from "@/lib/auth/access";
+import { CATALOGUE_PAGE_SIZE } from "@/lib/selections/catalogue";
 import { getCurrentUser } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
 
@@ -40,7 +41,7 @@ export async function GET(request: Request) {
   const brandId = searchParams.get("brand") ?? "";
   const placement = searchParams.get("placement") ?? "";
   const page = Math.max(1, Number(searchParams.get("page")) || 1);
-  const pageSize = 30;
+  const pageSize = CATALOGUE_PAGE_SIZE;
 
   const supabase = await createClient();
 

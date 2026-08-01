@@ -215,19 +215,6 @@ export const listSelectionLines = cache(async function listSelectionLines(
   });
 });
 
-/** Every revision of a unit, newest first — the unit's design history. */
-export async function listRevisions(unitId: string): Promise<SelectionRow[]> {
-  await requireTool("/selections");
-
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("selections")
-    .select("*")
-    .eq("unit_id", unitId)
-    .order("revision_no", { ascending: false });
-  return (data ?? []) as SelectionRow[];
-}
-
 /** The revision this one replaced, if any. */
 export async function getPreviousIssued(
   unitId: string,
@@ -335,11 +322,14 @@ export async function diffRevisions(
 }
 
 /**
- * Everything the Budgets tool receives from an issued revision.
+ * A revision assembled whole: header, spaces, lines, and what changed.
  *
- * Assembled here, in Selections, so the handoff is one documented shape
- * rather than each downstream tool inventing its own joins. Budgets will
- * call this (under its own grant) rather than re-querying these tables.
+ * Despite the name, Budgets does NOT call this — it can't: everything in
+ * this module gates on /selections, and Budgets reads the selection
+ * tables directly under its own grant (see lib/budgets/queries.ts). The
+ * name survives because this shape IS the documented handoff contract —
+ * what an issued revision hands downstream — and its real callers are
+ * Selections' own PDF and CSV exports, which render exactly that.
  *
  * Note what is NOT here: no cost, no margin, no client rate. Selections
  * records what was specified; `indicative_rate_snapshot` is the figure
