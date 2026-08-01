@@ -19,8 +19,10 @@
 --    hit it because the only user so far is an admin. 0008 already fixed
 --    this for items UPDATE alone and documented the wider mismatch.
 --
--- Both are policy changes, not data changes, so this migration is safe to
--- re-run and touches no rows.
+-- Both are policy changes, not data changes, so this migration touches no
+-- rows. Every statement is written to be re-runnable — the first attempt
+-- failed partway through, on a policy name 0008 had already used, and a
+-- migration that can't be run twice is a migration you can't recover from.
 
 -- ---------------------------------------------------------------------
 -- 1. Roles are an admin decision
@@ -28,7 +30,7 @@
 -- Postgres RLS can't restrict an UPDATE to particular *columns*, so the
 -- rule lives in a trigger: keep your own row editable, but changing what
 -- `role` says is something only an admin can do.
-create function profiles_guard()
+create or replace function profiles_guard()
 returns trigger
 language plpgsql
 security definer
@@ -41,6 +43,7 @@ begin
   return new;
 end $$;
 
+drop trigger if exists profiles_guard on profiles;
 create trigger profiles_guard
   before update on profiles
   for each row execute function profiles_guard();
@@ -49,6 +52,7 @@ create trigger profiles_guard
 -- at all. The 0001 policy is scoped to auth.uid() = id, so before this
 -- there was no path for an admin to promote anyone — the escalation hole
 -- was, ironically, the only way roles ever changed.
+drop policy if exists "profiles updatable by admins" on profiles;
 create policy "profiles updatable by admins"
   on profiles for update to authenticated
   using (is_admin()) with check (is_admin());
@@ -60,9 +64,14 @@ create policy "profiles updatable by admins"
 -- are a strict superset of the is_admin() ones they replace — no admin
 -- loses anything.
 --
--- Created BEFORE the old ones are dropped, deliberately: if this script
--- fails halfway, the tables are left with too many policies rather than
--- too few, and nobody is locked out of their own data.
+-- Note `items`: 0008 already created "items updatable by masters app" for
+-- exactly this reason, before the fix was applied schema-wide. The drop
+-- below absorbs it rather than colliding with it, which is what broke the
+-- first run of this migration.
+--
+-- New policies are created BEFORE the old ones are dropped, deliberately:
+-- if this script fails halfway, the tables are left with too many
+-- policies rather than too few, and nobody is locked out of their data.
 do $$
 declare
   t text;
@@ -72,9 +81,12 @@ begin
     'clients', 'units', 'vendors', 'stores', 'items', 'spaces'
   ])
   loop
+    execute format('drop policy if exists "%1$s insertable by masters app" on %1$s', t);
     execute format(
       'create policy "%1$s insertable by masters app" on %1$s for insert to authenticated with check (has_app(''/masters''))', t
     );
+
+    execute format('drop policy if exists "%1$s updatable by masters app" on %1$s', t);
     execute format(
       'create policy "%1$s updatable by masters app" on %1$s for update to authenticated using (has_app(''/masters'')) with check (has_app(''/masters''))', t
     );
@@ -89,14 +101,6 @@ begin
     execute format('drop policy if exists "%1$s updatable by admins" on %1$s', t);
   end loop;
 end $$;
-
--- 0008 added this for exactly the same reason, before the pattern was
--- applied everywhere. Now redundant with the loop above, and leaving two
--- identical policies on one table would only confuse the next reader.
-drop policy if exists "items updatable by masters app" on items;
-create policy "items updatable by masters app"
-  on items for update to authenticated
-  using (has_app('/masters')) with check (has_app('/masters'));
 
 -- ---------------------------------------------------------------------
 -- 3. is_admin() gets the same hardening every other helper already has
