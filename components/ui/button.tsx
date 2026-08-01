@@ -46,6 +46,13 @@ interface LinkButtonProps {
   size?: Size;
   className?: string;
   children: React.ReactNode;
+  /**
+   * Renders a plain anchor instead of a next/link. Use for anything that
+   * isn't an app route — a file download, an external site. next/link
+   * prefetches on hover, which for a generated file means the server
+   * builds the whole thing just because a cursor passed over the button.
+   */
+  plain?: boolean;
 }
 
 export function LinkButton({
@@ -54,12 +61,20 @@ export function LinkButton({
   variant = "primary",
   size = "md",
   children,
+  plain = false,
 }: LinkButtonProps) {
+  const classes = cn(base, variantClasses[variant], sizeClasses[size], className);
+
+  if (plain) {
+    return (
+      <a href={href} className={classes}>
+        {children}
+      </a>
+    );
+  }
+
   return (
-    <Link
-      href={href}
-      className={cn(base, variantClasses[variant], sizeClasses[size], className)}
-    >
+    <Link href={href} className={classes}>
       {children}
     </Link>
   );

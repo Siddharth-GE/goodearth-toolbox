@@ -4,6 +4,7 @@ import {
   Footprints,
   GraduationCap,
   type LucideIcon,
+  Palette,
   PiggyBank,
   Receipt,
   Settings as SettingsIcon,
@@ -22,6 +23,7 @@ export const TOOL_ICONS = {
   ClipboardList,
   Footprints,
   GraduationCap,
+  Palette,
   PiggyBank,
   Receipt,
   Settings: SettingsIcon,
@@ -52,6 +54,14 @@ export type Tool = {
 // directly. "Settings" is also never grantable — see requireAdmin in
 // lib/auth/access.ts.
 export const TOOLS: Tool[] = [
+  {
+    name: "Selections",
+    description: "Specify what goes into every space of a unit.",
+    href: "/selections",
+    icon: "Palette",
+    group: "Operations",
+    built: true,
+  },
   {
     name: "Indents",
     description: "Site teams request materials, tagged to project/plot.",
