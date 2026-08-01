@@ -11,6 +11,13 @@ import {
   verifyAdminPin,
   verifyPinHash,
 } from "@/lib/marathon/session";
+import {
+  ADMIN_TARGET,
+  checkLockout,
+  clearFailures,
+  lockoutMessage,
+  recordFailure,
+} from "@/lib/marathon/rate-limit";
 import { redirect } from "next/navigation";
 
 export type PinState = { error?: string } | undefined;
@@ -23,6 +30,12 @@ export async function verifyAgentPin(
   const pin = String(formData.get("pin") ?? "").trim();
   if (!pin) return { error: "Enter your PIN." };
 
+  // Checked before the PIN is even looked at, so somebody working through
+  // all 10,000 combinations against this public URL learns nothing from
+  // an attempt made while locked out.
+  const locked = await checkLockout(agentId);
+  if (locked) return { error: lockoutMessage(locked) };
+
   const supabase = createAdminClient();
   const { data: agent } = await supabase
     .from("marathon_agents")
@@ -31,9 +44,11 @@ export async function verifyAgentPin(
     .single();
 
   if (!agent || !verifyPinHash(pin, agent.pin_hash, agent.pin_salt)) {
-    return { error: "Wrong PIN. Try again." };
+    const nowLocked = await recordFailure(agentId);
+    return { error: nowLocked ? lockoutMessage(nowLocked) : "Wrong PIN. Try again." };
   }
 
+  await clearFailures(agentId);
   await createAgentSession(agent.id);
   redirect("/marathon/entry");
 }
@@ -47,10 +62,17 @@ export async function verifyAdminPinAction(_state: PinState, formData: FormData)
   const pin = String(formData.get("pin") ?? "").trim();
   if (!pin) return { error: "Enter the admin PIN." };
 
+  // The admin PIN is shared and opens every screen, so it matters more
+  // than any single agent's.
+  const locked = await checkLockout(ADMIN_TARGET);
+  if (locked) return { error: lockoutMessage(locked) };
+
   if (!(await verifyAdminPin(pin))) {
-    return { error: "Wrong PIN. Try again." };
+    const nowLocked = await recordFailure(ADMIN_TARGET);
+    return { error: nowLocked ? lockoutMessage(nowLocked) : "Wrong PIN. Try again." };
   }
 
+  await clearFailures(ADMIN_TARGET);
   await createAdminSession();
   redirect("/marathon/admin/entries");
 }
@@ -103,6 +125,81 @@ export async function createGroup(_state: CreateGroupState, formData: FormData):
   }
 
   redirect("/marathon/admin/groups");
+}
+
+// PINs ----------------------------------------------------------------
+// Both PINs shipped as seeded defaults in migration 0002 — admin 2026 and
+// a test agent on 1234 — and that migration is in version control, on a
+// kiosk URL anyone can reach. They have to be changeable from the app;
+// asking someone to run SQL to rotate a password is how it never happens.
+
+export type PinChangeState = { error?: string; done?: string } | undefined;
+
+const PIN_RULE = /^[0-9]{4,6}$/;
+
+export async function changeAdminPin(
+  _state: PinChangeState,
+  formData: FormData,
+): Promise<PinChangeState> {
+  await requireAdminSession();
+
+  const current = String(formData.get("currentPin") ?? "").trim();
+  const next = String(formData.get("newPin") ?? "").trim();
+  const confirm = String(formData.get("confirmPin") ?? "").trim();
+
+  // Asked for even though the session already proves admin: a kiosk left
+  // unlocked on a table is the realistic threat, not a stolen cookie.
+  if (!(await verifyAdminPin(current))) return { error: "That isn't the current admin PIN." };
+  if (!PIN_RULE.test(next)) return { error: "New PIN must be 4 to 6 digits." };
+  if (next !== confirm) return { error: "The two new PINs don't match." };
+  if (next === current) return { error: "That's already the PIN." };
+
+  const { hash, salt } = hashPin(next);
+  const supabase = createAdminClient();
+  const { data: config } = await supabase.from("marathon_config").select("id").single();
+  if (!config) return { error: "Could not read the event settings. Try again." };
+
+  const { error } = await supabase
+    .from("marathon_config")
+    .update({ admin_pin_hash: hash, admin_pin_salt: salt, updated_at: new Date().toISOString() })
+    .eq("id", config.id);
+
+  if (error) {
+    console.error("changeAdminPin failed:", error);
+    return { error: "Could not change the PIN. Try again." };
+  }
+
+  return { done: "Admin PIN changed." };
+}
+
+export async function resetAgentPin(
+  agentId: string,
+  _state: PinChangeState,
+  formData: FormData,
+): Promise<PinChangeState> {
+  await requireAdminSession();
+
+  const next = String(formData.get("newPin") ?? "").trim();
+  if (!PIN_RULE.test(next)) return { error: "PIN must be 4 to 6 digits." };
+
+  const { hash, salt } = hashPin(next);
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from("marathon_agents")
+    .update({ pin_hash: hash, pin_salt: salt })
+    .eq("id", agentId);
+
+  if (error) {
+    console.error("resetAgentPin failed:", error);
+    return { error: "Could not reset the PIN. Try again." };
+  }
+
+  // An agent locked out after ten wrong tries has almost certainly
+  // forgotten their PIN — resetting it should let them straight back in
+  // rather than leaving them waiting out a lockout for a PIN that no
+  // longer exists.
+  await clearFailures(agentId);
+  return { done: "PIN reset." };
 }
 
 export type EntryState = { error?: string; duplicate?: boolean } | undefined;

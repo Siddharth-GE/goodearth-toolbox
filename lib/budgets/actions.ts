@@ -92,7 +92,18 @@ export async function startPricing(selectionId: string): Promise<ActionState> {
     // Leaving the budget behind would be worse than failing: it would
     // look like a revision nobody has priced, and the team would redo
     // work they had already done. Removing it makes this retryable.
-    await supabase.from("budgets").delete().eq("id", data.id);
+    const { error: cleanupError } = await supabase.from("budgets").delete().eq("id", data.id);
+    if (cleanupError) {
+      // The cleanup itself failed, so a budget row survives and
+      // selection_id is unique — every retry from here would fail on the
+      // duplicate key with a message about carry-forward, which explains
+      // nothing. Say what actually happened instead of swallowing it.
+      console.error("startPricing cleanup failed:", cleanupError);
+      return {
+        error:
+          "This budget was left half-started and could not be cleared automatically. Open it from the list, or ask an admin to remove it.",
+      };
+    }
     return { error: carryError };
   }
 

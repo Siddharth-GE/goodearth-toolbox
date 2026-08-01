@@ -30,7 +30,7 @@ export default async function MarathonAdminEntriesPage({
   const categories = runFilter ? allCategories.filter((c) => c.run_id === runFilter) : allCategories;
   const effectiveCategoryFilter = categories.some((c) => c.id === categoryFilter) ? categoryFilter : undefined;
 
-  const { entries, grandTotal } = await getAdminEntries({
+  const { entries, matchingCount, grandTotal, truncated } = await getAdminEntries({
     runId: runFilter,
     groupId: groupFilter,
     categoryId: effectiveCategoryFilter,
@@ -43,10 +43,19 @@ export default async function MarathonAdminEntriesPage({
 
       <div className="px-5 pt-5 pb-16">
         <p className="mb-1 text-sm text-muted">{hasFilter ? "Matching" : "Total"} entries</p>
-        <p className="mb-5 text-3xl font-extrabold tracking-tight text-foreground">
-          {entries.length}
+        {/* The real count, not how many rows fitted on this page — the
+            list is capped, and a headline that quietly stops climbing on
+            race day would be worse than no headline at all. */}
+        <p className="mb-1 text-3xl font-extrabold tracking-tight text-foreground">
+          {matchingCount}
           {hasFilter && <span className="text-base font-medium text-muted"> of {grandTotal}</span>}
         </p>
+        {truncated && (
+          <p className="mb-5 text-xs text-muted">
+            Showing the {entries.length} most recent. Filter to narrow this down.
+          </p>
+        )}
+        {!truncated && <div className="mb-5" />}
 
         <AdminEntryFilters
           groups={groups}

@@ -7,6 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
     "test": "tsx --test lib/**/*.test.ts",
     "db:types": "supabase gen types typescript --project-id ipstebqawrvhkyntctrv --schema public > lib/supabase/database.types.ts"
   },
@@ -36,6 +39,8 @@
     "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.12",
+    "prettier": "^3.9.6",
+    "prettier-plugin-tailwindcss": "^0.8.1",
     "supabase": "^2.111.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.1",

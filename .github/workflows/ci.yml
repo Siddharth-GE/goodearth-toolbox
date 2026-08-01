@@ -1,0 +1,58 @@
+# Runs on every push and pull request.
+#
+# This project deliberately had no CI while it was one person pushing to
+# master. That changed on two counts: a second person is joining, and
+# master auto-deploys to production on every push — so until now the only
+# thing standing between a mistake and the live site was remembering to
+# run four commands by hand.
+#
+# It runs exactly the checks that were already being run manually. No new
+# tools, no coverage thresholds, nothing to argue with.
+
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `npm ci` rather than `npm install`: it installs exactly what the
+      # lockfile says, so CI can't pass on a different set of packages
+      # than a developer has.
+      - run: npm ci
+
+      - name: Formatting
+        run: npm run format:check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Types
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm test
+
+      # Last, because it's the slowest and the ones above catch most
+      # problems faster and with clearer messages.
+      - name: Build
+        run: npm run build
+        env:
+          # Build-time only. next.config.ts reads the URL to allow the
+          # Supabase image host, and the pages themselves are all dynamic,
+          # so no real data is fetched during a build. Placeholders keep
+          # the secrets out of CI entirely.
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key

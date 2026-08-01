@@ -5,6 +5,8 @@ import { requireAdminSession } from "@/lib/marathon/session";
 import { Users } from "lucide-react";
 import { AddAgentForm } from "../_components/add-agent-form";
 import { AdminNav } from "../_components/admin-nav";
+import { ChangeAdminPinForm } from "../_components/change-admin-pin-form";
+import { ResetAgentPin } from "../_components/reset-agent-pin";
 
 export default async function MarathonAdminMembersPage() {
   await requireAdminSession();
@@ -25,13 +27,20 @@ export default async function MarathonAdminMembersPage() {
               className="flex items-center gap-3 rounded-2xl border border-border bg-surface px-3.5 py-3"
             >
               <Avatar name={agent.name} size={36} />
-              <span className="font-medium text-foreground">{agent.name}</span>
+              <span className="min-w-0 flex-1 truncate font-medium text-foreground">
+                {agent.name}
+              </span>
+              <ResetAgentPin agentId={agent.id} name={agent.name} />
             </div>
           ))}
           {agents.length === 0 && <EmptyState icon={Users} title="No members yet" />}
         </div>
 
         <AddAgentForm />
+
+        <div className="mt-5">
+          <ChangeAdminPinForm />
+        </div>
       </div>
     </div>
   );
