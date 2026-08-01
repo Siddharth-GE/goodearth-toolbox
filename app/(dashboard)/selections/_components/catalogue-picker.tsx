@@ -20,16 +20,19 @@ export function CataloguePicker({
   spaces,
   currentSpaceId,
   categories,
+  brands,
 }: {
   selectionId: string;
   unitId: string;
   spaces: Space[];
   currentSpaceId: string;
   categories: { id: string; name: string }[];
+  brands: { id: string; name: string }[];
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  const [brandId, setBrandId] = useState("");
   const [placement, setPlacement] = useState("");
   const [page, setPage] = useState(1);
 
@@ -54,6 +57,7 @@ export function CataloguePicker({
       const params = new URLSearchParams({ page: String(page) });
       if (search) params.set("q", search);
       if (categoryId) params.set("category", categoryId);
+      if (brandId) params.set("brand", brandId);
       if (placement) params.set("placement", placement);
       try {
         const response = await fetch(`/api/catalogue?${params}`, { signal: controller.signal });
@@ -70,7 +74,7 @@ export function CataloguePicker({
       controller.abort();
       clearTimeout(timer);
     };
-  }, [open, search, categoryId, placement, page]);
+  }, [open, search, categoryId, brandId, placement, page]);
 
   const applyFilter = (apply: () => void) => {
     apply();
@@ -171,7 +175,7 @@ export function CataloguePicker({
             <Input
               value={search}
               onChange={(event) => applyFilter(() => setSearch(event.target.value))}
-              placeholder="Search name or code…"
+              placeholder="Search name, code or brand…"
               autoComplete="off"
               autoFocus
               className="pl-9"
@@ -186,6 +190,18 @@ export function CataloguePicker({
             {categories.map((category) => (
               <option key={category.id} value={category.id}>
                 {category.name}
+              </option>
+            ))}
+          </Select>
+          <Select
+            value={brandId}
+            onChange={(event) => applyFilter(() => setBrandId(event.target.value))}
+            className="w-auto"
+          >
+            <option value="">All brands</option>
+            {brands.map((brand) => (
+              <option key={brand.id} value={brand.id}>
+                {brand.name}
               </option>
             ))}
           </Select>
@@ -312,6 +328,11 @@ function ItemCard({
           sizes="(max-width: 640px) 45vw, 180px"
         />
         <p className="mt-2 line-clamp-2 text-xs font-medium text-foreground">{item.name}</p>
+        {/* Brand is shown so a brand search visibly explains its results,
+            rather than returning items whose names never mention it. */}
+        {item.brand_name && (
+          <p className="mt-0.5 truncate text-[11px] font-medium text-muted">{item.brand_name}</p>
+        )}
         <p className="mt-0.5 text-[11px] text-muted">
           {item.code ?? "—"}
           {item.indicative_price != null && (

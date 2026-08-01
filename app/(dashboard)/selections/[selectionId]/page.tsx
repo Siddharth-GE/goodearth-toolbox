@@ -9,6 +9,7 @@ import { AddSpaceDialog } from "../_components/add-space-dialog";
 import { CataloguePicker } from "../_components/catalogue-picker";
 import { LineGrid } from "../_components/line-grid";
 import { listItemCategories } from "@/lib/masters/item-categories";
+import { listBrands } from "@/lib/masters/brands";
 
 export default async function SelectionEditorPage({
   params,
@@ -23,11 +24,12 @@ export default async function SelectionEditorPage({
   const selection = await getSelection(selectionId);
   if (!selection) notFound();
 
-  const [spaces, lines, spaceTypes, categories] = await Promise.all([
+  const [spaces, lines, spaceTypes, categories, brands] = await Promise.all([
     listUnitSpaces(selection.unit_id, selectionId),
     listSelectionLines(selectionId),
     listActiveSpaceTypes(),
     listItemCategories(),
+    listBrands(),
   ]);
 
   // Land on the requested space, else the first one. A stale ?space from a
@@ -132,6 +134,7 @@ export default async function SelectionEditorPage({
                       spaces={spaces.map((s) => ({ id: s.id, label: s.label }))}
                       currentSpaceId={activeSpace.id}
                       categories={categories.map((c) => ({ id: c.id, name: c.name }))}
+                      brands={brands.map((b) => ({ id: b.id, name: b.name }))}
                     />
                   )}
                 </div>

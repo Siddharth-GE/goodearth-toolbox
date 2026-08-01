@@ -7,6 +7,8 @@ export type CatalogueItem = {
   id: string;
   code: string | null;
   name: string;
+  /** Flattened from the brands embed by the route handler. */
+  brand_name: string | null;
   thumb_url: string | null;
   indicative_price: number | null;
   default_uom: string;
