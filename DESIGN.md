@@ -90,6 +90,24 @@ screen that deserves delight (a successful save, a completed action).
 Don't add a second one to the same flow, and don't add motion anywhere
 else "to make it feel nice" — restraint is the point.
 
+## Loading states
+
+`Spinner` (`components/ui/spinner.tsx`) — a large spinning ring in the
+accent color — is the one loading indicator in the app. This is a
+functional signal, not decorative motion, so it isn't subject to the
+"one moment of delight" restraint above: every tool's route segment
+gets a `loading.tsx` that renders a centered `Spinner` (see
+`app/(dashboard)/loading.tsx`, `app/(dashboard)/masters/loading.tsx`),
+and any individual widget that fetches its own data inside an
+otherwise-fast page wraps in `<Suspense fallback={<Spinner />}>`
+(see `MarathonLiveCard` on the Overview page) rather than blocking the
+whole screen. Add both as a matter of course for every new tool, the
+same way every tool already reuses `components/ui/*` — don't leave a
+tool without a `loading.tsx`. For a small inline spinner (inside a
+button, a search result list), override the size/border with
+`className`, e.g. `<Spinner className="size-4 border-2" />`, rather
+than reaching for a different icon.
+
 ## Icons
 
 `lucide-react`. Small, tree-shakeable, line-icon style that matches the
@@ -114,8 +132,8 @@ Marathon's admin nav is the reference implementation.
 
 Built: `animated-reveal`, `avatar`, `badge` (+ status variants),
 `button`, `card`, `checkbox`, `dialog`, `dropdown-menu`, `empty-state`,
-`input`, `label`, `page-header`, `select`, `table`, `tabs` (+ `NavTabs`),
-`tooltip`.
+`input`, `label`, `page-header`, `select`, `spinner`, `table`, `tabs`
+(+ `NavTabs`), `tooltip`.
 
 Deliberately not built yet — add only when a real tool needs it, not
 speculatively: toast/notification, pagination, textarea, radio, popover,

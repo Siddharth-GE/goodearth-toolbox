@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
 import {
   captionSpaceView,
   deleteSpaceView,
@@ -10,7 +11,7 @@ import {
 } from "@/lib/selections/views-actions";
 import { designView } from "@/lib/pdf/theme";
 import type { SpaceViewRow } from "@/lib/selections/views";
-import { ChevronLeft, ChevronRight, ImagePlus, Loader2, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, ImagePlus, Trash2 } from "lucide-react";
 import { useRef, useState, useTransition } from "react";
 
 /**
@@ -128,7 +129,7 @@ export function SpaceViews({
               disabled={uploading}
               onClick={() => inputRef.current?.click()}
             >
-              {uploading ? <Loader2 className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
+              {uploading ? <Spinner className="size-4 border-2" /> : <ImagePlus className="size-4" />}
               {uploading ? "Uploading…" : "Add views"}
             </Button>
           </>
