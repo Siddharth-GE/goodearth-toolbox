@@ -12,8 +12,7 @@ import { RequestItemDialog } from "./request-item-dialog";
 import { Minus, Plus, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
-
-const inr = new Intl.NumberFormat("en-IN");
+import { formatCount, formatMoney } from "@/lib/format";
 
 type Space = { id: string; label: string };
 
@@ -301,7 +300,7 @@ export function CataloguePicker({
             <p className="text-muted text-xs">
               {loading
                 ? "Searching…"
-                : `${inr.format(result.total)} ${result.total === 1 ? "item" : "items"}`}
+                : `${formatCount(result.total)} ${result.total === 1 ? "item" : "items"}`}
             </p>
             {/* Also here, not only in the empty state: a designer often
                 knows something isn't in the catalogue without searching. */}
@@ -349,7 +348,7 @@ export function CataloguePicker({
                 </p>
                 <p className="text-muted text-xs">
                   Anything already there has its quantity increased
-                  {basketValue > 0 && ` · indicative ₹${inr.format(Math.round(basketValue))}`}
+                  {basketValue > 0 && ` · indicative ${formatMoney(basketValue)}`}
                 </p>
               </>
             )}
@@ -411,7 +410,7 @@ function ItemCard({
         <p className="text-muted mt-0.5 text-[11px]">
           {item.code ?? "—"}
           {item.indicative_price != null && (
-            <span className="ml-1 opacity-70">₹{inr.format(item.indicative_price)}</span>
+            <span className="ml-1 opacity-70">{formatMoney(item.indicative_price)}</span>
           )}
         </p>
       </button>

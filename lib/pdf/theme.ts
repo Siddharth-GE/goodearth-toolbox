@@ -79,32 +79,9 @@ export const designView = {
   twoUpFrom: 2,
 } as const;
 
-/** Quantities read better grouped, and prices are lakh-scale here. */
-export const formatQty = (value: number) =>
-  Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.00$/, "");
-
-/**
- * Money for print: Indian grouping, whole rupees, and NO currency symbol.
- *
- * Deliberately not the app's formatMoney. That one emits "₹" (U+20B9),
- * which the built-in Helvetica cannot draw — react-pdf would print a
- * blank box on every amount on the page. Documents state the currency
- * once in a header instead, which is how a financial document should
- * read anyway.
- *
- * Whole rupees, and rounded only here: totals are summed at full
- * precision so a column of rounded lines still adds up to its total.
- */
-export const formatAmount = (value: number | null) =>
-  value === null || !Number.isFinite(value)
-    ? "—"
-    : Math.round(value).toLocaleString("en-IN", { maximumFractionDigits: 0 });
-
-export const formatDate = (value: string | null) =>
-  value
-    ? new Date(value).toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      })
-    : "—";
+// Number and date formatting lives in lib/format.ts, shared with the
+// screens. A document and the screen it was generated from showing the
+// same quantity differently is a bug people notice and don't trust —
+// which is exactly what happened while this file had its own `formatQty`
+// that didn't group digits. Documents import `formatAmount` from there
+// (digits with no ₹, since Helvetica can't draw one).

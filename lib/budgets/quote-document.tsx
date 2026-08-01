@@ -1,6 +1,7 @@
 import { Document, Image, StyleSheet, Text, View } from "@react-pdf/renderer";
 import { DocumentPage, DocumentTable, type Column, type DocumentMeta } from "@/lib/pdf/document";
-import { designView, formatAmount, formatDate, formatQty, pdf } from "@/lib/pdf/theme";
+import { designView, pdf } from "@/lib/pdf/theme";
+import { formatAmount, formatDate, formatQuantity } from "@/lib/format";
 import type { QuoteData, QuoteLine, QuoteView } from "./quote";
 
 /**
@@ -108,7 +109,7 @@ const columns: Column<QuoteLine>[] = [
   { header: "#", width: 0.4, render: (_row, index) => String(index + 1) },
   { header: "Item", width: 3.4, render: (row) => row.item_name },
   { header: "Brand", width: 1.4, render: (row) => row.item_brand ?? "—" },
-  { header: "Qty", width: 0.7, align: "right", render: (row) => formatQty(row.quantity) },
+  { header: "Qty", width: 0.7, align: "right", render: (row) => formatQuantity(row.quantity) },
   { header: "Unit", width: 0.7, render: (row) => row.uom },
   { header: "Rate", width: 1.1, align: "right", render: (row) => formatAmount(row.rate) },
   { header: "Amount", width: 1.3, align: "right", render: (row) => formatAmount(row.amount) },

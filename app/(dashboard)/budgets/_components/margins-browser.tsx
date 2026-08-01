@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/table";
 import { setItemMargin } from "@/lib/budgets/actions";
 import type { CatalogueSearchResult } from "@/lib/selections/catalogue";
-import { formatMoney } from "@/lib/budgets/math";
+import { formatMoney } from "@/lib/format";
 import { Loader2, Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 

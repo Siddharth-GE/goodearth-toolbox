@@ -10,7 +10,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test lib/**/*.test.ts",
+    "test": "tsx --test \"lib/**/*.test.ts\"",
     "db:types": "supabase gen types typescript --project-id ipstebqawrvhkyntctrv --schema public > lib/supabase/database.types.ts"
   },
   "dependencies": {

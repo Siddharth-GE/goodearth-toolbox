@@ -17,8 +17,7 @@ import {
 import { GitCompare } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-
-const inr = new Intl.NumberFormat("en-IN");
+import { formatCount, formatQuantity } from "@/lib/format";
 
 export default async function RevisionDiffPage({
   params,
@@ -125,7 +124,7 @@ function Summary({
   return (
     <div className="border-border bg-surface rounded-xl border px-4 py-2.5">
       <span className="text-foreground text-sm font-semibold tabular-nums">
-        {inr.format(count)}
+        {formatCount(count)}
       </span>{" "}
       <Badge variant={tone} className="ml-1">
         {label}
@@ -169,10 +168,10 @@ function Section({
                 {entry.kind === "changed" ? (
                   <span className="tabular-nums">
                     <span className="text-muted line-through">
-                      {inr.format(entry.previous.quantity)}
+                      {formatQuantity(entry.previous.quantity)}
                     </span>{" "}
                     <span className="text-foreground font-semibold">
-                      {inr.format(entry.line.quantity)}
+                      {formatQuantity(entry.line.quantity)}
                     </span>{" "}
                     <span className="text-muted">{entry.line.uom}</span>
                     {entry.spaceChanged && (
@@ -181,7 +180,7 @@ function Section({
                   </span>
                 ) : (
                   <span className="tabular-nums">
-                    {inr.format(entry.line.quantity)}{" "}
+                    {formatQuantity(entry.line.quantity)}{" "}
                     <span className="text-muted">{entry.line.uom}</span>
                     {entry.kind === "removed" && (
                       <span className="text-muted ml-2 text-xs">was in R{previousRevisionNo}</span>

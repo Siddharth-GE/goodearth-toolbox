@@ -1,6 +1,7 @@
 import { Document, StyleSheet, Text, View } from "@react-pdf/renderer";
 import { DocumentPage, DocumentTable, type Column, type DocumentMeta } from "@/lib/pdf/document";
-import { formatAmount, formatDate, formatQty, pdf } from "@/lib/pdf/theme";
+import { pdf } from "@/lib/pdf/theme";
+import { formatAmount, formatDate, formatPercent, formatQuantity } from "@/lib/format";
 import type { BudgetDetail, BudgetLineRow } from "./queries";
 import { lineAmount, lineCost } from "./math";
 
@@ -108,7 +109,7 @@ const columns: Column<BudgetLineRow>[] = [
   { header: "#", width: 0.4, render: (_row, index) => String(index + 1) },
   { header: "Code", width: 1.1, render: (row) => row.item_code ?? "—" },
   { header: "Item", width: 2.6, render: (row) => row.item_name },
-  { header: "Qty", width: 0.6, align: "right", render: (row) => formatQty(row.quantity) },
+  { header: "Qty", width: 0.6, align: "right", render: (row) => formatQuantity(row.quantity) },
   { header: "Unit", width: 0.6, render: (row) => row.uom },
   { header: "Cost", width: 0.9, align: "right", render: (row) => formatAmount(row.unit_cost) },
   {
@@ -121,7 +122,7 @@ const columns: Column<BudgetLineRow>[] = [
     header: "Margin",
     width: 0.7,
     align: "right",
-    render: (row) => (row.margin_pct === null ? "—" : `${formatQty(row.margin_pct)}%`),
+    render: (row) => formatPercent(row.margin_pct),
   },
   { header: "Rate", width: 0.9, align: "right", render: (row) => formatAmount(row.client_rate) },
   {

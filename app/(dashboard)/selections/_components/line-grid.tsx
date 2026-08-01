@@ -16,8 +16,7 @@ import { removeLine, updateLine } from "@/lib/selections/actions";
 import type { SelectionLineRow } from "@/lib/selections/queries";
 import { PackageOpen, Trash2 } from "lucide-react";
 import { type ReactNode, useRef, useState, useTransition } from "react";
-
-const inr = new Intl.NumberFormat("en-IN");
+import { formatMoney, formatQuantity } from "@/lib/format";
 
 export function LineGrid({
   selectionId,
@@ -135,7 +134,7 @@ function LineRow({
               specified is Budgets' input, not a designer's decision. */}
           {line.indicative_rate_snapshot != null && (
             <span className="ml-2 opacity-60">
-              indicative ₹{inr.format(line.indicative_rate_snapshot)}
+              indicative {formatMoney(line.indicative_rate_snapshot)}
             </span>
           )}
         </div>
@@ -156,7 +155,7 @@ function LineRow({
             aria-label={`Quantity for ${line.item_name}`}
           />
         ) : (
-          inr.format(line.quantity)
+          formatQuantity(line.quantity)
         )}
         {error && <p className="text-danger mt-1 text-xs font-medium">{error}</p>}
       </TableCell>

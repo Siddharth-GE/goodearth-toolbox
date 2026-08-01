@@ -10,10 +10,7 @@ import { getAgentEntries, getEntryFormData } from "@/lib/marathon/queries";
 import { requireAgentSession } from "@/lib/marathon/session";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { Inbox } from "lucide-react";
-
-function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
-}
+import { formatTime } from "@/lib/format";
 
 export default async function MarathonListPage({
   searchParams,

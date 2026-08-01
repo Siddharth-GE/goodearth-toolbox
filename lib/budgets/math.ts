@@ -108,30 +108,6 @@ export function isFullyPriced(lines: PricedLine[]): boolean {
   return lines.length > 0 && lines.every((line) => line.unit_cost !== null);
 }
 
-/**
- * Indian-format rupees, e.g. ₹12,34,567.
- *
- * Whole rupees by default: paise on a construction budget are noise, and
- * the client quote reads better without them. Full precision is kept in
- * the data — this is presentation only.
- */
-export function formatMoney(value: number | null, options?: { paise?: boolean }): string {
-  if (value === null || !Number.isFinite(value)) return "—";
-  const digits = options?.paise ? 2 : 0;
-  return value.toLocaleString("en-IN", {
-    style: "currency",
-    currency: "INR",
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  });
-}
-
-/** Quantities are numeric in the database; trailing zeroes read badly. */
-export function formatQuantity(value: number): string {
-  return Number(value.toFixed(3)).toLocaleString("en-IN");
-}
-
-export function formatPercent(value: number | null): string {
-  if (value === null || !Number.isFinite(value)) return "—";
-  return `${Number(value.toFixed(2)).toLocaleString("en-IN")}%`;
-}
+// Formatting lives in lib/format.ts, not here. This module is arithmetic;
+// how a figure is written is a question for screens, documents and
+// exports alike, and they must all answer it the same way.

@@ -13,7 +13,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { saveLine } from "@/lib/budgets/actions";
-import { clientRate, formatMoney, formatQuantity, lineAmount, rollUp } from "@/lib/budgets/math";
+import { clientRate, lineAmount, rollUp } from "@/lib/budgets/math";
+import { formatMoney, formatQuantity } from "@/lib/format";
 import type { BudgetSpaceGroup } from "@/lib/budgets/queries";
 import { type ReactNode, useMemo, useRef, useState } from "react";
 import { ApproveButton } from "./approve-button";
