@@ -16,7 +16,8 @@ import { revalidatePath } from "next/cache";
  * had no way to know, and the person they thought they'd given access to
  * would simply not have it.
  */
-export type ActionState = { error?: string } | undefined;
+export type { ActionState } from "@/lib/action-state";
+import type { ActionState } from "@/lib/action-state";
 
 function isGrantable(app: string) {
   return GRANTABLE_TOOLS.some((tool) => tool.href === app);

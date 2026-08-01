@@ -1,15 +1,12 @@
 "use server";
 
-import { requireApp } from "@/lib/auth/access";
-import { requireUser } from "@/lib/auth/dal";
+import type { ActionState } from "@/lib/action-state";
+import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import type { ItemKind, Placement, Uom } from "./items";
+import { isItemKind, isUom, type ItemKind, type Placement, type Uom } from "./constants";
 
-const ITEM_KINDS = ["catalogue", "material"];
-const UOMS = ["each", "rft", "sqft", "lumpsum", "bag", "kg", "litre", "cft"];
-
-export type ItemFormState = { error?: string } | undefined;
+export type ItemFormState = ActionState;
 
 function readItemForm(formData: FormData) {
   return {
@@ -31,14 +28,13 @@ export async function createItem(
   _state: ItemFormState,
   formData: FormData,
 ): Promise<ItemFormState> {
-  const user = await requireUser();
-  await requireApp(user, "/masters");
+  await requireTool("/masters");
 
   const input = readItemForm(formData);
   if (!input.name) return { error: "Enter an item name." };
-  if (!ITEM_KINDS.includes(input.kind)) return { error: "Choose catalogue or material." };
+  if (!isItemKind(input.kind)) return { error: "Choose catalogue or material." };
   if (!input.category_id) return { error: "Choose a category." };
-  if (!UOMS.includes(input.default_uom)) return { error: "Choose a unit of measure." };
+  if (!isUom(input.default_uom)) return { error: "Choose a unit of measure." };
 
   const supabase = await createClient();
   const { error } = await supabase.from("items").insert(input);
@@ -57,14 +53,13 @@ export async function updateItem(
   _state: ItemFormState,
   formData: FormData,
 ): Promise<ItemFormState> {
-  const user = await requireUser();
-  await requireApp(user, "/masters");
+  await requireTool("/masters");
 
   const input = readItemForm(formData);
   if (!input.name) return { error: "Enter an item name." };
-  if (!ITEM_KINDS.includes(input.kind)) return { error: "Choose catalogue or material." };
+  if (!isItemKind(input.kind)) return { error: "Choose catalogue or material." };
   if (!input.category_id) return { error: "Choose a category." };
-  if (!UOMS.includes(input.default_uom)) return { error: "Choose a unit of measure." };
+  if (!isUom(input.default_uom)) return { error: "Choose a unit of measure." };
 
   const supabase = await createClient();
   const { error } = await supabase.from("items").update(input).eq("id", id);

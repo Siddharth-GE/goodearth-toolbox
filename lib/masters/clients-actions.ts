@@ -1,11 +1,11 @@
 "use server";
 
-import { requireApp } from "@/lib/auth/access";
-import { requireUser } from "@/lib/auth/dal";
+import type { ActionState } from "@/lib/action-state";
+import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
-export type ClientFormState = { error?: string } | undefined;
+export type ClientFormState = ActionState;
 
 function readClientForm(formData: FormData) {
   return {
@@ -20,8 +20,7 @@ export async function createClientRecord(
   _state: ClientFormState,
   formData: FormData,
 ): Promise<ClientFormState> {
-  const user = await requireUser();
-  await requireApp(user, "/masters");
+  await requireTool("/masters");
 
   const { name, mobile, email, notes } = readClientForm(formData);
   if (!name) return { error: "Enter the client's name." };
@@ -42,8 +41,7 @@ export async function updateClientRecord(
   _state: ClientFormState,
   formData: FormData,
 ): Promise<ClientFormState> {
-  const user = await requireUser();
-  await requireApp(user, "/masters");
+  await requireTool("/masters");
 
   const { name, mobile, email, notes } = readClientForm(formData);
   if (!name) return { error: "Enter the client's name." };

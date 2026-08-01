@@ -2,11 +2,11 @@ import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
 
-export type ItemKind = "catalogue" | "material";
-export type Placement = "fixed" | "loose" | "soft_furnishing";
-export type Uom = "each" | "rft" | "sqft" | "lumpsum" | "bag" | "kg" | "litre" | "cft";
-
-export const ITEM_KINDS: ItemKind[] = ["catalogue", "material"];
+// The value lists live in ./constants (import-free, so actions files can
+// use them as values); the types are re-exported here because this module
+// is where readers of item data already look for them.
+export type { ItemKind, Placement, Uom } from "./constants";
+import type { ItemKind, Placement, Uom } from "./constants";
 
 export type ItemRow = {
   id: string;

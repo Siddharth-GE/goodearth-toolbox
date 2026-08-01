@@ -1,28 +1,19 @@
 import "server-only";
 
-import { requireApp } from "@/lib/auth/access";
-import { requireUser } from "@/lib/auth/dal";
+import { requireTool } from "@/lib/auth/access";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { cache } from "react";
 
 import { rollUp, type Totals } from "./math";
 
-/**
- * Budgets reads the Selections tables DIRECTLY, under its own grant.
- *
- * It deliberately does not call lib/selections/queries.ts's
- * getBudgetHandoff(): every function in that module opens with
- * requireApp(user, "/selections"), so a budget-team member without the
- * design grant would be redirected away from their own screen. Cross-stage
- * reads belong to the downstream tool — the same rule that lets any tool
- * read lib/masters/* without holding /masters.
- */
-async function authorize() {
-  const user = await requireUser();
-  await requireApp(user, "/budgets");
-  return user;
-}
+// Budgets reads the Selections tables DIRECTLY, under its own /budgets
+// grant. It deliberately does not call lib/selections/queries.ts: every
+// function in that module opens with requireTool("/selections"), so a
+// budget-team member without the design grant would be redirected away
+// from their own screen. Cross-stage reads belong to the downstream tool —
+// the same rule that lets any tool read lib/masters/* without holding
+// /masters.
 
 export type BudgetStatus = "pricing" | "approved";
 
@@ -48,7 +39,7 @@ export type InboxRow = {
  * as history, but re-opening one is not work anybody should be offered.
  */
 export async function listInbox(): Promise<InboxRow[]> {
-  await authorize();
+  await requireTool("/budgets");
   const supabase = await createClient();
 
   // The line counts ride along as embedded count aggregates, so the whole
@@ -175,7 +166,7 @@ export type BudgetDetail = {
  * reason line_key exists.
  */
 export const getBudget = cache(async (budgetId: string): Promise<BudgetDetail | null> => {
-  await authorize();
+  await requireTool("/budgets");
   const supabase = await createClient();
 
   const { data: budget } = await supabase
@@ -330,7 +321,7 @@ export const getBudget = cache(async (budgetId: string): Promise<BudgetDetail | 
 
 /** Vendors for the expected-vendor picker on the pricing screen. */
 export async function listVendorOptions() {
-  await authorize();
+  await requireTool("/budgets");
   const supabase = await createClient();
   const { data } = await supabase.from("vendors").select("id, name").order("name");
   return data ?? [];
@@ -354,7 +345,7 @@ export type MarginRow = {
  * cost. (getBudget has its own scoped read for the same reason.)
  */
 export async function listMargins(): Promise<Map<string, number>> {
-  await authorize();
+  await requireTool("/budgets");
   const supabase = await createClient();
   const { data } = await fetchAll((from, to) =>
     supabase.from("item_margins").select("item_id, margin_pct").order("item_id").range(from, to),

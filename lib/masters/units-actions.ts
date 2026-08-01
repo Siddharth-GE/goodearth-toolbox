@@ -1,7 +1,7 @@
 "use server";
 
-import { requireApp } from "@/lib/auth/access";
-import { requireUser } from "@/lib/auth/dal";
+import type { ActionState } from "@/lib/action-state";
+import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { UnitStatus, UnitType } from "./units";
@@ -9,7 +9,7 @@ import type { UnitStatus, UnitType } from "./units";
 const UNIT_TYPES = ["apartment", "villa", "duplex_row_house"];
 const UNIT_STATUSES = ["available", "reserved", "sold"];
 
-export type UnitFormState = { error?: string } | undefined;
+export type UnitFormState = ActionState;
 
 function readUnitForm(formData: FormData) {
   return {
@@ -26,8 +26,7 @@ export async function createUnit(
   _state: UnitFormState,
   formData: FormData,
 ): Promise<UnitFormState> {
-  const user = await requireUser();
-  await requireApp(user, "/masters");
+  await requireTool("/masters");
 
   const { project_id, plot_id, name, unit_type, client_id, status } = readUnitForm(formData);
   if (!project_id) return { error: "Choose a project." };
@@ -55,8 +54,7 @@ export async function updateUnit(
   _state: UnitFormState,
   formData: FormData,
 ): Promise<UnitFormState> {
-  const user = await requireUser();
-  await requireApp(user, "/masters");
+  await requireTool("/masters");
 
   const { project_id, plot_id, name, unit_type, client_id, status } = readUnitForm(formData);
   if (!project_id) return { error: "Choose a project." };

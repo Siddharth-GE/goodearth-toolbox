@@ -1,14 +1,14 @@
 "use server";
 
-import { requireApp } from "@/lib/auth/access";
-import { requireUser } from "@/lib/auth/dal";
+import type { ActionState } from "@/lib/action-state";
+import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { PlotStatus } from "./plots";
 
 const PLOT_STATUSES = ["available", "reserved", "sold"];
 
-export type PlotFormState = { error?: string } | undefined;
+export type PlotFormState = ActionState;
 
 function readPlotForm(formData: FormData) {
   return {
@@ -23,8 +23,7 @@ export async function createPlot(
   _state: PlotFormState,
   formData: FormData,
 ): Promise<PlotFormState> {
-  const user = await requireUser();
-  await requireApp(user, "/masters");
+  await requireTool("/masters");
 
   const { project_id, name, area, status } = readPlotForm(formData);
   if (!project_id) return { error: "Choose a project." };
@@ -47,8 +46,7 @@ export async function updatePlot(
   _state: PlotFormState,
   formData: FormData,
 ): Promise<PlotFormState> {
-  const user = await requireUser();
-  await requireApp(user, "/masters");
+  await requireTool("/masters");
 
   const { project_id, name, area, status } = readPlotForm(formData);
   if (!project_id) return { error: "Choose a project." };

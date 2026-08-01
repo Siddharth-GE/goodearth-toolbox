@@ -1,7 +1,6 @@
 "use server";
 
-import { requireApp } from "@/lib/auth/access";
-import { requireUser } from "@/lib/auth/dal";
+import { requireTool } from "@/lib/auth/access";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
@@ -11,13 +10,8 @@ import { redirect } from "next/navigation";
 // pure and imports nothing, so it drags no server-only chain behind it.
 import { planCarryForward } from "./carry-forward";
 
-export type ActionState = { error?: string } | undefined;
-
-async function authorize() {
-  const user = await requireUser();
-  await requireApp(user, "/budgets");
-  return user;
-}
+import type { ActionState } from "@/lib/action-state";
+export type { ActionState };
 
 // ---------------------------------------------------------------------
 // Starting a budget
@@ -40,7 +34,7 @@ async function authorize() {
  * carryForward below.
  */
 export async function startPricing(selectionId: string): Promise<ActionState> {
-  const user = await authorize();
+  const user = await requireTool("/budgets");
   const supabase = await createClient();
 
   const { data: selection, error: selectionError } = await supabase
@@ -276,7 +270,7 @@ export async function saveLine(
   lineKey: string,
   input: LineInput,
 ): Promise<ActionState> {
-  const user = await authorize();
+  const user = await requireTool("/budgets");
 
   if (!(input.quantity > 0)) return { error: "Quantity must be more than zero." };
   if (input.unitCost !== null && input.unitCost < 0) return { error: "Cost cannot be negative." };
@@ -335,7 +329,7 @@ export async function saveLine(
  * backstop that holds even for a write this function never sees.
  */
 export async function approveBudget(budgetId: string): Promise<ActionState> {
-  const user = await authorize();
+  const user = await requireTool("/budgets");
   const supabase = await createClient();
 
   const { data: budget } = await supabase
@@ -412,7 +406,7 @@ export async function approveBudget(budgetId: string): Promise<ActionState> {
  * re-opening at once both produce v2. See migration 0012.
  */
 export async function reopenBudget(budgetId: string): Promise<ActionState> {
-  await authorize();
+  await requireTool("/budgets");
   const supabase = await createClient();
 
   const { error } = await supabase.rpc("reopen_budget", { p_budget_id: budgetId });
@@ -442,7 +436,7 @@ export async function setItemMargin(
   itemId: string,
   marginPct: number | null,
 ): Promise<ActionState> {
-  const user = await authorize();
+  const user = await requireTool("/budgets");
   const supabase = await createClient();
 
   // Clearing a margin means "no default", which is not the same as 0%.

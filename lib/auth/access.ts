@@ -1,7 +1,7 @@
 import "server-only";
 
 import { redirect } from "next/navigation";
-import type { getCurrentUser } from "./dal";
+import { requireUser, type getCurrentUser } from "./dal";
 
 type CurrentUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
 
@@ -19,6 +19,17 @@ export async function hasApp(user: CurrentUser, slug: string) {
 export async function requireApp(user: CurrentUser, slug: string) {
   if (await hasApp(user, slug)) return;
   redirect("/");
+}
+
+/**
+ * The two lines every gated action and query starts with, as one call:
+ * a signed-in user who holds this tool's grant, or a redirect. This is
+ * the real permission boundary — sidebar visibility is cosmetic.
+ */
+export async function requireTool(slug: string) {
+  const user = await requireUser();
+  await requireApp(user, slug);
+  return user;
 }
 
 // Separate from requireApp on purpose: granting/revoking other users'

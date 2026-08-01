@@ -1,26 +1,18 @@
 "use server";
 
-import { requireApp } from "@/lib/auth/access";
-import { requireUser } from "@/lib/auth/dal";
+import { requireTool } from "@/lib/auth/access";
+// constants.ts is import-free, which is what makes it safe to use as
+// VALUES from this file-level "use server" module — importing them from
+// a "server-only" module instead would drag that chain into the client
+// bundle and break the production build (see CLAUDE.md, "Shared masters").
+import { isUom } from "@/lib/masters/constants";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-// Re-declared rather than imported from queries.ts: that module is
-// "server-only", and importing a *value* from it into this file-level
-// "use server" module drags the server-only chain into the client bundle
-// and breaks the production build (see CLAUDE.md, "Shared masters").
-const UOMS = ["each", "rft", "sqft", "lumpsum", "bag", "kg", "litre", "cft"];
-
-export type ActionState = { error?: string } | undefined;
-
-/** Every mutation here needs the same two lines first. */
-async function authorize() {
-  const user = await requireUser();
-  await requireApp(user, "/selections");
-  return user;
-}
+import type { ActionState } from "@/lib/action-state";
+export type { ActionState };
 
 // ---------------------------------------------------------------------
 // Revisions
@@ -34,7 +26,7 @@ async function authorize() {
  * competing drafts — caught below and reported plainly.
  */
 export async function startFirstRevision(unitId: string): Promise<ActionState> {
-  const user = await authorize();
+  const user = await requireTool("/selections");
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -64,7 +56,7 @@ export async function issueSelection(
   selectionId: string,
   notes: string | null,
 ): Promise<ActionState> {
-  await authorize();
+  await requireTool("/selections");
   const supabase = await createClient();
 
   // Written before issuing, while the row is still a draft — the guard
@@ -98,7 +90,7 @@ export async function issueSelection(
  * Budgets keep pricing on lines that didn't change.
  */
 export async function createNextRevision(fromSelectionId: string): Promise<ActionState> {
-  await authorize();
+  await requireTool("/selections");
   const supabase = await createClient();
 
   const { data, error } = await supabase.rpc("create_next_revision", {
@@ -116,7 +108,7 @@ export async function createNextRevision(fromSelectionId: string): Promise<Actio
 }
 
 export async function deleteDraft(selectionId: string): Promise<ActionState> {
-  await authorize();
+  await requireTool("/selections");
   const supabase = await createClient();
 
   // Lines first: the immutability trigger checks the parent's status, and
@@ -156,7 +148,7 @@ export type NewSpace = { spaceTypeId: string; label: string };
  * designer approved on screen is exactly what gets written.
  */
 export async function addSpaces(unitId: string, spaces: NewSpace[]): Promise<ActionState> {
-  await authorize();
+  await requireTool("/selections");
 
   const cleaned = spaces
     .map((space) => ({ spaceTypeId: space.spaceTypeId, label: space.label.trim() }))
@@ -206,7 +198,7 @@ export async function addSpaces(unitId: string, spaces: NewSpace[]): Promise<Act
 }
 
 export async function removeSpace(spaceId: string): Promise<ActionState> {
-  await authorize();
+  await requireTool("/selections");
   const supabase = await createClient();
 
   const { error } = await supabase.from("spaces").delete().eq("id", spaceId);
@@ -249,7 +241,7 @@ export async function addLines(
   spaceIds: string[],
   entries: BasketEntry[],
 ): Promise<ActionState> {
-  const user = await authorize();
+  const user = await requireTool("/selections");
 
   const wanted = entries.filter((entry) => entry.quantity > 0);
   if (spaceIds.length === 0) return { error: "Choose at least one space." };
@@ -376,9 +368,9 @@ export async function updateLine(
   uom: string,
   note: string | null,
 ): Promise<ActionState> {
-  await authorize();
+  await requireTool("/selections");
   if (!(quantity > 0)) return { error: "Quantity must be more than zero." };
-  if (!UOMS.includes(uom)) return { error: "Choose a valid unit of measure." };
+  if (!isUom(uom)) return { error: "Choose a valid unit of measure." };
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -400,7 +392,7 @@ export async function updateLine(
 }
 
 export async function removeLine(selectionId: string, lineId: string): Promise<ActionState> {
-  await authorize();
+  await requireTool("/selections");
   const supabase = await createClient();
 
   const { error } = await supabase.from("selection_lines").delete().eq("id", lineId);
@@ -433,12 +425,12 @@ export async function requestItem(input: {
   specNote: string | null;
   uom: string;
 }): Promise<{ error?: string; itemId?: string }> {
-  const user = await authorize();
+  const user = await requireTool("/selections");
 
   const name = input.name.trim();
   if (!name) return { error: "Give the item a name." };
   if (!input.categoryId) return { error: "Choose a category." };
-  if (!UOMS.includes(input.uom)) return { error: "Choose a unit of measure." };
+  if (!isUom(input.uom)) return { error: "Choose a unit of measure." };
 
   const supabase = await createClient();
 

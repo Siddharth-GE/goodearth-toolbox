@@ -1,7 +1,7 @@
 "use server";
 
-import { requireApp } from "@/lib/auth/access";
-import { requireUser } from "@/lib/auth/dal";
+import type { ActionState } from "@/lib/action-state";
+import { requireTool } from "@/lib/auth/access";
 import { designView } from "@/lib/pdf/theme";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
@@ -19,13 +19,7 @@ const BUCKET = "design-views";
 const MAX_UPLOAD_BYTES = 3 * 1024 * 1024;
 const ACCEPTED = ["image/jpeg", "image/png", "image/webp", "image/avif"];
 
-export type ViewActionState = { error?: string } | undefined;
-
-async function authorize() {
-  const user = await requireUser();
-  await requireApp(user, "/selections");
-  return user;
-}
+export type ViewActionState = ActionState;
 
 /**
  * Uploads a design view for a space.
@@ -41,7 +35,7 @@ export async function uploadSpaceView(
   selectionId: string,
   formData: FormData,
 ): Promise<ViewActionState> {
-  const user = await authorize();
+  const user = await requireTool("/selections");
 
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) return { error: "Choose an image to upload." };
@@ -125,7 +119,7 @@ export async function captionSpaceView(
   selectionId: string,
   caption: string,
 ): Promise<ViewActionState> {
-  await authorize();
+  await requireTool("/selections");
   const supabase = await createClient();
 
   const { error } = await supabase
@@ -148,7 +142,7 @@ export async function moveSpaceView(
   selectionId: string,
   direction: "up" | "down",
 ): Promise<ViewActionState> {
-  await authorize();
+  await requireTool("/selections");
   const supabase = await createClient();
 
   const { data: view } = await supabase
@@ -188,7 +182,7 @@ export async function deleteSpaceView(
   viewId: string,
   selectionId: string,
 ): Promise<ViewActionState> {
-  await authorize();
+  await requireTool("/selections");
   const supabase = await createClient();
 
   const { data: view } = await supabase

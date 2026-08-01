@@ -1,11 +1,11 @@
 "use server";
 
-import { requireApp } from "@/lib/auth/access";
-import { requireUser } from "@/lib/auth/dal";
+import type { ActionState } from "@/lib/action-state";
+import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
-export type VendorFormState = { error?: string } | undefined;
+export type VendorFormState = ActionState;
 
 function readVendorForm(formData: FormData) {
   return {
@@ -22,8 +22,7 @@ export async function createVendor(
   _state: VendorFormState,
   formData: FormData,
 ): Promise<VendorFormState> {
-  const user = await requireUser();
-  await requireApp(user, "/masters");
+  await requireTool("/masters");
 
   const { name, contact_name, mobile, gst_no, address, is_active } = readVendorForm(formData);
   if (!name) return { error: "Enter the vendor's name." };
@@ -46,8 +45,7 @@ export async function updateVendor(
   _state: VendorFormState,
   formData: FormData,
 ): Promise<VendorFormState> {
-  const user = await requireUser();
-  await requireApp(user, "/masters");
+  await requireTool("/masters");
 
   const { name, contact_name, mobile, gst_no, address, is_active } = readVendorForm(formData);
   if (!name) return { error: "Enter the vendor's name." };

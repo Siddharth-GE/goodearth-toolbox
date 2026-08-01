@@ -1,11 +1,11 @@
 "use server";
 
-import { requireApp } from "@/lib/auth/access";
-import { requireUser } from "@/lib/auth/dal";
+import type { ActionState } from "@/lib/action-state";
+import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
-export type StoreFormState = { error?: string } | undefined;
+export type StoreFormState = ActionState;
 
 function readStoreForm(formData: FormData) {
   return {
@@ -20,8 +20,7 @@ export async function createStore(
   _state: StoreFormState,
   formData: FormData,
 ): Promise<StoreFormState> {
-  const user = await requireUser();
-  await requireApp(user, "/masters");
+  await requireTool("/masters");
 
   const { name, project_id, location, is_active } = readStoreForm(formData);
   if (!name) return { error: "Enter the store's name." };
@@ -42,8 +41,7 @@ export async function updateStore(
   _state: StoreFormState,
   formData: FormData,
 ): Promise<StoreFormState> {
-  const user = await requireUser();
-  await requireApp(user, "/masters");
+  await requireTool("/masters");
 
   const { name, project_id, location, is_active } = readStoreForm(formData);
   if (!name) return { error: "Enter the store's name." };

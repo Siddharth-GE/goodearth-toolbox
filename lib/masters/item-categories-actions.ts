@@ -1,26 +1,23 @@
 "use server";
 
-import { requireApp } from "@/lib/auth/access";
-import { requireUser } from "@/lib/auth/dal";
+import type { ActionState } from "@/lib/action-state";
+import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import type { ItemKind } from "./items";
+import { isItemKind } from "./constants";
 
-const ITEM_KINDS = ["catalogue", "material"];
-
-export type ItemCategoryFormState = { error?: string } | undefined;
+export type ItemCategoryFormState = ActionState;
 
 export async function createItemCategory(
   _state: ItemCategoryFormState,
   formData: FormData,
 ): Promise<ItemCategoryFormState> {
-  const user = await requireUser();
-  await requireApp(user, "/masters");
+  await requireTool("/masters");
 
   const name = String(formData.get("name") ?? "").trim();
-  const kind = String(formData.get("kind") ?? "") as ItemKind;
+  const kind = String(formData.get("kind") ?? "");
   if (!name) return { error: "Enter a category name." };
-  if (!ITEM_KINDS.includes(kind)) return { error: "Choose catalogue or material." };
+  if (!isItemKind(kind)) return { error: "Choose catalogue or material." };
 
   const supabase = await createClient();
   const { error } = await supabase.from("item_categories").insert({ name, kind });

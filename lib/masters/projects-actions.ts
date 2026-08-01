@@ -1,7 +1,7 @@
 "use server";
 
-import { requireApp } from "@/lib/auth/access";
-import { requireUser } from "@/lib/auth/dal";
+import type { ActionState } from "@/lib/action-state";
+import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { ProjectStatus, ProjectType } from "./projects";
@@ -9,7 +9,7 @@ import type { ProjectStatus, ProjectType } from "./projects";
 const PROJECT_TYPES = ["apartment_villa_community", "eco_village", "mixed_residential_commercial"];
 const PROJECT_STATUSES = ["planning", "active", "completed"];
 
-export type ProjectFormState = { error?: string } | undefined;
+export type ProjectFormState = ActionState;
 
 function readProjectForm(formData: FormData) {
   return {
@@ -24,8 +24,7 @@ export async function createProject(
   _state: ProjectFormState,
   formData: FormData,
 ): Promise<ProjectFormState> {
-  const user = await requireUser();
-  await requireApp(user, "/masters");
+  await requireTool("/masters");
 
   const { name, location, project_type, status } = readProjectForm(formData);
   if (!name) return { error: "Enter a project name." };
@@ -50,8 +49,7 @@ export async function updateProject(
   _state: ProjectFormState,
   formData: FormData,
 ): Promise<ProjectFormState> {
-  const user = await requireUser();
-  await requireApp(user, "/masters");
+  await requireTool("/masters");
 
   const { name, location, project_type, status } = readProjectForm(formData);
   if (!name) return { error: "Enter a project name." };

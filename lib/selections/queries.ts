@@ -1,7 +1,6 @@
 import "server-only";
 
-import { requireApp } from "@/lib/auth/access";
-import { requireUser } from "@/lib/auth/dal";
+import { requireTool } from "@/lib/auth/access";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { cache } from "react";
@@ -68,8 +67,7 @@ export type SelectionLineRow = {
  * so a unit with no design yet must be visible to be startable.
  */
 export async function listUnitsForSelections(projectId?: string): Promise<UnitSelectionRow[]> {
-  const user = await requireUser();
-  await requireApp(user, "/selections");
+  await requireTool("/selections");
 
   const supabase = await createClient();
   // fetchAll: every unit must be visible here to be startable, and a
@@ -114,8 +112,7 @@ export type SelectionDetail = SelectionRow & {
 // itself, and again inside diffRevisions — and without this each one is a
 // separate round trip for identical data.
 export const getSelection = cache(async (selectionId: string): Promise<SelectionDetail | null> => {
-  const user = await requireUser();
-  await requireApp(user, "/selections");
+  await requireTool("/selections");
 
   const supabase = await createClient();
   const { data } = await supabase
@@ -145,8 +142,7 @@ export const listUnitSpaces = cache(async function listUnitSpaces(
   unitId: string,
   selectionId?: string,
 ): Promise<UnitSpaceRow[]> {
-  const user = await requireUser();
-  await requireApp(user, "/selections");
+  await requireTool("/selections");
 
   const supabase = await createClient();
   const [spacesResult, linesResult] = await Promise.all([
@@ -181,8 +177,7 @@ export const listUnitSpaces = cache(async function listUnitSpaces(
 export const listSelectionLines = cache(async function listSelectionLines(
   selectionId: string,
 ): Promise<SelectionLineRow[]> {
-  const user = await requireUser();
-  await requireApp(user, "/selections");
+  await requireTool("/selections");
 
   const supabase = await createClient();
   const { data } = await supabase
@@ -222,8 +217,7 @@ export const listSelectionLines = cache(async function listSelectionLines(
 
 /** Every revision of a unit, newest first — the unit's design history. */
 export async function listRevisions(unitId: string): Promise<SelectionRow[]> {
-  const user = await requireUser();
-  await requireApp(user, "/selections");
+  await requireTool("/selections");
 
   const supabase = await createClient();
   const { data } = await supabase
@@ -239,8 +233,7 @@ export async function getPreviousIssued(
   unitId: string,
   revisionNo: number,
 ): Promise<SelectionRow | null> {
-  const user = await requireUser();
-  await requireApp(user, "/selections");
+  await requireTool("/selections");
 
   const supabase = await createClient();
   const { data } = await supabase
@@ -390,8 +383,7 @@ export async function getBudgetHandoff(selectionId: string): Promise<BudgetHando
 
 /** Space types a designer may pick from — proposals aren't offered until approved. */
 export async function listActiveSpaceTypes() {
-  const user = await requireUser();
-  await requireApp(user, "/selections");
+  await requireTool("/selections");
 
   const supabase = await createClient();
   const { data } = await supabase

@@ -1,18 +1,17 @@
 "use server";
 
-import { requireApp } from "@/lib/auth/access";
-import { requireUser } from "@/lib/auth/dal";
+import type { ActionState } from "@/lib/action-state";
+import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
-export type BrandFormState = { error?: string } | undefined;
+export type BrandFormState = ActionState;
 
 export async function createBrand(
   _state: BrandFormState,
   formData: FormData,
 ): Promise<BrandFormState> {
-  const user = await requireUser();
-  await requireApp(user, "/masters");
+  await requireTool("/masters");
 
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { error: "Enter a brand name." };

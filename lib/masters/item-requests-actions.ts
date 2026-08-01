@@ -1,17 +1,11 @@
 "use server";
 
-import { requireApp } from "@/lib/auth/access";
-import { requireUser } from "@/lib/auth/dal";
+import type { ActionState } from "@/lib/action-state";
+import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
-export type RequestActionState = { error?: string } | undefined;
-
-async function authorize() {
-  const user = await requireUser();
-  await requireApp(user, "/masters");
-  return user;
-}
+export type RequestActionState = ActionState;
 
 /**
  * Accepts the provisional item into the catalogue as it stands.
@@ -23,7 +17,7 @@ export async function approveItemRequest(
   provisionalItemId: string,
   code: string | null,
 ): Promise<RequestActionState> {
-  const user = await authorize();
+  const user = await requireTool("/masters");
   const supabase = await createClient();
 
   const { error: itemError } = await supabase
@@ -64,7 +58,7 @@ export async function mergeItemRequest(
   provisionalItemId: string,
   targetItemId: string,
 ): Promise<RequestActionState> {
-  const user = await authorize();
+  const user = await requireTool("/masters");
   if (!targetItemId) return { error: "Choose the item this duplicates." };
   if (targetItemId === provisionalItemId) return { error: "An item can't be merged into itself." };
 
@@ -103,7 +97,7 @@ export async function rejectItemRequest(
   requestId: string,
   provisionalItemId: string,
 ): Promise<RequestActionState> {
-  const user = await authorize();
+  const user = await requireTool("/masters");
   const supabase = await createClient();
 
   // Deactivated rather than deleted: selection lines may already point at
