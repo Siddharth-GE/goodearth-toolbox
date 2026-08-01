@@ -81,17 +81,25 @@ function LineRow({
   // transition so it doesn't mark the row busy — the value is already on
   // screen and updateLine deliberately doesn't revalidate the page.
   const save = () => {
-    const parsed = Number(quantity);
+    const parsed = Number(quantity.trim());
     if (parsed === saved.current.quantity && note === saved.current.note) return;
-    if (!(parsed > 0)) {
-      setError("Must be more than 0");
+    if (!Number.isFinite(parsed) || !(parsed > 0)) {
+      setError("Quantity must be more than 0");
       setQuantity(String(saved.current.quantity));
       return;
     }
     setError(undefined);
     saved.current = { quantity: parsed, note };
     void updateLine(selectionId, line.id, parsed, line.uom, note || null).then((result) => {
-      if (result?.error) setError(result.error);
+      if (result?.error) {
+        setError(result.error);
+        // It didn't persist, so the next blur has to try again. Without
+        // this the row is marked saved before the write is known to have
+        // worked, and the short-circuit above then blocks every retry —
+        // the designer's edit is silently lost. The pricing and margins
+        // grids already roll back this way.
+        saved.current = { quantity: NaN, note: "" };
+      }
     });
   };
 
@@ -157,7 +165,10 @@ function LineRow({
           <button
             type="button"
             aria-label={`Remove ${line.item_name}`}
-            className="rounded-lg p-1.5 text-muted transition-colors hover:bg-danger/10 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            // Dimming the row isn't enough on its own: the button stayed
+            // clickable, so a double-click fired removeLine twice.
+            disabled={removing}
+            className="rounded-lg p-1.5 text-muted transition-colors hover:bg-danger/10 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:pointer-events-none disabled:opacity-40"
             onClick={() =>
               startTransition(async () => {
                 const result = await removeLine(selectionId, line.id);
