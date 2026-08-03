@@ -36,7 +36,11 @@ function guardError(error: { message: string }, fallback: string): ActionState {
     message.includes("no longer exists") ||
     message.includes("deletion request") ||
     message.includes("admin can approve") ||
-    message.includes("receiving its goods")
+    message.includes("receiving its goods") ||
+    // Migration 0023: an issued PO whose goods are already in a store
+    // can no longer be cancelled.
+    message.includes("already been received") ||
+    message.includes("still outstanding")
   ) {
     return { error: message.replace(/^.*?:\s*/, "") };
   }

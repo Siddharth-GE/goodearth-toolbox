@@ -2,6 +2,7 @@ import { Attribution } from "@/components/ui/attribution";
 import { LinkButton } from "@/components/ui/button";
 import { PageTitle } from "@/components/ui/page-title";
 import { formatDate } from "@/lib/format";
+import { getPoReceipts } from "@/lib/inventory/queries";
 import { listGstRates } from "@/lib/masters/gst-rates";
 import { isFullyPriced } from "@/lib/purchase-orders/math";
 import {
@@ -16,14 +17,16 @@ import { PoStatusBadge } from "../_components/status-badge";
 import { ActionButtons } from "./_components/action-buttons";
 import { HeaderFields } from "./_components/header-fields";
 import { LineGrid } from "./_components/line-grid";
+import { ReceiptsSection } from "./_components/receipts-section";
 
 export default async function PurchaseOrderPage({ params }: { params: Promise<{ poId: string }> }) {
   const { poId } = await params;
-  const [po, actor, options, gstRates] = await Promise.all([
+  const [po, actor, options, gstRates, receipts] = await Promise.all([
     getPurchaseOrder(poId),
     getCurrentPoActor(),
     getPoFormOptions(),
     listGstRates(),
+    getPoReceipts(poId),
   ]);
   if (!po) notFound();
 
@@ -81,7 +84,10 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
           <p className="text-foreground text-sm">
             Issued to {po.vendor_name}
             {po.issued_at && <span className="text-muted"> on {formatDate(po.issued_at)}</span>} —
-            locked. Goods receipts against it arrive with the Inventory tool.
+            locked.{" "}
+            {receipts.length > 0
+              ? "Deliveries recorded against it are listed below."
+              : "Nothing has been delivered against it yet."}
           </p>
           <Attribution name={po.issued_by_name} label="Issued by" />
         </div>
@@ -124,7 +130,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
       {po.status === "completed" && (
         <div className="border-border bg-surface rounded-xl border px-4 py-3">
           <p className="text-foreground text-sm">
-            Completed — every line fully received. See the receipts in Inventory.
+            Completed — every line fully received. The deliveries are listed below.
           </p>
         </div>
       )}
@@ -144,6 +150,8 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
       />
 
       <LineGrid poId={po.id} lines={po.lines} editable={editable} gstRates={activeRates} />
+
+      <ReceiptsSection receipts={receipts} />
     </div>
   );
 }
