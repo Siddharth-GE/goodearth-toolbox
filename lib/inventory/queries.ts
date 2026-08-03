@@ -787,20 +787,28 @@ export async function listStockOnHand({
 
   const total = count ?? 0;
   return {
-    rows: rows.map((row) => {
-      const item = items.get(row.item_id ?? "");
-      return {
-        store_id: row.store_id ?? "",
-        store_name: storeNames.get(row.store_id ?? "") ?? "—",
-        item_id: row.item_id ?? "",
-        item_name: item?.name ?? "—",
-        item_code: item?.code ?? null,
-        item_brand: item?.brand ?? null,
-        item_thumb_url: item?.thumb_url ?? null,
-        uom: item?.default_uom ?? "each",
-        quantity: row.quantity ?? 0,
-      };
-    }),
+    // The database pages this by (store_id, item_id) so the pagination
+    // stays stable, but uuid order reads as random on screen — so the
+    // page in hand is sorted by name before it is rendered.
+    rows: rows
+      .map((row) => {
+        const item = items.get(row.item_id ?? "");
+        return {
+          store_id: row.store_id ?? "",
+          store_name: storeNames.get(row.store_id ?? "") ?? "—",
+          item_id: row.item_id ?? "",
+          item_name: item?.name ?? "—",
+          item_code: item?.code ?? null,
+          item_brand: item?.brand ?? null,
+          item_thumb_url: item?.thumb_url ?? null,
+          uom: item?.default_uom ?? "each",
+          quantity: row.quantity ?? 0,
+        };
+      })
+      .sort(
+        (a, b) =>
+          a.store_name.localeCompare(b.store_name) || a.item_name.localeCompare(b.item_name),
+      ),
     total,
     page: currentPage,
     pageCount: Math.max(1, Math.ceil(total / pageSize)),
