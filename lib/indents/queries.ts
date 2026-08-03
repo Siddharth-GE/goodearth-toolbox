@@ -113,6 +113,12 @@ export type IndentLineRow = {
   uom: string;
   note: string | null;
   source: IndentLineSource;
+  /** Who last touched the line — the attribution rule. */
+  updated_by_name: string | null;
+  /** Ordered across all live POs (Phase 6) — the "ordered X of Y" figure. */
+  ordered_quantity: number;
+  /** The PO references carrying this line, e.g. "PO/SAA/P12/001". */
+  ordered_po_refs: string | null;
 };
 
 export type IndentDetail = {
@@ -131,6 +137,8 @@ export type IndentDetail = {
   created_at: string;
   submitted_at: string | null;
   approved_at: string | null;
+  submitted_by_name: string | null;
+  approved_by_name: string | null;
   lines: IndentLineRow[];
   line_count: number;
 };
@@ -143,7 +151,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
     supabase
       .from("indents")
       .select(
-        "id, reference, status, stage, required_by, note, rejection_note, project_id, unit_id, created_at, submitted_at, approved_at, projects(name), plots(name), units(name)",
+        "id, reference, status, stage, required_by, note, rejection_note, project_id, unit_id, created_at, submitted_by, submitted_at, approved_by, approved_at, projects(name), plots(name), units(name)",
       )
       .eq("id", indentId)
       .maybeSingle(),
@@ -151,7 +159,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
       supabase
         .from("indent_lines")
         .select(
-          "id, item_id, quantity, uom, note, budget_id, construction_line_id, created_at, items(name, code, thumb_url, brands(name))",
+          "id, item_id, quantity, uom, note, budget_id, construction_line_id, created_by, updated_by, created_at, items(name, code, thumb_url, brands(name))",
         )
         .eq("indent_id", indentId)
         .order("created_at")
@@ -162,6 +170,43 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
 
   if (!indent) return null;
 
+  // Names for every actor on the document — the attribution rule. One
+  // profiles read rather than embedded joins (several FKs to profiles).
+  const actorIds = [
+    ...new Set(
+      [
+        indent.submitted_by,
+        indent.approved_by,
+        ...(lines ?? []).map((line) => line.updated_by ?? line.created_by),
+      ].filter((id): id is string => id != null),
+    ),
+  ];
+  const { data: profiles } = actorIds.length
+    ? await supabase.from("profiles").select("id, full_name").in("id", actorIds)
+    : { data: [] };
+  const names = new Map((profiles ?? []).map((profile) => [profile.id, profile.full_name]));
+  const nameOf = (id: string | null | undefined) => (id ? (names.get(id) ?? null) : null);
+
+  // "Ordered X of Y" per line, through the money-free po_line_facts view
+  // (migration 0022) — quantities and references only, never a rate, so
+  // a site user without /purchase-orders still sees fulfilment.
+  const lineIds = (lines ?? []).map((line) => line.id);
+  const { data: orderedFacts } = lineIds.length
+    ? await supabase
+        .from("po_line_facts")
+        .select("indent_line_id, quantity, po_reference, po_status")
+        .in("indent_line_id", lineIds)
+    : { data: [] };
+
+  const orderedByLine = new Map<string, { quantity: number; refs: Set<string> }>();
+  for (const fact of orderedFacts ?? []) {
+    if (fact.po_status === "cancelled" || !fact.indent_line_id) continue;
+    const entry = orderedByLine.get(fact.indent_line_id) ?? { quantity: 0, refs: new Set() };
+    entry.quantity += fact.quantity ?? 0;
+    if (fact.po_reference) entry.refs.add(fact.po_reference);
+    orderedByLine.set(fact.indent_line_id, entry);
+  }
+
   const mapped: IndentLineRow[] = (lines ?? []).map((line) => {
     const item = line.items as {
       name: string;
@@ -169,6 +214,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
       thumb_url: string | null;
       brands: { name: string } | null;
     } | null;
+    const ordered = orderedByLine.get(line.id);
     return {
       id: line.id,
       item_id: line.item_id,
@@ -185,6 +231,9 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
           : line.construction_line_id != null
             ? "construction"
             : "direct",
+      updated_by_name: nameOf(line.updated_by ?? line.created_by),
+      ordered_quantity: ordered?.quantity ?? 0,
+      ordered_po_refs: ordered ? [...ordered.refs].sort().join(", ") : null,
     };
   });
 
@@ -204,6 +253,8 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
     created_at: indent.created_at,
     submitted_at: indent.submitted_at,
     approved_at: indent.approved_at,
+    submitted_by_name: nameOf(indent.submitted_by),
+    approved_by_name: nameOf(indent.approved_by),
     lines: mapped,
     line_count: mapped.length,
   };

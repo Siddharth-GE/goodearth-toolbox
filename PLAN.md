@@ -17,23 +17,17 @@ and **what's next**.
 
 ## Where we are right now
 
-**Phase 5 (Indents + the Construction tree in Budgets) shipped and
-merged on 2026-08-03.** The operational spine now runs end to end:
-a designer specifies a unit space by space (Selections), the budget
-team prices it and a client quotation comes out (Budgets · Interiors);
-the QS team keeps a stage-wise quantity plan per unit (Budgets ·
-Construction); site teams raise numbered indents from either source or
-straight from the catalogue, and a named approver approves them or
-sends them back with a note.
-
-**Next: Phase 6 — Purchase Orders**, raised from approved indent
-lines. See "Next up".
+**Phase 6 (Purchase Orders) is in flight on `feature/purchase-orders`**
+— all four milestones built the same day the phase started; M1 and M2
+founder-tested and passed, M3+M4 awaiting their gates and the founder
+applying migration `0022` (see the tool's PLAN.md). The chain now runs
+design → price → indent → **PO with GST and a printable document**.
 
 |                     |                                                                                          |
 | ------------------- | ---------------------------------------------------------------------------------------- |
 | Last worked         | 2026-08-03                                                                               |
-| Branch              | `master` — Phase 5 merged, `feature/indents` deleted                                     |
-| Migrations applied  | `0001`–`0019` (next new one is `0020`)                                                   |
+| Branch              | `feature/purchase-orders` (Phase 6; master = through Phase 5)                            |
+| Migrations applied  | `0001`–`0021` (`0022` written, waiting for Studio; next new one is `0023`)               |
 | Items in database   | **2,633** (2,631 imported catalogue + 2 material seeds)                                  |
 | Categories / brands | 14 / 21                                                                                  |
 | Thumbnails          | **897** in Supabase Storage; 1,736 items use the colour placeholder                      |
@@ -52,7 +46,7 @@ lines. See "Next up".
 | 2b  | **Design views** — renders per space, in the design document                                           | ✅ Shipped, merged 2026-08-01 |
 | 4   | **Budgets** — cost + margin → client rate, approval, two documents                                     | ✅ Shipped, merged 2026-08-01 |
 | 5   | **Indents + Construction tree** — three line sources, QS stage-wise plans, approval                    | ✅ Shipped, merged 2026-08-03 |
-| 6   | Purchase Orders — vendor grouping + letterhead PDF                                                     | ⬜ **NEXT**                   |
+| 6   | Purchase Orders — vendor grouping + letterhead PDF                                                     | 🔨 In flight on its branch    |
 | 7   | Inventory / Store — goods receipt, stock on hand, issues                                               | ⬜ Not started                |
 | 8   | Bills — against POs and labour contracts                                                               | ⬜ Not started                |
 | 9   | Overview wired to real data + one real project end-to-end                                              | ⬜ Not started                |
@@ -80,28 +74,26 @@ after. Things to watch:
   ask whether they match how Goodearth actually talks before importing.
 - Source files go in `data/` (git-ignored, like the catalogue CSVs).
 
-### Phase 6 — Purchase Orders (not started)
+### Phase 6 — Purchase Orders (in flight, `feature/purchase-orders`)
 
-What's already settled or waiting for it:
+All four milestones are built; detail and gates live in
+`app/(dashboard)/purchase-orders/PLAN.md`. To finish the phase:
 
-- POs are raised from **approved** indent lines, grouped by vendor,
-  with a letterhead-quality PDF. Anything referencing interiors budget
-  lines uses the composite `(budget_id, line_key)` rule (CLAUDE.md);
-  indent lines have their own stable row ids to anchor on.
-- **Margin never appears on a PO** — cost/margin/client rate are
-  Budgets-only, RLS-enforced. A PO's money is the _purchase_ price
-  agreed with the vendor, a new column, not anything from Budgets.
-- **Before POs ship:** audit triggers on `items`/`vendors`/
-  `item_requests` (deferred from the 2026-08-01 audit — vendors become
-  counterparties on money documents then).
-- **Ask the founder at kickoff:** PO numbering format, and the real
-  letterhead assets (logo, address, GST, terms). The whole PDF layer
-  still uses a placeholder letterhead and Helvetica (no ₹ glyph —
-  amounts print digits-only via `formatAmount`); a real letterhead +
-  Geist `.ttf` upgrade would lift every document at once.
-- An indent `cancelled` status was deliberately deferred to this phase
-  — POs define what "partly consumed" means; additive CHECK swap when
-  needed.
+1. **Founder applies `0022_po_facts_views.sql` in Studio** (two
+   money-free views — the "ordered X of Y" and Overview stage 02 reads).
+2. Types regenerated, full verification, push for preview.
+3. Founder tests the M3+M4 gates in the browser.
+4. **Letterhead assets** (logo, address, GST no., terms — still
+   placeholder; a Geist `.ttf` would lift every document at once) swap
+   in, then merge to `master` and delete the branch.
+
+Settled during the build (decisions in the detailed plan, approved
+2026-08-03): PO number `PO/<project>/<plot-or-unit>/NNN` with plot/unit
+short codes in Masters; POs from approved indents only; one PO = one
+vendor + one scope; GST slabs as a managed `gst_rates` master; deleting
+an issued PO is request-then-admin-approves; indent approval is the one
+approval in the chain. The indent `cancelled` status stayed deferred —
+nothing in Phase 6 needed it after all; revisit if a real case appears.
 
 ### Smaller pending items (any session)
 
@@ -282,6 +274,21 @@ plumbing, migration conventions). What's still **live** from them:
 
 Compact by design — one entry per working day. Full detail: git
 history and the per-tool PLAN.md files.
+
+### 2026-08-03 (later) — Phase 6 planned and built in one sitting
+
+The founder approved the full Phases 6–8 feature overview (POs /
+Inventory / Bills — every decision now in the detailed plan and
+CLAUDE-adjacent docs), then Phase 6 was built through all four
+milestones on `feature/purchase-orders`: migrations `0020` (audit
+prerequisite) + `0021` (PO schema, guards, per-scope numbering) +
+`0022` (money-free fact views, **not yet applied**), the pure modules
+with 15 new tests, Masters groundwork (plot/unit codes, GST Rates tab),
+the raise-and-price flow, the issue/deletion status machine, attribution
+avatars, indent fulfilment, the PO PDF and a real Overview stage 02.
+M1 and M2 founder-gated same day (one fix: the qty input was squeezed —
+column widened, uom moved under it). Waiting on: `0022` in Studio, the
+M3/M4 browser gates, and letterhead assets before merge.
 
 ### 2026-08-03 — Phase 5 shipped end to end; an outage found, fixed and guarded
 

@@ -148,6 +148,8 @@ export type PoLineRow = {
   note: string | null;
   indent_line_id: string;
   indent_reference: string;
+  /** Who last touched the line — the attribution rule. */
+  updated_by_name: string | null;
 };
 
 export type PoDetail = {
@@ -174,6 +176,10 @@ export type PoDetail = {
   deletion_requested_by: string | null;
   deletion_requested_at: string | null;
   cancelled_at: string | null;
+  created_by_name: string | null;
+  issued_by_name: string | null;
+  deletion_requested_by_name: string | null;
+  cancelled_by_name: string | null;
   lines: PoLineRow[];
   line_count: number;
 };
@@ -186,7 +192,7 @@ export const getPurchaseOrder = cache(async (poId: string): Promise<PoDetail | n
     supabase
       .from("purchase_orders")
       .select(
-        "id, reference, status, project_id, plot_id, unit_id, scope_code, vendor_id, deliver_store_id, deliver_note, expected_by, terms, note, deletion_note, created_by, created_at, issued_at, deletion_requested_by, deletion_requested_at, cancelled_at, projects(name), plots(name), units(name), vendors(name)",
+        "id, reference, status, project_id, plot_id, unit_id, scope_code, vendor_id, deliver_store_id, deliver_note, expected_by, terms, note, deletion_note, created_by, created_at, issued_by, issued_at, deletion_requested_by, deletion_requested_at, cancelled_by, cancelled_at, projects(name), plots(name), units(name), vendors(name)",
       )
       .eq("id", poId)
       .maybeSingle(),
@@ -194,7 +200,7 @@ export const getPurchaseOrder = cache(async (poId: string): Promise<PoDetail | n
       supabase
         .from("purchase_order_lines")
         .select(
-          "id, item_id, quantity, uom, rate, gst_pct, note, indent_line_id, created_at, items(name, code, thumb_url, brands(name)), indent_lines(indents(reference))",
+          "id, item_id, quantity, uom, rate, gst_pct, note, indent_line_id, created_by, updated_by, created_at, items(name, code, thumb_url, brands(name)), indent_lines(indents(reference))",
         )
         .eq("po_id", poId)
         .order("sort_order")
@@ -205,6 +211,26 @@ export const getPurchaseOrder = cache(async (poId: string): Promise<PoDetail | n
   ]);
 
   if (!po) return null;
+
+  // One profiles read resolves every actor on the document — simpler
+  // and safer than four embedded joins on a table with several FKs to
+  // profiles (Supabase would need each constraint named explicitly).
+  const actorIds = [
+    ...new Set(
+      [
+        po.created_by,
+        po.issued_by,
+        po.deletion_requested_by,
+        po.cancelled_by,
+        ...(lines ?? []).map((line) => line.updated_by ?? line.created_by),
+      ].filter((id): id is string => id != null),
+    ),
+  ];
+  const { data: profiles } = actorIds.length
+    ? await supabase.from("profiles").select("id, full_name").in("id", actorIds)
+    : { data: [] };
+  const names = new Map((profiles ?? []).map((profile) => [profile.id, profile.full_name]));
+  const nameOf = (id: string | null | undefined) => (id ? (names.get(id) ?? null) : null);
 
   const mapped: PoLineRow[] = (lines ?? []).map((line) => {
     const item = line.items as {
@@ -228,6 +254,7 @@ export const getPurchaseOrder = cache(async (poId: string): Promise<PoDetail | n
       note: line.note,
       indent_line_id: line.indent_line_id,
       indent_reference: indent?.indents?.reference ?? "—",
+      updated_by_name: nameOf(line.updated_by ?? line.created_by),
     };
   });
 
@@ -258,10 +285,57 @@ export const getPurchaseOrder = cache(async (poId: string): Promise<PoDetail | n
     deletion_requested_by: po.deletion_requested_by,
     deletion_requested_at: po.deletion_requested_at,
     cancelled_at: po.cancelled_at,
+    created_by_name: nameOf(po.created_by),
+    issued_by_name: nameOf(po.issued_by),
+    deletion_requested_by_name: nameOf(po.deletion_requested_by),
+    cancelled_by_name: nameOf(po.cancelled_by),
     lines: mapped,
     line_count: mapped.length,
   };
 });
+
+export type PoPdfData = {
+  po: PoDetail;
+  vendor: {
+    name: string;
+    contact_name: string | null;
+    mobile: string | null;
+    gst_no: string | null;
+    address: string | null;
+  };
+  deliver_store_name: string | null;
+};
+
+/** Everything the PO document needs — the detail plus the vendor's
+ * full counterparty block from Masters. Gated by getPurchaseOrder. */
+export async function getPoPdfData(poId: string): Promise<PoPdfData | null> {
+  const po = await getPurchaseOrder(poId);
+  if (!po) return null;
+
+  const supabase = await createClient();
+  const [{ data: vendor }, store] = await Promise.all([
+    supabase
+      .from("vendors")
+      .select("name, contact_name, mobile, gst_no, address")
+      .eq("id", po.vendor_id)
+      .maybeSingle(),
+    po.deliver_store_id
+      ? supabase.from("stores").select("name").eq("id", po.deliver_store_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+
+  return {
+    po,
+    vendor: {
+      name: vendor?.name ?? po.vendor_name,
+      contact_name: vendor?.contact_name ?? null,
+      mobile: vendor?.mobile ?? null,
+      gst_no: vendor?.gst_no ?? null,
+      address: vendor?.address ?? null,
+    },
+    deliver_store_name: store?.data?.name ?? null,
+  };
+}
 
 /** Who the signed-in user is to this tool — drives the creator-or-admin
  * delete rule and (from M3) the admin-only deletion approval. The
@@ -274,6 +348,47 @@ export async function getCurrentPoActor(): Promise<{ isAdmin: boolean; userId: s
 /* ------------------------------------------------------------------ *
  * The pool — approved indent lines this PO can still order
  * ------------------------------------------------------------------ */
+
+/**
+ * Counts for the Overview pipeline's second stage.
+ *
+ * Deliberately NOT gated, exactly like countIndentsPipeline: the
+ * Overview is the shell's home and every signed-in user sees it. Safe
+ * because it reads the po_facts view (migration 0022), whose column
+ * list carries no money — a count of POs is operational fact.
+ */
+export async function countPosPipeline(): Promise<{
+  issuedThisMonth: number;
+  draftCount: number;
+  awaitingDeletion: number;
+}> {
+  const supabase = await createClient();
+
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+  const since = startOfMonth.toISOString();
+
+  // Exact database counts, head-only — never rows.length.
+  const [issued, drafts, deletions] = await Promise.all([
+    supabase
+      .from("po_facts")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["issued", "completed"])
+      .gte("issued_at", since),
+    supabase.from("po_facts").select("id", { count: "exact", head: true }).eq("status", "draft"),
+    supabase
+      .from("po_facts")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "deletion_requested"),
+  ]);
+
+  return {
+    issuedThisMonth: issued.count ?? 0,
+    draftCount: drafts.count ?? 0,
+    awaitingDeletion: deletions.count ?? 0,
+  };
+}
 
 export type PoolLineRow = {
   /** indent_lines.id — the provenance anchor a PO line carries. */

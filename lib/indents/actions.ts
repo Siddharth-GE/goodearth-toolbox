@@ -146,7 +146,7 @@ export async function addDirectLines(
     if (current) {
       const { error } = await supabase
         .from("indent_lines")
-        .update({ quantity: current.quantity + line.quantity })
+        .update({ quantity: current.quantity + line.quantity, updated_by: user.id })
         .eq("id", current.id);
       if (error) {
         console.error("addDirectLines merge failed:", error);
@@ -159,6 +159,7 @@ export async function addDirectLines(
         quantity: line.quantity,
         uom: uoms.get(line.itemId) ?? "each",
         created_by: user.id,
+        updated_by: user.id,
       });
     }
   }
@@ -240,6 +241,7 @@ export async function addConstructionPullLines(
       uom: source.uom,
       construction_line_id: source.id,
       created_by: user.id,
+      updated_by: user.id,
     });
   }
 
@@ -376,6 +378,7 @@ export async function addBudgetPullLines(
       budget_id: budgetId,
       line_key: line.sourceId,
       created_by: user.id,
+      updated_by: user.id,
     });
   }
 
@@ -408,7 +411,7 @@ export async function updateLine(
   lineId: string,
   input: { quantity: number; uom: string; note: string | null },
 ): Promise<ActionState> {
-  await requireTool("/indents");
+  const user = await requireTool("/indents");
 
   if (!Number.isFinite(input.quantity) || input.quantity <= 0) {
     return { error: "Quantity must be more than 0" };
@@ -418,7 +421,12 @@ export async function updateLine(
   const supabase = await createClient();
   const { error } = await supabase
     .from("indent_lines")
-    .update({ quantity: input.quantity, uom: input.uom, note: input.note?.trim() || null })
+    .update({
+      quantity: input.quantity,
+      uom: input.uom,
+      note: input.note?.trim() || null,
+      updated_by: user.id,
+    })
     .eq("id", lineId);
   if (error) {
     console.error("updateLine failed:", error);
@@ -447,7 +455,7 @@ export async function updateIndentHeader(
   indentId: string,
   input: { stage: string | null; requiredBy: string | null; note: string | null },
 ): Promise<ActionState> {
-  await requireTool("/indents");
+  const user = await requireTool("/indents");
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -456,6 +464,7 @@ export async function updateIndentHeader(
       stage: input.stage?.trim() || null,
       required_by: input.requiredBy || null,
       note: input.note?.trim() || null,
+      updated_by: user.id,
     })
     .eq("id", indentId);
   if (error) {

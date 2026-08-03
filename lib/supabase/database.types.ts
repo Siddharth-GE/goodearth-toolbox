@@ -1309,6 +1309,13 @@ export type Database = {
             foreignKeyName: "purchase_order_lines_po_id_fkey"
             columns: ["po_id"]
             isOneToOne: false
+            referencedRelation: "po_facts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_order_lines_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
             referencedRelation: "purchase_orders"
             referencedColumns: ["id"]
           },
@@ -1987,6 +1994,119 @@ export type Database = {
             columns: ["unit_id"]
             isOneToOne: false
             referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      po_facts: {
+        Row: {
+          created_at: string | null
+          expected_by: string | null
+          id: string | null
+          issued_at: string | null
+          plot_id: string | null
+          project_id: string | null
+          reference: string | null
+          scope_code: string | null
+          status: string | null
+          unit_id: string | null
+          vendor_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          expected_by?: string | null
+          id?: string | null
+          issued_at?: string | null
+          plot_id?: string | null
+          project_id?: string | null
+          reference?: string | null
+          scope_code?: string | null
+          status?: string | null
+          unit_id?: string | null
+          vendor_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          expected_by?: string | null
+          id?: string | null
+          issued_at?: string | null
+          plot_id?: string | null
+          project_id?: string | null
+          reference?: string | null
+          scope_code?: string | null
+          status?: string | null
+          unit_id?: string | null
+          vendor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_orders_plot_id_fkey"
+            columns: ["plot_id"]
+            isOneToOne: false
+            referencedRelation: "plots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      po_line_facts: {
+        Row: {
+          id: string | null
+          indent_line_id: string | null
+          item_id: string | null
+          po_id: string | null
+          po_reference: string | null
+          po_status: string | null
+          quantity: number | null
+          uom: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_order_lines_indent_line_id_fkey"
+            columns: ["indent_line_id"]
+            isOneToOne: false
+            referencedRelation: "indent_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_order_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_order_lines_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "po_facts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_order_lines_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
             referencedColumns: ["id"]
           },
         ]

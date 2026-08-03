@@ -1,19 +1,19 @@
 import { Card } from "@/components/ui/card";
 import { formatCount } from "@/lib/format";
 import { countIndentsPipeline } from "@/lib/indents/queries";
+import { countPosPipeline } from "@/lib/purchase-orders/queries";
 
-// Stages 02–05 are still static illustrations: POs, Inventory and Bills
-// don't exist yet. Each becomes real the same way stage 01 just did —
+// Stages 03–05 are still static illustrations: Inventory and Bills
+// don't exist yet. Each becomes real the same way 01 and 02 did —
 // one query, same component, no restructuring. See CLAUDE.md.
 const PLANNED_STAGES = [
-  { n: "02", name: "POs issued", count: 21, value: "₹39.6L", pct: 82 },
   { n: "03", name: "Goods received", count: 16, value: "₹28.9L", pct: 60 },
   { n: "04", name: "Bills booked", count: 12, value: "₹22.1L", pct: 46 },
   { n: "05", name: "Paid", count: 9, value: "₹15.4L", pct: 32, tail: true },
 ];
 
 export async function OperationsPipeline() {
-  const indents = await countIndentsPipeline();
+  const [indents, pos] = await Promise.all([countIndentsPipeline(), countPosPipeline()]);
 
   return (
     <Card className="p-5">
@@ -43,6 +43,29 @@ export async function OperationsPipeline() {
           </p>
           <div className="bg-border mt-3 h-[3px] overflow-hidden rounded-full">
             <div className="bg-accent h-full rounded-full" style={{ width: "100%" }} />
+          </div>
+        </div>
+
+        {/* Stage 02 is real. No rupee figure on purpose: PO money is
+            gated to the /purchase-orders grant, and this card renders
+            for every signed-in user — so it reports drafts in progress
+            instead, through the money-free po_facts view. */}
+        <div className="min-w-[110px] flex-1">
+          <p className="text-muted font-mono text-[10px]">02</p>
+          <p className="text-foreground mt-1.5 text-xs font-medium">POs issued</p>
+          <p className="text-foreground mt-1.5 text-2xl font-semibold tracking-tight">
+            {formatCount(pos.issuedThisMonth)}
+          </p>
+          <p className="text-accent mt-0.5 font-mono text-xs">
+            {formatCount(pos.draftCount)} {pos.draftCount === 1 ? "draft" : "drafts"} in progress
+          </p>
+          <div className="bg-border mt-3 h-[3px] overflow-hidden rounded-full">
+            <div
+              className="bg-accent h-full rounded-full"
+              style={{
+                width: `${indents.raisedThisMonth === 0 ? 0 : Math.min(100, Math.round((pos.issuedThisMonth / indents.raisedThisMonth) * 100))}%`,
+              }}
+            />
           </div>
         </div>
 

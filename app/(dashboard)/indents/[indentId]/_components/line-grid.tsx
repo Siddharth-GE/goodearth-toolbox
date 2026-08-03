@@ -2,6 +2,7 @@
 
 import { CataloguePickerDialog } from "@/components/masters/catalogue-picker";
 import { ItemThumb } from "@/components/masters/item-thumb";
+import { Attribution } from "@/components/ui/attribution";
 import { Button, LinkButton } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FormMessage } from "@/components/ui/form-message";
@@ -40,6 +41,7 @@ export function LineGrid({
   lines,
   editable,
   hasUnit,
+  showOrdered,
   categories,
   brands,
 }: {
@@ -50,6 +52,8 @@ export function LineGrid({
   /** The construction plan belongs to a unit, so that pull only makes
    * sense once the indent names one. */
   hasUnit: boolean;
+  /** Approved indents show "ordered X of Y" per line — POs consume them. */
+  showOrdered: boolean;
   categories: Option[];
   brands: Option[];
 }) {
@@ -108,7 +112,9 @@ export function LineGrid({
               <TableHeaderCell>Item</TableHeaderCell>
               <TableHeaderCell className="w-28">Qty</TableHeaderCell>
               <TableHeaderCell className="w-28">Unit</TableHeaderCell>
+              {showOrdered && <TableHeaderCell className="w-36">Ordered</TableHeaderCell>}
               <TableHeaderCell>Note</TableHeaderCell>
+              <TableHeaderCell className="w-12">By</TableHeaderCell>
               {editable && <TableHeaderCell className="w-12"></TableHeaderCell>}
             </TableRow>
           </TableHead>
@@ -123,6 +129,7 @@ export function LineGrid({
                 indentId={indentId}
                 line={line}
                 editable={editable}
+                showOrdered={showOrdered}
               />
             ))}
           </TableBody>
@@ -153,10 +160,12 @@ function LineRow({
   indentId,
   line,
   editable,
+  showOrdered,
 }: {
   indentId: string;
   line: IndentLineRow;
   editable: boolean;
+  showOrdered: boolean;
 }) {
   const [quantity, setQuantity] = useState(String(line.quantity));
   const [uom, setUom] = useState(line.uom);
@@ -253,6 +262,9 @@ function LineRow({
             />
           </TableCell>
           <TableCell>
+            <Attribution name={line.updated_by_name} label="Last edited by" />
+          </TableCell>
+          <TableCell>
             <IconButton
               aria-label={`Remove ${line.item_name}`}
               tone="danger"
@@ -272,7 +284,32 @@ function LineRow({
         <>
           <TableCell>{formatQuantity(line.quantity)}</TableCell>
           <TableCell className="text-muted">{line.uom}</TableCell>
+          {showOrdered && (
+            <TableCell>
+              {line.ordered_quantity > 0 ? (
+                <>
+                  <span
+                    className={
+                      line.ordered_quantity >= line.quantity
+                        ? "text-success font-medium"
+                        : "text-foreground"
+                    }
+                  >
+                    {formatQuantity(line.ordered_quantity)} of {formatQuantity(line.quantity)}
+                  </span>
+                  {line.ordered_po_refs && (
+                    <div className="text-muted text-xs">{line.ordered_po_refs}</div>
+                  )}
+                </>
+              ) : (
+                <span className="text-muted">not yet</span>
+              )}
+            </TableCell>
+          )}
           <TableCell className="text-muted">{line.note ?? "—"}</TableCell>
+          <TableCell>
+            <Attribution name={line.updated_by_name} label="Last edited by" />
+          </TableCell>
         </>
       )}
     </TableRow>

@@ -41,20 +41,29 @@ Budgets (cost/margin/client rate) appears on a PO, ever.**
       regenerated; plot/unit `code` fields in Masters; GST Rates tab;
       stub flipped `built: true`; PO list renders empty.
       _Gate passed 2026-08-03 (founder browser test)._
-- [ ] **M2 — raise a PO.** Built, awaiting the gate: new-PO flow
-      (project → scope → vendor, number previewed), the
-      approved-indent-line pool with remaining quantities, line grid
-      with rate + GST dropdown + live totals, draft save/delete.
-      _Gate: build a draft PO from a real indent's lines._
-- [ ] **M3 — issue, delete, fulfil.** Issue with the fully-priced
-      check; request-deletion → admin-approve; indent detail's
-      "ordered X of Y"; the attribution component (avatar + name on
-      hover) on PO and Indents screens.
-      _Gate: issue, request deletion as staff, approve as admin._
-- [ ] **M4 — the document + Overview.** The letterhead PO PDF (real
-      assets from the founder swap in before merge), Overview pipeline
-      stage 02 real.
-      _Gate: print a PO and check it against a real vendor order._
+- [x] **M2 — raise a PO.** New-PO flow (project → scope → vendor,
+      number previewed), the approved-indent-line pool with remaining
+      quantities, line grid with rate + GST dropdown + live totals,
+      draft save/delete.
+      _Gate passed 2026-08-03; qty-input visibility fixed on feedback._
+- [ ] **M3 — issue, delete, fulfil.** Built, awaiting the gate:
+      issue with the fully-priced check; request-deletion (note
+      required) → admin approve/refuse, withdraw by requester; status
+      banners; indent detail's "ordered X of Y" with PO references
+      (via the money-free `po_line_facts` view, migration `0022`);
+      the `Attribution` component (`components/ui/attribution.tsx`,
+      avatar + name on hover) on PO and Indent line grids and status
+      banners; `updated_by` stamped by all indent/PO line actions.
+      _Gate: issue, request deletion as staff, approve as admin,
+      check the avatars and the ordered column._
+- [ ] **M4 — the document + Overview.** Built, awaiting the gate:
+      the PO PDF (`lib/purchase-orders/po-document.tsx` on the shared
+      shell — vendor block with GSTIN, lines with GST, totals by slab,
+      DRAFT watermark, signature block on issued only); Overview
+      pipeline stage 02 real (issued this month + drafts in progress,
+      via money-free `po_facts`).
+      _Gate: print a PO and check it against a real vendor order.
+      Letterhead assets still placeholder — swap before merge._
 
 ## Notes
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { ItemThumb } from "@/components/masters/item-thumb";
+import { Attribution } from "@/components/ui/attribution";
 import { LinkButton } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FormMessage } from "@/components/ui/form-message";
@@ -100,11 +101,12 @@ export function LineGrid({
               <TableRow>
                 <TableHeaderCell className="w-14"></TableHeaderCell>
                 <TableHeaderCell>Item</TableHeaderCell>
-                <TableHeaderCell className="w-28">Qty</TableHeaderCell>
+                <TableHeaderCell className="w-40">Qty</TableHeaderCell>
                 <TableHeaderCell className="w-32">Rate</TableHeaderCell>
-                <TableHeaderCell className="w-28">GST</TableHeaderCell>
+                <TableHeaderCell className="w-24">GST</TableHeaderCell>
                 <TableHeaderCell className="w-32">Amount</TableHeaderCell>
                 <TableHeaderCell>Note</TableHeaderCell>
+                <TableHeaderCell className="w-12">By</TableHeaderCell>
                 {editable && <TableHeaderCell className="w-12"></TableHeaderCell>}
               </TableRow>
             </TableHead>
@@ -254,25 +256,25 @@ function LineRow({
       {editable ? (
         <>
           <TableCell>
-            <div className="flex items-center gap-1.5">
-              <Input
-                type="number"
-                step="any"
-                min="0"
-                value={quantity}
-                onChange={(event) => {
-                  setQuantity(event.target.value);
-                  report();
-                }}
-                onBlur={() => save()}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") event.currentTarget.blur();
-                }}
-                className="h-9"
-                aria-label={`Quantity for ${line.item_name}`}
-              />
-              <span className="text-muted text-xs">{line.uom}</span>
-            </div>
+            {/* The input gets the full column; the uom sits under it —
+                squeezing them side by side hid the number itself. */}
+            <Input
+              type="number"
+              step="any"
+              min="0"
+              value={quantity}
+              onChange={(event) => {
+                setQuantity(event.target.value);
+                report();
+              }}
+              onBlur={() => save()}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") event.currentTarget.blur();
+              }}
+              className="h-9 min-w-24"
+              aria-label={`Quantity for ${line.item_name}`}
+            />
+            <p className="text-muted mt-1 text-xs">{line.uom}</p>
             <FormMessage
               error={error}
               success={saved ? "Saved" : undefined}
@@ -332,6 +334,9 @@ function LineRow({
             />
           </TableCell>
           <TableCell>
+            <Attribution name={line.updated_by_name} label="Last edited by" />
+          </TableCell>
+          <TableCell>
             <IconButton
               aria-label={`Remove ${line.item_name}`}
               tone="danger"
@@ -358,6 +363,9 @@ function LineRow({
           </TableCell>
           <TableCell>{formatMoney(amount)}</TableCell>
           <TableCell className="text-muted">{line.note ?? "—"}</TableCell>
+          <TableCell>
+            <Attribution name={line.updated_by_name} label="Last edited by" />
+          </TableCell>
         </>
       )}
     </TableRow>

@@ -32,7 +32,10 @@ function guardError(error: { message: string }, fallback: string): ActionState {
     message.includes("inactive") ||
     message.includes("not both") ||
     message.includes("before issuing") ||
-    message.includes("no longer exists")
+    message.includes("no longer exists") ||
+    message.includes("deletion request") ||
+    message.includes("admin can approve") ||
+    message.includes("receiving its goods")
   ) {
     return { error: message.replace(/^.*?:\s*/, "") };
   }
@@ -265,6 +268,136 @@ export async function updatePoHeader(
     console.error("updatePoHeader failed:", error);
     return guardError(error, "Could not save. Try again.");
   }
+  return undefined;
+}
+
+/**
+ * Issues a draft to the vendor. The guard re-checks under the row lock
+ * that every line is priced (rate + GST) and at least one exists — the
+ * checks here only make the refusal read well in the common case.
+ */
+export async function issuePo(poId: string): Promise<ActionState> {
+  const user = await requireTool("/purchase-orders");
+  const supabase = await createClient();
+
+  const { count, error: countError } = await supabase
+    .from("purchase_order_lines")
+    .select("id", { count: "exact", head: true })
+    .eq("po_id", poId);
+  if (countError) {
+    console.error("issuePo count failed:", countError);
+    return { error: "Could not issue. Try again." };
+  }
+  if ((count ?? 0) === 0) {
+    return { error: "Add at least one line before issuing." };
+  }
+
+  const { error } = await supabase
+    .from("purchase_orders")
+    .update({
+      status: "issued",
+      issued_by: user.id,
+      issued_at: new Date().toISOString(),
+      updated_by: user.id,
+    })
+    // No status filter — filtering to drafts would make an issue on a
+    // locked PO match zero rows and "succeed" silently. The guard's
+    // refusal is worth showing (the submitIndent rule).
+    .eq("id", poId);
+  if (error) {
+    console.error("issuePo failed:", error);
+    return guardError(error, "Could not issue. Try again.");
+  }
+
+  revalidatePath(`/purchase-orders/${poId}`);
+  revalidatePath("/purchase-orders");
+  return undefined;
+}
+
+/**
+ * Asks for an issued PO to be removed — the founder's rule: anyone with
+ * the app can ask (with a reason), only an admin's yes cancels it.
+ */
+export async function requestPoDeletion(poId: string, note: string): Promise<ActionState> {
+  const user = await requireTool("/purchase-orders");
+
+  const reason = note.trim();
+  if (!reason) {
+    return { error: "Say why this purchase order should be removed — the admin reads this." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("purchase_orders")
+    .update({
+      status: "deletion_requested",
+      deletion_note: reason,
+      deletion_requested_by: user.id,
+      deletion_requested_at: new Date().toISOString(),
+      updated_by: user.id,
+    })
+    .eq("id", poId);
+  if (error) {
+    console.error("requestPoDeletion failed:", error);
+    return guardError(error, "Could not request deletion. Try again.");
+  }
+
+  revalidatePath(`/purchase-orders/${poId}`);
+  revalidatePath("/purchase-orders");
+  return undefined;
+}
+
+/** Takes a deletion request back (the requester) or refuses it (an
+ * admin) — either way the PO reads as plainly issued again. */
+export async function withdrawPoDeletion(poId: string): Promise<ActionState> {
+  const user = await requireTool("/purchase-orders");
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("purchase_orders")
+    .update({
+      status: "issued",
+      deletion_note: null,
+      deletion_requested_by: null,
+      deletion_requested_at: null,
+      updated_by: user.id,
+    })
+    .eq("id", poId);
+  if (error) {
+    console.error("withdrawPoDeletion failed:", error);
+    return guardError(error, "Could not withdraw the request. Try again.");
+  }
+
+  revalidatePath(`/purchase-orders/${poId}`);
+  revalidatePath("/purchase-orders");
+  return undefined;
+}
+
+/**
+ * The admin's yes: cancels a deletion-requested PO. Its quantities
+ * return to the unordered pool (the qty guard skips cancelled POs), and
+ * its number stays burnt. Admin-only, enforced by the guard DB-side.
+ */
+export async function approvePoDeletion(poId: string): Promise<ActionState> {
+  const user = await requireTool("/purchase-orders");
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("purchase_orders")
+    .update({
+      status: "cancelled",
+      cancelled_by: user.id,
+      cancelled_at: new Date().toISOString(),
+      updated_by: user.id,
+    })
+    .eq("id", poId);
+  if (error) {
+    console.error("approvePoDeletion failed:", error);
+    return guardError(error, "Could not cancel this purchase order. Try again.");
+  }
+
+  revalidatePath(`/purchase-orders/${poId}`);
+  revalidatePath("/purchase-orders");
   return undefined;
 }
 

@@ -1,3 +1,4 @@
+import { Attribution } from "@/components/ui/attribution";
 import { PageTitle } from "@/components/ui/page-title";
 import { formatDate } from "@/lib/format";
 import { getIndent, isCurrentUserApprover } from "@/lib/indents/queries";
@@ -60,7 +61,7 @@ export default async function IndentPage({ params }: { params: Promise<{ indentI
       )}
 
       {indent.status === "submitted" && (
-        <div className="border-border bg-surface rounded-xl border px-4 py-3">
+        <div className="border-border bg-surface flex items-center justify-between gap-3 rounded-xl border px-4 py-3">
           <p className="text-foreground text-sm">
             Submitted{" "}
             {indent.submitted_at && (
@@ -71,11 +72,12 @@ export default async function IndentPage({ params }: { params: Promise<{ indentI
               ? "yours to decide. Approve it, or send it back with a note."
               : "waiting for an approver. Nothing can be changed while it waits."}
           </p>
+          <Attribution name={indent.submitted_by_name} label="Submitted by" />
         </div>
       )}
 
       {indent.status === "approved" && (
-        <div className="border-border bg-surface rounded-xl border px-4 py-3">
+        <div className="border-border bg-surface flex items-center justify-between gap-3 rounded-xl border px-4 py-3">
           <p className="text-foreground text-sm">
             Approved{" "}
             {indent.approved_at && (
@@ -83,6 +85,7 @@ export default async function IndentPage({ params }: { params: Promise<{ indentI
             )}
             . This indent is final — purchase orders are raised from it.
           </p>
+          <Attribution name={indent.approved_by_name} label="Approved by" />
         </div>
       )}
 
@@ -100,6 +103,7 @@ export default async function IndentPage({ params }: { params: Promise<{ indentI
         lines={indent.lines}
         editable={editable}
         hasUnit={indent.unit_id != null}
+        showOrdered={indent.status === "approved"}
         categories={categories.map(({ id, name }) => ({ id, name }))}
         brands={brands.map(({ id, name }) => ({ id, name }))}
       />
