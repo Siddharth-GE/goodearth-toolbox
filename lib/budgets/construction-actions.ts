@@ -5,8 +5,10 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+// Type-only import, and deliberately NOT re-exported — see the note in
+// lib/budgets/actions.ts: a bare `export type { X };` in a "use server"
+// file crashes every action in its compiled chunk at load time.
 import type { ActionState } from "@/lib/action-state";
-export type { ActionState };
 
 /**
  * Writes for the Construction tree. No status machine here — a plan is
