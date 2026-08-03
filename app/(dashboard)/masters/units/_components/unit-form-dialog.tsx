@@ -78,6 +78,21 @@ export function UnitFormDialog({
         />
       </div>
       <div className="space-y-1.5">
+        <Label htmlFor="code">Code</Label>
+        <Input
+          id="code"
+          name="code"
+          defaultValue={unit?.code ?? ""}
+          autoComplete="off"
+          placeholder="V12A"
+          maxLength={10}
+        />
+        <p className="text-muted text-xs">
+          Short code used in PO numbers, e.g. V12A → PO/SAA/V12A/001. Needed before purchase orders
+          can be raised for this unit.
+        </p>
+      </div>
+      <div className="space-y-1.5">
         <Label htmlFor="unit_type">Unit type</Label>
         <Select id="unit_type" name="unit_type" defaultValue={unit?.unit_type ?? ""} required>
           <option value="" disabled>

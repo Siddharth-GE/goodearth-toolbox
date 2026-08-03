@@ -8,6 +8,8 @@ export type PlotRow = {
   id: string;
   project_id: string;
   name: string;
+  /** Short code for PO numbers (PO/SAA/<code>/001) — null until set. */
+  code: string | null;
   area: number | null;
   status: PlotStatus;
   created_at: string;

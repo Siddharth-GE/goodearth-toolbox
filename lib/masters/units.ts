@@ -11,6 +11,8 @@ export type UnitRow = {
   project_id: string;
   plot_id: string | null;
   name: string;
+  /** Short code for PO numbers (PO/SAA/<code>/001) — null until set. */
+  code: string | null;
   unit_type: UnitType;
   client_id: string | null;
   status: UnitStatus;

@@ -49,6 +49,7 @@ export default async function UnitsPage() {
           <TableHead>
             <TableRow>
               <TableHeaderCell>Name</TableHeaderCell>
+              <TableHeaderCell>Code</TableHeaderCell>
               <TableHeaderCell>Project</TableHeaderCell>
               <TableHeaderCell>Type</TableHeaderCell>
               <TableHeaderCell>Client</TableHeaderCell>
@@ -60,6 +61,7 @@ export default async function UnitsPage() {
             {units.map((unit) => (
               <TableRow key={unit.id}>
                 <TableCell className="text-foreground font-medium">{unit.name}</TableCell>
+                <TableCell className="font-mono text-xs">{unit.code ?? "—"}</TableCell>
                 <TableCell>{projectName(unit.project_id)}</TableCell>
                 <TableCell className="capitalize">{unit.unit_type.replace(/_/g, " ")}</TableCell>
                 <TableCell>{clientName(unit.client_id)}</TableCell>

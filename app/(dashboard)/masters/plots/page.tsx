@@ -40,6 +40,7 @@ export default async function PlotsPage() {
           <TableHead>
             <TableRow>
               <TableHeaderCell>Name / number</TableHeaderCell>
+              <TableHeaderCell>Code</TableHeaderCell>
               <TableHeaderCell>Project</TableHeaderCell>
               <TableHeaderCell>Area</TableHeaderCell>
               <TableHeaderCell>Status</TableHeaderCell>
@@ -50,6 +51,7 @@ export default async function PlotsPage() {
             {plots.map((plot) => (
               <TableRow key={plot.id}>
                 <TableCell className="text-foreground font-medium">{plot.name}</TableCell>
+                <TableCell className="font-mono text-xs">{plot.code ?? "—"}</TableCell>
                 <TableCell>{projectName(plot.project_id)}</TableCell>
                 <TableCell>{plot.area ?? "—"}</TableCell>
                 <TableCell>

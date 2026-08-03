@@ -76,7 +76,7 @@ export const TOOLS: Tool[] = [
     href: "/purchase-orders",
     icon: "ShoppingCart",
     group: "Operations",
-    built: false,
+    built: true,
   },
   {
     name: "Inventory",

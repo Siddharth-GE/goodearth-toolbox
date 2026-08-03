@@ -30,7 +30,11 @@ export function canIssue(status: PoStatus, lineCount: number, fullyPriced: boole
 }
 
 /** A draft is its creator's (or an admin's) to throw away. */
-export function canDeleteDraft(status: PoStatus, actor: PoActor, createdBy: string | null): boolean {
+export function canDeleteDraft(
+  status: PoStatus,
+  actor: PoActor,
+  createdBy: string | null,
+): boolean {
   return status === "draft" && (actor.isAdmin || createdBy === actor.userId);
 }
 

@@ -33,6 +33,21 @@ export function PlotFormDialog({ projects, plot }: { projects: ProjectRow[]; plo
         <Input id="name" name="name" defaultValue={plot?.name} required autoComplete="off" />
       </div>
       <div className="space-y-1.5">
+        <Label htmlFor="code">Code</Label>
+        <Input
+          id="code"
+          name="code"
+          defaultValue={plot?.code ?? ""}
+          autoComplete="off"
+          placeholder="P12"
+          maxLength={10}
+        />
+        <p className="text-muted text-xs">
+          Short code used in PO numbers, e.g. P12 → PO/SAA/P12/001. Needed before purchase orders
+          can be raised for this plot.
+        </p>
+      </div>
+      <div className="space-y-1.5">
         <Label htmlFor="area">Area</Label>
         <Input id="area" name="area" type="number" step="0.01" defaultValue={plot?.area ?? ""} />
       </div>

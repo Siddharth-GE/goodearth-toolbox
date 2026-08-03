@@ -372,6 +372,24 @@ export type Database = {
           },
         ]
       }
+      gst_rates: {
+        Row: {
+          created_at: string
+          is_active: boolean
+          rate: number
+        }
+        Insert: {
+          created_at?: string
+          is_active?: boolean
+          rate: number
+        }
+        Update: {
+          created_at?: string
+          is_active?: boolean
+          rate?: number
+        }
+        Relationships: []
+      }
       indent_approvers: {
         Row: {
           granted_at: string
@@ -442,6 +460,7 @@ export type Database = {
           quantity: number
           uom: string
           updated_at: string
+          updated_by: string | null
         }
         Insert: {
           budget_id?: string | null
@@ -456,6 +475,7 @@ export type Database = {
           quantity: number
           uom: string
           updated_at?: string
+          updated_by?: string | null
         }
         Update: {
           budget_id?: string | null
@@ -470,6 +490,7 @@ export type Database = {
           quantity?: number
           uom?: string
           updated_at?: string
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -514,6 +535,13 @@ export type Database = {
             referencedRelation: "items"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "indent_lines_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       indents: {
@@ -536,6 +564,7 @@ export type Database = {
           submitted_by: string | null
           unit_id: string | null
           updated_at: string
+          updated_by: string | null
         }
         Insert: {
           approved_at?: string | null
@@ -556,6 +585,7 @@ export type Database = {
           submitted_by?: string | null
           unit_id?: string | null
           updated_at?: string
+          updated_by?: string | null
         }
         Update: {
           approved_at?: string | null
@@ -576,6 +606,7 @@ export type Database = {
           submitted_by?: string | null
           unit_id?: string | null
           updated_at?: string
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -618,6 +649,13 @@ export type Database = {
             columns: ["unit_id"]
             isOneToOne: false
             referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "indents_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1081,6 +1119,7 @@ export type Database = {
       plots: {
         Row: {
           area: number | null
+          code: string | null
           created_at: string
           id: string
           name: string
@@ -1089,6 +1128,7 @@ export type Database = {
         }
         Insert: {
           area?: number | null
+          code?: string | null
           created_at?: string
           id?: string
           name: string
@@ -1097,6 +1137,7 @@ export type Database = {
         }
         Update: {
           area?: number | null
+          code?: string | null
           created_at?: string
           id?: string
           name?: string
@@ -1106,6 +1147,32 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "plots_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      po_counters: {
+        Row: {
+          last_no: number
+          project_id: string
+          scope: string
+        }
+        Insert: {
+          last_no?: number
+          project_id: string
+          scope: string
+        }
+        Update: {
+          last_no?: number
+          project_id?: string
+          scope?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "po_counters_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
@@ -1166,6 +1233,248 @@ export type Database = {
           status?: string
         }
         Relationships: []
+      }
+      purchase_order_lines: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          gst_pct: number | null
+          id: string
+          indent_line_id: string
+          item_id: string
+          note: string | null
+          po_id: string
+          quantity: number
+          rate: number | null
+          sort_order: number
+          uom: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          gst_pct?: number | null
+          id?: string
+          indent_line_id: string
+          item_id: string
+          note?: string | null
+          po_id: string
+          quantity: number
+          rate?: number | null
+          sort_order?: number
+          uom: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          gst_pct?: number | null
+          id?: string
+          indent_line_id?: string
+          item_id?: string
+          note?: string | null
+          po_id?: string
+          quantity?: number
+          rate?: number | null
+          sort_order?: number
+          uom?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_order_lines_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_order_lines_indent_line_id_fkey"
+            columns: ["indent_line_id"]
+            isOneToOne: false
+            referencedRelation: "indent_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_order_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_order_lines_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_order_lines_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_orders: {
+        Row: {
+          cancelled_at: string | null
+          cancelled_by: string | null
+          created_at: string
+          created_by: string | null
+          deletion_note: string | null
+          deletion_requested_at: string | null
+          deletion_requested_by: string | null
+          deliver_note: string | null
+          deliver_store_id: string | null
+          expected_by: string | null
+          id: string
+          issued_at: string | null
+          issued_by: string | null
+          note: string | null
+          plot_id: string | null
+          po_no: number
+          project_id: string
+          reference: string
+          scope_code: string
+          status: string
+          terms: string | null
+          unit_id: string | null
+          updated_at: string
+          updated_by: string | null
+          vendor_id: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          deletion_note?: string | null
+          deletion_requested_at?: string | null
+          deletion_requested_by?: string | null
+          deliver_note?: string | null
+          deliver_store_id?: string | null
+          expected_by?: string | null
+          id?: string
+          issued_at?: string | null
+          issued_by?: string | null
+          note?: string | null
+          plot_id?: string | null
+          po_no: number
+          project_id: string
+          reference: string
+          scope_code: string
+          status?: string
+          terms?: string | null
+          unit_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vendor_id: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          deletion_note?: string | null
+          deletion_requested_at?: string | null
+          deletion_requested_by?: string | null
+          deliver_note?: string | null
+          deliver_store_id?: string | null
+          expected_by?: string | null
+          id?: string
+          issued_at?: string | null
+          issued_by?: string | null
+          note?: string | null
+          plot_id?: string | null
+          po_no?: number
+          project_id?: string
+          reference?: string
+          scope_code?: string
+          status?: string
+          terms?: string | null
+          unit_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_orders_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_deletion_requested_by_fkey"
+            columns: ["deletion_requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_deliver_store_id_fkey"
+            columns: ["deliver_store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_issued_by_fkey"
+            columns: ["issued_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_plot_id_fkey"
+            columns: ["plot_id"]
+            isOneToOne: false
+            referencedRelation: "plots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       selection_lines: {
         Row: {
@@ -1484,6 +1793,7 @@ export type Database = {
       units: {
         Row: {
           client_id: string | null
+          code: string | null
           created_at: string
           id: string
           name: string
@@ -1494,6 +1804,7 @@ export type Database = {
         }
         Insert: {
           client_id?: string | null
+          code?: string | null
           created_at?: string
           id?: string
           name: string
@@ -1504,6 +1815,7 @@ export type Database = {
         }
         Update: {
           client_id?: string | null
+          code?: string | null
           created_at?: string
           id?: string
           name?: string
@@ -1716,7 +2028,25 @@ export type Database = {
         Args: { p_from_selection_id: string }
         Returns: string
       }
+      create_purchase_order: {
+        Args: {
+          p_deliver_note: string
+          p_deliver_store_id: string
+          p_expected_by: string
+          p_note: string
+          p_plot_id: string
+          p_project_id: string
+          p_terms: string
+          p_unit_id: string
+          p_vendor_id: string
+        }
+        Returns: string
+      }
       delete_draft_indent: { Args: { p_indent_id: string }; Returns: undefined }
+      delete_draft_purchase_order: {
+        Args: { p_po_id: string }
+        Returns: undefined
+      }
       delete_draft_selection: {
         Args: { p_selection_id: string }
         Returns: undefined
