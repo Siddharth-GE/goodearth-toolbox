@@ -94,6 +94,7 @@ export default async function IndentPage({ params }: { params: Promise<{ indentI
         reference={indent.reference}
         lines={indent.lines}
         editable={editable}
+        hasUnit={indent.unit_id != null}
         categories={categories.map(({ id, name }) => ({ id, name }))}
         brands={brands.map(({ id, name }) => ({ id, name }))}
       />

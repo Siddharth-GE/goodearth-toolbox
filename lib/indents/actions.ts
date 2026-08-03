@@ -175,6 +175,233 @@ export async function addDirectLines(
   return undefined;
 }
 
+export type PullLineInput = {
+  /** construction_budget_lines.id, or the budget's line_key. */
+  sourceId: string;
+  quantity: number;
+};
+
+/**
+ * Pulls lines from a construction plan stage — the site path.
+ *
+ * Everything except which lines and how many is re-read server-side:
+ * the item, the uom and the stage name all come from the plan, never
+ * from the client. Lines already on this indent are skipped rather than
+ * merged (the unique (indent_id, construction_line_id) pair means one
+ * row per plan line, and silently doubling a quantity is how a site
+ * ends up with twice the cement).
+ */
+export async function addConstructionPullLines(
+  indentId: string,
+  lines: PullLineInput[],
+): Promise<ActionState> {
+  const user = await requireTool("/indents");
+
+  if (lines.length === 0) return { error: "Pick at least one line." };
+  if (lines.some((line) => !Number.isFinite(line.quantity) || line.quantity <= 0)) {
+    return { error: "Quantities must be more than 0." };
+  }
+
+  const supabase = await createClient();
+  const sourceIds = lines.map((line) => line.sourceId);
+
+  const [{ data: sources, error: sourcesError }, { data: existing, error: existingError }] =
+    await Promise.all([
+      supabase
+        .from("construction_budget_lines")
+        .select("id, stage, item_id, uom")
+        .in("id", sourceIds),
+      supabase
+        .from("indent_lines")
+        .select("construction_line_id")
+        .eq("indent_id", indentId)
+        .in("construction_line_id", sourceIds),
+    ]);
+  if (sourcesError || existingError) {
+    console.error("addConstructionPullLines lookup failed:", sourcesError ?? existingError);
+    return { error: "Could not add those lines. Try again." };
+  }
+
+  const byId = new Map((sources ?? []).map((source) => [source.id, source]));
+  const already = new Set(
+    (existing ?? [])
+      .map((line) => line.construction_line_id)
+      .filter((id): id is string => id != null),
+  );
+
+  const inserts = [];
+  for (const line of lines) {
+    const source = byId.get(line.sourceId);
+    if (!source || already.has(line.sourceId)) continue;
+    inserts.push({
+      indent_id: indentId,
+      item_id: source.item_id,
+      quantity: line.quantity,
+      uom: source.uom,
+      construction_line_id: source.id,
+      created_by: user.id,
+    });
+  }
+
+  const skipped = lines.length - inserts.length;
+  if (inserts.length === 0) {
+    return { error: "Every one of those lines is already on this indent." };
+  }
+
+  const { error } = await supabase.from("indent_lines").insert(inserts);
+  if (error) {
+    console.error("addConstructionPullLines insert failed:", error);
+    return guardError(error, "Could not add those lines. Try again.");
+  }
+
+  // The indent takes the stage it was raised against, so a site request
+  // says which part of the build it belongs to. Only stamped when the
+  // pull is from a single stage and the indent doesn't already say.
+  const stages = new Set(inserts.map((row) => byId.get(row.construction_line_id)?.stage));
+  if (stages.size === 1) {
+    const [stage] = [...stages];
+    if (stage) {
+      const { data: indent } = await supabase
+        .from("indents")
+        .select("stage, status")
+        .eq("id", indentId)
+        .maybeSingle();
+      if (indent?.status === "draft" && !indent.stage) {
+        const { error: stampError } = await supabase
+          .from("indents")
+          .update({ stage })
+          .eq("id", indentId);
+        // A failed stamp is cosmetic — the lines are in, and the stage
+        // is editable on the indent. Logged, not surfaced.
+        if (stampError) console.error("addConstructionPullLines stage stamp failed:", stampError);
+      }
+    }
+  }
+
+  revalidatePath(`/indents/${indentId}`);
+  revalidatePath(`/indents/${indentId}/pull`);
+  if (skipped > 0) {
+    // Only reachable if the indent changed underneath (another tab, a
+    // colleague): the screen disables lines it already holds. Said out
+    // loud rather than silently adding fewer lines than were ticked.
+    return {
+      error: `Added ${inserts.length}. ${skipped} ${skipped === 1 ? "line was" : "lines were"} already on this indent and ${skipped === 1 ? "was" : "were"} not added again.`,
+    };
+  }
+  return undefined;
+}
+
+/**
+ * Pulls lines from an approved interiors budget.
+ *
+ * The anchor is the composite (budget_id, line_key) — the CLAUDE.md
+ * rule — and the item/uom are re-read from the selection line, never
+ * trusted from the client. Reads go through the approved_* views only:
+ * this action never touches budgets or budget_lines directly, so it
+ * cannot see (or accidentally copy) a cost, a margin or a client rate.
+ */
+export async function addBudgetPullLines(
+  indentId: string,
+  budgetId: string,
+  lines: PullLineInput[],
+): Promise<ActionState> {
+  const user = await requireTool("/indents");
+
+  if (lines.length === 0) return { error: "Pick at least one line." };
+  if (lines.some((line) => !Number.isFinite(line.quantity) || line.quantity <= 0)) {
+    return { error: "Quantities must be more than 0." };
+  }
+
+  const supabase = await createClient();
+  const lineKeys = lines.map((line) => line.sourceId);
+
+  const { data: budget, error: budgetError } = await supabase
+    .from("approved_budgets")
+    .select("id, selection_id")
+    .eq("id", budgetId)
+    .maybeSingle();
+  if (budgetError || !budget?.selection_id) {
+    console.error("addBudgetPullLines budget lookup failed:", budgetError);
+    return { error: "That budget is no longer available to pull from." };
+  }
+
+  const [{ data: valid, error: validError }, { data: design, error: designError }, existingResult] =
+    await Promise.all([
+      // Confirms each key really belongs to this APPROVED budget — the
+      // view is the filter, so a key from anywhere else simply isn't here.
+      supabase
+        .from("approved_budget_lines")
+        .select("line_key")
+        .eq("budget_id", budgetId)
+        .in("line_key", lineKeys),
+      supabase
+        .from("selection_lines")
+        .select("line_key, item_id, uom")
+        .eq("selection_id", budget.selection_id)
+        .in("line_key", lineKeys),
+      supabase
+        .from("indent_lines")
+        .select("line_key")
+        .eq("indent_id", indentId)
+        .eq("budget_id", budgetId)
+        .in("line_key", lineKeys),
+    ]);
+  if (validError || designError || existingResult.error) {
+    console.error(
+      "addBudgetPullLines lookup failed:",
+      validError ?? designError ?? existingResult.error,
+    );
+    return { error: "Could not add those lines. Try again." };
+  }
+
+  const allowed = new Set(
+    (valid ?? []).map((row) => row.line_key).filter((key): key is string => key != null),
+  );
+  const designByKey = new Map((design ?? []).map((row) => [row.line_key, row]));
+  const already = new Set(
+    (existingResult.data ?? [])
+      .map((row) => row.line_key)
+      .filter((key): key is string => key != null),
+  );
+
+  const inserts = [];
+  for (const line of lines) {
+    const source = designByKey.get(line.sourceId);
+    if (!allowed.has(line.sourceId) || !source || already.has(line.sourceId)) continue;
+    inserts.push({
+      indent_id: indentId,
+      item_id: source.item_id,
+      quantity: line.quantity,
+      uom: source.uom,
+      budget_id: budgetId,
+      line_key: line.sourceId,
+      created_by: user.id,
+    });
+  }
+
+  const skipped = lines.length - inserts.length;
+  if (inserts.length === 0) {
+    return { error: "Every one of those lines is already on this indent." };
+  }
+
+  const { error } = await supabase.from("indent_lines").insert(inserts);
+  if (error) {
+    console.error("addBudgetPullLines insert failed:", error);
+    return guardError(error, "Could not add those lines. Try again.");
+  }
+
+  revalidatePath(`/indents/${indentId}`);
+  revalidatePath(`/indents/${indentId}/pull-interiors`);
+  if (skipped > 0) {
+    // Same as the construction pull: the screen disables what's already
+    // here, so this only fires on a genuine race — and says so.
+    return {
+      error: `Added ${inserts.length}. ${skipped} ${skipped === 1 ? "line was" : "lines were"} already on this indent and ${skipped === 1 ? "was" : "were"} not added again.`,
+    };
+  }
+  return undefined;
+}
+
 /** Save-on-blur target for a row. No revalidate — the values are
  * already on screen (the saveLine pattern). */
 export async function updateLine(

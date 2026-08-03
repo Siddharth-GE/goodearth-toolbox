@@ -84,12 +84,19 @@ unrounded values, and 200 lines with two touched produce 199 carried.
 
 - Layout and typography of both documents is unfinished — placeholder
   letterhead, Helvetica, stand-in terms text.
-- **Margin secrecy has never been verified as a non-Budgets user.** The
-  policy is written and only `lib/budgets/` touches those tables, but
-  nobody has signed in without the grant and confirmed zero rows. Do
-  **not** check this with the service-role key — it bypasses exactly the
-  rules being tested. (Scheduled: Phase 5's M4 gate does exactly this
-  check with a test user holding `/indents` but not `/budgets`.)
+- ~~Margin secrecy has never been verified as a non-Budgets user.~~
+  **Verified 2026-08-03** at Phase 5's M4 gate, as a real staff user
+  holding `/indents` and not `/budgets` — never the service-role key,
+  which bypasses exactly the rules under test. Result: `budgets`,
+  `budget_lines` and `item_margins` all return **zero rows** through
+  that user's own JWT; `/budgets` and `/budgets/construction` redirect
+  away and Budgets leaves the sidebar; the `approved_budgets` /
+  `approved_budget_lines` views **do** return rows and carry no
+  `unit_cost`, `margin_pct` or `client_rate` column at all; and the
+  Indents pull screens show no rupee figure anywhere, in the rendered
+  page or in its RSC payload. Re-run that check
+  (`scratchpad/secrecy-check.mjs` pattern) if the views are ever
+  widened.
 
 ## The Construction tree (Phase 5, 2026-08-03)
 

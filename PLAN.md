@@ -15,12 +15,13 @@ and **what's next**.
 ## Where we are right now
 
 **Phase 5 (Indents + the Construction tree in Budgets) is IN PROGRESS
-on `feature/indents`.** Milestones 1–3 of 5 are built; M1–M2 are
-founder-tested, **M3 (the Indents app, direct lines) is pushed and
-awaiting the founder's browser gate on the preview** — see "Phase 5"
-under Next up for the checklist and what remains. A production outage
-in server actions was root-caused and hotfixed to `master` on
-2026-08-03 — see the session log.
+on `feature/indents`.** Milestones 1–4 of 5 are built; M1–M2 are
+founder-tested, **M3 (the Indents app) and M4 (both pull paths) are
+pushed and awaiting one combined browser gate on the preview** — see
+"Phase 5" under Next up for the checklist. Only M5 (approval +
+Overview + the CI smoke test) remains. A production outage in server
+actions was root-caused and hotfixed to `master` on 2026-08-03 — see
+the session log.
 
 The Selections → Budgets chain works end to end: a designer specifies a
 unit space by space, issues it, the budget team prices it, and a client
@@ -30,7 +31,7 @@ replacement.
 |                     |                                                                                                            |
 | ------------------- | ---------------------------------------------------------------------------------------------------------- |
 | Last worked         | 2026-08-03                                                                                                 |
-| Branch              | `feature/indents` (M1–M3 pushed; M3 awaiting its gate); `master` carries the action-crash hotfix           |
+| Branch              | `feature/indents` (M1–M4 pushed; M3+M4 awaiting one gate); `master` carries the action-crash hotfix        |
 | Migrations applied  | `0001`–`0019` (next new one is `0020`)                                                                     |
 | Items in database   | **2,633** (2,631 imported catalogue + 2 material seeds)                                                    |
 | Categories / brands | 14 / 21                                                                                                    |
@@ -223,14 +224,15 @@ beside **Interiors**), built in this same phase as the Indents app.
 **Remaining milestones** (full detail in the approved plan file at
 `C:\Users\Kaicha\.claude\plans\please-read-the-claude-elegant-pnueli.md`):
 
-- **M4 — Both pull paths:** construction pull (per stage, budgeted qty
-  prefilled, "already requested: N" summed over `construction_line_id`,
-  stamps `indents.stage`) and interiors pull (via the views +
-  `selection_lines` for item/space/uom, composite FK
-  `(budget_id, line_key)`, skip already-present keys). **The
-  margin-secrecy browser check gates M4**: sign in WITH `/indents` and
-  WITHOUT `/budgets`, confirm no cost/margin/rate anywhere — never via
-  the service-role key.
+- ~~**M4 — Both pull paths**~~ — **built 2026-08-03, awaiting the
+  founder's gate along with M3.** Both paths share one `PullBasket`
+  component: tick individual lines or take a whole stage/space,
+  quantities prefilled from the source and editable, nothing written
+  until Add. Construction pull stamps `indents.stage`; interiors pull
+  reads only the approved-only views and anchors on the composite
+  `(budget_id, line_key)`. Lines already on the indent are shown
+  disabled and labelled rather than silently skipped. **The
+  margin-secrecy gate passed** — see the session log below.
 - **M5 — Approval + Overview:** approve/reject-with-note wired to
   `canDecide` + the DB guard; Overview pipeline stage 01 goes real
   (counts + "N lines", no invented rupees — indents carry no money);
@@ -531,6 +533,46 @@ merging, per the git workflow.
   folder — move it only if a third consumer appears.
 
 ## Session log
+
+### 2026-08-03 (later still) — M4: both pull paths, and margin secrecy finally proved
+
+The two remaining line sources shipped, and with them **the check that
+had been outstanding since Budgets merged**: margin secrecy verified as
+a real staff user holding `/indents` and not `/budgets`, using that
+user's own JWT and browser session — never the service-role key, which
+bypasses exactly the rules under test.
+
+What the check found (all green): `budgets`, `budget_lines` and
+`item_margins` return **zero rows** for that user; `/budgets` and
+`/budgets/construction` redirect away and Budgets disappears from the
+sidebar; the `approved_budgets` / `approved_budget_lines` views **do**
+return rows and expose no `unit_cost`, `margin_pct` or `client_rate`
+column at all; and no rupee figure appears anywhere in the Indents
+pull screens, in the rendered page or in its RSC payload. The one
+"money word" the scan flagged was my own reassurance sentence on the
+pull screen ("No costs or rates appear here") — checked before
+concluding, rather than assumed either way.
+
+Three things worth keeping:
+
+- **`innerText` does not return `<input>` values.** Two smoke-test
+  assertions failed while the app was completely correct; the database
+  rows and a screenshot proved it before anything got "fixed". Verify
+  the app against the data, not against the test.
+- **The draft-only trigger blocks test cleanup too, and that's right.**
+  Deleting a submitted indent's lines is refused even with the service
+  key (triggers aren't RLS). Cleanup went through the guard's own
+  rejection path — submitted → draft with a note — which is a fair
+  proof that the status machine holds from every direction.
+- **Git Bash rewrites `/budgets` into a Windows path** in curl format
+  strings (MSYS path conversion). Use PowerShell for REST calls whose
+  arguments contain leading-slash app slugs.
+
+Test data created for the run (two indents, three construction plan
+lines, a temporary project code) was removed afterwards and the
+per-project counter reset, so the founder's `IND/SAA/001` and its line
+are the only indent rows in the database and their next indent is still
+`IND/SAA/002`.
 
 ### 2026-08-03 (later) — M3 built: the Indents app itself
 

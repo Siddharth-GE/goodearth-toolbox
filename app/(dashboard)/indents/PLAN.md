@@ -1,7 +1,7 @@
 # Indents — build notes
 
 **Status: in progress** (Phase 5, branch `feature/indents`). Migration
-`0019`. M3 of 5 built; M4 (pull paths) and M5 (approval) remain.
+`0019`. M4 of 5 built; only M5 (approval + Overview) remains.
 
 Site teams request materials, numbered per project, approved before
 purchase. **No money anywhere in this tool** — an indent carries items,
@@ -43,11 +43,16 @@ note. Approved indents are what Purchase Orders (Phase 6) consume.
       shared picker (`/indents` added to `/api/catalogue`'s allowed
       list), submit / delete-draft with the DB guard's messages
       surfaced.
-- [ ] **M4 — pull paths.** Construction stage pull (budgeted qty
-      prefilled, "already requested: N", stamps `stage`) and approved
-      interiors pull (via the views + `selection_lines`). **The
-      margin-secrecy browser check gates this milestone** — sign in with
-      `/indents`, without `/budgets`, never the service-role key.
+- [x] **M4 — pull paths.** Both shipped, sharing one `PullBasket`
+      component (tick lines or take a whole group, quantities prefilled
+      from the plan/budget and editable, nothing written until Add).
+      Construction pull stamps the indent's `stage` when a single stage
+      is taken and the indent doesn't already name one; interiors pull
+      is a two-step route (`?budget=`) over the approved-only views,
+      grouped by space with the expected vendor. Lines already on the
+      indent are shown, disabled and labelled rather than silently
+      skipped. **Margin-secrecy gate passed** — see budgets/PLAN.md for
+      exactly what was checked and how.
 - [ ] **M5 — approval + Overview.** Approve / reject-with-note on
       `canDecide`, Overview pipeline stage 01 real, CI smoke test (press
       a real save button post-build), merge.

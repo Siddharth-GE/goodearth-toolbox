@@ -2,7 +2,7 @@
 
 import { CataloguePickerDialog } from "@/components/masters/catalogue-picker";
 import { ItemThumb } from "@/components/masters/item-thumb";
-import { Button } from "@/components/ui/button";
+import { Button, LinkButton } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FormMessage } from "@/components/ui/form-message";
 import { IconButton } from "@/components/ui/icon-button";
@@ -21,7 +21,7 @@ import { addDirectLines, removeLine, updateLine } from "@/lib/indents/actions";
 import type { IndentLineRow, IndentLineSource } from "@/lib/indents/queries";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
 import { UOMS } from "@/lib/masters/constants";
-import { PackageOpen, Trash2 } from "lucide-react";
+import { HardHat, PackageOpen, Palette, Trash2 } from "lucide-react";
 import { useState, useTransition } from "react";
 
 type Option = { id: string; name: string };
@@ -39,6 +39,7 @@ export function LineGrid({
   reference,
   lines,
   editable,
+  hasUnit,
   categories,
   brands,
 }: {
@@ -46,6 +47,9 @@ export function LineGrid({
   reference: string;
   lines: IndentLineRow[];
   editable: boolean;
+  /** The construction plan belongs to a unit, so that pull only makes
+   * sense once the indent names one. */
+  hasUnit: boolean;
   categories: Option[];
   brands: Option[];
 }) {
@@ -55,14 +59,32 @@ export function LineGrid({
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-foreground text-lg font-bold tracking-tight">Lines</h2>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <span className="text-muted text-xs">
             {formatCount(lines.length)} {lines.length === 1 ? "line" : "lines"}
           </span>
           {editable && (
-            <Button size="sm" variant="secondary" onClick={() => setPickerOpen(true)}>
-              Add items
-            </Button>
+            <>
+              {/* The three sources a line can come from, in the order a
+                  site team reaches for them. */}
+              {hasUnit && (
+                <LinkButton href={`/indents/${indentId}/pull`} size="sm" variant="secondary">
+                  <HardHat className="size-4" />
+                  From construction plan
+                </LinkButton>
+              )}
+              <LinkButton
+                href={`/indents/${indentId}/pull-interiors`}
+                size="sm"
+                variant="secondary"
+              >
+                <Palette className="size-4" />
+                From interiors budget
+              </LinkButton>
+              <Button size="sm" variant="secondary" onClick={() => setPickerOpen(true)}>
+                Add items
+              </Button>
+            </>
           )}
         </div>
       </div>
