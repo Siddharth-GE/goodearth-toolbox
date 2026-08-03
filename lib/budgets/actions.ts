@@ -10,8 +10,13 @@ import { redirect } from "next/navigation";
 // pure and imports nothing, so it drags no server-only chain behind it.
 import { planCarryForward } from "./carry-forward";
 
+// Type-only import, and deliberately NOT re-exported: a bare
+// `export type { X };` in a "use server" file survives into the compiled
+// module's runtime export list, where X doesn't exist — every action in
+// the chunk then dies at module load ("ActionState is not defined", the
+// 2026-08-03 production outage). Import ActionState from
+// "@/lib/action-state" directly instead.
 import type { ActionState } from "@/lib/action-state";
-export type { ActionState };
 
 // ---------------------------------------------------------------------
 // Starting a budget
