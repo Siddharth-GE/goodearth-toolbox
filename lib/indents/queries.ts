@@ -553,6 +553,79 @@ export async function getBudgetPull(
   };
 }
 
+/**
+ * May the signed-in user decide on a submitted indent?
+ *
+ * Admins always may; everyone else needs a row in `indent_approvers`
+ * (managed from Settings). This drives which buttons appear —
+ * `indents_guard()` enforces the same rule in the database, which is
+ * what actually stops a decision.
+ */
+export async function isCurrentUserApprover(): Promise<{
+  isAdmin: boolean;
+  isApprover: boolean;
+}> {
+  const user = await requireTool("/indents");
+  const supabase = await createClient();
+
+  const isAdmin = user.profile?.role === "admin";
+  if (isAdmin) return { isAdmin: true, isApprover: true };
+
+  const { data } = await supabase
+    .from("indent_approvers")
+    .select("user_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  return { isAdmin: false, isApprover: data != null };
+}
+
+/**
+ * Counts for the Overview pipeline's first stage.
+ *
+ * Deliberately NOT gated: the Overview page is the shell's home and
+ * every signed-in user sees it, whether or not they hold /indents —
+ * so a gate here would redirect a designer off their own dashboard.
+ * Safe because it returns counts of rows whose reads are already open
+ * to all staff, and indents carry no money by design.
+ */
+export async function countIndentsPipeline(): Promise<{
+  raisedThisMonth: number;
+  lineCount: number;
+  awaitingApproval: number;
+  approved: number;
+}> {
+  const supabase = await createClient();
+
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+  const since = startOfMonth.toISOString();
+
+  // Exact database counts, head-only — never rows.length (the rule the
+  // codebase has now learned four separate times).
+  const [raised, lines, submitted, approved] = await Promise.all([
+    supabase.from("indents").select("id", { count: "exact", head: true }).gte("created_at", since),
+    supabase
+      .from("indent_lines")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", since),
+    supabase.from("indents").select("id", { count: "exact", head: true }).eq("status", "submitted"),
+    supabase
+      .from("indents")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "approved")
+      .gte("created_at", since),
+  ]);
+
+  return {
+    raisedThisMonth: raised.count ?? 0,
+    lineCount: lines.count ?? 0,
+    awaitingApproval: submitted.count ?? 0,
+    approved: approved.count ?? 0,
+  };
+}
+
 export type ProjectOption = { id: string; name: string; code: string | null };
 export type ScopedOption = { id: string; project_id: string; name: string };
 

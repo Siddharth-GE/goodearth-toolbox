@@ -1,6 +1,6 @@
 import { PageTitle } from "@/components/ui/page-title";
 import { formatDate } from "@/lib/format";
-import { getIndent } from "@/lib/indents/queries";
+import { getIndent, isCurrentUserApprover } from "@/lib/indents/queries";
 import { canEditIndent } from "@/lib/indents/workflow";
 import { listBrands } from "@/lib/masters/brands";
 import { listItemCategories } from "@/lib/masters/item-categories";
@@ -12,8 +12,9 @@ import { LineGrid } from "./_components/line-grid";
 
 export default async function IndentPage({ params }: { params: Promise<{ indentId: string }> }) {
   const { indentId } = await params;
-  const [indent, categories, brands] = await Promise.all([
+  const [indent, decider, categories, brands] = await Promise.all([
     getIndent(indentId),
+    isCurrentUserApprover(),
     listItemCategories(),
     listBrands(),
   ]);
@@ -41,6 +42,7 @@ export default async function IndentPage({ params }: { params: Promise<{ indentI
               indentId={indent.id}
               status={indent.status}
               lineCount={indent.line_count}
+              decider={decider}
             />
           </>
         }
@@ -64,7 +66,10 @@ export default async function IndentPage({ params }: { params: Promise<{ indentI
             {indent.submitted_at && (
               <span className="text-muted">on {formatDate(indent.submitted_at)}</span>
             )}{" "}
-            — waiting for an approver. Nothing can be changed while it waits.
+            —{" "}
+            {decider.isAdmin || decider.isApprover
+              ? "yours to decide. Approve it, or send it back with a note."
+              : "waiting for an approver. Nothing can be changed while it waits."}
           </p>
         </div>
       )}

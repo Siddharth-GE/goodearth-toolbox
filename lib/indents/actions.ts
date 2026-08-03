@@ -506,6 +506,74 @@ export async function submitIndent(indentId: string): Promise<ActionState> {
   return undefined;
 }
 
+/**
+ * Approves a submitted indent — the end of the road for this tool; a
+ * Purchase Order (Phase 6) is what happens next.
+ *
+ * Who may approve is checked in `indents_guard()` against
+ * `indent_approvers` (or admin), under the row lock. The check here is
+ * only so a refusal reads as a sentence rather than a database error.
+ */
+export async function approveIndent(indentId: string): Promise<ActionState> {
+  const user = await requireTool("/indents");
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("indents")
+    .update({
+      status: "approved",
+      approved_by: user.id,
+      approved_at: new Date().toISOString(),
+    })
+    .eq("id", indentId);
+  if (error) {
+    console.error("approveIndent failed:", error);
+    if (error.message.includes("approver")) {
+      return { error: "Only a named indent approver or an admin can approve an indent." };
+    }
+    return guardError(error, "Could not approve this indent. Try again.");
+  }
+
+  revalidatePath(`/indents/${indentId}`);
+  revalidatePath("/indents");
+  return undefined;
+}
+
+/**
+ * Sends a submitted indent back to draft with a reason.
+ *
+ * The note is mandatory — the guard refuses a rejection without one,
+ * because "rejected" with no explanation is the fastest way to make
+ * people stop using a tool. Submitting again clears it.
+ */
+export async function rejectIndent(indentId: string, note: string): Promise<ActionState> {
+  await requireTool("/indents");
+
+  const reason = note.trim();
+  if (!reason) return { error: "Say what needs changing — a rejection needs a note." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("indents")
+    .update({
+      status: "draft",
+      rejection_note: reason,
+      submitted_by: null,
+      submitted_at: null,
+      approved_by: null,
+      approved_at: null,
+    })
+    .eq("id", indentId);
+  if (error) {
+    console.error("rejectIndent failed:", error);
+    return guardError(error, "Could not send this indent back. Try again.");
+  }
+
+  revalidatePath(`/indents/${indentId}`);
+  revalidatePath("/indents");
+  return undefined;
+}
+
 /** Only a draft can go — the RPC re-checks under a row lock, and its
  * number stays burnt (gaps in the sequence are accepted and expected). */
 export async function deleteIndent(indentId: string): Promise<ActionState> {

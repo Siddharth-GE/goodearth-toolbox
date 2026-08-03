@@ -39,7 +39,17 @@ export default async function DashboardHome() {
       </div>
 
       <div className="space-y-5">
-        <OperationsPipeline />
+        {/* Fetches its own counts now that Indents is real, so it gets
+            its own boundary rather than holding up the whole page. */}
+        <Suspense
+          fallback={
+            <div className="bg-surface flex h-[168px] items-center justify-center rounded-2xl">
+              <Spinner />
+            </div>
+          }
+        >
+          <OperationsPipeline />
+        </Suspense>
         <KpiRow />
 
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.55fr_1fr]">

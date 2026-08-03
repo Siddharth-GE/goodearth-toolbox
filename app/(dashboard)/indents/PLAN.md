@@ -1,7 +1,7 @@
 # Indents — build notes
 
-**Status: in progress** (Phase 5, branch `feature/indents`). Migration
-`0019`. M4 of 5 built; only M5 (approval + Overview) remains.
+**Status: shipped** (Phase 5, merged 2026-08-03). Migration `0019`.
+All five milestones built and founder-tested.
 
 Site teams request materials, numbered per project, approved before
 purchase. **No money anywhere in this tool** — an indent carries items,
@@ -53,9 +53,14 @@ note. Approved indents are what Purchase Orders (Phase 6) consume.
       indent are shown, disabled and labelled rather than silently
       skipped. **Margin-secrecy gate passed** — see budgets/PLAN.md for
       exactly what was checked and how.
-- [ ] **M5 — approval + Overview.** Approve / reject-with-note on
-      `canDecide`, Overview pipeline stage 01 real, CI smoke test (press
-      a real save button post-build), merge.
+- [x] **M5 — approval + Overview.** Approve and "Send back" (a
+      rejection needs a note — the guard refuses one without) shown only
+      to admins and named approvers; the submitted banner tells an
+      approver it's theirs to decide. Overview pipeline stage 01 is
+      real: indents raised this month and their line count, **no
+      invented rupee figure** — an indent carries no money, so it
+      reports lines. The CI smoke test was deliberately split out of
+      this milestone (founder's call) — see root PLAN.md's "Next up".
 
 ## Notes
 
