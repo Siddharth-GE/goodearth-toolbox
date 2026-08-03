@@ -4,14 +4,16 @@ Internal tools platform for Goodearth, a design-led real estate company in Keral
 
 **Live on Vercel** (auto-deploys from `master` on every push — see
 README.md). **Shipped: Marathon, Settings, Masters, Selections,
-Budgets (two trees: Interiors + Construction), Indents.** Every other
-tool below is a Coming Soon stub, sidebar-ready but not yet built.
+Budgets (two trees: Interiors + Construction), Indents, Purchase
+Orders.** Every other tool below is a Coming Soon stub, sidebar-ready
+but not yet built.
 
-These are phases 1–5 of a multi-phase rebuild of Goodearth's
+These are phases 1–6 of a multi-phase rebuild of Goodearth's
 operational system (Masters → Selections → Budgets → Indents → Purchase
-Orders → Inventory → Bills, replacing AppSheet). **Read `PLAN.md` at the
-repo root first** — it's the live roadmap and session log, and says what
-shipped, what's next, and which decisions are already settled.
+Orders → Inventory → Bills, replacing AppSheet). **Read `STATUS.md` at
+the repo root first** — what's shipped, which decisions are settled,
+and the session log — **then `TODO.md`** — the detailed build plan for
+the next phases, written to be picked up with no context but the repo.
 
 ## Tools
 
@@ -57,6 +59,18 @@ database triggers; approvers are a named list managed in Settings.
 Indents carry **no money anywhere**. See
 `app/(dashboard)/indents/PLAN.md`.
 
+Built: **Purchase Orders** (`/purchase-orders`) — approved indent lines
+become one-vendor, one-plot/unit POs
+(`PO/<project code>/<plot-or-unit code>/NNN`, minted per scope in the
+database; plot/unit short codes set in Masters). Money enters the
+system here: a rate plus a GST slab per line (slabs are the `gst_rates`
+master), amounts always computed, totals by slab, a letterhead PDF.
+Draft → issued; deleting an issued PO is request-then-admin-approves —
+all trigger-enforced. Over-ordering an indent line is impossible at the
+database. PO money is RLS-gated to the `/purchase-orders` grant; other
+tools read the money-free `po_facts`/`po_line_facts` views. See
+`app/(dashboard)/purchase-orders/PLAN.md`.
+
 **Overview** (`/`, `app/(dashboard)/page.tsx`) — the shell's home page,
 not a `lib/tools.ts` entry (every signed-in user sees it, regardless of
 app grants). This already fulfills what the roadmap used to call
@@ -68,11 +82,10 @@ clearly-static illustrative widgets for tools that don't exist yet
 activity) — swap each widget for a real query as its tool actually
 ships, same file, no restructuring needed.
 
-Planned, roughly in build order — **this list will keep growing**; the pattern below for adding a tool matters more than the exact names:
+Planned, roughly in build order — **this list will keep growing**; the pattern below for adding a tool matters more than the exact names (Phases 7–8 are fully planned in `TODO.md`):
 
-- Purchase Orders — created from approved indent lines, split by vendor, with a well-designed PDF generator (company letterhead quality)
-- Inventory / Store — goods receipt against POs, stock by store, issue to manufacturing
-- Bills — recording against POs and labour contracts
+- Inventory / Store — goods receipt against POs (into a store or direct to site), stock by store, issue to manufacturing
+- Bills — recording against POs and labour contracts, approve → paid
 - Site Tracker — (details TBD as it's scoped)
 - Directory, Training — people-side tools
 
@@ -227,6 +240,18 @@ interiors budget data only through the `approved_budgets` /
 `approved_budget_lines` views, never the gated tables (see
 `lib/indents/queries.ts`).
 
+For tools consuming Purchase Orders (Inventory's receipts, Bills):
+anchor on **`purchase_order_lines.id`** — a stable row id, the same way
+PO lines anchor on `indent_lines.id`. PO money (rate, gst_pct) is
+RLS-gated to the `/purchase-orders` grant; a consumer that needs line
+facts without money reads the **`po_facts` / `po_line_facts` views**
+(migration `0022`), whose column lists ARE the boundary — never add a
+money column to them, and never solve a read need with a second SELECT
+policy on the PO tables (permissive policies OR together). Guard-trigger
+changes that Phase 7 owns: replacing `purchase_orders_guard` to admit
+`issued → completed` from the receipt trigger, and refusing
+cancellation once goods have been received.
+
 ## Shared masters (Projects, Plots, Units, Clients, Vendors, Stores, Items)
 
 Built in Phase 1 (`supabase/migrations/0004_masters.sql`) — Marathon
@@ -355,17 +380,21 @@ queries against the real schema — a typo'd column name now fails
 
 ## Documentation map
 
-This file is the entry point. **PLAN.md** (repo root) is the living
-roadmap and session log — **read it first at the start of any session**
-to see what's shipped, what's next, and which decisions are already
-settled; it's updated at the end of every working session. **DESIGN.md**
-covers the shared visual system — colors, type, spacing, components;
-read it before styling anything. Each tool keeps its own build
-plan/checklist colocated with its code — `app/marathon/PLAN.md` for the
-kiosk, `app/(dashboard)/<tool>/PLAN.md` for every dashboard tool
-(Masters, Selections, Budgets, Indents, Settings) — check the relevant
-one before starting or resuming work on that tool. Root PLAN.md is the level above those: it
-tracks the whole multi-phase rebuild, they track one tool each.
+This file is the entry point. **STATUS.md** (repo root) is where we are
+— what's shipped, settled decisions, the session log — **read it first
+at the start of any session**; it's updated at the end of every working
+session. **TODO.md** (repo root) is what's next — the complete build
+plan for the upcoming phases, detailed enough to pick up with no
+context beyond the repo; work items move from TODO.md into STATUS.md as
+they ship. **DESIGN.md** covers the shared visual system — colors,
+type, spacing, components; read it before styling anything. Each tool
+keeps its own build plan/checklist colocated with its code —
+`app/marathon/PLAN.md` for the kiosk,
+`app/(dashboard)/<tool>/PLAN.md` for every dashboard tool (Masters,
+Selections, Budgets, Indents, Purchase Orders, Settings) — check the
+relevant one before starting or resuming work on that tool. Root
+STATUS.md/TODO.md are the level above those: they track the whole
+multi-phase rebuild, the per-tool files track one tool each.
 
 @AGENTS.md
 @DESIGN.md

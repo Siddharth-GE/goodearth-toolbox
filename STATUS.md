@@ -1,38 +1,42 @@
-# Goodearth Toolbox — build plan & session log
+# Goodearth Toolbox — status & session log
 
-The living roadmap for rebuilding Goodearth's whole operational system
-here, replacing the AppSheet suite. Source of truth for **where we are**
-and **what's next**.
+Source of truth for **where we are**: what's shipped, which decisions
+are settled, and the session log. (This file was `PLAN.md` until
+2026-08-03; the forward-looking half now lives in **`TODO.md`** — the
+detailed, pick-up-cold plan for the next phases.)
 
 > **How this file works.** Updated at the end of every working session:
-> tick off what shipped, correct the plan where reality disagreed with
-> it, and keep "Next up" detailed enough that a cold start needs no
-> explanation. Per-tool detail lives in `app/(dashboard)/<tool>/PLAN.md`
-> (and `app/marathon/PLAN.md`); durable rules live in CLAUDE.md; full
-> history lives in git. This file stays lean — it was pruned on
-> 2026-08-03 after Phase 5 shipped, and should be pruned again whenever
-> finished work stops being useful context.
+> record what shipped, correct where reality disagreed with the plan,
+> move finished items out of TODO.md into here. Per-tool detail lives in
+> `app/(dashboard)/<tool>/PLAN.md` (and `app/marathon/PLAN.md`); durable
+> rules live in CLAUDE.md; full history lives in git. This file stays
+> lean — pruned 2026-08-03 after Phase 5, and again whenever finished
+> work stops being useful context.
 
 ---
 
 ## Where we are right now
 
-**Phase 6 (Purchase Orders) is in flight on `feature/purchase-orders`**
-— all four milestones built the same day the phase started; M1 and M2
-founder-tested and passed, M3+M4 awaiting their gates and the founder
-applying migration `0022` (see the tool's PLAN.md). The chain now runs
-design → price → indent → **PO with GST and a printable document**.
+**Phase 6 (Purchase Orders) shipped and merged on 2026-08-03** — the
+same day it was planned and built. The chain now runs design → price →
+indent → **PO with GST and a printable document**: approved indent
+lines become one-vendor, one-plot/unit POs (`PO/SAA/V12A/001`), priced
+against a managed GST slab list, issued, printed on the (still
+placeholder) letterhead, with an admin-approved deletion flow, avatars
+on every line, and "ordered X of Y" back on the indents.
 
-|                     |                                                                                          |
-| ------------------- | ---------------------------------------------------------------------------------------- |
-| Last worked         | 2026-08-03                                                                               |
-| Branch              | `feature/purchase-orders` (Phase 6; master = through Phase 5)                            |
-| Migrations applied  | `0001`–`0021` (`0022` written, waiting for Studio; next new one is `0023`)               |
-| Items in database   | **2,633** (2,631 imported catalogue + 2 material seeds)                                  |
-| Categories / brands | 14 / 21                                                                                  |
-| Thumbnails          | **897** in Supabase Storage; 1,736 items use the colour placeholder                      |
-| Built tools         | Marathon, Settings, Masters, Selections, Budgets (Interiors + Construction), Indents     |
-| Tests               | `npm test` — 46: pricing, carry-forward, diff, indent reference + workflow, PIN, formats |
+**Next: Phase 7 — Inventory.** The full plan is in `TODO.md`.
+
+|                     |                                                                                                           |
+| ------------------- | --------------------------------------------------------------------------------------------------------- |
+| Last worked         | 2026-08-03                                                                                                |
+| Branch              | `master` — Phase 6 merged, `feature/purchase-orders` deleted                                              |
+| Migrations applied  | `0001`–`0022` (next new one is `0023`)                                                                    |
+| Items in database   | **2,633** (2,631 imported catalogue + 2 material seeds)                                                   |
+| Categories / brands | 14 / 21                                                                                                   |
+| Thumbnails          | **897** in Supabase Storage; 1,736 items use the colour placeholder                                       |
+| Built tools         | Marathon, Settings, Masters, Selections, Budgets (Interiors + Construction), Indents, **Purchase Orders** |
+| Tests               | `npm test` — 61: pricing, carry-forward, diff, references + workflows, PO GST math, PIN, formats          |
 
 ## Phase status
 
@@ -46,9 +50,9 @@ design → price → indent → **PO with GST and a printable document**.
 | 2b  | **Design views** — renders per space, in the design document                                           | ✅ Shipped, merged 2026-08-01 |
 | 4   | **Budgets** — cost + margin → client rate, approval, two documents                                     | ✅ Shipped, merged 2026-08-01 |
 | 5   | **Indents + Construction tree** — three line sources, QS stage-wise plans, approval                    | ✅ Shipped, merged 2026-08-03 |
-| 6   | Purchase Orders — vendor grouping + letterhead PDF                                                     | 🔨 In flight on its branch    |
-| 7   | Inventory / Store — goods receipt, stock on hand, issues                                               | ⬜ Not started                |
-| 8   | Bills — against POs and labour contracts                                                               | ⬜ Not started                |
+| 6   | **Purchase Orders** — scope-numbered POs from approved indents, GST, guarded deletion, PDF             | ✅ Shipped, merged 2026-08-03 |
+| 7   | Inventory / Store — goods receipt, stock on hand, issues                                               | ⬜ **NEXT** — see TODO.md     |
+| 8   | Bills — against POs and labour contracts                                                               | ⬜ Planned — see TODO.md      |
 | 9   | Overview wired to real data + one real project end-to-end                                              | ⬜ Not started                |
 
 **Why 3 came before 2:** the catalogue picker was designed against
@@ -74,26 +78,19 @@ after. Things to watch:
   ask whether they match how Goodearth actually talks before importing.
 - Source files go in `data/` (git-ignored, like the catalogue CSVs).
 
-### Phase 6 — Purchase Orders (in flight, `feature/purchase-orders`)
+### Phase 7 — Inventory (next)
 
-All four milestones are built; detail and gates live in
-`app/(dashboard)/purchase-orders/PLAN.md`. To finish the phase:
+The complete build plan — schema, milestones, gates, settled decisions —
+is in **`TODO.md`**, written so a cold start needs nothing but the repo.
 
-1. **Founder applies `0022_po_facts_views.sql` in Studio** (two
-   money-free views — the "ordered X of Y" and Overview stage 02 reads).
-2. Types regenerated, full verification, push for preview.
-3. Founder tests the M3+M4 gates in the browser.
-4. **Letterhead assets** (logo, address, GST no., terms — still
-   placeholder; a Geist `.ttf` would lift every document at once) swap
-   in, then merge to `master` and delete the branch.
+### Letterhead assets (any session, before the next PDF-heavy phase)
 
-Settled during the build (decisions in the detailed plan, approved
-2026-08-03): PO number `PO/<project>/<plot-or-unit>/NNN` with plot/unit
-short codes in Masters; POs from approved indents only; one PO = one
-vendor + one scope; GST slabs as a managed `gst_rates` master; deleting
-an issued PO is request-then-admin-approves; indent approval is the one
-approval in the chain. The indent `cancelled` status stayed deferred —
-nothing in Phase 6 needed it after all; revisit if a real case appears.
+The whole PDF layer still prints on a placeholder letterhead in
+Helvetica (no ₹ glyph — amounts are digits-only via `formatAmount`).
+When the founder supplies the logo, registered address, company GST
+number and standard PO terms, swap them into `lib/pdf/document.tsx`'s
+`Letterhead` (one place); a Geist `.ttf` registered there lifts every
+document at once. Deliberately did not block the Phase 6 merge.
 
 ### Smaller pending items (any session)
 
@@ -152,6 +149,33 @@ nothing in Phase 6 needed it after all; revisit if a real case appears.
   from Settings; admins always may), enforced by the database guard —
   like every status rule: the triggers are the boundary, buttons are a
   courtesy.
+- **POs come from approved indents only** — no direct POs; a purchase
+  always has an approved request behind it. One PO = one vendor + one
+  plot/unit ("GEN" for general), because the scope is part of the
+  number: `PO/<project code>/<plot-or-unit code>/NNN`, numbers running
+  per scope, minted in `create_purchase_order()`. Plot/unit short codes
+  live in Masters like `projects.code`.
+- **PO money is gated; PO facts are not.** SELECT on
+  `purchase_orders`/`purchase_order_lines` requires `/purchase-orders`
+  (the Budgets precedent). The one sanctioned money-free window is the
+  `po_facts` / `po_line_facts` views (migration `0022`) — quantities,
+  references and statuses, **never a rate**; their column lists are the
+  boundary, exactly like `approved_budget_lines`.
+- **Over-ordering is impossible at the database**: unique
+  `(po_id, indent_line_id)` + the advisory-lock-serialised
+  `po_lines_qty_guard` cap every indent line at its approved quantity
+  across all non-cancelled POs. A PO line's uom is not editable — it
+  stays the indent line's unit so the guard's comparison stays honest.
+- **GST slabs are a managed master** (`gst_rates`, Masters tab), picked
+  per PO line and snapshotted into `gst_pct` — no FK, the
+  price-snapshot principle. PO amounts are computed, never stored.
+- **Deleting an issued PO takes an admin's yes** — request with a
+  mandatory note → admin approves (→ cancelled, quantities return to
+  the pool) or refuses; the requester may withdraw. Draft POs are their
+  creator's (or an admin's) to delete. Trigger-enforced.
+- **Attribution everywhere** — every line grid and status banner shows
+  the acting user's avatar (name on hover) via
+  `components/ui/attribution.tsx`; actions stamp `updated_by`.
 - **Item codes:** Goodearth's real convention is a 4-letter _sub-type_
   prefix + 3-digit sequence (`BENS001`, `SOFS…`) — finer than category.
   Nothing auto-generates codes today; whenever that's built it must
@@ -275,20 +299,24 @@ plumbing, migration conventions). What's still **live** from them:
 Compact by design — one entry per working day. Full detail: git
 history and the per-tool PLAN.md files.
 
-### 2026-08-03 (later) — Phase 6 planned and built in one sitting
+### 2026-08-03 (later) — Phase 6 planned, built, founder-tested and merged in one sitting
 
 The founder approved the full Phases 6–8 feature overview (POs /
-Inventory / Bills — every decision now in the detailed plan and
-CLAUDE-adjacent docs), then Phase 6 was built through all four
-milestones on `feature/purchase-orders`: migrations `0020` (audit
-prerequisite) + `0021` (PO schema, guards, per-scope numbering) +
-`0022` (money-free fact views, **not yet applied**), the pure modules
-with 15 new tests, Masters groundwork (plot/unit codes, GST Rates tab),
-the raise-and-price flow, the issue/deletion status machine, attribution
-avatars, indent fulfilment, the PO PDF and a real Overview stage 02.
-M1 and M2 founder-gated same day (one fix: the qty input was squeezed —
-column widened, uom moved under it). Waiting on: `0022` in Studio, the
-M3/M4 browser gates, and letterhead assets before merge.
+Inventory / Bills), then Phase 6 shipped through all four milestones on
+`feature/purchase-orders`: migrations `0020` (audit prerequisite) +
+`0021` (PO schema, guards, per-scope numbering) + `0022` (money-free
+fact views), pure modules with 15 new tests, Masters groundwork
+(plot/unit codes, GST Rates tab), the raise-and-price flow, the
+issue/deletion status machine, attribution avatars, indent fulfilment,
+the PO PDF and a real Overview stage 02. Two founder-found fixes: the
+qty input was squeezed (column widened, uom moved under it), and the
+Issue button read a stale server snapshot after on-blur rate saves — it
+stayed dead until an unrelated navigation. The button now needs only
+lines to exist; pricing is checked at click time server-side, where the
+saved rates are visible. Merged to `master` same day, branch deleted;
+letterhead assets still pending (see "Next up"). This file was renamed
+`PLAN.md` → `STATUS.md`, and the forward plan for Phases 7–8 moved to
+the new `TODO.md`.
 
 ### 2026-08-03 — Phase 5 shipped end to end; an outage found, fixed and guarded
 

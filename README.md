@@ -7,16 +7,18 @@ several tools, one per business function, on one shared Supabase
 
 **New here? Read in this order:**
 
-1. **[PLAN.md](./PLAN.md)** — what's shipped, what's next, and which
-   decisions are already settled. The living roadmap.
-2. **[CLAUDE.md](./CLAUDE.md)** — architecture: how tools are structured,
+1. **[STATUS.md](./STATUS.md)** — what's shipped, which decisions are
+   already settled, and the session log.
+2. **[TODO.md](./TODO.md)** — the detailed plan for what's next
+   (Phases 7–8: Inventory, Bills), written to be picked up cold.
+3. **[CLAUDE.md](./CLAUDE.md)** — architecture: how tools are structured,
    where code goes, how to add a new one.
-3. **[DESIGN.md](./DESIGN.md)** — the shared visual system. Read before
+4. **[DESIGN.md](./DESIGN.md)** — the shared visual system. Read before
    styling anything.
 
 Per-tool build notes live beside the code — every built tool has one:
 `app/marathon/PLAN.md`, and `app/(dashboard)/<tool>/PLAN.md` for
-Masters, Selections, Budgets and Settings.
+Masters, Selections, Budgets, Indents, Purchase Orders and Settings.
 
 ## Running locally
 

@@ -1,9 +1,9 @@
 # Purchase Orders — build notes
 
-**Status: in progress** (Phase 6, branch `feature/purchase-orders`).
-Migrations `0020` (audit prerequisite) + `0021` (schema). Full phase
-plan and every founder decision: the root PLAN.md session log for
-2026-08-03 and the approved detailed plan it references.
+**Status: shipped** (Phase 6, merged 2026-08-03, branch deleted).
+Migrations `0020` (audit prerequisite) + `0021` (schema) + `0022`
+(money-free fact views). Every founder decision: root STATUS.md's
+"Decisions locked in" and the 2026-08-03 session log.
 
 POs are raised from **approved indent lines only**, one vendor and one
 plot/unit (or "General") per PO — the scope is part of the number:
@@ -46,24 +46,24 @@ Budgets (cost/margin/client rate) appears on a PO, ever.**
       quantities, line grid with rate + GST dropdown + live totals,
       draft save/delete.
       _Gate passed 2026-08-03; qty-input visibility fixed on feedback._
-- [ ] **M3 — issue, delete, fulfil.** Built, awaiting the gate:
-      issue with the fully-priced check; request-deletion (note
-      required) → admin approve/refuse, withdraw by requester; status
-      banners; indent detail's "ordered X of Y" with PO references
-      (via the money-free `po_line_facts` view, migration `0022`);
-      the `Attribution` component (`components/ui/attribution.tsx`,
-      avatar + name on hover) on PO and Indent line grids and status
+- [x] **M3 — issue, delete, fulfil.** Issue with the priced-at-click
+      check (the button deliberately does NOT gate on the server's
+      fullyPriced snapshot — rate saves don't revalidate, so that prop
+      goes stale and the button played dead, a founder-found bug);
+      request-deletion (note required) → admin approve/refuse, withdraw
+      by requester; status banners; indent detail's "ordered X of Y"
+      with PO references (via the money-free `po_line_facts` view,
+      migration `0022`); the `Attribution` component
+      (`components/ui/attribution.tsx`) on PO and Indent line grids and
       banners; `updated_by` stamped by all indent/PO line actions.
-      _Gate: issue, request deletion as staff, approve as admin,
-      check the avatars and the ordered column._
-- [ ] **M4 — the document + Overview.** Built, awaiting the gate:
-      the PO PDF (`lib/purchase-orders/po-document.tsx` on the shared
-      shell — vendor block with GSTIN, lines with GST, totals by slab,
-      DRAFT watermark, signature block on issued only); Overview
-      pipeline stage 02 real (issued this month + drafts in progress,
-      via money-free `po_facts`).
-      _Gate: print a PO and check it against a real vendor order.
-      Letterhead assets still placeholder — swap before merge._
+      _Gate passed 2026-08-03._
+- [x] **M4 — the document + Overview.** The PO PDF
+      (`lib/purchase-orders/po-document.tsx` on the shared shell —
+      vendor block with GSTIN, lines with GST, totals by slab, DRAFT
+      watermark, signature block on issued only); Overview pipeline
+      stage 02 real via money-free `po_facts`.
+      _Gate passed 2026-08-03; merged same day. Letterhead assets
+      still placeholder — swap tracked in root STATUS.md._
 
 ## Notes
 

@@ -60,7 +60,7 @@ note. Approved indents are what Purchase Orders (Phase 6) consume.
       real: indents raised this month and their line count, **no
       invented rupee figure** — an indent carries no money, so it
       reports lines. The CI smoke test was deliberately split out of
-      this milestone (founder's call) — see root PLAN.md's "Next up".
+      this milestone (founder's call) — see root STATUS.md.
 
 ## Notes
 

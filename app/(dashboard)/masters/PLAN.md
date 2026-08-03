@@ -3,7 +3,7 @@
 **Status: SHIPPED — merged to `master` 2026-07-31.** Gate 1 tested and
 approved by the founder in the browser. Phase 2 (Selections) is next.
 
-See the root `PLAN.md` for the full multi-phase roadmap this is the
+See the root `STATUS.md` for the full multi-phase roadmap this is the
 foundation of.
 
 ## Steps
