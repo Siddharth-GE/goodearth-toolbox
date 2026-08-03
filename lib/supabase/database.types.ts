@@ -372,6 +372,228 @@ export type Database = {
           },
         ]
       }
+      goods_receipt_lines: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          item_id: string
+          note: string | null
+          po_line_id: string
+          quantity: number
+          receipt_id: string
+          uom: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          item_id: string
+          note?: string | null
+          po_line_id: string
+          quantity: number
+          receipt_id: string
+          uom: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          item_id?: string
+          note?: string | null
+          po_line_id?: string
+          quantity?: number
+          receipt_id?: string
+          uom?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "goods_receipt_lines_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goods_receipt_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goods_receipt_lines_po_line_id_fkey"
+            columns: ["po_line_id"]
+            isOneToOne: false
+            referencedRelation: "po_line_facts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goods_receipt_lines_po_line_id_fkey"
+            columns: ["po_line_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_order_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goods_receipt_lines_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "goods_receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goods_receipt_lines_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      goods_receipts: {
+        Row: {
+          challan_no: string | null
+          created_at: string
+          created_by: string | null
+          grn_no: number
+          id: string
+          note: string | null
+          plot_id: string | null
+          po_id: string
+          project_id: string
+          received_at: string
+          reference: string
+          store_id: string | null
+          to_site: boolean
+          unit_id: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          challan_no?: string | null
+          created_at?: string
+          created_by?: string | null
+          grn_no: number
+          id?: string
+          note?: string | null
+          plot_id?: string | null
+          po_id: string
+          project_id: string
+          received_at?: string
+          reference: string
+          store_id?: string | null
+          to_site?: boolean
+          unit_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          challan_no?: string | null
+          created_at?: string
+          created_by?: string | null
+          grn_no?: number
+          id?: string
+          note?: string | null
+          plot_id?: string | null
+          po_id?: string
+          project_id?: string
+          received_at?: string
+          reference?: string
+          store_id?: string | null
+          to_site?: boolean
+          unit_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "goods_receipts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goods_receipts_plot_id_fkey"
+            columns: ["plot_id"]
+            isOneToOne: false
+            referencedRelation: "plots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goods_receipts_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "po_facts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goods_receipts_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goods_receipts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goods_receipts_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goods_receipts_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goods_receipts_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      grn_counters: {
+        Row: {
+          last_no: number
+          project_id: string
+        }
+        Insert: {
+          last_no?: number
+          project_id: string
+        }
+        Update: {
+          last_no?: number
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grn_counters_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gst_rates: {
         Row: {
           created_at: string
@@ -656,6 +878,29 @@ export type Database = {
             columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      iss_counters: {
+        Row: {
+          last_no: number
+          project_id: string
+        }
+        Insert: {
+          last_no?: number
+          project_id: string
+        }
+        Update: {
+          last_no?: number
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "iss_counters_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
@@ -1762,6 +2007,236 @@ export type Database = {
           },
         ]
       }
+      stock_adjustments: {
+        Row: {
+          adjusted_at: string
+          created_at: string
+          created_by: string | null
+          id: string
+          item_id: string
+          quantity: number
+          reason: string
+          store_id: string
+          uom: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          adjusted_at?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          item_id: string
+          quantity: number
+          reason: string
+          store_id: string
+          uom: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          adjusted_at?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          item_id?: string
+          quantity?: number
+          reason?: string
+          store_id?: string
+          uom?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_adjustments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_adjustments_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_adjustments_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_adjustments_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_issue_lines: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          issue_id: string
+          item_id: string
+          note: string | null
+          quantity: number
+          uom: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          issue_id: string
+          item_id: string
+          note?: string | null
+          quantity: number
+          uom: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          issue_id?: string
+          item_id?: string
+          note?: string | null
+          quantity?: number
+          uom?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_issue_lines_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_issue_lines_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: false
+            referencedRelation: "stock_issues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_issue_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_issue_lines_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_issues: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          iss_no: number
+          issued_at: string
+          note: string | null
+          plot_id: string | null
+          project_id: string
+          reference: string
+          store_id: string
+          to_store_id: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          iss_no: number
+          issued_at?: string
+          note?: string | null
+          plot_id?: string | null
+          project_id: string
+          reference: string
+          store_id: string
+          to_store_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          iss_no?: number
+          issued_at?: string
+          note?: string | null
+          plot_id?: string | null
+          project_id?: string
+          reference?: string
+          store_id?: string
+          to_store_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_issues_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_issues_plot_id_fkey"
+            columns: ["plot_id"]
+            isOneToOne: false
+            referencedRelation: "plots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_issues_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_issues_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_issues_to_store_id_fkey"
+            columns: ["to_store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_issues_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stores: {
         Row: {
           created_at: string
@@ -2111,6 +2586,23 @@ export type Database = {
           },
         ]
       }
+      stock_by_location: {
+        Row: {
+          item_id: string | null
+          location_id: string | null
+          location_kind: string | null
+          quantity: number | null
+        }
+        Relationships: []
+      }
+      stock_on_hand: {
+        Row: {
+          item_id: string | null
+          quantity: number | null
+          store_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       admin_list_users: {
@@ -2122,6 +2614,17 @@ export type Database = {
           role: string
           team: string
         }[]
+      }
+      create_goods_receipt: {
+        Args: {
+          p_challan_no: string
+          p_note: string
+          p_po_id: string
+          p_received_at: string
+          p_store_id: string
+          p_to_site: boolean
+        }
+        Returns: string
       }
       create_indent: {
         Args: {
@@ -2159,6 +2662,17 @@ export type Database = {
           p_terms: string
           p_unit_id: string
           p_vendor_id: string
+        }
+        Returns: string
+      }
+      create_stock_issue: {
+        Args: {
+          p_issued_at: string
+          p_note: string
+          p_plot_id: string
+          p_project_id: string
+          p_store_id: string
+          p_to_store_id: string
         }
         Returns: string
       }
@@ -2209,6 +2723,10 @@ export type Database = {
       reopen_budget: { Args: { p_budget_id: string }; Returns: undefined }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      stock_qty_on_hand: {
+        Args: { p_item_id: string; p_store_id: string }
+        Returns: number
+      }
     }
     Enums: {
       [_ in never]: never

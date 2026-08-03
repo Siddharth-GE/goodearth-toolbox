@@ -80,11 +80,11 @@ export const TOOLS: Tool[] = [
   },
   {
     name: "Inventory",
-    description: "Goods receipt, stock by store, issue to manufacturing.",
+    description: "Goods receipt against POs, stock by store, issues out.",
     href: "/inventory",
     icon: "Warehouse",
     group: "Operations",
-    built: false,
+    built: true,
   },
   {
     name: "Bills",

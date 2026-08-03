@@ -216,6 +216,13 @@ are already correct and don't need to change.
    `rows.length`.
 3. Build every screen from `components/ui/*` (and `components/masters/*`
    where relevant). Never one-off styles — see DESIGN.md.
+   **If the tool renders `components/masters/catalogue-picker.tsx`, add
+   its grant to the allow-list in `app/api/catalogue/route.ts`** — that
+   Route Handler gates by an explicit list of tools, so a missing entry
+   makes the picker return 403 and sit empty inside the dialog rather
+   than refusing in any visible way. Phase 7 shipped this bug and only
+   a smoke run as a real single-grant user caught it; an admin passes
+   every check and never sees it.
 4. Add (or update) its entry in `lib/tools.ts` — `group`, `icon`,
    `built: true` — so it shows up correctly in the sidebar. Then grant
    it to whichever staff need it in Settings (`/settings`) — a tool

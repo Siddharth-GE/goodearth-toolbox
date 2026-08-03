@@ -1,19 +1,23 @@
 import { Card } from "@/components/ui/card";
 import { formatCount } from "@/lib/format";
 import { countIndentsPipeline } from "@/lib/indents/queries";
+import { countReceiptsPipeline } from "@/lib/inventory/queries";
 import { countPosPipeline } from "@/lib/purchase-orders/queries";
 
-// Stages 03–05 are still static illustrations: Inventory and Bills
-// don't exist yet. Each becomes real the same way 01 and 02 did —
-// one query, same component, no restructuring. See CLAUDE.md.
+// Stages 04–05 are still static illustrations: Bills doesn't exist
+// yet. Each becomes real the same way 01–03 did — one query, same
+// component, no restructuring. See CLAUDE.md.
 const PLANNED_STAGES = [
-  { n: "03", name: "Goods received", count: 16, value: "₹28.9L", pct: 60 },
   { n: "04", name: "Bills booked", count: 12, value: "₹22.1L", pct: 46 },
   { n: "05", name: "Paid", count: 9, value: "₹15.4L", pct: 32, tail: true },
 ];
 
 export async function OperationsPipeline() {
-  const [indents, pos] = await Promise.all([countIndentsPipeline(), countPosPipeline()]);
+  const [indents, pos, receipts] = await Promise.all([
+    countIndentsPipeline(),
+    countPosPipeline(),
+    countReceiptsPipeline(),
+  ]);
 
   return (
     <Card className="p-5">
@@ -64,6 +68,28 @@ export async function OperationsPipeline() {
               className="bg-accent h-full rounded-full"
               style={{
                 width: `${indents.raisedThisMonth === 0 ? 0 : Math.min(100, Math.round((pos.issuedThisMonth / indents.raisedThisMonth) * 100))}%`,
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Stage 03 is real. No rupee figure either: Inventory carries
+            no money at all by design, so the sub-line reports how many
+            orders are still waiting on their goods. */}
+        <div className="min-w-[110px] flex-1">
+          <p className="text-muted font-mono text-[10px]">03</p>
+          <p className="text-foreground mt-1.5 text-xs font-medium">Goods received</p>
+          <p className="text-foreground mt-1.5 text-2xl font-semibold tracking-tight">
+            {formatCount(receipts.receivedThisMonth)}
+          </p>
+          <p className="text-accent mt-0.5 font-mono text-xs">
+            {formatCount(receipts.awaitingDelivery)} awaiting delivery
+          </p>
+          <div className="bg-border mt-3 h-[3px] overflow-hidden rounded-full">
+            <div
+              className="bg-accent h-full rounded-full"
+              style={{
+                width: `${pos.issuedThisMonth === 0 ? 0 : Math.min(100, Math.round((receipts.receivedThisMonth / pos.issuedThisMonth) * 100))}%`,
               }}
             />
           </div>
