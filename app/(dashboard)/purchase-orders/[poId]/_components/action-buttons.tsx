@@ -22,7 +22,6 @@ import {
 import {
   canApproveDeletion,
   canDeleteDraft,
-  canIssue,
   canRequestDeletion,
   canWithdrawDeletion,
   type PoActor,
@@ -191,6 +190,14 @@ export function ActionButtons({
   if (status !== "draft") return null;
   const mayDelete = canDeleteDraft(status, actor, createdBy);
 
+  // fullyPriced is the server's snapshot, and rate edits save on blur
+  // WITHOUT revalidating — so right after pricing the lines this prop
+  // still says unpriced, and a button disabled on it stays dead until
+  // an unrelated navigation refreshes the page (a real founder-found
+  // bug). The button therefore only needs lines to exist (adding lines
+  // does revalidate); the pricing rule is checked at click time by the
+  // action and the database guard, where the saved rates are visible.
+
   return (
     <div className="space-y-1 text-right">
       <div className="flex items-center justify-end gap-2">
@@ -223,14 +230,8 @@ export function ActionButtons({
               </Button>
             )}
             <Button
-              disabled={pending || !canIssue(status, lineCount, fullyPriced)}
-              title={
-                lineCount === 0
-                  ? "Add at least one line first"
-                  : !fullyPriced
-                    ? "Every line needs a rate and a GST % first"
-                    : undefined
-              }
+              disabled={pending || lineCount === 0}
+              title={lineCount === 0 ? "Add at least one line first" : undefined}
               onClick={() => run(() => issuePo(poId))}
             >
               {pending ? "Issuing…" : "Issue to vendor"}
@@ -242,7 +243,7 @@ export function ActionButtons({
         <p className="text-muted text-xs">Add at least one line to issue</p>
       )}
       {!confirmingDelete && lineCount > 0 && !fullyPriced && (
-        <p className="text-muted text-xs">Every line needs a rate and GST to issue</p>
+        <p className="text-muted text-xs">Lines without a rate and GST will block issuing</p>
       )}
       <FormMessage error={error} size="xs" />
     </div>

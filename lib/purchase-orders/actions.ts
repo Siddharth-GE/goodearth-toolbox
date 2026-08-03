@@ -32,6 +32,7 @@ function guardError(error: { message: string }, fallback: string): ActionState {
     message.includes("inactive") ||
     message.includes("not both") ||
     message.includes("before issuing") ||
+    message.includes("rate and a GST") ||
     message.includes("no longer exists") ||
     message.includes("deletion request") ||
     message.includes("admin can approve") ||
@@ -280,16 +281,29 @@ export async function issuePo(poId: string): Promise<ActionState> {
   const user = await requireTool("/purchase-orders");
   const supabase = await createClient();
 
-  const { count, error: countError } = await supabase
-    .from("purchase_order_lines")
-    .select("id", { count: "exact", head: true })
-    .eq("po_id", poId);
-  if (countError) {
-    console.error("issuePo count failed:", countError);
+  const [{ count, error: countError }, { count: unpriced, error: unpricedError }] =
+    await Promise.all([
+      supabase
+        .from("purchase_order_lines")
+        .select("id", { count: "exact", head: true })
+        .eq("po_id", poId),
+      supabase
+        .from("purchase_order_lines")
+        .select("id", { count: "exact", head: true })
+        .eq("po_id", poId)
+        .or("rate.is.null,gst_pct.is.null"),
+    ]);
+  if (countError || unpricedError) {
+    console.error("issuePo count failed:", countError ?? unpricedError);
     return { error: "Could not issue. Try again." };
   }
   if ((count ?? 0) === 0) {
     return { error: "Add at least one line before issuing." };
+  }
+  if ((unpriced ?? 0) > 0) {
+    return {
+      error: `${unpriced} ${unpriced === 1 ? "line still needs" : "lines still need"} a rate and a GST % before issuing.`,
+    };
   }
 
   const { error } = await supabase
