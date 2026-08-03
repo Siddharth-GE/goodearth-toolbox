@@ -15,10 +15,12 @@ and **what's next**.
 ## Where we are right now
 
 **Phase 5 (Indents + the Construction tree in Budgets) is IN PROGRESS
-on `feature/indents`.** Milestones 1–2 of 5 are built and
-founder-tested on the preview; see "Phase 5" under Next up for exactly
-what remains. A production outage in server actions was root-caused and
-hotfixed to `master` on 2026-08-03 — see the session log.
+on `feature/indents`.** Milestones 1–3 of 5 are built; M1–M2 are
+founder-tested, **M3 (the Indents app, direct lines) is pushed and
+awaiting the founder's browser gate on the preview** — see "Phase 5"
+under Next up for the checklist and what remains. A production outage
+in server actions was root-caused and hotfixed to `master` on
+2026-08-03 — see the session log.
 
 The Selections → Budgets chain works end to end: a designer specifies a
 unit space by space, issues it, the budget team prices it, and a client
@@ -28,7 +30,7 @@ replacement.
 |                     |                                                                                                            |
 | ------------------- | ---------------------------------------------------------------------------------------------------------- |
 | Last worked         | 2026-08-03                                                                                                 |
-| Branch              | `feature/indents` (M1+M2 pushed, founder-tested); `master` carries the action-crash hotfix                 |
+| Branch              | `feature/indents` (M1–M3 pushed; M3 awaiting its gate); `master` carries the action-crash hotfix           |
 | Migrations applied  | `0001`–`0019` (next new one is `0020`)                                                                     |
 | Items in database   | **2,633** (2,631 imported catalogue + 2 material seeds)                                                    |
 | Categories / brands | 14 / 21                                                                                                    |
@@ -200,17 +202,27 @@ beside **Interiors**), built in this same phase as the Indents app.
   (extracted per DESIGN.md's third-copy rule; Selections keeps its own
   copy for now — migrating it is a noted later cleanup).
 
+**Built this session, awaiting the founder's gate (M3, 2026-08-03):**
+
+- **The Indents app is live** (`built: true`): list with status tabs,
+  honest "N of M" counts and string-href pagination; new-indent form
+  (code-less projects refused with a pointer to Masters, dependent
+  plot/unit selects); detail page with save-on-blur line grid + header
+  fields, direct add via the shared picker, submit and two-step
+  delete-draft. `lib/indents/queries.ts` + `actions.ts` follow every
+  convention (requireTool first, direct table reads, `ActionState`,
+  guard messages surfaced). `/indents` added to `/api/catalogue`'s
+  allowed list. `app/(dashboard)/indents/PLAN.md` started.
+- **Verified locally end to end** with Playwright against the
+  production build (13/13): sign-in → refusal on a code-less project →
+  `IND/VIH/001` minted → picker add → blur-saves persist across reload
+  → remove line → delete draft. Test data fully cleaned up afterwards
+  (temporary `VIH` code cleared, counter row deleted) — the founder's
+  own first indent still mints `…/001`.
+
 **Remaining milestones** (full detail in the approved plan file at
 `C:\Users\Kaicha\.claude\plans\please-read-the-claude-elegant-pnueli.md`):
 
-- **M3 — Raise an indent (direct lines):** flip `built: true` in
-  `lib/tools.ts`; `lib/indents/queries.ts` + `actions.ts` (every
-  function opens `requireTool("/indents")`; reads selections/spaces/
-  items/construction tables directly — never another tool's gated
-  queries); list (`INDENTS_LIST_LIMIT`, exact counts) / new / detail /
-  line-grid (`useSaveOnBlur`) / direct-add via the shared picker; add
-  `hasApp(user, "/indents")` to `app/api/catalogue/route.ts`'s allowed
-  list; `loading.tsx`; start `app/(dashboard)/indents/PLAN.md`.
 - **M4 — Both pull paths:** construction pull (per stage, budgeted qty
   prefilled, "already requested: N" summed over `construction_line_id`,
   stamps `indents.stage`) and interiors pull (via the views +
@@ -222,8 +234,13 @@ beside **Interiors**), built in this same phase as the Indents app.
 - **M5 — Approval + Overview:** approve/reject-with-note wired to
   `canDecide` + the DB guard; Overview pipeline stage 01 goes real
   (counts + "N lines", no invented rupees — indents carry no money);
-  update this file's phase table + budgets/indents PLAN.md; merge,
-  delete branch.
+  **plus the CI smoke test the founder approved on 2026-08-03**: a CI
+  job that builds, starts the app, signs in as a dedicated permanent
+  test user via Playwright and presses one real write-button — the
+  outage class `next build` can't catch. Needs GitHub repo secrets
+  (Supabase URL/anon key + smoke-user credentials); ask the founder to
+  add them when M5 starts. Then: update this file's phase table +
+  budgets/indents PLAN.md; merge, delete branch.
 
 **Notes a fresh session needs:**
 
@@ -514,6 +531,28 @@ merging, per the git workflow.
   folder — move it only if a third consumer appears.
 
 ## Session log
+
+### 2026-08-03 (later) — M3 built: the Indents app itself
+
+List / new / detail / line grid / direct add, exactly per the approved
+plan — see the Phase 5 section above for what shipped and the founder
+checklist below for the gate. Two things worth keeping:
+
+- **The local Playwright smoke pass is now the pre-push habit** for
+  anything with server actions: `npm run build && npm start`, drive the
+  real flows as `claude-preview-probe@goodearth.test` (password reset
+  via the auth admin API each time — it's never stored), verify, then
+  clean up any rows created. This session's pass was 13/13 and caught
+  nothing — which is the point; the founder's gate shouldn't be the
+  first time a button is pressed. Also re-grepped the built chunks for
+  the phantom-`ActionState` pattern: zero hits.
+- The typegen types every RPC argument non-null even when the SQL
+  accepts null — `createIndent` uses the same documented
+  `as unknown as string` casts as `create_item_request`. Not a bug,
+  a known limitation with a precedent.
+
+The founder also approved the **CI smoke test**, folded into M5 (see
+the M5 bullet above for what it needs).
 
 ### 2026-08-03 — Phase 5 M1+M2 shipped; a production outage found and fixed
 
