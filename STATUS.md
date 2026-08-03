@@ -25,19 +25,21 @@ against a managed GST slab list, issued, printed on the (still
 placeholder) letterhead, with an admin-approved deletion flow, avatars
 on every line, and "ordered X of Y" back on the indents.
 
-**Phase 7 (Inventory) is built on `feature/inventory` and waiting on
-two things**: migration `0023` applied in Studio, then the founder's
-browser gates. See `app/(dashboard)/inventory/PLAN.md`.
+**Phase 7 (Inventory) is built on `feature/inventory`, migration `0023`
+is applied, and the whole verification chain is green** (typecheck,
+build, 74 tests, `check:actions`). What remains is the founder's three
+browser gates on the preview, then the merge. See
+`app/(dashboard)/inventory/PLAN.md`.
 
-|                     |                                                                                                           |
-| ------------------- | --------------------------------------------------------------------------------------------------------- |
-| Last worked         | 2026-08-03                                                                                                |
-| Branch              | `feature/inventory` — built, not yet merged                                                               |
-| Migrations applied  | `0001`–`0022`; **`0023` written, NOT yet applied**                                                        |
-| Items in database   | **2,633** (2,631 imported catalogue + 2 material seeds)                                                   |
-| Categories / brands | 14 / 21                                                                                                   |
-| Thumbnails          | **897** in Supabase Storage; 1,736 items use the colour placeholder                                       |
-| Built tools         | Marathon, Settings, Masters, Selections, Budgets (Interiors + Construction), Indents, **Purchase Orders** |
+|                     |                                                                                                                    |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Last worked         | 2026-08-03                                                                                                         |
+| Branch              | `feature/inventory` — built, not yet merged                                                                        |
+| Migrations applied  | `0001`–`0023` (next new one is `0024`)                                                                             |
+| Items in database   | **2,633** (2,631 imported catalogue + 2 material seeds)                                                            |
+| Categories / brands | 14 / 21                                                                                                            |
+| Thumbnails          | **897** in Supabase Storage; 1,736 items use the colour placeholder                                                |
+| Built tools         | Marathon, Settings, Masters, Selections, Budgets (Interiors + Construction), Indents, **Purchase Orders**          |
 | Tests               | `npm test` — 74: pricing, carry-forward, diff, references + workflows, PO GST math, stock arithmetic, PIN, formats |
 
 ## Phase status
@@ -80,20 +82,14 @@ after. Things to watch:
   ask whether they match how Goodearth actually talks before importing.
 - Source files go in `data/` (git-ignored, like the catalogue CSVs).
 
-### Phase 7 — Inventory: apply `0023`, then walk the gates
+### Phase 7 — Inventory: walk the gates, then merge
 
-The code is written and committed on `feature/inventory`. Two steps
-remain, in this order:
-
-1. **Apply `supabase/migrations/0023_inventory.sql` in Supabase
-   Studio's SQL editor**, then `npm run db:types` and commit the
-   regenerated types. Until that happens `npm run typecheck` fails on
-   the five new tables — that is expected, and it is the only failing
-   class.
-2. **Walk the three founder gates in the browser** on the Vercel
-   preview (grant yourself `/inventory` in Settings first) — see
-   `app/(dashboard)/inventory/PLAN.md`. Merge to `master` only after
-   they pass, with a local Playwright smoke before the merge.
+`0023` is applied and the types are regenerated and committed. One step
+remains: **walk the three founder gates in the browser** on the
+`feature/inventory` Vercel preview (grant yourself `/inventory` in
+Settings first) — see `app/(dashboard)/inventory/PLAN.md`. Merge to
+`master` only after they pass, with a local Playwright smoke before the
+merge and one real write-button press on production after the deploy.
 
 ### Letterhead assets (any session, before the next PDF-heavy phase)
 

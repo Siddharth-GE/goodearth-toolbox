@@ -103,7 +103,18 @@ export async function recordGoodsReceipt(input: RecordReceiptInput): Promise<Act
     return { error: "Could not record this delivery. Try again." };
   }
 
-  const byId = new Map((sources ?? []).map((source) => [source.id, source]));
+  // Every column of a view is typed nullable by the generator (a view
+  // carries no NOT NULL metadata), so the rows are narrowed once here —
+  // a line missing its anchor or item is dropped rather than inserted
+  // with a hole in it.
+  const byId = new Map(
+    (sources ?? [])
+      .filter(
+        (source): source is typeof source & { id: string; item_id: string; uom: string } =>
+          source.id != null && source.item_id != null && source.uom != null,
+      )
+      .map((source) => [source.id, source]),
+  );
   const usable = input.lines.filter((line) => byId.has(line.poLineId));
   if (usable.length === 0) {
     return { error: "Those lines are not on this purchase order any more. Reload and try again." };
