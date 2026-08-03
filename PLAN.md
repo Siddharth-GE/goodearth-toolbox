@@ -14,24 +14,27 @@ and **what's next**.
 
 ## Where we are right now
 
-**Masters, the catalogue, Selections, design views and Budgets are all
-shipped. Indents is next.**
+**Phase 5 (Indents + the Construction tree in Budgets) is IN PROGRESS
+on `feature/indents`.** Milestones 1–2 of 5 are built and
+founder-tested on the preview; see "Phase 5" under Next up for exactly
+what remains. A production outage in server actions was root-caused and
+hotfixed to `master` on 2026-08-03 — see the session log.
 
-The Selections → Budgets chain now works end to end: a designer
-specifies a unit space by space, issues it, the budget team prices it,
-and a client quotation comes out the other side. That's the spine of the
-AppSheet replacement.
+The Selections → Budgets chain works end to end: a designer specifies a
+unit space by space, issues it, the budget team prices it, and a client
+quotation comes out the other side. That's the spine of the AppSheet
+replacement.
 
-|                     |                                                                                                 |
-| ------------------- | ----------------------------------------------------------------------------------------------- |
-| Last worked         | 2026-08-01                                                                                      |
-| Branch              | `master` — second-pass audit fully merged, all four gates approved                              |
-| Migrations applied  | `0001`–`0018` (next new one is `0019`)                                                          |
-| Items in database   | **2,633** (2,631 imported catalogue + 2 material seeds)                                         |
-| Categories / brands | 14 / 21                                                                                         |
-| Thumbnails          | **897** in Supabase Storage; 3 dead vendor links, 1,733 items have no image                     |
-| Built tools         | Marathon, Settings, Masters, Selections, Budgets                                                |
-| Tests               | `npm test` — 39, covering pricing, carry-forward, the revision diff, PIN hashing and formatting |
+|                     |                                                                                                            |
+| ------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Last worked         | 2026-08-03                                                                                                 |
+| Branch              | `feature/indents` (M1+M2 pushed, founder-tested); `master` carries the action-crash hotfix                 |
+| Migrations applied  | `0001`–`0019` (next new one is `0020`)                                                                     |
+| Items in database   | **2,633** (2,631 imported catalogue + 2 material seeds)                                                    |
+| Categories / brands | 14 / 21                                                                                                    |
+| Thumbnails          | **897** in Supabase Storage; 3 dead vendor links, 1,733 items have no image                                |
+| Built tools         | Marathon, Settings, Masters, Selections, Budgets (now two trees: Interiors + Construction)                 |
+| Tests               | `npm test` — 46, adding indent reference + workflow rules to pricing, carry-forward, diff, PIN, formatting |
 
 ---
 
@@ -46,7 +49,7 @@ AppSheet replacement.
 | 2   | **Selections** — per-unit design workspace + the catalogue picker                                      | ✅ Shipped, merged 2026-08-01                          |
 | 2b  | **Design views** — renders per space, in the design document                                           | ✅ Shipped, merged 2026-08-01                          |
 | 4   | **Budgets** — cost + margin → client rate, approval, two documents                                     | ✅ Shipped, merged 2026-08-01                          |
-| 5   | Indents — pull-from-budget _and_ direct site request                                                   | ⬜ **NEXT**                                            |
+| 5   | Indents + Construction tree — three line sources, QS stage-wise plans                                  | 🔶 **IN PROGRESS** — M1+M2 of 5 done, see Next up      |
 | 6   | Purchase Orders — vendor grouping + letterhead PDF                                                     | ⬜ Not started                                         |
 | 7   | Inventory / Store — goods receipt, stock on hand, issues                                               | ⬜ Not started                                         |
 | 8   | Bills — against POs and labour contracts                                                               | ⬜ Not started                                         |
@@ -144,34 +147,100 @@ present, verify counts and spot-checks after. Things to watch:
   ask whether they match how Goodearth actually talks before importing.
 - Source files go in `data/` (git-ignored, like the catalogue CSVs).
 
-### Phase 5 — Indents (branch `feature/indents`)
+### Phase 5 — Indents + the Construction tree (IN PROGRESS, branch `feature/indents`)
 
-Turning an approved budget into requests for the commercials team, who
-split them into purchase orders by vendor. This is why
-`budget_lines.expected_vendor_id` has existed since migration `0011`.
+**The founder corrected the scope on 2026-08-03**: the shipped Budgets
+tool covers only the **interiors** side (priced revisions → client
+quote). House construction has no client-quote step but still needs
+budgets — a **stage-wise quantity plan per unit** (Foundation, Sill,
+Lintel…), owned by the QS team, which is what site indents are raised
+against, stage by stage. So Budgets grew a second tree (**Construction**
+beside **Interiors**), built in this same phase as the Indents app.
 
-Two sources feed it and the tool has to handle both: **pull from an
-approved budget** (the common path) and **a direct site request** for
-something nobody designed.
+**Founder decisions, settled 2026-08-03 — do not re-ask:**
 
-**Context a cold start needs:**
+- Construction plan = materials + quantities ONLY (no money anywhere),
+  stages are free-form text, no approval step, QS-owned under
+  `/budgets`, one living plan per unit (unique `unit_id`), editable any
+  time. No revisions.
+- Indent lines come from **three sources**: a construction budget stage
+  (the site path — stamps the indent's `stage`), an **approved**
+  interiors budget line, or a direct pick from the item master. All
+  three ship in this phase.
+- One approval step for indents. Approvers are a **named list**
+  (`indent_approvers`, managed from Settings; admins always may).
+- Numbering: `IND/<projects.code>/001`, per project, minted in the DB
+  (`create_indent()`), stored at mint. Deleted drafts leave permanent
+  gaps — accepted. A project with no code refuses indent creation with
+  a friendly message.
+- Items are picked everywhere through the same catalogue-picker
+  experience as interiors, over the one items master.
 
-- Follow the "Adding a new tool" checklist in `CLAUDE.md`. The Coming
-  Soon stub, route and sidebar entry already exist — flip `built: true`
-  in `lib/tools.ts` and replace that route's `page.tsx`.
-- **Read `lib/budgets/` first, not Selections.** It's the newest and
-  cleanest data layer, and Indents consumes it exactly as Budgets
-  consumes Selections. Cross-stage reads belong to the DOWNSTREAM tool,
-  under its own grant — never call another tool's gated queries.
-- **Anchor on `line_key`**, as Budgets does. It is the only identifier
-  that survives a revision.
-- **Indents must not show cost or margin.** Reads on `budget_lines` are
-  gated to `/budgets` (migration `0011`), so an Indents query joining
-  that table returns nothing — by design, not by accident. Indents needs
-  quantity, item, space and vendor, none of which are secret. If a
-  screen genuinely needs a value from behind that boundary, that's a
-  conversation, not a policy edit.
-- **Every transactional table links to a project/plot**, per CLAUDE.md.
+**Done (M1+M2 of 5, founder-tested in the browser 2026-08-03):**
+
+- **Migration `0019` applied**: `construction_budgets`/`_lines`,
+  `indents`/`indent_lines` (status machine draft→submitted→approved
+  enforced by `indents_guard` + `indent_lines_draft_only` triggers,
+  approver check DB-side), `indent_counters` (atomic numbering),
+  `indent_approvers`, `projects.code`, `create_indent()` /
+  `delete_draft_indent()`, and the **`approved_budgets` /
+  `approved_budget_lines` security-barrier views** — the one sanctioned
+  window through the 0011 margin RLS. The views' column lists ARE the
+  security boundary: never add a column without checking it isn't on
+  the secret side (`unit_cost`, `margin_pct`, `client_rate`,
+  `item_margins`).
+- `lib/indents/reference.ts` + `workflow.ts` — pure, tested (46 tests).
+- Masters → Projects has the **Code** field; Settings has the
+  **"Approve indents"** column.
+- Budgets has two tabs (`budgets-nav.tsx`): Interiors untouched at
+  `/budgets`, Construction at `/budgets/construction` — plan list,
+  Start-plan dialog, stage-grouped editor
+  (`construction/[budgetId]/_components/stage-grid.tsx`), items added
+  via the **shared picker `components/masters/catalogue-picker.tsx`**
+  (extracted per DESIGN.md's third-copy rule; Selections keeps its own
+  copy for now — migrating it is a noted later cleanup).
+
+**Remaining milestones** (full detail in the approved plan file at
+`C:\Users\Kaicha\.claude\plans\please-read-the-claude-elegant-pnueli.md`):
+
+- **M3 — Raise an indent (direct lines):** flip `built: true` in
+  `lib/tools.ts`; `lib/indents/queries.ts` + `actions.ts` (every
+  function opens `requireTool("/indents")`; reads selections/spaces/
+  items/construction tables directly — never another tool's gated
+  queries); list (`INDENTS_LIST_LIMIT`, exact counts) / new / detail /
+  line-grid (`useSaveOnBlur`) / direct-add via the shared picker; add
+  `hasApp(user, "/indents")` to `app/api/catalogue/route.ts`'s allowed
+  list; `loading.tsx`; start `app/(dashboard)/indents/PLAN.md`.
+- **M4 — Both pull paths:** construction pull (per stage, budgeted qty
+  prefilled, "already requested: N" summed over `construction_line_id`,
+  stamps `indents.stage`) and interiors pull (via the views +
+  `selection_lines` for item/space/uom, composite FK
+  `(budget_id, line_key)`, skip already-present keys). **The
+  margin-secrecy browser check gates M4**: sign in WITH `/indents` and
+  WITHOUT `/budgets`, confirm no cost/margin/rate anywhere — never via
+  the service-role key.
+- **M5 — Approval + Overview:** approve/reject-with-note wired to
+  `canDecide` + the DB guard; Overview pipeline stage 01 goes real
+  (counts + "N lines", no invented rupees — indents carry no money);
+  update this file's phase table + budgets/indents PLAN.md; merge,
+  delete branch.
+
+**Notes a fresh session needs:**
+
+- Test user **`claude-preview-probe@goodearth.test`** exists (staff,
+  granted /masters /budgets /indents /selections) — created while
+  debugging the 2026-08-03 outage, and exactly what M4's secrecy check
+  needs (revoke its `/budgets` first). Its password was session-local
+  and is gone: reset it via the Supabase auth admin API with the
+  service key when needed. **Delete this user before the branch
+  merges.**
+- `sharp` can't load its win32 binary on the dev machine, so
+  Selections' actions module (design-view uploads) fails **locally
+  only** — Vercel/linux is fine. Don't chase it as an app bug.
+- Playwright end-to-end probing works well: install it in the session
+  scratchpad (`npm i playwright`, `npx playwright install chromium`),
+  run `npm run build && npm start`, drive `localhost:3000` as the test
+  user. This is how the outage was reproduced and verified fixed.
 
 ---
 
@@ -445,6 +514,58 @@ merging, per the git workflow.
   folder — move it only if a third consumer appears.
 
 ## Session log
+
+### 2026-08-03 — Phase 5 M1+M2 shipped; a production outage found and fixed
+
+**Phase 5 started on `feature/indents`** after the founder corrected its
+scope (the Construction tree — see the Phase 5 section above for
+everything decided and built). Migration `0019` applied in Studio,
+types regenerated, M1 (foundation) and M2 (construction tree) built and
+founder-tested on the preview.
+
+**The outage.** While testing, every save/issue/approve button — on the
+preview AND on production — showed the error page, while every page
+still rendered. Root cause: a bare **`export type { ActionState };` in
+a `"use server"` file** survives into the compiled module's runtime
+export list, where the name doesn't exist, so **every action in that
+chunk dies at module load** with "ActionState is not defined". The line
+had been in `lib/selections/actions.ts` and `lib/budgets/actions.ts`
+since they shipped; whether a given build miscompiles it is not
+deterministic — the 2026-08-01 gate builds were fine, and the
+docs-only rebuild of `master` that followed silently poisoned
+production, unnoticed for two days because nobody pressed a
+write-button on production after that deploy. My new
+`construction-actions.ts` copied the same pattern, which broke the
+preview and surfaced the whole thing.
+
+How it was found: direct PostgREST probes (service key, then a real
+authenticated test user) proved reads, writes, RLS, auth and triggers
+all healthy — so migration `0019` was innocent; a local
+`npm run build && npm start` + Playwright run of the founder's exact
+click reproduced the 500, and the server log named the module; grepping
+`.next/server/chunks` for `ActionState])` mapped the blast radius
+(selections + budgets actions on master too).
+
+Fix (hotfixed straight to `master`, then merged into the branch):
+removed the type re-exports from all four action files; consumers
+import `ActionState` from `lib/action-state` directly. The rule is now
+in CLAUDE.md's "Shared masters" section: **never `export type` from a
+`"use server"` file, in either form** — declaring an alias
+(`export type Foo = …`) is fine, only re-exports break. Verified by
+grepping the rebuilt chunks (zero hits) and replaying the failing flows
+end to end.
+
+**The lessons, written down:**
+
+- `next build` succeeding says NOTHING about server actions actually
+  running — a module-eval crash appears only when a button is pressed.
+  `tsc`, ESLint and the tests were all green throughout.
+- Nothing in the current gates presses a button after a deploy.
+  Feature gates test previews thoroughly, but a rebuild of `master`
+  (even docs-only) produces new chunks nobody exercises. **Proposed,
+  awaiting the founder's call: a CI smoke test** — build, start,
+  sign in as a test user, press one write-button — which would have
+  caught this exact class before it deployed.
 
 ### 2026-08-01 (after the audit) — pinned sidebar, phone layout, one hotfix
 
