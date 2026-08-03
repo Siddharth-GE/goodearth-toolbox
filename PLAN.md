@@ -613,6 +613,15 @@ the smoke test is now its own item at the top of "Next up".
   exist. The widget fetches its own data now, so it got a `Suspense`
   boundary like `MarathonLiveCard` rather than blocking the page.
 
+**Production was verified after the deploy, by pressing a button** —
+the habit the outage taught. Signed in to
+`goodearth-toolbox.vercel.app`, created a draft indent (server action +
+`create_indent`) and deleted it again (`delete_draft_indent`), and
+confirmed the real Overview widget renders. 5/5. `IND/SAA/006` is the
+burnt number from that check. The founder independently approved
+`IND/SAA/004` on production minutes later, so approval is confirmed
+working for a real admin too.
+
 **Two cleanup facts worth knowing** (both are the design working, not
 bugs):
 
