@@ -22,6 +22,17 @@ export async function listUsersForAdmin(): Promise<AdminUserRow[]> {
 // completion: this table is sized by users × tools (200 × 10 clears
 // PostgREST's silent 1,000-row cap), and a truncated read renders real
 // grants as unticked boxes — which an admin would then "fix" wrongly.
+// The named list of people who may approve indents (admins always may,
+// without a row here). Read to completion for the same reason as the
+// grants below: a truncated read renders a real approver as unticked.
+export async function listIndentApprovers(): Promise<Set<string>> {
+  const supabase = await createClient();
+  const { data } = await fetchAll((from, to) =>
+    supabase.from("indent_approvers").select("user_id").order("user_id").range(from, to),
+  );
+  return new Set((data ?? []).map((row) => row.user_id));
+}
+
 export async function listAllGrants(): Promise<Map<string, Set<string>>> {
   const supabase = await createClient();
   const { data } = await fetchAll((from, to) =>

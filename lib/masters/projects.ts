@@ -9,6 +9,9 @@ export type ProjectStatus = "planning" | "active" | "completed";
 export type ProjectRow = {
   id: string;
   name: string;
+  // Short code indent numbers are built from (ASHRAM → IND/ASHRAM/001).
+  // Nullable: a project without one can't have indents raised against it.
+  code: string | null;
   location: string | null;
   project_type: ProjectType;
   status: ProjectStatus;

@@ -44,6 +44,7 @@ export default async function ProjectsPage() {
           <TableHead>
             <TableRow>
               <TableHeaderCell>Name</TableHeaderCell>
+              <TableHeaderCell>Code</TableHeaderCell>
               <TableHeaderCell>Location</TableHeaderCell>
               <TableHeaderCell>Type</TableHeaderCell>
               <TableHeaderCell>Status</TableHeaderCell>
@@ -54,6 +55,7 @@ export default async function ProjectsPage() {
             {projects.map((project) => (
               <TableRow key={project.id}>
                 <TableCell className="text-foreground font-medium">{project.name}</TableCell>
+                <TableCell className="font-mono text-xs">{project.code || "—"}</TableCell>
                 <TableCell>{project.location || "—"}</TableCell>
                 <TableCell>{TYPE_LABELS[project.project_type]}</TableCell>
                 <TableCell>
