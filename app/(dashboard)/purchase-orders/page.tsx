@@ -67,9 +67,7 @@ export default async function PurchaseOrdersPage({
         <EmptyState
           icon={ShoppingCart}
           title={
-            tab.status
-              ? `No ${tab.label.toLowerCase()} purchase orders`
-              : "No purchase orders yet"
+            tab.status ? `No ${tab.label.toLowerCase()} purchase orders` : "No purchase orders yet"
           }
           description={
             tab.status

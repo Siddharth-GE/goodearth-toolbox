@@ -15,10 +15,10 @@ Budgets (cost/margin/client rate) appears on a PO, ever.**
 ## The rules everything rests on
 
 1. **The status machine lives in the database** (`purchase_orders_guard`
-   + `po_lines_draft_only`, 0021): draft → issued →
-   (deletion_requested → cancelled | back to issued); `completed` is
-   Phase 7's receipt trigger's alone. Lines and header editable only in
-   draft. `lib/purchase-orders/workflow.ts` mirrors it for buttons.
+   - `po_lines_draft_only`, 0021): draft → issued →
+     (deletion_requested → cancelled | back to issued); `completed` is
+     Phase 7's receipt trigger's alone. Lines and header editable only in
+     draft. `lib/purchase-orders/workflow.ts` mirrors it for buttons.
 2. **Over-ordering is impossible.** `unique (po_id, indent_line_id)` +
    the `po_lines_qty_guard` trigger (advisory-lock serialised) refuse
    the same indent line twice on a PO and any total beyond the approved
