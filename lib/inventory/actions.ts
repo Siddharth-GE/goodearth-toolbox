@@ -170,35 +170,6 @@ export async function recordGoodsReceipt(input: RecordReceiptInput): Promise<Act
   redirect(`/inventory/receipts/${receiptId}`);
 }
 
-/** Correcting the vendor's paperwork after the fact. What the receipt
- * IS — its order, destination and number — is permanent (the database
- * refuses); a wrong quantity is corrected by a stock adjustment, which
- * carries a reason. */
-export async function updateGoodsReceipt(
-  receiptId: string,
-  input: { challanNo: string | null; receivedAt: string | null; note: string | null },
-): Promise<ActionState> {
-  const user = await requireTool("/inventory");
-  const supabase = await createClient();
-
-  const { error } = await supabase
-    .from("goods_receipts")
-    .update({
-      challan_no: input.challanNo?.trim() || null,
-      received_at: input.receivedAt || undefined,
-      note: input.note?.trim() || null,
-      updated_by: user.id,
-    })
-    .eq("id", receiptId);
-  if (error) {
-    console.error("updateGoodsReceipt failed:", error);
-    return guardError(error, "Could not save that. Try again.");
-  }
-
-  revalidatePath(`/inventory/receipts/${receiptId}`);
-  return undefined;
-}
-
 /* ------------------------------------------------------------------ *
  * Issuing material out of a store
  * ------------------------------------------------------------------ */

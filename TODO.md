@@ -7,12 +7,11 @@ architecture rules, `DESIGN.md` before styling anything. Every decision
 below was approved by the founder on 2026-08-03 as part of the Phases
 6–8 plan.
 
-**Phase 7 (Inventory) is built** on `feature/inventory` and its plan
-has moved to `app/(dashboard)/inventory/PLAN.md`. It is not merged:
-migration `0023` still has to be applied in Studio and the three gates
-walked in the browser — see STATUS.md's "Next up". Purchase Orders
-(Phase 6) and Inventory (Phase 7) are both fresh reference
-implementations for nearly everything below.
+**Phase 7 (Inventory) shipped and merged on 2026-08-03** (migrations
+`0023`–`0024`); its record lives in
+`app/(dashboard)/inventory/PLAN.md`. Purchase Orders (Phase 6) and
+Inventory (Phase 7) are both fresh reference implementations for
+nearly everything below.
 
 **Work items move out of this file and into STATUS.md as they ship.**
 
@@ -59,10 +58,12 @@ implementations for nearly everything below.
 
 ---
 
-## Phase 8 — Bills (`/bills`) — after Inventory merges
+## Phase 8 — Bills (`/bills`) — NEXT
 
 The accounts-facing record of what Goodearth owes and has paid. The
-smallest phase. Branch `feature/bills`. Migration **`0024`**.
+smallest phase. Branch `feature/bills`. Migration **`0025`** (this
+plan originally said 0024, which Phase 7's stock-by-location follow-up
+took — the founder asked for plots on the Stock screen after testing).
 
 ### Kickoff questions for the founder
 
@@ -74,7 +75,7 @@ smallest phase. Branch `feature/bills`. Migration **`0024`**.
   (Working assumption: one free-text `payment_ref`.)
 - Bill numbering (working assumption: `BILL/<project code>/NNN`).
 
-### Migration 0024 — schema outline
+### Migration 0025 — schema outline
 
 - **`labour_contracts`** — vendor_id (the contractor — vendors are the
   one counterparty master), project_id, `scope text`, `contract_value
@@ -128,7 +129,7 @@ date`; money: `taxable_amount`, `gst_amount`, `total_amount` (stored
   counts only unless every viewer may see amounts (they may not:
   bill money is `/bills`-gated, and Overview renders for everyone — so
   counts, the stage-01/02 precedent).
-- **M1 — record.** 0024 applied + types; labour contracts in Masters;
+- **M1 — record.** 0025 applied + types; labour contracts in Masters;
   bill recording against both anchors; over-billing warning.
   _Gate: record a real vendor bill against a real PO._
 - **M2 — approve & pay.** Status machine + approvers in Settings;

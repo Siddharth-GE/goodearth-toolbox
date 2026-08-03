@@ -301,9 +301,9 @@ export type ReceivePool = {
   status: string;
   project_name: string;
   vendor_name: string;
-  /** Where the PO says the goods should go, if a store was named. */
-  deliver_store_name: string | null;
-  /** The plot/unit the PO is scoped to — the "directly at site" option. */
+  /** The plot/unit the PO is scoped to — the "directly at site" option.
+   * Null for a general-scope PO, which the receive screen reads as
+   * "there is no site; this must go into a store." */
   site_label: string | null;
   lines: ReceiveLine[];
   stores: { id: string; name: string }[];
@@ -366,10 +366,6 @@ export async function getReceivePool(poId: string): Promise<ReceivePool | null> 
     status: po.status ?? "",
     project_name: projects.get(po.project_id ?? "") ?? "—",
     vendor_name: vendors.get(po.vendor_id ?? "") ?? "—",
-    // po_facts carries no deliver_store_id (it is not a fact the site
-    // needs and the view's column list is the boundary) — the PO's
-    // delivery instruction stays on the PO screen.
-    deliver_store_name: null,
     site_label:
       (po.unit_id ? (units.get(po.unit_id) ?? null) : null) ??
       (po.plot_id ? (plots.get(po.plot_id) ?? null) : null),
@@ -1160,20 +1156,6 @@ export async function getItemMovements(
     balance: movements.reduce((total, movement) => total + movement.quantity, 0),
     movements,
   };
-}
-
-/** On-hand for one (store, item) — what the issue form checks against
- * before the database does. */
-export async function getStockQty(storeId: string, itemId: string): Promise<number> {
-  await requireTool("/inventory");
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("stock_on_hand")
-    .select("quantity")
-    .eq("store_id", storeId)
-    .eq("item_id", itemId)
-    .maybeSingle();
-  return data?.quantity ?? 0;
 }
 
 /**
