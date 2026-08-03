@@ -16,7 +16,9 @@ import { revalidatePath } from "next/cache";
  * had no way to know, and the person they thought they'd given access to
  * would simply not have it.
  */
-export type { ActionState } from "@/lib/action-state";
+// Type-only import, and deliberately NOT re-exported — see the note in
+// lib/budgets/actions.ts: a type re-export from a "use server" file can
+// survive into the compiled module's runtime export list and crash it.
 import type { ActionState } from "@/lib/action-state";
 
 function isGrantable(app: string) {
