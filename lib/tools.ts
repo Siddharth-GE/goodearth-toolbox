@@ -68,7 +68,7 @@ export const TOOLS: Tool[] = [
     href: "/indents",
     icon: "ClipboardList",
     group: "Operations",
-    built: false,
+    built: true,
   },
   {
     name: "Purchase Orders",
