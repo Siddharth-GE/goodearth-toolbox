@@ -84,7 +84,11 @@ export function ReceiveBasket({ pool }: { pool: ReceivePool }) {
   const allPicked =
     available.length > 0 && available.every((line) => picked[line.po_line_id] != null);
 
-  const destinationChosen = toSite || storeId !== "";
+  /** A general-scope PO has no plot or unit, so there is no site to
+   * unload at and nowhere in Stock for the goods to show — those must
+   * go into a store. The database refuses it too (migration 0024). */
+  const hasSite = pool.site_label !== null;
+  const destinationChosen = (toSite && hasSite) || storeId !== "";
 
   const commit = () =>
     startSaving(async () => {
@@ -141,20 +145,24 @@ export function ReceiveBasket({ pool }: { pool: ReceivePool }) {
             <Label htmlFor="destination-site">Or straight to site</Label>
             <label
               htmlFor="destination-site"
-              className="border-border bg-background flex h-11 items-center gap-2.5 rounded-xl border px-3.5"
+              className={`border-border bg-background flex h-11 items-center gap-2.5 rounded-xl border px-3.5 ${
+                hasSite ? "" : "opacity-60"
+              }`}
             >
               <Checkbox
                 id="destination-site"
                 checked={toSite}
+                disabled={!hasSite}
                 onChange={(event) => setToSite(event.target.checked)}
               />
               <span className="text-foreground text-sm">
-                Unloaded at {pool.site_label ?? "the site"}
+                Unloaded at {pool.site_label ?? "site"}
               </span>
             </label>
             <p className="text-muted text-xs">
-              Site deliveries count toward the order but never enter store stock — they are used
-              where they land.
+              {hasSite
+                ? "Site deliveries show against that plot in Stock, but never enter a store's balance — they are used where they land."
+                : "This is a general purchase order with no plot or unit, so there is no site to deliver to. Receive it into a store."}
             </p>
           </div>
 

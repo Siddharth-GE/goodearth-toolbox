@@ -720,9 +720,23 @@ async function receiptsForPo(supabase: Client, poId: string): Promise<PoReceiptR
  * Stock — the balance, and how it got there
  * ------------------------------------------------------------------ */
 
+/** A store, a plot or a unit — the three kinds of place material sits. */
+export type LocationKind = "store" | "plot" | "unit";
+
+export function isLocationKind(value: string): value is LocationKind {
+  return value === "store" || value === "plot" || value === "unit";
+}
+
+const LOCATION_TABLE: Record<LocationKind, "stores" | "plots" | "units"> = {
+  store: "stores",
+  plot: "plots",
+  unit: "units",
+};
+
 export type StockRow = {
-  store_id: string;
-  store_name: string;
+  location_kind: LocationKind;
+  location_id: string;
+  location_name: string;
   item_id: string;
   item_name: string;
   item_code: string | null;
@@ -732,25 +746,35 @@ export type StockRow = {
   quantity: number;
 };
 
+export type LocationOption = { kind: LocationKind; id: string; name: string };
+
 export type StockPage = {
   rows: StockRow[];
   total: number;
   page: number;
   pageCount: number;
   pageSize: number;
-  stores: { id: string; name: string }[];
+  locations: LocationOption[];
 };
 
 /**
- * Stock on hand, optionally for one store. Zero-quantity rows are kept
- * — "this store had some and has none left" is a different answer from
- * "this store never held it", and the movement history behind it is
+ * Where the material is, across all three kinds of location.
+ *
+ * A store row is a live balance that goes up and down. A plot or unit
+ * row is a running total of what has landed there — direct deliveries
+ * plus everything carried out from a store — because nothing leaves a
+ * site through this system; it is consumed by the build. Migration 0024
+ * explains why those two answers share one view but not one meaning.
+ *
+ * Zero-quantity store rows are kept: "had some, has none left" is a
+ * different answer from "never held it", and the history behind it is
  * still worth reaching.
  */
-export async function listStockOnHand({
+export async function listStockByLocation({
   page = 1,
-  storeId,
-}: { page?: number; storeId?: string } = {}): Promise<StockPage> {
+  kind,
+  locationId,
+}: { page?: number; kind?: LocationKind; locationId?: string } = {}): Promise<StockPage> {
   await requireTool("/inventory");
   const supabase = await createClient();
 
@@ -758,63 +782,150 @@ export async function listStockOnHand({
   const currentPage = Math.max(1, page);
 
   let query = supabase
-    .from("stock_on_hand")
-    .select("store_id, item_id, quantity", { count: "exact" })
-    .order("store_id")
+    .from("stock_by_location")
+    .select("location_kind, location_id, item_id, quantity", { count: "exact" })
+    .order("location_kind")
+    .order("location_id")
     .order("item_id")
     .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
-  if (storeId) query = query.eq("store_id", storeId);
+  if (kind) query = query.eq("location_kind", kind);
+  if (locationId) query = query.eq("location_id", locationId);
 
-  const [{ data, count, error }, stores] = await Promise.all([query, listActiveStores(supabase)]);
+  const [{ data, count, error }, locations] = await Promise.all([
+    query,
+    listStockLocations(supabase),
+  ]);
 
   if (error) {
-    console.error("listStockOnHand failed:", error);
-    return { rows: [], total: 0, page: currentPage, pageCount: 1, pageSize, stores };
+    console.error("listStockByLocation failed:", error);
+    return { rows: [], total: 0, page: currentPage, pageCount: 1, pageSize, locations };
   }
 
-  const rows = data ?? [];
-  const [items, storeNames] = await Promise.all([
+  // View columns are all typed nullable — normalise once (see above).
+  const rows = (data ?? [])
+    .map((row) => ({
+      location_kind: (row.location_kind ?? "store") as LocationKind,
+      location_id: row.location_id ?? "",
+      item_id: row.item_id ?? "",
+      quantity: row.quantity ?? 0,
+    }))
+    .filter((row) => isLocationKind(row.location_kind));
+
+  const [items, stores, plots, units] = await Promise.all([
     itemsById(
       supabase,
-      rows.map((row) => row.item_id ?? ""),
+      rows.map((row) => row.item_id),
     ),
     labelsById(
       supabase,
       "stores",
-      rows.map((row) => row.store_id),
+      rows.filter((r) => r.location_kind === "store").map((r) => r.location_id),
+    ),
+    labelsById(
+      supabase,
+      "plots",
+      rows.filter((r) => r.location_kind === "plot").map((r) => r.location_id),
+    ),
+    labelsById(
+      supabase,
+      "units",
+      rows.filter((r) => r.location_kind === "unit").map((r) => r.location_id),
     ),
   ]);
+  const nameFor = (row: { location_kind: LocationKind; location_id: string }) =>
+    (row.location_kind === "store"
+      ? stores.get(row.location_id)
+      : row.location_kind === "plot"
+        ? plots.get(row.location_id)
+        : units.get(row.location_id)) ?? "—";
 
   const total = count ?? 0;
   return {
-    // The database pages this by (store_id, item_id) so the pagination
+    // The database pages this by (kind, location, item) so pagination
     // stays stable, but uuid order reads as random on screen — so the
     // page in hand is sorted by name before it is rendered.
     rows: rows
       .map((row) => {
-        const item = items.get(row.item_id ?? "");
+        const item = items.get(row.item_id);
         return {
-          store_id: row.store_id ?? "",
-          store_name: storeNames.get(row.store_id ?? "") ?? "—",
-          item_id: row.item_id ?? "",
+          location_kind: row.location_kind,
+          location_id: row.location_id,
+          location_name: nameFor(row),
+          item_id: row.item_id,
           item_name: item?.name ?? "—",
           item_code: item?.code ?? null,
           item_brand: item?.brand ?? null,
           item_thumb_url: item?.thumb_url ?? null,
           uom: item?.default_uom ?? "each",
-          quantity: row.quantity ?? 0,
+          quantity: row.quantity,
         };
       })
       .sort(
         (a, b) =>
-          a.store_name.localeCompare(b.store_name) || a.item_name.localeCompare(b.item_name),
+          a.location_name.localeCompare(b.location_name) || a.item_name.localeCompare(b.item_name),
       ),
     total,
     page: currentPage,
     pageCount: Math.max(1, Math.ceil(total / pageSize)),
     pageSize,
-    stores,
+    locations,
   };
+}
+
+/**
+ * The filter list: only places that actually hold something, so the
+ * dropdown doesn't offer every plot in the company when two of them
+ * have material on the ground. Read to completion — a location missing
+ * here cannot be filtered to.
+ */
+async function listStockLocations(supabase: Client): Promise<LocationOption[]> {
+  const { data } = await fetchAll((from, to) =>
+    supabase
+      .from("stock_by_location")
+      .select("location_kind, location_id")
+      .order("location_kind")
+      .order("location_id")
+      .range(from, to),
+  );
+
+  const seen = new Map<string, { kind: LocationKind; id: string }>();
+  for (const row of data ?? []) {
+    const kind = row.location_kind ?? "";
+    const id = row.location_id ?? "";
+    if (!isLocationKind(kind) || !id) continue;
+    seen.set(`${kind}:${id}`, { kind, id });
+  }
+  const wanted = [...seen.values()];
+
+  const [stores, plots, units] = await Promise.all([
+    labelsById(
+      supabase,
+      "stores",
+      wanted.filter((l) => l.kind === "store").map((l) => l.id),
+    ),
+    labelsById(
+      supabase,
+      "plots",
+      wanted.filter((l) => l.kind === "plot").map((l) => l.id),
+    ),
+    labelsById(
+      supabase,
+      "units",
+      wanted.filter((l) => l.kind === "unit").map((l) => l.id),
+    ),
+  ]);
+
+  return wanted
+    .map((location) => ({
+      ...location,
+      name:
+        (location.kind === "store"
+          ? stores.get(location.id)
+          : location.kind === "plot"
+            ? plots.get(location.id)
+            : units.get(location.id)) ?? "—",
+    }))
+    .sort((a, b) => a.kind.localeCompare(b.kind) || a.name.localeCompare(b.name));
 }
 
 export type MovementRow = {
@@ -834,8 +945,9 @@ export type MovementRow = {
 };
 
 export type ItemMovements = {
-  store_id: string;
-  store_name: string;
+  location_kind: LocationKind;
+  location_id: string;
+  location_name: string;
   item_id: string;
   item_name: string;
   item_code: string | null;
@@ -845,24 +957,31 @@ export type ItemMovements = {
 };
 
 /**
- * Every movement of one item in one store, newest first — the answer
- * to "why does it say 40?". The four sources are read separately and
- * merged here rather than in SQL, because each carries a different
- * counterparty (a PO, a destination, a reason).
+ * Every movement of one item at one location, newest first — the answer
+ * to "why does it say 40?". The sources are read separately and merged
+ * here rather than in SQL, because each carries a different counterparty
+ * (a PO, a destination, a reason).
+ *
+ * A store sees all four kinds. A plot or unit only ever sees things
+ * arriving — direct deliveries and material carried out from a store —
+ * because nothing leaves a site through this system (migration 0024).
  */
 export async function getItemMovements(
-  storeId: string,
+  kind: LocationKind,
+  locationId: string,
   itemId: string,
 ): Promise<ItemMovements | null> {
   await requireTool("/inventory");
   const supabase = await createClient();
 
-  const [storeNames, items] = await Promise.all([
-    labelsById(supabase, "stores", [storeId]),
+  const [locationNames, items] = await Promise.all([
+    labelsById(supabase, LOCATION_TABLE[kind], [locationId]),
     itemsById(supabase, [itemId]),
   ]);
-  if (!storeNames.get(storeId)) return null;
+  const locationName = locationNames.get(locationId);
+  if (!locationName) return null;
   const item = items.get(itemId);
+  const isStore = kind === "store";
 
   // Each source read to completion — a movement list that silently
   // stops short would not add up to the balance shown above it.
@@ -871,7 +990,7 @@ export async function getItemMovements(
       supabase
         .from("goods_receipt_lines")
         .select(
-          "id, quantity, uom, note, created_at, created_by, receipt_id, goods_receipts(id, reference, store_id, received_at, po_id)",
+          "id, quantity, uom, note, created_at, created_by, receipt_id, goods_receipts(id, reference, store_id, to_site, plot_id, unit_id, received_at, po_id)",
         )
         .eq("item_id", itemId)
         .order("id")
@@ -887,21 +1006,28 @@ export async function getItemMovements(
         .order("id")
         .range(from, to),
     ),
-    fetchAll((from, to) =>
-      supabase
-        .from("stock_adjustments")
-        .select("id, quantity, uom, reason, adjusted_at, created_at, created_by")
-        .eq("item_id", itemId)
-        .eq("store_id", storeId)
-        .order("id")
-        .range(from, to),
-    ),
+    // Adjustments only ever apply to a store — a site has no balance to
+    // correct, so this read is skipped entirely for a plot or unit.
+    isStore
+      ? fetchAll((from, to) =>
+          supabase
+            .from("stock_adjustments")
+            .select("id, quantity, uom, reason, adjusted_at, created_at, created_by")
+            .eq("item_id", itemId)
+            .eq("store_id", locationId)
+            .order("id")
+            .range(from, to),
+        )
+      : Promise.resolve({ data: [] as never[] }),
   ]);
 
   type ReceiptParent = {
     id: string;
     reference: string;
     store_id: string | null;
+    to_site: boolean;
+    plot_id: string | null;
+    unit_id: string | null;
     received_at: string;
     po_id: string;
   };
@@ -914,15 +1040,30 @@ export async function getItemMovements(
     issued_at: string;
   };
 
-  const receipts = (receiptLines ?? []).filter(
-    (line) => (line.goods_receipts as ReceiptParent | null)?.store_id === storeId,
+  /** Did this delivery land at the location being looked at? */
+  const receivedHere = (parent: ReceiptParent | null) => {
+    if (!parent) return false;
+    if (isStore) return parent.store_id === locationId;
+    if (!parent.to_site) return false;
+    return kind === "plot" ? parent.plot_id === locationId : parent.unit_id === locationId;
+  };
+
+  const receipts = (receiptLines ?? []).filter((line) =>
+    receivedHere(line.goods_receipts as ReceiptParent | null),
   );
-  const issuesOut = (issueLines ?? []).filter(
-    (line) => (line.stock_issues as IssueParent | null)?.store_id === storeId,
-  );
-  const transfersIn = (issueLines ?? []).filter(
-    (line) => (line.stock_issues as IssueParent | null)?.to_store_id === storeId,
-  );
+  const issuesOut = isStore
+    ? (issueLines ?? []).filter(
+        (line) => (line.stock_issues as IssueParent | null)?.store_id === locationId,
+      )
+    : [];
+  // Arriving: a transfer into this store, or — for a plot — material
+  // carried out to it from a store. A unit is never an issue's
+  // destination (an issue goes to a store or a plot, 0023 §3).
+  const transfersIn = (issueLines ?? []).filter((line) => {
+    const parent = line.stock_issues as IssueParent | null;
+    if (!parent) return false;
+    return isStore ? parent.to_store_id === locationId : parent.plot_id === locationId;
+  });
 
   const [poRefs, otherStores, plots, nameOf] = await Promise.all([
     poReferencesById(
@@ -986,7 +1127,7 @@ export async function getItemMovements(
         uom: line.uom,
         at: parent.issued_at,
         reference: parent.reference,
-        counterparty: `${otherStores.get(parent.store_id) ?? "another store"} (transfer)`,
+        counterparty: `${otherStores.get(parent.store_id) ?? "another store"}${isStore ? " (transfer)" : ""}`,
         note: line.note,
         actor_name: nameOf(line.created_by),
         href: `/inventory/issues/${parent.id}`,
@@ -1009,8 +1150,9 @@ export async function getItemMovements(
   ].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
 
   return {
-    store_id: storeId,
-    store_name: storeNames.get(storeId) ?? "—",
+    location_kind: kind,
+    location_id: locationId,
+    location_name: locationName,
     item_id: itemId,
     item_name: item?.name ?? "—",
     item_code: item?.code ?? null,
@@ -1034,8 +1176,25 @@ export async function getStockQty(storeId: string, itemId: string): Promise<numb
   return data?.quantity ?? 0;
 }
 
-/** Every item a store currently holds, for the issue form's picker. */
-export async function listStoreHoldings(storeId: string): Promise<StockRow[]> {
+/**
+ * What a store holds, for the issue form's picker. Reads stock_on_hand,
+ * NOT stock_by_location: only a store has a balance that can be drawn
+ * down, and this list is what the negative-stock guard will be checked
+ * against.
+ */
+export type StoreHolding = {
+  store_id: string;
+  store_name: string;
+  item_id: string;
+  item_name: string;
+  item_code: string | null;
+  item_brand: string | null;
+  item_thumb_url: string | null;
+  uom: string;
+  quantity: number;
+};
+
+export async function listStoreHoldings(storeId: string): Promise<StoreHolding[]> {
   await requireTool("/inventory");
   const supabase = await createClient();
 

@@ -12,7 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDate, formatQuantity } from "@/lib/format";
-import { getItemMovements, type MovementRow } from "@/lib/inventory/queries";
+import { getItemMovements, isLocationKind, type MovementRow } from "@/lib/inventory/queries";
 import { History } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -20,7 +20,7 @@ import { notFound } from "next/navigation";
 const KIND_LABEL: Record<MovementRow["kind"], string> = {
   receipt: "Received",
   issue: "Issued",
-  transfer_in: "Transferred in",
+  transfer_in: "Arrived",
   adjustment: "Adjusted",
 };
 
@@ -31,22 +31,26 @@ const KIND_VARIANT: Record<MovementRow["kind"], "success" | "warning" | "info"> 
   adjustment: "info",
 };
 
-/** Why the number is what it is: every movement of one item in one
- * store, newest first, adding up to the balance shown above them. */
+/** Why the number is what it is: every movement of one item at one
+ * location, newest first, adding up to the figure shown above them. */
 export default async function ItemHistoryPage({
   params,
 }: {
-  params: Promise<{ storeId: string; itemId: string }>;
+  params: Promise<{ kind: string; locationId: string; itemId: string }>;
 }) {
-  const { storeId, itemId } = await params;
-  const history = await getItemMovements(storeId, itemId);
+  const { kind, locationId, itemId } = await params;
+  if (!isLocationKind(kind)) notFound();
+
+  const history = await getItemMovements(kind, locationId, itemId);
   if (!history) notFound();
+
+  const isStore = history.location_kind === "store";
 
   return (
     <div className="space-y-4">
       <PageTitle
         title={history.item_name}
-        description={`${history.store_name}${history.item_code ? ` · ${history.item_code}` : ""}`}
+        description={`${history.location_name}${history.item_code ? ` · ${history.item_code}` : ""}`}
         backHref="/inventory/stock"
         backLabel="Stock"
         actions={
@@ -59,7 +63,9 @@ export default async function ItemHistoryPage({
               className="w-10"
             />
             <div className="text-right">
-              <p className="text-muted text-xs font-semibold tracking-widest uppercase">On hand</p>
+              <p className="text-muted text-xs font-semibold tracking-widest uppercase">
+                {isStore ? "On hand" : "Delivered here"}
+              </p>
               <p className="text-foreground text-lg font-bold tracking-tight">
                 {formatQuantity(history.balance)}
               </p>
@@ -68,11 +74,22 @@ export default async function ItemHistoryPage({
         }
       />
 
+      {!isStore && (
+        <p className="text-muted text-sm">
+          Material at a site is used where it lands, so nothing is ever issued back out of here —
+          this is the running total of everything delivered.
+        </p>
+      )}
+
       {history.movements.length === 0 ? (
         <EmptyState
           icon={History}
           title="Nothing has moved yet"
-          description="This store has never received or issued this item."
+          description={
+            isStore
+              ? "This store has never received or issued this item."
+              : "Nothing of this item has been delivered here."
+          }
         />
       ) : (
         <Table>

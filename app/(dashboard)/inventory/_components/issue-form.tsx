@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/table";
 import { formatQuantity } from "@/lib/format";
 import { recordStockIssue } from "@/lib/inventory/actions";
-import type { IssueFormOptions, StockRow } from "@/lib/inventory/queries";
+import type { IssueFormOptions, StoreHolding } from "@/lib/inventory/queries";
 import { wouldGoNegative } from "@/lib/inventory/stock";
 import { useMemo, useState, useTransition } from "react";
 
@@ -35,7 +35,7 @@ export function IssueForm({
   options,
 }: {
   store: { id: string; name: string; project_id: string | null };
-  holdings: StockRow[];
+  holdings: StoreHolding[];
   options: IssueFormOptions;
 }) {
   const [destination, setDestination] = useState<Destination>("plot");
@@ -68,7 +68,7 @@ export function IssueForm({
       ? plotId !== ""
       : toStoreId !== "" && (!needsProject || projectId !== "");
 
-  const toggle = (row: StockRow, on: boolean) =>
+  const toggle = (row: StoreHolding, on: boolean) =>
     setPicked((current) => {
       const next = { ...current };
       if (on) next[row.item_id] = row.quantity;
@@ -137,7 +137,8 @@ export function IssueForm({
                 ))}
               </Select>
               <p className="text-muted text-xs">
-                Material issued to a plot leaves stock — it is used where it goes.
+                It leaves this store and shows against the plot in Stock, where it stays — site
+                material is used where it goes.
               </p>
             </div>
           ) : (

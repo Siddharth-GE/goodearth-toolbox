@@ -32,6 +32,7 @@ function guardError(error: { message: string }, fallback: string): ActionState {
     message.includes("short code") ||
     message.includes("inactive") ||
     message.includes("where the goods went") ||
+    message.includes("no site to deliver to") ||
     message.includes("one place") ||
     message.includes("different store") ||
     message.includes("Pick a store") ||
