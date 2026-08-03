@@ -103,10 +103,28 @@ is written out at length in 0021 §7).
       _Gate: issue material to a plot, transfer between stores, adjust a
       count with a reason._
 
-**Where it stands:** `0023` is applied and the founder has seen the
-tool ("looks good"). `0024` — plots and units on the Stock screen, at
-the founder's request — still has to be applied in Studio, and the
-three gates walked, before merging to `master`.
+**Where it stands:** shipped. `0023`–`0024` applied, founder-tested in
+the browser, merged to `master` on 2026-08-03.
+
+### The pre-merge smoke, and what it caught
+
+Run as the probe user holding **`/inventory` and nothing else** — the
+store-keeper case the founder cannot test, since an admin holds every
+grant. 18/18 passed, read-only (receipts and issues are append-only, so
+a write would have left permanent test data; the write paths were
+already proven by the founder's four real GRNs and two self-completing
+POs).
+
+It caught one real bug: **`/api/catalogue` did not list `/inventory`**,
+so the Adjustments item picker returned 403 and sat empty for an actual
+store-keeper. Now in CLAUDE.md's new-tool checklist, because it will
+recur for any future tool that renders the shared picker.
+
+What the smoke proves and no unit test can: the sidebar and a direct
+URL both refuse `/purchase-orders`; every Inventory page renders under
+a single grant; no rupee figure appears anywhere in the tool; and both
+a store's and a plot's movement history open — i.e. the whole
+`po_facts` design holds for the user it was designed for.
 
 ## Screens
 
