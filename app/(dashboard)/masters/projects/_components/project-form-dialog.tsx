@@ -21,6 +21,21 @@ export function ProjectFormDialog({ project }: { project?: ProjectRow }) {
         <Input id="name" name="name" defaultValue={project?.name} required autoComplete="off" />
       </div>
       <div className="space-y-1.5">
+        <Label htmlFor="code">Code</Label>
+        <Input
+          id="code"
+          name="code"
+          defaultValue={project?.code ?? ""}
+          autoComplete="off"
+          placeholder="ASHRAM"
+          maxLength={10}
+        />
+        <p className="text-muted text-xs">
+          Short code used in indent numbers, e.g. ASHRAM → IND/ASHRAM/001. Needed before indents can
+          be raised on this project.
+        </p>
+      </div>
+      <div className="space-y-1.5">
         <Label htmlFor="location">Location</Label>
         <Input
           id="location"

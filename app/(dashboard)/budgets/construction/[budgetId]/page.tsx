@@ -1,0 +1,38 @@
+import { PageTitle } from "@/components/ui/page-title";
+import { getConstructionPlan } from "@/lib/budgets/construction";
+import { listBrands } from "@/lib/masters/brands";
+import { listItemCategories } from "@/lib/masters/item-categories";
+import { notFound } from "next/navigation";
+import { StageGrid } from "./_components/stage-grid";
+
+export default async function ConstructionPlanPage({
+  params,
+}: {
+  params: Promise<{ budgetId: string }>;
+}) {
+  const { budgetId } = await params;
+  const [plan, categories, brands] = await Promise.all([
+    getConstructionPlan(budgetId),
+    listItemCategories(),
+    listBrands(),
+  ]);
+  if (!plan) notFound();
+
+  return (
+    <div className="space-y-4">
+      <PageTitle
+        title={`${plan.unit_name} — construction plan`}
+        backHref="/budgets/construction"
+        backLabel="All plans"
+        description={`${plan.project_name} · materials and quantities only, stage by stage — site indents pull from this.`}
+      />
+
+      <StageGrid
+        planId={plan.id}
+        stages={plan.stages}
+        categories={categories.map(({ id, name }) => ({ id, name }))}
+        brands={brands.map(({ id, name }) => ({ id, name }))}
+      />
+    </div>
+  );
+}

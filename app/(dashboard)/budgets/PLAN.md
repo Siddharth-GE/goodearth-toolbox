@@ -1,6 +1,9 @@
 # Budgets — build notes
 
 **Status: shipped** (Phase 4, merged 2026-08-01). Migrations `0011`–`0012`.
+**A second tree — Construction — was added in Phase 5 (2026-08-03,
+migration `0019`); see its section at the bottom.** Everything between
+here and there describes the original Interiors tree only.
 
 What an issued design revision costs, and what the client is charged.
 
@@ -81,8 +84,46 @@ unrounded values, and 200 lines with two touched produce 199 carried.
 
 - Layout and typography of both documents is unfinished — placeholder
   letterhead, Helvetica, stand-in terms text.
-- **Margin secrecy has never been verified as a non-Budgets user.** The
-  policy is written and only `lib/budgets/` touches those tables, but
-  nobody has signed in without the grant and confirmed zero rows. Do
-  **not** check this with the service-role key — it bypasses exactly the
-  rules being tested.
+- ~~Margin secrecy has never been verified as a non-Budgets user.~~
+  **Verified 2026-08-03** at Phase 5's M4 gate, as a real staff user
+  holding `/indents` and not `/budgets` — never the service-role key,
+  which bypasses exactly the rules under test. Result: `budgets`,
+  `budget_lines` and `item_margins` all return **zero rows** through
+  that user's own JWT; `/budgets` and `/budgets/construction` redirect
+  away and Budgets leaves the sidebar; the `approved_budgets` /
+  `approved_budget_lines` views **do** return rows and carry no
+  `unit_cost`, `margin_pct` or `client_rate` column at all; and the
+  Indents pull screens show no rupee figure anywhere, in the rendered
+  page or in its RSC payload. Re-run that check
+  (`scratchpad/secrecy-check.mjs` pattern) if the views are ever
+  widened.
+
+## The Construction tree (Phase 5, 2026-08-03)
+
+The tool's second tab (`budgets-nav.tsx`): `/budgets` is the Interiors
+inbox unchanged, `/budgets/construction` is the QS team's **stage-wise
+quantity plan per unit** — the thing site indents are raised against,
+stage by stage.
+
+Deliberately the opposite of Interiors in every way that matters:
+
+- **No money.** `construction_budgets`/`construction_budget_lines`
+  (migration `0019`) carry materials and quantities only, so their
+  reads are open to all signed-in staff (the selections precedent) and
+  none of the cost/margin secrecy machinery applies. Writes need
+  `/budgets`.
+- **No status, no approval, no revisions.** One living plan per unit
+  (unique `unit_id`), edited in place as the build progresses.
+- **Stages are free-form text** on the lines (`stage`), grouped in
+  first-appearance order (construction order, not alphabetical); a
+  rename is one UPDATE, and renaming onto another stage's name merges
+  them (that's the typo fix, not a bug).
+- Items are added through the **shared picker**
+  (`components/masters/catalogue-picker.tsx`) — same experience as the
+  Selections picker, same item master; an item already in the stage has
+  its quantity raised, and `uom` comes from the item master server-side.
+
+Data layer: `lib/budgets/construction.ts` (reads) +
+`construction-actions.ts` (writes) — separate files from the Interiors
+queries/actions on purpose; nothing in them may touch `budget_lines` or
+`item_margins`.
