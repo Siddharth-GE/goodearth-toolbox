@@ -338,6 +338,15 @@ that didn't include `/inventory`, so the Adjustments item picker
 returned 403 and sat empty. Fixed, and the rule is now in CLAUDE.md's
 new-tool checklist. 18/18 after that, read-only, so no test rows.
 
+**The post-deploy button press, done without leaving test data.** Every
+Inventory write is append-only, so production was verified by pressing
+a button the database was certain to REFUSE — removing 999,999 of an
+item from a store holding none. Production answered with the guard's
+own words ("Only 0 each of this item is in that store"), which proves
+the action chunk loaded and ran, the guard fired, and the friendly
+message reached the screen — with nothing written. Worth copying for
+any future append-only tool.
+
 **Three things worth carrying forward.** A `security definer` trigger
 plus a guard that re-checks its own precondition beats widening an RLS
 policy — the PO completes itself without any store-keeper gaining

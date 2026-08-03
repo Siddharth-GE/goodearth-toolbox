@@ -154,5 +154,12 @@ a store's and a plot's movement history open — i.e. the whole
   `stock_on_hand` view, not in the screens.
 - **`stores` has no `updated_at` or actor columns** (0004), so store
   rows carry no attribution — unlike every table this tool adds.
+- **`updateGoodsReceipt` in `actions.ts` has no caller.** The receipt
+  detail page is read-only, so correcting a challan number or date
+  isn't possible on screen yet. Either wire a small edit form (the
+  guard already permits exactly those three fields) or delete the
+  action — an unused `"use server"` export is dead weight on the
+  surface the outage rule cares about. Decide next session; don't leave
+  it drifting.
 - Bills (Phase 8) anchors on `purchase_order_lines.id` too; nothing in
   this tool needs to change for it.
