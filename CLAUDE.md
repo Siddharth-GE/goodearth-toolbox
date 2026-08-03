@@ -229,7 +229,12 @@ answer:
   compiled module's runtime export list, where it doesn't exist, and
   then _every_ action in that chunk dies at load with "X is not
   defined" — the 2026-08-03 production outage. Declaring a type alias
-  (`export type Foo = …`) is fine; only re-exports break. Validation constants
+  (`export type Foo = …`) is fine; only re-exports break. **This rule is
+  enforced automatically** by `npm run check:actions`
+  (`scripts/check-server-actions.ts`), which CI runs after the build: it
+  refuses the pattern in source _and_ scans the compiled chunks for its
+  fingerprint. Nothing else catches it — `tsc`, ESLint, the tests and
+  `next build` were all green throughout the outage. Validation constants
   an actions file needs as values live in **import-free** modules built
   for exactly this: `lib/masters/constants.ts` (UOMs, item kinds) and
   `lib/action-state.ts` (the shared `ActionState`). Add to those rather

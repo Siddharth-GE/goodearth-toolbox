@@ -45,8 +45,8 @@ jobs:
       - name: Tests
         run: npm test
 
-      # Last, because it's the slowest and the ones above catch most
-      # problems faster and with clearer messages.
+      # Second-to-last, because it's the slowest and the ones above catch
+      # most problems faster and with clearer messages.
       - name: Build
         run: npm run build
         env:
@@ -56,3 +56,15 @@ jobs:
           # the secrets out of CI entirely.
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+
+      # After the build on purpose: it inspects the compiled output as
+      # well as the source. Every check above was green during the
+      # 2026-08-03 outage, when a type re-export in a "use server" file
+      # left every write-button on production dead for two days. This is
+      # the one check that would have caught it.
+      #
+      # Deliberately NOT a browser test that signs in and clicks: that
+      # would need a real login in GitHub secrets and would write to the
+      # live database on every push. See PLAN.md for that decision.
+      - name: Server actions
+        run: npm run check:actions

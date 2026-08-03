@@ -21,11 +21,12 @@ fill it from any of three sources (construction stage, approved
 interiors budget, direct catalogue pick), submit, and have a named
 approver approve it or send it back with a note.
 
-**The next piece of work is the CI smoke test** — approved by the
-founder and deliberately split out of Phase 5 so it wouldn't hold up
-the merge. It needs two things from the founder before it can start;
-see "Next up" below. After that, Phase 6 (Purchase Orders) is the next
-tool, and it consumes approved indents.
+**The outage guard is now in CI** (`npm run check:actions`) — the lean
+half of what was originally planned as a browser smoke test; the full
+version was costed and declined at this scale. See "Next up".
+
+**Phase 6 (Purchase Orders) is the next tool**, and it consumes
+approved indents.
 
 A production outage in server actions was root-caused and hotfixed to
 `master` on 2026-08-03 — see the session log.
@@ -141,40 +142,40 @@ appear in Selections or on a client-facing document.
 
 ## Next up
 
-### The CI smoke test — approved, scheduled, not yet built
+### ✅ Done — the outage guard in CI (2026-08-03)
 
-**Approved by the founder on 2026-08-03**, and deliberately kept out of
-Phase 5's M5 so shipping Indents wasn't held up by new CI machinery.
-Build it as its own small piece once Phase 5 has merged.
+`npm run check:actions` (`scripts/check-server-actions.ts`) now runs in
+CI after the build. Two passes: it **refuses the banned pattern in
+source**, and it **scans the compiled chunks for its fingerprint** —
+Turbopack emits each action module's exports as
+`ensureServerEntryExports([i,j,k,…])`, where real actions are minified
+to short locals, so a type that has no runtime value survives as its
+original PascalCase name and throws on module load.
 
-**Why it exists:** the 2026-08-03 outage proved that `next build`
-succeeding says nothing about server actions actually running — a
-module-eval crash only appears when somebody presses a button. `tsc`,
-ESLint and the tests were all green while every write-button on
-production was dead for two days. Nothing in the current gates presses
-a button after a deploy.
+**The fingerprint was derived empirically, not guessed:** the bad
+pattern was deliberately reintroduced, built, and the compiled output
+inspected. The check was then verified to fail on that build (naming
+the file, line and chunk) and to pass on a clean one (55 export lists,
+no false positives — including the several code comments that quote the
+banned pattern while explaining it). If the bundler's output shape ever
+changes, the check **fails loudly** rather than silently passing: a
+guard that stops guarding is worse than no guard.
 
-**What to build:** a CI job that runs after the existing checks —
-`npm run build`, start the server, then drive a real browser
-(Playwright) to sign in and **press one real write-button**, asserting
-the write landed. The local smoke scripts written during M3/M4 are the
-working model; the pattern is proven, this is about moving it into CI.
+**The full browser smoke test was considered and declined** — the
+founder asked for a cost/benefit call at ~200 users on 2026-08-03, and
+the answer was no. It would have needed a permanent staff login in
+GitHub secrets, written to the live database on every push (burning
+real indent numbers forever, and approved indents cannot be deleted at
+all), and had to poll for the Vercel deploy to finish before testing
+anything real — with random failures teaching everyone to ignore CI.
+The failure it guards against has happened once, from one specific
+pattern that is now both documented and automatically refused. Revisit
+only if a _different_ runtime action failure ever reaches production.
 
-**What it needs from the founder** (ask when starting, don't assume):
-
-- A **permanent dedicated test user** — email, password, and the app
-  grants it should hold. The `claude-preview-probe` account used during
-  development is deleted when Phase 5 merges and must not be reused.
-- **GitHub repo secrets** for that user's credentials plus the Supabase
-  URL and anon key. Exact secret names to be given at build time.
-
-**Decisions to make then, not now:** whether it runs against a preview
-deployment or a locally-started build in CI; whether it writes to the
-production database (a dedicated throwaway project would be cleaner but
-is more setup); and how it cleans up after itself — the M3/M4 scripts'
-create-verify-delete discipline is the model, and the draft-only
-trigger means a submitted test indent needs the rejection path to be
-removable.
+**Still the human half of the answer:** press a real button on
+production after a deploy. Done by hand at the Phase 5 merge (create an
+indent, delete it) and worth repeating after any deploy that changes
+server actions.
 
 ### First: load the founder's master data (before Indents)
 
@@ -593,6 +594,29 @@ merging, per the git workflow.
   folder — move it only if a third consumer appears.
 
 ## Session log
+
+### 2026-08-03 (after the merge) — the outage guard, and a smoke test declined
+
+The founder asked for a cost/benefit call on the CI smoke test before
+it was built, given ~200 users. **The full browser version was
+declined** and a much cheaper guard shipped instead — see "Next up" for
+both the reasoning and what the guard does.
+
+The part worth remembering: **the compiled fingerprint was derived by
+rebuilding the bug on purpose**, not guessed. Reintroduce
+`export type { ActionState };`, build (it succeeds), and the compiled
+chunk contains
+`ensureServerEntryExports([i,j,k,l,m,n,o,p,q,r,s,ActionState])` — every
+real action minified to a single letter, the phantom type still spelled
+out because it has no runtime value to minify. That array is evaluated
+at module load, which is why the whole chunk dies. The check was then
+proved in both directions before being trusted: it fails on that build
+and passes on a clean one.
+
+Also worth keeping: **the check fails loudly if it can't find any
+`ensureServerEntryExports` lists at all.** If a future Next version
+changes its output shape, a pattern-matching guard would otherwise
+quietly pass forever while protecting nothing.
 
 ### 2026-08-03 (end of session) — M5, and Phase 5 merged
 
