@@ -25,35 +25,37 @@ against a managed GST slab list, issued, printed on the (still
 placeholder) letterhead, with an admin-approved deletion flow, avatars
 on every line, and "ordered X of Y" back on the indents.
 
-**Next: Phase 7 — Inventory.** The full plan is in `TODO.md`.
+**Phase 7 (Inventory) is built on `feature/inventory` and waiting on
+two things**: migration `0023` applied in Studio, then the founder's
+browser gates. See `app/(dashboard)/inventory/PLAN.md`.
 
 |                     |                                                                                                           |
 | ------------------- | --------------------------------------------------------------------------------------------------------- |
 | Last worked         | 2026-08-03                                                                                                |
-| Branch              | `master` — Phase 6 merged, `feature/purchase-orders` deleted                                              |
-| Migrations applied  | `0001`–`0022` (next new one is `0023`)                                                                    |
+| Branch              | `feature/inventory` — built, not yet merged                                                               |
+| Migrations applied  | `0001`–`0022`; **`0023` written, NOT yet applied**                                                        |
 | Items in database   | **2,633** (2,631 imported catalogue + 2 material seeds)                                                   |
 | Categories / brands | 14 / 21                                                                                                   |
 | Thumbnails          | **897** in Supabase Storage; 1,736 items use the colour placeholder                                       |
 | Built tools         | Marathon, Settings, Masters, Selections, Budgets (Interiors + Construction), Indents, **Purchase Orders** |
-| Tests               | `npm test` — 61: pricing, carry-forward, diff, references + workflows, PO GST math, PIN, formats          |
+| Tests               | `npm test` — 74: pricing, carry-forward, diff, references + workflows, PO GST math, stock arithmetic, PIN, formats |
 
 ## Phase status
 
-| #   | Phase                                                                                                  | Status                        |
-| --- | ------------------------------------------------------------------------------------------------------ | ----------------------------- |
-| 0   | Platform hardening — `user_apps` grants, `requireApp()`, generated Supabase types, migration rules     | ✅ Done                       |
-| 1   | **Masters** — projects, plots, units, clients, vendors, stores, items, categories, brands, space types | ✅ Shipped 2026-07-31         |
-| 3   | **Catalogue import** — the real 2,631-item catalogue                                                   | ✅ Done — pulled forward      |
-| 3b  | **Thumbnail pass** — catalogue images into Supabase Storage                                            | ✅ Done                       |
-| 2   | **Selections** — per-unit design workspace + the catalogue picker                                      | ✅ Shipped, merged 2026-08-01 |
-| 2b  | **Design views** — renders per space, in the design document                                           | ✅ Shipped, merged 2026-08-01 |
-| 4   | **Budgets** — cost + margin → client rate, approval, two documents                                     | ✅ Shipped, merged 2026-08-01 |
-| 5   | **Indents + Construction tree** — three line sources, QS stage-wise plans, approval                    | ✅ Shipped, merged 2026-08-03 |
-| 6   | **Purchase Orders** — scope-numbered POs from approved indents, GST, guarded deletion, PDF             | ✅ Shipped, merged 2026-08-03 |
-| 7   | Inventory / Store — goods receipt, stock on hand, issues                                               | ⬜ **NEXT** — see TODO.md     |
-| 8   | Bills — against POs and labour contracts                                                               | ⬜ Planned — see TODO.md      |
-| 9   | Overview wired to real data + one real project end-to-end                                              | ⬜ Not started                |
+| #   | Phase                                                                                                  | Status                            |
+| --- | ------------------------------------------------------------------------------------------------------ | --------------------------------- |
+| 0   | Platform hardening — `user_apps` grants, `requireApp()`, generated Supabase types, migration rules     | ✅ Done                           |
+| 1   | **Masters** — projects, plots, units, clients, vendors, stores, items, categories, brands, space types | ✅ Shipped 2026-07-31             |
+| 3   | **Catalogue import** — the real 2,631-item catalogue                                                   | ✅ Done — pulled forward          |
+| 3b  | **Thumbnail pass** — catalogue images into Supabase Storage                                            | ✅ Done                           |
+| 2   | **Selections** — per-unit design workspace + the catalogue picker                                      | ✅ Shipped, merged 2026-08-01     |
+| 2b  | **Design views** — renders per space, in the design document                                           | ✅ Shipped, merged 2026-08-01     |
+| 4   | **Budgets** — cost + margin → client rate, approval, two documents                                     | ✅ Shipped, merged 2026-08-01     |
+| 5   | **Indents + Construction tree** — three line sources, QS stage-wise plans, approval                    | ✅ Shipped, merged 2026-08-03     |
+| 6   | **Purchase Orders** — scope-numbered POs from approved indents, GST, guarded deletion, PDF             | ✅ Shipped, merged 2026-08-03     |
+| 7   | **Inventory** — goods receipt, stock on hand, issues, adjustments                                      | 🔨 Built, awaiting `0023` + gates |
+| 8   | Bills — against POs and labour contracts                                                               | ⬜ Planned — see TODO.md          |
+| 9   | Overview wired to real data + one real project end-to-end                                              | ⬜ Not started                    |
 
 **Why 3 came before 2:** the catalogue picker was designed against
 2,631 real items from day one instead of five samples. Same work,
@@ -78,10 +80,20 @@ after. Things to watch:
   ask whether they match how Goodearth actually talks before importing.
 - Source files go in `data/` (git-ignored, like the catalogue CSVs).
 
-### Phase 7 — Inventory (next)
+### Phase 7 — Inventory: apply `0023`, then walk the gates
 
-The complete build plan — schema, milestones, gates, settled decisions —
-is in **`TODO.md`**, written so a cold start needs nothing but the repo.
+The code is written and committed on `feature/inventory`. Two steps
+remain, in this order:
+
+1. **Apply `supabase/migrations/0023_inventory.sql` in Supabase
+   Studio's SQL editor**, then `npm run db:types` and commit the
+   regenerated types. Until that happens `npm run typecheck` fails on
+   the five new tables — that is expected, and it is the only failing
+   class.
+2. **Walk the three founder gates in the browser** on the Vercel
+   preview (grant yourself `/inventory` in Settings first) — see
+   `app/(dashboard)/inventory/PLAN.md`. Merge to `master` only after
+   they pass, with a local Playwright smoke before the merge.
 
 ### Letterhead assets (any session, before the next PDF-heavy phase)
 
@@ -295,6 +307,33 @@ plumbing, migration conventions). What's still **live** from them:
   belongs in the database, not git history.
 
 ## Session log
+
+### 2026-08-03 (later still) — Phase 7 built in one sitting
+
+The founder answered the three kickoff questions and Inventory was
+built end to end on `feature/inventory`: migration `0023` (goods
+receipts, stock issues, adjustments, the computed `stock_on_hand` view,
+five guards and two minting functions), two pure modules with 13 new
+tests, the whole data layer, and all four screens — Receive, Stock,
+Issues, Adjustments — plus a deliveries section on the PO detail page
+and Overview pipeline stage 03 going real.
+
+**One decision changed the plan:** TODO.md assumed issues went to a
+"manufacturing" bucket. The founder's answer was that a location is
+either a store or a plot, so `stock_issues` sends material to another
+store (a transfer, with both halves showing in stock) or to a plot
+(consumed there). There is no manufacturing destination.
+
+**Two things the plan didn't foresee.** The PO completion trigger is
+`security definer` and the guard re-checks the outstanding quantities
+itself, so the transition is self-validating and no RLS policy had to
+widen. And every column of a Postgres view is typed nullable by the
+Supabase generator — the `po_facts`/`po_line_facts` reads normalise the
+row shape once at the boundary rather than defending against nulls at
+every use.
+
+Nothing is merged: `0023` is unapplied, and all three gates are
+unwalked.
 
 Compact by design — one entry per working day. Full detail: git
 history and the per-tool PLAN.md files.
