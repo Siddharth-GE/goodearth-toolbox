@@ -180,7 +180,11 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
       uom: line.uom,
       note: line.note,
       source:
-        line.budget_id != null ? "interiors" : line.construction_line_id != null ? "construction" : "direct",
+        line.budget_id != null
+          ? "interiors"
+          : line.construction_line_id != null
+            ? "construction"
+            : "direct",
     };
   });
 
