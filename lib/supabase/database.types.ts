@@ -2586,6 +2586,15 @@ export type Database = {
           },
         ]
       }
+      stock_by_location: {
+        Row: {
+          item_id: string | null
+          location_id: string | null
+          location_kind: string | null
+          quantity: number | null
+        }
+        Relationships: []
+      }
       stock_on_hand: {
         Row: {
           item_id: string | null

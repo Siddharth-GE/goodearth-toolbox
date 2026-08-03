@@ -25,17 +25,24 @@ against a managed GST slab list, issued, printed on the (still
 placeholder) letterhead, with an admin-approved deletion flow, avatars
 on every line, and "ordered X of Y" back on the indents.
 
-**Phase 7 (Inventory) is built on `feature/inventory`, migration `0023`
-is applied, and the whole verification chain is green** (typecheck,
-build, 74 tests, `check:actions`). What remains is the founder's three
-browser gates on the preview, then the merge. See
+**Phase 7 (Inventory) is built on `feature/inventory`, migrations
+`0023`–`0024` are applied, and the whole verification chain is green**
+(typecheck, build, 74 tests, `check:actions`). What remains is the
+founder's three browser gates on the preview, then the merge. See
 `app/(dashboard)/inventory/PLAN.md`.
+
+`0024` came from the founder's first look at the tool: Stock listed
+only stores, and they wanted plots too — "whenever something goes
+directly there it should show, to study the data later which we will
+consolidate." A location is now a store, a plot or a unit, through a
+second view (`stock_by_location`) that leaves `stock_on_hand` and its
+negative-stock guards untouched.
 
 |                     |                                                                                                                    |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | Last worked         | 2026-08-03                                                                                                         |
 | Branch              | `feature/inventory` — built, not yet merged                                                                        |
-| Migrations applied  | `0001`–`0023` (next new one is `0024`)                                                                             |
+| Migrations applied  | `0001`–`0024` (next new one is `0025`)                                                                             |
 | Items in database   | **2,633** (2,631 imported catalogue + 2 material seeds)                                                            |
 | Categories / brands | 14 / 21                                                                                                            |
 | Thumbnails          | **897** in Supabase Storage; 1,736 items use the colour placeholder                                                |
