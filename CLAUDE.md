@@ -4,10 +4,10 @@ Internal tools platform for Goodearth, a design-led real estate company in Keral
 
 **Live on Vercel** (auto-deploys from `master` on every push — see
 README.md). **Shipped: Marathon, Settings, Masters, Selections,
-Budgets.** Every other tool below is a Coming Soon stub, sidebar-ready
-but not yet built.
+Budgets (two trees: Interiors + Construction), Indents.** Every other
+tool below is a Coming Soon stub, sidebar-ready but not yet built.
 
-These are phases 1, 2 and 4 of a multi-phase rebuild of Goodearth's
+These are phases 1–5 of a multi-phase rebuild of Goodearth's
 operational system (Masters → Selections → Budgets → Indents → Purchase
 Orders → Inventory → Bills, replacing AppSheet). **Read `PLAN.md` at the
 repo root first** — it's the live roadmap and session log, and says what
@@ -32,24 +32,45 @@ schema and feed Selections' add-space flow, but have no Masters screen
 or route — schema-only, on purpose.) `NavTabs`
 across all of them; plain table + `Dialog` create/edit form per master.
 Read functions in `lib/masters/*.ts` have no `requireApp` gate (any
-future tool — Indents, Budgets, etc. — calls them directly under its
-own grant); only writes require the `/masters` grant. See
-`app/(dashboard)/masters/PLAN.md`.
+tool calls them directly under its own grant); only writes require the
+`/masters` grant. See `app/(dashboard)/masters/PLAN.md`.
+
+Built: **Selections** (`/selections`) — the per-unit design workspace:
+spaces, the catalogue picker over all items, issue → immutable revision
+→ R+1 carrying `line_key`, line-by-line diff, item requests, design
+document PDF/CSV. See `app/(dashboard)/selections/PLAN.md`.
+
+Built: **Budgets** (`/budgets`) — two trees under one grant.
+**Interiors**: price an issued revision (cost + margin → generated
+client rate), reversible approval with versions, the internal budget
+sheet and the client quote. **Construction**
+(`/budgets/construction`): the QS team's stage-wise quantity plan per
+unit — materials and quantities only, no money, no approval — which
+site indents pull from. See `app/(dashboard)/budgets/PLAN.md`.
+
+Built: **Indents** (`/indents`) — site teams raise numbered material
+requests (`IND/<project code>/NNN`, minted in the database) against a
+project, filled from three sources: a construction plan stage, an
+approved interiors budget (via the money-free `approved_*` views), or a
+direct catalogue pick. Draft → submitted → approved, enforced by
+database triggers; approvers are a named list managed in Settings.
+Indents carry **no money anywhere**. See
+`app/(dashboard)/indents/PLAN.md`.
 
 **Overview** (`/`, `app/(dashboard)/page.tsx`) — the shell's home page,
 not a `lib/tools.ts` entry (every signed-in user sees it, regardless of
 app grants). This already fulfills what the roadmap used to call
 "Dashboard" — a read-only overview across all tools — so that's no
 longer a separate planned tool. It's a mix of real data (the Marathon
-card, reusing `getMarathonHome()`) and clearly-static illustrative
-widgets for tools that don't exist yet (pipeline, KPIs, budget bars,
-PO table, approvals, people, activity) — swap each widget for a real
-query as its tool actually ships, same file, no restructuring needed.
+card; the pipeline's stage 01, which counts real indents) and
+clearly-static illustrative widgets for tools that don't exist yet
+(pipeline stages 02–05, KPIs, budget bars, PO table, approvals, people,
+activity) — swap each widget for a real query as its tool actually
+ships, same file, no restructuring needed.
 
 Planned, roughly in build order — **this list will keep growing**; the pattern below for adding a tool matters more than the exact names:
 
-- Indents — site teams request materials, every line tagged to project/plot
-- Purchase Orders — created from indent lines, split by vendor, with a well-designed PDF generator (company letterhead quality)
+- Purchase Orders — created from approved indent lines, split by vendor, with a well-designed PDF generator (company letterhead quality)
 - Inventory / Store — goods receipt against POs, stock by store, issue to manufacturing
 - Bills — recording against POs and labour contracts
 - Site Tracker — (details TBD as it's scoped)
@@ -197,10 +218,14 @@ are already correct and don't need to change.
    illustrative widget standing in for this tool, swap it for a real
    query from step 2 — same file and component, not a rebuild.
 
-For tools consuming Budgets (Indents, POs): anchor lines on
+For tools consuming Budgets: anchor lines on
 **`(budget_id, line_key)` with a composite foreign key** to
 `budget_lines`' existing unique — never a bare `line_key`, which is only
-unique within one revision and can't be FK-enforced alone.
+unique within one revision and can't be FK-enforced alone. Indents does
+exactly this (`indent_lines`, migration `0019`) — copy it, and read
+interiors budget data only through the `approved_budgets` /
+`approved_budget_lines` views, never the gated tables (see
+`lib/indents/queries.ts`).
 
 ## Shared masters (Projects, Plots, Units, Clients, Vendors, Stores, Items)
 
@@ -310,17 +335,20 @@ queries against the real schema — a typo'd column name now fails
 - Keep it simple: no over-engineering, this serves ~200 users max.
 - **Tests cover pure logic only** — `npm test`, `node:test` via `tsx`, no
   framework. Today that's `lib/budgets/math.ts`, `carry-forward.ts` and
-  `reference.ts`, `lib/selections/diff.ts`, `lib/marathon/pin.ts` and
-  `lib/format.ts`: money, quantities, the revision diff, PIN hashing and
-  the rules that decide what a client is charged. Don't add tests that
-  need a database or a browser; when logic worth testing is trapped in a
-  module with server imports, extract it into a pure module first (the
-  pattern all of the above follow).
+  `reference.ts`, `lib/indents/reference.ts` and `workflow.ts`,
+  `lib/selections/diff.ts`, `lib/marathon/pin.ts` and `lib/format.ts`:
+  money, quantities, the revision diff, document numbering, status
+  rules, PIN hashing. Don't add tests that need a database or a
+  browser; when logic worth testing is trapped in a module with server
+  imports, extract it into a pure module first (the pattern all of the
+  above follow).
 - **CI and Prettier exist** (`.github/workflows/ci.yml`), added when a
   second developer joined. They were deliberately declined while this was
   one person — what changed is that `master` auto-deploys to production,
   so "remembering to run four commands" stopped being a safe gate. Still
-  no pre-commit hooks; CI is the gate.
+  no pre-commit hooks; CI is the gate. CI's last step is
+  `npm run check:actions`, the server-action outage guard (see "Shared
+  masters" above).
 - **Formatting goes through `lib/format.ts`** — money, quantities,
   percentages, dates, on screens and in PDFs alike. Never
   `new Intl.NumberFormat` in a component.
@@ -335,8 +363,8 @@ covers the shared visual system — colors, type, spacing, components;
 read it before styling anything. Each tool keeps its own build
 plan/checklist colocated with its code — `app/marathon/PLAN.md` for the
 kiosk, `app/(dashboard)/<tool>/PLAN.md` for every dashboard tool
-(Masters, Selections, Budgets, Settings) — check the relevant one
-before starting or resuming work on that tool. Root PLAN.md is the level above those: it
+(Masters, Selections, Budgets, Indents, Settings) — check the relevant
+one before starting or resuming work on that tool. Root PLAN.md is the level above those: it
 tracks the whole multi-phase rebuild, they track one tool each.
 
 @AGENTS.md
