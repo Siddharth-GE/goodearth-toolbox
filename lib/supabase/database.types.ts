@@ -125,6 +125,13 @@ export type Database = {
             foreignKeyName: "budget_lines_budget_id_selection_id_fkey"
             columns: ["budget_id", "selection_id"]
             isOneToOne: false
+            referencedRelation: "approved_budgets"
+            referencedColumns: ["id", "selection_id"]
+          },
+          {
+            foreignKeyName: "budget_lines_budget_id_selection_id_fkey"
+            columns: ["budget_id", "selection_id"]
+            isOneToOne: false
             referencedRelation: "budgets"
             referencedColumns: ["id", "selection_id"]
           },
@@ -248,6 +255,372 @@ export type Database = {
           notes?: string | null
         }
         Relationships: []
+      }
+      construction_budget_lines: {
+        Row: {
+          budget_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          item_id: string
+          note: string | null
+          quantity: number
+          sort_order: number
+          stage: string
+          uom: string
+          updated_at: string
+        }
+        Insert: {
+          budget_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          item_id: string
+          note?: string | null
+          quantity: number
+          sort_order?: number
+          stage: string
+          uom: string
+          updated_at?: string
+        }
+        Update: {
+          budget_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          item_id?: string
+          note?: string | null
+          quantity?: number
+          sort_order?: number
+          stage?: string
+          uom?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construction_budget_lines_budget_id_fkey"
+            columns: ["budget_id"]
+            isOneToOne: false
+            referencedRelation: "construction_budgets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construction_budget_lines_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construction_budget_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      construction_budgets: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          note: string | null
+          project_id: string
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          project_id: string
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          project_id?: string
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construction_budgets_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construction_budgets_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construction_budgets_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: true
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      indent_approvers: {
+        Row: {
+          granted_at: string
+          granted_by: string | null
+          user_id: string
+        }
+        Insert: {
+          granted_at?: string
+          granted_by?: string | null
+          user_id: string
+        }
+        Update: {
+          granted_at?: string
+          granted_by?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "indent_approvers_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "indent_approvers_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      indent_counters: {
+        Row: {
+          last_no: number
+          project_id: string
+        }
+        Insert: {
+          last_no?: number
+          project_id: string
+        }
+        Update: {
+          last_no?: number
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "indent_counters_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      indent_lines: {
+        Row: {
+          budget_id: string | null
+          construction_line_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          indent_id: string
+          item_id: string
+          line_key: string | null
+          note: string | null
+          quantity: number
+          uom: string
+          updated_at: string
+        }
+        Insert: {
+          budget_id?: string | null
+          construction_line_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          indent_id: string
+          item_id: string
+          line_key?: string | null
+          note?: string | null
+          quantity: number
+          uom: string
+          updated_at?: string
+        }
+        Update: {
+          budget_id?: string | null
+          construction_line_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          indent_id?: string
+          item_id?: string
+          line_key?: string | null
+          note?: string | null
+          quantity?: number
+          uom?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "indent_lines_budget_id_line_key_fkey"
+            columns: ["budget_id", "line_key"]
+            isOneToOne: false
+            referencedRelation: "approved_budget_lines"
+            referencedColumns: ["budget_id", "line_key"]
+          },
+          {
+            foreignKeyName: "indent_lines_budget_id_line_key_fkey"
+            columns: ["budget_id", "line_key"]
+            isOneToOne: false
+            referencedRelation: "budget_lines"
+            referencedColumns: ["budget_id", "line_key"]
+          },
+          {
+            foreignKeyName: "indent_lines_construction_line_id_fkey"
+            columns: ["construction_line_id"]
+            isOneToOne: false
+            referencedRelation: "construction_budget_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "indent_lines_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "indent_lines_indent_id_fkey"
+            columns: ["indent_id"]
+            isOneToOne: false
+            referencedRelation: "indents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "indent_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      indents: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          indent_no: number
+          note: string | null
+          plot_id: string | null
+          project_id: string
+          reference: string
+          rejection_note: string | null
+          required_by: string | null
+          stage: string | null
+          status: string
+          submitted_at: string | null
+          submitted_by: string | null
+          unit_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          indent_no: number
+          note?: string | null
+          plot_id?: string | null
+          project_id: string
+          reference: string
+          rejection_note?: string | null
+          required_by?: string | null
+          stage?: string | null
+          status?: string
+          submitted_at?: string | null
+          submitted_by?: string | null
+          unit_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          indent_no?: number
+          note?: string | null
+          plot_id?: string | null
+          project_id?: string
+          reference?: string
+          rejection_note?: string | null
+          required_by?: string | null
+          stage?: string | null
+          status?: string
+          submitted_at?: string | null
+          submitted_by?: string | null
+          unit_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "indents_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "indents_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "indents_plot_id_fkey"
+            columns: ["plot_id"]
+            isOneToOne: false
+            referencedRelation: "plots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "indents_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "indents_submitted_by_fkey"
+            columns: ["submitted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "indents_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       item_categories: {
         Row: {
@@ -766,6 +1139,7 @@ export type Database = {
       }
       projects: {
         Row: {
+          code: string | null
           created_at: string
           id: string
           location: string | null
@@ -774,6 +1148,7 @@ export type Database = {
           status: string
         }
         Insert: {
+          code?: string | null
           created_at?: string
           id?: string
           location?: string | null
@@ -782,6 +1157,7 @@ export type Database = {
           status?: string
         }
         Update: {
+          code?: string | null
           created_at?: string
           id?: string
           location?: string | null
@@ -1224,7 +1600,85 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      approved_budget_lines: {
+        Row: {
+          budget_id: string | null
+          budget_status: string | null
+          expected_vendor_id: string | null
+          line_key: string | null
+          quantity: number | null
+          selection_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_lines_budget_id_selection_id_fkey"
+            columns: ["budget_id", "selection_id"]
+            isOneToOne: false
+            referencedRelation: "approved_budgets"
+            referencedColumns: ["id", "selection_id"]
+          },
+          {
+            foreignKeyName: "budget_lines_budget_id_selection_id_fkey"
+            columns: ["budget_id", "selection_id"]
+            isOneToOne: false
+            referencedRelation: "budgets"
+            referencedColumns: ["id", "selection_id"]
+          },
+          {
+            foreignKeyName: "budget_lines_expected_vendor_id_fkey"
+            columns: ["expected_vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budget_lines_selection_id_line_key_fkey"
+            columns: ["selection_id", "line_key"]
+            isOneToOne: false
+            referencedRelation: "selection_lines"
+            referencedColumns: ["selection_id", "line_key"]
+          },
+        ]
+      }
+      approved_budgets: {
+        Row: {
+          approved_at: string | null
+          id: string | null
+          selection_id: string | null
+          unit_id: string | null
+          version: number | null
+        }
+        Insert: {
+          approved_at?: string | null
+          id?: string | null
+          selection_id?: string | null
+          unit_id?: string | null
+          version?: number | null
+        }
+        Update: {
+          approved_at?: string | null
+          id?: string | null
+          selection_id?: string | null
+          unit_id?: string | null
+          version?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budgets_selection_id_fkey"
+            columns: ["selection_id"]
+            isOneToOne: true
+            referencedRelation: "selections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budgets_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       admin_list_users: {
@@ -1236,6 +1690,17 @@ export type Database = {
           role: string
           team: string
         }[]
+      }
+      create_indent: {
+        Args: {
+          p_note: string
+          p_plot_id: string
+          p_project_id: string
+          p_required_by: string
+          p_stage: string
+          p_unit_id: string
+        }
+        Returns: string
       }
       create_item_request: {
         Args: {
@@ -1251,6 +1716,7 @@ export type Database = {
         Args: { p_from_selection_id: string }
         Returns: string
       }
+      delete_draft_indent: { Args: { p_indent_id: string }; Returns: undefined }
       delete_draft_selection: {
         Args: { p_selection_id: string }
         Returns: undefined
