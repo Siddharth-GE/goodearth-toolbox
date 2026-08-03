@@ -44,20 +44,20 @@ browser gates on the preview, then the merge. See
 
 ## Phase status
 
-| #   | Phase                                                                                                  | Status                            |
-| --- | ------------------------------------------------------------------------------------------------------ | --------------------------------- |
-| 0   | Platform hardening — `user_apps` grants, `requireApp()`, generated Supabase types, migration rules     | ✅ Done                           |
-| 1   | **Masters** — projects, plots, units, clients, vendors, stores, items, categories, brands, space types | ✅ Shipped 2026-07-31             |
-| 3   | **Catalogue import** — the real 2,631-item catalogue                                                   | ✅ Done — pulled forward          |
-| 3b  | **Thumbnail pass** — catalogue images into Supabase Storage                                            | ✅ Done                           |
-| 2   | **Selections** — per-unit design workspace + the catalogue picker                                      | ✅ Shipped, merged 2026-08-01     |
-| 2b  | **Design views** — renders per space, in the design document                                           | ✅ Shipped, merged 2026-08-01     |
-| 4   | **Budgets** — cost + margin → client rate, approval, two documents                                     | ✅ Shipped, merged 2026-08-01     |
-| 5   | **Indents + Construction tree** — three line sources, QS stage-wise plans, approval                    | ✅ Shipped, merged 2026-08-03     |
-| 6   | **Purchase Orders** — scope-numbered POs from approved indents, GST, guarded deletion, PDF             | ✅ Shipped, merged 2026-08-03     |
-| 7   | **Inventory** — goods receipt, stock on hand, issues, adjustments                                      | 🔨 Built, awaiting `0023` + gates |
-| 8   | Bills — against POs and labour contracts                                                               | ⬜ Planned — see TODO.md          |
-| 9   | Overview wired to real data + one real project end-to-end                                              | ⬜ Not started                    |
+| #   | Phase                                                                                                  | Status                                    |
+| --- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------- |
+| 0   | Platform hardening — `user_apps` grants, `requireApp()`, generated Supabase types, migration rules     | ✅ Done                                   |
+| 1   | **Masters** — projects, plots, units, clients, vendors, stores, items, categories, brands, space types | ✅ Shipped 2026-07-31                     |
+| 3   | **Catalogue import** — the real 2,631-item catalogue                                                   | ✅ Done — pulled forward                  |
+| 3b  | **Thumbnail pass** — catalogue images into Supabase Storage                                            | ✅ Done                                   |
+| 2   | **Selections** — per-unit design workspace + the catalogue picker                                      | ✅ Shipped, merged 2026-08-01             |
+| 2b  | **Design views** — renders per space, in the design document                                           | ✅ Shipped, merged 2026-08-01             |
+| 4   | **Budgets** — cost + margin → client rate, approval, two documents                                     | ✅ Shipped, merged 2026-08-01             |
+| 5   | **Indents + Construction tree** — three line sources, QS stage-wise plans, approval                    | ✅ Shipped, merged 2026-08-03             |
+| 6   | **Purchase Orders** — scope-numbered POs from approved indents, GST, guarded deletion, PDF             | ✅ Shipped, merged 2026-08-03             |
+| 7   | **Inventory** — goods receipt, stock on hand, issues, adjustments                                      | 🔨 Built + `0023` applied, awaiting gates |
+| 8   | Bills — against POs and labour contracts                                                               | ⬜ Planned — see TODO.md                  |
+| 9   | Overview wired to real data + one real project end-to-end                                              | ⬜ Not started                            |
 
 **Why 3 came before 2:** the catalogue picker was designed against
 2,631 real items from day one instead of five samples. Same work,
