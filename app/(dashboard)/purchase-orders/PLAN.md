@@ -37,11 +37,12 @@ Budgets (cost/margin/client rate) appears on a PO, ever.**
 
 - [x] **M0 — schema + pure logic.** 0020 + 0021 written; reference/
       math/workflow modules tested (15 tests).
-- [ ] **M1 — groundwork.** Migrations applied in Studio + types
+- [x] **M1 — groundwork.** Migrations applied in Studio + types
       regenerated; plot/unit `code` fields in Masters; GST Rates tab;
       stub flipped `built: true`; PO list renders empty.
-      _Gate: set codes on a real plot, edit the GST list._
-- [ ] **M2 — raise a PO.** New-PO flow (project → scope → vendor), the
+      _Gate passed 2026-08-03 (founder browser test)._
+- [ ] **M2 — raise a PO.** Built, awaiting the gate: new-PO flow
+      (project → scope → vendor, number previewed), the
       approved-indent-line pool with remaining quantities, line grid
       with rate + GST dropdown + live totals, draft save/delete.
       _Gate: build a draft PO from a real indent's lines._
