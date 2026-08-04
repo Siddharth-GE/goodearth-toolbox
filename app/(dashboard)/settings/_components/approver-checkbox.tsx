@@ -1,15 +1,27 @@
 "use client";
 
 import { Checkbox } from "@/components/ui/checkbox";
-import { setIndentApprover } from "@/lib/settings/actions";
 import { useState, useTransition } from "react";
 
 /**
- * The "Approve indents" switch — a sibling of GrantCheckbox with the
- * same controlled/rollback behaviour, calling one action with a boolean
- * instead of two.
+ * A named-approver switch — a sibling of GrantCheckbox with the same
+ * controlled/rollback behaviour, calling one action with a boolean
+ * instead of two. Generic over which list it manages: the indents and
+ * bills columns render this same component with their own action.
  */
-export function ApproverCheckbox({ userId, isApprover }: { userId: string; isApprover: boolean }) {
+export function ApproverCheckbox({
+  userId,
+  isApprover,
+  action,
+  label,
+}: {
+  userId: string;
+  isApprover: boolean;
+  /** A server action: (userId, canApprove) — setIndentApprover, setBillApprover. */
+  action: (userId: string, canApprove: boolean) => Promise<{ error?: string } | undefined>;
+  /** For the aria-label: "indent approver", "bill approver". */
+  label: string;
+}) {
   const [isPending, startTransition] = useTransition();
   // Controlled, not defaultChecked — the state the server actually
   // confirmed, rolled back if the write fails (see GrantCheckbox).
@@ -21,13 +33,13 @@ export function ApproverCheckbox({ userId, isApprover }: { userId: string; isApp
       <Checkbox
         checked={checked}
         disabled={isPending}
-        aria-label={`${checked ? "Remove" : "Make"} indent approver`}
+        aria-label={`${checked ? "Remove" : "Make"} ${label}`}
         onChange={(event) => {
           const next = event.target.checked;
           setChecked(next);
           setError(undefined);
           startTransition(async () => {
-            const result = await setIndentApprover(userId, next);
+            const result = await action(userId, next);
             if (result?.error) {
               setChecked(!next);
               setError(result.error);

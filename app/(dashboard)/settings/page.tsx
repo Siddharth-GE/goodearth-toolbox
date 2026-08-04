@@ -12,17 +12,24 @@ import {
 } from "@/components/ui/table";
 import { requireAdmin } from "@/lib/auth/access";
 import { requireUser } from "@/lib/auth/dal";
-import { listAllGrants, listIndentApprovers, listUsersForAdmin } from "@/lib/settings/queries";
+import { setBillApprover, setIndentApprover } from "@/lib/settings/actions";
+import {
+  listAllGrants,
+  listBillApprovers,
+  listIndentApprovers,
+  listUsersForAdmin,
+} from "@/lib/settings/queries";
 import { GRANTABLE_TOOLS } from "@/lib/tools";
 
 export default async function SettingsPage() {
   const user = await requireUser();
   await requireAdmin(user);
 
-  const [users, grants, approvers] = await Promise.all([
+  const [users, grants, approvers, billApprovers] = await Promise.all([
     listUsersForAdmin(),
     listAllGrants(),
     listIndentApprovers(),
+    listBillApprovers(),
   ]);
 
   return (
@@ -45,6 +52,12 @@ export default async function SettingsPage() {
                 Also needs the Indents app
               </span>
             </TableHeaderCell>
+            <TableHeaderCell>
+              Approve bills
+              <span className="text-muted block text-[10px] font-normal tracking-normal normal-case">
+                Also needs the Bills app
+              </span>
+            </TableHeaderCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -57,9 +70,9 @@ export default async function SettingsPage() {
                   <p className="text-muted text-xs">{row.email}</p>
                 </TableCell>
                 {row.role === "admin" ? (
-                  // +1 spans the "Approve indents" column too: admins can
-                  // always approve, without a row on the approvers list.
-                  <TableCell colSpan={GRANTABLE_TOOLS.length + 1}>
+                  // +2 spans the two approver columns too: admins can
+                  // always approve, without a row on either list.
+                  <TableCell colSpan={GRANTABLE_TOOLS.length + 2}>
                     <Badge variant="info">All apps (admin)</Badge>
                   </TableCell>
                 ) : (
@@ -74,7 +87,20 @@ export default async function SettingsPage() {
                       </TableCell>
                     ))}
                     <TableCell>
-                      <ApproverCheckbox userId={row.id} isApprover={approvers.has(row.id)} />
+                      <ApproverCheckbox
+                        userId={row.id}
+                        isApprover={approvers.has(row.id)}
+                        action={setIndentApprover}
+                        label="indent approver"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <ApproverCheckbox
+                        userId={row.id}
+                        isApprover={billApprovers.has(row.id)}
+                        action={setBillApprover}
+                        label="bill approver"
+                      />
                     </TableCell>
                   </>
                 )}

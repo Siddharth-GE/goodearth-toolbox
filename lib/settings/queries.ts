@@ -33,6 +33,15 @@ export async function listIndentApprovers(): Promise<Set<string>> {
   return new Set((data ?? []).map((row) => row.user_id));
 }
 
+// The bill twin of the list above (bill_approvers, migration 0025).
+export async function listBillApprovers(): Promise<Set<string>> {
+  const supabase = await createClient();
+  const { data } = await fetchAll((from, to) =>
+    supabase.from("bill_approvers").select("user_id").order("user_id").range(from, to),
+  );
+  return new Set((data ?? []).map((row) => row.user_id));
+}
+
 export async function listAllGrants(): Promise<Map<string, Set<string>>> {
   const supabase = await createClient();
   const { data } = await fetchAll((from, to) =>

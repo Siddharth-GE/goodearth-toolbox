@@ -88,3 +88,33 @@ export async function setIndentApprover(userId: string, canApprove: boolean): Pr
   revalidatePath("/settings");
   return undefined;
 }
+
+// The bill twin — backed by bill_approvers (migration 0025), read by
+// the bills_guard trigger, so ticking here is what actually lets
+// someone approve a bill, not just what shows them the button.
+export async function setBillApprover(userId: string, canApprove: boolean): Promise<ActionState> {
+  const user = await requireUser();
+  await requireAdmin(user);
+
+  const supabase = await createClient();
+  if (canApprove) {
+    const { error } = await supabase
+      .from("bill_approvers")
+      .insert({ user_id: userId, granted_by: user.id });
+    // Re-ticking someone already on the list hits the primary key and is
+    // a harmless no-op from the admin's point of view.
+    if (error && error.code !== "23505") {
+      console.error("setBillApprover failed:", error);
+      return { error: "Could not make this person an approver. Try again." };
+    }
+  } else {
+    const { error } = await supabase.from("bill_approvers").delete().eq("user_id", userId);
+    if (error) {
+      console.error("setBillApprover failed:", error);
+      return { error: "Could not remove this approver. Try again." };
+    }
+  }
+
+  revalidatePath("/settings");
+  return undefined;
+}
