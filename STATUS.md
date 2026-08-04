@@ -7,21 +7,23 @@ rules in `CLAUDE.md`; full history in git. Stays lean by design.
 
 ## Now
 
-**Phases 1–7 shipped** (Masters → Selections → Budgets → Indents →
-Purchase Orders → Inventory), the last three all merged 2026-08-03.
-The chain runs design → price → indent → PO → goods in / stock / goods
-out. **Next: Phase 8 — Bills** (plan in `TODO.md`), then Phase 9:
-Overview fully real + one real project run end-to-end.
+**Phases 1–8 built** (Masters → Selections → Budgets → Indents →
+Purchase Orders → Inventory → Bills). The chain runs design → price →
+indent → PO → goods in / stock / goods out → bill → paid. **Phase 8
+(Bills) sits on `feature/bills` awaiting the founder's browser gates**
+(record a real bill; approve → pay one) before merge — migration
+`0025` is already applied to production. **Next: Phase 9** — Overview
+fully real + one real project run end-to-end.
 
-|                    |                                                                                                                  |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| Last worked        | 2026-08-04                                                                                                       |
-| Branch             | `master` — clean                                                                                                 |
-| Migrations applied | `0001`–`0024` (next is `0025`)                                                                                   |
-| Items in database  | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands                                   |
-| Thumbnails         | 897 in Supabase Storage; 1,736 items use the colour placeholder                                                  |
-| Built tools        | Marathon, Settings, Masters, Selections, Budgets (Interiors + Construction), Indents, Purchase Orders, Inventory |
-| Tests              | `npm test` — 74, all pure logic                                                                                  |
+|                    |                                                                                                                         |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| Last worked        | 2026-08-04                                                                                                              |
+| Branch             | `feature/bills` — Phase 8 built, awaiting browser gates + merge                                                         |
+| Migrations applied | `0001`–`0025` (next is `0026`)                                                                                          |
+| Items in database  | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands                                          |
+| Thumbnails         | 897 in Supabase Storage; 1,736 items use the colour placeholder                                                         |
+| Built tools        | Marathon, Settings, Masters, Selections, Budgets (Interiors + Construction), Indents, Purchase Orders, Inventory, Bills |
+| Tests              | `npm test` — 85, all pure logic                                                                                         |
 
 ## Next up
 
@@ -31,8 +33,14 @@ Overview fully real + one real project run end-to-end.
   need their project per row and `unique (project_id, name)` holds;
   the project/plot **status value lists are my defaults, never
   confirmed** — ask first. Source files go in `data/` (git-ignored).
-- **Grant `/inventory`** in Settings to store-keepers (and site
-  engineers if wanted — its reads carry no money).
+- **Merge Phase 8** once the two browser gates pass on the
+  `feature/bills` preview: record a real vendor bill against a real PO;
+  approve one and mark it paid with a reference. Then the probe smokes
+  (a `/bills`-only user, and a `/purchase-orders`-only user who sees
+  the billed picture but not `/bills`).
+- **Grant `/bills`** in Settings to accounts (and tick their "Approve
+  bills" box), **`/inventory`** to store-keepers (and site engineers if
+  wanted — its reads carry no money).
 - **Letterhead assets** — logo, address, GST number, PO terms → swap
   into `lib/pdf/document.tsx`'s `Letterhead` (one place); a Geist
   `.ttf` registered there lifts every PDF at once.
@@ -58,14 +66,25 @@ Overview fully real + one real project run end-to-end.
   the database, gaps accepted; **approved is terminal** — no delete.
 - Construction plans are materials + quantities only — free-form
   stages, no approval, one living plan per unit, QS-owned.
-- Approvers (indents, and bills to come) are named lists managed in
-  Settings, enforced by DB guards — **triggers are the boundary,
-  buttons are a courtesy**.
+- Approvers (indents and bills) are named lists managed in Settings,
+  enforced by DB guards — **triggers are the boundary, buttons are a
+  courtesy**.
 - POs come from approved indents only; one vendor + one plot/unit
   ("GEN" for general); `PO/<project>/<scope>/NNN` minted per scope.
   Over-ordering is impossible at the database (unique + advisory-lock
   guard); a PO line's uom is locked to its indent line's.
 - Deleting an issued PO is request → admin approves, trigger-enforced.
+- Bills (Phase 8, 2026-08-04): a bill anchors on **exactly one** issued
+  PO or active labour contract; numbered `BILL/<project>/<scope>/NNN`
+  with the scope **derived from the anchor**, never picked; amounts
+  stored **as entered** from the paper (no total-equals-sum CHECK);
+  over-billing **warns, never blocks**; **self-approval allowed**;
+  paying needs one free-text `payment_ref`; "Unpaid" =
+  `status <> 'paid'`; recorded bills are recorder-or-admin deletable,
+  approved/paid are permanent. Labour contracts live in Masters with an
+  optional plot/unit. Bill money is `/bills`-gated; the windows are
+  `bill_facts` (money-free, open) and `po_billing_totals`
+  (`/purchase-orders` OR `/bills`, one totals row per PO).
 - Attribution everywhere: `components/ui/attribution.tsx` + stamp
   `updated_by`.
 - Item codes are 4-letter sub-type + 3 digits (`BENS001`); nothing
@@ -84,7 +103,6 @@ Overview fully real + one real project run end-to-end.
 
 ## Open decisions — ask at the phase that needs them
 
-- Phase 8: must a bill's approver differ from its recorder?
 - Phase 2 (dormant): can a design start on an unsold unit?
 - From Phase 1: the project/plot/unit status value lists (defaults,
   unconfirmed — see master-data load above).
@@ -109,6 +127,13 @@ Overview fully real + one real project run end-to-end.
 - Production: `goodearth-toolbox.vercel.app`. Post-deploy and pre-merge
   verification habits are in CLAUDE.md (probe-user smoke, the
   write-button press).
+- Migrations are applied from this machine since 2026-08-04: the
+  `toolbox-cli` personal access token sits in git-ignored `.env.local`
+  (`SUPABASE_ACCESS_TOKEN`); POST the SQL to the management API's
+  `/database/query` endpoint (what Studio's editor does), verify with
+  an information_schema count, then `npm run db:types`. Use Node for
+  the request — PowerShell's Invoke-RestMethod mangles large JSON
+  bodies. Revoke/rotate the token from the Supabase dashboard anytime.
 - Pre-push smoke: Playwright installed in the session scratchpad,
   `npm run build && npm start`, drive localhost as the probe user
   (reset its password via the auth admin API; never stored).
@@ -129,8 +154,13 @@ Overview fully real + one real project run end-to-end.
 
 One line per day; full detail in git history and the PLAN.md files.
 
-- **2026-08-04** — docs slimmed: CLAUDE.md, this file, TODO.md cut to
-  essentials.
+- **2026-08-04** — **Bills built end to end** (`0025`, both milestones,
+  branch `feature/bills` awaiting the founder's browser gates): labour
+  contracts in Masters, record/approve/send-back/pay, over-billing
+  warning, bill approvers in Settings, PO billed picture, Overview
+  04–05 real. The Studio bottleneck fell: migrations now apply from
+  this machine via the management API (token in `.env.local`). Also:
+  docs slimmed earlier the same day (CLAUDE.md, this file, TODO.md).
 - **2026-08-03** — three phases in one day. **Indents** (5 gates) — and
   the production outage found, hotfixed and permanently guarded
   (`check:actions`); margin secrecy proved as a real single-grant user.
