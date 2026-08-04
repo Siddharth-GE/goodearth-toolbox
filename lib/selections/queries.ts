@@ -65,45 +65,68 @@ export type SelectionLineRow = {
   sort_order: number;
 };
 
+export const SELECTIONS_LIST_LIMIT = 50;
+
+export type UnitSelectionPage = {
+  units: UnitSelectionRow[];
+  total: number;
+  page: number;
+  pageCount: number;
+  pageSize: number;
+};
+
 /**
  * Units a designer can work on, with whichever revision matters.
  *
  * Deliberately lists every unit rather than only those with a design:
  * starting the first revision for a unit is the most common action here,
- * so a unit with no design yet must be visible to be startable.
+ * so a unit with no design yet must be visible to be startable. Paged
+ * with a real database count — every unit is still reachable, 50 at a
+ * time, and the total is never derived from the rows that arrived.
  */
-export async function listUnitsForSelections(projectId?: string): Promise<UnitSelectionRow[]> {
+export async function listUnitsForSelections({
+  page = 1,
+}: { page?: number } = {}): Promise<UnitSelectionPage> {
   await requireTool("/selections");
-
   const supabase = await createClient();
-  // fetchAll: every unit must be visible here to be startable, and a
-  // capped read would silently hide real units as projects grow.
-  const { data } = await fetchAll((from, to) => {
-    let query = supabase
-      .from("units")
-      .select("id, name, unit_type, project_id, projects(name), selections(*)")
-      .order("name")
-      .order("id")
-      .range(from, to);
-    if (projectId) query = query.eq("project_id", projectId);
-    return query;
-  });
 
-  return (data ?? []).map((unit) => {
-    const revisions = ((unit.selections ?? []) as SelectionRow[])
-      .slice()
-      .sort((a, b) => b.revision_no - a.revision_no);
-    return {
-      unit_id: unit.id,
-      unit_name: unit.name,
-      unit_type: unit.unit_type,
-      // The embed is typed as an object or array depending on the FK
-      // direction; units → projects is many-to-one, so it's one row.
-      project_name: (unit.projects as { name: string } | null)?.name ?? "—",
-      draft: revisions.find((r) => r.status === "draft") ?? null,
-      latestIssued: revisions.find((r) => r.status === "issued") ?? null,
-    };
-  });
+  const pageSize = SELECTIONS_LIST_LIMIT;
+  const currentPage = Math.max(1, page);
+
+  const { data, count, error } = await supabase
+    .from("units")
+    .select("id, name, unit_type, project_id, projects(name), selections(*)", { count: "exact" })
+    .order("name")
+    .order("id")
+    .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
+
+  if (error) {
+    console.error("listUnitsForSelections failed:", error);
+    return { units: [], total: 0, page: currentPage, pageCount: 1, pageSize };
+  }
+
+  const total = count ?? 0;
+  return {
+    units: (data ?? []).map((unit) => {
+      const revisions = ((unit.selections ?? []) as SelectionRow[])
+        .slice()
+        .sort((a, b) => b.revision_no - a.revision_no);
+      return {
+        unit_id: unit.id,
+        unit_name: unit.name,
+        unit_type: unit.unit_type,
+        // The embed is typed as an object or array depending on the FK
+        // direction; units → projects is many-to-one, so it's one row.
+        project_name: (unit.projects as { name: string } | null)?.name ?? "—",
+        draft: revisions.find((r) => r.status === "draft") ?? null,
+        latestIssued: revisions.find((r) => r.status === "issued") ?? null,
+      };
+    }),
+    total,
+    page: currentPage,
+    pageCount: Math.max(1, Math.ceil(total / pageSize)),
+    pageSize,
+  };
 }
 
 export type SelectionDetail = SelectionRow & {
