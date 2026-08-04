@@ -8,7 +8,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDate, formatQuantity } from "@/lib/format";
-import type { PoReceiptRow } from "@/lib/inventory/queries";
+import type { PoReceiptRow } from "@/lib/purchase-orders/queries";
 import Link from "next/link";
 
 /**

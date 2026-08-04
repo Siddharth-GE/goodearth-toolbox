@@ -12,7 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDate, formatQuantity } from "@/lib/format";
-import { listStockAdjustments } from "@/lib/inventory/queries";
+import { listStockAdjustments } from "@/lib/inventory/issues-queries";
 import { listBrands } from "@/lib/masters/brands";
 import { listItemCategories } from "@/lib/masters/item-categories";
 import { SlidersHorizontal } from "lucide-react";

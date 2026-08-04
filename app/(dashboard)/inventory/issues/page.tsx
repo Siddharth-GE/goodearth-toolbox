@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCount, formatDate } from "@/lib/format";
-import { listStockIssues } from "@/lib/inventory/queries";
+import { listStockIssues } from "@/lib/inventory/issues-queries";
 import { PackageMinus } from "lucide-react";
 import Link from "next/link";
 import { InventoryNav } from "../_components/inventory-nav";

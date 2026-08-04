@@ -104,54 +104,6 @@ export async function listBills({
   };
 }
 
-/**
- * Counts for the Overview pipeline's last two stages.
- *
- * Deliberately NOT gated, exactly like countPosPipeline: the Overview
- * is the shell's home and every signed-in user sees it. Safe because it
- * reads the bill_facts view (migration 0025), whose column list carries
- * no money — a count of bills is operational fact. COUNTS ONLY, never a
- * rupee figure: bill money is /bills-gated.
- */
-export async function countBillsPipeline(): Promise<{
-  bookedThisMonth: number;
-  awaitingApproval: number;
-  paidThisMonth: number;
-  unpaidCount: number;
-}> {
-  const supabase = await createClient();
-
-  const startOfMonth = new Date();
-  startOfMonth.setDate(1);
-  startOfMonth.setHours(0, 0, 0, 0);
-  const since = startOfMonth.toISOString();
-
-  // Exact database counts, head-only — never rows.length.
-  const [booked, awaiting, paid, unpaid] = await Promise.all([
-    supabase
-      .from("bill_facts")
-      .select("id", { count: "exact", head: true })
-      .gte("created_at", since),
-    supabase
-      .from("bill_facts")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "recorded"),
-    supabase
-      .from("bill_facts")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "paid")
-      .gte("paid_at", since),
-    supabase.from("bill_facts").select("id", { count: "exact", head: true }).neq("status", "paid"),
-  ]);
-
-  return {
-    bookedThisMonth: booked.count ?? 0,
-    awaitingApproval: awaiting.count ?? 0,
-    paidThisMonth: paid.count ?? 0,
-    unpaidCount: unpaid.count ?? 0,
-  };
-}
-
 /** The list page's filter dropdowns — every vendor and project by
  * name. Light on purpose; the record form's options bag is the heavy
  * one. */

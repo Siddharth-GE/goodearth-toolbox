@@ -12,7 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDate, formatQuantity } from "@/lib/format";
-import { getItemMovements, isLocationKind, type MovementRow } from "@/lib/inventory/queries";
+import { getItemMovements, isLocationKind, type MovementRow } from "@/lib/inventory/stock-queries";
 import { History } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";

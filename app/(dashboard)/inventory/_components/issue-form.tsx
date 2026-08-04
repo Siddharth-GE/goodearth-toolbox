@@ -17,7 +17,8 @@ import {
 } from "@/components/ui/table";
 import { formatQuantity } from "@/lib/format";
 import { recordStockIssue } from "@/lib/inventory/actions";
-import type { IssueFormOptions, StoreHolding } from "@/lib/inventory/queries";
+import type { IssueFormOptions } from "@/lib/inventory/issues-queries";
+import type { StoreHolding } from "@/lib/inventory/stock-queries";
 import { wouldGoNegative } from "@/lib/inventory/stock";
 import { useMemo, useState, useTransition } from "react";
 

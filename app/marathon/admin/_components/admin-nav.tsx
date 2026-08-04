@@ -1,5 +1,5 @@
 import { ExitButton } from "@/app/marathon/_components/exit-button";
-import { PageHeader } from "@/components/ui/page-header";
+import { PageHeader } from "@/app/marathon/_components/page-header";
 import { NavTabs } from "@/components/ui/tabs";
 import { adminLogout } from "@/lib/marathon/actions";
 

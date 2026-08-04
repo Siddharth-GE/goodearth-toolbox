@@ -12,7 +12,7 @@ import {
   rejectItemRequest,
 } from "@/lib/masters/item-requests-actions";
 import { useDebouncedSearch } from "@/lib/hooks/use-debounced-search";
-import type { CatalogueSearchResult } from "@/lib/selections/catalogue";
+import type { CatalogueSearchResult } from "@/lib/masters/catalogue";
 import { Search } from "lucide-react";
 import { useState, useTransition } from "react";
 

@@ -1,12 +1,13 @@
-import { getMarathonHome } from "@/lib/marathon/queries";
 import { formatCount } from "@/lib/format";
+import { getMarathonPulse } from "@/lib/overview/queries";
 import { Footprints } from "lucide-react";
 import Link from "next/link";
 
-// Real data — reuses the exact same query Marathon's own home page
-// calls (lib/marathon/queries.ts), not a second implementation.
+// Real data — the same query Marathon's own home page calls, narrowed
+// through lib/overview so the dashboard never touches marathon
+// internals directly.
 export async function MarathonLiveCard() {
-  const { eventName, totalEntries, groupCount, runCounts } = await getMarathonHome();
+  const { eventName, totalEntries, groupCount, runCounts } = await getMarathonPulse();
 
   return (
     <Link

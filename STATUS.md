@@ -43,9 +43,8 @@ project run end-to-end.
 - **Letterhead assets** — logo, address, GST number, PO terms → swap
   into `lib/pdf/document.tsx`'s `Letterhead` (one place); a Geist
   `.ttf` registered there lifts every PDF at once.
-- Smaller, any session: migrate Selections onto the shared
-  `catalogue-picker`; Selections paste-from-Excel; the admins-only RLS
-  mismatch noted in migration `0008`; database clean-up once rolling
+- Smaller, any session: Selections paste-from-Excel; the admins-only
+  RLS mismatch noted in migration `0008`; database clean-up once rolling
   (test indents `IND/SAA/001`–`005`, the inert probe account — both
   need SQL in Studio, the app refuses by design).
 
@@ -166,6 +165,19 @@ project run end-to-end.
 
 One line per day; full detail in git history and the PLAN.md files.
 
+- **2026-08-04 (structure pass)** — the audit's bucket C, on
+  `feature/structure-pass` (awaiting the founder's browser sign-off
+  before merge): new `lib/overview/queries.ts` owns the home page's
+  five reads (the one module allowed to import other tools' queries);
+  catalogue types → `lib/masters/catalogue.ts`; `getPoReceipts` →
+  Purchase Orders; inventory reads split into
+  `receipts-/stock-/issues-queries.ts` over a shared-lookups core;
+  Marathon's `PageHeader`/`AnimatedReveal` → `app/marathon/_components`;
+  one `PageLoading` replaces 16 loading.tsx copies; Selections migrated
+  onto the shared catalogue picker (space chips and request-item kept,
+  421-line copy deleted); `/selections` and `/masters/units` page 50 at
+  a time (the unit dialog still gets the complete list for its
+  plot-uniqueness check).
 - **2026-08-04 (night)** — **Plot ↔ unit 1:1** (Stream A of the
   founder's three asks; `feature/plot-unit-one-to-one`, migration
   `0029` applied): units.plot_id NOT NULL + unique + same-project FK;

@@ -4,7 +4,7 @@ import { ListFilters } from "@/app/marathon/_components/list-filters";
 import { copy } from "@/app/marathon/_lib/copy";
 import { LinkButton } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { PageHeader } from "@/components/ui/page-header";
+import { PageHeader } from "@/app/marathon/_components/page-header";
 import { agentLogout } from "@/lib/marathon/actions";
 import { getAgentEntries, getEntryFormData } from "@/lib/marathon/queries";
 import { requireAgentSession } from "@/lib/marathon/session";

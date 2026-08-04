@@ -10,7 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCount, formatDate } from "@/lib/format";
-import { listGoodsReceipts, listReceivablePos } from "@/lib/inventory/queries";
+import { listGoodsReceipts, listReceivablePos } from "@/lib/inventory/receipts-queries";
 import { PackageCheck } from "lucide-react";
 import Link from "next/link";
 import { InventoryNav } from "./_components/inventory-nav";

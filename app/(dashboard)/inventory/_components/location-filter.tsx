@@ -1,7 +1,7 @@
 "use client";
 
 import { Select } from "@/components/ui/select";
-import type { LocationOption } from "@/lib/inventory/queries";
+import type { LocationOption } from "@/lib/inventory/stock-queries";
 import { useRouter } from "next/navigation";
 
 const GROUP_LABEL = {
