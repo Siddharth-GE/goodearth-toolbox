@@ -1,24 +1,27 @@
 "use client";
 
+import { SitePicker } from "@/components/masters/site-picker";
 import { Button, LinkButton } from "@/components/ui/button";
 import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { buildSiteOptions, decodeSite } from "@/lib/masters/site-options";
 import { createPurchaseOrder } from "@/lib/purchase-orders/actions";
 import type { PoFormOptions } from "@/lib/purchase-orders/queries";
 import { GENERAL_SCOPE, resolveScopeCode } from "@/lib/purchase-orders/reference";
 import { useMemo, useState, useTransition } from "react";
 
 /**
- * Project → scope → vendor. The scope (one plot, one unit, or a general
- * purchase) is part of the PO number and permanent once created — the
- * form says so, and previews the number as it's chosen.
+ * Project → scope → vendor. The scope (one place — a unit with its
+ * plot, a unit-less plot, or a general purchase) is part of the PO
+ * number and permanent once created — the form says so, and previews
+ * the number as it's chosen.
  */
 export function PoForm({ options }: { options: PoFormOptions }) {
   const [projectId, setProjectId] = useState("");
-  // "" = general, "plot:<id>" or "unit:<id>" otherwise — one select, so
+  // "" = general, "unit:<id>" or "plot:<id>" otherwise — one select, so
   // it's impossible to pick a plot AND a unit.
   const [scope, setScope] = useState("");
   const [vendorId, setVendorId] = useState("");
@@ -31,26 +34,21 @@ export function PoForm({ options }: { options: PoFormOptions }) {
   const [creating, startTransition] = useTransition();
 
   const project = options.projects.find((candidate) => candidate.id === projectId);
-  const plots = useMemo(
-    () => options.plots.filter((plot) => plot.project_id === projectId),
-    [options.plots, projectId],
-  );
-  const units = useMemo(
-    () => options.units.filter((unit) => unit.project_id === projectId),
-    [options.units, projectId],
+  const siteOptions = useMemo(
+    () => buildSiteOptions(options.units, options.plots, projectId),
+    [options.units, options.plots, projectId],
   );
 
-  const [scopeKind, scopeId]: ["plot" | "unit" | "", string] = scope
-    ? (scope.split(":") as ["plot" | "unit", string])
-    : ["", ""];
-  const scopedPlot = scopeKind === "plot" ? plots.find((plot) => plot.id === scopeId) : undefined;
-  const scopedUnit = scopeKind === "unit" ? units.find((unit) => unit.id === scopeId) : undefined;
+  const { plotId, unitId } = decodeSite(scope);
+  const scopedSite = siteOptions.find((option) => option.value === scope);
 
   const missingProjectCode = Boolean(project) && !project?.code;
+  // The picked place's code fills whichever slot its kind reads — the
+  // unit-first resolution order itself is unchanged.
   const scopeCode = resolveScopeCode(
-    scopedPlot?.code ?? null,
-    scopedUnit?.code ?? null,
-    scopeKind === "" ? "general" : scopeKind,
+    scopedSite?.code ?? null,
+    scopedSite?.code ?? null,
+    unitId ? "unit" : plotId ? "plot" : "general",
   );
   const missingScopeCode = scope !== "" && scopeCode === null;
 
@@ -59,8 +57,8 @@ export function PoForm({ options }: { options: PoFormOptions }) {
       // A success redirects to the new PO, so only errors come back.
       const result = await createPurchaseOrder({
         projectId,
-        plotId: scopeKind === "plot" ? scopeId : null,
-        unitId: scopeKind === "unit" ? scopeId : null,
+        plotId,
+        unitId,
         vendorId,
         deliverStoreId: deliverStoreId || null,
         deliverNote: deliverNote || null,
@@ -103,38 +101,18 @@ export function PoForm({ options }: { options: PoFormOptions }) {
 
       <div className="space-y-1.5">
         <Label htmlFor="po-scope">For</Label>
-        <Select
+        <SitePicker
           id="po-scope"
           value={scope}
           onChange={(event) => setScope(event.target.value)}
           disabled={!projectId}
-        >
-          <option value="">General — not for one plot or unit</option>
-          {plots.length > 0 && (
-            <optgroup label="Plots">
-              {plots.map((plot) => (
-                <option key={plot.id} value={`plot:${plot.id}`}>
-                  {plot.name}
-                  {plot.code ? ` (${plot.code})` : " — no code yet"}
-                </option>
-              ))}
-            </optgroup>
-          )}
-          {units.length > 0 && (
-            <optgroup label="Units">
-              {units.map((unit) => (
-                <option key={unit.id} value={`unit:${unit.id}`}>
-                  {unit.name}
-                  {unit.code ? ` (${unit.code})` : " — no code yet"}
-                </option>
-              ))}
-            </optgroup>
-          )}
-        </Select>
+          options={siteOptions}
+          showCodes
+        />
         {missingScopeCode ? (
           <p className="text-warning text-xs font-medium" role="alert">
-            {scopedPlot?.name ?? scopedUnit?.name} has no short code yet, so it can&apos;t number
-            purchase orders. Set one in Masters first.
+            {scopedSite?.name} has no short code yet, so it can&apos;t number purchase orders. Set
+            one in Masters first.
           </p>
         ) : (
           project?.code && (

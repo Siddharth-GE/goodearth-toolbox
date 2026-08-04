@@ -15,20 +15,30 @@ import { createUnit, updateUnit } from "@/lib/masters/units-actions";
 export function UnitFormDialog({
   projects,
   plots,
+  units,
   clients,
   unit,
 }: {
   projects: ProjectRow[];
   plots: PlotRow[];
+  units: UnitRow[];
   clients: ClientRow[];
   unit?: UnitRow;
 }) {
   const isEdit = !!unit;
   // Units are the one master with a dependent field: the plot list is
   // filtered by the chosen project, so this dialog keeps a little state
-  // of its own on top of the shared shell.
+  // of its own on top of the shared shell. Since 0029 the plot is
+  // required and one-per-unit, so only plots without a unit are offered
+  // (plus the unit's own when editing) — the DB's unique index is the
+  // backstop.
   const [projectId, setProjectId] = useState(unit?.project_id ?? "");
-  const filteredPlots = plots.filter((plot) => plot.project_id === projectId);
+  const takenPlotIds = new Set(
+    units.filter((candidate) => candidate.id !== unit?.id).map((candidate) => candidate.plot_id),
+  );
+  const filteredPlots = plots.filter(
+    (plot) => plot.project_id === projectId && !takenPlotIds.has(plot.id),
+  );
 
   return (
     <RecordFormDialog
@@ -51,20 +61,28 @@ export function UnitFormDialog({
         />
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="plot_id">Plot (optional)</Label>
+        <Label htmlFor="plot_id">Plot</Label>
         <Select
           id="plot_id"
           name="plot_id"
           defaultValue={unit?.plot_id ?? ""}
           disabled={!projectId}
+          required
         >
-          <option value="">No plot</option>
+          <option value="" disabled>
+            {projectId && filteredPlots.length === 0
+              ? "No free plots — create the plot first"
+              : "Choose a plot"}
+          </option>
           {filteredPlots.map((plot) => (
             <option key={plot.id} value={plot.id}>
               {plot.name}
             </option>
           ))}
         </Select>
+        <p className="text-muted text-xs">
+          Every unit sits on exactly one plot. Plots that already have a unit aren&apos;t offered.
+        </p>
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="name">Name</Label>

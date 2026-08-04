@@ -58,15 +58,6 @@ export function RecordFormDialog({
   onOpen?: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [state, formAction, pending] = useActionState(action, undefined);
-  const wasPending = useRef(false);
-
-  // Close only after a save that actually succeeded. Closing on submit
-  // would throw away the error message the user needs to read.
-  useEffect(() => {
-    if (wasPending.current && !pending && !state?.error) setOpen(false);
-    wasPending.current = pending;
-  }, [pending, state]);
 
   return (
     <Dialog
@@ -87,19 +78,53 @@ export function RecordFormDialog({
         <DialogHeader>
           <DialogTitle>{isEdit ? `Edit ${label}` : `New ${label}`}</DialogTitle>
         </DialogHeader>
-        <form action={formAction} className="space-y-3">
+        <RecordForm action={action} onSaved={() => setOpen(false)}>
           {children}
-          <FormMessage error={state?.error} />
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="secondary">Cancel</Button>
-            </DialogClose>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Saving…" : "Save"}
-            </Button>
-          </DialogFooter>
-        </form>
+        </RecordForm>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * The form lives INSIDE the dialog content, which Radix unmounts on
+ * close — so every open starts from a clean slate: no error message or
+ * half-finished save carried over from last time (the founder-reported
+ * "saved, reopened, popup was stuck" bug). While the save round-trip
+ * runs, the whole fieldset is disabled so the dialog reads as busy
+ * rather than half-dead, and a double submit is impossible.
+ */
+function RecordForm({
+  action,
+  onSaved,
+  children,
+}: {
+  action: (state: FormState, formData: FormData) => Promise<FormState>;
+  onSaved: () => void;
+  children: ReactNode;
+}) {
+  const [state, formAction, pending] = useActionState(action, undefined);
+  const wasPending = useRef(false);
+
+  // Close only after a save that actually succeeded. Closing on submit
+  // would throw away the error message the user needs to read.
+  useEffect(() => {
+    if (wasPending.current && !pending && !state?.error) onSaved();
+    wasPending.current = pending;
+  }, [pending, state, onSaved]);
+
+  return (
+    <form action={formAction}>
+      <fieldset disabled={pending} className="min-w-0 space-y-3">
+        {children}
+        <FormMessage error={state?.error} />
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="secondary">Cancel</Button>
+          </DialogClose>
+          <Button type="submit">{pending ? "Saving…" : "Save"}</Button>
+        </DialogFooter>
+      </fieldset>
+    </form>
   );
 }

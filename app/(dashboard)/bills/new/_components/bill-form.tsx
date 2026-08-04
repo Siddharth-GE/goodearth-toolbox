@@ -1,5 +1,6 @@
 "use client";
 
+import { SitePicker } from "@/components/masters/site-picker";
 import { Button, LinkButton } from "@/components/ui/button";
 import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
@@ -8,6 +9,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { createBill, createNmrBill } from "@/lib/bills/actions";
 import type { BillFormOptions } from "@/lib/bills/queries";
+import { buildSiteOptions, decodeSite } from "@/lib/masters/site-options";
 import { GENERAL_SCOPE, resolveScopeCode } from "@/lib/bills/reference";
 import { exceedsAnchor } from "@/lib/bills/workflow";
 import { formatMoney } from "@/lib/format";
@@ -76,30 +78,22 @@ export function BillForm({ options }: { options: BillFormOptions }) {
   const anchorTotal = anchoredPo?.ordered_total ?? anchoredContract?.contract_value ?? null;
   const alreadyBilled = anchoredPo?.billed_total ?? anchoredContract?.billed_total ?? 0;
 
-  // The NMR scope, the po-form way: one select, plot:<id> / unit:<id>
-  // / "" (general); a code-less pick warns and blocks submission — the
-  // database would refuse anyway, this just says so sooner.
+  // The NMR scope, the po-form way: one SitePicker, unit:<id> /
+  // plot:<id> / "" (general); a code-less pick warns and blocks
+  // submission — the database would refuse anyway, this just says so
+  // sooner.
   const project = options.projects.find((candidate) => candidate.id === projectId);
-  const nmrPlots = useMemo(
-    () => options.plots.filter((plot) => plot.project_id === projectId),
-    [options.plots, projectId],
+  const nmrSiteOptions = useMemo(
+    () => buildSiteOptions(options.units, options.plots, projectId),
+    [options.units, options.plots, projectId],
   );
-  const nmrUnits = useMemo(
-    () => options.units.filter((unit) => unit.project_id === projectId),
-    [options.units, projectId],
-  );
-  const [scopeKind, scopeId]: ["plot" | "unit" | "", string] = scope
-    ? (scope.split(":") as ["plot" | "unit", string])
-    : ["", ""];
-  const scopedPlot =
-    scopeKind === "plot" ? nmrPlots.find((plot) => plot.id === scopeId) : undefined;
-  const scopedUnit =
-    scopeKind === "unit" ? nmrUnits.find((unit) => unit.id === scopeId) : undefined;
+  const { plotId: scopePlotId, unitId: scopeUnitId } = decodeSite(scope);
+  const scopedSite = nmrSiteOptions.find((option) => option.value === scope);
   const missingProjectCode = kind === "nmr" && Boolean(project) && !project?.code;
   const scopeCode = resolveScopeCode(
-    scopedPlot?.code ?? null,
-    scopedUnit?.code ?? null,
-    scopeKind === "" ? "general" : scopeKind,
+    scopedSite?.code ?? null,
+    scopedSite?.code ?? null,
+    scopeUnitId ? "unit" : scopePlotId ? "plot" : "general",
   );
   const missingScopeCode = kind === "nmr" && scope !== "" && scopeCode === null;
 
@@ -147,8 +141,8 @@ export function BillForm({ options }: { options: BillFormOptions }) {
           ? await createNmrBill({
               vendorId: vendorId || null,
               projectId,
-              plotId: scopeKind === "plot" ? scopeId : null,
-              unitId: scopeKind === "unit" ? scopeId : null,
+              plotId: scopePlotId,
+              unitId: scopeUnitId,
               ...shared,
             })
           : await createBill({
@@ -268,34 +262,15 @@ export function BillForm({ options }: { options: BillFormOptions }) {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="bill-nmr-scope">For</Label>
-              <Select
+              <SitePicker
                 id="bill-nmr-scope"
                 value={scope}
                 onChange={(event) => setScope(event.target.value)}
                 disabled={!projectId}
-              >
-                <option value="">General — whole project</option>
-                {nmrUnits.length > 0 && (
-                  <optgroup label="Units">
-                    {nmrUnits.map((unit) => (
-                      <option key={unit.id} value={`unit:${unit.id}`}>
-                        {unit.name}
-                        {unit.code ? ` (${unit.code})` : " — no code yet"}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-                {nmrPlots.length > 0 && (
-                  <optgroup label="Plots">
-                    {nmrPlots.map((plot) => (
-                      <option key={plot.id} value={`plot:${plot.id}`}>
-                        {plot.name}
-                        {plot.code ? ` (${plot.code})` : " — no code yet"}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-              </Select>
+                options={nmrSiteOptions}
+                generalLabel="General — whole project"
+                showCodes
+              />
             </div>
           </div>
           {missingProjectCode && (
@@ -306,8 +281,8 @@ export function BillForm({ options }: { options: BillFormOptions }) {
           )}
           {missingScopeCode ? (
             <p className="text-warning text-xs font-medium" role="alert">
-              {scopedPlot?.name ?? scopedUnit?.name} has no short code yet, so it can&apos;t number
-              bills. Set one in Masters first.
+              {scopedSite?.name} has no short code yet, so it can&apos;t number bills. Set one in
+              Masters first.
             </p>
           ) : (
             project?.code && (

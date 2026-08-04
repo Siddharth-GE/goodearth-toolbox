@@ -1,11 +1,13 @@
 "use client";
 
 import { RecordFormDialog } from "@/components/masters/record-form-dialog";
+import { SitePicker } from "@/components/masters/site-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { createLabourContract, updateLabourContract } from "@/lib/bills/actions";
 import type { BillContractRow, BillScopedOption, BillVendorOption } from "@/lib/bills/queries";
+import { buildSiteOptions } from "@/lib/masters/site-options";
 import { useState } from "react";
 
 function scopeValue(contract?: BillContractRow): string {
@@ -29,16 +31,16 @@ export function ContractFormDialog({
   vendors: BillVendorOption[];
   projects: { id: string; name: string; code: string | null }[];
   plots: BillScopedOption[];
-  units: BillScopedOption[];
+  units: (BillScopedOption & { plot_id: string | null })[];
   contract?: BillContractRow;
 }) {
   const isEdit = !!contract;
-  // The plot/unit list filters by the chosen project (the units-dialog
-  // pattern). One select encodes plot:<id> / unit:<id> / "" (general) —
-  // picking both is structurally impossible, like the DB CHECK.
+  // The place list filters by the chosen project (the units-dialog
+  // pattern). One SitePicker encodes unit:<id> / plot:<id> / ""
+  // (general) — picking both is structurally impossible, like the DB
+  // CHECK.
   const [projectId, setProjectId] = useState(contract?.project_id ?? "");
-  const filteredPlots = plots.filter((plot) => plot.project_id === projectId);
-  const filteredUnits = units.filter((unit) => unit.project_id === projectId);
+  const siteOptions = buildSiteOptions(units, plots, projectId);
 
   return (
     <RecordFormDialog
@@ -83,28 +85,16 @@ export function ContractFormDialog({
         </Select>
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="scope">Plot / Unit (optional)</Label>
-        <Select id="scope" name="scope" defaultValue={scopeValue(contract)} disabled={!projectId}>
-          <option value="">General — whole project</option>
-          {filteredUnits.length > 0 && (
-            <optgroup label="Units">
-              {filteredUnits.map((unit) => (
-                <option key={unit.id} value={`unit:${unit.id}`}>
-                  {unit.name}
-                </option>
-              ))}
-            </optgroup>
-          )}
-          {filteredPlots.length > 0 && (
-            <optgroup label="Plots">
-              {filteredPlots.map((plot) => (
-                <option key={plot.id} value={`plot:${plot.id}`}>
-                  {plot.name}
-                </option>
-              ))}
-            </optgroup>
-          )}
-        </Select>
+        <Label htmlFor="scope">For (optional)</Label>
+        <SitePicker
+          id="scope"
+          name="scope"
+          key={projectId}
+          defaultValue={scopeValue(contract)}
+          disabled={!projectId}
+          options={siteOptions}
+          generalLabel="General — whole project"
+        />
         <p className="text-muted text-xs">
           Bills against this contract take their number&apos;s scope from here, e.g.
           BILL/SAA/V12A/001. A picked plot or unit needs a short code before bills can be recorded.

@@ -21,20 +21,19 @@ import { LocationFilter } from "../_components/location-filter";
 const KIND_LABEL: Record<LocationKind, string> = {
   store: "Store",
   plot: "Plot",
-  unit: "Unit",
 };
 
-const KIND_VARIANT: Record<LocationKind, "success" | "info" | "warning"> = {
+const KIND_VARIANT: Record<LocationKind, "success" | "info"> = {
   store: "success",
   plot: "info",
-  unit: "warning",
 };
 
 /**
- * Where the material is. A store row is a live balance; a plot or unit
- * row is a running total of everything that has landed there, because
- * nothing leaves a site through this system — it gets built into the
- * house. Both are computed from movements, never stored.
+ * Where the material is. A store row is a live balance; a plot row is
+ * a running total of everything that has landed there (a delivery to a
+ * unit lands at its plot — same place since 0029), because nothing
+ * leaves a site through this system — it gets built into the house.
+ * Both are computed from movements, never stored.
  */
 export default async function StockPage({
   searchParams,
@@ -44,7 +43,7 @@ export default async function StockPage({
   const { page, at } = await searchParams;
 
   // The filter travels as "kind:id" in one param so a single select can
-  // offer stores, plots and units together.
+  // offer stores and plots together.
   const [rawKind, rawId] = (at ?? "").split(":");
   const kind = rawKind && isLocationKind(rawKind) ? rawKind : undefined;
   const locationId = kind && rawId ? rawId : undefined;
@@ -72,7 +71,7 @@ export default async function StockPage({
     <div className="space-y-4">
       <PageTitle
         title="Stock"
-        description="Where material is sitting — in a store, or delivered out to a plot or unit."
+        description="Where material is sitting — in a store, or delivered out to a plot."
       />
 
       <InventoryNav active="stock" />
@@ -92,8 +91,8 @@ export default async function StockPage({
       ) : (
         <>
           <p className="text-muted text-xs">
-            A store shows what is in it right now. A plot or unit shows everything delivered there —
-            site material is used where it lands, so it is never issued back out.
+            A store shows what is in it right now. A plot shows everything delivered there — to the
+            plot or its unit — site material is used where it lands, so it is never issued back out.
           </p>
 
           <Table>

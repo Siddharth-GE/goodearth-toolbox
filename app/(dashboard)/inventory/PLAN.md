@@ -28,27 +28,26 @@ plots on the Stock screen):
   never enter this view: a plot has no balance to protect, and folding
   one in would corrupt every guard that asks "how much is in that
   store".
-- `stock_by_location` — **where material is**, across stores, plots and
-  units. For a store it is the balance above; for a plot or unit it is
-  a running total of everything that has landed there (direct
-  deliveries plus what was carried out from a store). Those totals only
-  grow, because nothing leaves a site through this system — it is built
-  into the house. This is what the Stock screen reads.
+- `stock_by_location` — **where material is**, across stores and
+  plots. For a store it is the balance above; for a plot it is a
+  running total of everything that has landed there (direct deliveries
+  — at the plot or its unit, the same place since 0029 — plus what was
+  carried out from a store). Those totals only grow, because nothing
+  leaves a site through this system — it is built into the house. This
+  is what the Stock screen reads.
 
 ## Settled decisions
 
 - **Quantities only, no money** — the reason reads are open to any
   signed-in staff member (the Indents precedent). Writes need
   `/inventory`.
-- **A location is a store, a plot or a unit.** There is no
-  "manufacturing" bucket (founder, kickoff); issue destinations are
-  another store or a plot. Units appear as locations because a site
-  delivery is scoped to the PO's plot **or** unit — and units are kept
-  as their own kind rather than rolled up into their plot, because
-  `units.plot_id` is nullable and rolling up would strand every
-  delivery to a plot-less unit. Consolidating unit into plot is a
-  reporting decision for the founder to make later, not one the view
-  makes for them.
+- **A location is a store or a plot.** There is no "manufacturing"
+  bucket (founder, kickoff); issue destinations are another store or a
+  plot. Units used to be their own location kind because
+  `units.plot_id` was nullable and rolling up would have stranded
+  deliveries to plot-less units; migration 0029 made plot ↔ unit
+  strictly 1:1 (founder decision, 2026-08-04), so a delivery at a unit
+  now shows under its plot and the 'unit' kind is gone.
 - **A general-scope PO cannot be delivered "to site"** — it has no plot
   or unit, so there is nowhere for the goods to show. It must be
   received into a store (refused in `create_goods_receipt`, and the
@@ -133,7 +132,7 @@ a store's and a plot's movement history open — i.e. the whole
 | `/inventory`                                    | Receive: POs awaiting delivery + recent deliveries    |
 | `/inventory/receive/[poId]`                     | The receive basket — ordered / received / arrived now |
 | `/inventory/receipts/[receiptId]`               | One delivery note                                     |
-| `/inventory/stock`                              | Where material is — store, plot or unit               |
+| `/inventory/stock`                              | Where material is — store or plot                     |
 | `/inventory/stock/[kind]/[locationId]/[itemId]` | Why the number is what it is — every movement         |
 | `/inventory/issues`                             | What has gone out                                     |
 | `/inventory/issues/new`                         | Pick a store, then issue from what it actually holds  |

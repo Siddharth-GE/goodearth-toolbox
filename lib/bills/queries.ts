@@ -340,7 +340,7 @@ export type BillFormOptions = {
   /** For the NMR branch: the scope is picked directly, like a PO's. */
   projects: { id: string; name: string; code: string | null }[];
   plots: BillScopedOption[];
-  units: BillScopedOption[];
+  units: (BillScopedOption & { plot_id: string | null })[];
 };
 
 // What's been billed against each labour contract, summed. Shared by
@@ -386,7 +386,13 @@ export async function getContractFormOptions() {
     vendors: vendors.map(({ id, name }) => ({ id, name })),
     projects: projects.map(({ id, name, code }) => ({ id, name, code })),
     plots: plots.map(({ id, project_id, name, code }) => ({ id, project_id, name, code })),
-    units: units.map(({ id, project_id, name, code }) => ({ id, project_id, name, code })),
+    units: units.map(({ id, project_id, plot_id, name, code }) => ({
+      id,
+      project_id,
+      plot_id,
+      name,
+      code,
+    })),
   };
 }
 
@@ -491,7 +497,13 @@ export async function getBillFormOptions(): Promise<BillFormOptions> {
     })),
     projects: projects.map(({ id, name, code }) => ({ id, name, code })),
     plots: plots.map(({ id, project_id, name, code }) => ({ id, project_id, name, code })),
-    units: units.map(({ id, project_id, name, code }) => ({ id, project_id, name, code })),
+    units: units.map(({ id, project_id, plot_id, name, code }) => ({
+      id,
+      project_id,
+      plot_id,
+      name,
+      code,
+    })),
   };
 }
 

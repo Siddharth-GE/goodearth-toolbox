@@ -14,7 +14,8 @@ export type UnitFormState = ActionState;
 function readUnitForm(formData: FormData) {
   return {
     project_id: String(formData.get("project_id") ?? ""),
-    plot_id: String(formData.get("plot_id") ?? "") || null,
+    // Required since 0029: every unit sits on exactly one plot.
+    plot_id: String(formData.get("plot_id") ?? ""),
     name: String(formData.get("name") ?? "").trim(),
     // Normalised the way poReference() expects: uppercase, no spaces.
     // The DB CHECK (^[A-Z0-9-]{2,10}$, migration 0021) is the backstop.
@@ -38,6 +39,16 @@ function validateCode(code: string | null): string | undefined {
   return undefined;
 }
 
+// Two unique constraints can fire a 23505 here: the per-project code,
+// and the one-unit-per-plot index (0029). The constraint name in the
+// message tells them apart.
+function duplicateError(message: string): string {
+  if (message.includes("units_plot_id_key")) {
+    return "That plot already has a unit — one unit per plot.";
+  }
+  return "That code is already used by another unit in this project.";
+}
+
 export async function createUnit(
   _state: UnitFormState,
   formData: FormData,
@@ -46,6 +57,7 @@ export async function createUnit(
 
   const { project_id, plot_id, name, code, unit_type, client_id, status } = readUnitForm(formData);
   if (!project_id) return { error: "Choose a project." };
+  if (!plot_id) return { error: "Choose a plot — every unit sits on one." };
   if (!name) return { error: "Enter a unit name." };
   const codeError = validateCode(code);
   if (codeError) return { error: codeError };
@@ -57,8 +69,7 @@ export async function createUnit(
     .from("units")
     .insert({ project_id, plot_id, name, code, unit_type, client_id, status });
   if (error) {
-    if (error.code === "23505")
-      return { error: "That code is already used by another unit in this project." };
+    if (error.code === "23505") return { error: duplicateError(error.message) };
     console.error("createUnit failed:", error);
     return { error: "Could not create unit. Try again." };
   }
@@ -78,6 +89,7 @@ export async function updateUnit(
 
   const { project_id, plot_id, name, code, unit_type, client_id, status } = readUnitForm(formData);
   if (!project_id) return { error: "Choose a project." };
+  if (!plot_id) return { error: "Choose a plot — every unit sits on one." };
   if (!name) return { error: "Enter a unit name." };
   const codeError = validateCode(code);
   if (codeError) return { error: codeError };
@@ -90,8 +102,7 @@ export async function updateUnit(
     .update({ project_id, plot_id, name, code, unit_type, client_id, status })
     .eq("id", id);
   if (error) {
-    if (error.code === "23505")
-      return { error: "That code is already used by another unit in this project." };
+    if (error.code === "23505") return { error: duplicateError(error.message) };
     console.error("updateUnit failed:", error);
     return { error: "Could not update unit. Try again." };
   }

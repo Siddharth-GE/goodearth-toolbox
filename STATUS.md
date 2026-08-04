@@ -18,11 +18,11 @@ project run end-to-end.
 | ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
 | Last worked        | 2026-08-04                                                                                                              |
 | Branch             | `master` — clean                                                                                                        |
-| Migrations applied | `0001`–`0028` (next is `0029`)                                                                                          |
+| Migrations applied | `0001`–`0029` (next is `0030`)                                                                                          |
 | Items in database  | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands                                          |
 | Thumbnails         | 897 in Supabase Storage; 1,736 items use the colour placeholder                                                         |
 | Built tools        | Marathon, Settings, Masters, Selections, Budgets (Interiors + Construction), Indents, Purchase Orders, Inventory, Bills |
-| Tests              | `npm test` — 96, all pure logic                                                                                         |
+| Tests              | `npm test` — 101, all pure logic                                                                                        |
 
 ## Next up
 
@@ -30,7 +30,9 @@ project run end-to-end.
   spreadsheets, the `scripts/import-catalogue.ts` way (re-runnable,
   dry-run default, skip existing, verify counts). Watch: plots/units
   need their project per row and `unique (project_id, name)` holds;
-  the project/plot **status value lists are my defaults, never
+  since `0029` **every unit needs its plot** (create plots first, pair
+  1:1 — a double link fails loudly on the unique index); the
+  project/plot **status value lists are my defaults, never
   confirmed** — ask first. Source files go in `data/` (git-ignored).
 - **Post-deploy button press** — after the Bills merge deploys, press
   one real write-button on production (approve or pay a bill) per the
@@ -89,6 +91,14 @@ project run end-to-end.
   totals row per PO).
 - Attribution everywhere: `components/ui/attribution.tsx` + stamp
   `updated_by`.
+- **Plot ↔ unit is strictly 1:1** (founder, 2026-08-04; migration
+  `0029`): every unit sits on exactly one plot, one unit per plot,
+  same project both sides. Forms ask one "For" question via the shared
+  `SitePicker` (`components/masters/site-picker.tsx` +
+  `lib/masters/site-options.ts`) — a pair submits the unit id, a
+  unit-less plot the plot id, so scope codes and RPCs are untouched.
+  Stock folds 'unit' rows into their plot. Every-plot-has-a-unit is
+  the soft side — surfaced on the plots list, not DB-enforced.
 - Item codes are 4-letter sub-type + 3 digits (`BENS001`); nothing
   auto-generates today — any future generator follows this, not
   categories.
@@ -156,6 +166,15 @@ project run end-to-end.
 
 One line per day; full detail in git history and the PLAN.md files.
 
+- **2026-08-04 (night)** — **Plot ↔ unit 1:1** (Stream A of the
+  founder's three asks; `feature/plot-unit-one-to-one`, migration
+  `0029` applied): units.plot_id NOT NULL + unique + same-project FK;
+  indents gain the scope XOR (11 test indents carried both — unit
+  kept); the four scope forms (indents' two dropdowns, PO, NMR bill,
+  contract) collapse onto one shared SitePicker; unit dialog requires
+  a free plot; plots list shows its unit; Stock drops the 'unit'
+  location kind. Streams B (plot at every goods destination) and C
+  (attribution everywhere) are next, per the approved plan.
 - **2026-08-04 (evening)** — **Indents revision-safety fix**
   (`feature/indents-revision-guard`, migration `0028` applied): the
   founder reported that the interiors pull offered every approved
