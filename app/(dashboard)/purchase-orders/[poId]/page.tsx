@@ -23,10 +23,9 @@ import { ReceiptsSection } from "./_components/receipts-section";
 
 export default async function PurchaseOrderPage({ params }: { params: Promise<{ poId: string }> }) {
   const { poId } = await params;
-  const [po, actor, options, gstRates, receipts, billedTotals] = await Promise.all([
+  const [po, actor, gstRates, receipts, billedTotals] = await Promise.all([
     getPurchaseOrder(poId),
     getCurrentPoActor(),
-    getPoFormOptions(),
     listGstRates(),
     getPoReceipts(poId),
     getPoBilledTotals(poId),
@@ -34,6 +33,10 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
   if (!po) notFound();
 
   const editable = canEditPo(po.status);
+  // The vendor/store pickers only render on an editable draft — most
+  // views of a PO are of issued ones, and paid for the whole options
+  // bag (all projects, plots, units, vendors, stores) without using it.
+  const options = editable ? await getPoFormOptions() : { vendors: [], stores: [] };
   const activeRates = gstRates.filter((rate) => rate.is_active).map((rate) => rate.rate);
   const fullyPriced = isFullyPriced(
     po.lines.map((line) => ({ quantity: line.quantity, rate: line.rate, gst_pct: line.gst_pct })),

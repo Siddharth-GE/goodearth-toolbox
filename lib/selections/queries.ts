@@ -158,8 +158,17 @@ export const listUnitSpaces = cache(async function listUnitSpaces(
       .eq("unit_id", unitId)
       .order("sort_order")
       .order("label"),
+    // Read to completion — a truncated read here under-counts the space
+    // rail's per-room line counts past 1,000 lines.
     selectionId
-      ? supabase.from("selection_lines").select("unit_space_id").eq("selection_id", selectionId)
+      ? fetchAll((from, to) =>
+          supabase
+            .from("selection_lines")
+            .select("unit_space_id")
+            .eq("selection_id", selectionId)
+            .order("id")
+            .range(from, to),
+        )
       : Promise.resolve({ data: [] as { unit_space_id: string }[] }),
   ]);
 
@@ -186,12 +195,23 @@ export const listSelectionLines = cache(async function listSelectionLines(
   await requireTool("/selections");
 
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("selection_lines")
-    .select("*, items(name, code, thumb_url, is_provisional, brands(name))")
-    .eq("selection_id", selectionId)
-    .order("sort_order")
-    .order("created_at");
+  // Read to completion: this one read feeds the editor grid, the design
+  // PDF, the Excel export and diffRevisions — past 1,000 lines a
+  // truncated read wouldn't error, it would silently drop lines (and the
+  // diff would report them as removed). The trailing .order("id") is the
+  // unique tiebreaker paging needs.
+  const { data } = await fetchAll((from, to) =>
+    supabase
+      .from("selection_lines")
+      .select(
+        "id, line_key, unit_space_id, item_id, quantity, uom, indicative_rate_snapshot, designer_note, sort_order, created_at, items(name, code, thumb_url, is_provisional, brands(name))",
+      )
+      .eq("selection_id", selectionId)
+      .order("sort_order")
+      .order("created_at")
+      .order("id")
+      .range(from, to),
+  );
 
   return (data ?? []).map((line) => {
     const item = line.items as {

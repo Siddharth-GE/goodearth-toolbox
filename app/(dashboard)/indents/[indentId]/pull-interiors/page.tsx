@@ -10,7 +10,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDate } from "@/lib/format";
-import { getBudgetPull, getIndent, listApprovedBudgetsForProject } from "@/lib/indents/queries";
+import {
+  getBudgetPull,
+  getIndentHeader,
+  listApprovedBudgetsForProject,
+} from "@/lib/indents/queries";
 import { canEditIndent } from "@/lib/indents/workflow";
 import { Palette } from "lucide-react";
 import Link from "next/link";
@@ -34,7 +38,8 @@ export default async function InteriorsPullPage({
   const { indentId } = await params;
   const { budget: budgetId } = await searchParams;
 
-  const indent = await getIndent(indentId);
+  // The light header read — this screen never shows the indent's lines.
+  const indent = await getIndentHeader(indentId);
   if (!indent) notFound();
   if (!canEditIndent(indent.status)) redirect(`/indents/${indentId}`);
 

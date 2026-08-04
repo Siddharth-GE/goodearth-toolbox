@@ -343,6 +343,53 @@ export type BillFormOptions = {
   units: BillScopedOption[];
 };
 
+// What's been billed against each labour contract, summed. Shared by
+// the record form and the contracts list — cache()d so a page calling
+// both never pages the bills table twice in one request.
+const billedByContractTotals = cache(async function billedByContractTotals() {
+  const supabase = await createClient();
+  const { data } = await fetchAll((from, to) =>
+    supabase
+      .from("bills")
+      .select("labour_contract_id, total_amount")
+      .not("labour_contract_id", "is", null)
+      .order("id")
+      .range(from, to),
+  );
+
+  const totals = new Map<string, number>();
+  for (const row of data ?? []) {
+    if (!row.labour_contract_id) continue;
+    totals.set(
+      row.labour_contract_id,
+      (totals.get(row.labour_contract_id) ?? 0) + (row.total_amount ?? 0),
+    );
+  }
+  return totals;
+});
+
+/**
+ * The masters lists the contract dialog's pickers need — and nothing
+ * else. The contracts page used to load getBillFormOptions for these
+ * four lists and paid for every PO and billing total in the database
+ * along the way.
+ */
+export async function getContractFormOptions() {
+  await requireTool("/bills");
+  const [vendors, projects, plots, units] = await Promise.all([
+    listVendors(),
+    listProjects(),
+    listPlots(),
+    listUnits(),
+  ]);
+  return {
+    vendors: vendors.map(({ id, name }) => ({ id, name })),
+    projects: projects.map(({ id, name, code }) => ({ id, name, code })),
+    plots: plots.map(({ id, project_id, name, code }) => ({ id, project_id, name, code })),
+    units: units.map(({ id, project_id, name, code }) => ({ id, project_id, name, code })),
+  };
+}
+
 /**
  * Everything the record form needs, in one gated call: every vendor,
  * their billable POs (issued or completed — from the money-free
@@ -355,55 +402,60 @@ export async function getBillFormOptions(): Promise<BillFormOptions> {
   await requireTool("/bills");
   const supabase = await createClient();
 
-  const [vendors, projects, plots, units, contractsResult, posResult, totalsResult, contractBills] =
-    await Promise.all([
-      listVendors(),
-      listProjects(),
-      listPlots(),
-      listUnits(),
-      // Only approved, active contracts take bills (guarded DB-side in
-      // create_bill too — this filter is the courtesy).
-      fetchAll((from, to) =>
-        supabase
-          .from("labour_contracts")
-          .select("id, vendor_id, project_id, plot_id, unit_id, description, contract_value")
-          .eq("status", "approved")
-          .eq("is_active", true)
-          .order("created_at", { ascending: false })
-          .order("id")
-          .range(from, to),
-      ),
-      // fetchAll throughout: these promise completeness — a capped read
-      // would silently hide a real PO or under-count what's billed.
-      fetchAll((from, to) =>
-        supabase
-          .from("po_facts")
-          .select("id, vendor_id, project_id, reference, status")
-          .in("status", ["issued", "completed"])
-          .order("created_at", { ascending: false })
-          .order("id")
-          .range(from, to),
-      ),
-      fetchAll((from, to) =>
-        supabase
-          .from("po_billing_totals")
-          .select("po_id, ordered_total, billed_total")
-          .order("po_id")
-          .range(from, to),
-      ),
-      fetchAll((from, to) =>
-        supabase
-          .from("bills")
-          .select("labour_contract_id, total_amount")
-          .not("labour_contract_id", "is", null)
-          .order("id")
-          .range(from, to),
-      ),
-    ]);
+  const [
+    vendors,
+    projects,
+    plots,
+    units,
+    contractsResult,
+    posResult,
+    totalsResult,
+    billedByContract,
+  ] = await Promise.all([
+    listVendors(),
+    listProjects(),
+    listPlots(),
+    listUnits(),
+    // Only approved, active contracts take bills (guarded DB-side in
+    // create_bill too — this filter is the courtesy).
+    fetchAll((from, to) =>
+      supabase
+        .from("labour_contracts")
+        .select("id, vendor_id, project_id, plot_id, unit_id, description, contract_value")
+        .eq("status", "approved")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(from, to),
+    ),
+    // fetchAll throughout: these promise completeness — a capped read
+    // would silently hide a real PO or under-count what's billed.
+    fetchAll((from, to) =>
+      supabase
+        .from("po_facts")
+        .select("id, vendor_id, project_id, reference, status")
+        .in("status", ["issued", "completed"])
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAll((from, to) =>
+      supabase
+        .from("po_billing_totals")
+        .select("po_id, ordered_total, billed_total")
+        .order("po_id")
+        .range(from, to),
+    ),
+    billedByContractTotals(),
+  ]);
   const contracts = contractsResult.data ?? [];
 
-  const projectName = (id: string | null) =>
-    id ? (projects.find((p) => p.id === id)?.name ?? "—") : "—";
+  // Map lookups, not per-row .find() — with every PO and contract in
+  // the list, the linear scans were quadratic in practice.
+  const projectNames = new Map(projects.map((p) => [p.id, p.name]));
+  const unitNames = new Map(units.map((u) => [u.id, u.name]));
+  const plotNames = new Map(plots.map((p) => [p.id, p.name]));
+  const projectName = (id: string | null) => (id ? (projectNames.get(id) ?? "—") : "—");
 
   // Every view column comes back nullable from the type generator, so
   // the shapes are normalised once here (the inventory queries rule).
@@ -413,15 +465,6 @@ export async function getBillFormOptions(): Promise<BillFormOptions> {
       { ordered: row.ordered_total ?? 0, billed: row.billed_total ?? 0 },
     ]),
   );
-
-  const billedByContract = new Map<string, number>();
-  for (const row of contractBills.data ?? []) {
-    if (!row.labour_contract_id) continue;
-    billedByContract.set(
-      row.labour_contract_id,
-      (billedByContract.get(row.labour_contract_id) ?? 0) + (row.total_amount ?? 0),
-    );
-  }
 
   return {
     vendors: vendors.map(({ id, name }) => ({ id, name })),
@@ -439,9 +482,9 @@ export async function getBillFormOptions(): Promise<BillFormOptions> {
       description: contract.description,
       project_name: projectName(contract.project_id),
       scope_name: contract.unit_id
-        ? (units.find((u) => u.id === contract.unit_id)?.name ?? "—")
+        ? (unitNames.get(contract.unit_id) ?? "—")
         : contract.plot_id
-          ? (plots.find((p) => p.id === contract.plot_id)?.name ?? "—")
+          ? (plotNames.get(contract.plot_id) ?? "—")
           : "General",
       contract_value: contract.contract_value,
       billed_total: billedByContract.get(contract.id) ?? 0,
@@ -481,7 +524,7 @@ export async function listBillContracts(): Promise<BillContractRow[]> {
   await requireTool("/bills");
   const supabase = await createClient();
 
-  const [contractsResult, contractBills] = await Promise.all([
+  const [contractsResult, billedByContract] = await Promise.all([
     fetchAll((from, to) =>
       supabase
         .from("labour_contracts")
@@ -492,25 +535,9 @@ export async function listBillContracts(): Promise<BillContractRow[]> {
         .order("id")
         .range(from, to),
     ),
-    fetchAll((from, to) =>
-      supabase
-        .from("bills")
-        .select("labour_contract_id, total_amount")
-        .not("labour_contract_id", "is", null)
-        .order("id")
-        .range(from, to),
-    ),
+    billedByContractTotals(),
   ]);
   const contracts = contractsResult.data ?? [];
-
-  const billedByContract = new Map<string, number>();
-  for (const row of contractBills.data ?? []) {
-    if (!row.labour_contract_id) continue;
-    billedByContract.set(
-      row.labour_contract_id,
-      (billedByContract.get(row.labour_contract_id) ?? 0) + (row.total_amount ?? 0),
-    );
-  }
 
   const approverIds = [
     ...new Set(contracts.map((c) => c.approved_by).filter((id): id is string => id != null)),

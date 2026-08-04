@@ -46,7 +46,8 @@ function isServerActionFile(source: string): boolean {
 }
 
 /**
- * Both re-export forms: `export type { X }` and `export { type X }`.
+ * All three re-export forms: `export type { X }`, `export { type X }`,
+ * and the wildcard `export type * from "./mod"`.
  *
  * Only lines that actually START a statement are considered — the
  * codebase deliberately mentions this pattern in comments explaining why
@@ -60,7 +61,7 @@ function findTypeReExports(source: string): { line: number; detail: string }[] {
     const line = lines[i].trim();
     if (!line.startsWith("export")) continue;
 
-    if (/^export\s+type\s*\{/.test(line)) {
+    if (/^export\s+type\s*(\{|\*)/.test(line)) {
       found.push({ line: i + 1, detail: line.slice(0, 90) });
       continue;
     }

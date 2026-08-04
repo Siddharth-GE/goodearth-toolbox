@@ -1,7 +1,16 @@
 import "server-only";
 
+import { requireAdmin } from "@/lib/auth/access";
+import { requireUser } from "@/lib/auth/dal";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
+
+// Settings is admin-only, so every read here guards itself — the page
+// checks too, but a query must not rely on its caller remembering to.
+async function requireAdminCaller() {
+  const user = await requireUser();
+  await requireAdmin(user);
+}
 
 export type AdminUserRow = {
   id: string;
@@ -12,6 +21,7 @@ export type AdminUserRow = {
 };
 
 export async function listUsersForAdmin(): Promise<AdminUserRow[]> {
+  await requireAdminCaller();
   const supabase = await createClient();
   const { data } = await supabase.rpc("admin_list_users");
   return data ?? [];
@@ -26,6 +36,7 @@ export async function listUsersForAdmin(): Promise<AdminUserRow[]> {
 // without a row here). Read to completion for the same reason as the
 // grants below: a truncated read renders a real approver as unticked.
 export async function listIndentApprovers(): Promise<Set<string>> {
+  await requireAdminCaller();
   const supabase = await createClient();
   const { data } = await fetchAll((from, to) =>
     supabase.from("indent_approvers").select("user_id").order("user_id").range(from, to),
@@ -35,6 +46,7 @@ export async function listIndentApprovers(): Promise<Set<string>> {
 
 // The bill twin of the list above (bill_approvers, migration 0025).
 export async function listBillApprovers(): Promise<Set<string>> {
+  await requireAdminCaller();
   const supabase = await createClient();
   const { data } = await fetchAll((from, to) =>
     supabase.from("bill_approvers").select("user_id").order("user_id").range(from, to),
@@ -43,6 +55,7 @@ export async function listBillApprovers(): Promise<Set<string>> {
 }
 
 export async function listAllGrants(): Promise<Map<string, Set<string>>> {
+  await requireAdminCaller();
   const supabase = await createClient();
   const { data } = await fetchAll((from, to) =>
     supabase.from("user_apps").select("user_id, app").order("user_id").order("app").range(from, to),

@@ -143,6 +143,39 @@ export type IndentDetail = {
   line_count: number;
 };
 
+export type IndentHeader = {
+  id: string;
+  reference: string;
+  status: IndentStatus;
+  project_id: string;
+  project_name: string;
+  unit_id: string | null;
+};
+
+/**
+ * Just the header — for screens (the two pull pages) that need the
+ * reference and status to render but have no use for the full detail's
+ * lines, fulfilment facts and actor names.
+ */
+export const getIndentHeader = cache(async (indentId: string): Promise<IndentHeader | null> => {
+  await requireTool("/indents");
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("indents")
+    .select("id, reference, status, project_id, unit_id, projects(name)")
+    .eq("id", indentId)
+    .maybeSingle();
+  if (!data) return null;
+  return {
+    id: data.id,
+    reference: data.reference,
+    status: data.status as IndentStatus,
+    project_id: data.project_id,
+    project_name: (data.projects as { name: string } | null)?.name ?? "—",
+    unit_id: data.unit_id,
+  };
+});
+
 export const getIndent = cache(async (indentId: string): Promise<IndentDetail | null> => {
   await requireTool("/indents");
   const supabase = await createClient();
@@ -190,12 +223,18 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
   // "Ordered X of Y" per line, through the money-free po_line_facts view
   // (migration 0022) — quantities and references only, never a rate, so
   // a site user without /purchase-orders still sees fulfilment.
+  // Read to completion: these rows are SUMMED into ordered quantities,
+  // so a silent 1,000-row cap would under-report "ordered X of Y".
   const lineIds = (lines ?? []).map((line) => line.id);
   const { data: orderedFacts } = lineIds.length
-    ? await supabase
-        .from("po_line_facts")
-        .select("indent_line_id, quantity, po_reference, po_status")
-        .in("indent_line_id", lineIds)
+    ? await fetchAll((from, to) =>
+        supabase
+          .from("po_line_facts")
+          .select("indent_line_id, quantity, po_reference, po_status")
+          .in("indent_line_id", lineIds)
+          .order("id")
+          .range(from, to),
+      )
     : { data: [] };
 
   const orderedByLine = new Map<string, { quantity: number; refs: Set<string> }>();

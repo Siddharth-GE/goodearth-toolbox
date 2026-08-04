@@ -34,24 +34,29 @@ export async function listConstructionPlans(): Promise<ConstructionPlanListRow[]
 
   // Both reads go to completion: the counts beside each plan are a merge
   // of the two, and a truncated read would show a plan with fewer stages
-  // than it has (the catalogue-pagination lesson).
-  const [{ data: plans }, { data: lines }] = await Promise.all([
-    fetchAll((from, to) =>
-      supabase
-        .from("construction_budgets")
-        .select("id, updated_at, units(name), projects(name)")
-        .order("updated_at", { ascending: false })
-        .order("id")
-        .range(from, to),
-    ),
-    fetchAll((from, to) =>
-      supabase
-        .from("construction_budget_lines")
-        .select("budget_id, stage")
-        .order("id")
-        .range(from, to),
-    ),
-  ]);
+  // than it has (the catalogue-pagination lesson). The lines read is
+  // scoped to the listed plans — un-filtered it paged the entire table,
+  // every plan's every line, just to compute two counts per row.
+  const { data: plans } = await fetchAll((from, to) =>
+    supabase
+      .from("construction_budgets")
+      .select("id, updated_at, units(name), projects(name)")
+      .order("updated_at", { ascending: false })
+      .order("id")
+      .range(from, to),
+  );
+
+  const planIds = (plans ?? []).map((plan) => plan.id);
+  const { data: lines } = planIds.length
+    ? await fetchAll((from, to) =>
+        supabase
+          .from("construction_budget_lines")
+          .select("budget_id, stage")
+          .in("budget_id", planIds)
+          .order("id")
+          .range(from, to),
+      )
+    : { data: [] };
 
   const stages = new Map<string, Set<string>>();
   const counts = new Map<string, number>();

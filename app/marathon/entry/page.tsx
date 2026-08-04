@@ -21,7 +21,7 @@ export default async function MarathonEntryPage({
   const [{ data: agent }, { groups, runs, categories }, savedEntry] = await Promise.all([
     supabase.from("marathon_agents").select("name").eq("id", session.agentId).single(),
     getEntryFormData(),
-    saved ? getSavedEntry(saved) : Promise.resolve(null),
+    saved ? getSavedEntry(saved, session.agentId) : Promise.resolve(null),
   ]);
 
   return (

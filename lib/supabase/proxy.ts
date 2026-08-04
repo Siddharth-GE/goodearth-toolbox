@@ -52,20 +52,28 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims verifies the JWT locally against the project's public
+  // signing key (ES256, JWKS cached in-process) instead of getUser()'s
+  // network round trip to Supabase Auth — which sat on the critical
+  // path of every navigation, prefetch and asset request. Expired
+  // tokens still refresh through the cookie handlers above, and if the
+  // token can't be verified locally supabase-js falls back to the
+  // server check itself.
+  const { data } = await supabase.auth.getClaims();
+  const claims = data?.claims ?? null;
 
+  // Exact match, not startsWith — a prefix match would make any future
+  // /login-adjacent route silently public.
   const path = request.nextUrl.pathname;
-  const isPublicPath = PUBLIC_PATHS.some((p) => path.startsWith(p));
+  const isPublicPath = PUBLIC_PATHS.includes(path);
 
-  if (!user && !isPublicPath) {
+  if (!claims && !isPublicPath) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  if (user && path === "/login") {
+  if (claims && path === "/login") {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);
@@ -78,9 +86,9 @@ export async function updateSession(request: NextRequest) {
   // verified — this is the only place in the app allowed to set it, so
   // nothing a client sends can survive to reach a Server Component.
   const requestHeaders = strippedHeaders(request);
-  if (user) {
-    requestHeaders.set("x-user-id", user.id);
-    requestHeaders.set("x-user-email", user.email ?? "");
+  if (claims) {
+    requestHeaders.set("x-user-id", claims.sub);
+    requestHeaders.set("x-user-email", typeof claims.email === "string" ? claims.email : "");
   }
 
   const finalResponse = NextResponse.next({ request: { headers: requestHeaders } });

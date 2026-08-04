@@ -1,6 +1,7 @@
 import "server-only";
 
 import { requireTool } from "@/lib/auth/access";
+import { listVendors } from "@/lib/masters/vendors";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { cache } from "react";
@@ -48,24 +49,35 @@ export async function listInbox(): Promise<InboxRow[]> {
   // which cap at 1,000 — but the previous shape did it as one exact-count
   // request per revision plus one per budget: correct, and ~180 round
   // trips by the hundredth issued revision.
-  const { data: selections } = await supabase
-    .from("selections")
-    .select(
-      "id, unit_id, revision_no, issued_at, units(name, projects(name)), selection_lines(count)",
-    )
-    .eq("status", "issued")
-    .order("issued_at", { ascending: false });
+  // Both reads go through fetchAll: the inbox is only correct when it is
+  // complete — a silent 1,000-row cap would make an issued revision
+  // simply not exist for Budgets, with no error anywhere.
+  const { data: selections } = await fetchAll((from, to) =>
+    supabase
+      .from("selections")
+      .select(
+        "id, unit_id, revision_no, issued_at, units(name, projects(name)), selection_lines(count)",
+      )
+      .eq("status", "issued")
+      .order("issued_at", { ascending: false })
+      .order("id")
+      .range(from, to),
+  );
 
   const selectionIds = (selections ?? []).map((row) => row.id);
   if (selectionIds.length === 0) return [];
 
   // The filter on the embedded table scopes the count to priced lines
   // only — how much of each budget is already done.
-  const { data: budgets } = await supabase
-    .from("budgets")
-    .select("id, selection_id, status, budget_lines(count)")
-    .in("selection_id", selectionIds)
-    .eq("budget_lines.budget_status", "priced");
+  const { data: budgets } = await fetchAll((from, to) =>
+    supabase
+      .from("budgets")
+      .select("id, selection_id, status, budget_lines(count)")
+      .in("selection_id", selectionIds)
+      .eq("budget_lines.budget_status", "priced")
+      .order("id")
+      .range(from, to),
+  );
 
   const budgetBySelection = new Map((budgets ?? []).map((budget) => [budget.selection_id, budget]));
 
@@ -322,9 +334,10 @@ export const getBudget = cache(async (budgetId: string): Promise<BudgetDetail | 
 /** Vendors for the expected-vendor picker on the pricing screen. */
 export async function listVendorOptions() {
   await requireTool("/budgets");
-  const supabase = await createClient();
-  const { data } = await supabase.from("vendors").select("id, name").order("name");
-  return data ?? [];
+  // The shared masters read (complete, fetchAll) rather than a second
+  // hand-rolled vendors query that had its own 1,000-row cap.
+  const vendors = await listVendors();
+  return vendors.map(({ id, name }) => ({ id, name }));
 }
 
 export type MarginRow = {

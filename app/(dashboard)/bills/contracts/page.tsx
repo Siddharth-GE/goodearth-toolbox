@@ -9,7 +9,11 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/components/ui/table";
-import { getBillFormOptions, getCurrentBillActor, listBillContracts } from "@/lib/bills/queries";
+import {
+  getContractFormOptions,
+  getCurrentBillActor,
+  listBillContracts,
+} from "@/lib/bills/queries";
 import { canApproveContract, canEditContract } from "@/lib/bills/workflow";
 import { formatMoney } from "@/lib/format";
 import { HardHat } from "lucide-react";
@@ -19,8 +23,8 @@ import { ContractFormDialog } from "./_components/contract-form-dialog";
 export default async function LabourContractsPage() {
   const [contracts, options, actor] = await Promise.all([
     listBillContracts(),
-    // Reused for the dialog's pickers: vendors, projects, plots, units.
-    getBillFormOptions(),
+    // The dialog's pickers: vendors, projects, plots, units — nothing more.
+    getContractFormOptions(),
     getCurrentBillActor(),
   ]);
 
