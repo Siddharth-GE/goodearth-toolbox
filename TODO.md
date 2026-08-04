@@ -2,8 +2,9 @@
 
 Phase 9 has no approved plan yet — read `STATUS.md` first; its "Next
 up" list holds the loose ends and Phase 9's shape (Overview fully real
-+ one real project run end to end). This file gets the Phase 9 build
-plan once the founder approves one.
+
+- one real project run end to end). This file gets the Phase 9 build
+  plan once the founder approves one.
 
 ## Structure pass (from the 2026-08-04 architecture audit)
 

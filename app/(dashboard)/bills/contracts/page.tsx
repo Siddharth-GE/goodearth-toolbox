@@ -9,7 +9,11 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/components/ui/table";
-import { getContractFormOptions, getCurrentBillActor, listBillContracts } from "@/lib/bills/queries";
+import {
+  getContractFormOptions,
+  getCurrentBillActor,
+  listBillContracts,
+} from "@/lib/bills/queries";
 import { canApproveContract, canEditContract } from "@/lib/bills/workflow";
 import { formatMoney } from "@/lib/format";
 import { HardHat } from "lucide-react";
