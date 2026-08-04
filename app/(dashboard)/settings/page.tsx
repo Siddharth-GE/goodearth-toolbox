@@ -1,6 +1,7 @@
 import { PageTitle } from "@/components/ui/page-title";
 import { ApproverCheckbox } from "./_components/approver-checkbox";
 import { GrantCheckbox } from "./_components/grant-checkbox";
+import { NameField } from "./_components/name-field";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -66,8 +67,11 @@ export default async function SettingsPage() {
             return (
               <TableRow key={row.id}>
                 <TableCell>
-                  <p className="text-foreground font-medium">{row.full_name || row.email}</p>
-                  <p className="text-muted text-xs">{row.email}</p>
+                  {/* The name feeds every avatar and "approved by" line
+                      in the toolbox — editable here because account
+                      creation never asks for one. */}
+                  <NameField userId={row.id} name={row.full_name} />
+                  <p className="text-muted mt-1 text-xs">{row.email}</p>
                 </TableCell>
                 {row.role === "admin" ? (
                   // +2 spans the two approver columns too: admins can

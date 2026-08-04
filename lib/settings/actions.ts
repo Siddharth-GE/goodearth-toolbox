@@ -25,6 +25,31 @@ function isGrantable(app: string) {
   return GRANTABLE_TOOLS.some((tool) => tool.href === app);
 }
 
+/**
+ * The name attribution shows everywhere — avatars, hover tooltips, the
+ * "approved by" lines. Set here by an admin because accounts are
+ * created in the Supabase dashboard, which never asks for one; without
+ * this every action a person takes renders as a quiet dash.
+ */
+export async function setFullName(userId: string, fullName: string): Promise<ActionState> {
+  const user = await requireUser();
+  await requireAdmin(user);
+
+  const name = fullName.trim();
+  if (!name) return { error: "The name can't be blank." };
+  if (name.length > 80) return { error: "Keep the name under 80 characters." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("profiles").update({ full_name: name }).eq("id", userId);
+  if (error) {
+    console.error("setFullName failed:", error);
+    return { error: "Could not save the name. Try again." };
+  }
+
+  revalidatePath("/settings");
+  return undefined;
+}
+
 export async function grantApp(userId: string, app: string): Promise<ActionState> {
   const user = await requireUser();
   await requireAdmin(user);

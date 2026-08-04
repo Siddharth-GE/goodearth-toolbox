@@ -3,7 +3,11 @@
 **Status: shipped.** Migration `0003`, hardened in `0013`.
 
 The admin console for per-user app access: one row per person, one
-checkbox per grantable tool.
+checkbox per grantable tool. The Person cell is also where a person's
+display name is set (`NameField`, save-on-blur → `setFullName`) —
+accounts are created in the Supabase dashboard, which never asks for a
+name, and until one is set every attribution the person leaves renders
+as a dash.
 
 ## This is the permission system
 
