@@ -13,15 +13,15 @@ The chain runs design → price → indent → PO → goods in / stock / goods
 out. **Next: Phase 8 — Bills** (plan in `TODO.md`), then Phase 9:
 Overview fully real + one real project run end-to-end.
 
-|                     |                                                                                        |
-| ------------------- | -------------------------------------------------------------------------------------- |
-| Last worked         | 2026-08-04                                                                             |
-| Branch              | `master` — clean                                                                       |
-| Migrations applied  | `0001`–`0024` (next is `0025`)                                                         |
-| Items in database   | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands         |
-| Thumbnails          | 897 in Supabase Storage; 1,736 items use the colour placeholder                        |
-| Built tools         | Marathon, Settings, Masters, Selections, Budgets (Interiors + Construction), Indents, Purchase Orders, Inventory |
-| Tests               | `npm test` — 74, all pure logic                                                        |
+|                    |                                                                                                                  |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| Last worked        | 2026-08-04                                                                                                       |
+| Branch             | `master` — clean                                                                                                 |
+| Migrations applied | `0001`–`0024` (next is `0025`)                                                                                   |
+| Items in database  | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands                                   |
+| Thumbnails         | 897 in Supabase Storage; 1,736 items use the colour placeholder                                                  |
+| Built tools        | Marathon, Settings, Masters, Selections, Budgets (Interiors + Construction), Indents, Purchase Orders, Inventory |
+| Tests              | `npm test` — 74, all pure logic                                                                                  |
 
 ## Next up
 

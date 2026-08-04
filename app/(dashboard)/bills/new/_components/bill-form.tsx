@@ -54,9 +54,7 @@ export function BillForm({ options }: { options: BillFormOptions }) {
     : ["", ""];
   const anchoredPo = anchorKind === "po" ? pos.find((po) => po.id === anchorId) : undefined;
   const anchoredContract =
-    anchorKind === "contract"
-      ? contracts.find((contract) => contract.id === anchorId)
-      : undefined;
+    anchorKind === "contract" ? contracts.find((contract) => contract.id === anchorId) : undefined;
 
   const anchorTotal = anchoredPo?.ordered_total ?? anchoredContract?.contract_value ?? null;
   const alreadyBilled = anchoredPo?.billed_total ?? anchoredContract?.billed_total ?? 0;
@@ -229,8 +227,8 @@ export function BillForm({ options }: { options: BillFormOptions }) {
       </p>
       {sumsDisagree && (
         <p className="text-muted text-xs">
-          Heads up: taxable + GST is {formatMoney(taxableNum + gstNum)}, not{" "}
-          {formatMoney(totalNum)}. If that&apos;s what the paper says, record it as is.
+          Heads up: taxable + GST is {formatMoney(taxableNum + gstNum)}, not {formatMoney(totalNum)}
+          . If that&apos;s what the paper says, record it as is.
         </p>
       )}
       {overBilled && anchorTotal !== null && (

@@ -7,10 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import type { LabourContractRow } from "@/lib/masters/labour-contracts";
-import {
-  createLabourContract,
-  updateLabourContract,
-} from "@/lib/masters/labour-contracts-actions";
+import { createLabourContract, updateLabourContract } from "@/lib/masters/labour-contracts-actions";
 import type { PlotRow } from "@/lib/masters/plots";
 import type { ProjectRow } from "@/lib/masters/projects";
 import type { UnitRow } from "@/lib/masters/units";
@@ -103,8 +100,8 @@ export function LabourContractFormDialog({
           )}
         </Select>
         <p className="text-muted text-xs">
-          Bills against this contract take their number's scope from here, e.g. BILL/SAA/V12A/001.
-          A picked plot or unit needs a short code before bills can be recorded.
+          Bills against this contract take their number's scope from here, e.g. BILL/SAA/V12A/001. A
+          picked plot or unit needs a short code before bills can be recorded.
         </p>
       </div>
       <div className="space-y-1.5">

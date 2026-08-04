@@ -36,7 +36,12 @@ export default async function LabourContractsPage() {
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <LabourContractFormDialog vendors={vendors} projects={projects} plots={plots} units={units} />
+        <LabourContractFormDialog
+          vendors={vendors}
+          projects={projects}
+          plots={plots}
+          units={units}
+        />
       </div>
 
       {contracts.length === 0 ? (

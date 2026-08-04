@@ -165,17 +165,15 @@ export async function deleteBill(billId: string): Promise<ActionState> {
   const supabase = await createClient();
   // RLS filters unauthorised deletes to zero rows rather than raising,
   // so count the match to tell "gone" from "refused".
-  const { count, error } = await supabase
-    .from("bills")
-    .delete({ count: "exact" })
-    .eq("id", billId);
+  const { count, error } = await supabase.from("bills").delete({ count: "exact" }).eq("id", billId);
   if (error) {
     console.error("deleteBill failed:", error);
     return guardError(error, "Could not delete the bill. Try again.");
   }
   if (!count) {
     return {
-      error: "Only the person who recorded this bill (or an admin) can delete it, and only while it's still recorded.",
+      error:
+        "Only the person who recorded this bill (or an admin) can delete it, and only while it's still recorded.",
     };
   }
 

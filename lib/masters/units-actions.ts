@@ -44,8 +44,7 @@ export async function createUnit(
 ): Promise<UnitFormState> {
   await requireTool("/masters");
 
-  const { project_id, plot_id, name, code, unit_type, client_id, status } =
-    readUnitForm(formData);
+  const { project_id, plot_id, name, code, unit_type, client_id, status } = readUnitForm(formData);
   if (!project_id) return { error: "Choose a project." };
   if (!name) return { error: "Enter a unit name." };
   const codeError = validateCode(code);
@@ -77,8 +76,7 @@ export async function updateUnit(
 ): Promise<UnitFormState> {
   await requireTool("/masters");
 
-  const { project_id, plot_id, name, code, unit_type, client_id, status } =
-    readUnitForm(formData);
+  const { project_id, plot_id, name, code, unit_type, client_id, status } = readUnitForm(formData);
   if (!project_id) return { error: "Choose a project." };
   if (!name) return { error: "Enter a unit name." };
   const codeError = validateCode(code);
