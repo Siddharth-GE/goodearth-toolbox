@@ -10,7 +10,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { Select } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { addLines } from "@/lib/selections/actions";
-import type { CatalogueItem, CatalogueSearchResult } from "@/lib/selections/catalogue";
+import type { CatalogueItem, CatalogueSearchResult } from "@/lib/masters/catalogue";
 import { RequestItemDialog } from "./request-item-dialog";
 import { Minus, Plus, Search } from "lucide-react";
 import { useRouter } from "next/navigation";

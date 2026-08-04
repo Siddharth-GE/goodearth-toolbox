@@ -1,5 +1,5 @@
 import { hasApp } from "@/lib/auth/access";
-import { CATALOGUE_PAGE_SIZE } from "@/lib/selections/catalogue";
+import { CATALOGUE_PAGE_SIZE } from "@/lib/masters/catalogue";
 import { getCurrentUser } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
 

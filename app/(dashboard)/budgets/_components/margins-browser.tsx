@@ -16,7 +16,7 @@ import { FormMessage } from "@/components/ui/form-message";
 import { Pagination } from "@/components/ui/pagination";
 import { Spinner } from "@/components/ui/spinner";
 import { setItemMargin } from "@/lib/budgets/actions";
-import type { CatalogueSearchResult } from "@/lib/selections/catalogue";
+import type { CatalogueSearchResult } from "@/lib/masters/catalogue";
 import { formatMoney } from "@/lib/format";
 import { useDebouncedSearch } from "@/lib/hooks/use-debounced-search";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";

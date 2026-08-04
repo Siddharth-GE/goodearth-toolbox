@@ -12,9 +12,9 @@ import { Spinner } from "@/components/ui/spinner";
 import { formatCount, formatMoney } from "@/lib/format";
 import { useDebouncedSearch } from "@/lib/hooks/use-debounced-search";
 // Types only — the contract of /api/catalogue, deliberately import-free
-// (see the note at the top of that module), so this pulls no Selections
-// code into the bundle.
-import type { CatalogueItem, CatalogueSearchResult } from "@/lib/selections/catalogue";
+// (see the note at the top of that module), living on the shared
+// masters surface every tool may read.
+import type { CatalogueItem, CatalogueSearchResult } from "@/lib/masters/catalogue";
 import { Minus, Plus, Search } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 
