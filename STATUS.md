@@ -165,9 +165,9 @@ project run end-to-end.
 
 One line per day; full detail in git history and the PLAN.md files.
 
-- **2026-08-04 (structure pass)** — the audit's bucket C, on
-  `feature/structure-pass` (awaiting the founder's browser sign-off
-  before merge): new `lib/overview/queries.ts` owns the home page's
+- **2026-08-04 (structure pass)** — the audit's bucket C, merged to
+  `master` after the founder's browser pass: new
+  `lib/overview/queries.ts` owns the home page's
   five reads (the one module allowed to import other tools' queries);
   catalogue types → `lib/masters/catalogue.ts`; `getPoReceipts` →
   Purchase Orders; inventory reads split into
@@ -177,7 +177,15 @@ One line per day; full detail in git history and the PLAN.md files.
   onto the shared catalogue picker (space chips and request-item kept,
   421-line copy deleted); `/selections` and `/masters/units` page 50 at
   a time (the unit dialog still gets the complete list for its
-  plot-uniqueness check).
+  plot-uniqueness check). Post-merge the founder found every
+  attribution rendering a dash — not a regression: no profile ever had
+  a `full_name` (dashboard-created accounts aren't asked). Fixed the
+  data by SQL (both founder accounts "Siddharth", the probe
+  "Probe (test)") and Settings gained a per-person name field
+  (save-on-blur → `setFullName`) — naming a person there is now part
+  of onboarding. The pre-merge probe smoke did NOT run this session:
+  resetting the probe password (auth admin API) was blocked by the
+  assistant's permission mode; founder verified in the browser instead.
 - **2026-08-04 (night)** — **Plot ↔ unit 1:1** (Stream A of the
   founder's three asks; `feature/plot-unit-one-to-one`, migration
   `0029` applied): units.plot_id NOT NULL + unique + same-project FK;
