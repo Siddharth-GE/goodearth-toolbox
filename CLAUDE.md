@@ -61,6 +61,10 @@ means flipping `built: true` and replacing the stub `page.tsx`.
 - **Tests** cover pure logic only (`npm test`, node:test via tsx) — no
   database, no browser; extract pure modules to test them. CI
   (typecheck, prettier, build, check:actions) is the gate; no hooks.
+- **Smoke-test as a real single-grant user** (the probe account, one
+  tool's grant only) before merging — an admin passes every check and
+  never sees grant bugs. After any deploy that changes server actions,
+  press one real write-button on production.
 
 ## Git
 

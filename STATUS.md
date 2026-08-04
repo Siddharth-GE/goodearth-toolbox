@@ -1,494 +1,146 @@
 # Goodearth Toolbox — status & session log
 
-Source of truth for **where we are**: what's shipped, which decisions
-are settled, and the session log. (This file was `PLAN.md` until
-2026-08-03; the forward-looking half now lives in **`TODO.md`** — the
-detailed, pick-up-cold plan for the next phases.)
+Where we are: what's shipped, settled decisions, the session log.
+Updated at the end of every session; finished work moves here from
+`TODO.md`. Per-tool detail lives in each tool's `PLAN.md`; durable
+rules in `CLAUDE.md`; full history in git. Stays lean by design.
 
-> **How this file works.** Updated at the end of every working session:
-> record what shipped, correct where reality disagreed with the plan,
-> move finished items out of TODO.md into here. Per-tool detail lives in
-> `app/(dashboard)/<tool>/PLAN.md` (and `app/marathon/PLAN.md`); durable
-> rules live in CLAUDE.md; full history lives in git. This file stays
-> lean — pruned 2026-08-03 after Phase 5, and again whenever finished
-> work stops being useful context.
+## Now
 
----
+**Phases 1–7 shipped** (Masters → Selections → Budgets → Indents →
+Purchase Orders → Inventory), the last three all merged 2026-08-03.
+The chain runs design → price → indent → PO → goods in / stock / goods
+out. **Next: Phase 8 — Bills** (plan in `TODO.md`), then Phase 9:
+Overview fully real + one real project run end-to-end.
 
-## Where we are right now
-
-**Phase 6 (Purchase Orders) shipped and merged on 2026-08-03** — the
-same day it was planned and built. The chain now runs design → price →
-indent → **PO with GST and a printable document**: approved indent
-lines become one-vendor, one-plot/unit POs (`PO/SAA/V12A/001`), priced
-against a managed GST slab list, issued, printed on the (still
-placeholder) letterhead, with an admin-approved deletion flow, avatars
-on every line, and "ordered X of Y" back on the indents.
-
-**Phase 7 (Inventory) shipped and merged on 2026-08-03**, planned,
-built, founder-tested and merged the same day — like Phase 6 before it.
-The chain now runs design → price → indent → PO → **goods in, stock,
-goods out**: deliveries recorded against issued POs (which complete
-themselves), stock computed from every movement across stores, plots
-and units, issues out to a plot or transferred between stores, and
-adjustments that demand a reason.
-
-`0024` came from the founder's first look at the tool: Stock listed
-only stores, and they wanted plots too — "whenever something goes
-directly there it should show, to study the data later which we will
-consolidate." A location is now a store, a plot or a unit, through a
-second view (`stock_by_location`) that leaves `stock_on_hand` and its
-negative-stock guards untouched.
-
-**Next: Phase 8 — Bills.** The full plan is in `TODO.md`.
-
-|                     |                                                                                                                      |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Last worked         | 2026-08-03                                                                                                           |
-| Branch              | `master` — Phase 7 merged, `feature/inventory` deleted                                                               |
-| Migrations applied  | `0001`–`0024` (next new one is `0025`)                                                                               |
-| Items in database   | **2,633** (2,631 imported catalogue + 2 material seeds)                                                              |
-| Categories / brands | 14 / 21                                                                                                              |
-| Thumbnails          | **897** in Supabase Storage; 1,736 items use the colour placeholder                                                  |
-| Built tools         | Marathon, Settings, Masters, Selections, Budgets (Interiors + Construction), Indents, Purchase Orders, **Inventory** |
-| Tests               | `npm test` — 74: pricing, carry-forward, diff, references + workflows, PO GST math, stock arithmetic, PIN, formats   |
-
-## Phase status
-
-| #   | Phase                                                                                                  | Status                        |
-| --- | ------------------------------------------------------------------------------------------------------ | ----------------------------- |
-| 0   | Platform hardening — `user_apps` grants, `requireApp()`, generated Supabase types, migration rules     | ✅ Done                       |
-| 1   | **Masters** — projects, plots, units, clients, vendors, stores, items, categories, brands, space types | ✅ Shipped 2026-07-31         |
-| 3   | **Catalogue import** — the real 2,631-item catalogue                                                   | ✅ Done — pulled forward      |
-| 3b  | **Thumbnail pass** — catalogue images into Supabase Storage                                            | ✅ Done                       |
-| 2   | **Selections** — per-unit design workspace + the catalogue picker                                      | ✅ Shipped, merged 2026-08-01 |
-| 2b  | **Design views** — renders per space, in the design document                                           | ✅ Shipped, merged 2026-08-01 |
-| 4   | **Budgets** — cost + margin → client rate, approval, two documents                                     | ✅ Shipped, merged 2026-08-01 |
-| 5   | **Indents + Construction tree** — three line sources, QS stage-wise plans, approval                    | ✅ Shipped, merged 2026-08-03 |
-| 6   | **Purchase Orders** — scope-numbered POs from approved indents, GST, guarded deletion, PDF             | ✅ Shipped, merged 2026-08-03 |
-| 7   | **Inventory** — goods receipt, stock by location, issues, adjustments                                  | ✅ Shipped, merged 2026-08-03 |
-| 8   | Bills — against POs and labour contracts                                                               | ⬜ Planned — see TODO.md      |
-| 9   | Overview wired to real data + one real project end-to-end                                              | ⬜ Not started                |
-
-**Why 3 came before 2:** the catalogue picker was designed against
-2,631 real items from day one instead of five samples. Same work,
-better order.
+|                     |                                                                                        |
+| ------------------- | -------------------------------------------------------------------------------------- |
+| Last worked         | 2026-08-04                                                                             |
+| Branch              | `master` — clean                                                                       |
+| Migrations applied  | `0001`–`0024` (next is `0025`)                                                         |
+| Items in database   | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands         |
+| Thumbnails          | 897 in Supabase Storage; 1,736 items use the colour placeholder                        |
+| Built tools         | Marathon, Settings, Masters, Selections, Budgets (Interiors + Construction), Indents, Purchase Orders, Inventory |
+| Tests               | `npm test` — 74, all pure logic                                                        |
 
 ## Next up
 
-### Load the founder's master data
-
-Agreed 2026-08-01, still pending: the founder will supply lists to load
-into Masters — clients, plots, units, and whatever else is ready
-(spreadsheet/CSV preferred, one per master). Do it the way
-`scripts/import-catalogue.ts` did: a re-runnable script, dry-run by
-default, skip rows already present, verify counts and spot-checks
-after. Things to watch:
-
-- Plots and units need their project named per row, and
-  `unique (project_id, name)` (migration `0017`) will refuse duplicates
-  within a project — clean the list rather than the constraint.
-- Status value lists (`planning/active/completed`,
-  `available/reserved/sold`) are still my defaults, never confirmed —
-  ask whether they match how Goodearth actually talks before importing.
-- Source files go in `data/` (git-ignored, like the catalogue CSVs).
-
-### Phase 8 — Bills (next)
-
-The complete build plan — schema, milestones, gates, settled decisions —
-is in **`TODO.md`**, written so a cold start needs nothing but the repo.
-
-### Grant `/inventory` to whoever needs it
-
-The tool is live but invisible until granted in Settings (`/settings`)
-— the app boundary IS the permission boundary. Store-keepers need
-`/inventory`; site engineers may want it too, since they can then see
-whether their material has arrived (Inventory reads are open, and it
-carries no money).
-
-### Letterhead assets (any session, before the next PDF-heavy phase)
-
-The whole PDF layer still prints on a placeholder letterhead in
-Helvetica (no ₹ glyph — amounts are digits-only via `formatAmount`).
-When the founder supplies the logo, registered address, company GST
-number and standard PO terms, swap them into `lib/pdf/document.tsx`'s
-`Letterhead` (one place); a Geist `.ttf` registered there lifts every
-document at once. Deliberately did not block the Phase 6 merge.
-
-### Smaller pending items (any session)
-
-- Migrate Selections onto the shared
-  `components/masters/catalogue-picker.tsx` — it kept its own copy
-  (space chips, request-item extras) when the shared picker was
-  extracted in Phase 5.
-- Selections: paste-from-Excel (deferred from Phase 2).
-- The wider admins-only RLS mismatch on master tables — see the note in
-  migration `0008`.
-- **Database clean-up once the app is fully rolling** (founder's call,
-  2026-08-03): test indents `IND/SAA/001`–`005` and the inert
-  `claude-preview-probe@goodearth.test` account. Approved indents and
-  the probe user need SQL in Studio — the app refuses both by design
-  (see "Deferred" below on actor FKs).
+- **Load the founder's master data** — clients, plots, units, from
+  spreadsheets, the `scripts/import-catalogue.ts` way (re-runnable,
+  dry-run default, skip existing, verify counts). Watch: plots/units
+  need their project per row and `unique (project_id, name)` holds;
+  the project/plot **status value lists are my defaults, never
+  confirmed** — ask first. Source files go in `data/` (git-ignored).
+- **Grant `/inventory`** in Settings to store-keepers (and site
+  engineers if wanted — its reads carry no money).
+- **Letterhead assets** — logo, address, GST number, PO terms → swap
+  into `lib/pdf/document.tsx`'s `Letterhead` (one place); a Geist
+  `.ttf` registered there lifts every PDF at once.
+- Smaller, any session: migrate Selections onto the shared
+  `catalogue-picker`; Selections paste-from-Excel; the admins-only RLS
+  mismatch noted in migration `0008`; database clean-up once rolling
+  (test indents `IND/SAA/001`–`005`, the inert probe account — both
+  need SQL in Studio, the app refuses by design).
 
 ## Decisions locked in
 
-- **One `items` table** for catalogue products and raw materials, split
-  by `kind`.
-- **Prices are snapshotted** onto lines at pick time; master price
-  edits never rewrite existing lines.
-- **An ISSUED selection revision is immutable** — a database trigger
-  refuses every write to its lines (migration `0006`). Draft lines are
-  deleted outright; there are no soft deletes, and downstream tools
-  must not expect them. History is preserved by the revision itself
-  plus the audit log.
-- **`line_key` is a line's cross-revision identity.**
-  `create_next_revision()` copies lines forward carrying their keys, so
-  Budgets prices against the key, never the row id — an unchanged line
-  keeps its price across revisions instead of being re-priced from
-  scratch. Downstream anchors use the composite `(budget_id, line_key)`.
-- **Margin is Budgets-only** — `budgets`, `budget_lines` and
-  `item_margins` require `/budgets` to _select_, not just write. The
-  **one** sanctioned window through that RLS is the
-  `approved_budgets` / `approved_budget_lines` security-barrier views
-  (migration `0019`), whose column lists ARE the boundary: no
-  `unit_cost`, `margin_pct` or `client_rate`, ever. Never add a column
-  to them without checking which side of the boundary it sits on, and
-  never add a second row-level SELECT policy on `budget_lines`
-  (permissive policies OR together).
-- **Access = per-user app grants.** `requireApp()`/`requireTool()`
-  first in every action and query; sidebar visibility is cosmetic only.
-- **Indents carry no money, anywhere.** They are items, quantities and
-  units; value enters the system at the PO.
-- **Indent numbering** is `IND/<projects.code>/NNN`, minted in the
-  database at creation and stored; deleted drafts leave permanent gaps
-  (accepted). A code-less project refuses indent creation with a
-  friendly message. **Approved is terminal** — the document POs are
-  raised from; there is no path back and no delete.
-- **Construction plans** (Budgets · Construction) are materials +
-  quantities only: free-form text stages, no approval, no revisions,
-  one living plan per unit (unique `unit_id`), QS-owned under
-  `/budgets`.
-- **Indent approvers are a named list** (`indent_approvers`, managed
-  from Settings; admins always may), enforced by the database guard —
-  like every status rule: the triggers are the boundary, buttons are a
-  courtesy.
-- **POs come from approved indents only** — no direct POs; a purchase
-  always has an approved request behind it. One PO = one vendor + one
-  plot/unit ("GEN" for general), because the scope is part of the
-  number: `PO/<project code>/<plot-or-unit code>/NNN`, numbers running
-  per scope, minted in `create_purchase_order()`. Plot/unit short codes
-  live in Masters like `projects.code`.
-- **PO money is gated; PO facts are not.** SELECT on
-  `purchase_orders`/`purchase_order_lines` requires `/purchase-orders`
-  (the Budgets precedent). The one sanctioned money-free window is the
-  `po_facts` / `po_line_facts` views (migration `0022`) — quantities,
-  references and statuses, **never a rate**; their column lists are the
-  boundary, exactly like `approved_budget_lines`.
-- **Over-ordering is impossible at the database**: unique
-  `(po_id, indent_line_id)` + the advisory-lock-serialised
-  `po_lines_qty_guard` cap every indent line at its approved quantity
-  across all non-cancelled POs. A PO line's uom is not editable — it
-  stays the indent line's unit so the guard's comparison stays honest.
-- **GST slabs are a managed master** (`gst_rates`, Masters tab), picked
-  per PO line and snapshotted into `gst_pct` — no FK, the
-  price-snapshot principle. PO amounts are computed, never stored.
-- **Deleting an issued PO takes an admin's yes** — request with a
-  mandatory note → admin approves (→ cancelled, quantities return to
-  the pool) or refuses; the requester may withdraw. Draft POs are their
-  creator's (or an admin's) to delete. Trigger-enforced.
-- **Attribution everywhere** — every line grid and status banner shows
-  the acting user's avatar (name on hover) via
-  `components/ui/attribution.tsx`; actions stamp `updated_by`.
-- **Item codes:** Goodearth's real convention is a 4-letter _sub-type_
-  prefix + 3-digit sequence (`BENS001`, `SOFS…`) — finer than category.
-  Nothing auto-generates codes today; whenever that's built it must
-  follow this convention and cannot key off `item_categories`.
-- **Images:** thumbnails are ours, full images stay borrowed links,
-  image-less items get a colour placeholder (see below). Image fetching
-  is never bundled into a data import — remote fetches must not be able
-  to damage a clean load.
-
-## Images — the settled rules
-
-897 thumbnails live in the public `catalogue` Storage bucket
-(`items/<item id>.webp`, ~5 KB each) via the re-runnable
-`scripts/fetch-catalogue-images.ts`; safe to re-run when new catalogue
-rows arrive.
-
-- **Grid tiles load `thumb_url` only**, never `image_url` (30 full
-  vendor images per page ≈ 15 MB vs ~150 KB of thumbs).
-- `image_url` stays a link to the vendor's CDN for a future detail/zoom
-  view. If one is ever built, `cdn.shopify.com` must be added to
-  `next.config.ts` `images.remotePatterns` — deliberately absent today.
-- **1,736 items have no image** and render the `lib/color-hash.ts`
-  placeholder (item code on a stable colour). That's the majority case
-  — tiles are designed for it first, not as a fallback.
-
-## The three documents
-
-The system's real output, and the reason Budgets is shaped the way it
-is. All three are built.
-
-|                         | Produced by | Contains                                                                              | Audience                    |
-| ----------------------- | ----------- | ------------------------------------------------------------------------------------- | --------------------------- |
-| **A · Design document** | Selections  | Spaces view by view — uploaded renders — with the items specified in each. No prices. | Client, for design sign-off |
-| **B · Budget sheet**    | Budgets     | Every element with quantity, **cost, margin** and client rate                         | Internal only               |
-| **C · Client quote**    | Budgets     | Views, items, quantity, **client rate and amount**, totals                            | Client                      |
-
-B and C are the same data, filtered — and the separation is structural,
-not cosmetic: C renders from `QuoteData` (`lib/budgets/quote.ts`), a
-type with **no cost or margin field at all**, so a template mistake is
-a compile error rather than a leaked margin.
+- One `items` table for products and materials, split by `kind`.
+- Prices are **snapshotted onto lines at pick time**; master edits
+  never rewrite existing lines. Same principle for PO `gst_pct`.
+- An issued selection revision is **immutable** (trigger, `0006`); no
+  soft deletes anywhere — history is revisions + the audit log.
+- `line_key` is a line's cross-revision identity; Budgets prices
+  against it; downstream anchors use `(budget_id, line_key)`.
+- Margin is `/budgets`-only, PO money `/purchase-orders`-only; the only
+  sanctioned windows are the `approved_*` and `po_*facts` views (see
+  CLAUDE.md — column lists are the boundary).
+- Indents carry no money; numbered `IND/<project code>/NNN`, minted in
+  the database, gaps accepted; **approved is terminal** — no delete.
+- Construction plans are materials + quantities only — free-form
+  stages, no approval, one living plan per unit, QS-owned.
+- Approvers (indents, and bills to come) are named lists managed in
+  Settings, enforced by DB guards — **triggers are the boundary,
+  buttons are a courtesy**.
+- POs come from approved indents only; one vendor + one plot/unit
+  ("GEN" for general); `PO/<project>/<scope>/NNN` minted per scope.
+  Over-ordering is impossible at the database (unique + advisory-lock
+  guard); a PO line's uom is locked to its indent line's.
+- Deleting an issued PO is request → admin approves, trigger-enforced.
+- Attribution everywhere: `components/ui/attribution.tsx` + stamp
+  `updated_by`.
+- Item codes are 4-letter sub-type + 3 digits (`BENS001`); nothing
+  auto-generates today — any future generator follows this, not
+  categories.
+- Images: grid tiles load `thumb_url` only (ours, in Storage);
+  `image_url` stays a borrowed vendor link (no `remotePatterns` entry
+  yet, deliberate); 1,736 image-less items use the `color-hash`
+  placeholder — the majority case, designed for. Image fetching is
+  never bundled into a data import.
+- The three documents: **A** design document (Selections, no prices,
+  client) · **B** budget sheet (cost + margin, internal) · **C** client
+  quote (client rates only). C renders from `QuoteData`
+  (`lib/budgets/quote.ts`), which has **no cost/margin fields** — a
+  template mistake is a compile error, not a leaked margin.
 
 ## Open decisions — ask at the phase that needs them
 
-| Phase | Question                                                      |
-| ----- | ------------------------------------------------------------- |
-| 2     | Can a design start on an unsold unit (`client_id` null)?      |
-| 6     | PO numbering format; letterhead assets (logo, address, terms) |
-| 8     | Does bill approval need a different person than the recorder? |
-
-Also still unconfirmed from Phase 1: the `status` value lists for
-projects (`planning`/`active`/`completed`) and plots/units
-(`available`/`reserved`/`sold`) were chosen as sensible defaults, not
-specified by the founder — confirm before the master-data import.
+- Phase 8: must a bill's approver differ from its recorder?
+- Phase 2 (dormant): can a design start on an unsold unit?
+- From Phase 1: the project/plot/unit status value lists (defaults,
+  unconfirmed — see master-data load above).
 
 ## Deferred, with the trigger for revisiting
 
-Two audit passes ran on 2026-08-01 (five stages, then a second pass)
-before the maintainer joined; everything they found is fixed and
-merged, and the durable rules they produced are in CLAUDE.md (fetchAll
-vs stated-limit reads, never count from `rows.length`, the shared
-plumbing, migration conventions). What's still **live** from them:
-
-- **`audit_log` retention**: it will become the biggest table, and that
-  is fine for years at this scale. Revisit (monthly partitioning on
-  `at`, or pruning `old_data`/`new_data` beyond ~12 months) when it
-  passes a few million rows or Studio queries on it feel slow.
-- **Actions trust the relationships in their inputs** (the DB
-  constraints are the boundary; ~200 trusted staff is the threat
-  model). Revisit only if the platform ever faces outsiders.
-- **Actor foreign keys** (`created_by`, `issued_by`, `priced_by`…) are
-  `NO ACTION`, so a person who has ever touched anything cannot be
-  deleted from auth — this is why the probe test user is inert rather
-  than gone. Fix as one migration flipping them to
-  `on delete set null` whenever offboarding first needs it.
-- **Audit triggers on `items`/`vendors`/`item_requests`**: none today.
-  Must land **before Purchase Orders ship**.
-- **`space_views` storage orphans**: deleting a space cascades its view
-  rows but nothing deletes the JPEGs from the private bucket. Cheap
-  disk, invisible; fix by `on delete restrict` or a reaper, someday.
-- **Two accepted small races**: `moveSpaceView`'s sort swap can
-  transiently duplicate a sort_order (self-heals on next save), and
-  Marathon's PIN `recordFailure` is read-then-write so a scripted
-  attacker gets a couple of extra guesses before lockout. The Marathon
-  one rides the next Marathon migration as a DB-side increment.
-- **`lib/selections/views.ts` stays where it is** (shared surface,
-  documented in the file and CLAUDE.md) — move it only if a third
-  consumer appears.
-- **The full CI browser smoke test was costed and declined**
-  (2026-08-03, ~200-user call): it needed a permanent login in GitHub
-  secrets, wrote to the live database on every push, and could fail for
-  unrelated reasons. The lean guard that shipped instead
-  (`npm run check:actions`) catches the outage class; revisit only if a
-  _different_ runtime action failure ever reaches production.
+- `audit_log` retention — revisit past a few million rows.
+- Actions trust their inputs' relationships (DB constraints are the
+  boundary; ~200 trusted staff) — revisit only if outsiders arrive.
+- Actor FKs are `NO ACTION` so past actors can't be deleted from auth —
+  flip to `on delete set null` when offboarding first needs it.
+- `space_views` storage orphans (deleted spaces leave JPEGs) — someday.
+- Two accepted races: `moveSpaceView` sort swap (self-heals) and
+  Marathon PIN lockout (fix rides the next Marathon migration).
+- `lib/selections/views.ts` stays put until a third consumer appears.
+- Full CI browser smoke **costed and declined** (2026-08-03);
+  `check:actions` covers the known outage class — revisit only if a
+  different runtime action failure reaches production.
 
 ## Environment & working notes
 
-- **Production**: `goodearth-toolbox.vercel.app`, auto-deploys from
-  `master`. After any deploy that changes server actions, **press one
-  real write-button on production** — the outage habit. CI's
-  `check:actions` guards the known crash class; a human press guards
-  the unknown ones.
-- **Pre-push habit for server-action work**: local Playwright smoke —
-  install in the session scratchpad (`npm i playwright`,
-  `npx playwright install chromium`), `npm run build && npm start`,
-  drive `localhost:3000` as the probe user (reset its password via the
-  Supabase auth admin API; it's never stored), then clean up any rows
-  created.
-- `sharp` can't load its win32 binary on the dev machine, so
-  Selections' actions module (design-view uploads) fails **locally
-  only** — Vercel/linux is fine. Don't chase it as an app bug.
-- The `npm test` glob is shell-dependent (`tsx --test "lib/**/*.test.ts"`)
-  — if tests ever appear not to run, check that before assuming green.
-- Git Bash rewrites leading-slash strings like `/budgets` into Windows
-  paths (MSYS path conversion) — use PowerShell for REST calls whose
-  arguments contain app slugs.
-- Source CSVs for imports live in `data/`, git-ignored — business data
-  belongs in the database, not git history.
+- Production: `goodearth-toolbox.vercel.app`. Post-deploy and pre-merge
+  verification habits are in CLAUDE.md (probe-user smoke, the
+  write-button press).
+- Pre-push smoke: Playwright installed in the session scratchpad,
+  `npm run build && npm start`, drive localhost as the probe user
+  (reset its password via the auth admin API; never stored).
+- `sharp` can't load its win32 binary locally — Selections' upload
+  action fails **locally only**; Vercel is fine. Not an app bug.
+- `npm test`'s glob is shell-dependent — check that before assuming
+  green. Git Bash rewrites `/budgets`-style args into Windows paths —
+  use PowerShell for REST calls with app slugs.
+- Lessons that stuck: Server Actions are wrong for reads (catalogue
+  search is a Route Handler) and cap bodies at 1 MB; Storage has its
+  own RLS and service-role checks prove nothing about real users;
+  Postgres view columns come back nullable from the type generator —
+  normalise at the read boundary; on Windows kill servers by port, not
+  `pkill`; audited tables need a surrogate `id`; PDFs print digits-only
+  (`formatAmount` — Helvetica has no ₹).
 
 ## Session log
 
-### 2026-08-03 (latest) — Phase 7 shipped: Inventory, in one sitting
+One line per day; full detail in git history and the PLAN.md files.
 
-Planned, built, founder-tested and merged the same day. Migration
-`0023` (goods receipts, stock issues, adjustments, the computed
-`stock_on_hand` view, five guards, two minting functions), two pure
-modules with 13 new tests, the full data layer, four screens, a
-deliveries section on the PO detail page, and Overview stage 03 going
-real. Then `0024` after the founder's first look: Stock covered only
-stores, and they wanted plots — so a location became a store, a plot or
-a unit via a second view, deliberately separate so the store balances
-the negative-stock guards read stayed untouched.
-
-**The store-keeper smoke earned its keep.** Driven as the probe user
-holding `/inventory` and nothing else — the case an admin can never
-see — it found that `/api/catalogue` gates on an explicit list of tools
-that didn't include `/inventory`, so the Adjustments item picker
-returned 403 and sat empty. Fixed, and the rule is now in CLAUDE.md's
-new-tool checklist. 18/18 after that, read-only, so no test rows.
-
-**The post-deploy button press, done without leaving test data.** Every
-Inventory write is append-only, so production was verified by pressing
-a button the database was certain to REFUSE — removing 999,999 of an
-item from a store holding none. Production answered with the guard's
-own words ("Only 0 each of this item is in that store"), which proves
-the action chunk loaded and ran, the guard fired, and the friendly
-message reached the screen — with nothing written. Worth copying for
-any future append-only tool.
-
-**Three things worth carrying forward.** A `security definer` trigger
-plus a guard that re-checks its own precondition beats widening an RLS
-policy — the PO completes itself without any store-keeper gaining
-write access to purchase orders. Every column of a Postgres view comes
-back typed nullable from the Supabase generator, so view reads
-normalise their row shape once at the boundary. And on Windows, `pkill`
-does not stop `next start`: a stale server served the old build and
-made a fixed bug look unfixed for two runs — kill by port instead.
-
-### 2026-08-03 (later still) — Phase 7 built in one sitting
-
-The founder answered the three kickoff questions and Inventory was
-built end to end on `feature/inventory`: migration `0023` (goods
-receipts, stock issues, adjustments, the computed `stock_on_hand` view,
-five guards and two minting functions), two pure modules with 13 new
-tests, the whole data layer, and all four screens — Receive, Stock,
-Issues, Adjustments — plus a deliveries section on the PO detail page
-and Overview pipeline stage 03 going real.
-
-**One decision changed the plan:** TODO.md assumed issues went to a
-"manufacturing" bucket. The founder's answer was that a location is
-either a store or a plot, so `stock_issues` sends material to another
-store (a transfer, with both halves showing in stock) or to a plot
-(consumed there). There is no manufacturing destination.
-
-**Two things the plan didn't foresee.** The PO completion trigger is
-`security definer` and the guard re-checks the outstanding quantities
-itself, so the transition is self-validating and no RLS policy had to
-widen. And every column of a Postgres view is typed nullable by the
-Supabase generator — the `po_facts`/`po_line_facts` reads normalise the
-row shape once at the boundary rather than defending against nulls at
-every use.
-
-Nothing is merged: `0023` is unapplied, and all three gates are
-unwalked.
-
-Compact by design — one entry per working day. Full detail: git
-history and the per-tool PLAN.md files.
-
-### 2026-08-03 (later) — Phase 6 planned, built, founder-tested and merged in one sitting
-
-The founder approved the full Phases 6–8 feature overview (POs /
-Inventory / Bills), then Phase 6 shipped through all four milestones on
-`feature/purchase-orders`: migrations `0020` (audit prerequisite) +
-`0021` (PO schema, guards, per-scope numbering) + `0022` (money-free
-fact views), pure modules with 15 new tests, Masters groundwork
-(plot/unit codes, GST Rates tab), the raise-and-price flow, the
-issue/deletion status machine, attribution avatars, indent fulfilment,
-the PO PDF and a real Overview stage 02. Two founder-found fixes: the
-qty input was squeezed (column widened, uom moved under it), and the
-Issue button read a stale server snapshot after on-blur rate saves — it
-stayed dead until an unrelated navigation. The button now needs only
-lines to exist; pricing is checked at click time server-side, where the
-saved rates are visible. Merged to `master` same day, branch deleted;
-letterhead assets still pending (see "Next up"). This file was renamed
-`PLAN.md` → `STATUS.md`, and the forward plan for Phases 7–8 moved to
-the new `TODO.md`.
-
-### 2026-08-03 — Phase 5 shipped end to end; an outage found, fixed and guarded
-
-**Phase 5 built and merged in one day**, five founder-gated milestones
-on `feature/indents`: migration `0019` + Masters project codes +
-Settings approver column (M1); the Construction tree in Budgets (M2);
-the Indents app with direct catalogue lines (M3); both pull paths
-sharing one `PullBasket` (M4); approve/send-back and a real Overview
-pipeline stage 01 (M5). The founder corrected the scope at kickoff —
-Budgets grew the Construction tree because house construction needs
-quantity plans, not client quotes. Everything durable from the phase is
-now in "Decisions locked in" and the indents/budgets PLAN.md files.
-
-**The production outage.** Every write-button on production had been
-dead for two days while every page rendered: a bare
-`export type { ActionState };` in a `"use server"` file survives into
-the compiled chunk's runtime export list, where the name doesn't exist,
-killing every action in the chunk at module load. `tsc`, ESLint, tests
-and `next build` were all green throughout. Hotfixed to `master`;
-the rule and its **automatic enforcement** (`npm run check:actions`,
-in CI after the build — source pass + compiled-fingerprint pass, the
-fingerprint derived by rebuilding the bug on purpose and verified in
-both directions) are in CLAUDE.md. The full browser smoke test was
-considered and declined — see "Deferred".
-
-**Margin secrecy finally proved** (outstanding since Budgets shipped):
-as a real staff user holding `/indents` without `/budgets` — never the
-service-role key — `budgets`/`budget_lines`/`item_margins` return zero
-rows, the approved-only views return rows with no money columns, and no
-rupee figure appears anywhere in Indents. Recorded in budgets/PLAN.md.
-
-**Verification habits that paid off:** Playwright smoke passes before
-every push (13/13, 17/17, 5/5-on-production); assertions checked
-against the database and screenshots before "fixing" anything
-(`innerText` doesn't return `<input>` values — two false failures);
-test data cleaned up through the guard's own paths, which proved the
-status machine holds from every direction.
-
-**Leftovers, deliberate:** `IND/SAA/001`–`004` are the founder's
-production tests (004 approved), `005` mine (approved, undeletable by
-design), `006` a burnt number from the post-deploy check; the probe
-user is inert (all grants revoked). All cleaned up together when the
-founder calls the general database clean-up.
-
-### 2026-08-01 — audits, mobile shell, Selections, design views, Budgets
-
-**Selections (Phase 2)**: spaces, the picker over 2,633 real items,
-issue/revision/diff on `line_key`, item requests, PDF + CSV. Lessons
-that stuck: Server Actions are the wrong tool for reads (the catalogue
-search moved to a Route Handler); `useState(prop)` in a component that
-survives navigation silently targets the wrong record.
-
-**Design views (Phase 2b)**: renders per space, one spec
-(`lib/pdf/theme.ts` `designView`) driving upload, preview and PDF.
-Lessons: Server Actions cap request bodies at 1 MB (normalise images
-client-side first); Supabase Storage has its **own** RLS in
-`storage.objects` and a private bucket starts with none; verifying with
-the service-role key proves nothing about a signed-in user.
-
-**Budgets (Phase 4)**: pricing on `line_key` with carry-forward,
-per-product default margins, reversible approval with a version number
-(`R2-v1`; version bumps on re-open, not approval), both documents, and
-the first tests in the repo. Two rules that generalise: any audited
-table needs a surrogate `id` (the shared `audit_row()` trigger reads
-`new.id`), and Helvetica has no ₹ glyph — PDFs print digits-only via
-`formatAmount`, never the app's `formatMoney`.
-
-**The audits** (five stages + a second pass, all merged after
-founder-tested gates): privilege escalation closed, the 1,000-row
-truncation bug killed in six places, PIN rate-limiting, `lib/format.ts`
-and the shared primitives/hooks extracted, database indexes and
-`updated_at` triggers, docs corrected, dead code deleted; CI + Prettier
-added now that `master` auto-deploys and a maintainer is joining. One
-production hotfix from the same day's browser testing: a Server
-Component can't pass a function to a Client Component — the pager takes
-precomputed href strings, and consolidations that change who renders a
-component need their consumers opened in a browser, not just built.
-What's still live from the audits is the "Deferred" list above.
-
-### 2026-07-31 — Masters shipped, catalogue loaded
-
-Masters (Phase 1) merged after Gate 1. The real catalogue imported —
-2,631 items, exceptionally clean, via the dry-run-by-default
-re-runnable `scripts/import-catalogue.ts`; verified by count
-reconciliation and spot-checks. Items list paginated with honest counts
-(the first sighting of the 1,000-row cap). Thumbnail pass: 897 of 900
-fetched, 3 vendor URLs already dead — the link-rot that justified
-storing our own thumbnails showed up on day one.
+- **2026-08-04** — docs slimmed: CLAUDE.md, this file, TODO.md cut to
+  essentials.
+- **2026-08-03** — three phases in one day. **Indents** (5 gates) — and
+  the production outage found, hotfixed and permanently guarded
+  (`check:actions`); margin secrecy proved as a real single-grant user.
+  **Purchase Orders** (`0020`–`0022`). **Inventory** (`0023`, then
+  `0024` when the founder wanted plots on Stock) — the store-keeper
+  smoke caught the catalogue-allowlist 403. `PLAN.md` → `STATUS.md` +
+  `TODO.md` split.
+- **2026-08-01** — Selections, design views, Budgets shipped; the
+  five-stage audit merged (escalation closed, 1,000-row bug killed,
+  shared primitives extracted); CI + Prettier added.
+- **2026-07-31** — Masters shipped; the real 2,631-item catalogue
+  imported and thumbnailed (3 vendor URLs already dead — the link-rot
+  that justified our own thumbnails).
