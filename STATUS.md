@@ -17,7 +17,7 @@ project run end-to-end.
 |                    |                                                                                                                         |
 | ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
 | Last worked        | 2026-08-04                                                                                                              |
-| Branch             | `feature/management-group` — awaiting the founder's browser pass                                                        |
+| Branch             | `master` — clean                                                                                                        |
 | Migrations applied | `0001`–`0030` (next is `0031`)                                                                                          |
 | Items in database  | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands                                          |
 | Thumbnails         | 897 in Supabase Storage; 1,736 items use the colour placeholder                                                         |
