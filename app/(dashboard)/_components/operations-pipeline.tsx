@@ -1,22 +1,16 @@
 import { Card } from "@/components/ui/card";
+import { countBillsPipeline } from "@/lib/bills/queries";
 import { formatCount } from "@/lib/format";
 import { countIndentsPipeline } from "@/lib/indents/queries";
 import { countReceiptsPipeline } from "@/lib/inventory/queries";
 import { countPosPipeline } from "@/lib/purchase-orders/queries";
 
-// Stages 04–05 are still static illustrations: Bills doesn't exist
-// yet. Each becomes real the same way 01–03 did — one query, same
-// component, no restructuring. See CLAUDE.md.
-const PLANNED_STAGES = [
-  { n: "04", name: "Bills booked", count: 12, value: "₹22.1L", pct: 46 },
-  { n: "05", name: "Paid", count: 9, value: "₹15.4L", pct: 32, tail: true },
-];
-
 export async function OperationsPipeline() {
-  const [indents, pos, receipts] = await Promise.all([
+  const [indents, pos, receipts, bills] = await Promise.all([
     countIndentsPipeline(),
     countPosPipeline(),
     countReceiptsPipeline(),
+    countBillsPipeline(),
   ]);
 
   return (
@@ -95,24 +89,49 @@ export async function OperationsPipeline() {
           </div>
         </div>
 
-        {PLANNED_STAGES.map((stage) => (
-          <div key={stage.n} className="min-w-[110px] flex-1">
-            <p className="text-muted font-mono text-[10px]">{stage.n}</p>
-            <p className="text-foreground mt-1.5 text-xs font-medium">{stage.name}</p>
-            <p className="text-foreground mt-1.5 text-2xl font-semibold tracking-tight">
-              {stage.count}
-            </p>
-            <p className={`mt-0.5 font-mono text-xs ${stage.tail ? "text-danger" : "text-accent"}`}>
-              {stage.value}
-            </p>
-            <div className="bg-border mt-3 h-[3px] overflow-hidden rounded-full">
-              <div
-                className={`h-full rounded-full ${stage.tail ? "bg-danger" : "bg-accent"}`}
-                style={{ width: `${stage.pct}%` }}
-              />
-            </div>
+        {/* Stage 04 is real. No rupee figure on purpose: bill money is
+            gated to the /bills grant, and this card renders for every
+            signed-in user — so it counts through the money-free
+            bill_facts view and reports what's awaiting approval. */}
+        <div className="min-w-[110px] flex-1">
+          <p className="text-muted font-mono text-[10px]">04</p>
+          <p className="text-foreground mt-1.5 text-xs font-medium">Bills booked</p>
+          <p className="text-foreground mt-1.5 text-2xl font-semibold tracking-tight">
+            {formatCount(bills.bookedThisMonth)}
+          </p>
+          <p className="text-accent mt-0.5 font-mono text-xs">
+            {formatCount(bills.awaitingApproval)} awaiting approval
+          </p>
+          <div className="bg-border mt-3 h-[3px] overflow-hidden rounded-full">
+            <div
+              className="bg-accent h-full rounded-full"
+              style={{
+                width: `${pos.issuedThisMonth === 0 ? 0 : Math.min(100, Math.round((bills.bookedThisMonth / pos.issuedThisMonth) * 100))}%`,
+              }}
+            />
           </div>
-        ))}
+        </div>
+
+        {/* Stage 05 is real — the tail. Unpaid is the number accounts
+            chases, so it takes the danger colour the illustration used. */}
+        <div className="min-w-[110px] flex-1">
+          <p className="text-muted font-mono text-[10px]">05</p>
+          <p className="text-foreground mt-1.5 text-xs font-medium">Paid</p>
+          <p className="text-foreground mt-1.5 text-2xl font-semibold tracking-tight">
+            {formatCount(bills.paidThisMonth)}
+          </p>
+          <p className="text-danger mt-0.5 font-mono text-xs">
+            {formatCount(bills.unpaidCount)} unpaid
+          </p>
+          <div className="bg-border mt-3 h-[3px] overflow-hidden rounded-full">
+            <div
+              className="bg-danger h-full rounded-full"
+              style={{
+                width: `${bills.bookedThisMonth === 0 ? 0 : Math.min(100, Math.round((bills.paidThisMonth / bills.bookedThisMonth) * 100))}%`,
+              }}
+            />
+          </div>
+        </div>
       </div>
     </Card>
   );
