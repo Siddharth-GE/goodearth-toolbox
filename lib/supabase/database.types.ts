@@ -2634,7 +2634,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
-          plot_id: string | null
+          plot_id: string
           project_id: string
           status: string
           unit_type: string
@@ -2645,7 +2645,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
-          plot_id?: string | null
+          plot_id: string
           project_id: string
           status?: string
           unit_type: string
@@ -2656,7 +2656,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
-          plot_id?: string | null
+          plot_id?: string
           project_id?: string
           status?: string
           unit_type?: string
@@ -2675,6 +2675,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "plots"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "units_plot_same_project"
+            columns: ["project_id", "plot_id"]
+            isOneToOne: false
+            referencedRelation: "plots"
+            referencedColumns: ["project_id", "id"]
           },
           {
             foreignKeyName: "units_project_id_fkey"
