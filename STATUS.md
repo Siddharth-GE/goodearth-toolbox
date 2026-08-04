@@ -7,18 +7,17 @@ rules in `CLAUDE.md`; full history in git. Stays lean by design.
 
 ## Now
 
-**Phases 1–8 built** (Masters → Selections → Budgets → Indents →
-Purchase Orders → Inventory → Bills). The chain runs design → price →
-indent → PO → goods in / stock / goods out → bill → paid. **Phase 8
-(Bills) sits on `feature/bills` awaiting the founder's browser gates**
-(record a real bill; approve → pay one) before merge — migration
-`0025` is already applied to production. **Next: Phase 9** — Overview
-fully real + one real project run end-to-end.
+**Phases 1–8 shipped** (Masters → Selections → Budgets → Indents →
+Purchase Orders → Inventory → Bills, the last merged 2026-08-04 after
+the founder's browser gates and the single-grant probe smoke). The
+chain runs design → price → indent → PO → goods in / stock / goods
+out → bill → paid. **Next: Phase 9** — Overview fully real + one real
+project run end-to-end.
 
 |                    |                                                                                                                         |
 | ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
 | Last worked        | 2026-08-04                                                                                                              |
-| Branch             | `feature/bills` — Phase 8 built, awaiting browser gates + merge                                                         |
+| Branch             | `master` — clean                                                                                                        |
 | Migrations applied | `0001`–`0026` (next is `0027`)                                                                                          |
 | Items in database  | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands                                          |
 | Thumbnails         | 897 in Supabase Storage; 1,736 items use the colour placeholder                                                         |
@@ -33,11 +32,9 @@ fully real + one real project run end-to-end.
   need their project per row and `unique (project_id, name)` holds;
   the project/plot **status value lists are my defaults, never
   confirmed** — ask first. Source files go in `data/` (git-ignored).
-- **Merge Phase 8** once the two browser gates pass on the
-  `feature/bills` preview: record a real vendor bill against a real PO;
-  approve one and mark it paid with a reference. Then the probe smokes
-  (a `/bills`-only user, and a `/purchase-orders`-only user who sees
-  the billed picture but not `/bills`).
+- **Post-deploy button press** — after the Bills merge deploys, press
+  one real write-button on production (approve or pay a bill) per the
+  CLAUDE.md habit.
 - **Grant `/bills`** in Settings to accounts (and tick their "Approve
   bills" box), **`/inventory`** to store-keepers (and site engineers if
   wanted — its reads carry no money).
@@ -159,15 +156,16 @@ fully real + one real project run end-to-end.
 
 One line per day; full detail in git history and the PLAN.md files.
 
-- **2026-08-04** — **Bills built end to end** (`0025` + `0026`, branch
-  `feature/bills` awaiting the founder's browser gates):
-  record/approve/send-back/pay, over-billing warning, bill approvers in
-  Settings, PO billed picture, Overview 04–05 real. Founder corrections
-  same day (`0026`): labour contracts moved from Masters into Bills
-  with their own approval step, and **NMR daily-wage bills** added (no
-  anchor, vendor optional). The Studio bottleneck fell: migrations now
-  apply from this machine via the management API (token in
-  `.env.local`). Also: docs slimmed earlier the same day.
+- **2026-08-04** — **Bills shipped** (`0025` + `0026`, merged after the
+  founder's browser gates and a 12-check single-grant probe smoke at
+  the RLS boundary): record/approve/send-back/pay, over-billing
+  warning, bill approvers in Settings, PO billed picture, Overview
+  04–05 real. Founder corrections mid-build (`0026`): labour contracts
+  moved from Masters into Bills with their own approval step, and
+  **NMR daily-wage bills** added (no anchor, vendor optional). The
+  Studio bottleneck fell: migrations now apply from this machine via
+  the management API (token in `.env.local`). Also: docs slimmed
+  earlier the same day.
 - **2026-08-03** — three phases in one day. **Indents** (5 gates) — and
   the production outage found, hotfixed and permanently guarded
   (`check:actions`); margin secrecy proved as a real single-grant user.

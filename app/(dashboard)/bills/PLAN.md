@@ -1,10 +1,12 @@
 # Bills — build notes
 
-**Status: built on `feature/bills` 2026-08-04**, awaiting the founder's
-browser gates (record a real bill; approve → pay one) before merge.
-Migrations `0025` + `0026` (both applied to production the same day).
-Every founder decision: root STATUS.md's "Decisions locked in" and the
-session log.
+**Status: shipped** (Phase 8, merged 2026-08-04, branch deleted).
+Migrations `0025` + `0026`. Gates passed the same day: the founder's
+browser run on the preview, plus a 12-check single-grant probe smoke
+straight at PostgREST (bill money invisible without `/bills`, PO money
+invisible to bills-only, `po_billing_totals` open to exactly the two
+grants, non-approver approval refused by the trigger). Every founder
+decision: root STATUS.md's "Decisions locked in" and the session log.
 
 The accounts-facing record of what Goodearth owes and has paid: a
 bill is one of **three kinds** — against an issued purchase order,
