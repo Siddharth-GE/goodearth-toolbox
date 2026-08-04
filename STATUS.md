@@ -18,7 +18,7 @@ project run end-to-end.
 | ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
 | Last worked        | 2026-08-04                                                                                                              |
 | Branch             | `feature/audit-fixes` — awaiting founder preview + merge                                                                |
-| Migrations applied | `0001`–`0026` (`0027` written, **not yet applied** — see Next up)                                                       |
+| Migrations applied | `0001`–`0027` (next is `0028`)                                                                                          |
 | Items in database  | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands                                          |
 | Thumbnails         | 897 in Supabase Storage; 1,736 items use the colour placeholder                                                         |
 | Built tools        | Marathon, Settings, Masters, Selections, Budgets (Interiors + Construction), Indents, Purchase Orders, Inventory, Bills |
@@ -26,11 +26,8 @@ project run end-to-end.
 
 ## Next up
 
-- **Apply migration `0027`** (labour contract values move behind
-  `/bills` — founder-approved in the audit) via Studio or the
-  management-API workflow, then merge `feature/audit-fixes` after the
-  preview checks. The code doesn't depend on it, but apply before or
-  with the merge so the policy and the decision land together.
+- **Merge `feature/audit-fixes`** after the founder's preview checks
+  (`0027` is applied and verified; types regenerated, no diff).
 - **Load the founder's master data** — clients, plots, units, from
   spreadsheets, the `scripts/import-catalogue.ts` way (re-runnable,
   dry-run default, skip existing, verify counts). Watch: plots/units
