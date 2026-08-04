@@ -980,28 +980,45 @@ export async function getItemMovements(
   const isStore = kind === "store";
 
   // Each source read to completion — a movement list that silently
-  // stops short would not add up to the balance shown above it.
+  // stops short would not add up to the balance shown above it. The
+  // location predicate is pushed into the query via the !inner join:
+  // un-filtered, a common material held at ten sites paid for ten
+  // locations' history to show one.
   const [{ data: receiptLines }, { data: issueLines }, { data: adjustments }] = await Promise.all([
-    fetchAll((from, to) =>
-      supabase
+    fetchAll((from, to) => {
+      let query = supabase
         .from("goods_receipt_lines")
         .select(
-          "id, quantity, uom, note, created_at, created_by, receipt_id, goods_receipts(id, reference, store_id, to_site, plot_id, unit_id, received_at, po_id)",
+          "id, quantity, uom, note, created_at, created_by, receipt_id, goods_receipts!inner(id, reference, store_id, to_site, plot_id, unit_id, received_at, po_id)",
         )
-        .eq("item_id", itemId)
-        .order("id")
-        .range(from, to),
-    ),
-    fetchAll((from, to) =>
-      supabase
-        .from("stock_issue_lines")
-        .select(
-          "id, quantity, uom, note, created_at, created_by, issue_id, stock_issues(id, reference, store_id, to_store_id, plot_id, issued_at)",
-        )
-        .eq("item_id", itemId)
-        .order("id")
-        .range(from, to),
-    ),
+        .eq("item_id", itemId);
+      query = isStore
+        ? query.eq("goods_receipts.store_id", locationId)
+        : query
+            .eq("goods_receipts.to_site", true)
+            .eq(kind === "plot" ? "goods_receipts.plot_id" : "goods_receipts.unit_id", locationId);
+      return query.order("id").range(from, to);
+    }),
+    // A unit is never an issue's source or destination (an issue goes to
+    // a store or a plot, 0023 §3), so that read is skipped outright.
+    kind === "unit"
+      ? Promise.resolve({ data: [] as never[] })
+      : fetchAll((from, to) =>
+          supabase
+            .from("stock_issue_lines")
+            .select(
+              "id, quantity, uom, note, created_at, created_by, issue_id, stock_issues!inner(id, reference, store_id, to_store_id, plot_id, issued_at)",
+            )
+            .eq("item_id", itemId)
+            .or(
+              isStore
+                ? `store_id.eq.${locationId},to_store_id.eq.${locationId}`
+                : `plot_id.eq.${locationId}`,
+              { referencedTable: "stock_issues" },
+            )
+            .order("id")
+            .range(from, to),
+        ),
     // Adjustments only ever apply to a store — a site has no balance to
     // correct, so this read is skipped entirely for a plot or unit.
     isStore
