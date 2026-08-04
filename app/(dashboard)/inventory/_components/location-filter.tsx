@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 const GROUP_LABEL = {
   store: "Stores",
   plot: "Plots",
-  unit: "Units",
 } as const;
 
 /**
@@ -31,7 +30,7 @@ export function LocationFilter({
 
   if (locations.length === 0) return null;
 
-  const groups = (["store", "plot", "unit"] as const)
+  const groups = (["store", "plot"] as const)
     .map((kind) => ({ kind, options: locations.filter((l) => l.kind === kind) }))
     .filter((group) => group.options.length > 0);
 

@@ -716,17 +716,21 @@ async function receiptsForPo(supabase: Client, poId: string): Promise<PoReceiptR
  * Stock — the balance, and how it got there
  * ------------------------------------------------------------------ */
 
-/** A store, a plot or a unit — the three kinds of place material sits. */
-export type LocationKind = "store" | "plot" | "unit";
+/**
+ * A store or a plot — the two kinds of place material sits. A unit and
+ * its plot are the same place since 0029 (plot ↔ unit is 1:1), so the
+ * stock view folds deliveries at a unit into its plot and 'unit' is no
+ * longer a location kind; stale /unit/ URLs fall out here as 404s.
+ */
+export type LocationKind = "store" | "plot";
 
 export function isLocationKind(value: string): value is LocationKind {
-  return value === "store" || value === "plot" || value === "unit";
+  return value === "store" || value === "plot";
 }
 
-const LOCATION_TABLE: Record<LocationKind, "stores" | "plots" | "units"> = {
+const LOCATION_TABLE: Record<LocationKind, "stores" | "plots"> = {
   store: "stores",
   plot: "plots",
-  unit: "units",
 };
 
 export type StockRow = {
@@ -756,11 +760,12 @@ export type StockPage = {
 /**
  * Where the material is, across all three kinds of location.
  *
- * A store row is a live balance that goes up and down. A plot or unit
- * row is a running total of what has landed there — direct deliveries
- * plus everything carried out from a store — because nothing leaves a
- * site through this system; it is consumed by the build. Migration 0024
- * explains why those two answers share one view but not one meaning.
+ * A store row is a live balance that goes up and down. A plot row is a
+ * running total of what has landed there — direct deliveries (at the
+ * plot or its unit, same place since 0029) plus everything carried out
+ * from a store — because nothing leaves a site through this system; it
+ * is consumed by the build. Migration 0024 explains why those two
+ * answers share one view but not one meaning.
  *
  * Zero-quantity store rows are kept: "had some, has none left" is a
  * different answer from "never held it", and the history behind it is
@@ -807,7 +812,7 @@ export async function listStockByLocation({
     }))
     .filter((row) => isLocationKind(row.location_kind));
 
-  const [items, stores, plots, units] = await Promise.all([
+  const [items, stores, plots] = await Promise.all([
     itemsById(
       supabase,
       rows.map((row) => row.item_id),
@@ -822,18 +827,10 @@ export async function listStockByLocation({
       "plots",
       rows.filter((r) => r.location_kind === "plot").map((r) => r.location_id),
     ),
-    labelsById(
-      supabase,
-      "units",
-      rows.filter((r) => r.location_kind === "unit").map((r) => r.location_id),
-    ),
   ]);
   const nameFor = (row: { location_kind: LocationKind; location_id: string }) =>
-    (row.location_kind === "store"
-      ? stores.get(row.location_id)
-      : row.location_kind === "plot"
-        ? plots.get(row.location_id)
-        : units.get(row.location_id)) ?? "—";
+    (row.location_kind === "store" ? stores.get(row.location_id) : plots.get(row.location_id)) ??
+    "—";
 
   const total = count ?? 0;
   return {
@@ -893,7 +890,7 @@ async function listStockLocations(supabase: Client): Promise<LocationOption[]> {
   }
   const wanted = [...seen.values()];
 
-  const [stores, plots, units] = await Promise.all([
+  const [stores, plots] = await Promise.all([
     labelsById(
       supabase,
       "stores",
@@ -904,22 +901,13 @@ async function listStockLocations(supabase: Client): Promise<LocationOption[]> {
       "plots",
       wanted.filter((l) => l.kind === "plot").map((l) => l.id),
     ),
-    labelsById(
-      supabase,
-      "units",
-      wanted.filter((l) => l.kind === "unit").map((l) => l.id),
-    ),
   ]);
 
   return wanted
     .map((location) => ({
       ...location,
       name:
-        (location.kind === "store"
-          ? stores.get(location.id)
-          : location.kind === "plot"
-            ? plots.get(location.id)
-            : units.get(location.id)) ?? "—",
+        (location.kind === "store" ? stores.get(location.id) : plots.get(location.id)) ?? "—",
     }))
     .sort((a, b) => a.kind.localeCompare(b.kind) || a.name.localeCompare(b.name));
 }
@@ -958,9 +946,9 @@ export type ItemMovements = {
  * here rather than in SQL, because each carries a different counterparty
  * (a PO, a destination, a reason).
  *
- * A store sees all four kinds. A plot or unit only ever sees things
- * arriving — direct deliveries and material carried out from a store —
- * because nothing leaves a site through this system (migration 0024).
+ * A store sees all four kinds. A plot only ever sees things arriving —
+ * direct deliveries and material carried out from a store — because
+ * nothing leaves a site through this system (migration 0024).
  */
 export async function getItemMovements(
   kind: LocationKind,
@@ -979,6 +967,13 @@ export async function getItemMovements(
   const item = items.get(itemId);
   const isStore = kind === "store";
 
+  // A delivery to a unit landed at its plot (1:1 since 0029), so a
+  // plot's history must match receipts recorded against either id.
+  const { data: plotUnit } = isStore
+    ? { data: null }
+    : await supabase.from("units").select("id").eq("plot_id", locationId).maybeSingle();
+  const unitId = plotUnit?.id ?? null;
+
   // Each source read to completion — a movement list that silently
   // stops short would not add up to the balance shown above it. The
   // location predicate is pushed into the query via the !inner join:
@@ -996,31 +991,32 @@ export async function getItemMovements(
         ? query.eq("goods_receipts.store_id", locationId)
         : query
             .eq("goods_receipts.to_site", true)
-            .eq(kind === "plot" ? "goods_receipts.plot_id" : "goods_receipts.unit_id", locationId);
+            .or(
+              unitId
+                ? `plot_id.eq.${locationId},unit_id.eq.${unitId}`
+                : `plot_id.eq.${locationId}`,
+              { referencedTable: "goods_receipts" },
+            );
       return query.order("id").range(from, to);
     }),
-    // A unit is never an issue's source or destination (an issue goes to
-    // a store or a plot, 0023 §3), so that read is skipped outright.
-    kind === "unit"
-      ? Promise.resolve({ data: [] as never[] })
-      : fetchAll((from, to) =>
-          supabase
-            .from("stock_issue_lines")
-            .select(
-              "id, quantity, uom, note, created_at, created_by, issue_id, stock_issues!inner(id, reference, store_id, to_store_id, plot_id, issued_at)",
-            )
-            .eq("item_id", itemId)
-            .or(
-              isStore
-                ? `store_id.eq.${locationId},to_store_id.eq.${locationId}`
-                : `plot_id.eq.${locationId}`,
-              { referencedTable: "stock_issues" },
-            )
-            .order("id")
-            .range(from, to),
-        ),
+    fetchAll((from, to) =>
+      supabase
+        .from("stock_issue_lines")
+        .select(
+          "id, quantity, uom, note, created_at, created_by, issue_id, stock_issues!inner(id, reference, store_id, to_store_id, plot_id, issued_at)",
+        )
+        .eq("item_id", itemId)
+        .or(
+          isStore
+            ? `store_id.eq.${locationId},to_store_id.eq.${locationId}`
+            : `plot_id.eq.${locationId}`,
+          { referencedTable: "stock_issues" },
+        )
+        .order("id")
+        .range(from, to),
+    ),
     // Adjustments only ever apply to a store — a site has no balance to
-    // correct, so this read is skipped entirely for a plot or unit.
+    // correct, so this read is skipped entirely for a plot.
     isStore
       ? fetchAll((from, to) =>
           supabase
@@ -1053,12 +1049,13 @@ export async function getItemMovements(
     issued_at: string;
   };
 
-  /** Did this delivery land at the location being looked at? */
+  /** Did this delivery land at the location being looked at? A receipt
+   * recorded against the plot's unit is the same place. */
   const receivedHere = (parent: ReceiptParent | null) => {
     if (!parent) return false;
     if (isStore) return parent.store_id === locationId;
     if (!parent.to_site) return false;
-    return kind === "plot" ? parent.plot_id === locationId : parent.unit_id === locationId;
+    return parent.plot_id === locationId || (unitId !== null && parent.unit_id === unitId);
   };
 
   const receipts = (receiptLines ?? []).filter((line) =>
@@ -1070,8 +1067,8 @@ export async function getItemMovements(
       )
     : [];
   // Arriving: a transfer into this store, or — for a plot — material
-  // carried out to it from a store. A unit is never an issue's
-  // destination (an issue goes to a store or a plot, 0023 §3).
+  // carried out to it from a store (an issue goes to a store or a
+  // plot, 0023 §3).
   const transfersIn = (issueLines ?? []).filter((line) => {
     const parent = line.stock_issues as IssueParent | null;
     if (!parent) return false;
