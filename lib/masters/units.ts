@@ -2,6 +2,7 @@ import "server-only";
 
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
+import { cleanSearch, pagedList } from "./paged";
 
 export type UnitType = "apartment" | "villa" | "duplex_row_house";
 export type UnitStatus = "available" | "reserved" | "sold";
@@ -45,31 +46,39 @@ export type UnitPage = {
   pageSize: number;
 };
 
+export type UnitPageFilters = {
+  projectId?: string;
+  search?: string;
+  page?: number;
+};
+
 /** One page of units for the masters table, with a real database count. */
-export async function listUnitsPage({ page = 1 }: { page?: number } = {}): Promise<UnitPage> {
+export async function listUnitsPage(filters: UnitPageFilters = {}): Promise<UnitPage> {
   const supabase = await createClient();
-
   const pageSize = UNITS_LIST_LIMIT;
-  const currentPage = Math.max(1, page);
+  const search = cleanSearch(filters.search);
 
-  const { data, count, error } = await supabase
-    .from("units")
-    .select("*", { count: "exact" })
-    .order("name")
-    .order("id")
-    .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
-
-  if (error) {
-    console.error("listUnitsPage failed:", error);
-    return { units: [], total: 0, page: currentPage, pageCount: 1, pageSize };
-  }
-
-  const total = count ?? 0;
-  return {
-    units: (data ?? []) as UnitRow[],
-    total,
-    page: currentPage,
-    pageCount: Math.max(1, Math.ceil(total / pageSize)),
+  const result = await pagedList<UnitRow>(
+    (page) => {
+      let query = supabase
+        .from("units")
+        .select("*", { count: "exact" })
+        .order("name")
+        .order("id")
+        .range((page - 1) * pageSize, page * pageSize - 1);
+      if (filters.projectId) query = query.eq("project_id", filters.projectId);
+      if (search) query = query.or(`name.ilike.%${search}%,code.ilike.%${search}%`);
+      return query;
+    },
+    filters.page ?? 1,
     pageSize,
+  );
+
+  return {
+    units: result.rows,
+    total: result.total,
+    page: result.page,
+    pageCount: result.pageCount,
+    pageSize: result.pageSize,
   };
 }

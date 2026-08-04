@@ -2,6 +2,7 @@ import "server-only";
 
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
+import { cleanSearch, pagedList, type PagedResult } from "./paged";
 
 export type PlotStatus = "available" | "reserved" | "sold";
 
@@ -27,4 +28,34 @@ export async function listPlots(projectId?: string): Promise<PlotRow[]> {
     return query;
   });
   return (data ?? []) as PlotRow[];
+}
+
+export const PLOTS_PAGE_SIZE = 50;
+
+export type PlotFilters = {
+  projectId?: string;
+  search?: string;
+  page?: number;
+};
+
+/** One page for the masters table screen; listPlots stays the complete read. */
+export async function listPlotsPage(filters: PlotFilters = {}): Promise<PagedResult<PlotRow>> {
+  const supabase = await createClient();
+  const search = cleanSearch(filters.search);
+
+  return pagedList<PlotRow>(
+    (page) => {
+      let query = supabase
+        .from("plots")
+        .select("*", { count: "exact" })
+        .order("name")
+        .order("id")
+        .range((page - 1) * PLOTS_PAGE_SIZE, page * PLOTS_PAGE_SIZE - 1);
+      if (filters.projectId) query = query.eq("project_id", filters.projectId);
+      if (search) query = query.or(`name.ilike.%${search}%,code.ilike.%${search}%`);
+      return query;
+    },
+    filters.page ?? 1,
+    PLOTS_PAGE_SIZE,
+  );
 }
