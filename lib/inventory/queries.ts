@@ -906,8 +906,7 @@ async function listStockLocations(supabase: Client): Promise<LocationOption[]> {
   return wanted
     .map((location) => ({
       ...location,
-      name:
-        (location.kind === "store" ? stores.get(location.id) : plots.get(location.id)) ?? "—",
+      name: (location.kind === "store" ? stores.get(location.id) : plots.get(location.id)) ?? "—",
     }))
     .sort((a, b) => a.kind.localeCompare(b.kind) || a.name.localeCompare(b.name));
 }
@@ -992,9 +991,7 @@ export async function getItemMovements(
         : query
             .eq("goods_receipts.to_site", true)
             .or(
-              unitId
-                ? `plot_id.eq.${locationId},unit_id.eq.${unitId}`
-                : `plot_id.eq.${locationId}`,
+              unitId ? `plot_id.eq.${locationId},unit_id.eq.${unitId}` : `plot_id.eq.${locationId}`,
               { referencedTable: "goods_receipts" },
             );
       return query.order("id").range(from, to);

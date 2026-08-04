@@ -39,7 +39,10 @@ test("a plot with no unit yet still appears, submitting the plot id", () => {
 
 test("a plot whose unit is listed does not appear twice", () => {
   const options = buildSiteOptions(units, plots, "proj");
-  assert.equal(options.some((option) => option.value === "plot:p1"), false);
+  assert.equal(
+    options.some((option) => option.value === "plot:p1"),
+    false,
+  );
   assert.equal(options.length, 2);
 });
 
