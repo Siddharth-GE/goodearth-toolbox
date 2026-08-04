@@ -6,21 +6,30 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { createBill } from "@/lib/bills/actions";
+import { createBill, createNmrBill } from "@/lib/bills/actions";
 import type { BillFormOptions } from "@/lib/bills/queries";
+import { GENERAL_SCOPE, resolveScopeCode } from "@/lib/bills/reference";
 import { exceedsAnchor } from "@/lib/bills/workflow";
 import { formatMoney } from "@/lib/format";
 import { useMemo, useState, useTransition } from "react";
 
+type FormKind = "po" | "contract" | "nmr";
+
 /**
- * Vendor → that vendor's PO or labour contract → the invoice's figures.
- * One anchor select encodes po:<id> / contract:<id>, so picking both is
- * structurally impossible — the same exactly-one rule the DB CHECK
- * enforces. Over-billing WARNS, never blocks (founder decision).
+ * What is this bill for? A purchase order, an approved labour
+ * contract, or NMR — daily wages (no anchor at all, vendor optional).
+ * PO/contract: vendor first, then that vendor's anchors. NMR: the
+ * project and plot/unit are picked directly and enter the number.
+ * Over-billing WARNS, never blocks (founder decision); NMR has nothing
+ * to compare against, so it never warns.
  */
 export function BillForm({ options }: { options: BillFormOptions }) {
+  const [kind, setKind] = useState<FormKind>("po");
   const [vendorId, setVendorId] = useState("");
-  const [anchor, setAnchor] = useState("");
+  const [anchorId, setAnchorId] = useState("");
+  // The NMR branch's own scope pick.
+  const [projectId, setProjectId] = useState("");
+  const [scope, setScope] = useState("");
   const [invoiceNo, setInvoiceNo] = useState("");
   const [invoiceDate, setInvoiceDate] = useState("");
   const [taxable, setTaxable] = useState("");
@@ -30,15 +39,26 @@ export function BillForm({ options }: { options: BillFormOptions }) {
   const [error, setError] = useState<string>();
   const [recording, startTransition] = useTransition();
 
-  // Only vendors with something to bill against: a billable PO or an
-  // active contract. Others would dead-end at an empty anchor select.
+  const switchKind = (next: FormKind) => {
+    setKind(next);
+    setVendorId("");
+    setAnchorId("");
+    setProjectId("");
+    setScope("");
+    setError(undefined);
+  };
+
+  // Only vendors with something to bill against in the chosen mode —
+  // others would dead-end at an empty anchor select.
   const vendors = useMemo(() => {
-    const billable = new Set([
-      ...options.pos.map((po) => po.vendor_id),
-      ...options.contracts.map((contract) => contract.vendor_id),
-    ]);
+    if (kind === "nmr") return options.vendors;
+    const billable = new Set(
+      kind === "po"
+        ? options.pos.map((po) => po.vendor_id)
+        : options.contracts.map((contract) => contract.vendor_id),
+    );
     return options.vendors.filter((vendor) => billable.has(vendor.id));
-  }, [options]);
+  }, [options, kind]);
 
   const pos = useMemo(
     () => options.pos.filter((po) => po.vendor_id === vendorId),
@@ -49,15 +69,39 @@ export function BillForm({ options }: { options: BillFormOptions }) {
     [options.contracts, vendorId],
   );
 
-  const [anchorKind, anchorId]: ["po" | "contract" | "", string] = anchor
-    ? (anchor.split(":") as ["po" | "contract", string])
-    : ["", ""];
-  const anchoredPo = anchorKind === "po" ? pos.find((po) => po.id === anchorId) : undefined;
+  const anchoredPo = kind === "po" ? pos.find((po) => po.id === anchorId) : undefined;
   const anchoredContract =
-    anchorKind === "contract" ? contracts.find((contract) => contract.id === anchorId) : undefined;
+    kind === "contract" ? contracts.find((contract) => contract.id === anchorId) : undefined;
 
   const anchorTotal = anchoredPo?.ordered_total ?? anchoredContract?.contract_value ?? null;
   const alreadyBilled = anchoredPo?.billed_total ?? anchoredContract?.billed_total ?? 0;
+
+  // The NMR scope, the po-form way: one select, plot:<id> / unit:<id>
+  // / "" (general); a code-less pick warns and blocks submission — the
+  // database would refuse anyway, this just says so sooner.
+  const project = options.projects.find((candidate) => candidate.id === projectId);
+  const nmrPlots = useMemo(
+    () => options.plots.filter((plot) => plot.project_id === projectId),
+    [options.plots, projectId],
+  );
+  const nmrUnits = useMemo(
+    () => options.units.filter((unit) => unit.project_id === projectId),
+    [options.units, projectId],
+  );
+  const [scopeKind, scopeId]: ["plot" | "unit" | "", string] = scope
+    ? (scope.split(":") as ["plot" | "unit", string])
+    : ["", ""];
+  const scopedPlot =
+    scopeKind === "plot" ? nmrPlots.find((plot) => plot.id === scopeId) : undefined;
+  const scopedUnit =
+    scopeKind === "unit" ? nmrUnits.find((unit) => unit.id === scopeId) : undefined;
+  const missingProjectCode = kind === "nmr" && Boolean(project) && !project?.code;
+  const scopeCode = resolveScopeCode(
+    scopedPlot?.code ?? null,
+    scopedUnit?.code ?? null,
+    scopeKind === "" ? "general" : scopeKind,
+  );
+  const missingScopeCode = kind === "nmr" && scope !== "" && scopeCode === null;
 
   const taxableNum = Number(taxable);
   const gstNum = Number(gst);
@@ -74,107 +118,238 @@ export function BillForm({ options }: { options: BillFormOptions }) {
     totalNum > 0;
 
   const overBilled =
-    amountsValid && anchor !== "" && exceedsAnchor(anchorTotal, alreadyBilled, totalNum);
+    amountsValid && anchorId !== "" && exceedsAnchor(anchorTotal, alreadyBilled, totalNum);
   // A gentle nudge, not a rule: real invoices round their own way, and
   // the founder's decision is to record the paper as printed.
   const sumsDisagree = amountsValid && Math.abs(taxableNum + gstNum - totalNum) > 1;
 
+  const readyToRecord =
+    amountsValid &&
+    invoiceNo.trim() !== "" &&
+    invoiceDate !== "" &&
+    (kind === "nmr"
+      ? projectId !== "" && !missingProjectCode && !missingScopeCode
+      : anchorId !== "");
+
   const record = () =>
     startTransition(async () => {
       // A success redirects to the new bill, so only errors come back.
-      const result = await createBill({
-        poId: anchorKind === "po" ? anchorId : null,
-        labourContractId: anchorKind === "contract" ? anchorId : null,
+      const shared = {
         invoiceNo,
         invoiceDate,
         taxableAmount: taxableNum,
         gstAmount: gstNum,
         totalAmount: totalNum,
         note: note || null,
-      });
+      };
+      const result =
+        kind === "nmr"
+          ? await createNmrBill({
+              vendorId: vendorId || null,
+              projectId,
+              plotId: scopeKind === "plot" ? scopeId : null,
+              unitId: scopeKind === "unit" ? scopeId : null,
+              ...shared,
+            })
+          : await createBill({
+              poId: kind === "po" ? anchorId : null,
+              labourContractId: kind === "contract" ? anchorId : null,
+              ...shared,
+            });
       if (result?.error) setError(result.error);
     });
 
   return (
     <div className="border-border bg-surface max-w-xl space-y-4 rounded-2xl border p-5">
       <div className="space-y-1.5">
-        <Label htmlFor="bill-vendor">Vendor</Label>
+        <Label htmlFor="bill-kind">This bill is for</Label>
         <Select
-          id="bill-vendor"
-          value={vendorId}
-          onChange={(event) => {
-            setVendorId(event.target.value);
-            setAnchor("");
-          }}
+          id="bill-kind"
+          value={kind}
+          onChange={(event) => switchKind(event.target.value as FormKind)}
         >
-          <option value="" disabled>
-            Choose a vendor
-          </option>
-          {vendors.map((vendor) => (
-            <option key={vendor.id} value={vendor.id}>
-              {vendor.name}
-            </option>
-          ))}
+          <option value="po">A purchase order</option>
+          <option value="contract">A labour contract</option>
+          <option value="nmr">NMR — daily wages</option>
         </Select>
-        <p className="text-muted text-xs">
-          Only vendors with an issued PO or an active labour contract appear here.
-        </p>
-      </div>
-
-      <div className="space-y-1.5">
-        <Label htmlFor="bill-anchor">Against</Label>
-        <Select
-          id="bill-anchor"
-          value={anchor}
-          onChange={(event) => setAnchor(event.target.value)}
-          disabled={!vendorId}
-        >
-          <option value="" disabled>
-            Choose a purchase order or contract
-          </option>
-          {pos.length > 0 && (
-            <optgroup label="Purchase orders">
-              {pos.map((po) => (
-                <option key={po.id} value={`po:${po.id}`}>
-                  {po.reference} — {po.project_name}
-                </option>
-              ))}
-            </optgroup>
-          )}
-          {contracts.length > 0 && (
-            <optgroup label="Labour contracts">
-              {contracts.map((contract) => (
-                <option key={contract.id} value={`contract:${contract.id}`}>
-                  {contract.description} — {contract.project_name} ({contract.scope_name})
-                </option>
-              ))}
-            </optgroup>
-          )}
-        </Select>
-        {anchor !== "" && (
+        {kind === "contract" && (
           <p className="text-muted text-xs">
-            {anchoredPo
-              ? `PO value ${formatMoney(anchoredPo.ordered_total)} · billed so far ${formatMoney(alreadyBilled)}`
-              : anchoredContract
-                ? `Contract value ${formatMoney(anchoredContract.contract_value)} · billed so far ${formatMoney(alreadyBilled)}`
-                : null}
+            Only approved, active contracts can take bills — manage them under Bills → Labour
+            contracts.
           </p>
         )}
       </div>
 
+      {kind !== "nmr" ? (
+        <>
+          <div className="space-y-1.5">
+            <Label htmlFor="bill-vendor">Vendor</Label>
+            <Select
+              id="bill-vendor"
+              value={vendorId}
+              onChange={(event) => {
+                setVendorId(event.target.value);
+                setAnchorId("");
+              }}
+            >
+              <option value="" disabled>
+                Choose a vendor
+              </option>
+              {vendors.map((vendor) => (
+                <option key={vendor.id} value={vendor.id}>
+                  {vendor.name}
+                </option>
+              ))}
+            </Select>
+            <p className="text-muted text-xs">
+              {kind === "po"
+                ? "Only vendors with an issued PO appear here."
+                : "Only contractors with an approved, active contract appear here."}
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="bill-anchor">Against</Label>
+            <Select
+              id="bill-anchor"
+              value={anchorId}
+              onChange={(event) => setAnchorId(event.target.value)}
+              disabled={!vendorId}
+            >
+              <option value="" disabled>
+                {kind === "po" ? "Choose a purchase order" : "Choose a contract"}
+              </option>
+              {kind === "po"
+                ? pos.map((po) => (
+                    <option key={po.id} value={po.id}>
+                      {po.reference} — {po.project_name}
+                    </option>
+                  ))
+                : contracts.map((contract) => (
+                    <option key={contract.id} value={contract.id}>
+                      {contract.description} — {contract.project_name} ({contract.scope_name})
+                    </option>
+                  ))}
+            </Select>
+            {anchorId !== "" && (
+              <p className="text-muted text-xs">
+                {anchoredPo
+                  ? `PO value ${formatMoney(anchoredPo.ordered_total)} · billed so far ${formatMoney(alreadyBilled)}`
+                  : anchoredContract
+                    ? `Contract value ${formatMoney(anchoredContract.contract_value)} · billed so far ${formatMoney(alreadyBilled)}`
+                    : null}
+              </p>
+            )}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="bill-nmr-project">Project</Label>
+              <Select
+                id="bill-nmr-project"
+                value={projectId}
+                onChange={(event) => {
+                  setProjectId(event.target.value);
+                  setScope("");
+                }}
+              >
+                <option value="" disabled>
+                  Choose a project
+                </option>
+                {options.projects.map((candidate) => (
+                  <option key={candidate.id} value={candidate.id}>
+                    {candidate.name}
+                    {candidate.code ? ` (${candidate.code})` : " — no code yet"}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="bill-nmr-scope">For</Label>
+              <Select
+                id="bill-nmr-scope"
+                value={scope}
+                onChange={(event) => setScope(event.target.value)}
+                disabled={!projectId}
+              >
+                <option value="">General — whole project</option>
+                {nmrUnits.length > 0 && (
+                  <optgroup label="Units">
+                    {nmrUnits.map((unit) => (
+                      <option key={unit.id} value={`unit:${unit.id}`}>
+                        {unit.name}
+                        {unit.code ? ` (${unit.code})` : " — no code yet"}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {nmrPlots.length > 0 && (
+                  <optgroup label="Plots">
+                    {nmrPlots.map((plot) => (
+                      <option key={plot.id} value={`plot:${plot.id}`}>
+                        {plot.name}
+                        {plot.code ? ` (${plot.code})` : " — no code yet"}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </Select>
+            </div>
+          </div>
+          {missingProjectCode && (
+            <p className="text-warning text-xs font-medium" role="alert">
+              {project?.name} has no short code yet, so it can&apos;t number bills. Set one in
+              Masters → Projects first.
+            </p>
+          )}
+          {missingScopeCode ? (
+            <p className="text-warning text-xs font-medium" role="alert">
+              {scopedPlot?.name ?? scopedUnit?.name} has no short code yet, so it can&apos;t number
+              bills. Set one in Masters first.
+            </p>
+          ) : (
+            project?.code && (
+              <p className="text-muted text-xs">
+                Will be numbered BILL/{project.code}/{scopeCode ?? GENERAL_SCOPE}/… — the scope is
+                part of the number and can&apos;t change later.
+              </p>
+            )
+          )}
+          <div className="space-y-1.5">
+            <Label htmlFor="bill-nmr-vendor">Labour contractor (optional)</Label>
+            <Select
+              id="bill-nmr-vendor"
+              value={vendorId}
+              onChange={(event) => setVendorId(event.target.value)}
+            >
+              <option value="">No vendor — paid directly</option>
+              {options.vendors.map((vendor) => (
+                <option key={vendor.id} value={vendor.id}>
+                  {vendor.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+        </>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label htmlFor="bill-invoice-no">Invoice number</Label>
+          <Label htmlFor="bill-invoice-no">
+            {kind === "nmr" ? "Muster roll / bill reference" : "Invoice number"}
+          </Label>
           <Input
             id="bill-invoice-no"
             value={invoiceNo}
             onChange={(event) => setInvoiceNo(event.target.value)}
-            placeholder="As printed on the bill"
+            placeholder={kind === "nmr" ? "e.g. NMR week 32" : "As printed on the bill"}
             autoComplete="off"
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="bill-invoice-date">Invoice date</Label>
+          <Label htmlFor="bill-invoice-date">{kind === "nmr" ? "Bill date" : "Invoice date"}</Label>
           <Input
             id="bill-invoice-date"
             type="date"
@@ -223,7 +398,7 @@ export function BillForm({ options }: { options: BillFormOptions }) {
         </div>
       </div>
       <p className="text-muted text-xs">
-        The vendor&apos;s figures, exactly as printed — nothing is computed or corrected.
+        The figures exactly as printed — nothing is computed or corrected.
       </p>
       {sumsDisagree && (
         <p className="text-muted text-xs">
@@ -256,10 +431,7 @@ export function BillForm({ options }: { options: BillFormOptions }) {
         <LinkButton href="/bills" variant="ghost">
           Cancel
         </LinkButton>
-        <Button
-          onClick={record}
-          disabled={recording || !anchor || !invoiceNo.trim() || !invoiceDate || !amountsValid}
-        >
+        <Button onClick={record} disabled={recording || !readyToRecord}>
           {recording ? "Recording…" : "Record bill"}
         </Button>
       </div>

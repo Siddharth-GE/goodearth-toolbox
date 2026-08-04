@@ -1,42 +1,40 @@
 "use client";
 
-import { ProjectPicker } from "@/components/masters/project-picker";
 import { RecordFormDialog } from "@/components/masters/record-form-dialog";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import type { LabourContractRow } from "@/lib/masters/labour-contracts";
-import { createLabourContract, updateLabourContract } from "@/lib/masters/labour-contracts-actions";
-import type { PlotRow } from "@/lib/masters/plots";
-import type { ProjectRow } from "@/lib/masters/projects";
-import type { UnitRow } from "@/lib/masters/units";
-import type { VendorRow } from "@/lib/masters/vendors";
+import { createLabourContract, updateLabourContract } from "@/lib/bills/actions";
+import type { BillContractRow, BillScopedOption, BillVendorOption } from "@/lib/bills/queries";
 import { useState } from "react";
 
-function scopeValue(contract?: LabourContractRow): string {
+function scopeValue(contract?: BillContractRow): string {
   if (contract?.unit_id) return `unit:${contract.unit_id}`;
   if (contract?.plot_id) return `plot:${contract.plot_id}`;
   return "";
 }
 
-export function LabourContractFormDialog({
+/**
+ * Create/edit a labour contract, inside Bills. New contracts start
+ * pending approval; editing is only offered while pending (the DB
+ * guard locks the terms on approval).
+ */
+export function ContractFormDialog({
   vendors,
   projects,
   plots,
   units,
   contract,
 }: {
-  vendors: VendorRow[];
-  projects: ProjectRow[];
-  plots: PlotRow[];
-  units: UnitRow[];
-  contract?: LabourContractRow;
+  vendors: BillVendorOption[];
+  projects: { id: string; name: string; code: string | null }[];
+  plots: BillScopedOption[];
+  units: BillScopedOption[];
+  contract?: BillContractRow;
 }) {
   const isEdit = !!contract;
-  // The units-dialog pattern: the plot/unit list filters by the chosen
-  // project, so this dialog keeps a little state on top of the shared
-  // shell. One select encodes plot:<id> / unit:<id> / "" (general) —
+  // The plot/unit list filters by the chosen project (the units-dialog
+  // pattern). One select encodes plot:<id> / unit:<id> / "" (general) —
   // picking both is structurally impossible, like the DB CHECK.
   const [projectId, setProjectId] = useState(contract?.project_id ?? "");
   const filteredPlots = plots.filter((plot) => plot.project_id === projectId);
@@ -55,26 +53,34 @@ export function LabourContractFormDialog({
           <option value="" disabled>
             Select a vendor
           </option>
-          {vendors
-            .filter((vendor) => vendor.is_active || vendor.id === contract?.vendor_id)
-            .map((vendor) => (
-              <option key={vendor.id} value={vendor.id}>
-                {vendor.name}
-              </option>
-            ))}
+          {vendors.map((vendor) => (
+            <option key={vendor.id} value={vendor.id}>
+              {vendor.name}
+            </option>
+          ))}
         </Select>
-        <p className="text-muted text-xs">Contractors are vendors — add them in the Vendors tab.</p>
+        <p className="text-muted text-xs">
+          Contractors are vendors — add them in Masters → Vendors.
+        </p>
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="project_id">Project</Label>
-        <ProjectPicker
+        <Select
           id="project_id"
           name="project_id"
-          projects={projects}
           value={projectId}
           onChange={(e) => setProjectId(e.target.value)}
           required
-        />
+        >
+          <option value="" disabled>
+            Select a project
+          </option>
+          {projects.map((project) => (
+            <option key={project.id} value={project.id}>
+              {project.name}
+            </option>
+          ))}
+        </Select>
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="scope">Plot / Unit (optional)</Label>
@@ -100,8 +106,8 @@ export function LabourContractFormDialog({
           )}
         </Select>
         <p className="text-muted text-xs">
-          Bills against this contract take their number's scope from here, e.g. BILL/SAA/V12A/001. A
-          picked plot or unit needs a short code before bills can be recorded.
+          Bills against this contract take their number&apos;s scope from here, e.g.
+          BILL/SAA/V12A/001. A picked plot or unit needs a short code before bills can be recorded.
         </p>
       </div>
       <div className="space-y-1.5">
@@ -128,13 +134,9 @@ export function LabourContractFormDialog({
           autoComplete="off"
         />
         <p className="text-muted text-xs">
-          What the over-billing warning compares against when bills are recorded.
+          Locks on approval, and the over-billing warning compares against it.
         </p>
       </div>
-      <label className="text-foreground flex items-center gap-2 text-sm">
-        <Checkbox name="is_active" value="1" defaultChecked={contract?.is_active ?? true} />
-        Active — new bills can be recorded against it
-      </label>
     </RecordFormDialog>
   );
 }

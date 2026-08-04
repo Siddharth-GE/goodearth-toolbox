@@ -36,9 +36,13 @@ function guardError(error: { message: string }, fallback: string): ActionState {
     message.includes("can''t be negative") ||
     message.includes("can't be negative") ||
     message.includes("more than zero") ||
-    message.includes("Invalid bill status change") ||
+    message.includes("status change") ||
     message.includes("must clear") ||
-    message.includes("must record")
+    message.includes("must record") ||
+    message.includes("approved yet") ||
+    message.includes("does not belong") ||
+    message.includes("not both") ||
+    message.includes("muster roll")
   ) {
     return { error: message.replace(/^.*?:\s*/, "") };
   }
@@ -99,6 +103,192 @@ export async function createBill(input: CreateBillInput): Promise<ActionState> {
 
   revalidatePath("/bills");
   redirect(`/bills/${billId}`);
+}
+
+export type CreateNmrBillInput = {
+  /** Optional: the labour contractor, or null when paid directly. */
+  vendorId: string | null;
+  projectId: string;
+  plotId: string | null;
+  unitId: string | null;
+  invoiceNo: string;
+  invoiceDate: string;
+  taxableAmount: number;
+  gstAmount: number;
+  totalAmount: number;
+  note: string | null;
+};
+
+/** NMR — daily wages. No PO, no contract; the scope is picked here and
+ * enters the number. No over-billing warning exists, by design. */
+export async function createNmrBill(input: CreateNmrBillInput): Promise<ActionState> {
+  await requireTool("/bills");
+
+  if (!input.projectId) return { error: "Pick the project this muster roll belongs to." };
+  if (input.plotId && input.unitId) {
+    return { error: "An NMR bill is for one plot or one unit, not both." };
+  }
+  if (!input.invoiceNo.trim()) return { error: "Type the muster roll or bill reference." };
+  if (!input.invoiceDate) return { error: "Pick the bill date." };
+  if (!Number.isFinite(input.taxableAmount) || input.taxableAmount < 0) {
+    return { error: "Enter the taxable amount — zero or more." };
+  }
+  if (!Number.isFinite(input.gstAmount) || input.gstAmount < 0) {
+    return { error: "Enter the GST amount — zero or more." };
+  }
+  if (!Number.isFinite(input.totalAmount) || input.totalAmount <= 0) {
+    return { error: "Enter the bill total — more than zero." };
+  }
+
+  const supabase = await createClient();
+  const { data: billId, error } = await supabase.rpc("create_nmr_bill", {
+    p_vendor_id: (input.vendorId || null) as unknown as string,
+    p_project_id: input.projectId,
+    p_plot_id: (input.plotId || null) as unknown as string,
+    p_unit_id: (input.unitId || null) as unknown as string,
+    p_invoice_no: input.invoiceNo.trim(),
+    p_invoice_date: input.invoiceDate,
+    p_taxable_amount: input.taxableAmount,
+    p_gst_amount: input.gstAmount,
+    p_total_amount: input.totalAmount,
+    p_note: (input.note?.trim() || null) as unknown as string,
+  });
+  if (error) {
+    console.error("createNmrBill failed:", error);
+    return guardError(error, "Could not record the bill. Try again.");
+  }
+  if (!billId) return { error: "Could not record the bill. Try again." };
+
+  revalidatePath("/bills");
+  redirect(`/bills/${billId}`);
+}
+
+/* ------------------------------------------------------------------ *
+ * Labour contracts — created and approved inside Bills
+ * ------------------------------------------------------------------ */
+
+export type LabourContractFormState = ActionState;
+
+function readContractForm(formData: FormData) {
+  // One "scope" select encoding plot:<id> / unit:<id> / "" (general) —
+  // picking both is structurally impossible, mirroring the DB CHECK.
+  const scope = String(formData.get("scope") ?? "");
+  return {
+    vendor_id: String(formData.get("vendor_id") ?? ""),
+    project_id: String(formData.get("project_id") ?? ""),
+    plot_id: scope.startsWith("plot:") ? scope.slice("plot:".length) : null,
+    unit_id: scope.startsWith("unit:") ? scope.slice("unit:".length) : null,
+    description: String(formData.get("description") ?? "").trim(),
+    contract_value: Number(formData.get("contract_value")),
+  };
+}
+
+function validateContract(form: ReturnType<typeof readContractForm>): string | undefined {
+  if (!form.vendor_id) return "Choose the contractor (a vendor in Masters).";
+  if (!form.project_id) return "Choose a project.";
+  if (!form.description) return "Say what the contract covers.";
+  if (!Number.isFinite(form.contract_value) || form.contract_value <= 0)
+    return "Enter the contract value — more than zero.";
+  return undefined;
+}
+
+/** New contracts start pending — a bill approver or an admin must
+ * approve before bills can be recorded against them. */
+export async function createLabourContract(
+  _state: LabourContractFormState,
+  formData: FormData,
+): Promise<LabourContractFormState> {
+  const user = await requireTool("/bills");
+
+  const form = readContractForm(formData);
+  const invalid = validateContract(form);
+  if (invalid) return { error: invalid };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("labour_contracts")
+    .insert({ ...form, created_by: user.id, updated_by: user.id });
+  if (error) {
+    console.error("createLabourContract failed:", error);
+    return { error: "Could not record the labour contract. Try again." };
+  }
+
+  revalidatePath("/bills/contracts");
+  return undefined;
+}
+
+/** Terms are editable only while pending — the guard refuses after
+ * approval (deactivate and record a new one instead). */
+export async function updateLabourContract(
+  id: string,
+  _state: LabourContractFormState,
+  formData: FormData,
+): Promise<LabourContractFormState> {
+  const user = await requireTool("/bills");
+
+  const form = readContractForm(formData);
+  const invalid = validateContract(form);
+  if (invalid) return { error: invalid };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("labour_contracts")
+    .update({ ...form, updated_by: user.id })
+    .eq("id", id);
+  if (error) {
+    console.error("updateLabourContract failed:", error);
+    return guardError(error, "Could not update the labour contract. Try again.");
+  }
+
+  revalidatePath("/bills/contracts");
+  return undefined;
+}
+
+/** pending → approved. The DB guard re-checks the approver list. */
+export async function approveLabourContract(contractId: string): Promise<ActionState> {
+  const user = await requireTool("/bills");
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("labour_contracts")
+    .update({
+      status: "approved",
+      approved_by: user.id,
+      approved_at: new Date().toISOString(),
+      updated_by: user.id,
+    })
+    // No status filter — the guard's message beats silent zero rows.
+    .eq("id", contractId);
+  if (error) {
+    console.error("approveLabourContract failed:", error);
+    return guardError(error, "Could not approve the contract. Try again.");
+  }
+
+  revalidatePath("/bills/contracts");
+  return undefined;
+}
+
+/** The off-switch: an inactive contract takes no new bills. Allowed at
+ * any status; existing bills are untouched. */
+export async function setLabourContractActive(
+  contractId: string,
+  isActive: boolean,
+): Promise<ActionState> {
+  const user = await requireTool("/bills");
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("labour_contracts")
+    .update({ is_active: isActive, updated_by: user.id })
+    .eq("id", contractId);
+  if (error) {
+    console.error("setLabourContractActive failed:", error);
+    return guardError(error, "Could not update the contract. Try again.");
+  }
+
+  revalidatePath("/bills/contracts");
+  revalidatePath("/bills/new");
+  return undefined;
 }
 
 export type UpdateBillInput = {

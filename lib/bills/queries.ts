@@ -3,7 +3,6 @@ import "server-only";
 import { cache } from "react";
 
 import { requireTool } from "@/lib/auth/access";
-import { listLabourContracts } from "@/lib/masters/labour-contracts";
 import { listPlots } from "@/lib/masters/plots";
 import { listProjects } from "@/lib/masters/projects";
 import { listUnits } from "@/lib/masters/units";
@@ -11,7 +10,7 @@ import { listVendors } from "@/lib/masters/vendors";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 
-import type { BillStatus } from "./workflow";
+import type { BillKind, BillStatus, ContractStatus } from "./workflow";
 
 // Bills reads the masters tables and the money-free PO views DIRECTLY,
 // under its own /bills grant — never another tool's gated queries
@@ -24,12 +23,14 @@ export type BillListRow = {
   id: string;
   reference: string;
   status: BillStatus;
+  kind: BillKind;
   invoice_no: string;
   invoice_date: string;
   total_amount: number;
   created_at: string;
   project_name: string;
-  vendor_name: string;
+  /** Null on a directly-paid NMR bill — there is no vendor. */
+  vendor_name: string | null;
 };
 
 export type BillListPage = {
@@ -65,7 +66,7 @@ export async function listBills({
   let query = supabase
     .from("bills")
     .select(
-      "id, reference, status, invoice_no, invoice_date, total_amount, created_at, projects(name), vendors(name)",
+      "id, reference, status, kind, invoice_no, invoice_date, total_amount, created_at, projects(name), vendors(name)",
       { count: "exact" },
     )
     .order("created_at", { ascending: false })
@@ -88,12 +89,13 @@ export async function listBills({
       id: row.id,
       reference: row.reference ?? "—",
       status: row.status as BillStatus,
+      kind: row.kind as BillKind,
       invoice_no: row.invoice_no ?? "—",
       invoice_date: row.invoice_date,
       total_amount: row.total_amount ?? 0,
       created_at: row.created_at,
       project_name: (row.projects as { name: string } | null)?.name ?? "—",
-      vendor_name: (row.vendors as { name: string } | null)?.name ?? "—",
+      vendor_name: (row.vendors as { name: string } | null)?.name ?? null,
     })),
     total,
     page: currentPage,
@@ -173,11 +175,13 @@ export type BillDetail = {
   id: string;
   reference: string;
   status: BillStatus;
+  kind: BillKind;
   project_name: string;
   /** The plot/unit the bill's anchor is for, or null for General. */
   scope_name: string | null;
   scope_code: string;
-  vendor_name: string;
+  /** Null on a directly-paid NMR bill — there is no vendor. */
+  vendor_name: string | null;
   po_id: string | null;
   po_reference: string | null;
   labour_contract_id: string | null;
@@ -206,7 +210,7 @@ export const getBill = cache(async (billId: string): Promise<BillDetail | null> 
   const { data: bill } = await supabase
     .from("bills")
     .select(
-      "id, reference, status, scope_code, po_id, labour_contract_id, invoice_no, invoice_date, taxable_amount, gst_amount, total_amount, note, rejection_note, payment_ref, created_by, created_at, approved_by, approved_at, paid_by, paid_at, projects(name), plots(name), units(name), vendors(name), labour_contracts(description)",
+      "id, reference, status, kind, scope_code, po_id, labour_contract_id, invoice_no, invoice_date, taxable_amount, gst_amount, total_amount, note, rejection_note, payment_ref, created_by, created_at, approved_by, approved_at, paid_by, paid_at, projects(name), plots(name), units(name), vendors(name), labour_contracts(description)",
     )
     .eq("id", billId)
     .maybeSingle();
@@ -242,13 +246,14 @@ export const getBill = cache(async (billId: string): Promise<BillDetail | null> 
     id: bill.id,
     reference: bill.reference ?? "—",
     status: bill.status as BillStatus,
+    kind: bill.kind as BillKind,
     project_name: (bill.projects as { name: string } | null)?.name ?? "—",
     scope_name:
       (bill.units as { name: string } | null)?.name ??
       (bill.plots as { name: string } | null)?.name ??
       null,
     scope_code: bill.scope_code ?? "—",
-    vendor_name: (bill.vendors as { name: string } | null)?.name ?? "—",
+    vendor_name: (bill.vendors as { name: string } | null)?.name ?? null,
     po_id: bill.po_id,
     po_reference: poFact?.reference ?? null,
     labour_contract_id: bill.labour_contract_id,
@@ -321,30 +326,53 @@ export type BillAnchorContract = {
   billed_total: number;
 };
 
+export type BillScopedOption = {
+  id: string;
+  project_id: string;
+  name: string;
+  code: string | null;
+};
+
 export type BillFormOptions = {
   vendors: BillVendorOption[];
   pos: BillAnchorPo[];
   contracts: BillAnchorContract[];
+  /** For the NMR branch: the scope is picked directly, like a PO's. */
+  projects: { id: string; name: string; code: string | null }[];
+  plots: BillScopedOption[];
+  units: BillScopedOption[];
 };
 
 /**
  * Everything the record form needs, in one gated call: every vendor,
  * their billable POs (issued or completed — from the money-free
- * po_facts, with totals from the po_billing_totals window) and their
- * active labour contracts, each carrying what's already been billed so
- * the over-billing warning can be derived client-side.
+ * po_facts, with totals from the po_billing_totals window), their
+ * APPROVED active labour contracts (each carrying what's already been
+ * billed so the over-billing warning can be derived client-side), and
+ * the project/plot/unit lists the NMR branch picks its scope from.
  */
 export async function getBillFormOptions(): Promise<BillFormOptions> {
   await requireTool("/bills");
   const supabase = await createClient();
 
-  const [vendors, projects, plots, units, contracts, posResult, totalsResult, contractBills] =
+  const [vendors, projects, plots, units, contractsResult, posResult, totalsResult, contractBills] =
     await Promise.all([
       listVendors(),
       listProjects(),
       listPlots(),
       listUnits(),
-      listLabourContracts(true),
+      // Only approved, active contracts take bills (guarded DB-side in
+      // create_bill too — this filter is the courtesy).
+      fetchAll((from, to) =>
+        supabase
+          .from("labour_contracts")
+          .select("id, vendor_id, project_id, plot_id, unit_id, description, contract_value")
+          .eq("status", "approved")
+          .eq("is_active", true)
+          .order("created_at", { ascending: false })
+          .order("id")
+          .range(from, to),
+      ),
       // fetchAll throughout: these promise completeness — a capped read
       // would silently hide a real PO or under-count what's billed.
       fetchAll((from, to) =>
@@ -372,6 +400,7 @@ export async function getBillFormOptions(): Promise<BillFormOptions> {
           .range(from, to),
       ),
     ]);
+  const contracts = contractsResult.data ?? [];
 
   const projectName = (id: string | null) =>
     id ? (projects.find((p) => p.id === id)?.name ?? "—") : "—";
@@ -417,5 +446,98 @@ export async function getBillFormOptions(): Promise<BillFormOptions> {
       contract_value: contract.contract_value,
       billed_total: billedByContract.get(contract.id) ?? 0,
     })),
+    projects: projects.map(({ id, name, code }) => ({ id, name, code })),
+    plots: plots.map(({ id, project_id, name, code }) => ({ id, project_id, name, code })),
+    units: units.map(({ id, project_id, name, code }) => ({ id, project_id, name, code })),
   };
+}
+
+/* ------------------------------------------------------------------ *
+ * Labour contracts — the Bills tool's own list
+ * ------------------------------------------------------------------ */
+
+export type BillContractRow = {
+  id: string;
+  vendor_id: string;
+  vendor_name: string;
+  project_id: string;
+  project_name: string;
+  plot_id: string | null;
+  unit_id: string | null;
+  /** The plot/unit the contract is for, or "General". */
+  scope_name: string;
+  description: string;
+  contract_value: number;
+  status: ContractStatus;
+  is_active: boolean;
+  billed_total: number;
+  approved_by_name: string | null;
+  created_at: string;
+};
+
+/** Every labour contract, newest first, with what's been billed
+ * against each — the /bills/contracts page. */
+export async function listBillContracts(): Promise<BillContractRow[]> {
+  await requireTool("/bills");
+  const supabase = await createClient();
+
+  const [contractsResult, contractBills] = await Promise.all([
+    fetchAll((from, to) =>
+      supabase
+        .from("labour_contracts")
+        .select(
+          "id, vendor_id, project_id, plot_id, unit_id, description, contract_value, status, is_active, approved_by, created_at, vendors(name), projects(name), plots(name), units(name)",
+        )
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAll((from, to) =>
+      supabase
+        .from("bills")
+        .select("labour_contract_id, total_amount")
+        .not("labour_contract_id", "is", null)
+        .order("id")
+        .range(from, to),
+    ),
+  ]);
+  const contracts = contractsResult.data ?? [];
+
+  const billedByContract = new Map<string, number>();
+  for (const row of contractBills.data ?? []) {
+    if (!row.labour_contract_id) continue;
+    billedByContract.set(
+      row.labour_contract_id,
+      (billedByContract.get(row.labour_contract_id) ?? 0) + (row.total_amount ?? 0),
+    );
+  }
+
+  const approverIds = [
+    ...new Set(contracts.map((c) => c.approved_by).filter((id): id is string => id != null)),
+  ];
+  const { data: profiles } = approverIds.length
+    ? await supabase.from("profiles").select("id, full_name").in("id", approverIds)
+    : { data: [] };
+  const names = new Map((profiles ?? []).map((profile) => [profile.id, profile.full_name]));
+
+  return contracts.map((contract) => ({
+    id: contract.id,
+    vendor_id: contract.vendor_id,
+    vendor_name: (contract.vendors as { name: string } | null)?.name ?? "—",
+    project_id: contract.project_id,
+    project_name: (contract.projects as { name: string } | null)?.name ?? "—",
+    plot_id: contract.plot_id,
+    unit_id: contract.unit_id,
+    scope_name:
+      (contract.units as { name: string } | null)?.name ??
+      (contract.plots as { name: string } | null)?.name ??
+      "General",
+    description: contract.description,
+    contract_value: contract.contract_value,
+    status: contract.status as ContractStatus,
+    is_active: contract.is_active,
+    billed_total: billedByContract.get(contract.id) ?? 0,
+    approved_by_name: contract.approved_by ? (names.get(contract.approved_by) ?? null) : null,
+    created_at: contract.created_at,
+  }));
 }

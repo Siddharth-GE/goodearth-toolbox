@@ -8,11 +8,14 @@ import { test } from "node:test";
 
 import {
   canApprove,
+  canApproveContract,
   canDeleteBill,
   canEditBill,
+  canEditContract,
   canMarkPaid,
   canSendBack,
   exceedsAnchor,
+  isContractBillable,
 } from "./workflow";
 
 const adminDecider = { isAdmin: true, isApprover: false };
@@ -58,6 +61,24 @@ test("a recorded bill is its recorder's (or an admin's) to delete, never once ap
   assert.equal(canDeleteBill("recorded", stranger, "r"), false);
   assert.equal(canDeleteBill("approved", recorder, "r"), false);
   assert.equal(canDeleteBill("paid", admin, "r"), false);
+});
+
+test("a contract is approved by a decider, and only while pending", () => {
+  assert.equal(canApproveContract("pending_approval", approver), true);
+  assert.equal(canApproveContract("pending_approval", adminDecider), true);
+  assert.equal(canApproveContract("pending_approval", bystander), false);
+  assert.equal(canApproveContract("approved", approver), false);
+});
+
+test("a contract takes bills only once approved and while active", () => {
+  assert.equal(isContractBillable("approved", true), true);
+  assert.equal(isContractBillable("approved", false), false);
+  assert.equal(isContractBillable("pending_approval", true), false);
+});
+
+test("a contract's terms lock on approval", () => {
+  assert.equal(canEditContract("pending_approval"), true);
+  assert.equal(canEditContract("approved"), false);
 });
 
 test("over-billing warns past the anchor total, never at or under it", () => {

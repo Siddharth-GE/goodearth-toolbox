@@ -15,6 +15,12 @@
  */
 export type BillStatus = "recorded" | "approved" | "paid";
 
+/** What a bill is recorded against: a PO, a labour contract, or NMR
+ * (daily wages — no anchor, optional vendor). */
+export type BillKind = "po" | "contract" | "nmr";
+
+export type ContractStatus = "pending_approval" | "approved";
+
 /** Whether the current user may decide bills — the indents Decider shape. */
 export type BillDecider = {
   isAdmin: boolean;
@@ -60,12 +66,29 @@ export function canDeleteBill(
   return status === "recorded" && (actor.isAdmin || createdBy === actor.userId);
 }
 
+/** A pending labour contract is approved by the same deciders as a
+ * bill (founder decision: one list). Its terms lock on approval. */
+export function canApproveContract(status: ContractStatus, decider: BillDecider): boolean {
+  return status === "pending_approval" && (decider.isAdmin || decider.isApprover);
+}
+
+/** A contract takes bills only once approved and while active. */
+export function isContractBillable(status: ContractStatus, isActive: boolean): boolean {
+  return status === "approved" && isActive;
+}
+
+/** A contract's terms are editable only before approval. */
+export function canEditContract(status: ContractStatus): boolean {
+  return status === "pending_approval";
+}
+
 /**
  * The over-billing check: true when recording this bill would take the
  * anchor past its total. WARNS, NEVER BLOCKS (founder decision — real
  * invoices legitimately differ; a human decides): callers render a
  * warning line, no rule refuses. A null anchor total means there is
- * nothing to compare against — no warning.
+ * nothing to compare against — no warning (NMR bills always pass null:
+ * daily wages have no contracted ceiling, by design).
  */
 export function exceedsAnchor(
   anchorTotal: number | null,

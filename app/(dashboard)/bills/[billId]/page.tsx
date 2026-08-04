@@ -14,11 +14,14 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
   if (!bill) notFound();
 
   const editable = canEditBill(bill.status);
-  const anchorLabel = bill.po_reference
-    ? `against ${bill.po_reference}`
-    : bill.contract_description
-      ? `against the contract "${bill.contract_description}"`
-      : null;
+  const anchorLabel =
+    bill.kind === "nmr"
+      ? "for daily wages (NMR)"
+      : bill.po_reference
+        ? `against ${bill.po_reference}`
+        : bill.contract_description
+          ? `against the contract "${bill.contract_description}"`
+          : null;
 
   return (
     <div className="space-y-4">
@@ -28,9 +31,10 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
         backLabel="All bills"
         description={
           <>
-            {bill.vendor_name}
+            {bill.vendor_name ?? "Direct labour — no vendor"}
             {` · ${bill.project_name}`}
             {bill.scope_name ? ` · ${bill.scope_name}` : " · General"}
+            {bill.kind === "nmr" ? " · NMR daily wages" : ""}
             {bill.po_reference ? ` · ${bill.po_reference}` : ""}
             {bill.contract_description ? ` · ${bill.contract_description}` : ""}
           </>

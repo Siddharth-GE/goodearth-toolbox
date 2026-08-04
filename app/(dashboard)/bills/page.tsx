@@ -77,7 +77,14 @@ export default async function BillsPage({
       <PageTitle
         title="Bills"
         description="Vendor invoices recorded against POs and labour contracts — what we owe and what we've paid."
-        actions={<LinkButton href="/bills/new">Record bill</LinkButton>}
+        actions={
+          <>
+            <LinkButton href="/bills/contracts" variant="secondary">
+              Labour contracts
+            </LinkButton>
+            <LinkButton href="/bills/new">Record bill</LinkButton>
+          </>
+        }
       />
 
       <NavTabs
@@ -134,8 +141,15 @@ export default async function BillsPage({
             <TableBody>
               {bills.map((bill) => (
                 <TableRow key={bill.id}>
-                  <TableCell className="text-foreground font-medium">{bill.reference}</TableCell>
-                  <TableCell>{bill.vendor_name}</TableCell>
+                  <TableCell className="text-foreground font-medium">
+                    {bill.reference}
+                    {bill.kind === "nmr" && (
+                      <span className="text-muted ml-1.5 text-[10px] font-semibold tracking-wider uppercase">
+                        NMR
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell>{bill.vendor_name ?? "Direct"}</TableCell>
                   <TableCell>{bill.project_name}</TableCell>
                   <TableCell className="font-mono text-xs">{bill.invoice_no}</TableCell>
                   <TableCell className="text-muted">{formatDate(bill.invoice_date)}</TableCell>
