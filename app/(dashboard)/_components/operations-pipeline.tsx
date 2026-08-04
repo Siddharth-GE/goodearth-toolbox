@@ -1,9 +1,11 @@
 import { Card } from "@/components/ui/card";
-import { countBillsPipeline } from "@/lib/bills/queries";
 import { formatCount } from "@/lib/format";
-import { countIndentsPipeline } from "@/lib/indents/queries";
-import { countReceiptsPipeline } from "@/lib/inventory/queries";
-import { countPosPipeline } from "@/lib/purchase-orders/queries";
+import {
+  countBillsPipeline,
+  countIndentsPipeline,
+  countPosPipeline,
+  countReceiptsPipeline,
+} from "@/lib/overview/queries";
 
 export async function OperationsPipeline() {
   const [indents, pos, receipts, bills] = await Promise.all([

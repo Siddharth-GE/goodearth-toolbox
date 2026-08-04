@@ -388,47 +388,6 @@ export async function getCurrentPoActor(): Promise<{ isAdmin: boolean; userId: s
  * The pool — approved indent lines this PO can still order
  * ------------------------------------------------------------------ */
 
-/**
- * Counts for the Overview pipeline's second stage.
- *
- * Deliberately NOT gated, exactly like countIndentsPipeline: the
- * Overview is the shell's home and every signed-in user sees it. Safe
- * because it reads the po_facts view (migration 0022), whose column
- * list carries no money — a count of POs is operational fact.
- */
-export async function countPosPipeline(): Promise<{
-  issuedThisMonth: number;
-  draftCount: number;
-  awaitingDeletion: number;
-}> {
-  const supabase = await createClient();
-
-  const startOfMonth = new Date();
-  startOfMonth.setDate(1);
-  startOfMonth.setHours(0, 0, 0, 0);
-  const since = startOfMonth.toISOString();
-
-  // Exact database counts, head-only — never rows.length.
-  const [issued, drafts, deletions] = await Promise.all([
-    supabase
-      .from("po_facts")
-      .select("id", { count: "exact", head: true })
-      .in("status", ["issued", "completed"])
-      .gte("issued_at", since),
-    supabase.from("po_facts").select("id", { count: "exact", head: true }).eq("status", "draft"),
-    supabase
-      .from("po_facts")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "deletion_requested"),
-  ]);
-
-  return {
-    issuedThisMonth: issued.count ?? 0,
-    draftCount: drafts.count ?? 0,
-    awaitingDeletion: deletions.count ?? 0,
-  };
-}
-
 export type PoolLineRow = {
   /** indent_lines.id — the provenance anchor a PO line carries. */
   indent_line_id: string;
