@@ -10,6 +10,8 @@ import { listVendors } from "@/lib/masters/vendors";
 import { listStores } from "@/lib/masters/stores";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
+import type { Database } from "@/lib/supabase/database.types";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { PoStatus } from "./workflow";
 
@@ -543,4 +545,157 @@ export async function getIndentPool(poId: string): Promise<IndentPool | null> {
         lines: byIndent.get(indent.id) ?? [],
       })),
   };
+}
+
+/* ------------------------------------------------------------------ *
+ * Receipts against this PO — the detail page's "did it arrive?"
+ * ------------------------------------------------------------------ */
+
+type Client = SupabaseClient<Database>;
+
+/** name-by-id for any master table with an `id` and a `name`. */
+async function labelsById(
+  supabase: Client,
+  table: "stores" | "plots" | "units",
+  ids: (string | null | undefined)[],
+): Promise<Map<string, string>> {
+  const unique = [...new Set(ids.filter((id): id is string => id != null))];
+  if (unique.length === 0) return new Map();
+  const { data } = await fetchAll((from, to) =>
+    supabase.from(table).select("id, name").in("id", unique).order("id").range(from, to),
+  );
+  return new Map((data ?? []).map((row) => [row.id, row.name]));
+}
+
+/** Actor names for a set of profile ids — the attribution rule. */
+async function namesById(
+  supabase: Client,
+  ids: (string | null | undefined)[],
+): Promise<(id: string | null | undefined) => string | null> {
+  const unique = [...new Set(ids.filter((id): id is string => id != null))];
+  const { data } = unique.length
+    ? await supabase.from("profiles").select("id, full_name").in("id", unique)
+    : { data: [] };
+  const names = new Map((data ?? []).map((profile) => [profile.id, profile.full_name]));
+  return (id) => (id ? (names.get(id) ?? null) : null);
+}
+
+/** Item names for a set of ids — only the name; the receipt rows on the
+ * PO page show no thumbnails or codes. */
+async function itemNamesById(supabase: Client, ids: string[]): Promise<Map<string, string>> {
+  const unique = [...new Set(ids)];
+  if (unique.length === 0) return new Map();
+  const { data } = await fetchAll((from, to) =>
+    supabase.from("items").select("id, name").in("id", unique).order("id").range(from, to),
+  );
+  return new Map((data ?? []).map((row) => [row.id, row.name]));
+}
+
+function describeDestination(
+  row: {
+    store_id: string | null;
+    to_site: boolean;
+    plot_id: string | null;
+    unit_id: string | null;
+  },
+  stores: Map<string, string>,
+  plots: Map<string, string>,
+  units: Map<string, string>,
+): string {
+  if (row.store_id) return stores.get(row.store_id) ?? "A store";
+  const site =
+    (row.unit_id ? units.get(row.unit_id) : null) ?? (row.plot_id ? plots.get(row.plot_id) : null);
+  return site ? `Site — ${site}` : "Site";
+}
+
+export type PoReceiptRow = {
+  id: string;
+  reference: string;
+  destination: string;
+  challan_no: string | null;
+  received_at: string;
+  received_by_name: string | null;
+  lines: { item_name: string; quantity: number; uom: string }[];
+};
+
+/**
+ * The receipts against one PO, for the purchase-order detail page —
+ * gated on this tool's own /purchase-orders grant. Nothing here is
+ * money; it is the PO holder's own screen asking "did it arrive?".
+ * The goods tables' reads are open by design (Inventory carries no
+ * money), read directly rather than through Inventory's queries module.
+ */
+export async function getPoReceipts(poId: string): Promise<PoReceiptRow[]> {
+  await requireTool("/purchase-orders");
+  const supabase = await createClient();
+
+  const { data: receipts } = await fetchAll((from, to) =>
+    supabase
+      .from("goods_receipts")
+      .select(
+        "id, reference, store_id, to_site, plot_id, unit_id, challan_no, received_at, created_by",
+      )
+      .eq("po_id", poId)
+      .order("received_at")
+      .order("id")
+      .range(from, to),
+  );
+  if ((receipts ?? []).length === 0) return [];
+
+  const receiptIds = (receipts ?? []).map((receipt) => receipt.id);
+  const { data: lines } = await fetchAll((from, to) =>
+    supabase
+      .from("goods_receipt_lines")
+      .select("receipt_id, item_id, quantity, uom")
+      .in("receipt_id", receiptIds)
+      .order("id")
+      .range(from, to),
+  );
+
+  const [items, stores, plots, units, nameOf] = await Promise.all([
+    itemNamesById(
+      supabase,
+      (lines ?? []).map((line) => line.item_id),
+    ),
+    labelsById(
+      supabase,
+      "stores",
+      (receipts ?? []).map((r) => r.store_id),
+    ),
+    labelsById(
+      supabase,
+      "plots",
+      (receipts ?? []).map((r) => r.plot_id),
+    ),
+    labelsById(
+      supabase,
+      "units",
+      (receipts ?? []).map((r) => r.unit_id),
+    ),
+    namesById(
+      supabase,
+      (receipts ?? []).map((r) => r.created_by),
+    ),
+  ]);
+
+  const linesByReceipt = new Map<string, { item_name: string; quantity: number; uom: string }[]>();
+  for (const line of lines ?? []) {
+    const group = linesByReceipt.get(line.receipt_id) ?? [];
+    group.push({
+      item_name: items.get(line.item_id) ?? "—",
+      quantity: line.quantity,
+      uom: line.uom,
+    });
+    linesByReceipt.set(line.receipt_id, group);
+  }
+
+  return (receipts ?? []).map((receipt) => ({
+    id: receipt.id,
+    reference: receipt.reference ?? "—",
+    destination: describeDestination(receipt, stores, plots, units),
+    challan_no: receipt.challan_no,
+    received_at: receipt.received_at,
+    received_by_name: nameOf(receipt.created_by),
+    lines: linesByReceipt.get(receipt.id) ?? [],
+  }));
 }

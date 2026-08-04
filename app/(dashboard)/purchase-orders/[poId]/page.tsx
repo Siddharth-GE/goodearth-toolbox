@@ -2,13 +2,13 @@ import { Attribution } from "@/components/ui/attribution";
 import { LinkButton } from "@/components/ui/button";
 import { PageTitle } from "@/components/ui/page-title";
 import { formatDate } from "@/lib/format";
-import { getPoReceipts } from "@/lib/inventory/queries";
 import { listGstRates } from "@/lib/masters/gst-rates";
 import { isFullyPriced } from "@/lib/purchase-orders/math";
 import {
   getCurrentPoActor,
   getPoBilledTotals,
   getPoFormOptions,
+  getPoReceipts,
   getPurchaseOrder,
 } from "@/lib/purchase-orders/queries";
 import { canEditPo } from "@/lib/purchase-orders/workflow";
