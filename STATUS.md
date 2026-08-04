@@ -17,8 +17,8 @@ project run end-to-end.
 |                    |                                                                                                                         |
 | ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
 | Last worked        | 2026-08-04                                                                                                              |
-| Branch             | `master` — clean                                                                                                        |
-| Migrations applied | `0001`–`0026` (next is `0027`)                                                                                          |
+| Branch             | `feature/audit-fixes` — awaiting founder preview + merge                                                                |
+| Migrations applied | `0001`–`0026` (`0027` written, **not yet applied** — see Next up)                                                       |
 | Items in database  | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands                                          |
 | Thumbnails         | 897 in Supabase Storage; 1,736 items use the colour placeholder                                                         |
 | Built tools        | Marathon, Settings, Masters, Selections, Budgets (Interiors + Construction), Indents, Purchase Orders, Inventory, Bills |
@@ -26,6 +26,11 @@ project run end-to-end.
 
 ## Next up
 
+- **Apply migration `0027`** (labour contract values move behind
+  `/bills` — founder-approved in the audit) via Studio or the
+  management-API workflow, then merge `feature/audit-fixes` after the
+  preview checks. The code doesn't depend on it, but apply before or
+  with the merge so the policy and the decision land together.
 - **Load the founder's master data** — clients, plots, units, from
   spreadsheets, the `scripts/import-catalogue.ts` way (re-runnable,
   dry-run default, skip existing, verify counts). Watch: plots/units
@@ -156,6 +161,17 @@ project run end-to-end.
 
 One line per day; full detail in git history and the PLAN.md files.
 
+- **2026-08-04 (later)** — **Architecture audit** (three parallel
+  sweeps: independence, boundaries, performance; verdict: holds).
+  Fixed on `feature/audit-fixes`: the Marathon walk-any-bib read, four
+  guardless Settings queries, every remaining silent 1,000-row cap
+  (worst: selection lines feeding the PDF/CSV/diff), middleware auth
+  now verified locally (getClaims) instead of a network call per
+  request, the construction full-table read, Bills' double scans and
+  over-broad options, inventory history location pushdown, four page
+  waterfalls. `0027` written (contract values → `/bills`). Bucket C
+  (structure moves) queued in TODO.md for its own session. Probe smoke
+  passed locally against the production build.
 - **2026-08-04** — **Bills shipped** (`0025` + `0026`, merged after the
   founder's browser gates and a 12-check single-grant probe smoke at
   the RLS boundary): record/approve/send-back/pay, over-billing
