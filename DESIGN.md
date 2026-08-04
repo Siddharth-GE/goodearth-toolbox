@@ -104,9 +104,10 @@ else "to make it feel nice" — restraint is the point.
 accent color — is the one loading indicator in the app. This is a
 functional signal, not decorative motion, so it isn't subject to the
 "one moment of delight" restraint above: every tool's route segment
-gets a `loading.tsx` that renders a centered `Spinner` (see
-`app/(dashboard)/loading.tsx`, `app/(dashboard)/masters/loading.tsx`),
-and any individual widget that fetches its own data inside an
+gets a `loading.tsx` that renders `PageLoading`
+(`components/ui/page-loading.tsx` — the one centered-spinner layout;
+`tall` for kiosk routes), and any individual widget that fetches its own
+data inside an
 otherwise-fast page wraps in `<Suspense fallback={<Spinner />}>`
 (see `MarathonLiveCard` on the Overview page) rather than blocking the
 whole screen. Add both as a matter of course for every new tool, the
@@ -140,8 +141,9 @@ Marathon's admin nav is the reference implementation.
 
 Built: `avatar`, `badge` (+ status variants), `button`, `card`,
 `checkbox`, `dialog`, `dropdown-menu`, `empty-state`, `form-message`,
-`icon-button`, `input`, `label`, `page-title`, `pagination`, `select`,
-`spinner`, `table`, `tabs` (+ `NavTabs`), `textarea`.
+`icon-button`, `input`, `label`, `page-loading`, `page-title`,
+`pagination`, `select`, `spinner`, `table`, `tabs` (+ `NavTabs`),
+`textarea`.
 
 `PageTitle` vs `PageHeader`: `PageTitle` is the static h1/description/
 back-link block every dashboard screen starts with; `PageHeader`
