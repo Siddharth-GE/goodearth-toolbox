@@ -29,13 +29,14 @@ export default async function UnitsPage() {
     listClients(),
   ]);
   const projectName = (id: string) => projects.find((p) => p.id === id)?.name ?? "—";
+  const plotName = (id: string) => plots.find((p) => p.id === id)?.name ?? "—";
   const clientName = (id: string | null) =>
     id ? (clients.find((c) => c.id === id)?.name ?? "—") : "—";
 
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <UnitFormDialog projects={projects} plots={plots} clients={clients} />
+        <UnitFormDialog projects={projects} plots={plots} units={units} clients={clients} />
       </div>
 
       {units.length === 0 ? (
@@ -50,6 +51,7 @@ export default async function UnitsPage() {
             <TableRow>
               <TableHeaderCell>Name</TableHeaderCell>
               <TableHeaderCell>Code</TableHeaderCell>
+              <TableHeaderCell>Plot</TableHeaderCell>
               <TableHeaderCell>Project</TableHeaderCell>
               <TableHeaderCell>Type</TableHeaderCell>
               <TableHeaderCell>Client</TableHeaderCell>
@@ -62,6 +64,7 @@ export default async function UnitsPage() {
               <TableRow key={unit.id}>
                 <TableCell className="text-foreground font-medium">{unit.name}</TableCell>
                 <TableCell className="font-mono text-xs">{unit.code ?? "—"}</TableCell>
+                <TableCell>{plotName(unit.plot_id)}</TableCell>
                 <TableCell>{projectName(unit.project_id)}</TableCell>
                 <TableCell className="capitalize">{unit.unit_type.replace(/_/g, " ")}</TableCell>
                 <TableCell>{clientName(unit.client_id)}</TableCell>
@@ -71,7 +74,13 @@ export default async function UnitsPage() {
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  <UnitFormDialog projects={projects} plots={plots} clients={clients} unit={unit} />
+                  <UnitFormDialog
+                    projects={projects}
+                    plots={plots}
+                    units={units}
+                    clients={clients}
+                    unit={unit}
+                  />
                 </TableCell>
               </TableRow>
             ))}

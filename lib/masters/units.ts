@@ -9,7 +9,8 @@ export type UnitStatus = "available" | "reserved" | "sold";
 export type UnitRow = {
   id: string;
   project_id: string;
-  plot_id: string | null;
+  /** The unit's plot — required and unique since 0029 (plot ↔ unit is 1:1). */
+  plot_id: string;
   name: string;
   /** Short code for PO numbers (PO/SAA/<code>/001) — null until set. */
   code: string | null;
