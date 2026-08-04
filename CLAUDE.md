@@ -23,8 +23,8 @@ means flipping `built: true` and replacing the stub `page.tsx`.
   touches only its own folders plus a registry entry, and editing or
   even breaking one must not take the others down. Tools connect only
   through the shared database and the few deliberate shared surfaces
-  (`lib/masters/`, the money-free views, `components/ui`) — one tool
-  never imports another tool's code. When in doubt, choose the design
+  (`lib/masters/`, the money-free views, `components/ui`,
+  `lib/hooks/`) — one tool never imports another tool's code. When in doubt, choose the design
   that keeps tools independent.
 - **Structure.** A tool is `app/(dashboard)/<tool>/` (screens) plus
   `lib/<tool>/` (`queries.ts` reads, `actions.ts` writes). Kiosk-style
