@@ -143,6 +143,39 @@ export type IndentDetail = {
   line_count: number;
 };
 
+export type IndentHeader = {
+  id: string;
+  reference: string;
+  status: IndentStatus;
+  project_id: string;
+  project_name: string;
+  unit_id: string | null;
+};
+
+/**
+ * Just the header — for screens (the two pull pages) that need the
+ * reference and status to render but have no use for the full detail's
+ * lines, fulfilment facts and actor names.
+ */
+export const getIndentHeader = cache(async (indentId: string): Promise<IndentHeader | null> => {
+  await requireTool("/indents");
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("indents")
+    .select("id, reference, status, project_id, unit_id, projects(name)")
+    .eq("id", indentId)
+    .maybeSingle();
+  if (!data) return null;
+  return {
+    id: data.id,
+    reference: data.reference,
+    status: data.status as IndentStatus,
+    project_id: data.project_id,
+    project_name: (data.projects as { name: string } | null)?.name ?? "—",
+    unit_id: data.unit_id,
+  };
+});
+
 export const getIndent = cache(async (indentId: string): Promise<IndentDetail | null> => {
   await requireTool("/indents");
   const supabase = await createClient();

@@ -9,10 +9,12 @@ import {
   listActiveSpaceTypes,
   listSelectionLines,
   listUnitSpaces,
+  type SelectionRow,
 } from "@/lib/selections/queries";
 import { FileDown, GitCompare, LayoutGrid, Sheet } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { AddSpaceDialog } from "../_components/add-space-dialog";
 import { CataloguePicker } from "../_components/catalogue-picker";
 import { IssueDialog } from "../_components/issue-dialog";
@@ -46,15 +48,13 @@ export default async function SelectionEditorPage({
     getPreviousIssued(selection.unit_id, selection.revision_no),
   ]);
 
-  // Two more reads that depend on the batch above but not on each other:
-  // views belong to the space, not the revision (a render of Bedroom 1 is
-  // still a render of Bedroom 1 in R3), and the diff is what the budget
-  // team will be handed — computed for a draft too, so the Issue dialog
-  // can state it before the click rather than after.
-  const [viewsBySpace, diff] = await Promise.all([
-    listSpaceViews(spaces.map((space) => space.id)),
-    previous ? diffRevisions(previous.id, selectionId, selection.unit_id) : null,
-  ]);
+  // Views belong to the space, not the revision (a render of Bedroom 1
+  // is still a render of Bedroom 1 in R3). The revision diff is NOT
+  // awaited here: every space click is a full server navigation, and
+  // the diff re-read the whole previous revision each time just to feed
+  // the Issue dialog's summary and one paragraph — both stream in
+  // behind their own <Suspense> below so the grid paints first.
+  const viewsBySpace = await listSpaceViews(spaces.map((space) => space.id));
 
   // Land on the requested space, else the first one. A stale ?space from a
   // bookmark (or a space just deleted) falls back rather than 404s.
@@ -118,17 +118,16 @@ export default async function SelectionEditorPage({
                   existing={spaces.map((s) => ({ label: s.label, space_type_id: s.space_type_id }))}
                 />
                 {lines.length > 0 && (
-                  <IssueDialog
-                    selectionId={selectionId}
-                    revisionNo={selection.revision_no}
-                    lineCount={lines.length}
-                    spaceCount={spaces.filter((s) => s.line_count > 0).length}
-                    previousRevisionNo={previous?.revision_no ?? null}
-                    added={diff?.added ?? 0}
-                    removed={diff?.removed ?? 0}
-                    changed={diff?.changed ?? 0}
-                    unchanged={diff?.unchanged ?? 0}
-                  />
+                  <Suspense fallback={null}>
+                    <IssueDialogWithDiff
+                      selectionId={selectionId}
+                      unitId={selection.unit_id}
+                      revisionNo={selection.revision_no}
+                      lineCount={lines.length}
+                      spaceCount={spaces.filter((s) => s.line_count > 0).length}
+                      previous={previous}
+                    />
+                  </Suspense>
                 )}
               </>
             )}
@@ -150,23 +149,20 @@ export default async function SelectionEditorPage({
           {selection.notes && <p className="text-muted mt-1 text-sm">“{selection.notes}”</p>}
           {/* Says plainly what the budget team was handed, so a designer
               can answer "what did they get?" without leaving the screen. */}
-          <p className="text-muted mt-2 text-xs">
-            Budgeting received {lines.length} {lines.length === 1 ? "line" : "lines"}
-            {diff && previous
-              ? ` — ${diff.added} added, ${diff.removed} removed and ${diff.changed} changed since R${previous.revision_no}; ${diff.unchanged} kept existing pricing.`
-              : " — all of it new to price."}
-            {previous && (
-              <>
-                {" "}
-                <Link
-                  href={`/selections/${selectionId}/diff`}
-                  className="text-accent font-medium hover:underline"
-                >
-                  See what changed
-                </Link>
-              </>
-            )}
-          </p>
+          <Suspense
+            fallback={
+              <p className="text-muted mt-2 text-xs">
+                Budgeting received {lines.length} {lines.length === 1 ? "line" : "lines"}.
+              </p>
+            }
+          >
+            <HandoffSummary
+              selectionId={selectionId}
+              unitId={selection.unit_id}
+              lineCount={lines.length}
+              previous={previous}
+            />
+          </Suspense>
         </div>
       )}
 
@@ -262,5 +258,74 @@ export default async function SelectionEditorPage({
         </div>
       )}
     </div>
+  );
+}
+
+// The two diff consumers, each streamed behind its own <Suspense> so a
+// space click never waits on re-reading the previous revision. They are
+// mutually exclusive (dialog on drafts, summary once issued), so the
+// diff is still computed at most once per navigation.
+
+async function IssueDialogWithDiff({
+  selectionId,
+  unitId,
+  revisionNo,
+  lineCount,
+  spaceCount,
+  previous,
+}: {
+  selectionId: string;
+  unitId: string;
+  revisionNo: number;
+  lineCount: number;
+  spaceCount: number;
+  previous: SelectionRow | null;
+}) {
+  const diff = previous ? await diffRevisions(previous.id, selectionId, unitId) : null;
+  return (
+    <IssueDialog
+      selectionId={selectionId}
+      revisionNo={revisionNo}
+      lineCount={lineCount}
+      spaceCount={spaceCount}
+      previousRevisionNo={previous?.revision_no ?? null}
+      added={diff?.added ?? 0}
+      removed={diff?.removed ?? 0}
+      changed={diff?.changed ?? 0}
+      unchanged={diff?.unchanged ?? 0}
+    />
+  );
+}
+
+async function HandoffSummary({
+  selectionId,
+  unitId,
+  lineCount,
+  previous,
+}: {
+  selectionId: string;
+  unitId: string;
+  lineCount: number;
+  previous: SelectionRow | null;
+}) {
+  const diff = previous ? await diffRevisions(previous.id, selectionId, unitId) : null;
+  return (
+    <p className="text-muted mt-2 text-xs">
+      Budgeting received {lineCount} {lineCount === 1 ? "line" : "lines"}
+      {diff && previous
+        ? ` — ${diff.added} added, ${diff.removed} removed and ${diff.changed} changed since R${previous.revision_no}; ${diff.unchanged} kept existing pricing.`
+        : " — all of it new to price."}
+      {previous && (
+        <>
+          {" "}
+          <Link
+            href={`/selections/${selectionId}/diff`}
+            className="text-accent font-medium hover:underline"
+          >
+            See what changed
+          </Link>
+        </>
+      )}
+    </p>
   );
 }

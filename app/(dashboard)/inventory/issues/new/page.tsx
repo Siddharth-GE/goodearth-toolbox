@@ -18,8 +18,10 @@ export default async function NewIssuePage({
   searchParams: Promise<{ store?: string }>;
 }) {
   const { store } = await searchParams;
-  const options = await getIssueFormOptions();
-  const holdings = store ? await listStoreHoldings(store) : [];
+  const [options, holdings] = await Promise.all([
+    getIssueFormOptions(),
+    store ? listStoreHoldings(store) : Promise.resolve([]),
+  ]);
   const chosen = options.stores.find((s) => s.id === store) ?? null;
 
   return (

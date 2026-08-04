@@ -1,7 +1,7 @@
 import { LinkButton } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageTitle } from "@/components/ui/page-title";
-import { getConstructionPull, getIndent } from "@/lib/indents/queries";
+import { getConstructionPull, getIndentHeader } from "@/lib/indents/queries";
 import { canEditIndent } from "@/lib/indents/workflow";
 import { HardHat } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
@@ -17,7 +17,8 @@ export default async function ConstructionPullPage({
   params: Promise<{ indentId: string }>;
 }) {
   const { indentId } = await params;
-  const indent = await getIndent(indentId);
+  // The light header read — this screen never shows the indent's lines.
+  const indent = await getIndentHeader(indentId);
   if (!indent) notFound();
   // Lines can only be added to a draft — the database says so too.
   if (!canEditIndent(indent.status)) redirect(`/indents/${indentId}`);
