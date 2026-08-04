@@ -12,8 +12,10 @@ next). `DESIGN.md` before styling anything. Each tool keeps its own
 `PLAN.md` next to its code — check it before touching that tool.
 
 **Shipped:** Marathon (kiosk), Settings, Masters, Selections, Budgets,
-Indents, Purchase Orders, Inventory. **Next:** Bills, then more (Site
-Tracker, Directory, Training). Unbuilt tools are Coming Soon stubs —
+Indents, Purchase Orders, Inventory, Bills. **Next:** the Management
+group (Dashboard, Project, Design, Client Relations, Financial,
+Business Planning — planned with the founder one at a time), plus
+Directory and Training. Unbuilt tools are Coming Soon stubs —
 route and sidebar entry already exist in `lib/tools.ts`; building one
 means flipping `built: true` and replacing the stub `page.tsx`.
 

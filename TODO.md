@@ -6,6 +6,14 @@ up" list holds the loose ends and Phase 9's shape (Overview fully real
 - one real project run end to end). This file gets the Phase 9 build
   plan once the founder approves one.
 
+## Management group — plan one tool at a time
+
+The six Management stubs are live (sidebar + homepage vision cards,
+2026-08-04). Each tool gets its own planning session with the founder
+before any code: Dashboard, Project Management, Design Management,
+Client Relations, Financial Management, Business Planning. No order
+agreed yet — ask which comes first.
+
 ## Smaller, any session
 
 - PO-anchor picker in the Bills record form: move to server-side

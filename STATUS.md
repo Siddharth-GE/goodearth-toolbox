@@ -17,8 +17,8 @@ project run end-to-end.
 |                    |                                                                                                                         |
 | ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
 | Last worked        | 2026-08-04                                                                                                              |
-| Branch             | `master` — clean                                                                                                        |
-| Migrations applied | `0001`–`0029` (next is `0030`)                                                                                          |
+| Branch             | `feature/management-group` — awaiting the founder's browser pass                                                        |
+| Migrations applied | `0001`–`0030` (next is `0031`)                                                                                          |
 | Items in database  | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands                                          |
 | Thumbnails         | 897 in Supabase Storage; 1,736 items use the colour placeholder                                                         |
 | Built tools        | Marathon, Settings, Masters, Selections, Budgets (Interiors + Construction), Indents, Purchase Orders, Inventory, Bills |
@@ -165,6 +165,18 @@ project run end-to-end.
 
 One line per day; full detail in git history and the PLAN.md files.
 
+- **2026-08-04 (management group)** — the founder set the vision for
+  the next layer: a **Management** sidebar group above Operations with
+  six Coming Soon tools — Dashboard (a leadership view, distinct from
+  Overview), Project Management, Design Management, Client Relations,
+  Financial Management, Business Planning
+  (`feature/management-group`). Each is a registry entry + stub route
+  (the Directory pattern); the homepage opens with six vision cards
+  drawn from the registry (icon, name, one-liner, Coming Soon badge —
+  no fake numbers). Migration `0030` applied: the six slugs join the
+  `user_apps_app_known` CHECK so Settings can grant them. Names and
+  slugs are now locked in the DB; each tool gets planned with the
+  founder one at a time before any is built.
 - **2026-08-04 (structure pass)** — the audit's bucket C, merged to
   `master` after the founder's browser pass: new
   `lib/overview/queries.ts` owns the home page's
