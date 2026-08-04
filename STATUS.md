@@ -17,7 +17,7 @@ project run end-to-end.
 |                    |                                                                                                                         |
 | ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
 | Last worked        | 2026-08-04                                                                                                              |
-| Branch             | `feature/audit-fixes` — awaiting founder preview + merge                                                                |
+| Branch             | `master` — clean                                                                                                        |
 | Migrations applied | `0001`–`0027` (next is `0028`)                                                                                          |
 | Items in database  | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands                                          |
 | Thumbnails         | 897 in Supabase Storage; 1,736 items use the colour placeholder                                                         |
@@ -26,8 +26,6 @@ project run end-to-end.
 
 ## Next up
 
-- **Merge `feature/audit-fixes`** after the founder's preview checks
-  (`0027` is applied and verified; types regenerated, no diff).
 - **Load the founder's master data** — clients, plots, units, from
   spreadsheets, the `scripts/import-catalogue.ts` way (re-runnable,
   dry-run default, skip existing, verify counts). Watch: plots/units
