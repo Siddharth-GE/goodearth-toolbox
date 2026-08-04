@@ -47,6 +47,240 @@ export type Database = {
         }
         Relationships: []
       }
+      bill_approvers: {
+        Row: {
+          granted_at: string
+          granted_by: string | null
+          user_id: string
+        }
+        Insert: {
+          granted_at?: string
+          granted_by?: string | null
+          user_id: string
+        }
+        Update: {
+          granted_at?: string
+          granted_by?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bill_approvers_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_approvers_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bill_counters: {
+        Row: {
+          last_no: number
+          project_id: string
+          scope: string
+        }
+        Insert: {
+          last_no?: number
+          project_id: string
+          scope: string
+        }
+        Update: {
+          last_no?: number
+          project_id?: string
+          scope?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bill_counters_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bills: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          bill_no: number
+          created_at: string
+          created_by: string | null
+          gst_amount: number
+          id: string
+          invoice_date: string
+          invoice_no: string
+          labour_contract_id: string | null
+          note: string | null
+          paid_at: string | null
+          paid_by: string | null
+          payment_ref: string | null
+          plot_id: string | null
+          po_id: string | null
+          project_id: string
+          reference: string
+          rejection_note: string | null
+          scope_code: string
+          status: string
+          taxable_amount: number
+          total_amount: number
+          unit_id: string | null
+          updated_at: string
+          updated_by: string | null
+          vendor_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          bill_no: number
+          created_at?: string
+          created_by?: string | null
+          gst_amount: number
+          id?: string
+          invoice_date: string
+          invoice_no: string
+          labour_contract_id?: string | null
+          note?: string | null
+          paid_at?: string | null
+          paid_by?: string | null
+          payment_ref?: string | null
+          plot_id?: string | null
+          po_id?: string | null
+          project_id: string
+          reference: string
+          rejection_note?: string | null
+          scope_code: string
+          status?: string
+          taxable_amount: number
+          total_amount: number
+          unit_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vendor_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          bill_no?: number
+          created_at?: string
+          created_by?: string | null
+          gst_amount?: number
+          id?: string
+          invoice_date?: string
+          invoice_no?: string
+          labour_contract_id?: string | null
+          note?: string | null
+          paid_at?: string | null
+          paid_by?: string | null
+          payment_ref?: string | null
+          plot_id?: string | null
+          po_id?: string | null
+          project_id?: string
+          reference?: string
+          rejection_note?: string | null
+          scope_code?: string
+          status?: string
+          taxable_amount?: number
+          total_amount?: number
+          unit_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bills_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_labour_contract_id_fkey"
+            columns: ["labour_contract_id"]
+            isOneToOne: false
+            referencedRelation: "labour_contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_paid_by_fkey"
+            columns: ["paid_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_plot_id_fkey"
+            columns: ["plot_id"]
+            isOneToOne: false
+            referencedRelation: "plots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "po_billing_totals"
+            referencedColumns: ["po_id"]
+          },
+          {
+            foreignKeyName: "bills_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "po_facts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       brands: {
         Row: {
           created_at: string
@@ -526,6 +760,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "plots"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goods_receipts_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "po_billing_totals"
+            referencedColumns: ["po_id"]
           },
           {
             foreignKeyName: "goods_receipts_po_id_fkey"
@@ -1135,6 +1376,94 @@ export type Database = {
           },
         ]
       }
+      labour_contracts: {
+        Row: {
+          contract_value: number
+          created_at: string
+          created_by: string | null
+          description: string
+          id: string
+          is_active: boolean
+          plot_id: string | null
+          project_id: string
+          unit_id: string | null
+          updated_at: string
+          updated_by: string | null
+          vendor_id: string
+        }
+        Insert: {
+          contract_value: number
+          created_at?: string
+          created_by?: string | null
+          description: string
+          id?: string
+          is_active?: boolean
+          plot_id?: string | null
+          project_id: string
+          unit_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vendor_id: string
+        }
+        Update: {
+          contract_value?: number
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          id?: string
+          is_active?: boolean
+          plot_id?: string | null
+          project_id?: string
+          unit_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "labour_contracts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "labour_contracts_plot_id_fkey"
+            columns: ["plot_id"]
+            isOneToOne: false
+            referencedRelation: "plots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "labour_contracts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "labour_contracts_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "labour_contracts_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "labour_contracts_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       marathon_agents: {
         Row: {
           created_at: string
@@ -1549,6 +1878,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "items"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_order_lines_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "po_billing_totals"
+            referencedColumns: ["po_id"]
           },
           {
             foreignKeyName: "purchase_order_lines_po_id_fkey"
@@ -2473,6 +2809,126 @@ export type Database = {
           },
         ]
       }
+      bill_facts: {
+        Row: {
+          approved_at: string | null
+          bill_no: number | null
+          created_at: string | null
+          id: string | null
+          invoice_date: string | null
+          labour_contract_id: string | null
+          paid_at: string | null
+          plot_id: string | null
+          po_id: string | null
+          project_id: string | null
+          reference: string | null
+          scope_code: string | null
+          status: string | null
+          unit_id: string | null
+          vendor_id: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          bill_no?: number | null
+          created_at?: string | null
+          id?: string | null
+          invoice_date?: string | null
+          labour_contract_id?: string | null
+          paid_at?: string | null
+          plot_id?: string | null
+          po_id?: string | null
+          project_id?: string | null
+          reference?: string | null
+          scope_code?: string | null
+          status?: string | null
+          unit_id?: string | null
+          vendor_id?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          bill_no?: number | null
+          created_at?: string | null
+          id?: string | null
+          invoice_date?: string | null
+          labour_contract_id?: string | null
+          paid_at?: string | null
+          plot_id?: string | null
+          po_id?: string | null
+          project_id?: string | null
+          reference?: string | null
+          scope_code?: string | null
+          status?: string | null
+          unit_id?: string | null
+          vendor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bills_labour_contract_id_fkey"
+            columns: ["labour_contract_id"]
+            isOneToOne: false
+            referencedRelation: "labour_contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_plot_id_fkey"
+            columns: ["plot_id"]
+            isOneToOne: false
+            referencedRelation: "plots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "po_billing_totals"
+            referencedColumns: ["po_id"]
+          },
+          {
+            foreignKeyName: "bills_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "po_facts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      po_billing_totals: {
+        Row: {
+          bill_count: number | null
+          billed_total: number | null
+          ordered_total: number | null
+          po_id: string | null
+        }
+        Relationships: []
+      }
       po_facts: {
         Row: {
           created_at: string | null
@@ -2574,6 +3030,13 @@ export type Database = {
             foreignKeyName: "purchase_order_lines_po_id_fkey"
             columns: ["po_id"]
             isOneToOne: false
+            referencedRelation: "po_billing_totals"
+            referencedColumns: ["po_id"]
+          },
+          {
+            foreignKeyName: "purchase_order_lines_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
             referencedRelation: "po_facts"
             referencedColumns: ["id"]
           },
@@ -2614,6 +3077,19 @@ export type Database = {
           role: string
           team: string
         }[]
+      }
+      create_bill: {
+        Args: {
+          p_gst_amount: number
+          p_invoice_date: string
+          p_invoice_no: string
+          p_labour_contract_id: string
+          p_note: string
+          p_po_id: string
+          p_taxable_amount: number
+          p_total_amount: number
+        }
+        Returns: string
       }
       create_goods_receipt: {
         Args: {
