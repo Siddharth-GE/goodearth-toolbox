@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { ActivityFeed } from "./_components/activity-feed";
 import { BudgetVsActual } from "./_components/budget-vs-actual";
 import { KpiRow } from "./_components/kpi-row";
+import { ManagementVision } from "./_components/management-vision";
 import { MarathonLiveCard } from "./_components/marathon-live-card";
 import { OperationsPipeline } from "./_components/operations-pipeline";
 import { PendingApprovals } from "./_components/pending-approvals";
@@ -39,6 +40,7 @@ export default async function DashboardHome() {
       </div>
 
       <div className="space-y-5">
+        <ManagementVision />
         {/* Fetches its own counts now that Indents is real, so it gets
             its own boundary rather than holding up the whole page. */}
         <Suspense
