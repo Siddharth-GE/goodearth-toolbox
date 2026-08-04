@@ -105,7 +105,7 @@ export type PoStoreOption = { id: string; name: string };
 export type PoFormOptions = {
   projects: PoProjectOption[];
   plots: PoScopedOption[];
-  units: PoScopedOption[];
+  units: (PoScopedOption & { plot_id: string | null })[];
   vendors: PoVendorOption[];
   stores: PoStoreOption[];
 };
@@ -124,7 +124,13 @@ export async function getPoFormOptions(): Promise<PoFormOptions> {
   return {
     projects: projects.map(({ id, name, code }) => ({ id, name, code })),
     plots: plots.map(({ id, project_id, name, code }) => ({ id, project_id, name, code })),
-    units: units.map(({ id, project_id, name, code }) => ({ id, project_id, name, code })),
+    units: units.map(({ id, project_id, plot_id, name, code }) => ({
+      id,
+      project_id,
+      plot_id,
+      name,
+      code,
+    })),
     vendors: vendors.map(({ id, name }) => ({ id, name })),
     stores: stores.filter((store) => store.is_active).map(({ id, name }) => ({ id, name })),
   };

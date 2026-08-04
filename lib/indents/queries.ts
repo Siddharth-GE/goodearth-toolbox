@@ -892,12 +892,12 @@ export async function countIndentsPipeline(): Promise<{
 }
 
 export type ProjectOption = { id: string; name: string; code: string | null };
-export type ScopedOption = { id: string; project_id: string; name: string };
+export type ScopedOption = { id: string; project_id: string; name: string; code: string | null };
 
 export type IndentFormOptions = {
   projects: ProjectOption[];
   plots: ScopedOption[];
-  units: ScopedOption[];
+  units: (ScopedOption & { plot_id: string | null })[];
 };
 
 /** Everything the new-indent form needs, in one gated call. The masters
@@ -907,7 +907,13 @@ export async function getIndentFormOptions(): Promise<IndentFormOptions> {
   const [projects, plots, units] = await Promise.all([listProjects(), listPlots(), listUnits()]);
   return {
     projects: projects.map(({ id, name, code }) => ({ id, name, code })),
-    plots: plots.map(({ id, project_id, name }) => ({ id, project_id, name })),
-    units: units.map(({ id, project_id, name }) => ({ id, project_id, name })),
+    plots: plots.map(({ id, project_id, name, code }) => ({ id, project_id, name, code })),
+    units: units.map(({ id, project_id, plot_id, name, code }) => ({
+      id,
+      project_id,
+      plot_id,
+      name,
+      code,
+    })),
   };
 }
