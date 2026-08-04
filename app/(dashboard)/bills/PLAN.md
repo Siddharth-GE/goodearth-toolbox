@@ -2,15 +2,24 @@
 
 **Status: built on `feature/bills` 2026-08-04**, awaiting the founder's
 browser gates (record a real bill; approve → pay one) before merge.
-Migration `0025` (applied to production the same day). Every founder
-decision: root STATUS.md's "Decisions locked in" and the session log.
+Migrations `0025` + `0026` (both applied to production the same day).
+Every founder decision: root STATUS.md's "Decisions locked in" and the
+session log.
 
 The accounts-facing record of what Goodearth owes and has paid: a
-vendor's paper invoice recorded against **exactly one anchor** — an
-issued purchase order or an active labour contract — numbered
-`BILL/<project>/<plot-or-unit-or-GEN>/NNN` (the PO shape; the scope
-comes from the anchor, never picked at bill time), moving
-recorded → approved → paid with send-back carrying a mandatory note.
+bill is one of **three kinds** — against an issued purchase order,
+against an **approved** labour contract, or **NMR (daily wages)** with
+no anchor at all — numbered `BILL/<project>/<plot-or-unit-or-GEN>/NNN`
+(the PO shape; PO/contract bills derive the scope from their anchor,
+NMR picks it directly), moving recorded → approved → paid with
+send-back carrying a mandatory note.
+
+**Second pass (0026, same day, founder corrections):** labour
+contracts moved out of Masters into Bills itself (`/bills/contracts`),
+gained a `pending_approval → approved` step (same deciders as bills,
+terms lock on approval, deactivate is the correction path), and NMR
+arrived with an **optional** vendor (a contractor when one supplied
+the workers, nothing when the muster roll is paid directly).
 
 ## The rules everything rests on
 
@@ -21,7 +30,8 @@ recorded → approved → paid with send-back carrying a mandatory note.
    `lib/bills/workflow.ts` mirrors it for buttons.
 2. **Approvers are a named list** (`bill_approvers`, managed in
    Settings beside indent approvers; admins always may).
-   **Self-approval allowed** — founder decision.
+   **Self-approval allowed** — founder decision. The same list
+   approves labour contracts (`labour_contracts_guard`, 0026).
 3. **Amounts are stored as entered** from the paper invoice
    (taxable/GST/total — the vendor's figures, never computed, no
    total-equals-sum CHECK). Over-billing against the PO value or
@@ -38,9 +48,12 @@ recorded → approved → paid with send-back carrying a mandatory note.
    vendor-inactive check — a real invoice from a deactivated vendor
    still enters the books; the contract's own `is_active` is the
    off-switch.
-6. **Labour contracts are a Masters table** (`lib/masters/
-labour-contracts*.ts`, two-file split) — vendor, project, optional
-   plot/unit (at most one), what it covers, value, active toggle.
+6. **Labour contracts belong to Bills** (0026 — 0025 had them in
+   Masters; the founder moved them): created at `/bills/contracts` by
+   any `/bills` holder, `pending_approval` until a decider approves,
+   terms permanent after. `kind` on bills is explicit
+   (`po`/`contract`/`nmr`) with CHECKs tying it to the anchors;
+   `vendor_id` is nullable for NMR only.
 
 ## Milestones
 

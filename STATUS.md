@@ -19,11 +19,11 @@ fully real + one real project run end-to-end.
 | ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
 | Last worked        | 2026-08-04                                                                                                              |
 | Branch             | `feature/bills` — Phase 8 built, awaiting browser gates + merge                                                         |
-| Migrations applied | `0001`–`0025` (next is `0026`)                                                                                          |
+| Migrations applied | `0001`–`0026` (next is `0027`)                                                                                          |
 | Items in database  | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands                                          |
 | Thumbnails         | 897 in Supabase Storage; 1,736 items use the colour placeholder                                                         |
 | Built tools        | Marathon, Settings, Masters, Selections, Budgets (Interiors + Construction), Indents, Purchase Orders, Inventory, Bills |
-| Tests              | `npm test` — 85, all pure logic                                                                                         |
+| Tests              | `npm test` — 88, all pure logic                                                                                         |
 
 ## Next up
 
@@ -74,17 +74,22 @@ fully real + one real project run end-to-end.
   Over-ordering is impossible at the database (unique + advisory-lock
   guard); a PO line's uom is locked to its indent line's.
 - Deleting an issued PO is request → admin approves, trigger-enforced.
-- Bills (Phase 8, 2026-08-04): a bill anchors on **exactly one** issued
-  PO or active labour contract; numbered `BILL/<project>/<scope>/NNN`
-  with the scope **derived from the anchor**, never picked; amounts
-  stored **as entered** from the paper (no total-equals-sum CHECK);
-  over-billing **warns, never blocks**; **self-approval allowed**;
-  paying needs one free-text `payment_ref`; "Unpaid" =
-  `status <> 'paid'`; recorded bills are recorder-or-admin deletable,
-  approved/paid are permanent. Labour contracts live in Masters with an
-  optional plot/unit. Bill money is `/bills`-gated; the windows are
-  `bill_facts` (money-free, open) and `po_billing_totals`
-  (`/purchase-orders` OR `/bills`, one totals row per PO).
+- Bills (Phase 8, 2026-08-04): a bill is one of **three kinds** — an
+  issued PO, an **approved** labour contract, or **NMR daily wages**
+  (no anchor, vendor optional — nothing when the muster roll is paid
+  directly); numbered `BILL/<project>/<scope>/NNN`, the scope derived
+  from the anchor (NMR picks it directly); amounts stored **as
+  entered** from the paper (no total-equals-sum CHECK); over-billing
+  **warns, never blocks** (NMR never warns — no ceiling exists);
+  **self-approval allowed**; paying needs one free-text `payment_ref`;
+  "Unpaid" = `status <> 'paid'`; recorded bills are recorder-or-admin
+  deletable, approved/paid are permanent. **Labour contracts live in
+  the Bills tool** (`/bills/contracts`, moved out of Masters in 0026):
+  any `/bills` holder records one, a bill approver or admin approves
+  it, terms lock on approval, deactivating is the off-switch. Bill
+  money is `/bills`-gated; the windows are `bill_facts` (money-free,
+  open) and `po_billing_totals` (`/purchase-orders` OR `/bills`, one
+  totals row per PO).
 - Attribution everywhere: `components/ui/attribution.tsx` + stamp
   `updated_by`.
 - Item codes are 4-letter sub-type + 3 digits (`BENS001`); nothing
@@ -154,13 +159,15 @@ fully real + one real project run end-to-end.
 
 One line per day; full detail in git history and the PLAN.md files.
 
-- **2026-08-04** — **Bills built end to end** (`0025`, both milestones,
-  branch `feature/bills` awaiting the founder's browser gates): labour
-  contracts in Masters, record/approve/send-back/pay, over-billing
-  warning, bill approvers in Settings, PO billed picture, Overview
-  04–05 real. The Studio bottleneck fell: migrations now apply from
-  this machine via the management API (token in `.env.local`). Also:
-  docs slimmed earlier the same day (CLAUDE.md, this file, TODO.md).
+- **2026-08-04** — **Bills built end to end** (`0025` + `0026`, branch
+  `feature/bills` awaiting the founder's browser gates):
+  record/approve/send-back/pay, over-billing warning, bill approvers in
+  Settings, PO billed picture, Overview 04–05 real. Founder corrections
+  same day (`0026`): labour contracts moved from Masters into Bills
+  with their own approval step, and **NMR daily-wage bills** added (no
+  anchor, vendor optional). The Studio bottleneck fell: migrations now
+  apply from this machine via the management API (token in
+  `.env.local`). Also: docs slimmed earlier the same day.
 - **2026-08-03** — three phases in one day. **Indents** (5 gates) — and
   the production outage found, hotfixed and permanently guarded
   (`check:actions`); margin secrecy proved as a real single-grant user.
