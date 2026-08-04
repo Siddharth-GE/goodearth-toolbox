@@ -8,9 +8,10 @@ import type { ReactNode } from "react";
  *
  * Eight pages carried this same block hand-typed — identical classes,
  * eight chances to drift — before it became a component. It is NOT
- * PageHeader: that one is the sticky, backdrop-blurred bar for
- * kiosk-style screens with real scroll length (Marathon); this is the
- * static heading a dashboard page starts with.
+ * PageHeader (app/marathon/_components/page-header.tsx): that one is
+ * the sticky, backdrop-blurred bar for kiosk-style screens with real
+ * scroll length (Marathon); this is the static heading a dashboard
+ * page starts with.
  */
 export function PageTitle({
   title,

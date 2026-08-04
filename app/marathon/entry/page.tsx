@@ -2,7 +2,7 @@ import { BibCard } from "@/app/marathon/_components/bib-card";
 import { EntryForm } from "@/app/marathon/_components/entry-form";
 import { ExitButton } from "@/app/marathon/_components/exit-button";
 import { copy } from "@/app/marathon/_lib/copy";
-import { PageHeader } from "@/components/ui/page-header";
+import { PageHeader } from "@/app/marathon/_components/page-header";
 import { agentLogout } from "@/lib/marathon/actions";
 import { getEntryFormData, getSavedEntry } from "@/lib/marathon/queries";
 import { requireAgentSession } from "@/lib/marathon/session";

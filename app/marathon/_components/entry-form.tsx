@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatedReveal } from "@/components/ui/animated-reveal";
+import { AnimatedReveal } from "./animated-reveal";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";

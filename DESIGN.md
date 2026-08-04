@@ -76,7 +76,10 @@ A named scale — use these combinations, not arbitrary sizes:
 
 ## Motion
 
-Sparing, on purpose. Two reusable patterns, both in `components/ui/`:
+Sparing, on purpose. Two reusable patterns, both currently used only by
+the Marathon kiosk and so living in `app/marathon/_components/` (they
+move back to `components/ui/` only if a second kiosk-style tool
+appears):
 
 - **`PageHeader`** — the sticky `bg-background/95 backdrop-blur` +
   hairline-border treatment for a screen's title/tabs + primary action
@@ -135,15 +138,15 @@ Marathon's admin nav is the reference implementation.
 
 ## Component inventory
 
-Built: `animated-reveal`, `avatar`, `badge` (+ status variants),
-`button`, `card`, `checkbox`, `dialog`, `dropdown-menu`, `empty-state`,
-`form-message`, `icon-button`, `input`, `label`, `page-header`,
-`page-title`, `pagination`, `select`, `spinner`, `table`, `tabs`
-(+ `NavTabs`), `textarea`.
+Built: `avatar`, `badge` (+ status variants), `button`, `card`,
+`checkbox`, `dialog`, `dropdown-menu`, `empty-state`, `form-message`,
+`icon-button`, `input`, `label`, `page-title`, `pagination`, `select`,
+`spinner`, `table`, `tabs` (+ `NavTabs`), `textarea`.
 
 `PageTitle` vs `PageHeader`: `PageTitle` is the static h1/description/
-back-link block every dashboard screen starts with; `PageHeader` is the
-sticky, backdrop-blurred bar for kiosk screens with real scroll length
+back-link block every dashboard screen starts with; `PageHeader`
+(`app/marathon/_components/page-header.tsx`) is the sticky,
+backdrop-blurred bar for kiosk screens with real scroll length
 (Marathon). Don't hand-roll either.
 
 Shared domain components live in `components/masters/`: `item-thumb`,
