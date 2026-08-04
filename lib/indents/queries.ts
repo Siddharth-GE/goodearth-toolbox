@@ -577,6 +577,13 @@ export async function getBudgetPull(
     .maybeSingle();
   if (!budget || !budget.selection_id || !budget.unit_id) return null;
 
+  // An indent tagged to a unit pulls from that unit alone — the chooser
+  // never offers another unit's budget, so arriving here with one is a
+  // pasted URL.
+  const indent = await getIndentHeader(indentId);
+  if (!indent) return null;
+  if (indent.unit_id && indent.unit_id !== budget.unit_id) return null;
+
   const [{ data: budgetLines }, { data: selectionLines }, { data: spaces }, { data: selection }] =
     await Promise.all([
       fetchAll((from, to) =>
@@ -601,17 +608,33 @@ export async function getBudgetPull(
       supabase.from("spaces").select("id, label, sort_order").eq("unit_id", budget.unit_id),
       supabase
         .from("selections")
-        .select("revision_no, units(name)")
+        .select("revision_no, status, units(name)")
         .eq("id", budget.selection_id as string)
         .maybeSingle(),
     ]);
 
-  // Every line already raised against THIS budget, on any indent.
+  // Only the current design revision may be requested against. The
+  // chooser already filters; this holds against a stale tab or a pasted
+  // URL, and the 0028 trigger backstops the insert itself.
+  if (selection?.status !== "issued") return null;
+
+  // Every line already raised against ANY of this unit's budgets, on any
+  // indent. line_key is stable across revisions, so a line pulled from
+  // R1's budget must show as already asked when R2's budget is on
+  // screen — scoping this to one budget_id was the double-buy bug.
+  const { data: siblingBudgets } = await supabase
+    .from("approved_budgets")
+    .select("id")
+    .eq("unit_id", budget.unit_id);
+  const siblingIds = (siblingBudgets ?? [])
+    .map((row) => row.id)
+    .filter((id): id is string => id != null);
+
   const { data: raised } = await fetchAll((from, to) =>
     supabase
       .from("indent_lines")
       .select("line_key, quantity, indent_id")
-      .eq("budget_id", budgetId)
+      .in("budget_id", siblingIds)
       .order("id")
       .range(from, to),
   );
