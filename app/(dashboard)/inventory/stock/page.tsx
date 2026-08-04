@@ -12,7 +12,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatQuantity } from "@/lib/format";
-import { isLocationKind, listStockByLocation, type LocationKind } from "@/lib/inventory/queries";
+import {
+  isLocationKind,
+  listStockByLocation,
+  type LocationKind,
+} from "@/lib/inventory/stock-queries";
 import { Boxes } from "lucide-react";
 import Link from "next/link";
 import { InventoryNav } from "../_components/inventory-nav";

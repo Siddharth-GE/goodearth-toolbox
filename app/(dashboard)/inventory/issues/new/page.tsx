@@ -1,7 +1,8 @@
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageTitle } from "@/components/ui/page-title";
 import { Select } from "@/components/ui/select";
-import { getIssueFormOptions, listStoreHoldings } from "@/lib/inventory/queries";
+import { getIssueFormOptions } from "@/lib/inventory/issues-queries";
+import { listStoreHoldings } from "@/lib/inventory/stock-queries";
 import { PackageMinus } from "lucide-react";
 import Link from "next/link";
 import { IssueForm } from "../../_components/issue-form";

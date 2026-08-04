@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDate, formatQuantity } from "@/lib/format";
-import { getGoodsReceipt } from "@/lib/inventory/queries";
+import { getGoodsReceipt } from "@/lib/inventory/receipts-queries";
 import { notFound } from "next/navigation";
 
 export default async function ReceiptPage({ params }: { params: Promise<{ receiptId: string }> }) {

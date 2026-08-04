@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDate, formatQuantity } from "@/lib/format";
-import { getStockIssue } from "@/lib/inventory/queries";
+import { getStockIssue } from "@/lib/inventory/issues-queries";
 import { notFound } from "next/navigation";
 
 export default async function IssuePage({ params }: { params: Promise<{ issueId: string }> }) {

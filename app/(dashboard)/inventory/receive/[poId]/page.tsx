@@ -1,6 +1,6 @@
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageTitle } from "@/components/ui/page-title";
-import { getReceivePool } from "@/lib/inventory/queries";
+import { getReceivePool } from "@/lib/inventory/receipts-queries";
 import { PackageCheck } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import { ReceiveBasket } from "../../_components/receive-basket";

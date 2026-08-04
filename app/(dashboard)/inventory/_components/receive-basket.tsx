@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/table";
 import { formatQuantity } from "@/lib/format";
 import { recordGoodsReceipt } from "@/lib/inventory/actions";
-import type { ReceivePool } from "@/lib/inventory/queries";
+import type { ReceivePool } from "@/lib/inventory/receipts-queries";
 import { isFullyReceivedOrder } from "@/lib/inventory/stock";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
