@@ -1,5 +1,6 @@
 import "server-only";
 
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -13,15 +14,22 @@ export type GstRateRow = {
   created_at: string;
 };
 
+// fetchAll for consistency with the other masters reads: every list
+// here promises completeness, so none of them get to silently cap.
+// (rate is the primary key, so it is its own unique tiebreaker.)
 export async function listGstRates(): Promise<GstRateRow[]> {
   const supabase = await createClient();
-  const { data } = await supabase.from("gst_rates").select("*").order("rate");
+  const { data } = await fetchAll((from, to) =>
+    supabase.from("gst_rates").select("*").order("rate").range(from, to),
+  );
   return (data ?? []) as GstRateRow[];
 }
 
 /** Only the rates a PO line may pick today. */
 export async function listActiveGstRates(): Promise<GstRateRow[]> {
   const supabase = await createClient();
-  const { data } = await supabase.from("gst_rates").select("*").eq("is_active", true).order("rate");
+  const { data } = await fetchAll((from, to) =>
+    supabase.from("gst_rates").select("*").eq("is_active", true).order("rate").range(from, to),
+  );
   return (data ?? []) as GstRateRow[];
 }

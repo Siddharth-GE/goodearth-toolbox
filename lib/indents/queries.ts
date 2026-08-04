@@ -190,12 +190,18 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
   // "Ordered X of Y" per line, through the money-free po_line_facts view
   // (migration 0022) — quantities and references only, never a rate, so
   // a site user without /purchase-orders still sees fulfilment.
+  // Read to completion: these rows are SUMMED into ordered quantities,
+  // so a silent 1,000-row cap would under-report "ordered X of Y".
   const lineIds = (lines ?? []).map((line) => line.id);
   const { data: orderedFacts } = lineIds.length
-    ? await supabase
-        .from("po_line_facts")
-        .select("indent_line_id, quantity, po_reference, po_status")
-        .in("indent_line_id", lineIds)
+    ? await fetchAll((from, to) =>
+        supabase
+          .from("po_line_facts")
+          .select("indent_line_id, quantity, po_reference, po_status")
+          .in("indent_line_id", lineIds)
+          .order("id")
+          .range(from, to),
+      )
     : { data: [] };
 
   const orderedByLine = new Map<string, { quantity: number; refs: Set<string> }>();
