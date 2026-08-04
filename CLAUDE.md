@@ -1,451 +1,89 @@
 # goodearth-toolbox
 
-Internal tools platform for Goodearth, a design-led real estate company in Kerala, India (~70 staff plus contractors). Replacing spreadsheet- and AppSheet-based workflows with one self-hosted platform: multiple tools, one per business function, used independently by different teams but connected through one shared Supabase (Postgres) database.
+Internal tools platform for Goodearth, a design-led real estate company
+in Kerala (~70 staff). One self-hosted Next.js + Supabase (Postgres)
+app replacing spreadsheet/AppSheet workflows: many tools, one per
+business function, one shared database. Serves ~200 users max — keep it
+simple, no over-engineering, no extra libraries unless truly needed.
 
-**Live on Vercel** (auto-deploys from `master` on every push — see
-README.md). **Shipped: Marathon, Settings, Masters, Selections,
-Budgets (two trees: Interiors + Construction), Indents, Purchase
-Orders.** Every other tool below is a Coming Soon stub, sidebar-ready
-but not yet built.
+**Read first, every session: `STATUS.md`** (what's shipped, settled
+decisions, session log) **then `TODO.md`** (the build plan for what's
+next). `DESIGN.md` before styling anything. Each tool keeps its own
+`PLAN.md` next to its code — check it before touching that tool.
 
-These are phases 1–6 of a multi-phase rebuild of Goodearth's
-operational system (Masters → Selections → Budgets → Indents → Purchase
-Orders → Inventory → Bills, replacing AppSheet). **Read `STATUS.md` at
-the repo root first** — what's shipped, which decisions are settled,
-and the session log — **then `TODO.md`** — the detailed build plan for
-the next phases, written to be picked up with no context but the repo.
+**Shipped:** Marathon (kiosk), Settings, Masters, Selections, Budgets,
+Indents, Purchase Orders, Inventory. **Next:** Bills, then more (Site
+Tracker, Directory, Training). Unbuilt tools are Coming Soon stubs —
+route and sidebar entry already exist in `lib/tools.ts`; building one
+means flipping `built: true` and replacing the stub `page.tsx`.
 
-## Tools
+## Architecture — first principles
 
-Built: **Marathon** — event registration app: field agents with simple PIN logins register runners (name, age, gender, mobile, t-shirt size, run type); category auto-assigned from age+gender; bib numbers auto-generated with category prefix; groups (schools/clubs) and agents managed by admin; entries counter on agent home; filtered lists throughout. Agents have basic literacy — UI must be extremely simple. Live at `/marathon` on the production domain, no Toolbox login needed — see `app/marathon/PLAN.md` for status and pending launch-readiness items.
+- **Structure.** A tool is `app/(dashboard)/<tool>/` (screens) plus
+  `lib/<tool>/` (`queries.ts` reads, `actions.ts` writes). Kiosk-style
+  tools with their own auth live top-level (`app/marathon/` — the only
+  one; not the pattern to copy). Platform actions (login/logout) in
+  `app/actions/`; everything tool-specific in `lib/<tool>/`.
+- **Access.** The app grant IS the permission boundary (`user_apps` +
+  Settings; admins get everything). Every query/action calls
+  `requireTool("<href>")` from `lib/auth/access.ts` first — sidebar
+  visibility is cosmetic. Actions return the shared `ActionState`
+  (`lib/action-state.ts`), never throw. Dashboard tools use the
+  RLS-scoped client (`lib/supabase/server.ts`), never the admin client.
+- **Shared masters** (`lib/masters/`): reads are ungated, any tool
+  calls them; writes require the `/masters` grant. Two files per
+  master — queries (`import "server-only"`) and actions (file-level
+  `"use server"`) — never mixed, and **never `export type` re-exports
+  from a `"use server"` file** (caused a production outage;
+  `npm run check:actions` in CI enforces this).
+- **Money stays confined.** Indents carry no money. PO money is
+  RLS-gated to the `/purchase-orders` grant; consumers read the
+  money-free views (`po_facts`/`po_line_facts`, `approved_budgets`/
+  `approved_budget_lines`) — never add money columns to them, never add
+  a second SELECT policy on gated tables. Cross-tool lines anchor on
+  stable ids (`purchase_order_lines.id`, `indent_lines.id`) or the
+  `(budget_id, line_key)` composite FK — never a bare `line_key`.
+- **Reads.** PostgREST silently caps selects at 1,000 rows. Anything
+  needing completeness (merges, lookups, carry-forward) goes through
+  `fetchAll` (`lib/supabase/fetch-all.ts`); on-screen lists state a
+  limit and show "N of M" from a real count, never `rows.length`.
+- **Database.** Every schema change is a numbered SQL file in
+  `supabase/migrations/`, additive only, never edited once applied.
+  Apply in Supabase Studio **before** deploying dependent code, then
+  `npm run db:types` and commit types with the migration. New tool →
+  extend the `user_apps_app_known` CHECK in the same migration.
+- **UI.** Every screen from `components/ui/*` (+ `components/masters/*`
+  for shared domain pieces) — no one-off styles, no raw color classes.
+  All formatting through `lib/format.ts`. Every route gets a
+  `loading.tsx` with the shared `Spinner`. If a tool uses the catalogue
+  picker, add its grant to the allow-list in
+  `app/api/catalogue/route.ts` or the picker silently 403s.
+- **Tests** cover pure logic only (`npm test`, node:test via tsx) — no
+  database, no browser; extract pure modules to test them. CI
+  (typecheck, prettier, build, check:actions) is the gate; no hooks.
 
-Built: **Settings** (`/settings`) — the admin console for per-user app
-access: one row per person, one checkbox per grantable tool. Admins
-always have every app and aren't shown checkboxes for it. This _is_
-the access-control mechanism (`user_apps` table +
-`lib/auth/access.ts`'s `requireApp`/`requireAdmin`), not just a sidebar
-filter — see "Other architecture principles" below.
+## Git
 
-Built: **Masters** (`/masters`) — the shared foundation every later
-tool reads from: projects, plots, units, clients, vendors, stores,
-items (one table for both catalogue products and raw materials, via a
-`kind` column), item categories, and brands. (Space types exist in the
-schema and feed Selections' add-space flow, but have no Masters screen
-or route — schema-only, on purpose.) `NavTabs`
-across all of them; plain table + `Dialog` create/edit form per master.
-Read functions in `lib/masters/*.ts` have no `requireApp` gate (any
-tool calls them directly under its own grant); only writes require the
-`/masters` grant. See `app/(dashboard)/masters/PLAN.md`.
-
-Built: **Selections** (`/selections`) — the per-unit design workspace:
-spaces, the catalogue picker over all items, issue → immutable revision
-→ R+1 carrying `line_key`, line-by-line diff, item requests, design
-document PDF/CSV. See `app/(dashboard)/selections/PLAN.md`.
-
-Built: **Budgets** (`/budgets`) — two trees under one grant.
-**Interiors**: price an issued revision (cost + margin → generated
-client rate), reversible approval with versions, the internal budget
-sheet and the client quote. **Construction**
-(`/budgets/construction`): the QS team's stage-wise quantity plan per
-unit — materials and quantities only, no money, no approval — which
-site indents pull from. See `app/(dashboard)/budgets/PLAN.md`.
-
-Built: **Indents** (`/indents`) — site teams raise numbered material
-requests (`IND/<project code>/NNN`, minted in the database) against a
-project, filled from three sources: a construction plan stage, an
-approved interiors budget (via the money-free `approved_*` views), or a
-direct catalogue pick. Draft → submitted → approved, enforced by
-database triggers; approvers are a named list managed in Settings.
-Indents carry **no money anywhere**. See
-`app/(dashboard)/indents/PLAN.md`.
-
-Built: **Purchase Orders** (`/purchase-orders`) — approved indent lines
-become one-vendor, one-plot/unit POs
-(`PO/<project code>/<plot-or-unit code>/NNN`, minted per scope in the
-database; plot/unit short codes set in Masters). Money enters the
-system here: a rate plus a GST slab per line (slabs are the `gst_rates`
-master), amounts always computed, totals by slab, a letterhead PDF.
-Draft → issued; deleting an issued PO is request-then-admin-approves —
-all trigger-enforced. Over-ordering an indent line is impossible at the
-database. PO money is RLS-gated to the `/purchase-orders` grant; other
-tools read the money-free `po_facts`/`po_line_facts` views. See
-`app/(dashboard)/purchase-orders/PLAN.md`.
-
-**Overview** (`/`, `app/(dashboard)/page.tsx`) — the shell's home page,
-not a `lib/tools.ts` entry (every signed-in user sees it, regardless of
-app grants). This already fulfills what the roadmap used to call
-"Dashboard" — a read-only overview across all tools — so that's no
-longer a separate planned tool. It's a mix of real data (the Marathon
-card; the pipeline's stage 01, which counts real indents) and
-clearly-static illustrative widgets for tools that don't exist yet
-(pipeline stages 02–05, KPIs, budget bars, PO table, approvals, people,
-activity) — swap each widget for a real query as its tool actually
-ships, same file, no restructuring needed.
-
-Planned, roughly in build order — **this list will keep growing**; the pattern below for adding a tool matters more than the exact names (Phases 7–8 are fully planned in `TODO.md`):
-
-- Inventory / Store — goods receipt against POs (into a store or direct to site), stock by store, issue to manufacturing
-- Bills — recording against POs and labour contracts, approve → paid
-- Site Tracker — (details TBD as it's scoped)
-- Directory, Training — people-side tools
-
-Every tool above already has a sidebar entry and a route
-(`lib/tools.ts`, grouped Operations/Events/People/Admin) even before
-it's built — see "Coming Soon stubs" below.
-
-## Project structure
-
-Two different tool-shell patterns — pick the one that fits, don't
-default to copying Marathon:
-
-- **Normal tools** (the vast majority) live _inside_ the dashboard
-  shell, keeping the sidebar/topbar: `app/(dashboard)/<tool>/`.
-- **Kiosk-style tools** — a separate device, its own auth, no sidebar —
-  live top-level with their own layout, opting _out_ of the dashboard
-  shell entirely: `app/<tool>/` (Marathon is the only one so far; its
-  `proxy.ts` exemption and separate PIN auth only make sense because
-  it's genuinely a standalone kiosk, not the default to reach for).
-
-```
-app/
-  (auth)/            unauthenticated shell — login
-  (dashboard)/        authenticated shell — sidebar + Overview home.
-                       Normal tools live here: app/(dashboard)/<tool>/
-    _components/       components used only by the Overview page today
-  actions/            platform-level server actions (e.g. login/logout).
-                       A tool's own actions do NOT go here — see below.
-  <tool>/              kiosk-style tools only (see above) — own layout,
-                       opts out of the dashboard shell (e.g. app/marathon/)
-    _components/       components used only by this tool
-    _lib/               route-local helpers only this tool needs (e.g.
-                        bilingual copy strings) — NOT the same thing as
-                        the top-level lib/ below; see "Two kinds of lib"
-    PLAN.md            this tool's own build notes/checklist
-components/
-  ui/                 shared primitives — Button, Input, Card, Dialog,
-                       etc. Every screen in every tool is built from
-                       these. Never write one-off styles.
-  masters/             shared domain components used across multiple
-                       tools — item-thumb, project-picker, and
-                       record-form-dialog (the create/edit shell every
-                       Masters record uses). Not generic enough for ui/,
-                       not specific enough to belong to one tool.
-  layout/              shell-level components (e.g. the sidebar)
-lib/
-  <tool>/              each tool's own server data-layer: actions.ts,
-                       queries.ts, and anything else tool-specific
-                       (Marathon also has session.ts for its kiosk PIN
-                       auth). Mirrors app/<tool>/.
-  masters/             shared queries/mutations for Projects, Plots,
-                       Units, Clients, Vendors, Stores, Items — one
-                       queries file (`<name>.ts`, reads, `server-only`)
-                       + one actions file (`<name>-actions.ts`, writes,
-                       file-level `"use server"`) per master, used by
-                       every tool that needs them. See "Shared masters"
-                       below for why writes need their own file.
-  auth/                platform auth helpers: current user, requireUser
-                       (dal.ts), and requireApp/requireAdmin (access.ts)
-                       — the real access-control boundary, see below
-  supabase/            Supabase client setup (admin/server/client/proxy)
-  tools.ts             the sidebar registry — every tool adds one entry
-                       here to become visible (see checklist below)
-supabase/
-  migrations/          numbered SQL files, applied in order — see
-                       "Database changes" below
-```
-
-### Two kinds of "lib"
-
-`app/<tool>/_lib/` and top-level `lib/<tool>/` are both real and both
-correct — they're different things that happen to share a word:
-
-- `app/<tool>/_lib/` — the underscore is a Next.js convention meaning
-  "not a route." Holds small things private to that tool's UI, like
-  Marathon's bilingual copy strings.
-- `lib/<tool>/` — the tool's actual server-side data layer: actions,
-  queries, session handling. This is where the real logic lives.
-
-### Where server actions live
-
-`app/actions/` is for platform-level concerns only (today: just
-login/logout). A tool's own actions — creating an entry, verifying a
-PIN, anything tool-specific — belong in `lib/<tool>/actions.ts`,
-alongside that tool's `queries.ts`. Don't add tool-specific actions to
-`app/actions/`, and don't move `login`/`logout` into a tool folder —
-they're genuinely shared across every tool.
-
-## Coming Soon stubs
-
-Every planned tool already has a `lib/tools.ts` entry with
-`built: false`, so it shows up in the grouped sidebar and has a real
-route today, even before any real work starts — it just renders the
-shared `app/(dashboard)/_components/coming-soon.tsx` (a thin wrapper
-around `components/ui/empty-state.tsx`) instead of a real screen. Each
-stub `page.tsx` looks the same: look up its own entry in `TOOLS` by
-`href`, pass its `name`/`description`/icon into `<ComingSoon>`. When a
-tool actually gets built, replace that one file's contents (and flip
-`built: true` in `lib/tools.ts`) — the route, sidebar entry, and group
-are already correct and don't need to change.
-
-## Adding a new tool — checklist
-
-1. Decide the shell: `app/(dashboard)/<tool>/` for a normal tool (the
-   default), or top-level `app/<tool>/` with its own `layout.tsx` only
-   if it's genuinely kiosk-style like Marathon — see "Two kinds of
-   shell" above. If it already exists as a Coming Soon stub, flip
-   `built: true` in `lib/tools.ts` and replace that route's `page.tsx`.
-2. `lib/<tool>/actions.ts` and `queries.ts` for its data layer. Reuse
-   `lib/masters/*` for anything touching Projects/Plots/Items/Vendors/
-   Stores — don't re-query or re-implement master data per tool. Every
-   action and query must call `requireTool("<href>")`
-   (`lib/auth/access.ts`) first — sidebar visibility is only cosmetic,
-   this call is the real permission boundary, same principle as
-   Marathon's `requireAgentSession`/`requireAdminSession`. Actions
-   return the shared `ActionState` (`lib/action-state.ts`), never throw.
-   Dashboard tools use the RLS-scoped server client
-   (`lib/supabase/server.ts`); Marathon's service-role bypass
-   (`lib/supabase/admin.ts`) is a kiosk-only exception, not the pattern
-   to copy.
-   **Reads come in two kinds — pick deliberately.** PostgREST silently
-   caps any un-ranged select at 1,000 rows. A read whose correctness
-   depends on completeness (a merge, a carry-forward, a lookup map, an
-   access-control grid) goes through `fetchAll`
-   (`lib/supabase/fetch-all.ts`); a list on screen states its own limit
-   and shows "N of M" from an exact database count (the
-   `MARATHON_LIST_LIMIT` pattern). Never derive a count from
-   `rows.length`.
-3. Build every screen from `components/ui/*` (and `components/masters/*`
-   where relevant). Never one-off styles — see DESIGN.md.
-   **If the tool renders `components/masters/catalogue-picker.tsx`, add
-   its grant to the allow-list in `app/api/catalogue/route.ts`** — that
-   Route Handler gates by an explicit list of tools, so a missing entry
-   makes the picker return 403 and sit empty inside the dialog rather
-   than refusing in any visible way. Phase 7 shipped this bug and only
-   a smoke run as a real single-grant user caught it; an admin passes
-   every check and never sees it.
-4. Add (or update) its entry in `lib/tools.ts` — `group`, `icon`,
-   `built: true` — so it shows up correctly in the sidebar. Then grant
-   it to whichever staff need it in Settings (`/settings`) — a tool
-   with no grants is invisible to everyone but admins.
-5. Start `app/<tool>/PLAN.md` — that tool's own build checklist and
-   bookmark, same pattern as `app/marathon/PLAN.md`.
-6. Any new tables as a numbered file in `supabase/migrations/` — see
-   below. Every transactional table links to a project/plot. In the same
-   migration, **extend the `user_apps_app_known` CHECK constraint**
-   (added in `0017`) with the new tool's slug — without that, granting
-   the tool in Settings fails at the database.
-7. If the Overview page (`app/(dashboard)/page.tsx`) has a static
-   illustrative widget standing in for this tool, swap it for a real
-   query from step 2 — same file and component, not a rebuild.
-
-For tools consuming Budgets: anchor lines on
-**`(budget_id, line_key)` with a composite foreign key** to
-`budget_lines`' existing unique — never a bare `line_key`, which is only
-unique within one revision and can't be FK-enforced alone. Indents does
-exactly this (`indent_lines`, migration `0019`) — copy it, and read
-interiors budget data only through the `approved_budgets` /
-`approved_budget_lines` views, never the gated tables (see
-`lib/indents/queries.ts`).
-
-For tools consuming Purchase Orders (Inventory's receipts, Bills):
-anchor on **`purchase_order_lines.id`** — a stable row id, the same way
-PO lines anchor on `indent_lines.id`. PO money (rate, gst_pct) is
-RLS-gated to the `/purchase-orders` grant; a consumer that needs line
-facts without money reads the **`po_facts` / `po_line_facts` views**
-(migration `0022`), whose column lists ARE the boundary — never add a
-money column to them, and never solve a read need with a second SELECT
-policy on the PO tables (permissive policies OR together). Guard-trigger
-changes that Phase 7 owns: replacing `purchase_orders_guard` to admit
-`issued → completed` from the receipt trigger, and refusing
-cancellation once goods have been received.
-
-## Shared masters (Projects, Plots, Units, Clients, Vendors, Stores, Items)
-
-Built in Phase 1 (`supabase/migrations/0004_masters.sql`) — Marathon
-never touches them, but every tool from Indents onward reads them
-constantly. Convention, so two tools don't each invent a different
-answer:
-
-- Schema: a new numbered migration written when the first tool that
-  needs a new master actually starts — not speculatively ahead of time.
-- **Two files per master, not one** — `lib/masters/<name>.ts` (types +
-  read functions, `import "server-only"`) and
-  `lib/masters/<name>-actions.ts` (writes, file-level `"use server"`,
-  no `server-only`). This split is required, not stylistic: a Client
-  Component (a create/edit dialog) needs to import the write functions
-  directly, and Next's bundler only fully strips a module's server-only
-  imports from the client bundle when `"use server"` is a _file-level_
-  directive — a file mixing per-function `"use server"` with plain
-  reads (and `import "server-only"`) fails the production build (not
-  `tsc`, only `next build` catches it). The actions file must not
-  import _values_ from its queries file either (that reintroduces the
-  same transitive `server-only` chain through `lib/auth/access.ts`) —
-  `import type` is fine (erased before bundling). **Never `export type`
-  from a `"use server"` file** in either form (`export type { X };` or
-  `export type { X } from "…"`): the bundler can keep the name in the
-  compiled module's runtime export list, where it doesn't exist, and
-  then _every_ action in that chunk dies at load with "X is not
-  defined" — the 2026-08-03 production outage. Declaring a type alias
-  (`export type Foo = …`) is fine; only re-exports break. **This rule is
-  enforced automatically** by `npm run check:actions`
-  (`scripts/check-server-actions.ts`), which CI runs after the build: it
-  refuses the pattern in source _and_ scans the compiled chunks for its
-  fingerprint. Nothing else catches it — `tsc`, ESLint, the tests and
-  `next build` were all green throughout the outage. Validation constants
-  an actions file needs as values live in **import-free** modules built
-  for exactly this: `lib/masters/constants.ts` (UOMs, item kinds) and
-  `lib/action-state.ts` (the shared `ActionState`). Add to those rather
-  than re-declaring per file.
-- Read functions have no gate call — any tool's own (already-gated)
-  queries/actions can call them directly. Write functions call
-  `requireTool("/masters")` first, exactly like every other tool's
-  actions.
-- One more deliberately shared read module lives outside `lib/masters/`:
-  `lib/selections/views.ts` (design views). Budgets renders those into
-  the client quote under its own grant — see the note at the top of that
-  file before moving or gating it.
-- Shared UI (a project picker, a vendor combobox): `components/masters/`,
-  sibling to `components/ui/`.
-
-## Database changes
-
-All schema changes are numbered SQL files in `supabase/migrations/` —
-never ad hoc. Apply a migration by running its SQL against the project
-via the Supabase Studio SQL editor, in numbered order (there's no CLI/
-local-Postgres setup for this today — see README.md).
-
-Order matters: apply a migration in Supabase Studio's SQL editor
-**first**, then merge/deploy the code that depends on it — code that
-expects a new column or table must never reach production before that
-schema exists.
-
-Migrations are additive only: new tables and new columns, never
-renaming or dropping something still in use. A true rename is three
-steps across two migrations: add the new column/table → migrate the
-data → drop the old one in a **later**, separate migration, with a code
-deploy in between each step.
-
-Never edit a migration file that's already been applied, even for a
-typo fix — a correction is a new, later-numbered migration file.
-
-After every migration is applied in Studio, regenerate types and commit
-them together with the migration file: `npm run db:types` (one-time
-`npx supabase login` per machine, browser-based, no password needed).
-The generated `lib/supabase/database.types.ts` is what makes every
-Supabase client (`lib/supabase/{client,server,admin}.ts`) type-check
-queries against the real schema — a typo'd column name now fails
-`npm run typecheck`, not silently at runtime.
-
-## Git workflow
-
-- `master` is production — always deployable, auto-deploys to Vercel on
-  every push. No direct feature work on `master`.
-- Any tool or sizeable change gets its own `feature/<tool>` branch (e.g.
-  `feature/settings-access-model`). Small fixes to an already-live tool
-  can go straight to `master`.
-- Every push to a `feature/*` branch gets its own Vercel preview URL —
-  that's the staging link shared at each review gate, so testing never
-  touches production.
-- Merge to `master` only after a milestone has been tested in the
-  browser and approved — never mid-feature. Pushing a feature branch
-  (to get a preview link) is fine at any point; it's merging into
-  `master` that waits for sign-off.
-- Delete the branch once it's merged.
-
-## Other architecture principles
-
-- Per-user app access: a staff user's access is exactly the apps
-  they've been granted in Settings (`user_apps` table, see
-  `supabase/migrations/0003_user_apps.sql`); admins have every app
-  automatically. No roles beyond admin/staff, no field-level
-  permissions — the app boundary _is_ the permission boundary.
-  `lib/tools.ts`'s `visibleTools()` decides sidebar visibility from
-  this, but that's cosmetic; `requireApp`/`requireAdmin`
-  (`lib/auth/access.ts`) are the real check every tool's own code must
-  call. `profiles.team` still exists in the schema but is no longer
-  read for access control.
-- Keep it simple: no over-engineering, this serves ~200 users max.
-- **Tests cover pure logic only** — `npm test`, `node:test` via `tsx`, no
-  framework. Today that's `lib/budgets/math.ts`, `carry-forward.ts` and
-  `reference.ts`, `lib/indents/reference.ts` and `workflow.ts`,
-  `lib/selections/diff.ts`, `lib/marathon/pin.ts` and `lib/format.ts`:
-  money, quantities, the revision diff, document numbering, status
-  rules, PIN hashing. Don't add tests that need a database or a
-  browser; when logic worth testing is trapped in a module with server
-  imports, extract it into a pure module first (the pattern all of the
-  above follow).
-- **CI and Prettier exist** (`.github/workflows/ci.yml`), added when a
-  second developer joined. They were deliberately declined while this was
-  one person — what changed is that `master` auto-deploys to production,
-  so "remembering to run four commands" stopped being a safe gate. Still
-  no pre-commit hooks; CI is the gate. CI's last step is
-  `npm run check:actions`, the server-action outage guard (see "Shared
-  masters" above).
-- **Formatting goes through `lib/format.ts`** — money, quantities,
-  percentages, dates, on screens and in PDFs alike. Never
-  `new Intl.NumberFormat` in a component.
-
-## Documentation map
-
-This file is the entry point. **STATUS.md** (repo root) is where we are
-— what's shipped, settled decisions, the session log — **read it first
-at the start of any session**; it's updated at the end of every working
-session. **TODO.md** (repo root) is what's next — the complete build
-plan for the upcoming phases, detailed enough to pick up with no
-context beyond the repo; work items move from TODO.md into STATUS.md as
-they ship. **DESIGN.md** covers the shared visual system — colors,
-type, spacing, components; read it before styling anything. Each tool
-keeps its own build plan/checklist colocated with its code —
-`app/marathon/PLAN.md` for the kiosk,
-`app/(dashboard)/<tool>/PLAN.md` for every dashboard tool (Masters,
-Selections, Budgets, Indents, Purchase Orders, Settings) — check the
-relevant one before starting or resuming work on that tool. Root
-STATUS.md/TODO.md are the level above those: they track the whole
-multi-phase rebuild, the per-tool files track one tool each.
+`master` is production — auto-deploys to Vercel on every push. Tools
+and sizeable changes get a `feature/<tool>` branch (each push gets a
+preview URL for review); merge to `master` only after browser testing
+and sign-off, then delete the branch. Small fixes to live tools may go
+straight to `master`.
 
 @AGENTS.md
-@DESIGN.md
 
-## Working with me (IMPORTANT — read every session)
+## Working with me
 
-I am the founder, not a developer. I direct the product; you handle the code.
-Follow these rules in every session without being reminded:
+I am the founder, not a developer. I direct the product; you handle the
+code. Every session, unprompted:
 
-### Communication
-
-- Before starting any task: explain WHAT you will do and WHY in plain,
-  non-technical language, in 3–5 short bullet points. Wait for my go-ahead
-  if the task touches more than a couple of files.
-- After finishing: summarize what changed in 2 sentences max, in plain
-  language, and tell me exactly how to see/test it in the browser.
-- When something breaks: explain the cause in one plain sentence before
-  fixing it. No jargon walls.
-- If I ask "explain X", teach me like a smart non-programmer.
-
-### Process discipline
-
-- Work in small steps. One feature or fix at a time — never a big-bang
-  change across the whole app.
-- After every working piece: commit with a clear plain-English message
-  (e.g. "add marathon registration form"). Never leave work uncommitted
-  at the end of a task.
-- If a change goes wrong, tell me immediately and offer to roll back to
-  the last commit rather than patching chaos on top of chaos.
-- All database changes as numbered SQL files in supabase/migrations.
-  Never modify tables ad hoc.
-
-### Code standards
-
-- Simplicity over cleverness. This app serves ~200 users; no
-  over-engineering, no extra libraries unless truly needed.
-- Every screen is built from the shared components in components/ui.
-  Never write one-off styles.
-- Handle the unhappy paths: wrong inputs, empty states, deleted
-  references, double submissions.
-
-### My review checkpoints
-
-- I judge the running app in the browser, not the code. Always give me
-  a clear "open this page, try this action" checklist after each task.
-- Anything I approve in the plan stage, build fully. Anything not in
-  the plan, ask before adding.
+- Before a task: 3–5 plain-language bullets on what and why; wait for
+  my go-ahead if it touches more than a couple of files.
+- After: a 2-sentence plain summary plus an "open this page, try this"
+  browser checklist — I judge the running app, not the code.
+- Small steps, one thing at a time; commit each working piece with a
+  plain-English message; never leave work uncommitted.
+- If something breaks: one plain sentence on the cause, then offer a
+  rollback before patching chaos on chaos.
+- Handle the unhappy paths (bad input, empty states, double submits).
+- Build fully what I approved; ask before adding anything I didn't.
