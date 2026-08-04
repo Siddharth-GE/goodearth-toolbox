@@ -11,11 +11,13 @@ import {
 } from "@/components/ui/table";
 import {
   diffRevisions,
+  getDownstreamImpact,
   getPreviousIssued,
   getSelection,
   type LineChange,
+  type LineImpact,
 } from "@/lib/selections/queries";
-import { GitCompare } from "lucide-react";
+import { GitCompare, TriangleAlert } from "lucide-react";
 import { notFound } from "next/navigation";
 import { formatCount, formatQuantity } from "@/lib/format";
 
@@ -86,8 +88,29 @@ async function DiffBody({
     );
   }
 
+  // Changed or removed lines that are already on an indent (or a PO
+  // through one) — the people who ordered them need to hear about this
+  // revision. Additions can't be on an order yet, so they're not asked.
+  const impact = await getDownstreamImpact(
+    [...changed, ...removed].map((entry) => entry.line.line_key),
+  );
+  const affectedCount = [...changed, ...removed].filter((entry) =>
+    impact.has(entry.line.line_key),
+  ).length;
+
   return (
     <div className="space-y-5">
+      {affectedCount > 0 && (
+        <div className="border-warning/40 bg-warning/5 flex items-start gap-3 rounded-xl border px-4 py-3">
+          <TriangleAlert className="text-warning mt-0.5 size-4 shrink-0" />
+          <p className="text-foreground text-sm">
+            {formatCount(affectedCount)} changed or removed{" "}
+            {affectedCount === 1 ? "line has" : "lines have"} already been requested on an indent —
+            the orders named below may need revisiting.
+          </p>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2">
         <Summary tone="success" count={diff.added} label="added" />
         <Summary tone="danger" count={diff.removed} label="removed" />
@@ -98,8 +121,18 @@ async function DiffBody({
       </div>
 
       <Section title="Added" entries={added} previousRevisionNo={previousRevisionNo} />
-      <Section title="Removed" entries={removed} previousRevisionNo={previousRevisionNo} />
-      <Section title="Quantity changed" entries={changed} previousRevisionNo={previousRevisionNo} />
+      <Section
+        title="Removed"
+        entries={removed}
+        previousRevisionNo={previousRevisionNo}
+        impact={impact}
+      />
+      <Section
+        title="Quantity changed"
+        entries={changed}
+        previousRevisionNo={previousRevisionNo}
+        impact={impact}
+      />
     </div>
   );
 }
@@ -129,10 +162,13 @@ function Section({
   title,
   entries,
   previousRevisionNo,
+  impact,
 }: {
   title: string;
   entries: LineChange[];
   previousRevisionNo: number;
+  /** line_key → the indents/POs already carrying it (changed/removed only). */
+  impact?: Map<string, LineImpact>;
 }) {
   if (entries.length === 0) return null;
 
@@ -151,37 +187,49 @@ function Section({
           </TableRow>
         </TableHead>
         <TableBody>
-          {entries.map((entry) => (
-            <TableRow key={entry.line.line_key}>
-              <TableCell className="text-muted">{entry.space}</TableCell>
-              <TableCell className="text-muted">{entry.line.item_code ?? "—"}</TableCell>
-              <TableCell className="text-foreground font-medium">{entry.line.item_name}</TableCell>
-              <TableCell>
-                {entry.kind === "changed" ? (
-                  <span className="tabular-nums">
-                    <span className="text-muted line-through">
-                      {formatQuantity(entry.previous.quantity)}
-                    </span>{" "}
-                    <span className="text-foreground font-semibold">
-                      {formatQuantity(entry.line.quantity)}
-                    </span>{" "}
-                    <span className="text-muted">{entry.line.uom}</span>
-                    {entry.spaceChanged && (
-                      <span className="text-muted ml-2 text-xs">moved from another space</span>
-                    )}
-                  </span>
-                ) : (
-                  <span className="tabular-nums">
-                    {formatQuantity(entry.line.quantity)}{" "}
-                    <span className="text-muted">{entry.line.uom}</span>
-                    {entry.kind === "removed" && (
-                      <span className="text-muted ml-2 text-xs">was in R{previousRevisionNo}</span>
-                    )}
-                  </span>
-                )}
-              </TableCell>
-            </TableRow>
-          ))}
+          {entries.map((entry) => {
+            const lineImpact = impact?.get(entry.line.line_key);
+            return (
+              <TableRow key={entry.line.line_key}>
+                <TableCell className="text-muted">{entry.space}</TableCell>
+                <TableCell className="text-muted">{entry.line.item_code ?? "—"}</TableCell>
+                <TableCell className="text-foreground font-medium">
+                  {entry.line.item_name}
+                  {lineImpact && (
+                    <div className="text-warning text-xs font-normal">
+                      affects {[...lineImpact.indent_refs, ...lineImpact.po_refs].join(", ")}
+                    </div>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {entry.kind === "changed" ? (
+                    <span className="tabular-nums">
+                      <span className="text-muted line-through">
+                        {formatQuantity(entry.previous.quantity)}
+                      </span>{" "}
+                      <span className="text-foreground font-semibold">
+                        {formatQuantity(entry.line.quantity)}
+                      </span>{" "}
+                      <span className="text-muted">{entry.line.uom}</span>
+                      {entry.spaceChanged && (
+                        <span className="text-muted ml-2 text-xs">moved from another space</span>
+                      )}
+                    </span>
+                  ) : (
+                    <span className="tabular-nums">
+                      {formatQuantity(entry.line.quantity)}{" "}
+                      <span className="text-muted">{entry.line.uom}</span>
+                      {entry.kind === "removed" && (
+                        <span className="text-muted ml-2 text-xs">
+                          was in R{previousRevisionNo}
+                        </span>
+                      )}
+                    </span>
+                  )}
+                </TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </div>
