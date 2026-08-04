@@ -19,6 +19,12 @@ export function ItemFormDialog({
   item?: ItemRow;
 }) {
   const isEdit = !!item;
+  // Deactivated categories/brands stop being offered, but an item already
+  // filed under one keeps its value visible until someone changes it.
+  const pickableCategories = categories.filter(
+    (category) => category.is_active || category.id === item?.category_id,
+  );
+  const pickableBrands = brands.filter((brand) => brand.is_active || brand.id === item?.brand_id);
 
   return (
     <RecordFormDialog
@@ -46,7 +52,7 @@ export function ItemFormDialog({
           <option value="" disabled>
             Select a category
           </option>
-          {categories.map((category) => (
+          {pickableCategories.map((category) => (
             <option key={category.id} value={category.id}>
               {category.name} ({category.kind})
             </option>
@@ -57,7 +63,7 @@ export function ItemFormDialog({
         <Label htmlFor="brand_id">Brand (optional)</Label>
         <Select id="brand_id" name="brand_id" defaultValue={item?.brand_id ?? ""}>
           <option value="">No brand</option>
-          {brands.map((brand) => (
+          {pickableBrands.map((brand) => (
             <option key={brand.id} value={brand.id}>
               {brand.name}
             </option>

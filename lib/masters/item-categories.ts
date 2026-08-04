@@ -8,6 +8,7 @@ export type ItemCategoryRow = {
   id: string;
   name: string;
   kind: ItemKind;
+  is_active: boolean;
   created_at: string;
 };
 

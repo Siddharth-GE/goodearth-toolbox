@@ -45,7 +45,7 @@ export async function updateVendor(
   _state: VendorFormState,
   formData: FormData,
 ): Promise<VendorFormState> {
-  await requireTool("/masters");
+  const user = await requireTool("/masters");
 
   const { name, contact_name, mobile, gst_no, address, is_active } = readVendorForm(formData);
   if (!name) return { error: "Enter the vendor's name." };
@@ -53,7 +53,7 @@ export async function updateVendor(
   const supabase = await createClient();
   const { error } = await supabase
     .from("vendors")
-    .update({ name, contact_name, mobile, gst_no, address, is_active })
+    .update({ name, contact_name, mobile, gst_no, address, is_active, updated_by: user.id })
     .eq("id", id);
   if (error) {
     console.error("updateVendor failed:", error);

@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 export type BrandRow = {
   id: string;
   name: string;
+  is_active: boolean;
   created_at: string;
 };
 

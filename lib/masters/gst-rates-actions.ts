@@ -31,12 +31,12 @@ export async function addGstRate(
 }
 
 export async function setGstRateActive(rate: number, isActive: boolean): Promise<GstRateFormState> {
-  await requireTool("/masters");
+  const user = await requireTool("/masters");
 
   const supabase = await createClient();
   const { error } = await supabase
     .from("gst_rates")
-    .update({ is_active: isActive })
+    .update({ is_active: isActive, updated_by: user.id })
     .eq("rate", rate);
   if (error) {
     console.error("setGstRateActive failed:", error);

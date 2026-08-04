@@ -39,6 +39,11 @@ export function UnitFormDialog({
   const filteredPlots = plots.filter(
     (plot) => plot.project_id === projectId && !takenPlotIds.has(plot.id),
   );
+  // Deactivated clients stop being offered, but a unit already assigned
+  // to one keeps that assignment visible until someone changes it.
+  const pickableClients = clients.filter(
+    (client) => client.is_active || client.id === unit?.client_id,
+  );
 
   return (
     <RecordFormDialog
@@ -125,7 +130,7 @@ export function UnitFormDialog({
         <Label htmlFor="client_id">Client (optional)</Label>
         <Select id="client_id" name="client_id" defaultValue={unit?.client_id ?? ""}>
           <option value="">Unassigned</option>
-          {clients.map((client) => (
+          {pickableClients.map((client) => (
             <option key={client.id} value={client.id}>
               {client.name}
             </option>

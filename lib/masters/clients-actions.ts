@@ -13,6 +13,7 @@ function readClientForm(formData: FormData) {
     mobile: String(formData.get("mobile") ?? "").trim() || null,
     email: String(formData.get("email") ?? "").trim() || null,
     notes: String(formData.get("notes") ?? "").trim() || null,
+    is_active: formData.get("is_active") === "1",
   };
 }
 
@@ -22,11 +23,13 @@ export async function createClientRecord(
 ): Promise<ClientFormState> {
   await requireTool("/masters");
 
-  const { name, mobile, email, notes } = readClientForm(formData);
+  const { name, mobile, email, notes, is_active } = readClientForm(formData);
   if (!name) return { error: "Enter the client's name." };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("clients").insert({ name, mobile, email, notes });
+  const { error } = await supabase
+    .from("clients")
+    .insert({ name, mobile, email, notes, is_active });
   if (error) {
     console.error("createClientRecord failed:", error);
     return { error: "Could not create client. Try again." };
@@ -41,15 +44,15 @@ export async function updateClientRecord(
   _state: ClientFormState,
   formData: FormData,
 ): Promise<ClientFormState> {
-  await requireTool("/masters");
+  const user = await requireTool("/masters");
 
-  const { name, mobile, email, notes } = readClientForm(formData);
+  const { name, mobile, email, notes, is_active } = readClientForm(formData);
   if (!name) return { error: "Enter the client's name." };
 
   const supabase = await createClient();
   const { error } = await supabase
     .from("clients")
-    .update({ name, mobile, email, notes })
+    .update({ name, mobile, email, notes, is_active, updated_by: user.id })
     .eq("id", id);
   if (error) {
     console.error("updateClientRecord failed:", error);

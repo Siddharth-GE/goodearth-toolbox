@@ -9,6 +9,7 @@ export type ClientRow = {
   mobile: string | null;
   email: string | null;
   notes: string | null;
+  is_active: boolean;
   created_at: string;
 };
 

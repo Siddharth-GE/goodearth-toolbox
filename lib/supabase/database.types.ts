@@ -288,19 +288,36 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          is_active: boolean
           name: string
+          updated_at: string | null
+          updated_by: string | null
         }
         Insert: {
           created_at?: string
           id?: string
+          is_active?: boolean
           name: string
+          updated_at?: string | null
+          updated_by?: string | null
         }
         Update: {
           created_at?: string
           id?: string
+          is_active?: boolean
           name?: string
+          updated_at?: string | null
+          updated_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "brands_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       budget_lines: {
         Row: {
@@ -471,27 +488,44 @@ export type Database = {
           created_at: string
           email: string | null
           id: string
+          is_active: boolean
           mobile: string | null
           name: string
           notes: string | null
+          updated_at: string | null
+          updated_by: string | null
         }
         Insert: {
           created_at?: string
           email?: string | null
           id?: string
+          is_active?: boolean
           mobile?: string | null
           name: string
           notes?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
         }
         Update: {
           created_at?: string
           email?: string | null
           id?: string
+          is_active?: boolean
           mobile?: string | null
           name?: string
           notes?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "clients_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       construction_budget_lines: {
         Row: {
@@ -841,20 +875,37 @@ export type Database = {
       gst_rates: {
         Row: {
           created_at: string
+          id: string
           is_active: boolean
           rate: number
+          updated_at: string | null
+          updated_by: string | null
         }
         Insert: {
           created_at?: string
+          id?: string
           is_active?: boolean
           rate: number
+          updated_at?: string | null
+          updated_by?: string | null
         }
         Update: {
           created_at?: string
+          id?: string
           is_active?: boolean
           rate?: number
+          updated_at?: string | null
+          updated_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "gst_rates_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       indent_approvers: {
         Row: {
@@ -1153,22 +1204,39 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          is_active: boolean
           kind: string
           name: string
+          updated_at: string | null
+          updated_by: string | null
         }
         Insert: {
           created_at?: string
           id?: string
+          is_active?: boolean
           kind: string
           name: string
+          updated_at?: string | null
+          updated_by?: string | null
         }
         Update: {
           created_at?: string
           id?: string
+          is_active?: boolean
           kind?: string
           name?: string
+          updated_at?: string | null
+          updated_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "item_categories_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       item_margins: {
         Row: {
@@ -1316,6 +1384,8 @@ export type Database = {
           placement: string | null
           source_url: string | null
           thumb_url: string | null
+          updated_at: string | null
+          updated_by: string | null
         }
         Insert: {
           brand_id?: string | null
@@ -1335,6 +1405,8 @@ export type Database = {
           placement?: string | null
           source_url?: string | null
           thumb_url?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
         }
         Update: {
           brand_id?: string | null
@@ -1354,6 +1426,8 @@ export type Database = {
           placement?: string | null
           source_url?: string | null
           thumb_url?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -1375,6 +1449,13 @@ export type Database = {
             columns: ["merged_into_item_id"]
             isOneToOne: false
             referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "items_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1718,6 +1799,8 @@ export type Database = {
           name: string
           project_id: string
           status: string
+          updated_at: string | null
+          updated_by: string | null
         }
         Insert: {
           area?: number | null
@@ -1727,6 +1810,8 @@ export type Database = {
           name: string
           project_id: string
           status?: string
+          updated_at?: string | null
+          updated_by?: string | null
         }
         Update: {
           area?: number | null
@@ -1736,6 +1821,8 @@ export type Database = {
           name?: string
           project_id?: string
           status?: string
+          updated_at?: string | null
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -1743,6 +1830,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plots_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1806,6 +1900,8 @@ export type Database = {
           name: string
           project_type: string
           status: string
+          updated_at: string | null
+          updated_by: string | null
         }
         Insert: {
           code?: string | null
@@ -1815,6 +1911,8 @@ export type Database = {
           name: string
           project_type: string
           status?: string
+          updated_at?: string | null
+          updated_by?: string | null
         }
         Update: {
           code?: string | null
@@ -1824,8 +1922,18 @@ export type Database = {
           name?: string
           project_type?: string
           status?: string
+          updated_at?: string | null
+          updated_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "projects_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       purchase_order_lines: {
         Row: {
@@ -2600,6 +2708,8 @@ export type Database = {
           location: string | null
           name: string
           project_id: string | null
+          updated_at: string | null
+          updated_by: string | null
         }
         Insert: {
           created_at?: string
@@ -2608,6 +2718,8 @@ export type Database = {
           location?: string | null
           name: string
           project_id?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
         }
         Update: {
           created_at?: string
@@ -2616,6 +2728,8 @@ export type Database = {
           location?: string | null
           name?: string
           project_id?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -2623,6 +2737,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stores_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -2638,6 +2759,8 @@ export type Database = {
           project_id: string
           status: string
           unit_type: string
+          updated_at: string | null
+          updated_by: string | null
         }
         Insert: {
           client_id?: string | null
@@ -2649,6 +2772,8 @@ export type Database = {
           project_id: string
           status?: string
           unit_type: string
+          updated_at?: string | null
+          updated_by?: string | null
         }
         Update: {
           client_id?: string | null
@@ -2660,6 +2785,8 @@ export type Database = {
           project_id?: string
           status?: string
           unit_type?: string
+          updated_at?: string | null
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -2688,6 +2815,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "units_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -2731,6 +2865,8 @@ export type Database = {
           is_active: boolean
           mobile: string | null
           name: string
+          updated_at: string | null
+          updated_by: string | null
         }
         Insert: {
           address?: string | null
@@ -2741,6 +2877,8 @@ export type Database = {
           is_active?: boolean
           mobile?: string | null
           name: string
+          updated_at?: string | null
+          updated_by?: string | null
         }
         Update: {
           address?: string | null
@@ -2751,8 +2889,18 @@ export type Database = {
           is_active?: boolean
           mobile?: string | null
           name?: string
+          updated_at?: string | null
+          updated_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "vendors_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

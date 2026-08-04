@@ -41,7 +41,7 @@ export async function updateStore(
   _state: StoreFormState,
   formData: FormData,
 ): Promise<StoreFormState> {
-  await requireTool("/masters");
+  const user = await requireTool("/masters");
 
   const { name, project_id, location, is_active } = readStoreForm(formData);
   if (!name) return { error: "Enter the store's name." };
@@ -49,7 +49,7 @@ export async function updateStore(
   const supabase = await createClient();
   const { error } = await supabase
     .from("stores")
-    .update({ name, project_id, location, is_active })
+    .update({ name, project_id, location, is_active, updated_by: user.id })
     .eq("id", id);
   if (error) {
     console.error("updateStore failed:", error);

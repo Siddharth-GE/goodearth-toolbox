@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
   Table,
@@ -33,6 +34,7 @@ export default async function ClientsPage() {
               <TableHeaderCell>Name</TableHeaderCell>
               <TableHeaderCell>Mobile</TableHeaderCell>
               <TableHeaderCell>Email</TableHeaderCell>
+              <TableHeaderCell>Status</TableHeaderCell>
               <TableHeaderCell></TableHeaderCell>
             </TableRow>
           </TableHead>
@@ -42,6 +44,11 @@ export default async function ClientsPage() {
                 <TableCell className="text-foreground font-medium">{client.name}</TableCell>
                 <TableCell>{client.mobile || "—"}</TableCell>
                 <TableCell>{client.email || "—"}</TableCell>
+                <TableCell>
+                  <Badge variant={client.is_active ? "success" : "neutral"}>
+                    {client.is_active ? "Active" : "Inactive"}
+                  </Badge>
+                </TableCell>
                 <TableCell>
                   <ClientFormDialog client={client} />
                 </TableCell>

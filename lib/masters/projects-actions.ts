@@ -68,7 +68,7 @@ export async function updateProject(
   _state: ProjectFormState,
   formData: FormData,
 ): Promise<ProjectFormState> {
-  await requireTool("/masters");
+  const user = await requireTool("/masters");
 
   const { name, code, location, project_type, status } = readProjectForm(formData);
   if (!name) return { error: "Enter a project name." };
@@ -80,7 +80,7 @@ export async function updateProject(
   const supabase = await createClient();
   const { error } = await supabase
     .from("projects")
-    .update({ name, code, location, project_type, status })
+    .update({ name, code, location, project_type, status, updated_by: user.id })
     .eq("id", id);
   if (error) {
     if (error.code === "23505") return { error: "That code is already used by another project." };
