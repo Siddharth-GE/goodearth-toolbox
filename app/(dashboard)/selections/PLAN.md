@@ -52,14 +52,14 @@ reintroduce:
 
 ## What's here
 
-| Route                        | What it is                                    |
-| ---------------------------- | --------------------------------------------- |
-| `/selections`                | Every unit, with its live revision            |
-| `/selections/[id]`           | The editor — space rail, views, line grid     |
-| `/selections/[id]/diff`      | What changed against the previous revision    |
-| `/selections/[id]/pdf`       | Document A, the design document               |
-| `/selections/[id]/csv`       | The same lines as a spreadsheet               |
-| `/selections/views/[viewId]` | Streams a design view from the private bucket |
+| Route                        | What it is                                                                                                                                                                                                                                           |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/selections`                | Every unit, with its live revision                                                                                                                                                                                                                   |
+| `/selections/[id]`           | The editor — space rail, views, line grid                                                                                                                                                                                                            |
+| `/selections/[id]/diff`      | What changed against the previous revision — and, since 2026-08-04, which changed/removed lines are already on indents or POs (`getDownstreamImpact`: open reads of indent_lines/indents + the money-free `po_line_facts`; no Indents code imported) |
+| `/selections/[id]/pdf`       | Document A, the design document                                                                                                                                                                                                                      |
+| `/selections/[id]/csv`       | The same lines as a spreadsheet                                                                                                                                                                                                                      |
+| `/selections/views/[viewId]` | Streams a design view from the private bucket                                                                                                                                                                                                        |
 
 ## Open
 

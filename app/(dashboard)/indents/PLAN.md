@@ -62,6 +62,30 @@ note. Approved indents are what Purchase Orders (Phase 6) consume.
       reports lines. The CI smoke test was deliberately split out of
       this milestone (founder's call) — see root STATUS.md.
 
+## Revision safety (added 2026-08-04, migration `0028`)
+
+A unit's design is revised over time and every issued revision gets its
+own approved budget; `line_key` is the same line across all of them.
+The original pull screen offered every approved budget and scoped
+"already asked" to one `budget_id` — the same line could be pulled from
+R1's budget and again from R2's, and bought twice. Now:
+
+- The pull chooser offers only each unit's **issued** revision's budget
+  (`classifyBudgetChooser` in `pull-rules.ts`, pure + tested); a unit
+  whose new revision awaits budget approval shows a greyed pending row.
+  An indent tagged to a unit sees that unit alone.
+- "Already asked" and the add-action dedupe span **all** of the unit's
+  budgets by `line_key`, not just the one on screen.
+- `getBudgetPull` and `addBudgetPullLines` refuse superseded-revision
+  budgets and cross-unit pulls; the `indent_lines_budget_current`
+  trigger (`0028`, security definer — same shape as inventory's
+  auto-complete) is the boundary that holds against stale tabs and
+  pasted URLs.
+- Lines anchored to a revision superseded AFTER they were pulled get a
+  warning badge on the indent detail ("design changed/removed since
+  this was requested") via `classifyDesignDrift` — Selections' diff
+  page shows the mirror warning with the affected IND/PO references.
+
 ## Notes
 
 - Data layer: `lib/indents/queries.ts` (reads, `server-only`) +
