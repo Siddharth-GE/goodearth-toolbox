@@ -117,6 +117,7 @@ export type Database = {
           id: string
           invoice_date: string
           invoice_no: string
+          kind: string
           labour_contract_id: string | null
           note: string | null
           paid_at: string | null
@@ -134,7 +135,7 @@ export type Database = {
           unit_id: string | null
           updated_at: string
           updated_by: string | null
-          vendor_id: string
+          vendor_id: string | null
         }
         Insert: {
           approved_at?: string | null
@@ -146,6 +147,7 @@ export type Database = {
           id?: string
           invoice_date: string
           invoice_no: string
+          kind: string
           labour_contract_id?: string | null
           note?: string | null
           paid_at?: string | null
@@ -163,7 +165,7 @@ export type Database = {
           unit_id?: string | null
           updated_at?: string
           updated_by?: string | null
-          vendor_id: string
+          vendor_id?: string | null
         }
         Update: {
           approved_at?: string | null
@@ -175,6 +177,7 @@ export type Database = {
           id?: string
           invoice_date?: string
           invoice_no?: string
+          kind?: string
           labour_contract_id?: string | null
           note?: string | null
           paid_at?: string | null
@@ -192,7 +195,7 @@ export type Database = {
           unit_id?: string | null
           updated_at?: string
           updated_by?: string | null
-          vendor_id?: string
+          vendor_id?: string | null
         }
         Relationships: [
           {
@@ -1378,6 +1381,8 @@ export type Database = {
       }
       labour_contracts: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
           contract_value: number
           created_at: string
           created_by: string | null
@@ -1386,12 +1391,15 @@ export type Database = {
           is_active: boolean
           plot_id: string | null
           project_id: string
+          status: string
           unit_id: string | null
           updated_at: string
           updated_by: string | null
           vendor_id: string
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
           contract_value: number
           created_at?: string
           created_by?: string | null
@@ -1400,12 +1408,15 @@ export type Database = {
           is_active?: boolean
           plot_id?: string | null
           project_id: string
+          status?: string
           unit_id?: string | null
           updated_at?: string
           updated_by?: string | null
           vendor_id: string
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
           contract_value?: number
           created_at?: string
           created_by?: string | null
@@ -1414,12 +1425,20 @@ export type Database = {
           is_active?: boolean
           plot_id?: string | null
           project_id?: string
+          status?: string
           unit_id?: string | null
           updated_at?: string
           updated_by?: string | null
           vendor_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "labour_contracts_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "labour_contracts_created_by_fkey"
             columns: ["created_by"]
@@ -2816,6 +2835,7 @@ export type Database = {
           created_at: string | null
           id: string | null
           invoice_date: string | null
+          kind: string | null
           labour_contract_id: string | null
           paid_at: string | null
           plot_id: string | null
@@ -2833,6 +2853,7 @@ export type Database = {
           created_at?: string | null
           id?: string | null
           invoice_date?: string | null
+          kind?: string | null
           labour_contract_id?: string | null
           paid_at?: string | null
           plot_id?: string | null
@@ -2850,6 +2871,7 @@ export type Database = {
           created_at?: string | null
           id?: string | null
           invoice_date?: string | null
+          kind?: string | null
           labour_contract_id?: string | null
           paid_at?: string | null
           plot_id?: string | null
@@ -3125,6 +3147,21 @@ export type Database = {
       }
       create_next_revision: {
         Args: { p_from_selection_id: string }
+        Returns: string
+      }
+      create_nmr_bill: {
+        Args: {
+          p_gst_amount: number
+          p_invoice_date: string
+          p_invoice_no: string
+          p_note: string
+          p_plot_id: string
+          p_project_id: string
+          p_taxable_amount: number
+          p_total_amount: number
+          p_unit_id: string
+          p_vendor_id: string
+        }
         Returns: string
       }
       create_purchase_order: {
