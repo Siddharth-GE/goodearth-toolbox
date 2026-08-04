@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { requireTool } from "@/lib/auth/access";
 import { listLabourContracts } from "@/lib/masters/labour-contracts";
 import { listPlots } from "@/lib/masters/plots";
@@ -98,6 +100,134 @@ export async function listBills({
     pageCount: Math.max(1, Math.ceil(total / pageSize)),
     pageSize,
   };
+}
+
+/* ------------------------------------------------------------------ *
+ * One bill, in full
+ * ------------------------------------------------------------------ */
+
+export type BillDetail = {
+  id: string;
+  reference: string;
+  status: BillStatus;
+  project_name: string;
+  /** The plot/unit the bill's anchor is for, or null for General. */
+  scope_name: string | null;
+  scope_code: string;
+  vendor_name: string;
+  po_id: string | null;
+  po_reference: string | null;
+  labour_contract_id: string | null;
+  contract_description: string | null;
+  invoice_no: string;
+  invoice_date: string;
+  taxable_amount: number;
+  gst_amount: number;
+  total_amount: number;
+  note: string | null;
+  rejection_note: string | null;
+  payment_ref: string | null;
+  created_by: string | null;
+  created_at: string;
+  approved_at: string | null;
+  paid_at: string | null;
+  created_by_name: string | null;
+  approved_by_name: string | null;
+  paid_by_name: string | null;
+};
+
+export const getBill = cache(async (billId: string): Promise<BillDetail | null> => {
+  await requireTool("/bills");
+  const supabase = await createClient();
+
+  const { data: bill } = await supabase
+    .from("bills")
+    .select(
+      "id, reference, status, scope_code, po_id, labour_contract_id, invoice_no, invoice_date, taxable_amount, gst_amount, total_amount, note, rejection_note, payment_ref, created_by, created_at, approved_by, approved_at, paid_by, paid_at, projects(name), plots(name), units(name), vendors(name), labour_contracts(description)",
+    )
+    .eq("id", billId)
+    .maybeSingle();
+  if (!bill) return null;
+
+  // The PO reference comes from the money-free po_facts view, NOT an
+  // embedded purchase_orders join: a /bills-only user has no SELECT on
+  // the PO tables, so the embed would silently come back null for
+  // exactly the people this tool is for.
+  const [{ data: poFact }, { data: profiles }] = await Promise.all([
+    bill.po_id
+      ? supabase.from("po_facts").select("reference").eq("id", bill.po_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    // One profiles read resolves every actor on the document — simpler
+    // and safer than three embedded joins on a table with several FKs
+    // to profiles (Supabase would need each constraint named).
+    (async () => {
+      const actorIds = [
+        ...new Set(
+          [bill.created_by, bill.approved_by, bill.paid_by].filter(
+            (id): id is string => id != null,
+          ),
+        ),
+      ];
+      if (actorIds.length === 0) return { data: [] };
+      return supabase.from("profiles").select("id, full_name").in("id", actorIds);
+    })(),
+  ]);
+  const names = new Map((profiles ?? []).map((profile) => [profile.id, profile.full_name]));
+  const nameOf = (id: string | null | undefined) => (id ? (names.get(id) ?? null) : null);
+
+  return {
+    id: bill.id,
+    reference: bill.reference ?? "—",
+    status: bill.status as BillStatus,
+    project_name: (bill.projects as { name: string } | null)?.name ?? "—",
+    scope_name:
+      (bill.units as { name: string } | null)?.name ??
+      (bill.plots as { name: string } | null)?.name ??
+      null,
+    scope_code: bill.scope_code ?? "—",
+    vendor_name: (bill.vendors as { name: string } | null)?.name ?? "—",
+    po_id: bill.po_id,
+    po_reference: poFact?.reference ?? null,
+    labour_contract_id: bill.labour_contract_id,
+    contract_description:
+      (bill.labour_contracts as { description: string } | null)?.description ?? null,
+    invoice_no: bill.invoice_no ?? "—",
+    invoice_date: bill.invoice_date,
+    taxable_amount: bill.taxable_amount ?? 0,
+    gst_amount: bill.gst_amount ?? 0,
+    total_amount: bill.total_amount ?? 0,
+    note: bill.note,
+    rejection_note: bill.rejection_note,
+    payment_ref: bill.payment_ref,
+    created_by: bill.created_by,
+    created_at: bill.created_at,
+    approved_at: bill.approved_at,
+    paid_at: bill.paid_at,
+    created_by_name: nameOf(bill.created_by),
+    approved_by_name: nameOf(bill.approved_by),
+    paid_by_name: nameOf(bill.paid_by),
+  };
+});
+
+/** Whether the current user may decide bills, plus their id for the
+ * recorder-ownership delete rule. Admins short-circuit — has_app() and
+ * the guard both treat them as approvers. */
+export async function getCurrentBillActor(): Promise<{
+  isAdmin: boolean;
+  isApprover: boolean;
+  userId: string;
+}> {
+  const user = await requireTool("/bills");
+  const isAdmin = user.profile?.role === "admin";
+  if (isAdmin) return { isAdmin: true, isApprover: true, userId: user.id };
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("bill_approvers")
+    .select("user_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  return { isAdmin: false, isApprover: data != null, userId: user.id };
 }
 
 /* ------------------------------------------------------------------ *
