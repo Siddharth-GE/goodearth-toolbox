@@ -60,11 +60,18 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
       )}
 
       {editable && !bill.rejection_note && (
-        <div className="border-border bg-surface flex items-center justify-between gap-3 rounded-xl border px-4 py-3">
-          <p className="text-foreground text-sm">
-            Recorded {anchorLabel} — waiting for approval. The figures can still be corrected.
+        <div className="border-border bg-surface rounded-xl border px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-foreground text-sm">
+              Recorded {anchorLabel} — waiting for approval. The figures can still be corrected.
+            </p>
+            <Attribution name={bill.created_by_name} label="Recorded by" />
+          </div>
+          <p className="text-muted mt-1 text-xs">
+            {actor.isAdmin || actor.isApprover
+              ? "Yours to decide — approve it, or delete it if it was recorded wrongly."
+              : "Waiting for a named bill approver or an admin."}
           </p>
-          <Attribution name={bill.created_by_name} label="Recorded by" />
         </div>
       )}
 

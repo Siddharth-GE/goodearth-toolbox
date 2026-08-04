@@ -156,6 +156,93 @@ export async function updateBill(billId: string, input: UpdateBillInput): Promis
   return undefined;
 }
 
+/** recorded → approved. The DB guard re-checks the approver list; the
+ * button is a courtesy. Self-approval is allowed (founder decision). */
+export async function approveBill(billId: string): Promise<ActionState> {
+  const user = await requireTool("/bills");
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("bills")
+    .update({
+      status: "approved",
+      approved_by: user.id,
+      approved_at: new Date().toISOString(),
+      // The guard requires a cleared note — an approval answers the
+      // send-back that set it.
+      rejection_note: null,
+      updated_by: user.id,
+    })
+    // No status filter — a stale button on a moved-on bill should get
+    // the guard's message, not a silent zero-row "success".
+    .eq("id", billId);
+  if (error) {
+    console.error("approveBill failed:", error);
+    return guardError(error, "Could not approve. Try again.");
+  }
+
+  revalidatePath(`/bills/${billId}`);
+  revalidatePath("/bills");
+  return undefined;
+}
+
+/** approved → recorded, with the mandatory note. The approval record
+ * clears so the next approval stamps fresh (the rejectIndent shape). */
+export async function sendBackBill(billId: string, note: string): Promise<ActionState> {
+  const user = await requireTool("/bills");
+
+  if (!note.trim()) return { error: "Say what needs changing — a send-back needs a note." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("bills")
+    .update({
+      status: "recorded",
+      rejection_note: note.trim(),
+      approved_by: null,
+      approved_at: null,
+      updated_by: user.id,
+    })
+    .eq("id", billId);
+  if (error) {
+    console.error("sendBackBill failed:", error);
+    return guardError(error, "Could not send the bill back. Try again.");
+  }
+
+  revalidatePath(`/bills/${billId}`);
+  revalidatePath("/bills");
+  return undefined;
+}
+
+/** approved → paid, with the payment reference the guard insists on. */
+export async function markBillPaid(billId: string, paymentRef: string): Promise<ActionState> {
+  const user = await requireTool("/bills");
+
+  if (!paymentRef.trim()) {
+    return { error: "Record the payment reference — UTR, cheque number, UPI ref." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("bills")
+    .update({
+      status: "paid",
+      payment_ref: paymentRef.trim(),
+      paid_by: user.id,
+      paid_at: new Date().toISOString(),
+      updated_by: user.id,
+    })
+    .eq("id", billId);
+  if (error) {
+    console.error("markBillPaid failed:", error);
+    return guardError(error, "Could not mark the bill paid. Try again.");
+  }
+
+  revalidatePath(`/bills/${billId}`);
+  revalidatePath("/bills");
+  return undefined;
+}
+
 /** A wrongly recorded bill is thrown away and recorded again — the
  * number is burnt, gaps accepted. RLS narrows this to recorded bills
  * owned by the actor (or an admin). */
