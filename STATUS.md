@@ -18,11 +18,11 @@ project run end-to-end.
 | ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
 | Last worked        | 2026-08-04                                                                                                              |
 | Branch             | `master` — clean                                                                                                        |
-| Migrations applied | `0001`–`0027` (next is `0028`)                                                                                          |
+| Migrations applied | `0001`–`0028` (next is `0029`)                                                                                          |
 | Items in database  | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands                                          |
 | Thumbnails         | 897 in Supabase Storage; 1,736 items use the colour placeholder                                                         |
 | Built tools        | Marathon, Settings, Masters, Selections, Budgets (Interiors + Construction), Indents, Purchase Orders, Inventory, Bills |
-| Tests              | `npm test` — 88, all pure logic                                                                                         |
+| Tests              | `npm test` — 96, all pure logic                                                                                         |
 
 ## Next up
 
@@ -156,6 +156,17 @@ project run end-to-end.
 
 One line per day; full detail in git history and the PLAN.md files.
 
+- **2026-08-04 (evening)** — **Indents revision-safety fix**
+  (`feature/indents-revision-guard`, migration `0028` applied): the
+  founder reported that the interiors pull offered every approved
+  budget, old revisions included, and "already asked" was scoped to one
+  budget — the same line could be indented twice across revisions. Pull
+  chooser now offers only each unit's issued revision (paused units say
+  "R2 issued — budget pending approval"), scoped to the indent's unit;
+  dedupe spans all of a unit's budgets by line_key; a DB trigger
+  backstops stale pulls; drift badges on indent lines and a
+  "affects IND/…, PO/…" impact panel on the Selections diff page warn
+  when a revision touches live orders.
 - **2026-08-04 (later)** — **Architecture audit** (three parallel
   sweeps: independence, boundaries, performance; verdict: holds).
   Fixed on `feature/audit-fixes`: the Marathon walk-any-bib read, four

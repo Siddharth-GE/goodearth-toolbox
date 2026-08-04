@@ -3,6 +3,7 @@
 import { CataloguePickerDialog } from "@/components/masters/catalogue-picker";
 import { ItemThumb } from "@/components/masters/item-thumb";
 import { Attribution } from "@/components/ui/attribution";
+import { Badge } from "@/components/ui/badge";
 import { Button, LinkButton } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FormMessage } from "@/components/ui/form-message";
@@ -208,6 +209,17 @@ function LineRow({
           {line.item_brand && <span className="ml-2">{line.item_brand}</span>}
           {sourceLabel && <span className="ml-2 italic">{sourceLabel}</span>}
         </div>
+        {line.design_drift && (
+          // A revision issued after this line was pulled changed or
+          // removed it — the order may need revisiting.
+          <div className="mt-1">
+            <Badge variant="warning">
+              {line.design_drift === "removed"
+                ? "Removed from the design since this was requested"
+                : "Design changed since this was requested"}
+            </Badge>
+          </div>
+        )}
       </TableCell>
       {editable ? (
         <>

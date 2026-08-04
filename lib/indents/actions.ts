@@ -319,13 +319,41 @@ export async function addBudgetPullLines(
 
   const { data: budget, error: budgetError } = await supabase
     .from("approved_budgets")
-    .select("id, selection_id")
+    .select("id, selection_id, unit_id")
     .eq("id", budgetId)
     .maybeSingle();
-  if (budgetError || !budget?.selection_id) {
+  if (budgetError || !budget?.selection_id || !budget.unit_id) {
     console.error("addBudgetPullLines budget lookup failed:", budgetError);
     return { error: "That budget is no longer available to pull from." };
   }
+
+  // Only the current design revision may be requested against — a stale
+  // tab or pasted URL lands here after the screens have filtered, and
+  // the 0028 trigger backstops the insert itself.
+  const [{ data: revision }, { data: indent }] = await Promise.all([
+    supabase.from("selections").select("status").eq("id", budget.selection_id).maybeSingle(),
+    supabase.from("indents").select("unit_id").eq("id", indentId).maybeSingle(),
+  ]);
+  if (revision?.status !== "issued") {
+    return {
+      error:
+        "That budget belongs to a superseded design revision. Pull from the latest issued revision instead.",
+    };
+  }
+  if (indent?.unit_id && indent.unit_id !== budget.unit_id) {
+    return { error: "That budget belongs to a different unit than this indent." };
+  }
+
+  // A line pulled from ANY of this unit's budgets is the same line —
+  // line_key is stable across revisions, so the dedupe must span them
+  // all, not just the budget on screen (the double-buy bug).
+  const { data: siblingBudgets } = await supabase
+    .from("approved_budgets")
+    .select("id")
+    .eq("unit_id", budget.unit_id);
+  const siblingIds = (siblingBudgets ?? [])
+    .map((row) => row.id)
+    .filter((id): id is string => id != null);
 
   const [{ data: valid, error: validError }, { data: design, error: designError }, existingResult] =
     await Promise.all([
@@ -345,7 +373,7 @@ export async function addBudgetPullLines(
         .from("indent_lines")
         .select("line_key")
         .eq("indent_id", indentId)
-        .eq("budget_id", budgetId)
+        .in("budget_id", siblingIds)
         .in("line_key", lineKeys),
     ]);
   if (validError || designError || existingResult.error) {

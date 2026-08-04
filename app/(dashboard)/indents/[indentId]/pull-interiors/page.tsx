@@ -78,8 +78,13 @@ export default async function InteriorsPullPage({
     );
   }
 
-  // Step one: which approved budget?
-  const budgets = await listApprovedBudgetsForProject(indent.project_id);
+  // Step one: which approved budget? Only each unit's current (issued)
+  // revision is offered — a superseded revision's budget is history, and
+  // pulling from it is how the same line gets bought twice.
+  const { pullable, pending } = await listApprovedBudgetsForProject(
+    indent.project_id,
+    indent.unit_id,
+  );
 
   return (
     <div className="space-y-4">
@@ -87,10 +92,10 @@ export default async function InteriorsPullPage({
         title="Pull from an interiors budget"
         backHref={`/indents/${indentId}`}
         backLabel={indent.reference}
-        description={`Approved budgets on ${indent.project_name}. Only approved ones can be requested against.`}
+        description={`Approved budgets on ${indent.project_name}. Only the latest issued revision's approved budget can be requested against.`}
       />
 
-      {budgets.length === 0 ? (
+      {pullable.length === 0 && pending.length === 0 ? (
         <EmptyState
           icon={Palette}
           title="No approved budgets on this project"
@@ -108,7 +113,7 @@ export default async function InteriorsPullPage({
             </TableRow>
           </TableHead>
           <TableBody>
-            {budgets.map((budget) => (
+            {pullable.map((budget) => (
               <TableRow key={budget.budget_id}>
                 <TableCell className="text-foreground font-medium">{budget.unit_name}</TableCell>
                 <TableCell>
@@ -123,6 +128,14 @@ export default async function InteriorsPullPage({
                   >
                     Choose
                   </Link>
+                </TableCell>
+              </TableRow>
+            ))}
+            {pending.map((unit) => (
+              <TableRow key={unit.unit_name}>
+                <TableCell className="text-muted font-medium">{unit.unit_name}</TableCell>
+                <TableCell className="text-muted" colSpan={3}>
+                  R{unit.revision_no} issued — budget pending approval
                 </TableCell>
               </TableRow>
             ))}

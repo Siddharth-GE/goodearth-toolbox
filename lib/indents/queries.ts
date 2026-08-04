@@ -9,6 +9,14 @@ import { listUnits } from "@/lib/masters/units";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 
+import {
+  classifyBudgetChooser,
+  classifyDesignDrift,
+  type BudgetCandidate,
+  type DriftLine,
+  type DriftStatus,
+  type IssuedRevision,
+} from "./pull-rules";
 import type { IndentStatus } from "./workflow";
 
 // Indents reads the construction/selections/masters tables DIRECTLY,
@@ -119,6 +127,11 @@ export type IndentLineRow = {
   ordered_quantity: number;
   /** The PO references carrying this line, e.g. "PO/SAA/P12/001". */
   ordered_po_refs: string | null;
+  /** Set when a design revision issued AFTER this line was pulled has
+   * changed or removed it — the "check this order" flag. Null for
+   * direct/construction lines and for lines still on the current
+   * revision. */
+  design_drift: "changed" | "removed" | null;
 };
 
 export type IndentDetail = {
@@ -192,7 +205,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
       supabase
         .from("indent_lines")
         .select(
-          "id, item_id, quantity, uom, note, budget_id, construction_line_id, created_by, updated_by, created_at, items(name, code, thumb_url, brands(name))",
+          "id, item_id, quantity, uom, note, budget_id, line_key, construction_line_id, created_by, updated_by, created_at, items(name, code, thumb_url, brands(name))",
         )
         .eq("indent_id", indentId)
         .order("created_at")
@@ -246,6 +259,97 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
     orderedByLine.set(fact.indent_line_id, entry);
   }
 
+  // Lines anchored to an interiors budget may have drifted: a revision
+  // issued AFTER the pull can change or remove the design line they came
+  // from. Compare each anchored line (its own revision's selection line)
+  // against the unit's latest issued revision, and flag the differences.
+  // All money-free reads: approved_budgets, selections, selection_lines.
+  const driftByAnchor = new Map<string, DriftStatus>();
+  const anchoredBudgetIds = [
+    ...new Set(
+      (lines ?? []).map((line) => line.budget_id).filter((id): id is string => id != null),
+    ),
+  ];
+  if (anchoredBudgetIds.length > 0) {
+    const { data: anchorBudgets } = await supabase
+      .from("approved_budgets")
+      .select("id, selection_id, unit_id")
+      .in("id", anchoredBudgetIds);
+    const budgets = (anchorBudgets ?? []).filter(
+      (row): row is { id: string; selection_id: string; unit_id: string } =>
+        row.id != null && row.selection_id != null && row.unit_id != null,
+    );
+    const { data: anchorSelections } = budgets.length
+      ? await supabase
+          .from("selections")
+          .select("id, status")
+          .in(
+            "id",
+            budgets.map((row) => row.selection_id),
+          )
+      : { data: [] };
+    const statusById = new Map((anchorSelections ?? []).map((row) => [row.id, row.status]));
+    const superseded = budgets.filter((row) => statusById.get(row.selection_id) !== "issued");
+
+    if (superseded.length > 0) {
+      const anchoredKeysByBudget = new Map<string, string[]>();
+      for (const line of lines ?? []) {
+        if (!line.budget_id || !line.line_key) continue;
+        const keys = anchoredKeysByBudget.get(line.budget_id) ?? [];
+        keys.push(line.line_key);
+        anchoredKeysByBudget.set(line.budget_id, keys);
+      }
+
+      const { data: issuedSelections } = await supabase
+        .from("selections")
+        .select("id, unit_id")
+        .in("unit_id", [...new Set(superseded.map((row) => row.unit_id))])
+        .eq("status", "issued");
+      const issuedByUnit = new Map((issuedSelections ?? []).map((row) => [row.unit_id, row.id]));
+
+      const selectionIds = [
+        ...new Set([
+          ...superseded.map((row) => row.selection_id),
+          ...(issuedSelections ?? []).map((row) => row.id),
+        ]),
+      ];
+      const allKeys = [
+        ...new Set(superseded.flatMap((row) => anchoredKeysByBudget.get(row.id) ?? [])),
+      ];
+      const { data: revisionLines } = allKeys.length
+        ? await fetchAll((from, to) =>
+            supabase
+              .from("selection_lines")
+              .select("selection_id, line_key, item_id, quantity, unit_space_id")
+              .in("selection_id", selectionIds)
+              .in("line_key", allKeys)
+              .order("id")
+              .range(from, to),
+          )
+        : { data: [] };
+      const linesBySelection = new Map<string, DriftLine[]>();
+      for (const row of revisionLines ?? []) {
+        const bucket = linesBySelection.get(row.selection_id) ?? [];
+        bucket.push(row);
+        linesBySelection.set(row.selection_id, bucket);
+      }
+
+      for (const budget of superseded) {
+        const issuedId = issuedByUnit.get(budget.unit_id);
+        const keys = anchoredKeysByBudget.get(budget.id) ?? [];
+        if (!issuedId || keys.length === 0) continue;
+        const drift = classifyDesignDrift(
+          keys,
+          linesBySelection.get(budget.selection_id) ?? [],
+          linesBySelection.get(issuedId) ?? [],
+        );
+        for (const [key, status] of drift) {
+          driftByAnchor.set(`${budget.id}:${key}`, status);
+        }
+      }
+    }
+  }
+
   const mapped: IndentLineRow[] = (lines ?? []).map((line) => {
     const item = line.items as {
       name: string;
@@ -273,6 +377,10 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
       updated_by_name: nameOf(line.updated_by ?? line.created_by),
       ordered_quantity: ordered?.quantity ?? 0,
       ordered_po_refs: ordered ? [...ordered.refs].sort().join(", ") : null,
+      design_drift:
+        line.budget_id && line.line_key
+          ? (driftByAnchor.get(`${line.budget_id}:${line.line_key}`) ?? null)
+          : null,
     };
   });
 
@@ -444,53 +552,97 @@ export type ApprovedBudgetOption = {
   approved_at: string | null;
 };
 
-/** The approved interiors budgets on this indent's project — what the
- * pull screen offers to pull from. */
+/** A unit whose current revision is issued but not yet priced and
+ * approved — shown paused rather than silently offering the old budget. */
+export type PendingBudgetUnit = {
+  unit_name: string;
+  revision_no: number;
+};
+
+export type BudgetChooser = {
+  pullable: ApprovedBudgetOption[];
+  pending: PendingBudgetUnit[];
+};
+
+/**
+ * The approved interiors budgets the pull screen may offer: only each
+ * unit's CURRENT (issued) revision. A superseded revision's budget stays
+ * approved forever as history, but requesting material against it is how
+ * the same line gets bought twice — those units appear as pending until
+ * the new revision's budget is approved. An indent tagged to a unit sees
+ * that unit alone.
+ */
 export async function listApprovedBudgetsForProject(
   projectId: string,
-): Promise<ApprovedBudgetOption[]> {
+  unitId?: string | null,
+): Promise<BudgetChooser> {
   await requireTool("/indents");
   const supabase = await createClient();
 
-  const units = await listUnits(projectId);
-  if (units.length === 0) return [];
+  const units = (await listUnits(projectId)).filter((unit) => !unitId || unit.id === unitId);
+  if (units.length === 0) return { pullable: [], pending: [] };
   const unitNames = new Map(units.map((unit) => [unit.id, unit.name]));
+  const unitIds = units.map((unit) => unit.id);
 
-  const { data: budgets } = await fetchAll((from, to) =>
+  const [{ data: budgets }, { data: issuedSelections }] = await Promise.all([
+    fetchAll((from, to) =>
+      supabase
+        .from("approved_budgets")
+        .select("id, selection_id, unit_id, version, approved_at")
+        .in("unit_id", unitIds)
+        .order("id")
+        .range(from, to),
+    ),
+    // At most one issued selection per unit (issue_selection supersedes
+    // the previous one) — the R-number and the "is this current" test in
+    // one read.
     supabase
-      .from("approved_budgets")
-      .select("id, selection_id, unit_id, version, approved_at")
-      .in(
-        "unit_id",
-        units.map((unit) => unit.id),
-      )
-      .order("id")
-      .range(from, to),
+      .from("selections")
+      .select("id, unit_id, revision_no")
+      .in("unit_id", unitIds)
+      .eq("status", "issued"),
+  ]);
+  if ((budgets ?? []).length === 0) return { pullable: [], pending: [] };
+
+  const issuedByUnit = new Map<string, IssuedRevision>(
+    (issuedSelections ?? []).map((row) => [
+      row.unit_id,
+      { selection_id: row.id, revision_no: row.revision_no },
+    ]),
   );
-  if ((budgets ?? []).length === 0) return [];
 
-  // R-numbers live on the selection, which the view deliberately doesn't
-  // carry — it's the design's number, not the budget's.
-  const selectionIds = (budgets ?? [])
-    .map((budget) => budget.selection_id)
-    .filter((id): id is string => id != null);
-  const { data: selections } = await supabase
-    .from("selections")
-    .select("id, revision_no")
-    .in("id", selectionIds);
-  const revisions = new Map((selections ?? []).map((row) => [row.id, row.revision_no]));
-
-  return (budgets ?? [])
-    .filter((budget) => budget.id != null && budget.unit_id != null)
+  const candidates: BudgetCandidate[] = (budgets ?? [])
+    .filter((budget) => budget.id != null && budget.unit_id != null && budget.selection_id != null)
     .map((budget) => ({
       budget_id: budget.id as string,
       unit_id: budget.unit_id as string,
-      unit_name: unitNames.get(budget.unit_id as string) ?? "—",
-      revision_no: revisions.get(budget.selection_id as string) ?? 0,
+      selection_id: budget.selection_id as string,
       version: budget.version ?? 1,
       approved_at: budget.approved_at,
-    }))
-    .sort((a, b) => a.unit_name.localeCompare(b.unit_name) || b.revision_no - a.revision_no);
+    }));
+
+  const rows = classifyBudgetChooser(candidates, issuedByUnit);
+
+  return {
+    pullable: rows
+      .filter((row) => row.kind === "pullable")
+      .map((row) => ({
+        budget_id: row.budget.budget_id,
+        unit_id: row.budget.unit_id,
+        unit_name: unitNames.get(row.budget.unit_id) ?? "—",
+        revision_no: row.revision_no,
+        version: row.budget.version,
+        approved_at: row.budget.approved_at,
+      }))
+      .sort((a, b) => a.unit_name.localeCompare(b.unit_name)),
+    pending: rows
+      .filter((row) => row.kind === "pending")
+      .map((row) => ({
+        unit_name: unitNames.get(row.unit_id) ?? "—",
+        revision_no: row.revision_no,
+      }))
+      .sort((a, b) => a.unit_name.localeCompare(b.unit_name)),
+  };
 }
 
 export type BudgetPullLineRow = PullLineRow & {
@@ -532,6 +684,13 @@ export async function getBudgetPull(
     .maybeSingle();
   if (!budget || !budget.selection_id || !budget.unit_id) return null;
 
+  // An indent tagged to a unit pulls from that unit alone — the chooser
+  // never offers another unit's budget, so arriving here with one is a
+  // pasted URL.
+  const indent = await getIndentHeader(indentId);
+  if (!indent) return null;
+  if (indent.unit_id && indent.unit_id !== budget.unit_id) return null;
+
   const [{ data: budgetLines }, { data: selectionLines }, { data: spaces }, { data: selection }] =
     await Promise.all([
       fetchAll((from, to) =>
@@ -556,17 +715,33 @@ export async function getBudgetPull(
       supabase.from("spaces").select("id, label, sort_order").eq("unit_id", budget.unit_id),
       supabase
         .from("selections")
-        .select("revision_no, units(name)")
+        .select("revision_no, status, units(name)")
         .eq("id", budget.selection_id as string)
         .maybeSingle(),
     ]);
 
-  // Every line already raised against THIS budget, on any indent.
+  // Only the current design revision may be requested against. The
+  // chooser already filters; this holds against a stale tab or a pasted
+  // URL, and the 0028 trigger backstops the insert itself.
+  if (selection?.status !== "issued") return null;
+
+  // Every line already raised against ANY of this unit's budgets, on any
+  // indent. line_key is stable across revisions, so a line pulled from
+  // R1's budget must show as already asked when R2's budget is on
+  // screen — scoping this to one budget_id was the double-buy bug.
+  const { data: siblingBudgets } = await supabase
+    .from("approved_budgets")
+    .select("id")
+    .eq("unit_id", budget.unit_id);
+  const siblingIds = (siblingBudgets ?? [])
+    .map((row) => row.id)
+    .filter((id): id is string => id != null);
+
   const { data: raised } = await fetchAll((from, to) =>
     supabase
       .from("indent_lines")
       .select("line_key, quantity, indent_id")
-      .eq("budget_id", budgetId)
+      .in("budget_id", siblingIds)
       .order("id")
       .range(from, to),
   );

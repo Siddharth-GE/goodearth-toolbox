@@ -351,3 +351,87 @@ export async function listActiveSpaceTypes() {
     .order("sort_order");
   return data ?? [];
 }
+
+/** Where a design line has already gone downstream — the indents (and
+ * through them the POs) carrying it. */
+export type LineImpact = {
+  indent_refs: string[];
+  po_refs: string[];
+};
+
+/**
+ * Which of these lines are already on indents or purchase orders — the
+ * diff page's "this change affects live orders" warning.
+ *
+ * Direct table reads under the /selections grant: indent_lines and
+ * indents are open reads by design (0019), and po_line_facts (0022) is
+ * the money-free PO window every tool may use — references and
+ * quantities, never a rate. Selections imports no Indents code; the
+ * database is the shared surface. Matching on bare line_key is safe
+ * HERE because it's a read and line_key is a uuid — anchors elsewhere
+ * stay composite per the CLAUDE.md rule.
+ */
+export async function getDownstreamImpact(lineKeys: string[]): Promise<Map<string, LineImpact>> {
+  await requireTool("/selections");
+  const impact = new Map<string, LineImpact>();
+  if (lineKeys.length === 0) return impact;
+
+  const supabase = await createClient();
+
+  // Read to completion — a silent cap here would hide an affected order.
+  const { data: indentLines } = await fetchAll((from, to) =>
+    supabase
+      .from("indent_lines")
+      .select("id, line_key, indent_id")
+      .in("line_key", lineKeys)
+      .order("id")
+      .range(from, to),
+  );
+  const anchored = (indentLines ?? []).filter(
+    (line): line is { id: string; line_key: string; indent_id: string } =>
+      line.line_key != null && line.indent_id != null,
+  );
+  if (anchored.length === 0) return impact;
+
+  const [{ data: indents }, { data: poFacts }] = await Promise.all([
+    supabase
+      .from("indents")
+      .select("id, reference")
+      .in("id", [...new Set(anchored.map((line) => line.indent_id))]),
+    fetchAll((from, to) =>
+      supabase
+        .from("po_line_facts")
+        .select("indent_line_id, po_reference, po_status")
+        .in(
+          "indent_line_id",
+          anchored.map((line) => line.id),
+        )
+        .order("id")
+        .range(from, to),
+    ),
+  ]);
+
+  const indentRefs = new Map((indents ?? []).map((row) => [row.id, row.reference]));
+  const poRefsByLineId = new Map<string, Set<string>>();
+  for (const fact of poFacts ?? []) {
+    if (fact.po_status === "cancelled" || !fact.indent_line_id || !fact.po_reference) continue;
+    const refs = poRefsByLineId.get(fact.indent_line_id) ?? new Set();
+    refs.add(fact.po_reference);
+    poRefsByLineId.set(fact.indent_line_id, refs);
+  }
+
+  for (const line of anchored) {
+    const entry = impact.get(line.line_key) ?? { indent_refs: [], po_refs: [] };
+    const indentRef = indentRefs.get(line.indent_id);
+    if (indentRef && !entry.indent_refs.includes(indentRef)) entry.indent_refs.push(indentRef);
+    for (const ref of poRefsByLineId.get(line.id) ?? []) {
+      if (!entry.po_refs.includes(ref)) entry.po_refs.push(ref);
+    }
+    impact.set(line.line_key, entry);
+  }
+  for (const entry of impact.values()) {
+    entry.indent_refs.sort();
+    entry.po_refs.sort();
+  }
+  return impact;
+}
