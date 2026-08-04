@@ -66,9 +66,13 @@ export type SavedEntry = {
   marathon_runs: { name: string } | null;
 };
 
-export async function getSavedEntry(bib: string): Promise<SavedEntry | null> {
+export async function getSavedEntry(bib: string, agentId: string): Promise<SavedEntry | null> {
   const supabase = createAdminClient();
 
+  // Scoped to the calling agent: bib arrives from a URL param on the
+  // service-role client, so without this filter any signed-in agent
+  // could read any runner's entry by walking bib numbers.
+  //
   // The DB returns single objects here (each entry has exactly one
   // category and one run), but supabase-js can't infer that without
   // generated types and defaults to typing embeds as arrays.
@@ -76,6 +80,7 @@ export async function getSavedEntry(bib: string): Promise<SavedEntry | null> {
     .from("marathon_entries")
     .select("bib, name, tee_size, marathon_categories(name, color), marathon_runs(name)")
     .eq("bib", bib)
+    .eq("agent_id", agentId)
     .single();
 
   return data as unknown as SavedEntry | null;
