@@ -92,7 +92,7 @@ export const TOOLS: Tool[] = [
     href: "/bills",
     icon: "Receipt",
     group: "Operations",
-    built: false,
+    built: true,
   },
   {
     name: "Budgets",
