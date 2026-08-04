@@ -9,6 +9,7 @@ const TABS = [
   { key: "units", href: "/masters/units", label: "Units" },
   { key: "clients", href: "/masters/clients", label: "Clients" },
   { key: "vendors", href: "/masters/vendors", label: "Vendors" },
+  { key: "labour-contracts", href: "/masters/labour-contracts", label: "Labour Contracts" },
   { key: "stores", href: "/masters/stores", label: "Stores" },
   { key: "items", href: "/masters/items", label: "Items" },
   { key: "categories", href: "/masters/categories", label: "Categories & Brands" },
