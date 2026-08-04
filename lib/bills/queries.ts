@@ -102,6 +102,21 @@ export async function listBills({
   };
 }
 
+/** The list page's filter dropdowns — every vendor and project by
+ * name. Light on purpose; the record form's options bag is the heavy
+ * one. */
+export async function getBillFilterOptions(): Promise<{
+  vendors: { id: string; name: string }[];
+  projects: { id: string; name: string }[];
+}> {
+  await requireTool("/bills");
+  const [vendors, projects] = await Promise.all([listVendors(), listProjects()]);
+  return {
+    vendors: vendors.map(({ id, name }) => ({ id, name })),
+    projects: projects.map(({ id, name }) => ({ id, name })),
+  };
+}
+
 /* ------------------------------------------------------------------ *
  * One bill, in full
  * ------------------------------------------------------------------ */

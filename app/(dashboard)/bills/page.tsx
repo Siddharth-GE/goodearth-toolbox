@@ -11,11 +11,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { NavTabs } from "@/components/ui/tabs";
-import { listBills } from "@/lib/bills/queries";
+import { getBillFilterOptions, listBills } from "@/lib/bills/queries";
 import type { BillStatus } from "@/lib/bills/workflow";
 import { formatDate, formatMoney } from "@/lib/format";
 import { Receipt } from "lucide-react";
 import Link from "next/link";
+import { BillFilters } from "./_components/bill-filters";
 import { BillStatusBadge } from "./_components/status-badge";
 
 // "Unpaid" is a derived view (everything not yet paid — recorded and
@@ -32,25 +33,44 @@ const TABS: { key: string; label: string; param?: string; status?: BillStatus; u
 export default async function BillsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; page?: string }>;
+  searchParams: Promise<{ status?: string; page?: string; vendor?: string; project?: string }>;
 }) {
-  const { status: statusParam, page } = await searchParams;
+  const { status: statusParam, page, vendor, project } = await searchParams;
   const tab = TABS.find((t) => t.param === statusParam) ?? TABS[0];
 
-  const result = await listBills({
-    page: Number(page) || 1,
-    status: tab.status,
-    unpaid: tab.unpaid,
-  });
+  const [result, filterOptions] = await Promise.all([
+    listBills({
+      page: Number(page) || 1,
+      status: tab.status,
+      unpaid: tab.unpaid,
+      vendorId: vendor || undefined,
+      projectId: project || undefined,
+    }),
+    getBillFilterOptions(),
+  ]);
   const { bills, total, page: currentPage, pageCount, pageSize } = result;
+
+  const hrefWith = (params: URLSearchParams) => {
+    if (vendor) params.set("vendor", vendor);
+    if (project) params.set("project", project);
+    const query = params.toString();
+    return query ? `/bills?${query}` : "/bills";
+  };
 
   const hrefForPage = (target: number) => {
     const params = new URLSearchParams();
     if (tab.param) params.set("status", tab.param);
     if (target > 1) params.set("page", String(target));
-    const query = params.toString();
-    return query ? `/bills?${query}` : "/bills";
+    return hrefWith(params);
   };
+
+  const hrefForTab = (param?: string) => {
+    const params = new URLSearchParams();
+    if (param) params.set("status", param);
+    return hrefWith(params);
+  };
+
+  const filtered = Boolean(vendor || project);
 
   return (
     <div className="space-y-4">
@@ -63,22 +83,38 @@ export default async function BillsPage({
       <NavTabs
         tabs={TABS.map((t) => ({
           key: t.key,
-          href: t.param ? `/bills?status=${t.param}` : "/bills",
+          href: hrefForTab(t.param),
           label: t.label,
         }))}
         active={tab.key}
       />
 
+      <BillFilters
+        vendors={filterOptions.vendors}
+        projects={filterOptions.projects}
+        selectedVendor={vendor ?? ""}
+        selectedProject={project ?? ""}
+        status={tab.param ?? ""}
+      />
+
       {bills.length === 0 ? (
         <EmptyState
           icon={Receipt}
-          title={tab.param ? `No ${tab.label.toLowerCase()} bills` : "No bills yet"}
+          title={
+            tab.param || filtered
+              ? `No ${tab.param ? `${tab.label.toLowerCase()} ` : ""}bills${filtered ? " match these filters" : ""}`
+              : "No bills yet"
+          }
           description={
-            tab.param
+            tab.param || filtered
               ? undefined
               : "Record the first vendor invoice against a purchase order or a labour contract."
           }
-          action={tab.param ? undefined : <LinkButton href="/bills/new">Record bill</LinkButton>}
+          action={
+            tab.param || filtered ? undefined : (
+              <LinkButton href="/bills/new">Record bill</LinkButton>
+            )
+          }
         />
       ) : (
         <>
