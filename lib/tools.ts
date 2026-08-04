@@ -1,14 +1,20 @@
 import {
   Boxes,
   ClipboardList,
+  Compass,
+  FolderKanban,
   Footprints,
   GraduationCap,
+  Handshake,
+  Landmark,
+  LayoutDashboard,
   type LucideIcon,
   Palette,
   PiggyBank,
   Receipt,
   Settings as SettingsIcon,
   ShoppingCart,
+  Target,
   Users,
   Warehouse,
 } from "lucide-react";
@@ -21,18 +27,24 @@ import {
 export const TOOL_ICONS = {
   Boxes,
   ClipboardList,
+  Compass,
+  FolderKanban,
   Footprints,
   GraduationCap,
+  Handshake,
+  Landmark,
+  LayoutDashboard,
   Palette,
   PiggyBank,
   Receipt,
   Settings: SettingsIcon,
   ShoppingCart,
+  Target,
   Users,
   Warehouse,
 } satisfies Record<string, LucideIcon>;
 
-export type ToolGroup = "Operations" | "Events" | "People" | "Admin";
+export type ToolGroup = "Management" | "Operations" | "Events" | "People" | "Admin";
 
 export type Tool = {
   name: string;
@@ -141,6 +153,54 @@ export const TOOLS: Tool[] = [
     icon: "Settings",
     group: "Admin",
     built: true,
+  },
+  {
+    name: "Dashboard",
+    description: "One leadership view across projects, money and people.",
+    href: "/management-dashboard",
+    icon: "LayoutDashboard",
+    group: "Management",
+    built: false,
+  },
+  {
+    name: "Project Management",
+    description: "Track every project's schedule, milestones and health.",
+    href: "/project-management",
+    icon: "FolderKanban",
+    group: "Management",
+    built: false,
+  },
+  {
+    name: "Design Management",
+    description: "Design revisions, drawings and approvals in one place.",
+    href: "/design-management",
+    icon: "Compass",
+    group: "Management",
+    built: false,
+  },
+  {
+    name: "Client Relations",
+    description: "Every client and enquiry, from first visit to handover.",
+    href: "/client-relations",
+    icon: "Handshake",
+    group: "Management",
+    built: false,
+  },
+  {
+    name: "Financial Management",
+    description: "Cash flow, receivables and spending across the company.",
+    href: "/financial-management",
+    icon: "Landmark",
+    group: "Management",
+    built: false,
+  },
+  {
+    name: "Business Planning",
+    description: "Targets, forecasts and the year's plan in one place.",
+    href: "/business-planning",
+    icon: "Target",
+    group: "Management",
+    built: false,
   },
 ];
 

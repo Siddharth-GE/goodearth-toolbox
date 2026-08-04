@@ -16,7 +16,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
-const GROUP_ORDER: ToolGroup[] = ["Operations", "Events", "People", "Admin"];
+const GROUP_ORDER: ToolGroup[] = ["Management", "Operations", "Events", "People", "Admin"];
 
 function NavRow({
   href,
