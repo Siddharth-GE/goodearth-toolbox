@@ -139,10 +139,7 @@ export async function countBillsPipeline(): Promise<{
       .select("id", { count: "exact", head: true })
       .eq("status", "paid")
       .gte("paid_at", since),
-    supabase
-      .from("bill_facts")
-      .select("id", { count: "exact", head: true })
-      .neq("status", "paid"),
+    supabase.from("bill_facts").select("id", { count: "exact", head: true }).neq("status", "paid"),
   ]);
 
   return {
