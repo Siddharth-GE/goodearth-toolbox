@@ -294,6 +294,39 @@ export const getPurchaseOrder = cache(async (poId: string): Promise<PoDetail | n
   };
 });
 
+export type PoBilledTotals = {
+  ordered_total: number;
+  billed_total: number;
+  bill_count: number;
+};
+
+/**
+ * The ordered-vs-billed picture for one PO, from the po_billing_totals
+ * window (migration 0025) — the one sanctioned money view between
+ * Purchase Orders and Bills. Its WHERE qual admits /purchase-orders and
+ * /bills holders; this caller is already behind requireTool, and a row
+ * filtered away by the qual comes back as null, rendered as "nothing
+ * billed yet".
+ */
+export async function getPoBilledTotals(poId: string): Promise<PoBilledTotals> {
+  await requireTool("/purchase-orders");
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("po_billing_totals")
+    .select("ordered_total, billed_total, bill_count")
+    .eq("po_id", poId)
+    .maybeSingle();
+
+  // Every view column is typed nullable by the generator — normalise
+  // once at the boundary.
+  return {
+    ordered_total: data?.ordered_total ?? 0,
+    billed_total: data?.billed_total ?? 0,
+    bill_count: data?.bill_count ?? 0,
+  };
+}
+
 export type PoPdfData = {
   po: PoDetail;
   vendor: {

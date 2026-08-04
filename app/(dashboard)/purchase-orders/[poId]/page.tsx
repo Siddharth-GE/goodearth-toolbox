@@ -7,6 +7,7 @@ import { listGstRates } from "@/lib/masters/gst-rates";
 import { isFullyPriced } from "@/lib/purchase-orders/math";
 import {
   getCurrentPoActor,
+  getPoBilledTotals,
   getPoFormOptions,
   getPurchaseOrder,
 } from "@/lib/purchase-orders/queries";
@@ -15,18 +16,20 @@ import { FileDown } from "lucide-react";
 import { notFound } from "next/navigation";
 import { PoStatusBadge } from "../_components/status-badge";
 import { ActionButtons } from "./_components/action-buttons";
+import { BilledSection } from "./_components/billed-section";
 import { HeaderFields } from "./_components/header-fields";
 import { LineGrid } from "./_components/line-grid";
 import { ReceiptsSection } from "./_components/receipts-section";
 
 export default async function PurchaseOrderPage({ params }: { params: Promise<{ poId: string }> }) {
   const { poId } = await params;
-  const [po, actor, options, gstRates, receipts] = await Promise.all([
+  const [po, actor, options, gstRates, receipts, billedTotals] = await Promise.all([
     getPurchaseOrder(poId),
     getCurrentPoActor(),
     getPoFormOptions(),
     listGstRates(),
     getPoReceipts(poId),
+    getPoBilledTotals(poId),
   ]);
   if (!po) notFound();
 
@@ -152,6 +155,8 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
       <LineGrid poId={po.id} lines={po.lines} editable={editable} gstRates={activeRates} />
 
       <ReceiptsSection receipts={receipts} />
+
+      <BilledSection totals={billedTotals} />
     </div>
   );
 }
