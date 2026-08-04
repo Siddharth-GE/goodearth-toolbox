@@ -21,7 +21,7 @@ export function ManagementVision() {
             <Link key={tool.href} href={tool.href}>
               <Card className="hover:border-accent/40 h-full p-5 transition-colors">
                 <div className="flex items-start justify-between">
-                  <div className="bg-accent/10 text-accent flex size-10 items-center justify-center rounded-xl">
+                  <div className="bg-accent/10 text-accent flex size-9 items-center justify-center rounded-lg">
                     <Icon className="size-5" />
                   </div>
                   <Badge variant="neutral">Coming Soon</Badge>

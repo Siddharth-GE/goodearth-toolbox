@@ -10,3 +10,11 @@ supabase/migrations/
 .next/
 node_modules/
 data/
+
+# The impeccable design skill's own files (third-party, vendored as-is) —
+# reformatting them would churn code we don't maintain.
+.claude/
+.github/agents/
+.github/hooks/
+.github/skills/
+.impeccable/
