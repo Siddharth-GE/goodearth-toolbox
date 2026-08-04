@@ -56,8 +56,10 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // Exact match, not startsWith — a prefix match would make any future
+  // /login-adjacent route silently public.
   const path = request.nextUrl.pathname;
-  const isPublicPath = PUBLIC_PATHS.some((p) => path.startsWith(p));
+  const isPublicPath = PUBLIC_PATHS.includes(path);
 
   if (!user && !isPublicPath) {
     const url = request.nextUrl.clone();
