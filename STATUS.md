@@ -16,13 +16,13 @@ project run end-to-end.
 
 |                    |                                                                                                                         |
 | ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
-| Last worked        | 2026-08-04                                                                                                              |
-| Branch             | `master` — clean                                                                                                        |
-| Migrations applied | `0001`–`0030` (next is `0031`)                                                                                          |
+| Last worked        | 2026-08-05                                                                                                              |
+| Branch             | `feature/masters-settings-upgrade` — awaiting browser test                                                              |
+| Migrations applied | `0001`–`0034` (next is `0035`)                                                                                          |
 | Items in database  | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands                                          |
 | Thumbnails         | 897 in Supabase Storage; 1,736 items use the colour placeholder                                                         |
 | Built tools        | Marathon, Settings, Masters, Selections, Budgets (Interiors + Construction), Indents, Purchase Orders, Inventory, Bills |
-| Tests              | `npm test` — 101, all pure logic                                                                                        |
+| Tests              | `npm test` — 136, all pure logic                                                                                        |
 
 ## Next up
 
@@ -43,10 +43,13 @@ project run end-to-end.
 - **Letterhead assets** — logo, address, GST number, PO terms → swap
   into `lib/pdf/document.tsx`'s `Letterhead` (one place); a Geist
   `.ttf` registered there lifts every PDF at once.
-- Smaller, any session: Selections paste-from-Excel; the admins-only
-  RLS mismatch noted in migration `0008`; database clean-up once rolling
-  (test indents `IND/SAA/001`–`005`, the inert probe account — both
-  need SQL in Studio, the app refuses by design).
+- **Set up the real roles** once the Masters & Settings branch merges —
+  Site Engineer, Purchase, Accounts, and whatever else matches how the
+  office actually splits work; then assign a role instead of ticking
+  apps one at a time.
+- Smaller, any session: Selections paste-from-Excel; database clean-up
+  once rolling (test indents `IND/SAA/001`–`005`, the inert probe
+  account — both need SQL in Studio, the app refuses by design).
 
 ## Decisions locked in
 
@@ -165,6 +168,21 @@ project run end-to-end.
 
 One line per day; full detail in git history and the PLAN.md files.
 
+- **2026-08-05 (masters & settings upgrade)** — seven shippable pieces
+  on `feature/masters-settings-upgrade`, migrations `0031`–`0034`.
+  **Masters:** the last admins-only write (gst_rates) fixed, audit
+  trails and `updated_at`/`updated_by` on every master, an off-switch
+  for clients/categories/brands, search + filters + paging on vendors /
+  clients / plots / units, and detail pages for vendors, clients and
+  projects reading only the money-free views. **Settings:** the one
+  wide checkbox matrix became People / Roles / Overview — a page per
+  person with grouped apps, approval rights and an access history from
+  `audit_log`; invite (the one sanctioned service-role call) and
+  deactivate, with the last active admin protected at the database;
+  bill approval **limits**; and **role templates**, where `has_app()`
+  learned about bundles so ~80 RLS policies followed with no policy
+  edits. Backward compatibility checked against the live database by
+  impersonating each real user. Awaiting the founder's browser test.
 - **2026-08-04 (management group)** — the founder set the vision for
   the next layer: a **Management** sidebar group above Operations with
   six Coming Soon tools — Dashboard (a leadership view, distinct from
