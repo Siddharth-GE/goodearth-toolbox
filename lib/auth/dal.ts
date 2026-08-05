@@ -51,11 +51,21 @@ export const getCurrentUser = cache(async () => {
   // round trip on every gated query. The role's bundle rides along on
   // the same trip via the role_id FK (0034), so granting through a role
   // costs nothing extra per request.
-  const { data } = await supabase
+  // The FK is named explicitly: `roles` also carries created_by and
+  // updated_by pointing back at profiles (0034), so a bare `roles(…)`
+  // is ambiguous and PostgREST refuses it outright (PGRST201) — which
+  // silently signed everyone out until it was named.
+  const { data, error } = await supabase
     .from("profiles")
-    .select("id, full_name, role, team, is_active, role_id, user_apps(app), roles(role_apps(app))")
+    .select(
+      "id, full_name, role, team, is_active, role_id, user_apps(app), roles!profiles_role_id_fkey(role_apps(app))",
+    )
     .eq("id", userId)
     .single();
+
+  // Never fail silently here: a broken query looks exactly like "no such
+  // user", which logs a real person out with no trace of why.
+  if (error) console.error("getCurrentUser profile read failed:", error);
 
   // No profile row means no such staff member — every real user gets one
   // from the handle_new_user trigger at signup (0001_profiles.sql). This
