@@ -28,7 +28,8 @@ export type AdminUserRow = {
 export async function listUsersForAdmin(): Promise<AdminUserRow[]> {
   await requireAdminCaller();
   const supabase = await createClient();
-  const { data } = await supabase.rpc("admin_list_users");
+  const { data, error } = await supabase.rpc("admin_list_users");
+  if (error) console.error("listUsersForAdmin failed:", error);
   return data ?? [];
 }
 
@@ -43,9 +44,10 @@ export async function listUsersForAdmin(): Promise<AdminUserRow[]> {
 export async function listIndentApprovers(): Promise<Set<string>> {
   await requireAdminCaller();
   const supabase = await createClient();
-  const { data } = await fetchAll((from, to) =>
+  const { data, error } = await fetchAll((from, to) =>
     supabase.from("indent_approvers").select("user_id").order("user_id").range(from, to),
   );
+  if (error) console.error("listIndentApprovers failed:", error);
   return new Set((data ?? []).map((row) => row.user_id));
 }
 
@@ -53,9 +55,10 @@ export async function listIndentApprovers(): Promise<Set<string>> {
 export async function listBillApprovers(): Promise<Set<string>> {
   await requireAdminCaller();
   const supabase = await createClient();
-  const { data } = await fetchAll((from, to) =>
+  const { data, error } = await fetchAll((from, to) =>
     supabase.from("bill_approvers").select("user_id").order("user_id").range(from, to),
   );
+  if (error) console.error("listBillApprovers failed:", error);
   return new Set((data ?? []).map((row) => row.user_id));
 }
 
@@ -67,13 +70,14 @@ export async function listBillApprovers(): Promise<Set<string>> {
 export async function listBillApprovalLimits(): Promise<Map<string, number | null>> {
   await requireAdminCaller();
   const supabase = await createClient();
-  const { data } = await fetchAll((from, to) =>
+  const { data, error } = await fetchAll((from, to) =>
     supabase
       .from("bill_approvers")
       .select("user_id, approval_limit")
       .order("user_id")
       .range(from, to),
   );
+  if (error) console.error("listBillApprovalLimits failed:", error);
   return new Map((data ?? []).map((row) => [row.user_id, row.approval_limit]));
 }
 
@@ -88,9 +92,10 @@ export async function getPersonForAdmin(userId: string): Promise<AdminUserRow | 
 export async function listGrantsForUser(userId: string): Promise<Set<string>> {
   await requireAdminCaller();
   const supabase = await createClient();
-  const { data } = await fetchAll((from, to) =>
+  const { data, error } = await fetchAll((from, to) =>
     supabase.from("user_apps").select("app").eq("user_id", userId).order("app").range(from, to),
   );
+  if (error) console.error("listGrantsForUser failed:", error);
   return new Set((data ?? []).map((row) => row.app));
 }
 
@@ -138,7 +143,11 @@ export async function listAccessHistory(userId: string): Promise<AccessAuditRow[
   const actorIds = [...new Set(rows.map((row) => row.actor).filter((id): id is string => !!id))];
   const actorNames = new Map<string, string>();
   if (actorIds.length) {
-    const { data } = await supabase.from("profiles").select("id, full_name").in("id", actorIds);
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, full_name")
+      .in("id", actorIds);
+    if (error) console.error("listAccessHistory actor names failed:", error);
     for (const person of data ?? []) {
       if (person.full_name) actorNames.set(person.id, person.full_name);
     }
@@ -157,9 +166,10 @@ export async function listAccessHistory(userId: string): Promise<AccessAuditRow[
 export async function listAllGrants(): Promise<Map<string, Set<string>>> {
   await requireAdminCaller();
   const supabase = await createClient();
-  const { data } = await fetchAll((from, to) =>
+  const { data, error } = await fetchAll((from, to) =>
     supabase.from("user_apps").select("user_id, app").order("user_id").order("app").range(from, to),
   );
+  if (error) console.error("listAllGrants failed:", error);
 
   const grants = new Map<string, Set<string>>();
   for (const row of data ?? []) {

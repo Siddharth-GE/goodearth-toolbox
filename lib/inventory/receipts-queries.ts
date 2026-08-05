@@ -152,7 +152,7 @@ async function receivedProgressForPos(
   if (poIds.length === 0) return byPo;
 
   // Completeness-critical: a missing line reads as "fully received".
-  const { data } = await fetchAll((from, to) =>
+  const { data, error } = await fetchAll((from, to) =>
     supabase
       .from("po_line_facts")
       .select("id, po_id, quantity")
@@ -160,6 +160,7 @@ async function receivedProgressForPos(
       .order("id")
       .range(from, to),
   );
+  if (error) console.error("receivedProgressForPos failed:", error);
   // View columns are all typed nullable — normalise once (see above).
   const lines = (data ?? []).map((line) => ({
     id: line.id ?? "",
@@ -188,7 +189,7 @@ async function receivedByPoLine(
   const totals = new Map<string, number>();
   if (poLineIds.length === 0) return totals;
 
-  const { data } = await fetchAll((from, to) =>
+  const { data, error } = await fetchAll((from, to) =>
     supabase
       .from("goods_receipt_lines")
       .select("po_line_id, quantity")
@@ -196,6 +197,7 @@ async function receivedByPoLine(
       .order("id")
       .range(from, to),
   );
+  if (error) console.error("receivedByPoLine failed:", error);
   for (const line of data ?? []) {
     totals.set(line.po_line_id, (totals.get(line.po_line_id) ?? 0) + line.quantity);
   }
@@ -249,7 +251,7 @@ export async function getReceivePool(poId: string): Promise<ReceivePool | null> 
 
   // Completeness-critical: a truncated line list would read as a
   // shorter order and let the rest of the delivery go unrecorded.
-  const { data } = await fetchAll((from, to) =>
+  const { data, error } = await fetchAll((from, to) =>
     supabase
       .from("po_line_facts")
       .select("id, item_id, quantity, uom")
@@ -257,6 +259,7 @@ export async function getReceivePool(poId: string): Promise<ReceivePool | null> 
       .order("id")
       .range(from, to),
   );
+  if (error) console.error("getReceivePool failed:", error);
   // View columns are all typed nullable — normalise once (see above).
   const lines = (data ?? []).map((line) => ({
     id: line.id ?? "",

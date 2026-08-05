@@ -173,11 +173,12 @@ export type IndentHeader = {
 export const getIndentHeader = cache(async (indentId: string): Promise<IndentHeader | null> => {
   await requireTool("/indents");
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("indents")
     .select("id, reference, status, project_id, unit_id, projects(name)")
     .eq("id", indentId)
     .maybeSingle();
+  if (error) console.error("listIndents failed:", error);
   if (!data) return null;
   return {
     id: data.id,

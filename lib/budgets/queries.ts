@@ -360,8 +360,9 @@ export type MarginRow = {
 export async function listMargins(): Promise<Map<string, number>> {
   await requireTool("/budgets");
   const supabase = await createClient();
-  const { data } = await fetchAll((from, to) =>
+  const { data, error } = await fetchAll((from, to) =>
     supabase.from("item_margins").select("item_id, margin_pct").order("item_id").range(from, to),
   );
+  if (error) console.error("listMargins failed:", error);
   return new Map((data ?? []).map((row) => [row.item_id, Number(row.margin_pct)]));
 }

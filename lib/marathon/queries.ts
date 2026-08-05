@@ -76,12 +76,13 @@ export async function getSavedEntry(bib: string, agentId: string): Promise<Saved
   // The DB returns single objects here (each entry has exactly one
   // category and one run), but supabase-js can't infer that without
   // generated types and defaults to typing embeds as arrays.
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("marathon_entries")
     .select("bib, name, tee_size, marathon_categories(name, color), marathon_runs(name)")
     .eq("bib", bib)
     .eq("agent_id", agentId)
     .single();
+  if (error) console.error("getSavedEntry failed:", error);
 
   return data as unknown as SavedEntry | null;
 }
@@ -186,13 +187,15 @@ export async function getAdminEntries(filters: AdminEntryFilters = {}) {
 
 export async function getAdminAgents() {
   const supabase = createAdminClient();
-  const { data } = await supabase.from("marathon_agents").select("id, name").order("name");
+  const { data, error } = await supabase.from("marathon_agents").select("id, name").order("name");
+  if (error) console.error("getAdminAgents failed:", error);
   return data ?? [];
 }
 
 export async function getAdminGroups() {
   const supabase = createAdminClient();
-  const { data } = await supabase.from("marathon_groups").select("id, name").order("name");
+  const { data, error } = await supabase.from("marathon_groups").select("id, name").order("name");
+  if (error) console.error("getAdminGroups failed:", error);
   return data ?? [];
 }
 

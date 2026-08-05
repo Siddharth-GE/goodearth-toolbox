@@ -175,7 +175,7 @@ export async function listStockByLocation({
  * here cannot be filtered to.
  */
 async function listStockLocations(supabase: Client): Promise<LocationOption[]> {
-  const { data } = await fetchAll((from, to) =>
+  const { data, error } = await fetchAll((from, to) =>
     supabase
       .from("stock_by_location")
       .select("location_kind, location_id")
@@ -183,6 +183,7 @@ async function listStockLocations(supabase: Client): Promise<LocationOption[]> {
       .order("location_id")
       .range(from, to),
   );
+  if (error) console.error("listStockLocations failed:", error);
 
   const seen = new Map<string, { kind: LocationKind; id: string }>();
   for (const row of data ?? []) {
@@ -495,7 +496,7 @@ export async function listStoreHoldings(storeId: string): Promise<StoreHolding[]
   const supabase = await createClient();
 
   // Completeness-critical: an item missing here cannot be issued.
-  const { data } = await fetchAll((from, to) =>
+  const { data, error } = await fetchAll((from, to) =>
     supabase
       .from("stock_on_hand")
       .select("store_id, item_id, quantity")
@@ -503,6 +504,7 @@ export async function listStoreHoldings(storeId: string): Promise<StoreHolding[]
       .order("item_id")
       .range(from, to),
   );
+  if (error) console.error("listStoreHoldings failed:", error);
 
   const rows = (data ?? []).filter((row) => (row.quantity ?? 0) > 0);
   const [items, storeNames] = await Promise.all([

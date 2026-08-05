@@ -68,15 +68,17 @@ export async function listRoles(): Promise<RoleWithApps[]> {
 export async function listRoleApps(roleId: string): Promise<Set<string>> {
   await requireAdminCaller();
   const supabase = await createClient();
-  const { data } = await fetchAll((from, to) =>
+  const { data, error } = await fetchAll((from, to) =>
     supabase.from("role_apps").select("app").eq("role_id", roleId).order("app").range(from, to),
   );
+  if (error) console.error("listRoleApps failed:", error);
   return new Set((data ?? []).map((row) => row.app));
 }
 
 export async function getRole(roleId: string): Promise<RoleRow | null> {
   await requireAdminCaller();
   const supabase = await createClient();
-  const { data } = await supabase.from("roles").select("*").eq("id", roleId).maybeSingle();
+  const { data, error } = await supabase.from("roles").select("*").eq("id", roleId).maybeSingle();
+  if (error) console.error("getRole failed:", error);
   return (data as RoleRow) ?? null;
 }

@@ -144,11 +144,12 @@ export const getSelection = cache(async (selectionId: string): Promise<Selection
   await requireTool("/selections");
 
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("selections")
     .select("*, units(name, projects(name))")
     .eq("id", selectionId)
     .maybeSingle();
+  if (error) console.error("listUnitsForSelections failed:", error);
   if (!data) return null;
 
   const unit = data.units as { name: string; projects: { name: string } | null } | null;
@@ -223,7 +224,7 @@ export const listSelectionLines = cache(async function listSelectionLines(
   // truncated read wouldn't error, it would silently drop lines (and the
   // diff would report them as removed). The trailing .order("id") is the
   // unique tiebreaker paging needs.
-  const { data } = await fetchAll((from, to) =>
+  const { data, error } = await fetchAll((from, to) =>
     supabase
       .from("selection_lines")
       .select(
@@ -235,6 +236,7 @@ export const listSelectionLines = cache(async function listSelectionLines(
       .order("id")
       .range(from, to),
   );
+  if (error) console.error("listSelectionLines failed:", error);
 
   return (data ?? []).map((line) => {
     const item = line.items as {
@@ -272,7 +274,7 @@ export async function getPreviousIssued(
   await requireTool("/selections");
 
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("selections")
     .select("*")
     .eq("unit_id", unitId)
@@ -281,6 +283,7 @@ export async function getPreviousIssued(
     .order("revision_no", { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (error) console.error("getPreviousIssued failed:", error);
   return (data as SelectionRow) ?? null;
 }
 
@@ -367,11 +370,12 @@ export async function listActiveSpaceTypes() {
   await requireTool("/selections");
 
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("space_types")
     .select("id, code, name, sort_order")
     .eq("status", "active")
     .order("sort_order");
+  if (error) console.error("listActiveSpaceTypes failed:", error);
   return data ?? [];
 }
 

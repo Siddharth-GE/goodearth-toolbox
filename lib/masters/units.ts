@@ -28,11 +28,12 @@ export type UnitRow = {
 // below instead.
 export async function listUnits(projectId?: string): Promise<UnitRow[]> {
   const supabase = await createClient();
-  const { data } = await fetchAll((from, to) => {
+  const { data, error } = await fetchAll((from, to) => {
     let query = supabase.from("units").select("*").order("name").order("id").range(from, to);
     if (projectId) query = query.eq("project_id", projectId);
     return query;
   });
+  if (error) console.error("listUnits failed:", error);
   return (data ?? []) as UnitRow[];
 }
 

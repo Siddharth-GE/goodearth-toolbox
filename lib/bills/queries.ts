@@ -334,7 +334,7 @@ export type BillFormOptions = {
 // both never pages the bills table twice in one request.
 const billedByContractTotals = cache(async function billedByContractTotals() {
   const supabase = await createClient();
-  const { data } = await fetchAll((from, to) =>
+  const { data, error } = await fetchAll((from, to) =>
     supabase
       .from("bills")
       .select("labour_contract_id, total_amount")
@@ -342,6 +342,7 @@ const billedByContractTotals = cache(async function billedByContractTotals() {
       .order("id")
       .range(from, to),
   );
+  if (error) console.error("billedByContractTotals failed:", error);
 
   const totals = new Map<string, number>();
   for (const row of data ?? []) {

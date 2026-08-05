@@ -320,11 +320,12 @@ export async function getPoBilledTotals(poId: string): Promise<PoBilledTotals> {
   await requireTool("/purchase-orders");
   const supabase = await createClient();
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("po_billing_totals")
     .select("ordered_total, billed_total, bill_count")
     .eq("po_id", poId)
     .maybeSingle();
+  if (error) console.error("getPoBilledTotals failed:", error);
 
   // Every view column is typed nullable by the generator — normalise
   // once at the boundary.
@@ -561,9 +562,10 @@ async function labelsById(
 ): Promise<Map<string, string>> {
   const unique = [...new Set(ids.filter((id): id is string => id != null))];
   if (unique.length === 0) return new Map();
-  const { data } = await fetchAll((from, to) =>
+  const { data, error } = await fetchAll((from, to) =>
     supabase.from(table).select("id, name").in("id", unique).order("id").range(from, to),
   );
+  if (error) console.error("labelsById failed:", error);
   return new Map((data ?? []).map((row) => [row.id, row.name]));
 }
 
@@ -585,9 +587,10 @@ async function namesById(
 async function itemNamesById(supabase: Client, ids: string[]): Promise<Map<string, string>> {
   const unique = [...new Set(ids)];
   if (unique.length === 0) return new Map();
-  const { data } = await fetchAll((from, to) =>
+  const { data, error } = await fetchAll((from, to) =>
     supabase.from("items").select("id, name").in("id", unique).order("id").range(from, to),
   );
+  if (error) console.error("itemNamesById failed:", error);
   return new Map((data ?? []).map((row) => [row.id, row.name]));
 }
 

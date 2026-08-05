@@ -32,12 +32,13 @@ export async function listSpaceViews(spaceIds: string[]): Promise<Map<string, Sp
   if (spaceIds.length === 0) return bySpace;
 
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("space_views")
     .select("id, space_id, storage_path, caption, sort_order")
     .in("space_id", spaceIds)
     .order("sort_order")
     .order("created_at");
+  if (error) console.error("listSpaceViews failed:", error);
 
   for (const view of (data ?? []) as SpaceViewRow[]) {
     const existing = bySpace.get(view.space_id);

@@ -30,11 +30,12 @@ export async function listItemRequests(
 ): Promise<ItemRequestRow[]> {
   const supabase = await createClient();
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("item_requests")
     .select("*, item_categories(name), brands(name)")
     .eq("status", status)
     .order("created_at", { ascending: false });
+  if (error) console.error("listItemRequests failed:", error);
 
   const requests = data ?? [];
   if (requests.length === 0) return [];
