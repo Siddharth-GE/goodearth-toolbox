@@ -5,11 +5,12 @@ management added in `0032`.
 
 The admin console for who exists and what they can open. Three screens:
 
-- **People** (`/settings`) — everyone, searchable, with their app count
-  and approval rights. Invite from here.
+- **People** (`/settings`) — everyone, searchable, with their role, app
+  count and approval rights. Invite from here.
 - **A person** (`/settings/people/[id]`) — name, account switches
-  (admin, active), apps grouped by area, approval rights, and the
-  access history read from `audit_log`.
+  (admin, active), their role, apps grouped by area, approval rights,
+  and the access history read from `audit_log`.
+- **Roles** (`/settings/roles`) — the bundles (see below).
 - **Overview** (`/settings/overview`) — the old who-has-what grid,
   **read-only**. It used to be the editor, which made every one of
   sixteen columns a place to mis-click.
@@ -78,6 +79,41 @@ back out with a plain message.
 **Accepted gap:** a deactivated person's already-issued JWT can still
 reach authenticated _reads_ (masters lists and other open selects) until
 it expires, ~1h. Writes and every gated screen are closed immediately.
+
+## Role templates (`0034`)
+
+A role names a job — Site Engineer, Purchase, Accounts — and bundles a
+set of apps plus approval rights. Assign it and the person has the
+bundle; edit it and everyone holding it changes on their next page load.
+
+**Effective access = the role's bundle ∪ the person's own grants,
+computed at read time, never copied.** Two consequences, both deliberate:
+
+- Editing a role takes effect immediately — there is no stored copy to
+  drift out of step.
+- **A role only ever ADDS.** There is no way to give a role and take one
+  app back, because a hole in a bundle is invisible on screen. Someone
+  whose job is "Purchase plus Inventory" gets the role and one extra
+  tick.
+
+**`has_app()` is the whole mechanism.** ~80 RLS policies across every
+tool already call it, so teaching that one function about bundles taught
+all of them, with no policy edits. The definition is a strict superset
+for an active user — personal grants are still checked first and
+unchanged — so every pre-existing `user_apps` row keeps working by
+construction. `lib/settings/access-model.ts` mirrors it in pure TS for
+the screens; if the two ever disagree, the database is right.
+
+Approval rights ride along (`can_approve_indents`, `can_approve_bills`,
+`bill_approval_limit`), resolved personal ∪ role, taking the **more
+generous** — unlimited beats a number, otherwise the larger. Being named
+personally must never leave someone able to approve less than their role
+alone would have allowed.
+
+Deleting a role someone holds is refused by the FK (`on delete
+restrict`) — silently stripping access was the alternative, and it isn't
+one. `profiles.role` (admin/staff) is untouched by all this: that's the
+admin flag, a different question from what someone does here.
 
 ## Why Settings isn't grantable
 

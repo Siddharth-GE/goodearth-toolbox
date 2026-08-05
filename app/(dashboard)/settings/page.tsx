@@ -15,6 +15,8 @@ import {
 import { requireAdmin } from "@/lib/auth/access";
 import { requireUser } from "@/lib/auth/dal";
 import { formatMoney } from "@/lib/format";
+import { effectiveApps } from "@/lib/settings/access-model";
+import { listRoles } from "@/lib/settings/roles";
 import {
   listAllGrants,
   listBillApprovalLimits,
@@ -36,13 +38,15 @@ export default async function SettingsPeoplePage({
   await requireAdmin(user);
   const { q } = await searchParams;
 
-  const [users, grants, indentApprovers, billApprovers, billLimits] = await Promise.all([
+  const [users, grants, indentApprovers, billApprovers, billLimits, roles] = await Promise.all([
     listUsersForAdmin(),
     listAllGrants(),
     listIndentApprovers(),
     listBillApprovers(),
     listBillApprovalLimits(),
+    listRoles(),
   ]);
+  const roleById = new Map(roles.map((role) => [role.id, role]));
 
   // ~70 people: filtering in memory is honest here — listUsersForAdmin
   // already returns everyone, so there's no second read to save.
@@ -103,6 +107,7 @@ export default async function SettingsPeoplePage({
           <TableHead>
             <TableRow>
               <TableHeaderCell>Person</TableHeaderCell>
+              <TableHeaderCell>Role</TableHeaderCell>
               <TableHeaderCell>Apps</TableHeaderCell>
               <TableHeaderCell>Can approve</TableHeaderCell>
               <TableHeaderCell></TableHeaderCell>
@@ -111,7 +116,15 @@ export default async function SettingsPeoplePage({
           <TableBody>
             {people.map((row) => {
               const isAdmin = row.role === "admin";
-              const appCount = grants.get(row.id)?.size ?? 0;
+              const personRole = row.role_id ? roleById.get(row.role_id) : undefined;
+              const appCount = effectiveApps(
+                grants.get(row.id) ?? [],
+                personRole?.apps ?? [],
+              ).length;
+              const canApproveIndents =
+                indentApprovers.has(row.id) || (personRole?.can_approve_indents ?? false);
+              const canApproveBills =
+                billApprovers.has(row.id) || (personRole?.can_approve_bills ?? false);
               return (
                 <TableRow key={row.id}>
                   <TableCell>
@@ -127,6 +140,9 @@ export default async function SettingsPeoplePage({
                     <p className="text-muted mt-0.5 text-xs">{row.email}</p>
                   </TableCell>
                   <TableCell>
+                    {personRole ? personRole.name : <span className="text-muted">no role</span>}
+                  </TableCell>
+                  <TableCell>
                     {isAdmin ? (
                       <Badge variant="info">All apps (admin)</Badge>
                     ) : appCount === 0 ? (
@@ -137,10 +153,10 @@ export default async function SettingsPeoplePage({
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1.5">
-                      {isAdmin || indentApprovers.has(row.id) ? (
+                      {isAdmin || canApproveIndents ? (
                         <Badge variant="neutral">Indents</Badge>
                       ) : null}
-                      {isAdmin || billApprovers.has(row.id) ? (
+                      {isAdmin || canApproveBills ? (
                         <Badge variant="neutral">
                           Bills
                           {!isAdmin && billLimits.get(row.id) != null
@@ -148,7 +164,7 @@ export default async function SettingsPeoplePage({
                             : ""}
                         </Badge>
                       ) : null}
-                      {!isAdmin && !indentApprovers.has(row.id) && !billApprovers.has(row.id) && (
+                      {!isAdmin && !canApproveIndents && !canApproveBills && (
                         <span className="text-muted">—</span>
                       )}
                     </div>

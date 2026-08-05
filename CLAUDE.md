@@ -63,7 +63,8 @@ means flipping `built: true` and replacing the stub `page.tsx`.
   `supabase/migrations/`, additive only, never edited once applied.
   Apply in Supabase Studio **before** deploying dependent code, then
   `npm run db:types` and commit types with the migration. New tool →
-  extend the `user_apps_app_known` CHECK in the same migration.
+  extend **both** the `user_apps_app_known` and `role_apps_app_known`
+  CHECKs in the same migration, or granting it fails at the database.
 - **UI.** Every screen from `components/ui/*` (+ `components/masters/*`
   for shared domain pieces) — no one-off styles, no raw color classes.
   All formatting through `lib/format.ts`. Every route gets a

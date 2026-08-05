@@ -1883,6 +1883,7 @@ export type Database = {
           id: string
           is_active: boolean
           role: string
+          role_id: string | null
           team: string | null
         }
         Insert: {
@@ -1891,6 +1892,7 @@ export type Database = {
           id: string
           is_active?: boolean
           role?: string
+          role_id?: string | null
           team?: string | null
         }
         Update: {
@@ -1899,9 +1901,18 @@ export type Database = {
           id?: string
           is_active?: boolean
           role?: string
+          role_id?: string | null
           team?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       projects: {
         Row: {
@@ -2199,6 +2210,83 @@ export type Database = {
             columns: ["vendor_id"]
             isOneToOne: false
             referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      role_apps: {
+        Row: {
+          app: string
+          id: string
+          role_id: string
+        }
+        Insert: {
+          app: string
+          id?: string
+          role_id: string
+        }
+        Update: {
+          app?: string
+          id?: string
+          role_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_apps_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      roles: {
+        Row: {
+          bill_approval_limit: number | null
+          can_approve_bills: boolean
+          can_approve_indents: boolean
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          bill_approval_limit?: number | null
+          can_approve_bills?: boolean
+          can_approve_indents?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          bill_approval_limit?: number | null
+          can_approve_bills?: boolean
+          can_approve_indents?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roles_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roles_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -3265,9 +3353,13 @@ export type Database = {
           id: string
           is_active: boolean
           role: string
+          role_id: string
           team: string
         }[]
       }
+      bill_approval_cap: { Args: { uid: string }; Returns: number }
+      can_approve_bills: { Args: { uid: string }; Returns: boolean }
+      can_approve_indents: { Args: { uid: string }; Returns: boolean }
       create_bill: {
         Args: {
           p_gst_amount: number

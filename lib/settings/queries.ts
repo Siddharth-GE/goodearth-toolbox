@@ -17,9 +17,12 @@ export type AdminUserRow = {
   id: string;
   email: string;
   full_name: string | null;
+  /** The admin/staff flag — a separate question from role_id (0034). */
   role: string;
   team: string | null;
   is_active: boolean;
+  /** The assigned role template, or null. */
+  role_id: string | null;
 };
 
 export async function listUsersForAdmin(): Promise<AdminUserRow[]> {
