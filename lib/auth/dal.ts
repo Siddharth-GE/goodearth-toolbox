@@ -10,6 +10,7 @@ export type Profile = {
   full_name: string | null;
   role: string;
   team: string | null;
+  is_active: boolean;
 };
 
 export const getCurrentUser = cache(async () => {
@@ -48,7 +49,7 @@ export const getCurrentUser = cache(async () => {
   // round trip on every gated query.
   const { data } = await supabase
     .from("profiles")
-    .select("id, full_name, role, team, user_apps(app)")
+    .select("id, full_name, role, team, is_active, user_apps(app)")
     .eq("id", userId)
     .single();
 
@@ -60,6 +61,13 @@ export const getCurrentUser = cache(async () => {
   // in" should mean a real person.
   if (!data) return null;
 
+  // A deactivated person is treated exactly like a signed-out one: every
+  // requireUser() lands on /login, and every gated query redirects. The
+  // database agrees independently — is_admin() and has_app() (0032) both
+  // answer false for them, so this is the polite half of the rule, not
+  // the enforcing half.
+  if (!data.is_active) return null;
+
   return {
     id: userId,
     email: userEmail,
@@ -68,6 +76,7 @@ export const getCurrentUser = cache(async () => {
       full_name: data.full_name,
       role: data.role,
       team: data.team,
+      is_active: data.is_active,
     } satisfies Profile,
     grantedApps: (data.user_apps ?? []).map((row) => row.app),
   };

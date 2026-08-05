@@ -1872,6 +1872,7 @@ export type Database = {
           created_at: string
           full_name: string | null
           id: string
+          is_active: boolean
           role: string
           team: string | null
         }
@@ -1879,6 +1880,7 @@ export type Database = {
           created_at?: string
           full_name?: string | null
           id: string
+          is_active?: boolean
           role?: string
           team?: string | null
         }
@@ -1886,6 +1888,7 @@ export type Database = {
           created_at?: string
           full_name?: string | null
           id?: string
+          is_active?: boolean
           role?: string
           team?: string | null
         }
@@ -3251,6 +3254,7 @@ export type Database = {
           email: string
           full_name: string
           id: string
+          is_active: boolean
           role: string
           team: string
         }[]
@@ -3388,6 +3392,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      profile_is_active: { Args: { uid: string }; Returns: boolean }
       reopen_budget: { Args: { p_budget_id: string }; Returns: undefined }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }

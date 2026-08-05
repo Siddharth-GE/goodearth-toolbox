@@ -2,9 +2,11 @@
 
 import { requireAdmin } from "@/lib/auth/access";
 import { requireUser } from "@/lib/auth/dal";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { GRANTABLE_TOOLS } from "@/lib/tools";
 import { revalidatePath } from "next/cache";
+import { blockedReason, validateInvite } from "./invite";
 
 /**
  * Same shape every other tool's actions return.
@@ -47,6 +49,153 @@ export async function setFullName(userId: string, fullName: string): Promise<Act
   }
 
   revalidatePath("/settings");
+  return undefined;
+}
+
+/**
+ * Creates a real account and hands back nothing — the admin already has
+ * the starting password, because they chose it.
+ *
+ * THE ONE SANCTIONED SERVICE-ROLE CALL IN THE DASHBOARD. Creating an
+ * auth user is not expressible through RLS: auth.users has no policy
+ * path for the authenticated role at all, by Supabase's design. So this
+ * action alone reaches for the admin client, and only for the auth-admin
+ * API — never a table write, which would silently bypass every policy
+ * this app relies on. It is admin-gated above and does nothing else.
+ * (Everywhere else in the dashboard: the RLS-scoped client, always.)
+ *
+ * The profile row, with the name already on it, is created by the
+ * handle_new_user trigger (0001) from user_metadata — so nobody starts
+ * life as an unnamed dash on the documents they touch.
+ *
+ * A temp password rather than an emailed invite link: invite mail needs
+ * SMTP configured on the project, and a mail failure would leave a
+ * half-made account nobody can get into.
+ */
+export async function inviteUser(_state: ActionState, formData: FormData): Promise<ActionState> {
+  const user = await requireUser();
+  await requireAdmin(user);
+
+  const fullName = String(formData.get("full_name") ?? "").trim();
+  const email = String(formData.get("email") ?? "")
+    .trim()
+    .toLowerCase();
+  const password = String(formData.get("password") ?? "");
+
+  const invalid = validateInvite({ fullName, email, password });
+  if (invalid) return { error: invalid };
+
+  const admin = createAdminClient();
+  const { error } = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { full_name: fullName },
+  });
+
+  if (error) {
+    // Supabase says "already been registered" for a duplicate; say it
+    // in the founder's words rather than passing the raw message on.
+    if (/already/i.test(error.message)) {
+      return { error: "Someone already has an account with that email." };
+    }
+    console.error("inviteUser failed:", error);
+    return { error: "Could not create the account. Try again." };
+  }
+
+  revalidatePath("/settings");
+  return undefined;
+}
+
+/**
+ * Switches an account off or back on. Never deletes: the auth user and
+ * every "recorded by" line stay exactly as they were, and reactivating
+ * is one click. profiles_guard() (0032) is the real boundary — the
+ * checks here exist so the refusal reads like a sentence.
+ */
+export async function setActive(userId: string, active: boolean): Promise<ActionState> {
+  const user = await requireUser();
+  await requireAdmin(user);
+
+  const supabase = await createClient();
+
+  if (!active) {
+    const [{ data: target }, { count }] = await Promise.all([
+      supabase.from("profiles").select("role, is_active").eq("id", userId).maybeSingle(),
+      supabase
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("role", "admin")
+        .eq("is_active", true),
+    ]);
+    if (!target) return { error: "That person no longer exists." };
+
+    const blocked = blockedReason({
+      targetIsAdmin: target.role === "admin",
+      targetIsActive: target.is_active,
+      activeAdminCount: count ?? 0,
+      isSelf: userId === user.id,
+    });
+    if (blocked) return { error: blocked };
+  }
+
+  const { error } = await supabase.from("profiles").update({ is_active: active }).eq("id", userId);
+  if (error) {
+    console.error("setActive failed:", error);
+    return { error: "Could not change the account. Try again." };
+  }
+
+  revalidatePath("/settings");
+  revalidatePath(`/settings/people/${userId}`);
+  return undefined;
+}
+
+/**
+ * Makes someone an admin, or takes it away.
+ *
+ * This reverses the old "roles change in Studio only" stance, on the
+ * founder's call. It is safe to hand over now because three things hold
+ * it: profiles_guard() lets only an admin change a role, refuses to
+ * remove the last active admin, and audit_profiles records every change
+ * with who made it.
+ */
+export async function setAdmin(userId: string, isAdmin: boolean): Promise<ActionState> {
+  const user = await requireUser();
+  await requireAdmin(user);
+
+  const supabase = await createClient();
+
+  if (!isAdmin) {
+    const [{ data: target }, { count }] = await Promise.all([
+      supabase.from("profiles").select("role, is_active").eq("id", userId).maybeSingle(),
+      supabase
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("role", "admin")
+        .eq("is_active", true),
+    ]);
+    if (!target) return { error: "That person no longer exists." };
+
+    const blocked = blockedReason({
+      targetIsAdmin: target.role === "admin",
+      targetIsActive: target.is_active,
+      activeAdminCount: count ?? 0,
+      isSelf: userId === user.id,
+    });
+    if (blocked) return { error: blocked };
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ role: isAdmin ? "admin" : "staff" })
+    .eq("id", userId);
+  if (error) {
+    console.error("setAdmin failed:", error);
+    return { error: "Could not change admin access. Try again." };
+  }
+
+  revalidatePath("/settings");
+  revalidatePath(`/settings/people/${userId}`);
   return undefined;
 }
 

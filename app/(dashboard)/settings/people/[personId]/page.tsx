@@ -15,6 +15,7 @@ import {
 } from "@/lib/settings/queries";
 import { GRANTABLE_TOOLS, type ToolGroup } from "@/lib/tools";
 import { notFound } from "next/navigation";
+import { AccountSwitches } from "../../_components/account-switches";
 import { ApproverCheckbox } from "../../_components/approver-checkbox";
 import { GrantCheckbox } from "../../_components/grant-checkbox";
 import { NameField } from "../../_components/name-field";
@@ -53,8 +54,22 @@ export default async function PersonPage({ params }: { params: Promise<{ personI
         backHref="/settings"
         backLabel="All people"
         description={person.email}
-        actions={isAdmin ? <Badge variant="info">Admin</Badge> : null}
+        actions={
+          <>
+            {isAdmin && <Badge variant="info">Admin</Badge>}
+            {!person.is_active && <Badge variant="neutral">Deactivated</Badge>}
+          </>
+        }
       />
+
+      {!person.is_active && (
+        <div className="border-border bg-surface rounded-xl border px-4 py-3">
+          <p className="text-foreground text-sm">
+            This account is switched off — they can&apos;t sign in. Their apps and approval rights
+            are kept exactly as they were, and come back the moment it&apos;s reactivated.
+          </p>
+        </div>
+      )}
 
       <Card className="space-y-3 p-4">
         <p className="text-muted text-xs font-semibold tracking-widest uppercase">Name</p>
@@ -62,6 +77,22 @@ export default async function PersonPage({ params }: { params: Promise<{ personI
             toolbox — editable here because account creation never asks
             for one. */}
         <NameField userId={person.id} name={person.full_name} />
+      </Card>
+
+      <Card className="space-y-3 p-4">
+        <div>
+          <p className="text-muted text-xs font-semibold tracking-widest uppercase">Account</p>
+          <p className="text-muted mt-1 text-sm">
+            Admins can open every app and change everyone&apos;s access. Deactivating stops someone
+            signing in without deleting anything they&apos;ve done.
+          </p>
+        </div>
+        <AccountSwitches
+          userId={person.id}
+          isAdmin={isAdmin}
+          isActive={person.is_active}
+          isSelf={person.id === user.id}
+        />
       </Card>
 
       <Card className="space-y-4 p-4">

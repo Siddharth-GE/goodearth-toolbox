@@ -38,7 +38,10 @@ means flipping `built: true` and replacing the stub `page.tsx`.
   `requireTool("<href>")` from `lib/auth/access.ts` first — sidebar
   visibility is cosmetic. Actions return the shared `ActionState`
   (`lib/action-state.ts`), never throw. Dashboard tools use the
-  RLS-scoped client (`lib/supabase/server.ts`), never the admin client.
+  RLS-scoped client (`lib/supabase/server.ts`), never the admin client —
+  the single sanctioned exception is `inviteUser` in
+  `lib/settings/actions.ts` (creating a login has no RLS path), and it
+  touches only the auth-admin API, never a table.
 - **Shared masters** (`lib/masters/`): reads are ungated, any tool
   calls them; writes require the `/masters` grant. Two files per
   master — queries (`import "server-only"`) and actions (file-level

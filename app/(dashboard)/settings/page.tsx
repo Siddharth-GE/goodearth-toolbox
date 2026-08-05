@@ -22,6 +22,7 @@ import {
 } from "@/lib/settings/queries";
 import { Users } from "lucide-react";
 import Link from "next/link";
+import { InviteDialog } from "./_components/invite-dialog";
 import { SettingsNav } from "./_components/settings-nav";
 
 export default async function SettingsPeoplePage({
@@ -80,9 +81,12 @@ export default async function SettingsPeoplePage({
             </LinkButton>
           )}
         </form>
-        <p className="text-muted text-sm">
-          {people.length} of {users.length}
-        </p>
+        <div className="flex items-center gap-3">
+          <p className="text-muted text-sm">
+            {people.length} of {users.length}
+          </p>
+          <InviteDialog />
+        </div>
       </div>
 
       {people.length === 0 ? (
@@ -108,12 +112,15 @@ export default async function SettingsPeoplePage({
               return (
                 <TableRow key={row.id}>
                   <TableCell>
-                    <Link
-                      href={`/settings/people/${row.id}`}
-                      className="text-foreground font-medium hover:underline"
-                    >
-                      {row.full_name ?? "No name yet"}
-                    </Link>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Link
+                        href={`/settings/people/${row.id}`}
+                        className="text-foreground font-medium hover:underline"
+                      >
+                        {row.full_name ?? "No name yet"}
+                      </Link>
+                      {!row.is_active && <Badge variant="neutral">Deactivated</Badge>}
+                    </div>
                     <p className="text-muted mt-0.5 text-xs">{row.email}</p>
                   </TableCell>
                   <TableCell>

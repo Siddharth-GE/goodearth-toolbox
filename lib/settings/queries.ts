@@ -19,6 +19,7 @@ export type AdminUserRow = {
   full_name: string | null;
   role: string;
   team: string | null;
+  is_active: boolean;
 };
 
 export async function listUsersForAdmin(): Promise<AdminUserRow[]> {
