@@ -10,8 +10,10 @@ import {
 } from "@/components/ui/table";
 import { requireAdmin } from "@/lib/auth/access";
 import { requireUser } from "@/lib/auth/dal";
+import { formatMoney } from "@/lib/format";
 import {
   listAllGrants,
+  listBillApprovalLimits,
   listBillApprovers,
   listIndentApprovers,
   listUsersForAdmin,
@@ -29,11 +31,12 @@ export default async function SettingsOverviewPage() {
   const user = await requireUser();
   await requireAdmin(user);
 
-  const [users, grants, indentApprovers, billApprovers] = await Promise.all([
+  const [users, grants, indentApprovers, billApprovers, billLimits] = await Promise.all([
     listUsersForAdmin(),
     listAllGrants(),
     listIndentApprovers(),
     listBillApprovers(),
+    listBillApprovalLimits(),
   ]);
 
   return (
@@ -96,7 +99,14 @@ export default async function SettingsOverviewPage() {
                       <TableCell>
                         <div className="flex flex-wrap gap-1.5">
                           {indentApprovers.has(row.id) && <Badge variant="neutral">Indents</Badge>}
-                          {billApprovers.has(row.id) && <Badge variant="neutral">Bills</Badge>}
+                          {billApprovers.has(row.id) && (
+                            <Badge variant="neutral">
+                              Bills
+                              {billLimits.get(row.id) != null
+                                ? ` up to ${formatMoney(billLimits.get(row.id))}`
+                                : ""}
+                            </Badge>
+                          )}
                           {!indentApprovers.has(row.id) && !billApprovers.has(row.id) && (
                             <span className="text-muted">—</span>
                           )}

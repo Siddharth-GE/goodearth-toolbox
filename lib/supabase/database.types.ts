@@ -49,18 +49,24 @@ export type Database = {
       }
       bill_approvers: {
         Row: {
+          approval_limit: number | null
           granted_at: string
           granted_by: string | null
+          id: string
           user_id: string
         }
         Insert: {
+          approval_limit?: number | null
           granted_at?: string
           granted_by?: string | null
+          id?: string
           user_id: string
         }
         Update: {
+          approval_limit?: number | null
           granted_at?: string
           granted_by?: string | null
+          id?: string
           user_id?: string
         }
         Relationships: [
@@ -911,16 +917,19 @@ export type Database = {
         Row: {
           granted_at: string
           granted_by: string | null
+          id: string
           user_id: string
         }
         Insert: {
           granted_at?: string
           granted_by?: string | null
+          id?: string
           user_id: string
         }
         Update: {
           granted_at?: string
           granted_by?: string | null
+          id?: string
           user_id?: string
         }
         Relationships: [

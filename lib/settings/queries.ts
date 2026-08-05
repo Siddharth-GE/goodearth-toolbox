@@ -56,6 +56,24 @@ export async function listBillApprovers(): Promise<Set<string>> {
   return new Set((data ?? []).map((row) => row.user_id));
 }
 
+/**
+ * Each bill approver's ceiling (0033). Absent from the map means not an
+ * approver at all; present with null means an approver with no limit —
+ * a distinction the screens rely on, so it isn't flattened here.
+ */
+export async function listBillApprovalLimits(): Promise<Map<string, number | null>> {
+  await requireAdminCaller();
+  const supabase = await createClient();
+  const { data } = await fetchAll((from, to) =>
+    supabase
+      .from("bill_approvers")
+      .select("user_id, approval_limit")
+      .order("user_id")
+      .range(from, to),
+  );
+  return new Map((data ?? []).map((row) => [row.user_id, row.approval_limit]));
+}
+
 /** One person for their own Settings page, or null if the id is unknown. */
 export async function getPersonForAdmin(userId: string): Promise<AdminUserRow | null> {
   await requireAdminCaller();

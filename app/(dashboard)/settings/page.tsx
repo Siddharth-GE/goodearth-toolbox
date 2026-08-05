@@ -14,8 +14,10 @@ import {
 } from "@/components/ui/table";
 import { requireAdmin } from "@/lib/auth/access";
 import { requireUser } from "@/lib/auth/dal";
+import { formatMoney } from "@/lib/format";
 import {
   listAllGrants,
+  listBillApprovalLimits,
   listBillApprovers,
   listIndentApprovers,
   listUsersForAdmin,
@@ -34,11 +36,12 @@ export default async function SettingsPeoplePage({
   await requireAdmin(user);
   const { q } = await searchParams;
 
-  const [users, grants, indentApprovers, billApprovers] = await Promise.all([
+  const [users, grants, indentApprovers, billApprovers, billLimits] = await Promise.all([
     listUsersForAdmin(),
     listAllGrants(),
     listIndentApprovers(),
     listBillApprovers(),
+    listBillApprovalLimits(),
   ]);
 
   // ~70 people: filtering in memory is honest here — listUsersForAdmin
@@ -138,7 +141,12 @@ export default async function SettingsPeoplePage({
                         <Badge variant="neutral">Indents</Badge>
                       ) : null}
                       {isAdmin || billApprovers.has(row.id) ? (
-                        <Badge variant="neutral">Bills</Badge>
+                        <Badge variant="neutral">
+                          Bills
+                          {!isAdmin && billLimits.get(row.id) != null
+                            ? ` up to ${formatMoney(billLimits.get(row.id))}`
+                            : ""}
+                        </Badge>
                       ) : null}
                       {!isAdmin && !indentApprovers.has(row.id) && !billApprovers.has(row.id) && (
                         <span className="text-muted">—</span>

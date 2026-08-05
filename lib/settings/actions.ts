@@ -263,6 +263,44 @@ export async function setIndentApprover(userId: string, canApprove: boolean): Pr
   return undefined;
 }
 
+/**
+ * The ceiling on what a bill approver may approve (0033).
+ *
+ * Blank means unlimited, which is also what every approver had before
+ * limits existed — so clearing the box restores exactly the old
+ * behaviour rather than reducing someone to nothing. Zero is refused
+ * for that reason: "0" reads as "no limit" to a human and would mean
+ * "can approve nothing" to the database.
+ */
+export async function setBillApprovalLimit(userId: string, rawLimit: string): Promise<ActionState> {
+  const user = await requireUser();
+  await requireAdmin(user);
+
+  const text = rawLimit.trim();
+  let limit: number | null = null;
+  if (text !== "") {
+    const parsed = Number(text.replace(/,/g, ""));
+    if (!Number.isFinite(parsed))
+      return { error: "Enter an amount, or leave it blank for no limit." };
+    if (parsed <= 0) return { error: "Leave it blank for no limit — zero would approve nothing." };
+    limit = parsed;
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("bill_approvers")
+    .update({ approval_limit: limit })
+    .eq("user_id", userId);
+  if (error) {
+    console.error("setBillApprovalLimit failed:", error);
+    return { error: "Could not save the limit. Try again." };
+  }
+
+  revalidatePath("/settings");
+  revalidatePath(`/settings/people/${userId}`);
+  return undefined;
+}
+
 // The bill twin — backed by bill_approvers (migration 0025), read by
 // the bills_guard trigger, so ticking here is what actually lets
 // someone approve a bill, not just what shows them the button.

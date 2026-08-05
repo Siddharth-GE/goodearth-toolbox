@@ -9,6 +9,7 @@ import { describeAccessHistory } from "@/lib/settings/history";
 import {
   getPersonForAdmin,
   listAccessHistory,
+  listBillApprovalLimits,
   listBillApprovers,
   listGrantsForUser,
   listIndentApprovers,
@@ -16,6 +17,7 @@ import {
 import { GRANTABLE_TOOLS, type ToolGroup } from "@/lib/tools";
 import { notFound } from "next/navigation";
 import { AccountSwitches } from "../../_components/account-switches";
+import { ApprovalLimitField } from "../../_components/approval-limit-field";
 import { ApproverCheckbox } from "../../_components/approver-checkbox";
 import { GrantCheckbox } from "../../_components/grant-checkbox";
 import { NameField } from "../../_components/name-field";
@@ -33,10 +35,11 @@ export default async function PersonPage({ params }: { params: Promise<{ personI
   const person = await getPersonForAdmin(personId);
   if (!person) notFound();
 
-  const [grants, indentApprovers, billApprovers, historyRows] = await Promise.all([
+  const [grants, indentApprovers, billApprovers, billLimits, historyRows] = await Promise.all([
     listGrantsForUser(personId),
     listIndentApprovers(),
     listBillApprovers(),
+    listBillApprovalLimits(),
     listAccessHistory(personId),
   ]);
 
@@ -173,20 +176,34 @@ export default async function PersonPage({ params }: { params: Promise<{ personI
                 </span>
               </span>
             </label>
-            <label className="border-border flex items-start gap-2 rounded-lg border px-3 py-2">
-              <ApproverCheckbox
-                userId={person.id}
-                isApprover={billApprovers.has(person.id)}
-                action={setBillApprover}
-                label="bill approver"
-              />
-              <span className="min-w-0">
-                <span className="text-foreground block text-sm font-medium">Approve bills</span>
-                <span className="text-muted block text-xs">
-                  Also needs the Bills app to see them.
+            <div className="border-border space-y-2 rounded-lg border px-3 py-2">
+              <label className="flex items-start gap-2">
+                <ApproverCheckbox
+                  userId={person.id}
+                  isApprover={billApprovers.has(person.id)}
+                  action={setBillApprover}
+                  label="bill approver"
+                />
+                <span className="min-w-0">
+                  <span className="text-foreground block text-sm font-medium">Approve bills</span>
+                  <span className="text-muted block text-xs">
+                    Also needs the Bills app to see them.
+                  </span>
                 </span>
-              </span>
-            </label>
+              </label>
+              {billApprovers.has(person.id) && (
+                <div className="space-y-1 pl-6">
+                  <p className="text-foreground text-xs font-medium">Up to (₹)</p>
+                  <ApprovalLimitField
+                    userId={person.id}
+                    limit={billLimits.get(person.id) ?? null}
+                  />
+                  <p className="text-muted text-xs">
+                    Leave blank for no limit. Bills above it wait for an admin or a higher approver.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </Card>

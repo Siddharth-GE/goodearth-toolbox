@@ -47,6 +47,7 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
               status={bill.status}
               actor={actor}
               createdBy={bill.created_by}
+              totalAmount={bill.total_amount}
             />
           </>
         }

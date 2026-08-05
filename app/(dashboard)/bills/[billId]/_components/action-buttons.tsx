@@ -21,6 +21,7 @@ import {
   canSendBack,
   type BillStatus,
 } from "@/lib/bills/workflow";
+import { formatMoney } from "@/lib/format";
 import { useState, useTransition } from "react";
 
 /**
@@ -35,11 +36,14 @@ export function ActionButtons({
   status,
   actor,
   createdBy,
+  totalAmount,
 }: {
   billId: string;
   status: BillStatus;
-  actor: { isAdmin: boolean; isApprover: boolean; userId: string };
+  actor: { isAdmin: boolean; isApprover: boolean; approvalLimit: number | null; userId: string };
   createdBy: string | null;
+  /** Checked against the approver's limit (0033). */
+  totalAmount: number;
 }) {
   const [pending, startTransition] = useTransition();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -168,9 +172,13 @@ export function ActionButtons({
   }
 
   // ---- Recorded: approve, or throw it away --------------------------
-  const approvable = canApprove(status, actor);
+  const approvable = canApprove(status, actor, totalAmount);
   const deletable = canDeleteBill(status, actor, createdBy);
-  if (!approvable && !deletable) return null;
+  // A named approver who is simply over their ceiling gets told so,
+  // rather than watching the button quietly vanish.
+  const overLimit =
+    status === "recorded" && !approvable && (actor.isAdmin || actor.isApprover) && !actor.isAdmin;
+  if (!approvable && !deletable && !overLimit) return null;
 
   return (
     <div className="space-y-1 text-right">
@@ -207,6 +215,12 @@ export function ActionButtons({
               <Button disabled={pending} onClick={() => run(() => approveBill(billId))}>
                 {pending ? "Approving…" : "Approve"}
               </Button>
+            )}
+            {overLimit && (
+              <span className="text-muted text-xs">
+                Above your approval limit of {formatMoney(actor.approvalLimit)} — an admin or a
+                higher approver decides this one.
+              </span>
             )}
           </>
         )}

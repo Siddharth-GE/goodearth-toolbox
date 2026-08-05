@@ -231,23 +231,33 @@ export const getBill = cache(async (billId: string): Promise<BillDetail | null> 
 
 /** Whether the current user may decide bills, plus their id for the
  * recorder-ownership delete rule. Admins short-circuit — has_app() and
- * the guard both treat them as approvers. */
+ * the guard both treat them as approvers, and no limit applies to them
+ * (0033). */
 export async function getCurrentBillActor(): Promise<{
   isAdmin: boolean;
   isApprover: boolean;
+  /** Null means unlimited — see exceedsApprovalLimit in workflow.ts. */
+  approvalLimit: number | null;
   userId: string;
 }> {
   const user = await requireTool("/bills");
   const isAdmin = user.profile?.role === "admin";
-  if (isAdmin) return { isAdmin: true, isApprover: true, userId: user.id };
+  if (isAdmin) {
+    return { isAdmin: true, isApprover: true, approvalLimit: null, userId: user.id };
+  }
 
   const supabase = await createClient();
   const { data } = await supabase
     .from("bill_approvers")
-    .select("user_id")
+    .select("user_id, approval_limit")
     .eq("user_id", user.id)
     .maybeSingle();
-  return { isAdmin: false, isApprover: data != null, userId: user.id };
+  return {
+    isAdmin: false,
+    isApprover: data != null,
+    approvalLimit: data?.approval_limit ?? null,
+    userId: user.id,
+  };
 }
 
 /* ------------------------------------------------------------------ *
