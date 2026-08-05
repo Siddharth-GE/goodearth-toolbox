@@ -194,7 +194,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
   await requireTool("/indents");
   const supabase = await createClient();
 
-  const [{ data: indent }, { data: lines }] = await Promise.all([
+  const [{ data: indent }, lines] = await Promise.all([
     supabase
       .from("indents")
       .select(
@@ -224,7 +224,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
       [
         indent.submitted_by,
         indent.approved_by,
-        ...(lines ?? []).map((line) => line.updated_by ?? line.created_by),
+        ...lines.map((line) => line.updated_by ?? line.created_by),
       ].filter((id): id is string => id != null),
     ),
   ];
@@ -239,8 +239,8 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
   // a site user without /purchase-orders still sees fulfilment.
   // Read to completion: these rows are SUMMED into ordered quantities,
   // so a silent 1,000-row cap would under-report "ordered X of Y".
-  const lineIds = (lines ?? []).map((line) => line.id);
-  const { data: orderedFacts } = lineIds.length
+  const lineIds = lines.map((line) => line.id);
+  const orderedFacts = lineIds.length
     ? await fetchAll((from, to) =>
         supabase
           .from("po_line_facts")
@@ -249,10 +249,10 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
           .order("id")
           .range(from, to),
       )
-    : { data: [] };
+    : [];
 
   const orderedByLine = new Map<string, { quantity: number; refs: Set<string> }>();
-  for (const fact of orderedFacts ?? []) {
+  for (const fact of orderedFacts) {
     if (fact.po_status === "cancelled" || !fact.indent_line_id) continue;
     const entry = orderedByLine.get(fact.indent_line_id) ?? { quantity: 0, refs: new Set() };
     entry.quantity += fact.quantity ?? 0;
@@ -267,9 +267,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
   // All money-free reads: approved_budgets, selections, selection_lines.
   const driftByAnchor = new Map<string, DriftStatus>();
   const anchoredBudgetIds = [
-    ...new Set(
-      (lines ?? []).map((line) => line.budget_id).filter((id): id is string => id != null),
-    ),
+    ...new Set(lines.map((line) => line.budget_id).filter((id): id is string => id != null)),
   ];
   if (anchoredBudgetIds.length > 0) {
     const { data: anchorBudgets } = await supabase
@@ -294,7 +292,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
 
     if (superseded.length > 0) {
       const anchoredKeysByBudget = new Map<string, string[]>();
-      for (const line of lines ?? []) {
+      for (const line of lines) {
         if (!line.budget_id || !line.line_key) continue;
         const keys = anchoredKeysByBudget.get(line.budget_id) ?? [];
         keys.push(line.line_key);
@@ -317,7 +315,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
       const allKeys = [
         ...new Set(superseded.flatMap((row) => anchoredKeysByBudget.get(row.id) ?? [])),
       ];
-      const { data: revisionLines } = allKeys.length
+      const revisionLines = allKeys.length
         ? await fetchAll((from, to) =>
             supabase
               .from("selection_lines")
@@ -327,9 +325,9 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
               .order("id")
               .range(from, to),
           )
-        : { data: [] };
+        : [];
       const linesBySelection = new Map<string, DriftLine[]>();
-      for (const row of revisionLines ?? []) {
+      for (const row of revisionLines) {
         const bucket = linesBySelection.get(row.selection_id) ?? [];
         bucket.push(row);
         linesBySelection.set(row.selection_id, bucket);
@@ -351,7 +349,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
     }
   }
 
-  const mapped: IndentLineRow[] = (lines ?? []).map((line) => {
+  const mapped: IndentLineRow[] = lines.map((line) => {
     const item = line.items as {
       name: string;
       code: string | null;
@@ -462,7 +460,7 @@ export async function getConstructionPull(
     .maybeSingle();
   if (!plan) return null;
 
-  const { data: lines } = await fetchAll((from, to) =>
+  const lines = await fetchAll((from, to) =>
     supabase
       .from("construction_budget_lines")
       .select("id, stage, item_id, quantity, uom, note, items(name, code, thumb_url, brands(name))")
@@ -472,12 +470,12 @@ export async function getConstructionPull(
       .range(from, to),
   );
 
-  const sourceIds = (lines ?? []).map((line) => line.id);
+  const sourceIds = lines.map((line) => line.id);
 
   // Read to completion: these sums are the "already requested" figure a
   // QS decides on, and a truncated read would under-report it — which
   // reads as "nothing has been ordered yet" and buys the material twice.
-  const { data: raised } = sourceIds.length
+  const raised = sourceIds.length
     ? await fetchAll((from, to) =>
         supabase
           .from("indent_lines")
@@ -486,11 +484,11 @@ export async function getConstructionPull(
           .order("id")
           .range(from, to),
       )
-    : { data: [] };
+    : [];
 
   const requested = new Map<string, number>();
   const onThisIndent = new Set<string>();
-  for (const line of raised ?? []) {
+  for (const line of raised) {
     const key = line.construction_line_id;
     if (!key) continue;
     requested.set(key, (requested.get(key) ?? 0) + line.quantity);
@@ -500,7 +498,7 @@ export async function getConstructionPull(
   // First-appearance order, so stages stay in construction order rather
   // than alphabetical — same rule as the plan editor.
   const groups = new Map<string, PullLineRow[]>();
-  for (const line of lines ?? []) {
+  for (const line of lines) {
     const item = line.items as {
       name: string;
       code: string | null;
@@ -585,7 +583,7 @@ export async function listApprovedBudgetsForProject(
   const unitNames = new Map(units.map((unit) => [unit.id, unit.name]));
   const unitIds = units.map((unit) => unit.id);
 
-  const [{ data: budgets }, { data: issuedSelections }] = await Promise.all([
+  const [budgets, { data: issuedSelections }] = await Promise.all([
     fetchAll((from, to) =>
       supabase
         .from("approved_budgets")
@@ -603,7 +601,7 @@ export async function listApprovedBudgetsForProject(
       .in("unit_id", unitIds)
       .eq("status", "issued"),
   ]);
-  if ((budgets ?? []).length === 0) return { pullable: [], pending: [] };
+  if (budgets.length === 0) return { pullable: [], pending: [] };
 
   const issuedByUnit = new Map<string, IssuedRevision>(
     (issuedSelections ?? []).map((row) => [
@@ -612,7 +610,7 @@ export async function listApprovedBudgetsForProject(
     ]),
   );
 
-  const candidates: BudgetCandidate[] = (budgets ?? [])
+  const candidates: BudgetCandidate[] = budgets
     .filter((budget) => budget.id != null && budget.unit_id != null && budget.selection_id != null)
     .map((budget) => ({
       budget_id: budget.id as string,
@@ -692,34 +690,33 @@ export async function getBudgetPull(
   if (!indent) return null;
   if (indent.unit_id && indent.unit_id !== budget.unit_id) return null;
 
-  const [{ data: budgetLines }, { data: selectionLines }, { data: spaces }, { data: selection }] =
-    await Promise.all([
-      fetchAll((from, to) =>
-        supabase
-          .from("approved_budget_lines")
-          .select("line_key, quantity, expected_vendor_id")
-          .eq("budget_id", budgetId)
-          .order("line_key")
-          .range(from, to),
-      ),
-      fetchAll((from, to) =>
-        supabase
-          .from("selection_lines")
-          .select(
-            "line_key, item_id, uom, unit_space_id, sort_order, items(name, code, thumb_url, brands(name))",
-          )
-          .eq("selection_id", budget.selection_id as string)
-          .order("sort_order")
-          .order("id")
-          .range(from, to),
-      ),
-      supabase.from("spaces").select("id, label, sort_order").eq("unit_id", budget.unit_id),
+  const [budgetLines, selectionLines, { data: spaces }, { data: selection }] = await Promise.all([
+    fetchAll((from, to) =>
       supabase
-        .from("selections")
-        .select("revision_no, status, units(name)")
-        .eq("id", budget.selection_id as string)
-        .maybeSingle(),
-    ]);
+        .from("approved_budget_lines")
+        .select("line_key, quantity, expected_vendor_id")
+        .eq("budget_id", budgetId)
+        .order("line_key")
+        .range(from, to),
+    ),
+    fetchAll((from, to) =>
+      supabase
+        .from("selection_lines")
+        .select(
+          "line_key, item_id, uom, unit_space_id, sort_order, items(name, code, thumb_url, brands(name))",
+        )
+        .eq("selection_id", budget.selection_id as string)
+        .order("sort_order")
+        .order("id")
+        .range(from, to),
+    ),
+    supabase.from("spaces").select("id, label, sort_order").eq("unit_id", budget.unit_id),
+    supabase
+      .from("selections")
+      .select("revision_no, status, units(name)")
+      .eq("id", budget.selection_id as string)
+      .maybeSingle(),
+  ]);
 
   // Only the current design revision may be requested against. The
   // chooser already filters; this holds against a stale tab or a pasted
@@ -738,7 +735,7 @@ export async function getBudgetPull(
     .map((row) => row.id)
     .filter((id): id is string => id != null);
 
-  const { data: raised } = await fetchAll((from, to) =>
+  const raised = await fetchAll((from, to) =>
     supabase
       .from("indent_lines")
       .select("line_key, quantity, indent_id")
@@ -749,7 +746,7 @@ export async function getBudgetPull(
 
   const requested = new Map<string, number>();
   const onThisIndent = new Set<string>();
-  for (const line of raised ?? []) {
+  for (const line of raised) {
     const key = line.line_key;
     if (!key) continue;
     requested.set(key, (requested.get(key) ?? 0) + line.quantity);

@@ -22,13 +22,12 @@ export type VendorRow = {
 // off them — a capped read would silently hide real vendors.
 export async function listVendors(activeOnly = false): Promise<VendorRow[]> {
   const supabase = await createClient();
-  const { data, error } = await fetchAll((from, to) => {
+  const data = await fetchAll((from, to) => {
     let query = supabase.from("vendors").select("*").order("name").order("id").range(from, to);
     if (activeOnly) query = query.eq("is_active", true);
     return query;
   });
-  if (error) console.error("listVendors failed:", error);
-  return (data ?? []) as VendorRow[];
+  return data as VendorRow[];
 }
 
 export const VENDORS_PAGE_SIZE = 50;

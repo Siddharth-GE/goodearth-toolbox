@@ -44,7 +44,7 @@ export async function itemsById(supabase: Client, ids: string[]): Promise<Map<st
   if (unique.length === 0) return new Map();
   // Completeness matters — an item missing from this map renders as a
   // dash on a line the store-keeper is about to count.
-  const { data, error } = await fetchAll((from, to) =>
+  const data = await fetchAll((from, to) =>
     supabase
       .from("items")
       .select("id, name, code, thumb_url, default_uom, brands(name)")
@@ -52,9 +52,8 @@ export async function itemsById(supabase: Client, ids: string[]): Promise<Map<st
       .order("id")
       .range(from, to),
   );
-  if (error) console.error("itemsById failed:", error);
   return new Map(
-    (data ?? []).map((item) => [
+    data.map((item) => [
       item.id,
       {
         id: item.id,
@@ -89,16 +88,15 @@ export async function labelsById(
 ): Promise<Map<string, string>> {
   const unique = [...new Set(ids.filter((id): id is string => id != null))];
   if (unique.length === 0) return new Map();
-  const { data, error } = await fetchAll((from, to) =>
+  const data = await fetchAll((from, to) =>
     supabase.from(table).select("id, name").in("id", unique).order("id").range(from, to),
   );
-  if (error) console.error("labelsById failed:", error);
-  return new Map((data ?? []).map((row) => [row.id, row.name]));
+  return new Map(data.map((row) => [row.id, row.name]));
 }
 
 /** The active stores, for destination pickers and filters. */
 export async function listActiveStores(supabase: Client): Promise<{ id: string; name: string }[]> {
-  const { data, error } = await fetchAll((from, to) =>
+  const data = await fetchAll((from, to) =>
     supabase
       .from("stores")
       .select("id, name")
@@ -107,8 +105,7 @@ export async function listActiveStores(supabase: Client): Promise<{ id: string; 
       .order("id")
       .range(from, to),
   );
-  if (error) console.error("listActiveStores failed:", error);
-  return (data ?? []).map(({ id, name }) => ({ id, name }));
+  return data.map(({ id, name }) => ({ id, name }));
 }
 
 /** PO references for a set of po ids, via the money-free po_facts view. */
@@ -118,9 +115,8 @@ export async function poReferencesById(
 ): Promise<Map<string, string>> {
   const unique = [...new Set(ids)];
   if (unique.length === 0) return new Map();
-  const { data, error } = await fetchAll((from, to) =>
+  const data = await fetchAll((from, to) =>
     supabase.from("po_facts").select("id, reference").in("id", unique).order("id").range(from, to),
   );
-  if (error) console.error("poReferencesById failed:", error);
-  return new Map((data ?? []).map((row) => [row.id ?? "", row.reference ?? "—"]));
+  return new Map(data.map((row) => [row.id ?? "", row.reference ?? "—"]));
 }

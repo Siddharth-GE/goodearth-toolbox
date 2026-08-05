@@ -106,7 +106,7 @@ export async function listStockByLocation({
   }
 
   // View columns are all typed nullable — normalise once (see above).
-  const rows = (data ?? [])
+  const rows = data
     .map((row) => ({
       location_kind: (row.location_kind ?? "store") as LocationKind,
       location_id: row.location_id ?? "",
@@ -175,7 +175,7 @@ export async function listStockByLocation({
  * here cannot be filtered to.
  */
 async function listStockLocations(supabase: Client): Promise<LocationOption[]> {
-  const { data, error } = await fetchAll((from, to) =>
+  const data = await fetchAll((from, to) =>
     supabase
       .from("stock_by_location")
       .select("location_kind, location_id")
@@ -183,10 +183,9 @@ async function listStockLocations(supabase: Client): Promise<LocationOption[]> {
       .order("location_id")
       .range(from, to),
   );
-  if (error) console.error("listStockLocations failed:", error);
 
   const seen = new Map<string, { kind: LocationKind; id: string }>();
-  for (const row of data ?? []) {
+  for (const row of data) {
     const kind = row.location_kind ?? "";
     const id = row.location_id ?? "";
     if (!isLocationKind(kind) || !id) continue;
@@ -282,7 +281,7 @@ export async function getItemMovements(
   // location predicate is pushed into the query via the !inner join:
   // un-filtered, a common material held at ten sites paid for ten
   // locations' history to show one.
-  const [{ data: receiptLines }, { data: issueLines }, { data: adjustments }] = await Promise.all([
+  const [receiptLines, issueLines, adjustments] = await Promise.all([
     fetchAll((from, to) => {
       let query = supabase
         .from("goods_receipt_lines")
@@ -328,7 +327,7 @@ export async function getItemMovements(
             .order("id")
             .range(from, to),
         )
-      : Promise.resolve({ data: [] as never[] }),
+      : Promise.resolve([] as never[]),
   ]);
 
   type ReceiptParent = {
@@ -359,18 +358,18 @@ export async function getItemMovements(
     return parent.plot_id === locationId || (unitId !== null && parent.unit_id === unitId);
   };
 
-  const receipts = (receiptLines ?? []).filter((line) =>
+  const receipts = receiptLines.filter((line) =>
     receivedHere(line.goods_receipts as ReceiptParent | null),
   );
   const issuesOut = isStore
-    ? (issueLines ?? []).filter(
+    ? issueLines.filter(
         (line) => (line.stock_issues as IssueParent | null)?.store_id === locationId,
       )
     : [];
   // Arriving: a transfer into this store, or — for a plot — material
   // carried out to it from a store (an issue goes to a store or a
   // plot, 0023 §3).
-  const transfersIn = (issueLines ?? []).filter((line) => {
+  const transfersIn = issueLines.filter((line) => {
     const parent = line.stock_issues as IssueParent | null;
     if (!parent) return false;
     return isStore ? parent.to_store_id === locationId : parent.plot_id === locationId;
@@ -392,7 +391,7 @@ export async function getItemMovements(
       ...receipts.map((l) => l.created_by),
       ...issuesOut.map((l) => l.created_by),
       ...transfersIn.map((l) => l.created_by),
-      ...(adjustments ?? []).map((a) => a.created_by),
+      ...adjustments.map((a) => a.created_by),
     ]),
   ]);
 
@@ -444,7 +443,7 @@ export async function getItemMovements(
         href: `/inventory/issues/${parent.id}`,
       };
     }),
-    ...(adjustments ?? []).map((row): MovementRow => {
+    ...adjustments.map((row): MovementRow => {
       return {
         id: row.id,
         kind: "adjustment",
@@ -496,7 +495,7 @@ export async function listStoreHoldings(storeId: string): Promise<StoreHolding[]
   const supabase = await createClient();
 
   // Completeness-critical: an item missing here cannot be issued.
-  const { data, error } = await fetchAll((from, to) =>
+  const data = await fetchAll((from, to) =>
     supabase
       .from("stock_on_hand")
       .select("store_id, item_id, quantity")
@@ -504,9 +503,8 @@ export async function listStoreHoldings(storeId: string): Promise<StoreHolding[]
       .order("item_id")
       .range(from, to),
   );
-  if (error) console.error("listStoreHoldings failed:", error);
 
-  const rows = (data ?? []).filter((row) => (row.quantity ?? 0) > 0);
+  const rows = data.filter((row) => (row.quantity ?? 0) > 0);
   const [items, storeNames] = await Promise.all([
     itemsById(
       supabase,

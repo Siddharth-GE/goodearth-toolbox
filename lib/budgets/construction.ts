@@ -37,7 +37,7 @@ export async function listConstructionPlans(): Promise<ConstructionPlanListRow[]
   // than it has (the catalogue-pagination lesson). The lines read is
   // scoped to the listed plans — un-filtered it paged the entire table,
   // every plan's every line, just to compute two counts per row.
-  const { data: plans } = await fetchAll((from, to) =>
+  const plans = await fetchAll((from, to) =>
     supabase
       .from("construction_budgets")
       .select("id, updated_at, units(name), projects(name)")
@@ -46,8 +46,8 @@ export async function listConstructionPlans(): Promise<ConstructionPlanListRow[]
       .range(from, to),
   );
 
-  const planIds = (plans ?? []).map((plan) => plan.id);
-  const { data: lines } = planIds.length
+  const planIds = plans.map((plan) => plan.id);
+  const lines = planIds.length
     ? await fetchAll((from, to) =>
         supabase
           .from("construction_budget_lines")
@@ -56,18 +56,18 @@ export async function listConstructionPlans(): Promise<ConstructionPlanListRow[]
           .order("id")
           .range(from, to),
       )
-    : { data: [] };
+    : [];
 
   const stages = new Map<string, Set<string>>();
   const counts = new Map<string, number>();
-  for (const line of lines ?? []) {
+  for (const line of lines) {
     const set = stages.get(line.budget_id) ?? new Set<string>();
     set.add(line.stage);
     stages.set(line.budget_id, set);
     counts.set(line.budget_id, (counts.get(line.budget_id) ?? 0) + 1);
   }
 
-  return (plans ?? []).map((plan) => ({
+  return plans.map((plan) => ({
     id: plan.id,
     unit_name: (plan.units as { name: string } | null)?.name ?? "—",
     project_name: (plan.projects as { name: string } | null)?.name ?? "—",
@@ -113,7 +113,7 @@ export const getConstructionPlan = cache(
     await requireTool("/budgets");
     const supabase = await createClient();
 
-    const [{ data: plan }, { data: lines }] = await Promise.all([
+    const [{ data: plan }, lines] = await Promise.all([
       supabase
         .from("construction_budgets")
         .select("id, unit_id, updated_at, units(name), projects(name)")
@@ -137,7 +137,7 @@ export const getConstructionPlan = cache(
     // Group by stage in first-appearance order (rows arrive in creation
     // order, so a stage sits where the QS team started it).
     const groups = new Map<string, ConstructionLineRow[]>();
-    for (const line of lines ?? []) {
+    for (const line of lines) {
       const item = line.items as {
         name: string;
         code: string | null;
@@ -168,7 +168,7 @@ export const getConstructionPlan = cache(
       project_name: (plan.projects as { name: string } | null)?.name ?? "—",
       updated_at: plan.updated_at,
       stages: [...groups.entries()].map(([stage, stageLines]) => ({ stage, lines: stageLines })),
-      line_count: (lines ?? []).length,
+      line_count: lines.length,
     };
   },
 );
@@ -184,7 +184,7 @@ export async function listStartableUnits(): Promise<StartableUnit[]> {
   await requireTool("/budgets");
   const supabase = await createClient();
 
-  const [units, projects, { data: plans }] = await Promise.all([
+  const [units, projects, plans] = await Promise.all([
     listUnits(),
     listProjects(),
     fetchAll((from, to) =>
@@ -192,7 +192,7 @@ export async function listStartableUnits(): Promise<StartableUnit[]> {
     ),
   ]);
 
-  const planned = new Set((plans ?? []).map((plan) => plan.unit_id));
+  const planned = new Set(plans.map((plan) => plan.unit_id));
   const projectNames = new Map(projects.map((project) => [project.id, project.name]));
 
   return units

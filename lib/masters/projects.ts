@@ -25,9 +25,8 @@ export type ProjectRow = {
 // here promises completeness, so none of them get to silently cap.
 export async function listProjects(): Promise<ProjectRow[]> {
   const supabase = await createClient();
-  const { data, error } = await fetchAll((from, to) =>
+  const data = await fetchAll((from, to) =>
     supabase.from("projects").select("*").order("name").order("id").range(from, to),
   );
-  if (error) console.error("listProjects failed:", error);
-  return (data ?? []) as ProjectRow[];
+  return data as ProjectRow[];
 }

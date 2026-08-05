@@ -85,7 +85,7 @@ export async function listBills({
 
   const total = count ?? 0;
   return {
-    bills: (data ?? []).map((row) => ({
+    bills: data.map((row) => ({
       id: row.id,
       reference: row.reference ?? "—",
       status: row.status as BillStatus,
@@ -334,7 +334,7 @@ export type BillFormOptions = {
 // both never pages the bills table twice in one request.
 const billedByContractTotals = cache(async function billedByContractTotals() {
   const supabase = await createClient();
-  const { data, error } = await fetchAll((from, to) =>
+  const data = await fetchAll((from, to) =>
     supabase
       .from("bills")
       .select("labour_contract_id, total_amount")
@@ -342,10 +342,9 @@ const billedByContractTotals = cache(async function billedByContractTotals() {
       .order("id")
       .range(from, to),
   );
-  if (error) console.error("billedByContractTotals failed:", error);
 
   const totals = new Map<string, number>();
-  for (const row of data ?? []) {
+  for (const row of data) {
     if (!row.labour_contract_id) continue;
     totals.set(
       row.labour_contract_id,
@@ -395,53 +394,44 @@ export async function getBillFormOptions(): Promise<BillFormOptions> {
   await requireTool("/bills");
   const supabase = await createClient();
 
-  const [
-    vendors,
-    projects,
-    plots,
-    units,
-    contractsResult,
-    posResult,
-    totalsResult,
-    billedByContract,
-  ] = await Promise.all([
-    listVendors(),
-    listProjects(),
-    listPlots(),
-    listUnits(),
-    // Only approved, active contracts take bills (guarded DB-side in
-    // create_bill too — this filter is the courtesy).
-    fetchAll((from, to) =>
-      supabase
-        .from("labour_contracts")
-        .select("id, vendor_id, project_id, plot_id, unit_id, description, contract_value")
-        .eq("status", "approved")
-        .eq("is_active", true)
-        .order("created_at", { ascending: false })
-        .order("id")
-        .range(from, to),
-    ),
-    // fetchAll throughout: these promise completeness — a capped read
-    // would silently hide a real PO or under-count what's billed.
-    fetchAll((from, to) =>
-      supabase
-        .from("po_facts")
-        .select("id, vendor_id, project_id, reference, status")
-        .in("status", ["issued", "completed"])
-        .order("created_at", { ascending: false })
-        .order("id")
-        .range(from, to),
-    ),
-    fetchAll((from, to) =>
-      supabase
-        .from("po_billing_totals")
-        .select("po_id, ordered_total, billed_total")
-        .order("po_id")
-        .range(from, to),
-    ),
-    billedByContractTotals(),
-  ]);
-  const contracts = contractsResult.data ?? [];
+  const [vendors, projects, plots, units, contracts, poRows, totalRows, billedByContract] =
+    await Promise.all([
+      listVendors(),
+      listProjects(),
+      listPlots(),
+      listUnits(),
+      // Only approved, active contracts take bills (guarded DB-side in
+      // create_bill too — this filter is the courtesy).
+      fetchAll((from, to) =>
+        supabase
+          .from("labour_contracts")
+          .select("id, vendor_id, project_id, plot_id, unit_id, description, contract_value")
+          .eq("status", "approved")
+          .eq("is_active", true)
+          .order("created_at", { ascending: false })
+          .order("id")
+          .range(from, to),
+      ),
+      // fetchAll throughout: these promise completeness — a capped read
+      // would silently hide a real PO or under-count what's billed.
+      fetchAll((from, to) =>
+        supabase
+          .from("po_facts")
+          .select("id, vendor_id, project_id, reference, status")
+          .in("status", ["issued", "completed"])
+          .order("created_at", { ascending: false })
+          .order("id")
+          .range(from, to),
+      ),
+      fetchAll((from, to) =>
+        supabase
+          .from("po_billing_totals")
+          .select("po_id, ordered_total, billed_total")
+          .order("po_id")
+          .range(from, to),
+      ),
+      billedByContractTotals(),
+    ]);
 
   // Map lookups, not per-row .find() — with every PO and contract in
   // the list, the linear scans were quadratic in practice.
@@ -453,7 +443,7 @@ export async function getBillFormOptions(): Promise<BillFormOptions> {
   // Every view column comes back nullable from the type generator, so
   // the shapes are normalised once here (the inventory queries rule).
   const totalsByPo = new Map(
-    (totalsResult.data ?? []).map((row) => [
+    totalRows.map((row) => [
       row.po_id ?? "",
       { ordered: row.ordered_total ?? 0, billed: row.billed_total ?? 0 },
     ]),
@@ -461,7 +451,7 @@ export async function getBillFormOptions(): Promise<BillFormOptions> {
 
   return {
     vendors: vendors.map(({ id, name }) => ({ id, name })),
-    pos: (posResult.data ?? []).map((row) => ({
+    pos: poRows.map((row) => ({
       id: row.id ?? "",
       vendor_id: row.vendor_id ?? "",
       reference: row.reference ?? "—",
@@ -523,7 +513,7 @@ export async function listBillContracts(): Promise<BillContractRow[]> {
   await requireTool("/bills");
   const supabase = await createClient();
 
-  const [contractsResult, billedByContract] = await Promise.all([
+  const [contracts, billedByContract] = await Promise.all([
     fetchAll((from, to) =>
       supabase
         .from("labour_contracts")
@@ -536,7 +526,6 @@ export async function listBillContracts(): Promise<BillContractRow[]> {
     ),
     billedByContractTotals(),
   ]);
-  const contracts = contractsResult.data ?? [];
 
   const approverIds = [
     ...new Set(contracts.map((c) => c.approved_by).filter((id): id is string => id != null)),

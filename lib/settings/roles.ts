@@ -31,7 +31,7 @@ export async function listRoles(): Promise<RoleWithApps[]> {
   await requireAdminCaller();
   const supabase = await createClient();
 
-  const [rolesRes, appsRes, membersRes] = await Promise.all([
+  const [roleRows, appRows, memberRows] = await Promise.all([
     fetchAll((from, to) =>
       supabase.from("roles").select("*").order("name").order("id").range(from, to),
     ),
@@ -49,15 +49,15 @@ export async function listRoles(): Promise<RoleWithApps[]> {
   ]);
 
   const appsByRole = new Map<string, string[]>();
-  for (const row of appsRes.data ?? []) {
+  for (const row of appRows) {
     appsByRole.set(row.role_id, [...(appsByRole.get(row.role_id) ?? []), row.app]);
   }
   const memberCounts = new Map<string, number>();
-  for (const row of membersRes.data ?? []) {
+  for (const row of memberRows) {
     if (row.role_id) memberCounts.set(row.role_id, (memberCounts.get(row.role_id) ?? 0) + 1);
   }
 
-  return ((rolesRes.data ?? []) as RoleRow[]).map((role) => ({
+  return (roleRows as RoleRow[]).map((role) => ({
     ...role,
     apps: appsByRole.get(role.id) ?? [],
     memberCount: memberCounts.get(role.id) ?? 0,
@@ -68,11 +68,10 @@ export async function listRoles(): Promise<RoleWithApps[]> {
 export async function listRoleApps(roleId: string): Promise<Set<string>> {
   await requireAdminCaller();
   const supabase = await createClient();
-  const { data, error } = await fetchAll((from, to) =>
+  const data = await fetchAll((from, to) =>
     supabase.from("role_apps").select("app").eq("role_id", roleId).order("app").range(from, to),
   );
-  if (error) console.error("listRoleApps failed:", error);
-  return new Set((data ?? []).map((row) => row.app));
+  return new Set(data.map((row) => row.app));
 }
 
 export async function getRole(roleId: string): Promise<RoleRow | null> {

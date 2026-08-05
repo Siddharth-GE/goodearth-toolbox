@@ -15,19 +15,37 @@ import "server-only";
  * The caller supplies the query as a function of a range, ordered by
  * something with a unique tiebreaker (`.order("id")` at minimum) —
  * without a total order, rows can repeat or vanish between pages.
+ *
+ * THROWS if a page fails, and hands back the rows directly.
+ *
+ * It used to return `{ data, error }` with whatever had been read so
+ * far. Of roughly seventy call sites, four checked the error; the rest
+ * carried on with a partial array — reintroducing, at the point of
+ * failure, the exact bug this helper exists to prevent at the point of
+ * truncation. A read that is only correct when complete has no sensible
+ * half-answer, so there is no longer a way to ask for one: every row, or
+ * it raises. Screens land on app/(dashboard)/error.tsx; the two Server
+ * Actions that call this catch it themselves, because an action must
+ * return an ActionState rather than throw.
  */
-export async function fetchAll<Row, Err extends { message: string }>(
-  page: (from: number, to: number) => PromiseLike<{ data: Row[] | null; error: Err | null }>,
-): Promise<{ data: Row[]; error: Err | null }> {
+export async function fetchAll<Row>(
+  page: (
+    from: number,
+    to: number,
+  ) => PromiseLike<{ data: Row[] | null; error: { message: string } | null }>,
+): Promise<Row[]> {
   const PAGE_SIZE = 1000;
   const rows: Row[] = [];
 
   for (let from = 0; ; from += PAGE_SIZE) {
     const { data, error } = await page(from, from + PAGE_SIZE - 1);
-    if (error) return { data: rows, error };
+    if (error) {
+      console.error("fetchAll page failed:", error);
+      throw new Error(`A read that must be complete failed: ${error.message}`, { cause: error });
+    }
     rows.push(...(data ?? []));
     if ((data ?? []).length < PAGE_SIZE) break;
   }
 
-  return { data: rows, error: null };
+  return rows;
 }

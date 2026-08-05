@@ -19,19 +19,17 @@ export type GstRateRow = {
 // (rate is the primary key, so it is its own unique tiebreaker.)
 export async function listGstRates(): Promise<GstRateRow[]> {
   const supabase = await createClient();
-  const { data, error } = await fetchAll((from, to) =>
+  const data = await fetchAll((from, to) =>
     supabase.from("gst_rates").select("*").order("rate").range(from, to),
   );
-  if (error) console.error("listGstRates failed:", error);
-  return (data ?? []) as GstRateRow[];
+  return data as GstRateRow[];
 }
 
 /** Only the rates a PO line may pick today. */
 export async function listActiveGstRates(): Promise<GstRateRow[]> {
   const supabase = await createClient();
-  const { data, error } = await fetchAll((from, to) =>
+  const data = await fetchAll((from, to) =>
     supabase.from("gst_rates").select("*").eq("is_active", true).order("rate").range(from, to),
   );
-  if (error) console.error("listActiveGstRates failed:", error);
-  return (data ?? []) as GstRateRow[];
+  return data as GstRateRow[];
 }

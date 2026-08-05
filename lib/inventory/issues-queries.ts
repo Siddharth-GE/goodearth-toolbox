@@ -130,7 +130,7 @@ export const getStockIssue = cache(async (issueId: string): Promise<IssueDetail 
     .maybeSingle();
   if (!issue) return null;
 
-  const { data: lines } = await fetchAll((from, to) =>
+  const lines = await fetchAll((from, to) =>
     supabase
       .from("stock_issue_lines")
       .select("id, item_id, quantity, uom, note, created_by, updated_by")
@@ -143,13 +143,13 @@ export const getStockIssue = cache(async (issueId: string): Promise<IssueDetail 
   const [items, stores, plots, nameOf] = await Promise.all([
     itemsById(
       supabase,
-      (lines ?? []).map((line) => line.item_id),
+      lines.map((line) => line.item_id),
     ),
     labelsById(supabase, "stores", [issue.store_id, issue.to_store_id]),
     labelsById(supabase, "plots", [issue.plot_id]),
     namesById(supabase, [
       issue.created_by,
-      ...(lines ?? []).map((line) => line.updated_by ?? line.created_by),
+      ...lines.map((line) => line.updated_by ?? line.created_by),
     ]),
   ]);
 
@@ -164,7 +164,7 @@ export const getStockIssue = cache(async (issueId: string): Promise<IssueDetail 
     issued_at: issue.issued_at,
     note: issue.note,
     issued_by_name: nameOf(issue.created_by),
-    lines: (lines ?? []).map((line) => {
+    lines: lines.map((line) => {
       const item = items.get(line.item_id);
       return {
         id: line.id,
@@ -192,7 +192,7 @@ export async function getIssueFormOptions(): Promise<IssueFormOptions> {
   await requireTool("/inventory");
   const supabase = await createClient();
 
-  const [{ data: stores }, { data: plots }, { data: projects }] = await Promise.all([
+  const [stores, plots, projects] = await Promise.all([
     fetchAll((from, to) =>
       supabase
         .from("stores")
@@ -216,13 +216,13 @@ export async function getIssueFormOptions(): Promise<IssueFormOptions> {
   ]);
 
   return {
-    stores: (stores ?? []).map(({ id, name, project_id }) => ({ id, name, project_id })),
-    plots: (plots ?? []).map((plot) => ({
+    stores: stores.map(({ id, name, project_id }) => ({ id, name, project_id })),
+    plots: plots.map((plot) => ({
       id: plot.id,
       name: plot.name,
       project_name: (plot.projects as { name: string } | null)?.name ?? "—",
     })),
-    projects: (projects ?? []).map(({ id, name }) => ({ id, name })),
+    projects: projects.map(({ id, name }) => ({ id, name })),
   };
 }
 

@@ -107,7 +107,7 @@ export async function listUnitsForSelections({
 
   const total = count ?? 0;
   return {
-    units: (data ?? []).map((unit) => {
+    units: data.map((unit) => {
       const revisions = ((unit.selections ?? []) as SelectionRow[])
         .slice()
         .sort((a, b) => b.revision_no - a.revision_no);
@@ -193,11 +193,11 @@ export const listUnitSpaces = cache(async function listUnitSpaces(
             .order("id")
             .range(from, to),
         )
-      : Promise.resolve({ data: [] as { unit_space_id: string }[] }),
+      : Promise.resolve([] as { unit_space_id: string }[]),
   ]);
 
   const counts = new Map<string, number>();
-  for (const line of linesResult.data ?? []) {
+  for (const line of linesResult) {
     counts.set(line.unit_space_id, (counts.get(line.unit_space_id) ?? 0) + 1);
   }
 
@@ -224,7 +224,7 @@ export const listSelectionLines = cache(async function listSelectionLines(
   // truncated read wouldn't error, it would silently drop lines (and the
   // diff would report them as removed). The trailing .order("id") is the
   // unique tiebreaker paging needs.
-  const { data, error } = await fetchAll((from, to) =>
+  const data = await fetchAll((from, to) =>
     supabase
       .from("selection_lines")
       .select(
@@ -236,9 +236,8 @@ export const listSelectionLines = cache(async function listSelectionLines(
       .order("id")
       .range(from, to),
   );
-  if (error) console.error("listSelectionLines failed:", error);
 
-  return (data ?? []).map((line) => {
+  return data.map((line) => {
     const item = line.items as {
       name: string;
       code: string | null;
@@ -406,7 +405,7 @@ export async function getDownstreamImpact(lineKeys: string[]): Promise<Map<strin
   const supabase = await createClient();
 
   // Read to completion — a silent cap here would hide an affected order.
-  const { data: indentLines } = await fetchAll((from, to) =>
+  const indentLines = await fetchAll((from, to) =>
     supabase
       .from("indent_lines")
       .select("id, line_key, indent_id")
@@ -414,13 +413,13 @@ export async function getDownstreamImpact(lineKeys: string[]): Promise<Map<strin
       .order("id")
       .range(from, to),
   );
-  const anchored = (indentLines ?? []).filter(
+  const anchored = indentLines.filter(
     (line): line is { id: string; line_key: string; indent_id: string } =>
       line.line_key != null && line.indent_id != null,
   );
   if (anchored.length === 0) return impact;
 
-  const [{ data: indents }, { data: poFacts }] = await Promise.all([
+  const [{ data: indents }, poFacts] = await Promise.all([
     supabase
       .from("indents")
       .select("id, reference")
@@ -440,7 +439,7 @@ export async function getDownstreamImpact(lineKeys: string[]): Promise<Map<strin
 
   const indentRefs = new Map((indents ?? []).map((row) => [row.id, row.reference]));
   const poRefsByLineId = new Map<string, Set<string>>();
-  for (const fact of poFacts ?? []) {
+  for (const fact of poFacts) {
     if (fact.po_status === "cancelled" || !fact.indent_line_id || !fact.po_reference) continue;
     const refs = poRefsByLineId.get(fact.indent_line_id) ?? new Set();
     refs.add(fact.po_reference);
