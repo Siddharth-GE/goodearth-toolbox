@@ -270,18 +270,27 @@ export async function addLines(
   // completion (fetchAll) and never silently on error — a partial or
   // missing view of the existing lines would break exactly the merge
   // promise this function makes, duplicating lines instead of raising
-  // their quantity.
-  const { data: existing, error: existingError } = await fetchAll((from, to) =>
-    supabase
-      .from("selection_lines")
-      .select("id, unit_space_id, item_id, quantity, sort_order")
-      .eq("selection_id", selectionId)
-      .in("unit_space_id", spaceIds)
-      .order("id")
-      .range(from, to),
-  );
-  if (existingError) {
-    console.error("addLines existing read failed:", existingError);
+  // their quantity. fetchAll raises rather than returning half a list;
+  // caught here because an action answers with an ActionState.
+  let existing: {
+    id: string;
+    unit_space_id: string;
+    item_id: string;
+    quantity: number;
+    sort_order: number;
+  }[];
+  try {
+    existing = await fetchAll((from, to) =>
+      supabase
+        .from("selection_lines")
+        .select("id, unit_space_id, item_id, quantity, sort_order")
+        .eq("selection_id", selectionId)
+        .in("unit_space_id", spaceIds)
+        .order("id")
+        .range(from, to),
+    );
+  } catch (error) {
+    console.error("addLines existing read failed:", error);
     return { error: "Could not read the current lines. Try again." };
   }
 

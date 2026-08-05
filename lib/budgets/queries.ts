@@ -52,7 +52,7 @@ export async function listInbox(): Promise<InboxRow[]> {
   // Both reads go through fetchAll: the inbox is only correct when it is
   // complete — a silent 1,000-row cap would make an issued revision
   // simply not exist for Budgets, with no error anywhere.
-  const { data: selections } = await fetchAll((from, to) =>
+  const selections = await fetchAll((from, to) =>
     supabase
       .from("selections")
       .select(
@@ -64,12 +64,12 @@ export async function listInbox(): Promise<InboxRow[]> {
       .range(from, to),
   );
 
-  const selectionIds = (selections ?? []).map((row) => row.id);
+  const selectionIds = selections.map((row) => row.id);
   if (selectionIds.length === 0) return [];
 
   // The filter on the embedded table scopes the count to priced lines
   // only — how much of each budget is already done.
-  const { data: budgets } = await fetchAll((from, to) =>
+  const budgets = await fetchAll((from, to) =>
     supabase
       .from("budgets")
       .select("id, selection_id, status, budget_lines(count)")
@@ -79,12 +79,12 @@ export async function listInbox(): Promise<InboxRow[]> {
       .range(from, to),
   );
 
-  const budgetBySelection = new Map((budgets ?? []).map((budget) => [budget.selection_id, budget]));
+  const budgetBySelection = new Map(budgets.map((budget) => [budget.selection_id, budget]));
 
   const embeddedCount = (embed: unknown): number =>
     (embed as { count: number }[] | null)?.[0]?.count ?? 0;
 
-  return (selections ?? []).map((selection) => {
+  return selections.map((selection) => {
     const unit = selection.units as { name: string; projects: { name: string } | null } | null;
     const budget = budgetBySelection.get(selection.id);
     return {
@@ -198,7 +198,7 @@ export const getBudget = cache(async (budgetId: string): Promise<BudgetDetail | 
   // read wouldn't error — priced lines would render unpriced and the
   // totals (and the budget-sheet PDF built from them) would under-report.
   // The trailing .order("id") is the unique tiebreaker paging needs.
-  const [linesResult, budgetLinesResult, spacesResult] = await Promise.all([
+  const [selectionLines, budgetLines, spacesResult] = await Promise.all([
     fetchAll((from, to) =>
       supabase
         .from("selection_lines")
@@ -225,11 +225,7 @@ export const getBudget = cache(async (budgetId: string): Promise<BudgetDetail | 
       .order("label"),
   ]);
 
-  if (linesResult.error || budgetLinesResult.error) {
-    console.error("getBudget line read failed:", linesResult.error ?? budgetLinesResult.error);
-  }
-
-  const budgetByKey = new Map((budgetLinesResult.data ?? []).map((line) => [line.line_key, line]));
+  const budgetByKey = new Map(budgetLines.map((line) => [line.line_key, line]));
 
   // The product's default markup, shown on lines nobody has priced yet so
   // the field arrives filled in rather than blank. Saving the line copies
@@ -241,7 +237,7 @@ export const getBudget = cache(async (budgetId: string): Promise<BudgetDetail | 
   // 2,633 catalogue items, some lines would silently arrive with a blank
   // margin instead of the configured one — and a blank margin that gets
   // saved is a line sold at cost.
-  const itemIds = [...new Set((linesResult.data ?? []).map((line) => line.item_id))];
+  const itemIds = [...new Set(selectionLines.map((line) => line.item_id))];
   const { data: margins } = itemIds.length
     ? await supabase.from("item_margins").select("item_id, margin_pct").in("item_id", itemIds)
     : { data: [] };
@@ -249,7 +245,7 @@ export const getBudget = cache(async (budgetId: string): Promise<BudgetDetail | 
     (margins ?? []).map((row) => [row.item_id, Number(row.margin_pct)]),
   );
 
-  const lines: BudgetLineRow[] = (linesResult.data ?? []).map((line) => {
+  const lines: BudgetLineRow[] = selectionLines.map((line) => {
     const item = line.items as {
       name: string;
       code: string | null;
@@ -360,8 +356,8 @@ export type MarginRow = {
 export async function listMargins(): Promise<Map<string, number>> {
   await requireTool("/budgets");
   const supabase = await createClient();
-  const { data } = await fetchAll((from, to) =>
+  const data = await fetchAll((from, to) =>
     supabase.from("item_margins").select("item_id, margin_pct").order("item_id").range(from, to),
   );
-  return new Map((data ?? []).map((row) => [row.item_id, Number(row.margin_pct)]));
+  return new Map(data.map((row) => [row.item_id, Number(row.margin_pct)]));
 }

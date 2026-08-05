@@ -38,18 +38,25 @@ export default async function PersonPage({ params }: { params: Promise<{ personI
   const person = await getPersonForAdmin(personId);
   if (!person) notFound();
 
-  const [grants, indentApprovers, billApprovers, billLimits, historyRows, roles] =
-    await Promise.all([
-      listGrantsForUser(personId),
-      listIndentApprovers(),
-      listBillApprovers(),
-      listBillApprovalLimits(),
-      listAccessHistory(personId),
-      listRoles(),
-    ]);
-
-  // The role's own bundle and rights, when they hold one.
-  const [roleApps, assignedRole] = await Promise.all([
+  // One batch, not two. The role's own bundle and rights (the last pair)
+  // depend only on person.role_id, which is in hand a line above — so
+  // they used to wait on six unrelated reads for no reason.
+  const [
+    grants,
+    indentApprovers,
+    billApprovers,
+    billLimits,
+    historyRows,
+    roles,
+    roleApps,
+    assignedRole,
+  ] = await Promise.all([
+    listGrantsForUser(personId),
+    listIndentApprovers(),
+    listBillApprovers(),
+    listBillApprovalLimits(),
+    listAccessHistory(personId),
+    listRoles(),
     person.role_id ? listRoleApps(person.role_id) : Promise.resolve(new Set<string>()),
     person.role_id ? getRole(person.role_id) : Promise.resolve(null),
   ]);

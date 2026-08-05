@@ -81,7 +81,7 @@ export async function listReceivablePos({
   // Every column of a view is typed nullable by the generator (a view
   // carries no NOT NULL metadata), so the row shape is normalised once
   // here rather than defended against at every use below.
-  const rows = (data ?? []).map((row) => ({
+  const rows = data.map((row) => ({
     id: row.id ?? "",
     project_id: row.project_id ?? "",
     vendor_id: row.vendor_id ?? "",
@@ -152,7 +152,7 @@ async function receivedProgressForPos(
   if (poIds.length === 0) return byPo;
 
   // Completeness-critical: a missing line reads as "fully received".
-  const { data } = await fetchAll((from, to) =>
+  const data = await fetchAll((from, to) =>
     supabase
       .from("po_line_facts")
       .select("id, po_id, quantity")
@@ -161,7 +161,7 @@ async function receivedProgressForPos(
       .range(from, to),
   );
   // View columns are all typed nullable — normalise once (see above).
-  const lines = (data ?? []).map((line) => ({
+  const lines = data.map((line) => ({
     id: line.id ?? "",
     po_id: line.po_id ?? "",
     quantity: line.quantity ?? 0,
@@ -188,7 +188,7 @@ async function receivedByPoLine(
   const totals = new Map<string, number>();
   if (poLineIds.length === 0) return totals;
 
-  const { data } = await fetchAll((from, to) =>
+  const data = await fetchAll((from, to) =>
     supabase
       .from("goods_receipt_lines")
       .select("po_line_id, quantity")
@@ -196,7 +196,7 @@ async function receivedByPoLine(
       .order("id")
       .range(from, to),
   );
-  for (const line of data ?? []) {
+  for (const line of data) {
     totals.set(line.po_line_id, (totals.get(line.po_line_id) ?? 0) + line.quantity);
   }
   return totals;
@@ -249,7 +249,7 @@ export async function getReceivePool(poId: string): Promise<ReceivePool | null> 
 
   // Completeness-critical: a truncated line list would read as a
   // shorter order and let the rest of the delivery go unrecorded.
-  const { data } = await fetchAll((from, to) =>
+  const data = await fetchAll((from, to) =>
     supabase
       .from("po_line_facts")
       .select("id, item_id, quantity, uom")
@@ -258,7 +258,7 @@ export async function getReceivePool(poId: string): Promise<ReceivePool | null> 
       .range(from, to),
   );
   // View columns are all typed nullable — normalise once (see above).
-  const lines = (data ?? []).map((line) => ({
+  const lines = data.map((line) => ({
     id: line.id ?? "",
     item_id: line.item_id ?? "",
     quantity: line.quantity ?? 0,
@@ -461,7 +461,7 @@ export const getGoodsReceipt = cache(async (receiptId: string): Promise<ReceiptD
     .maybeSingle();
   if (!receipt) return null;
 
-  const { data: lines } = await fetchAll((from, to) =>
+  const lines = await fetchAll((from, to) =>
     supabase
       .from("goods_receipt_lines")
       .select("id, item_id, quantity, uom, note, created_by, updated_by")
@@ -474,7 +474,7 @@ export const getGoodsReceipt = cache(async (receiptId: string): Promise<ReceiptD
   const [items, poRefs, projects, stores, plots, units, nameOf] = await Promise.all([
     itemsById(
       supabase,
-      (lines ?? []).map((line) => line.item_id),
+      lines.map((line) => line.item_id),
     ),
     poReferencesById(supabase, [receipt.po_id]),
     labelsById(supabase, "projects", [receipt.project_id]),
@@ -483,7 +483,7 @@ export const getGoodsReceipt = cache(async (receiptId: string): Promise<ReceiptD
     labelsById(supabase, "units", [receipt.unit_id]),
     namesById(supabase, [
       receipt.created_by,
-      ...(lines ?? []).map((line) => line.updated_by ?? line.created_by),
+      ...lines.map((line) => line.updated_by ?? line.created_by),
     ]),
   ]);
 
@@ -500,7 +500,7 @@ export const getGoodsReceipt = cache(async (receiptId: string): Promise<ReceiptD
     note: receipt.note,
     created_at: receipt.created_at,
     received_by_name: nameOf(receipt.created_by),
-    lines: (lines ?? []).map((line) => {
+    lines: lines.map((line) => {
       const item = items.get(line.item_id);
       return {
         id: line.id,

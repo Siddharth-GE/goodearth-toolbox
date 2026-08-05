@@ -32,11 +32,12 @@ export type LockoutState = { lockedUntil: Date } | null;
  */
 export async function checkLockout(target: string): Promise<LockoutState> {
   const supabase = createAdminClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("marathon_pin_attempts")
     .select("locked_until")
     .eq("target", target)
     .maybeSingle();
+  if (error) console.error("checkLockout failed:", error);
 
   if (!data?.locked_until) return null;
   const lockedUntil = new Date(data.locked_until);

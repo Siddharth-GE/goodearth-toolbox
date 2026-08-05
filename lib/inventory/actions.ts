@@ -138,6 +138,12 @@ export async function recordGoodsReceipt(input: RecordReceiptInput): Promise<Act
   // One line at a time, deliberately: the over-receipt guard raises per
   // line with the figure still to come, and a batch insert would fail
   // wholesale on the first refusal — losing the lines that were fine.
+  //
+  // The cost of that choice: a refusal part-way leaves a delivery note
+  // holding fewer lines than arrived, and there is no way to add lines
+  // to a receipt afterwards. Recording a SECOND receipt against the same
+  // PO for the rest is the recovery, and the over-receipt guard makes it
+  // safe — so that is what the message below must say.
   let added = 0;
   for (const line of usable) {
     const source = byId.get(line.poLineId)!;
@@ -157,7 +163,7 @@ export async function recordGoodsReceipt(input: RecordReceiptInput): Promise<Act
       return {
         error:
           added > 0
-            ? `Recorded ${added}, then stopped: ${friendly?.error ?? "a line was refused."} The delivery note was saved — open it to finish.`
+            ? `Recorded ${added} ${added === 1 ? "line" : "lines"}, then stopped: ${friendly?.error ?? "a line was refused."} Those ${added} are saved on this delivery note and can't be changed — record a second delivery against the same order for whatever else arrived.`
             : `${friendly?.error ?? "A line was refused."} Nothing was recorded against this delivery note.`,
       };
     }
@@ -234,7 +240,10 @@ export async function recordStockIssue(input: RecordIssueInput): Promise<ActionS
   if (!issueId) return { error: "Could not record this issue. Try again." };
 
   // One at a time, same reason as a goods receipt: the negative-stock
-  // guard raises per line with the quantity actually in the store.
+  // guard raises per line with the quantity actually in the store. Same
+  // cost too — a refusal part-way leaves an issue note short, lines
+  // can't be added to it afterwards, and recording a second issue from
+  // the same store is the recovery.
   let added = 0;
   for (const line of input.lines) {
     const { error: lineError } = await supabase.from("stock_issue_lines").insert({
@@ -252,7 +261,7 @@ export async function recordStockIssue(input: RecordIssueInput): Promise<ActionS
       return {
         error:
           added > 0
-            ? `Recorded ${added}, then stopped: ${friendly?.error ?? "a line was refused."} The issue note was saved — open it to finish.`
+            ? `Issued ${added} ${added === 1 ? "line" : "lines"}, then stopped: ${friendly?.error ?? "a line was refused."} Those ${added} have left the store and can't be changed — record a second issue for anything still to go.`
             : `${friendly?.error ?? "A line was refused."} Nothing was issued.`,
       };
     }

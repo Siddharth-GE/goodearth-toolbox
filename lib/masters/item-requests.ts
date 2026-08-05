@@ -30,11 +30,12 @@ export async function listItemRequests(
 ): Promise<ItemRequestRow[]> {
   const supabase = await createClient();
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("item_requests")
     .select("*, item_categories(name), brands(name)")
     .eq("status", status)
     .order("created_at", { ascending: false });
+  if (error) console.error("listItemRequests failed:", error);
 
   const requests = data ?? [];
   if (requests.length === 0) return [];
@@ -44,7 +45,7 @@ export async function listItemRequests(
   // completion: a count derived from a capped read would report a
   // heavily-used item as barely used, and it could be merged on that
   // basis.
-  const { data: lines } = await fetchAll((from, to) =>
+  const lines = await fetchAll((from, to) =>
     supabase
       .from("selection_lines")
       .select("item_id")
@@ -57,7 +58,7 @@ export async function listItemRequests(
   );
 
   const usage = new Map<string, number>();
-  for (const line of lines ?? []) usage.set(line.item_id, (usage.get(line.item_id) ?? 0) + 1);
+  for (const line of lines) usage.set(line.item_id, (usage.get(line.item_id) ?? 0) + 1);
 
   return requests.map((request) => ({
     id: request.id,

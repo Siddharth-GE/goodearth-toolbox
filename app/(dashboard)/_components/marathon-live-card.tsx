@@ -7,7 +7,11 @@ import Link from "next/link";
 // through lib/overview so the dashboard never touches marathon
 // internals directly.
 export async function MarathonLiveCard() {
-  const { eventName, totalEntries, groupCount, runCounts } = await getMarathonPulse();
+  const pulse = await getMarathonPulse();
+  // Marathon unreachable: show nothing rather than a live card with
+  // nothing live in it. The rest of the home page is unaffected.
+  if (!pulse) return null;
+  const { eventName, totalEntries, groupCount, runCounts } = pulse;
 
   return (
     <Link

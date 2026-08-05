@@ -28,7 +28,8 @@ export type AdminUserRow = {
 export async function listUsersForAdmin(): Promise<AdminUserRow[]> {
   await requireAdminCaller();
   const supabase = await createClient();
-  const { data } = await supabase.rpc("admin_list_users");
+  const { data, error } = await supabase.rpc("admin_list_users");
+  if (error) console.error("listUsersForAdmin failed:", error);
   return data ?? [];
 }
 
@@ -43,20 +44,20 @@ export async function listUsersForAdmin(): Promise<AdminUserRow[]> {
 export async function listIndentApprovers(): Promise<Set<string>> {
   await requireAdminCaller();
   const supabase = await createClient();
-  const { data } = await fetchAll((from, to) =>
+  const data = await fetchAll((from, to) =>
     supabase.from("indent_approvers").select("user_id").order("user_id").range(from, to),
   );
-  return new Set((data ?? []).map((row) => row.user_id));
+  return new Set(data.map((row) => row.user_id));
 }
 
 // The bill twin of the list above (bill_approvers, migration 0025).
 export async function listBillApprovers(): Promise<Set<string>> {
   await requireAdminCaller();
   const supabase = await createClient();
-  const { data } = await fetchAll((from, to) =>
+  const data = await fetchAll((from, to) =>
     supabase.from("bill_approvers").select("user_id").order("user_id").range(from, to),
   );
-  return new Set((data ?? []).map((row) => row.user_id));
+  return new Set(data.map((row) => row.user_id));
 }
 
 /**
@@ -67,14 +68,14 @@ export async function listBillApprovers(): Promise<Set<string>> {
 export async function listBillApprovalLimits(): Promise<Map<string, number | null>> {
   await requireAdminCaller();
   const supabase = await createClient();
-  const { data } = await fetchAll((from, to) =>
+  const data = await fetchAll((from, to) =>
     supabase
       .from("bill_approvers")
       .select("user_id, approval_limit")
       .order("user_id")
       .range(from, to),
   );
-  return new Map((data ?? []).map((row) => [row.user_id, row.approval_limit]));
+  return new Map(data.map((row) => [row.user_id, row.approval_limit]));
 }
 
 /** One person for their own Settings page, or null if the id is unknown. */
@@ -88,10 +89,10 @@ export async function getPersonForAdmin(userId: string): Promise<AdminUserRow | 
 export async function listGrantsForUser(userId: string): Promise<Set<string>> {
   await requireAdminCaller();
   const supabase = await createClient();
-  const { data } = await fetchAll((from, to) =>
+  const data = await fetchAll((from, to) =>
     supabase.from("user_apps").select("app").eq("user_id", userId).order("app").range(from, to),
   );
-  return new Set((data ?? []).map((row) => row.app));
+  return new Set(data.map((row) => row.app));
 }
 
 const HISTORY_LIMIT = 50;
@@ -138,7 +139,11 @@ export async function listAccessHistory(userId: string): Promise<AccessAuditRow[
   const actorIds = [...new Set(rows.map((row) => row.actor).filter((id): id is string => !!id))];
   const actorNames = new Map<string, string>();
   if (actorIds.length) {
-    const { data } = await supabase.from("profiles").select("id, full_name").in("id", actorIds);
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, full_name")
+      .in("id", actorIds);
+    if (error) console.error("listAccessHistory actor names failed:", error);
     for (const person of data ?? []) {
       if (person.full_name) actorNames.set(person.id, person.full_name);
     }
@@ -157,12 +162,12 @@ export async function listAccessHistory(userId: string): Promise<AccessAuditRow[
 export async function listAllGrants(): Promise<Map<string, Set<string>>> {
   await requireAdminCaller();
   const supabase = await createClient();
-  const { data } = await fetchAll((from, to) =>
+  const data = await fetchAll((from, to) =>
     supabase.from("user_apps").select("user_id, app").order("user_id").order("app").range(from, to),
   );
 
   const grants = new Map<string, Set<string>>();
-  for (const row of data ?? []) {
+  for (const row of data) {
     const apps = grants.get(row.user_id) ?? new Set<string>();
     apps.add(row.app);
     grants.set(row.user_id, apps);

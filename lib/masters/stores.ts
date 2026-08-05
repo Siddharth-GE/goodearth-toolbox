@@ -16,8 +16,8 @@ export type StoreRow = {
 // here promises completeness, so none of them get to silently cap.
 export async function listStores(): Promise<StoreRow[]> {
   const supabase = await createClient();
-  const { data } = await fetchAll((from, to) =>
+  const data = await fetchAll((from, to) =>
     supabase.from("stores").select("*").order("name").order("id").range(from, to),
   );
-  return (data ?? []) as StoreRow[];
+  return data as StoreRow[];
 }
