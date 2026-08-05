@@ -104,7 +104,11 @@ export default async function LabourContractsPage() {
                     <ContractActions
                       contractId={contract.id}
                       isActive={contract.is_active}
-                      showApprove={canApproveContract(contract.status, actor)}
+                      showApprove={canApproveContract(
+                        contract.status,
+                        actor,
+                        contract.contract_value,
+                      )}
                     />
                   </div>
                 </TableCell>

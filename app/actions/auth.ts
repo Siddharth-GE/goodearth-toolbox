@@ -19,10 +19,25 @@ export async function login(_state: LoginState, formData: FormData): Promise<Log
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
     return { error: "Incorrect email or password." };
+  }
+
+  // The credentials are right, but the account may have been switched
+  // off. Signing them straight back out is clearer than letting them in
+  // to a dashboard where every screen redirects (0032).
+  if (data.user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("is_active")
+      .eq("id", data.user.id)
+      .maybeSingle();
+    if (profile && !profile.is_active) {
+      await supabase.auth.signOut();
+      return { error: "This account has been deactivated. Ask an admin to switch it back on." };
+    }
   }
 
   redirect("/");

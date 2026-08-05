@@ -85,7 +85,7 @@ export async function updateUnit(
   _state: UnitFormState,
   formData: FormData,
 ): Promise<UnitFormState> {
-  await requireTool("/masters");
+  const user = await requireTool("/masters");
 
   const { project_id, plot_id, name, code, unit_type, client_id, status } = readUnitForm(formData);
   if (!project_id) return { error: "Choose a project." };
@@ -99,7 +99,7 @@ export async function updateUnit(
   const supabase = await createClient();
   const { error } = await supabase
     .from("units")
-    .update({ project_id, plot_id, name, code, unit_type, client_id, status })
+    .update({ project_id, plot_id, name, code, unit_type, client_id, status, updated_by: user.id })
     .eq("id", id);
   if (error) {
     if (error.code === "23505") return { error: duplicateError(error.message) };

@@ -229,25 +229,59 @@ export const getBill = cache(async (billId: string): Promise<BillDetail | null> 
   };
 });
 
-/** Whether the current user may decide bills, plus their id for the
+/**
+ * Whether the current user may decide bills, plus their id for the
  * recorder-ownership delete rule. Admins short-circuit — has_app() and
- * the guard both treat them as approvers. */
+ * the guard both treat them as approvers, and no limit applies to them
+ * (0033).
+ *
+ * The right can come from being named on `bill_approvers` OR from the
+ * person's role (0034), so this asks the database's own helpers rather
+ * than reading either source directly — they are the same functions
+ * `bills_guard()` calls, so the button and the trigger cannot drift
+ * apart. Reading `bill_approvers` alone was the bug: a role that
+ * granted bill approval was honoured by the database but never showed
+ * anyone a button.
+ */
 export async function getCurrentBillActor(): Promise<{
   isAdmin: boolean;
   isApprover: boolean;
+  /** Null means unlimited — see exceedsApprovalLimit in workflow.ts. */
+  approvalLimit: number | null;
   userId: string;
 }> {
   const user = await requireTool("/bills");
   const isAdmin = user.profile?.role === "admin";
-  if (isAdmin) return { isAdmin: true, isApprover: true, userId: user.id };
+  if (isAdmin) {
+    return { isAdmin: true, isApprover: true, approvalLimit: null, userId: user.id };
+  }
 
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("bill_approvers")
-    .select("user_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-  return { isAdmin: false, isApprover: data != null, userId: user.id };
+  // Both are needed: bill_approval_cap returns null for "unlimited" AND
+  // for "not an approver at all", so can_approve_bills is what tells
+  // those two apart.
+  const [approver, cap] = await Promise.all([
+    supabase.rpc("can_approve_bills", { uid: user.id }),
+    supabase.rpc("bill_approval_cap", { uid: user.id }),
+  ]);
+
+  // Fail closed: a missing button is recoverable (an admin approves),
+  // a button that dies on click is not.
+  if (approver.error) {
+    console.error("getCurrentBillActor can_approve_bills failed:", approver.error);
+    return { isAdmin: false, isApprover: false, approvalLimit: null, userId: user.id };
+  }
+  if (cap.error) {
+    console.error("getCurrentBillActor bill_approval_cap failed:", cap.error);
+    return { isAdmin: false, isApprover: false, approvalLimit: null, userId: user.id };
+  }
+
+  return {
+    isAdmin: false,
+    isApprover: approver.data === true,
+    approvalLimit: cap.data ?? null,
+    userId: user.id,
+  };
 }
 
 /* ------------------------------------------------------------------ *

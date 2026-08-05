@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/table";
 import { listProjects, type ProjectStatus, type ProjectType } from "@/lib/masters/projects";
 import { Boxes } from "lucide-react";
+import Link from "next/link";
 import { ProjectFormDialog } from "./_components/project-form-dialog";
 
 const TYPE_LABELS: Record<ProjectType, string> = {
@@ -54,7 +55,11 @@ export default async function ProjectsPage() {
           <TableBody>
             {projects.map((project) => (
               <TableRow key={project.id}>
-                <TableCell className="text-foreground font-medium">{project.name}</TableCell>
+                <TableCell className="text-foreground font-medium">
+                  <Link href={`/masters/projects/${project.id}`} className="hover:underline">
+                    {project.name}
+                  </Link>
+                </TableCell>
                 <TableCell className="font-mono text-xs">{project.code || "—"}</TableCell>
                 <TableCell>{project.location || "—"}</TableCell>
                 <TableCell>{TYPE_LABELS[project.project_type]}</TableCell>

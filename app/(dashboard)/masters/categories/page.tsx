@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import {
   Table,
@@ -11,6 +12,7 @@ import { listBrands } from "@/lib/masters/brands";
 import { listItemCategories } from "@/lib/masters/item-categories";
 import { BrandForm } from "./_components/brand-form";
 import { CategoryForm } from "./_components/category-form";
+import { BrandEditDialog, CategoryEditDialog } from "./_components/edit-dialogs";
 
 export default async function CategoriesPage() {
   const [categories, brands] = await Promise.all([listItemCategories(), listBrands()]);
@@ -28,6 +30,8 @@ export default async function CategoriesPage() {
               <TableRow>
                 <TableHeaderCell>Name</TableHeaderCell>
                 <TableHeaderCell>Kind</TableHeaderCell>
+                <TableHeaderCell>Status</TableHeaderCell>
+                <TableHeaderCell></TableHeaderCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -35,6 +39,14 @@ export default async function CategoriesPage() {
                 <TableRow key={category.id}>
                   <TableCell className="text-foreground font-medium">{category.name}</TableCell>
                   <TableCell className="capitalize">{category.kind}</TableCell>
+                  <TableCell>
+                    <Badge variant={category.is_active ? "success" : "neutral"}>
+                      {category.is_active ? "Active" : "Inactive"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <CategoryEditDialog category={category} />
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -52,12 +64,22 @@ export default async function CategoriesPage() {
             <TableHead>
               <TableRow>
                 <TableHeaderCell>Name</TableHeaderCell>
+                <TableHeaderCell>Status</TableHeaderCell>
+                <TableHeaderCell></TableHeaderCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {brands.map((brand) => (
                 <TableRow key={brand.id}>
                   <TableCell className="text-foreground font-medium">{brand.name}</TableCell>
+                  <TableCell>
+                    <Badge variant={brand.is_active ? "success" : "neutral"}>
+                      {brand.is_active ? "Active" : "Inactive"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <BrandEditDialog brand={brand} />
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

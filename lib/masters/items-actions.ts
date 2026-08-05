@@ -53,7 +53,7 @@ export async function updateItem(
   _state: ItemFormState,
   formData: FormData,
 ): Promise<ItemFormState> {
-  await requireTool("/masters");
+  const user = await requireTool("/masters");
 
   const input = readItemForm(formData);
   if (!input.name) return { error: "Enter an item name." };
@@ -62,7 +62,10 @@ export async function updateItem(
   if (!isUom(input.default_uom)) return { error: "Choose a unit of measure." };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("items").update(input).eq("id", id);
+  const { error } = await supabase
+    .from("items")
+    .update({ ...input, updated_by: user.id })
+    .eq("id", id);
   if (error) {
     if (error.code === "23505") return { error: "An item with this code already exists." };
     console.error("updateItem failed:", error);

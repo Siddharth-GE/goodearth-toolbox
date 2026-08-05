@@ -10,6 +10,9 @@ export type Profile = {
   full_name: string | null;
   role: string;
   team: string | null;
+  is_active: boolean;
+  /** The assigned role template (0034), or null for no role. */
+  role_id: string | null;
 };
 
 export const getCurrentUser = cache(async () => {
@@ -45,12 +48,24 @@ export const getCurrentUser = cache(async () => {
 
   // user_apps is fetched in the same request as the profile — see
   // lib/auth/access.ts, which used to do this as its own separate
-  // round trip on every gated query.
-  const { data } = await supabase
+  // round trip on every gated query. The role's bundle rides along on
+  // the same trip via the role_id FK (0034), so granting through a role
+  // costs nothing extra per request.
+  // The FK is named explicitly: `roles` also carries created_by and
+  // updated_by pointing back at profiles (0034), so a bare `roles(…)`
+  // is ambiguous and PostgREST refuses it outright (PGRST201) — which
+  // silently signed everyone out until it was named.
+  const { data, error } = await supabase
     .from("profiles")
-    .select("id, full_name, role, team, user_apps(app)")
+    .select(
+      "id, full_name, role, team, is_active, role_id, user_apps(app), roles!profiles_role_id_fkey(role_apps(app))",
+    )
     .eq("id", userId)
     .single();
+
+  // Never fail silently here: a broken query looks exactly like "no such
+  // user", which logs a real person out with no trace of why.
+  if (error) console.error("getCurrentUser profile read failed:", error);
 
   // No profile row means no such staff member — every real user gets one
   // from the handle_new_user trigger at signup (0001_profiles.sql). This
@@ -60,6 +75,20 @@ export const getCurrentUser = cache(async () => {
   // in" should mean a real person.
   if (!data) return null;
 
+  // A deactivated person is treated exactly like a signed-out one: every
+  // requireUser() lands on /login, and every gated query redirects. The
+  // database agrees independently — is_admin() and has_app() (0032) both
+  // answer false for them, so this is the polite half of the rule, not
+  // the enforcing half.
+  if (!data.is_active) return null;
+
+  // Effective access is the union, computed here on every request
+  // rather than copied anywhere — so editing a role takes effect for
+  // everyone holding it immediately. Mirrors has_app() (0034), which is
+  // the boundary that actually holds.
+  const personalApps = (data.user_apps ?? []).map((row) => row.app);
+  const roleApps = (data.roles?.role_apps ?? []).map((row) => row.app);
+
   return {
     id: userId,
     email: userEmail,
@@ -68,8 +97,10 @@ export const getCurrentUser = cache(async () => {
       full_name: data.full_name,
       role: data.role,
       team: data.team,
+      is_active: data.is_active,
+      role_id: data.role_id,
     } satisfies Profile,
-    grantedApps: (data.user_apps ?? []).map((row) => row.app),
+    grantedApps: [...new Set([...personalApps, ...roleApps])],
   };
 });
 

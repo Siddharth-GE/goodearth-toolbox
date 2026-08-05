@@ -25,6 +25,12 @@ export type ContractStatus = "pending_approval" | "approved";
 export type BillDecider = {
   isAdmin: boolean;
   isApprover: boolean;
+  /**
+   * The most this approver may approve, or null for no ceiling (0033).
+   * Null is "unlimited", never "nothing" — every approver who predates
+   * limits has null, and admins ignore it entirely.
+   */
+  approvalLimit?: number | null;
 };
 
 export type BillActor = {
@@ -38,12 +44,41 @@ export function canEditBill(status: BillStatus): boolean {
   return status === "recorded";
 }
 
-/** A recorded bill is approved by a named approver or an admin. */
-export function canApprove(status: BillStatus, decider: BillDecider): boolean {
-  return status === "recorded" && (decider.isAdmin || decider.isApprover);
+/**
+ * True when this amount is beyond what the decider may approve.
+ *
+ * Admins are never limited — the ceiling delegates authority downward,
+ * it doesn't cap the person handing it out. A null limit is unlimited,
+ * and the comparison is `<=`, so a ₹50,000 limit approves a ₹50,000
+ * bill exactly. Mirrors the bills_guard check (0033).
+ */
+export function exceedsApprovalLimit(decider: BillDecider, amount: number | null): boolean {
+  if (decider.isAdmin) return false;
+  const limit = decider.approvalLimit ?? null;
+  if (limit === null || amount === null) return false;
+  return amount > limit;
 }
 
-/** An approved (unpaid) bill can be sent back, with a note, by a decider. */
+/**
+ * A recorded bill is approved by a named approver or an admin — and, if
+ * that approver has a limit, only up to it. The amount is optional so
+ * callers with nothing to compare (a list row) keep the old meaning.
+ */
+export function canApprove(
+  status: BillStatus,
+  decider: BillDecider,
+  amount: number | null = null,
+): boolean {
+  if (status !== "recorded") return false;
+  if (!(decider.isAdmin || decider.isApprover)) return false;
+  return !exceedsApprovalLimit(decider, amount);
+}
+
+/**
+ * An approved (unpaid) bill can be sent back, with a note, by a decider.
+ * Deliberately NOT limit-gated: returning a bill authorises no spending,
+ * and someone who spots a problem on a large bill must be able to say so.
+ */
 export function canSendBack(status: BillStatus, decider: BillDecider): boolean {
   return status === "approved" && (decider.isAdmin || decider.isApprover);
 }
@@ -67,9 +102,16 @@ export function canDeleteBill(
 }
 
 /** A pending labour contract is approved by the same deciders as a
- * bill (founder decision: one list). Its terms lock on approval. */
-export function canApproveContract(status: ContractStatus, decider: BillDecider): boolean {
-  return status === "pending_approval" && (decider.isAdmin || decider.isApprover);
+ * bill (founder decision: one list), and against the same limit — its
+ * value is the amount at stake. Its terms lock on approval. */
+export function canApproveContract(
+  status: ContractStatus,
+  decider: BillDecider,
+  contractValue: number | null = null,
+): boolean {
+  if (status !== "pending_approval") return false;
+  if (!(decider.isAdmin || decider.isApprover)) return false;
+  return !exceedsApprovalLimit(decider, contractValue);
 }
 
 /** A contract takes bills only once approved and while active. */

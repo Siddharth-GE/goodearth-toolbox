@@ -1,6 +1,10 @@
 import { Badge } from "@/components/ui/badge";
+import { Button, LinkButton } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Pagination } from "@/components/ui/pagination";
+import { Select } from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -25,14 +29,14 @@ const STATUS_VARIANT: Record<UnitStatus, "info" | "warning" | "success"> = {
 export default async function UnitsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ q?: string; project?: string; page?: string }>;
 }) {
-  const { page } = await searchParams;
+  const { q, project, page } = await searchParams;
   // The table shows one page; the form dialog still gets the COMPLETE
   // list — it computes which plots are already taken from `units`, and
   // a single page would silently offer occupied plots.
   const [unitPage, allUnits, projects, plots, clients] = await Promise.all([
-    listUnitsPage({ page: Number(page) || 1 }),
+    listUnitsPage({ search: q, projectId: project, page: Number(page) || 1 }),
     listUnits(),
     listProjects(),
     listPlots(),
@@ -44,20 +48,63 @@ export default async function UnitsPage({
   const clientName = (id: string | null) =>
     id ? (clients.find((c) => c.id === id)?.name ?? "—") : "—";
 
-  const hrefForPage = (target: number) =>
-    target > 1 ? `/masters/units?page=${target}` : "/masters/units";
+  // Carries the active filters onto the pager links, so paging never
+  // silently drops the search you're in the middle of.
+  const hrefForPage = (target: number) => {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (project) params.set("project", project);
+    if (target > 1) params.set("page", String(target));
+    const query = params.toString();
+    return query ? `/masters/units?${query}` : "/masters/units";
+  };
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        {/* GET form: submitting drops `page`, so changing any filter
+            naturally returns to page 1 rather than stranding you on page 40. */}
+        <form action="/masters/units" className="flex flex-wrap items-end gap-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="q">Search</Label>
+            <Input
+              id="q"
+              name="q"
+              defaultValue={q ?? ""}
+              placeholder="Name or code…"
+              autoComplete="off"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="project">Project</Label>
+            <Select id="project" name="project" defaultValue={project ?? ""}>
+              <option value="">All projects</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <Button type="submit" variant="secondary">
+            Filter
+          </Button>
+          {(q || project) && (
+            <LinkButton href="/masters/units" variant="ghost">
+              Clear
+            </LinkButton>
+          )}
+        </form>
         <UnitFormDialog projects={projects} plots={plots} units={allUnits} clients={clients} />
       </div>
 
       {units.length === 0 ? (
         <EmptyState
           icon={Boxes}
-          title="No units yet"
-          description="Create the first unit under a project."
+          title={q || project ? "No units found" : "No units yet"}
+          description={
+            q || project ? "Try a different search." : "Create the first unit under a project."
+          }
         />
       ) : (
         <>

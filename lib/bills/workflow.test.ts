@@ -15,6 +15,7 @@ import {
   canMarkPaid,
   canSendBack,
   exceedsAnchor,
+  exceedsApprovalLimit,
   isContractBillable,
 } from "./workflow";
 
@@ -38,6 +39,51 @@ test("approving takes a recorded bill and a named approver or an admin", () => {
   assert.equal(canApprove("recorded", bystander), false);
   assert.equal(canApprove("approved", approver), false);
   assert.equal(canApprove("paid", approver), false);
+});
+
+// The limit matrix (0033). A ceiling that leaked would either block a
+// legitimate approval or, far worse, let one through — so every corner
+// is pinned: at the limit, either side of it, unlimited, and admin.
+const capped = { isAdmin: false, isApprover: true, approvalLimit: 50000 };
+
+test("an approver's limit passes below and at the number, and stops above it", () => {
+  assert.equal(canApprove("recorded", capped, 49000), true);
+  assert.equal(canApprove("recorded", capped, 50000), true, "a limit means up to and including");
+  assert.equal(canApprove("recorded", capped, 51000), false);
+});
+
+test("no limit means unlimited, not nothing — every approver who predates limits", () => {
+  const unlimited = { isAdmin: false, isApprover: true, approvalLimit: null };
+  assert.equal(canApprove("recorded", unlimited, 10_000_000), true);
+  // Absent field, the shape callers used before 0033.
+  assert.equal(canApprove("recorded", { isAdmin: false, isApprover: true }, 10_000_000), true);
+});
+
+test("an admin is never capped, whatever the amount or the stored limit", () => {
+  const cappedAdmin = { isAdmin: true, isApprover: true, approvalLimit: 1000 };
+  assert.equal(canApprove("recorded", cappedAdmin, 10_000_000), true);
+  assert.equal(exceedsApprovalLimit(cappedAdmin, 10_000_000), false);
+});
+
+test("a limit never promotes a bystander into an approver", () => {
+  assert.equal(
+    canApprove("recorded", { isAdmin: false, isApprover: false, approvalLimit: 1e9 }, 1),
+    false,
+  );
+});
+
+test("an unknown amount is not treated as zero, nor as over the limit", () => {
+  assert.equal(canApprove("recorded", capped, null), true);
+  assert.equal(exceedsApprovalLimit(capped, null), false);
+});
+
+test("send-back is not capped — a big bill must still be returnable", () => {
+  assert.equal(canSendBack("approved", capped), true);
+});
+
+test("a contract is capped by the same limit as a bill", () => {
+  assert.equal(canApproveContract("pending_approval", capped, 40000), true);
+  assert.equal(canApproveContract("pending_approval", capped, 60000), false);
 });
 
 test("send-back takes an approved bill and a decider", () => {

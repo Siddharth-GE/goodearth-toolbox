@@ -22,7 +22,7 @@ export async function approveItemRequest(
 
   const { error: itemError } = await supabase
     .from("items")
-    .update({ is_provisional: false, code: code?.trim() || null })
+    .update({ is_provisional: false, code: code?.trim() || null, updated_by: user.id })
     .eq("id", provisionalItemId);
   if (itemError) {
     if (itemError.code === "23505") return { error: "That code is already used by another item." };
@@ -66,7 +66,12 @@ export async function mergeItemRequest(
 
   const { error: itemError } = await supabase
     .from("items")
-    .update({ merged_into_item_id: targetItemId, is_active: false, is_provisional: false })
+    .update({
+      merged_into_item_id: targetItemId,
+      is_active: false,
+      is_provisional: false,
+      updated_by: user.id,
+    })
     .eq("id", provisionalItemId);
   if (itemError) {
     console.error("mergeItemRequest item failed:", itemError);
@@ -104,7 +109,7 @@ export async function rejectItemRequest(
   // it, and those lines are the record of what was specified.
   const { error: itemError } = await supabase
     .from("items")
-    .update({ is_active: false })
+    .update({ is_active: false, updated_by: user.id })
     .eq("id", provisionalItemId);
   if (itemError) {
     console.error("rejectItemRequest item failed:", itemError);

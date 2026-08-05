@@ -66,7 +66,7 @@ export async function updatePlot(
   _state: PlotFormState,
   formData: FormData,
 ): Promise<PlotFormState> {
-  await requireTool("/masters");
+  const user = await requireTool("/masters");
 
   const { project_id, name, code, area, status } = readPlotForm(formData);
   if (!project_id) return { error: "Choose a project." };
@@ -78,7 +78,7 @@ export async function updatePlot(
   const supabase = await createClient();
   const { error } = await supabase
     .from("plots")
-    .update({ project_id, name, code, area, status })
+    .update({ project_id, name, code, area, status, updated_by: user.id })
     .eq("id", id);
   if (error) {
     if (error.code === "23505")

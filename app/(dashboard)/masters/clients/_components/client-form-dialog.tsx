@@ -1,5 +1,6 @@
 "use client";
 
+import { Checkbox } from "@/components/ui/checkbox";
 import { RecordFormDialog } from "@/components/masters/record-form-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,6 +38,10 @@ export function ClientFormDialog({ client }: { client?: ClientRow }) {
         <Label htmlFor="notes">Notes</Label>
         <Input id="notes" name="notes" defaultValue={client?.notes ?? ""} autoComplete="off" />
       </div>
+      <label className="text-foreground flex items-center gap-2 text-sm">
+        <Checkbox name="is_active" value="1" defaultChecked={client?.is_active ?? true} />
+        Active
+      </label>
     </RecordFormDialog>
   );
 }

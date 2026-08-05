@@ -38,7 +38,10 @@ means flipping `built: true` and replacing the stub `page.tsx`.
   `requireTool("<href>")` from `lib/auth/access.ts` first — sidebar
   visibility is cosmetic. Actions return the shared `ActionState`
   (`lib/action-state.ts`), never throw. Dashboard tools use the
-  RLS-scoped client (`lib/supabase/server.ts`), never the admin client.
+  RLS-scoped client (`lib/supabase/server.ts`), never the admin client —
+  the single sanctioned exception is `inviteUser` in
+  `lib/settings/actions.ts` (creating a login has no RLS path), and it
+  touches only the auth-admin API, never a table.
 - **Shared masters** (`lib/masters/`): reads are ungated, any tool
   calls them; writes require the `/masters` grant. Two files per
   master — queries (`import "server-only"`) and actions (file-level
@@ -60,7 +63,8 @@ means flipping `built: true` and replacing the stub `page.tsx`.
   `supabase/migrations/`, additive only, never edited once applied.
   Apply in Supabase Studio **before** deploying dependent code, then
   `npm run db:types` and commit types with the migration. New tool →
-  extend the `user_apps_app_known` CHECK in the same migration.
+  extend **both** the `user_apps_app_known` and `role_apps_app_known`
+  CHECKs in the same migration, or granting it fails at the database.
 - **UI.** Every screen from `components/ui/*` (+ `components/masters/*`
   for shared domain pieces) — no one-off styles, no raw color classes.
   All formatting through `lib/format.ts`. Every route gets a
