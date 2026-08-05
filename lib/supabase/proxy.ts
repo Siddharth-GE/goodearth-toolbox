@@ -73,11 +73,19 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (claims && path === "/login") {
-    const url = request.nextUrl.clone();
-    url.pathname = "/";
-    return NextResponse.redirect(url);
-  }
+  // Deliberately NOT redirecting a claims-holder away from /login.
+  //
+  // A valid JWT does not mean the app will let you in: lib/auth/dal.ts
+  // still turns you away if your profile row is missing or your account
+  // has been switched off, and it turns you away by redirecting to
+  // /login. Bouncing that back to "/" made the two rules chase each
+  // other — an unbounded redirect loop, ending in ERR_TOO_MANY_REDIRECTS
+  // with the whole toolbox unreachable. Deactivating a signed-in
+  // colleague was enough to trigger it.
+  //
+  // What we lose: someone already signed in who types /login sees the
+  // login page instead of being sent home. That is a fair price, and
+  // the page they land on is honest about where they are.
 
   // Hand the identity we just verified down to Server Components via a
   // request header, so lib/auth/dal.ts doesn't need to re-verify the
