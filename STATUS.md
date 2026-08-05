@@ -17,8 +17,8 @@ project run end-to-end.
 |                    |                                                                                                                         |
 | ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
 | Last worked        | 2026-08-05                                                                                                              |
-| Branch             | `feature/masters-settings-upgrade` — awaiting browser test                                                              |
-| Migrations applied | `0001`–`0034` (next is `0035`)                                                                                          |
+| Branch             | `master` — clean                                                                                                        |
+| Migrations applied | `0001`–`0035` (next is `0036`)                                                                                          |
 | Items in database  | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands                                          |
 | Thumbnails         | 897 in Supabase Storage; 1,736 items use the colour placeholder                                                         |
 | Built tools        | Marathon, Settings, Masters, Selections, Budgets (Interiors + Construction), Indents, Purchase Orders, Inventory, Bills |
@@ -168,8 +168,8 @@ project run end-to-end.
 
 One line per day; full detail in git history and the PLAN.md files.
 
-- **2026-08-05 (masters & settings upgrade)** — seven shippable pieces
-  on `feature/masters-settings-upgrade`, migrations `0031`–`0034`.
+- **2026-08-05 (masters & settings upgrade)** — merged to `master`.
+  Seven shippable pieces plus two fixes, migrations `0031`–`0035`.
   **Masters:** the last admins-only write (gst_rates) fixed, audit
   trails and `updated_at`/`updated_by` on every master, an off-switch
   for clients/categories/brands, search + filters + paging on vendors /
@@ -182,7 +182,16 @@ One line per day; full detail in git history and the PLAN.md files.
   bill approval **limits**; and **role templates**, where `has_app()`
   learned about bundles so ~80 RLS policies followed with no policy
   edits. Backward compatibility checked against the live database by
-  impersonating each real user. Awaiting the founder's browser test.
+  impersonating each real user. **Two fixes after the founder's
+  browser test:** the `roles` embed was ambiguous (three FKs back to
+  `profiles`), which made every signed-in person look like nobody and
+  produced a login redirect loop — the query now names the FK, and a
+  failed profile read is logged rather than silently signing someone
+  out; and role-granted approval rights reached the database but not
+  the buttons, so the bill and indent deciders now call the same
+  `can_approve_*` functions the guards do (`0035` also closes those
+  helpers to `anon`). A 4-minute Vercel build was investigated and
+  ruled a queue blip — the eight builds around it all ran ~60s.
 - **2026-08-04 (management group)** — the founder set the vision for
   the next layer: a **Management** sidebar group above Operations with
   six Coming Soon tools — Dashboard (a leadership view, distinct from
