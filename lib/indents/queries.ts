@@ -821,10 +821,11 @@ export async function getBudgetPull(
 /**
  * May the signed-in user decide on a submitted indent?
  *
- * Admins always may; everyone else needs a row in `indent_approvers`
- * (managed from Settings). This drives which buttons appear —
- * `indents_guard()` enforces the same rule in the database, which is
- * what actually stops a decision.
+ * Admins always may; everyone else is either named on
+ * `indent_approvers` or holds a role that approves indents (0034).
+ * This asks the database's own `can_approve_indents()` — the same
+ * function `indents_guard()` calls — so which buttons appear and what
+ * the database will actually allow cannot drift apart.
  */
 export async function isCurrentUserApprover(): Promise<{
   isAdmin: boolean;
@@ -836,13 +837,14 @@ export async function isCurrentUserApprover(): Promise<{
   const isAdmin = user.profile?.role === "admin";
   if (isAdmin) return { isAdmin: true, isApprover: true };
 
-  const { data } = await supabase
-    .from("indent_approvers")
-    .select("user_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const { data, error } = await supabase.rpc("can_approve_indents", { uid: user.id });
+  // Fail closed: a missing button is recoverable, a dead one isn't.
+  if (error) {
+    console.error("isCurrentUserApprover failed:", error);
+    return { isAdmin: false, isApprover: false };
+  }
 
-  return { isAdmin: false, isApprover: data != null };
+  return { isAdmin: false, isApprover: data === true };
 }
 
 export type ProjectOption = { id: string; name: string; code: string | null };
