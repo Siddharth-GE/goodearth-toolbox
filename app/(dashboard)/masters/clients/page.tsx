@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/table";
 import { listClientsPage } from "@/lib/masters/clients";
 import { Users } from "lucide-react";
+import Link from "next/link";
 import { ClientFormDialog } from "./_components/client-form-dialog";
 
 export default async function ClientsPage({
@@ -98,7 +99,11 @@ export default async function ClientsPage({
             <TableBody>
               {clients.map((client) => (
                 <TableRow key={client.id}>
-                  <TableCell className="text-foreground font-medium">{client.name}</TableCell>
+                  <TableCell className="text-foreground font-medium">
+                    <Link href={`/masters/clients/${client.id}`} className="hover:underline">
+                      {client.name}
+                    </Link>
+                  </TableCell>
                   <TableCell>{client.mobile || "—"}</TableCell>
                   <TableCell>{client.email || "—"}</TableCell>
                   <TableCell>

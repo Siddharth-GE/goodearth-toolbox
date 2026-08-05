@@ -12,6 +12,8 @@ export type ClientRow = {
   notes: string | null;
   is_active: boolean;
   created_at: string;
+  updated_at: string | null;
+  updated_by: string | null;
 };
 
 // fetchAll for consistency with the other masters reads: every list

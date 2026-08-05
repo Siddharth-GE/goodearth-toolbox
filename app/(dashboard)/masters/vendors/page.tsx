@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/table";
 import { listVendorsPage } from "@/lib/masters/vendors";
 import { ShoppingCart } from "lucide-react";
+import Link from "next/link";
 import { VendorFormDialog } from "./_components/vendor-form-dialog";
 
 export default async function VendorsPage({
@@ -95,7 +96,11 @@ export default async function VendorsPage({
             <TableBody>
               {vendors.map((vendor) => (
                 <TableRow key={vendor.id}>
-                  <TableCell className="text-foreground font-medium">{vendor.name}</TableCell>
+                  <TableCell className="text-foreground font-medium">
+                    <Link href={`/masters/vendors/${vendor.id}`} className="hover:underline">
+                      {vendor.name}
+                    </Link>
+                  </TableCell>
                   <TableCell>{vendor.contact_name || "—"}</TableCell>
                   <TableCell>{vendor.mobile || "—"}</TableCell>
                   <TableCell>{vendor.gst_no || "—"}</TableCell>

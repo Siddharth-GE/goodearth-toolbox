@@ -17,6 +17,8 @@ export type ProjectRow = {
   project_type: ProjectType;
   status: ProjectStatus;
   created_at: string;
+  updated_at: string | null;
+  updated_by: string | null;
 };
 
 // fetchAll for consistency with the other masters reads: every list
