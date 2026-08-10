@@ -14,10 +14,24 @@ const ANNA = "anna";
 const RAVI = "ravi";
 const SITA = "sita";
 
+// A leg IS an activity (0043); label is the activity's name snapshotted
+// when the leg was written.
 const legs: Leg[] = [
-  { leg_no: 1, label: "Design draft", assignee_id: ANNA, expected_days: 3 },
-  { leg_no: 2, label: "Structural check", assignee_id: RAVI, expected_days: 2 },
-  { leg_no: 3, label: "Client sign-off", assignee_id: SITA, expected_days: 4 },
+  { leg_no: 1, activity_id: "act-1", label: "Design draft", assignee_id: ANNA, expected_days: 3 },
+  {
+    leg_no: 2,
+    activity_id: "act-2",
+    label: "Structural check",
+    assignee_id: RAVI,
+    expected_days: 2,
+  },
+  {
+    leg_no: 3,
+    activity_id: "act-3",
+    label: "Client sign-off",
+    assignee_id: SITA,
+    expected_days: 4,
+  },
 ];
 
 /** 10:00 IST on the given August 2026 day. */
@@ -298,7 +312,9 @@ test("nothing is offered on leg 1 or after the finish", () => {
 
 test("a one-leg trail can be finished but never pushed", () => {
   seq = 0;
-  const solo: Leg[] = [{ leg_no: 1, label: "Just do it", assignee_id: ANNA, expected_days: 1 }];
+  const solo: Leg[] = [
+    { leg_no: 1, activity_id: "act-1", label: "Just do it", assignee_id: ANNA, expected_days: 1 },
+  ];
   const opened = started(1);
   const anna = { userId: ANNA, isAdmin: false };
 

@@ -3,6 +3,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { FormMessage } from "@/components/ui/form-message";
 import { IconButton } from "@/components/ui/icon-button";
 import { Select } from "@/components/ui/select";
@@ -35,10 +36,13 @@ export function SetEditor({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const ids = set.activities.map((a) => a.activityId);
-  const unused = activities.filter((a) => !ids.includes(a.id));
+  const items = set.activities.map((a) => ({
+    activityId: a.activityId,
+    expectedDays: a.expectedDays,
+  }));
+  const unused = activities.filter((a) => !items.some((i) => i.activityId === a.id));
 
-  const save = async (next: string[]) => {
+  const save = async (next: { activityId: string; expectedDays: number }[]) => {
     setBusy(true);
     setError(null);
     const result = await setTrailSetActivities(set.id, next);
@@ -51,12 +55,15 @@ export function SetEditor({
   };
 
   const move = (from: number, to: number) => {
-    if (to < 0 || to >= ids.length) return;
-    const next = [...ids];
+    if (to < 0 || to >= items.length) return;
+    const next = [...items];
     const [moved] = next.splice(from, 1);
     next.splice(to, 0, moved);
     void save(next);
   };
+
+  const setDays = (activityId: string, expectedDays: number) =>
+    void save(items.map((i) => (i.activityId === activityId ? { ...i, expectedDays } : i)));
 
   const toggleActive = async () => {
     setBusy(true);
@@ -75,7 +82,7 @@ export function SetEditor({
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h2 className="text-foreground text-base font-bold tracking-tight">{set.name}</h2>
         <span className="text-muted text-xs">
-          {set.activities.length} trail{set.activities.length === 1 ? "" : "s"} per house
+          {set.activities.length} activit{set.activities.length === 1 ? "y" : "ies"}
         </span>
         <span className="ml-auto flex items-center gap-2">
           {!set.isActive && <Badge variant="neutral">Switched off</Badge>}
@@ -89,7 +96,7 @@ export function SetEditor({
 
       {set.activities.length === 0 ? (
         <p className="text-muted border-border mt-3 rounded-xl border border-dashed p-4 text-center text-sm">
-          Nothing in this set yet. Add the activities a house normally goes through, in the order
+          Nothing in this type yet. Add the activities a house normally goes through, in the order
           they happen.
         </p>
       ) : (
@@ -98,6 +105,23 @@ export function SetEditor({
             <li key={item.itemId} className="flex items-center gap-2 py-2">
               <span className="text-muted w-5 text-center font-mono text-xs">{i + 1}</span>
               <span className="text-foreground min-w-0 flex-1 text-sm">{item.activityName}</span>
+              {/* Days per activity, so picking a type fills in a plan
+                  and not just a list of names. Editable again on the
+                  trail itself before it starts. */}
+              <Input
+                aria-label={`${item.activityName} days`}
+                type="number"
+                min={1}
+                step={1}
+                defaultValue={item.expectedDays}
+                disabled={busy}
+                onBlur={(e) => {
+                  const days = Number(e.target.value);
+                  if (days !== item.expectedDays) setDays(item.activityId, days);
+                }}
+                className="w-16 text-center font-mono"
+              />
+              <span className="text-muted text-xs">days</span>
               <IconButton
                 aria-label={`Move ${item.activityName} up`}
                 disabled={busy || i === 0}
@@ -116,7 +140,7 @@ export function SetEditor({
                 tone="danger"
                 aria-label={`Remove ${item.activityName}`}
                 disabled={busy}
-                onClick={() => void save(ids.filter((id) => id !== item.activityId))}
+                onClick={() => void save(items.filter((i) => i.activityId !== item.activityId))}
               >
                 <X className="size-4" />
               </IconButton>
@@ -145,7 +169,7 @@ export function SetEditor({
             variant="secondary"
             disabled={!adding || busy}
             onClick={() => {
-              void save([...ids, adding]);
+              void save([...items, { activityId: adding, expectedDays: 2 }]);
               setAdding("");
             }}
           >

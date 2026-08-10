@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { LinkButton } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { PageTitle } from "@/components/ui/page-title";
 import { getHouse, listTrailSets } from "@/lib/pusher/queries";
@@ -35,11 +36,14 @@ export default async function HousePage({
         title={house.unit.name}
         description="Everything this house is waiting on, and everything already moving."
         actions={
-          cold > 0 ? (
-            <Badge variant="danger">{cold} cold</Badge>
-          ) : (
-            <Badge variant="neutral">{house.running.length} running</Badge>
-          )
+          <div className="flex items-center gap-2">
+            {cold > 0 && <Badge variant="danger">{cold} cold</Badge>}
+            {/* Both pickers arrive answered, so opening a one-off trail
+                on a house is not a trip back through Project and Unit. */}
+            <LinkButton href={`/pusher/new?project=${projectId}&unit=${unitId}`}>
+              Open a trail
+            </LinkButton>
+          </div>
         }
       />
       <PusherNav active="projects" />

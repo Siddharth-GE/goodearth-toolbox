@@ -109,7 +109,7 @@ export default async function PusherCourtPage() {
                             .filter((l) => l.leg_no < (row.currentLeg ?? 1))
                             .map((l) => ({
                               legNo: l.leg_no,
-                              label: l.label,
+                              label: l.label ?? "—",
                               assigneeName: namesById.get(l.assignee_id) ?? "Unnamed",
                             })),
                         }}

@@ -71,13 +71,13 @@ export function HouseQueue({
         </h2>
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <Select
-            aria-label="Standard set"
+            aria-label="Trail type"
             value={setId}
             onChange={(e) => setSetId(e.target.value)}
             disabled={busy !== null || sets.length === 0}
           >
             <option value="">
-              {sets.length === 0 ? "No standard sets yet" : "Add a standard set…"}
+              {sets.length === 0 ? "No trail types yet" : "Add a trail type…"}
             </option>
             {sets.map((s) => (
               <option key={s.id} value={s.id}>
@@ -100,8 +100,8 @@ export function HouseQueue({
 
       {queued.length === 0 ? (
         <p className="text-muted border-border mt-3 rounded-xl border border-dashed p-4 text-center text-sm">
-          Nothing waiting. Add a standard set and the usual trails for a house land here, staffed
-          and ready — none of them counting a day until you start it.
+          Nothing waiting. Add a trail type and this house&apos;s whole run of activities lands here
+          as one trail, staffed and ready — not counting a day until you start it.
         </p>
       ) : (
         <div className="divide-border mt-3 divide-y">
@@ -119,7 +119,7 @@ export function HouseQueue({
                   ) : null}
                 </p>
                 <p className="text-muted mt-0.5 text-xs">
-                  {trail.legCount} leg{trail.legCount === 1 ? "" : "s"} · not started
+                  {trail.legCount} activit{trail.legCount === 1 ? "y" : "ies"} · not started
                 </p>
               </Link>
               <Button

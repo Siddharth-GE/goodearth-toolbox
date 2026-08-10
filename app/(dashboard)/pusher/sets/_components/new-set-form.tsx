@@ -25,7 +25,7 @@ export function NewSetForm({
 
   return (
     <form ref={formRef} action={formAction} className="space-y-2">
-      <Label htmlFor="set-name">New standard set</Label>
+      <Label htmlFor="set-name">New trail type</Label>
       <div className="flex flex-wrap items-center gap-2">
         <Input
           id="set-name"

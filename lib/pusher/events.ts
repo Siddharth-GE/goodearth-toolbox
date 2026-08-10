@@ -51,9 +51,17 @@ export type ChainEvent = {
   occurred_at: string;
 };
 
+/**
+ * A leg IS an activity (0043, founder's call). `activity_id` is the
+ * answer; `label` is the activity's name SNAPSHOTTED when the leg was
+ * written, so renaming "Fire NOC" to "Fire clearance" cannot rewrite
+ * what a trail from last March says it did. Nullable only because the
+ * activity is the truth and the name is the courtesy.
+ */
 export type Leg = {
   leg_no: number;
-  label: string;
+  activity_id: string;
+  label: string | null;
   assignee_id: string;
   expected_days: number;
 };

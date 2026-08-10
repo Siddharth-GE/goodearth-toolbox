@@ -226,7 +226,13 @@ export default async function TrailPage({ params }: { params: Promise<{ chainId:
   );
 }
 
-function legName(trail: { legs: { leg_no: number; label: string }[] }, legNo: number | null) {
+// `label` is the activity's name snapshotted when the leg was written
+// (0043) — nullable, because the activity is the truth and the name is
+// the courtesy. Falls back to the leg number rather than showing a gap.
+function legName(
+  trail: { legs: { leg_no: number; label: string | null }[] },
+  legNo: number | null,
+) {
   if (legNo === null) return "the finish";
-  return trail.legs.find((l) => l.leg_no === legNo)?.label ?? `leg ${legNo}`;
+  return trail.legs.find((l) => l.leg_no === legNo)?.label ?? `step ${legNo}`;
 }

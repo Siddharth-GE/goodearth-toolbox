@@ -2449,42 +2449,52 @@ export type Database = {
       }
       pusher_chain_legs: {
         Row: {
+          activity_id: string
           assignee_id: string
           chain_id: string
           created_at: string
           created_by: string | null
           expected_days: number
           id: string
-          label: string
+          label: string | null
           leg_no: number
           updated_at: string
           updated_by: string | null
         }
         Insert: {
+          activity_id: string
           assignee_id: string
           chain_id: string
           created_at?: string
           created_by?: string | null
           expected_days: number
           id?: string
-          label: string
+          label?: string | null
           leg_no: number
           updated_at?: string
           updated_by?: string | null
         }
         Update: {
+          activity_id?: string
           assignee_id?: string
           chain_id?: string
           created_at?: string
           created_by?: string | null
           expected_days?: number
           id?: string
-          label?: string
+          label?: string | null
           leg_no?: number
           updated_at?: string
           updated_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "pusher_chain_legs_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "pusher_activities"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "pusher_chain_legs_assignee_id_fkey"
             columns: ["assignee_id"]
@@ -2576,7 +2586,7 @@ export type Database = {
       }
       pusher_chains: {
         Row: {
-          activity_id: string
+          activity_id: string | null
           created_at: string
           created_by: string | null
           id: string
@@ -2584,12 +2594,13 @@ export type Database = {
           project_id: string
           project_stage_id: string | null
           title: string | null
+          trail_set_id: string | null
           unit_id: string | null
           updated_at: string
           updated_by: string | null
         }
         Insert: {
-          activity_id: string
+          activity_id?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -2597,12 +2608,13 @@ export type Database = {
           project_id: string
           project_stage_id?: string | null
           title?: string | null
+          trail_set_id?: string | null
           unit_id?: string | null
           updated_at?: string
           updated_by?: string | null
         }
         Update: {
-          activity_id?: string
+          activity_id?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -2610,6 +2622,7 @@ export type Database = {
           project_id?: string
           project_stage_id?: string | null
           title?: string | null
+          trail_set_id?: string | null
           unit_id?: string | null
           updated_at?: string
           updated_by?: string | null
@@ -2649,6 +2662,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "project_stages"
             referencedColumns: ["project_id", "id"]
+          },
+          {
+            foreignKeyName: "pusher_chains_trail_set_id_fkey"
+            columns: ["trail_set_id"]
+            isOneToOne: false
+            referencedRelation: "pusher_trail_sets"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "pusher_chains_unit_id_fkey"
@@ -2771,6 +2791,7 @@ export type Database = {
           activity_id: string
           created_at: string
           created_by: string | null
+          expected_days: number
           id: string
           set_id: string
           sort_order: number
@@ -2781,6 +2802,7 @@ export type Database = {
           activity_id: string
           created_at?: string
           created_by?: string | null
+          expected_days?: number
           id?: string
           set_id: string
           sort_order?: number
@@ -2791,6 +2813,7 @@ export type Database = {
           activity_id?: string
           created_at?: string
           created_by?: string | null
+          expected_days?: number
           id?: string
           set_id?: string
           sort_order?: number
@@ -4013,6 +4036,8 @@ export type Database = {
           project_stage_id: string | null
           started_at: string | null
           title: string | null
+          trail_set_id: string | null
+          trail_set_name: string | null
           unit_id: string | null
           unit_name: string | null
         }
@@ -4051,6 +4076,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "project_stages"
             referencedColumns: ["project_id", "id"]
+          },
+          {
+            foreignKeyName: "pusher_chains_trail_set_id_fkey"
+            columns: ["trail_set_id"]
+            isOneToOne: false
+            referencedRelation: "pusher_trail_sets"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "pusher_chains_unit_id_fkey"
@@ -4248,17 +4280,31 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      open_chain: {
-        Args: {
-          p_activity_id: string
-          p_legs: Json
-          p_note: string
-          p_project_id: string
-          p_title: string
-          p_unit_id: string
-        }
-        Returns: string
-      }
+      open_chain:
+        | {
+            Args: {
+              p_activity_id: string
+              p_legs: Json
+              p_note: string
+              p_project_id: string
+              p_title: string
+              p_unit_id: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_activity_id: string
+              p_legs: Json
+              p_note: string
+              p_project_id: string
+              p_start: boolean
+              p_title: string
+              p_trail_set_id: string
+              p_unit_id: string
+            }
+            Returns: string
+          }
       profile_is_active: { Args: { uid: string }; Returns: boolean }
       reopen_budget: { Args: { p_budget_id: string }; Returns: undefined }
       replace_future_legs: {

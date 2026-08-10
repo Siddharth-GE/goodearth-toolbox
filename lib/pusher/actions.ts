@@ -9,7 +9,7 @@ import { revalidatePath } from "next/cache";
 // activities, and each one's legs from its last run. Both live in
 // queries.ts; this is a plain server-to-server import, and it stays a
 // one-way street (queries.ts never imports from here).
-import { getPrefillsByActivity, listTrailSets } from "./queries";
+import { getActivityDefaults, getDepartmentsByTrailSet, listTrailSets } from "./queries";
 
 // Type-only import, and deliberately NOT re-exported — a bare
 // `export type { X };` in a "use server" file crashes every action in its
@@ -55,17 +55,29 @@ function revalidate(chainId?: string) {
   if (chainId) revalidatePath(`/pusher/trails/${chainId}`);
 }
 
-export type LegInput = { label: string; assigneeId: string; expectedDays: number };
+/** A leg IS an activity (0043) — there is no label to type any more. */
+export type LegInput = { activityId: string; assigneeId: string; expectedDays: number };
 
 export type OpenTrailInput = {
   projectId: string;
   unitId: string | null;
-  activityId: string;
+  /**
+   * The trail's single activity — only for a one-step trail, and null
+   * for anything longer. Since 0043 the activities live on the LEGS; a
+   * twelve-step trail has no one answer to "which activity is it", which
+   * is why the column is nullable and the view falls back to the type's
+   * name.
+   */
+  activityId: string | null;
+  /** Which trail type this is, if it came from one. */
+  trailSetId: string | null;
   title: string | null;
   note: string | null;
   legs: LegInput[];
   /** A trail can be in several at once — a selections handoff is Design and Purchase. */
   departmentIds: string[];
+  /** False lays it out without starting it — the queue the founder kept. */
+  start?: boolean;
 };
 
 export async function openTrail(
@@ -74,15 +86,22 @@ export async function openTrail(
   await requireTool("/pusher");
 
   if (!input.projectId) return { error: "Pick a project first." };
-  if (!input.activityId) return { error: "Pick an activity first." };
-  if (input.legs.length === 0) return { error: "A trail needs at least one leg." };
+  if (input.legs.length === 0) return { error: "A trail needs at least one activity." };
 
   for (const [i, leg] of input.legs.entries()) {
-    if (!leg.label.trim()) return { error: `Leg ${i + 1} needs a name.` };
-    if (!leg.assigneeId) return { error: `Leg ${i + 1} needs someone to carry it.` };
+    if (!leg.activityId) return { error: `Step ${i + 1} needs an activity.` };
+    if (!leg.assigneeId) return { error: `Step ${i + 1} needs someone to carry it.` };
     if (!Number.isInteger(leg.expectedDays) || leg.expectedDays < 1) {
-      return { error: `Leg ${i + 1} needs a whole number of days, at least 1.` };
+      return { error: `Step ${i + 1} needs a whole number of days, at least 1.` };
     }
+  }
+
+  // The same activity twice in one trail would put the baton through
+  // identical steps, which is never what anyone meant and is impossible
+  // to read on the route afterwards.
+  const seen = new Set(input.legs.map((l) => l.activityId));
+  if (seen.size !== input.legs.length) {
+    return { error: "The same activity appears twice — each step should be a different one." };
   }
 
   const supabase = await createClient();
@@ -92,14 +111,18 @@ export async function openTrail(
   const { data, error } = await supabase.rpc("open_chain", {
     p_project_id: input.projectId,
     p_unit_id: input.unitId as string,
-    p_activity_id: input.activityId,
+    p_activity_id: input.activityId as string,
     p_title: input.title as string,
     p_note: input.note as string,
     p_legs: input.legs.map((l) => ({
-      label: l.label.trim(),
+      activity_id: l.activityId,
       assignee_id: l.assigneeId,
       expected_days: l.expectedDays,
     })),
+    p_trail_set_id: input.trailSetId as string,
+    // Kept by the founder: a trail can be laid out now and begun when
+    // the site is actually ready.
+    p_start: input.start !== false,
   });
 
   if (error) return guardError(error, "Could not open this trail.") ?? {};
@@ -231,10 +254,10 @@ export async function replaceFutureLegs(chainId: string, legs: LegInput[]): Prom
   await requireTool("/pusher");
 
   for (const [i, leg] of legs.entries()) {
-    if (!leg.label.trim()) return { error: `Leg ${i + 1} needs a name.` };
-    if (!leg.assigneeId) return { error: `Leg ${i + 1} needs someone to carry it.` };
+    if (!leg.activityId) return { error: `Step ${i + 1} needs an activity.` };
+    if (!leg.assigneeId) return { error: `Step ${i + 1} needs someone to carry it.` };
     if (!Number.isInteger(leg.expectedDays) || leg.expectedDays < 1) {
-      return { error: `Leg ${i + 1} needs a whole number of days, at least 1.` };
+      return { error: `Step ${i + 1} needs a whole number of days, at least 1.` };
     }
   }
 
@@ -242,7 +265,7 @@ export async function replaceFutureLegs(chainId: string, legs: LegInput[]): Prom
   const { error } = await supabase.rpc("replace_future_legs", {
     p_chain_id: chainId,
     p_legs: legs.map((l) => ({
-      label: l.label.trim(),
+      activity_id: l.activityId,
       assignee_id: l.assigneeId,
       expected_days: l.expectedDays,
     })),
@@ -550,70 +573,89 @@ function revalidateHouse(projectId: string, unitId?: string) {
  * it. An activity nobody has ever run has no prefill, so it is reported
  * by name rather than silently skipped or landed with an empty leg.
  */
+/**
+ * Lay a trail type down on a house — ONE trail, whose legs are the
+ * type's activities in order (0043).
+ *
+ * This used to create twelve separate trails. The founder's correction:
+ * "the leg is the activity". So a standard villa is one trail with
+ * twelve activity-legs and one baton walking them, which also means one
+ * clock rather than twelve — the thing the queue was invented to stop.
+ *
+ * Each activity's person and days come from the type's own defaults,
+ * falling back to whoever last carried that activity anywhere. Everything
+ * is editable afterwards, and nothing behind the baton ever is.
+ */
 export async function applyTrailSet(
   projectId: string,
   unitId: string,
   setId: string,
+  start = false,
 ): Promise<ActionState> {
   await requireTool("/pusher");
 
   if (!projectId || !unitId) return { error: "Pick a house first." };
-  if (!setId) return { error: "Pick a standard set first." };
+  if (!setId) return { error: "Pick a trail type first." };
 
-  const [sets, prefills] = await Promise.all([listTrailSets(true), getPrefillsByActivity()]);
+  const [sets, defaults, departments] = await Promise.all([
+    listTrailSets(true),
+    getActivityDefaults(),
+    getDepartmentsByTrailSet(),
+  ]);
   const set = sets.find((s) => s.id === setId);
-  if (!set) return { error: "That standard set no longer exists." };
+  if (!set) return { error: "That trail type no longer exists." };
   if (set.activities.length === 0) {
     return { error: `"${set.name}" has no activities in it yet — add some first.` };
   }
 
-  const unstaffed: string[] = [];
-  const chains = set.activities.map((item) => {
-    const legs = prefills.get(item.activityId)?.legs ?? [];
-    const usable = legs.filter((l) => l.label.trim() && l.assigneeId);
-    if (usable.length === 0) unstaffed.push(item.activityName);
-    return {
-      activity_id: item.activityId,
-      title: null,
-      legs: usable.map((l) => ({
-        label: l.label.trim(),
-        assignee_id: l.assigneeId,
-        expected_days: l.expectedDays,
-      })),
-    };
-  });
+  // An activity nobody has ever carried has no one to put on it. Naming
+  // them is the whole value of this message: the fix is to pick someone,
+  // and nobody can do that without being told which.
+  const unstaffed = set.activities
+    .filter((item) => !defaults.get(item.activityId)?.assigneeId)
+    .map((item) => item.activityName);
 
   if (unstaffed.length > 0) {
-    // Naming them is the whole value of this message: the fix is to run
-    // one of each by hand first, and a person cannot do that without
-    // being told which.
     return {
-      error: `No one has ever run ${unstaffed.join(", ")}, so there are no legs to copy. Open one of each by hand first — after that this set will fill itself in.`,
+      error: `No one has ever carried ${unstaffed.join(", ")}, so there is nobody to put on ${unstaffed.length === 1 ? "it" : "them"}. Open a trail by hand once with ${unstaffed.length === 1 ? "that activity" : "those activities"} and this type will fill itself in after that.`,
     };
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.rpc("create_chains", {
+  const { data, error } = await supabase.rpc("open_chain", {
     p_project_id: projectId,
     p_unit_id: unitId,
-    p_chains: chains,
+    p_activity_id: null as unknown as string,
+    p_title: set.name,
+    p_note: null as unknown as string,
+    p_legs: set.activities.map((item) => ({
+      activity_id: item.activityId,
+      assignee_id: defaults.get(item.activityId)!.assigneeId,
+      expected_days: item.expectedDays,
+    })),
+    p_trail_set_id: setId,
+    p_start: start,
   });
 
-  if (error) return guardError(error, "Could not add this standard set.") ?? {};
+  if (error) return guardError(error, "Could not add this trail type.") ?? {};
+
+  const chainId = typeof data === "string" ? data : undefined;
+  const departmentIds = departments.get(setId) ?? [];
+  if (chainId && departmentIds.length > 0) {
+    // Best effort, and deliberately not fatal: the trail exists and is
+    // correct without its department tags, and failing the whole action
+    // here would leave the founder staring at an error beside a trail
+    // that plainly did get created.
+    await supabase.rpc("set_chain_departments", {
+      p_chain_id: chainId,
+      p_department_ids: departmentIds,
+    });
+  }
 
   revalidateHouse(projectId, unitId);
   return undefined;
 }
 
-/**
- * Start a queued trail: the baton lands on leg 1 and the clock begins.
- *
- * Anyone holding /pusher may do this, deliberately matching what the
- * tool already allows — the Open-a-trail form has always let one person
- * open a trail whose first leg belongs to someone else. A stricter rule
- * would let a coordinator lay down a house's whole set and then be
- * unable to begin any of it.
- */
 export async function startTrail(chainId: string, projectId: string, unitId: string) {
   await requireTool("/pusher");
   if (!chainId) return { error: "Pick a trail first." };
@@ -653,7 +695,7 @@ export async function createTrailSet(
   await requireTool("/pusher");
 
   const name = String(formData.get("name") ?? "").trim();
-  if (!name) return { error: "A standard set needs a name." };
+  if (!name) return { error: "A trail type needs a name." };
 
   const supabase = await createClient();
   const user = await getCurrentUser();
@@ -662,15 +704,15 @@ export async function createTrailSet(
     .insert({ name, created_by: user?.id, updated_by: user?.id });
 
   if (error) {
-    if (error.code === "23505") return { error: `"${name}" is already a standard set.` };
-    return { error: "Could not add this standard set." };
+    if (error.code === "23505") return { error: `"${name}" is already a trail type.` };
+    return { error: "Could not add this trail type." };
   }
 
   revalidatePath("/pusher/sets");
   return undefined;
 }
 
-/** Sets are switched off, never deleted — the houses they built stay readable. */
+/** Types are switched off, never deleted — the trails they built stay readable. */
 export async function setTrailSetActive(id: string, isActive: boolean): Promise<ActionState> {
   await requireTool("/pusher");
 
@@ -681,7 +723,7 @@ export async function setTrailSetActive(id: string, isActive: boolean): Promise<
     .update({ is_active: isActive, updated_by: user?.id })
     .eq("id", id);
 
-  if (error) return { error: "Could not change this standard set." };
+  if (error) return { error: "Could not change this trail type." };
   revalidatePath("/pusher/sets");
   return undefined;
 }
@@ -696,15 +738,20 @@ export async function setTrailSetActive(id: string, isActive: boolean): Promise<
  */
 export async function setTrailSetActivities(
   setId: string,
-  activityIds: string[],
+  items: { activityId: string; expectedDays: number }[],
 ): Promise<ActionState> {
   await requireTool("/pusher");
-  if (!setId) return { error: "Pick a standard set first." };
+  if (!setId) return { error: "Pick a trail type first." };
 
-  // A set with the same activity twice would put two identical trails on
-  // every house — the database refuses it, and this says so first.
-  if (new Set(activityIds).size !== activityIds.length) {
-    return { error: "That activity is already in this set." };
+  // The same activity twice would send the baton through identical
+  // steps — the database refuses it, and this says so first.
+  if (new Set(items.map((i) => i.activityId)).size !== items.length) {
+    return { error: "That activity is already in this type." };
+  }
+  for (const item of items) {
+    if (!Number.isInteger(item.expectedDays) || item.expectedDays < 1) {
+      return { error: "Each activity needs a whole number of days, at least 1." };
+    }
   }
 
   const supabase = await createClient();
@@ -714,19 +761,20 @@ export async function setTrailSetActivities(
     .from("pusher_trail_set_items")
     .delete()
     .eq("set_id", setId);
-  if (clearError) return { error: "Could not update this standard set." };
+  if (clearError) return { error: "Could not update this trail type." };
 
-  if (activityIds.length > 0) {
+  if (items.length > 0) {
     const { error } = await supabase.from("pusher_trail_set_items").insert(
-      activityIds.map((activityId, i) => ({
+      items.map((item, i) => ({
         set_id: setId,
-        activity_id: activityId,
+        activity_id: item.activityId,
+        expected_days: item.expectedDays,
         sort_order: (i + 1) * 10,
         created_by: user?.id,
         updated_by: user?.id,
       })),
     );
-    if (error) return { error: "Could not update this standard set." };
+    if (error) return { error: "Could not update this trail type." };
   }
 
   revalidatePath("/pusher/sets");

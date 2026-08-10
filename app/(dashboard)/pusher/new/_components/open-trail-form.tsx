@@ -14,15 +14,20 @@ import { DepartmentPicker } from "../../_components/department-picker";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-type Leg = { label: string; assigneeId: string; expectedDays: number };
+type Leg = { activityId: string; assigneeId: string; expectedDays: number };
 
-const BLANK_LEG: Leg = { label: "", assigneeId: "", expectedDays: 2 };
+const BLANK_LEG: Leg = { activityId: "", assigneeId: "", expectedDays: 2 };
 
 /**
- * Opening a trail. The whole design goal is thirty seconds for a repeat:
- * pick the activity, and its legs arrive prefilled from the last time
- * anyone ran it. Everything is editable before it opens; nothing is
- * editable behind the baton afterwards.
+ * Opening a trail.
+ *
+ * A trail is an ordered list of ACTIVITIES (0043), each with a person and
+ * a number of days — the leg IS the activity, so there is nothing to
+ * type. Pick a trail type and the whole list arrives, staffed from
+ * whoever last carried each activity; or build one activity at a time.
+ *
+ * Everything is editable before it opens. Nothing behind the baton is
+ * editable afterwards.
  */
 export function OpenTrailForm({
   projects,
@@ -30,44 +35,73 @@ export function OpenTrailForm({
   activities,
   departments,
   people,
-  prefills,
+  trailSets,
+  activityDefaults,
+  initialProjectId,
+  initialUnitId,
 }: {
   projects: { id: string; name: string }[];
   units: { id: string; name: string; project_id: string }[];
   activities: { id: string; name: string }[];
   departments: { id: string; name: string }[];
   people: { id: string; name: string }[];
-  /** Last run per activity — legs and departments — sent with the page so picking one is instant. */
-  prefills: Record<string, { legs: Leg[]; departmentIds: string[] }>;
+  /** The named trail types, each with its fixed activities in order. */
+  trailSets: {
+    id: string;
+    name: string;
+    activities: { activityId: string; activityName: string; expectedDays: number }[];
+  }[];
+  /** Per activity: who normally carries it and for how long. Sent up front so picking is instant. */
+  activityDefaults: Record<string, { assigneeId: string; expectedDays: number }>;
+  /** Set when the form is opened from a house, so the two pickers arrive answered. */
+  initialProjectId?: string;
+  initialUnitId?: string;
 }) {
   const router = useRouter();
-  const [projectId, setProjectId] = useState("");
-  const [unitId, setUnitId] = useState("");
-  const [activityId, setActivityId] = useState("");
+  const [projectId, setProjectId] = useState(initialProjectId ?? "");
+  const [unitId, setUnitId] = useState(initialUnitId ?? "");
+  const [trailSetId, setTrailSetId] = useState("");
   const [title, setTitle] = useState("");
-  const [legs, setLegs] = useState<Leg[]>([]);
+  const [legs, setLegs] = useState<Leg[]>([{ ...BLANK_LEG }]);
   const [departmentIds, setDepartmentIds] = useState<string[]>([]);
-  const [prefilled, setPrefilled] = useState(false);
+  const [startNow, setStartNow] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const projectUnits = units.filter((u) => u.project_id === projectId);
 
-  const pickActivity = (id: string) => {
-    setActivityId(id);
-    if (!id) {
-      setLegs([]);
-      setDepartmentIds([]);
-      setPrefilled(false);
-      return;
-    }
-    const previous = prefills[id];
-    const previousLegs = previous?.legs ?? [];
-    setLegs(previousLegs.length > 0 ? previousLegs.map((leg) => ({ ...leg })) : [{ ...BLANK_LEG }]);
-    // Departments prefill alongside the legs, for the same reason: a
-    // Fire NOC is the same two departments every time it runs.
-    setDepartmentIds(previous?.departmentIds ?? []);
-    setPrefilled(previousLegs.length > 0);
+  /** Picking a type replaces the whole list; picking none leaves it alone. */
+  const pickTrailSet = (id: string) => {
+    setTrailSetId(id);
+    if (!id) return;
+    const set = trailSets.find((s) => s.id === id);
+    if (!set || set.activities.length === 0) return;
+    setLegs(
+      set.activities.map((a) => ({
+        activityId: a.activityId,
+        // Whoever last carried this activity anywhere — better evidence
+        // than the last whole trail that happened to mention it.
+        assigneeId: activityDefaults[a.activityId]?.assigneeId ?? "",
+        expectedDays: a.expectedDays,
+      })),
+    );
+    if (!title) setTitle(set.name);
+  };
+
+  /** Choosing an activity fills in who normally does it, and for how long. */
+  const pickActivityForLeg = (index: number, activityId: string) => {
+    const preset = activityDefaults[activityId];
+    setLegs((current) =>
+      current.map((leg, i) =>
+        i === index
+          ? {
+              activityId,
+              assigneeId: leg.assigneeId || (preset?.assigneeId ?? ""),
+              expectedDays: preset?.expectedDays ?? leg.expectedDays,
+            }
+          : leg,
+      ),
+    );
   };
 
   const setLeg = (index: number, patch: Partial<Leg>) =>
@@ -79,11 +113,16 @@ export function OpenTrailForm({
       const result = await openTrail({
         projectId,
         unitId: unitId || null,
-        activityId,
+        // A one-step trail still has a single activity worth recording;
+        // anything longer has no one answer, and the column is nullable
+        // for exactly that reason.
+        activityId: legs.length === 1 ? legs[0].activityId : null,
+        trailSetId: trailSetId || null,
         title: title.trim() || null,
         note: null,
         legs,
         departmentIds,
+        start: startNow,
       });
       if (result.error) {
         setError(result.error);
@@ -134,17 +173,19 @@ export function OpenTrailForm({
         </div>
 
         <div>
-          <Label htmlFor="activity">Activity</Label>
+          <Label htmlFor="trail-type">
+            Trail type <span className="text-muted font-normal">(optional)</span>
+          </Label>
           <Select
-            id="activity"
+            id="trail-type"
             className="mt-1 w-full"
-            value={activityId}
-            onChange={(e) => pickActivity(e.target.value)}
+            value={trailSetId}
+            onChange={(e) => pickTrailSet(e.target.value)}
           >
-            <option value="">Choose…</option>
-            {activities.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
+            <option value="">Build it activity by activity</option>
+            {trailSets.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name} ({s.activities.length})
               </option>
             ))}
           </Select>
@@ -164,102 +205,120 @@ export function OpenTrailForm({
         </div>
       </div>
 
-      {!activityId ? (
-        <p className="text-muted border-border rounded-xl border border-dashed p-4 text-center text-sm">
-          Pick an activity — the legs from the last time anyone ran it will fill in here.
-        </p>
-      ) : (
-        <div className="space-y-3">
-          {prefilled && (
-            <p className="text-muted bg-background border-border rounded-xl border p-3 text-sm">
-              Legs filled in from the last run of{" "}
-              <b className="text-foreground font-semibold">
-                {activities.find((a) => a.id === activityId)?.name}
-              </b>
-              . Change anything before you open it.
-            </p>
-          )}
+      <div className="space-y-3">
+        {trailSetId && (
+          <p className="text-muted bg-background border-border rounded-xl border p-3 text-sm">
+            Filled in from{" "}
+            <b className="text-foreground font-semibold">
+              {trailSets.find((s) => s.id === trailSetId)?.name}
+            </b>
+            , with whoever last carried each activity. Change anything before you open it.
+          </p>
+        )}
 
-          <div>
-            <Label>Departments</Label>
-            <p className="text-muted mt-0.5 mb-2 text-xs">
-              Pick every department this touches — a trail can cross more than one.
-            </p>
-            <DepartmentPicker
-              departments={departments}
-              selected={departmentIds}
-              onChange={setDepartmentIds}
-            />
-          </div>
-
-          <div>
-            <Label>Legs — what happens, who does it, how many days</Label>
-            <div className="mt-2 space-y-2">
-              {legs.map((leg, i) => (
-                <div
-                  key={i}
-                  className="grid grid-cols-[1.5rem_1fr_2.5rem] items-center gap-2 sm:grid-cols-[1.5rem_minmax(0,1.4fr)_minmax(0,1fr)_4.5rem_2.5rem]"
-                >
-                  <span className="text-muted text-center font-mono text-xs">{i + 1}</span>
-                  <Input
-                    aria-label={`Leg ${i + 1} name`}
-                    placeholder="What happens here"
-                    value={leg.label}
-                    onChange={(e) => setLeg(i, { label: e.target.value })}
-                    className="col-span-2 sm:col-span-1"
-                  />
-                  <Select
-                    aria-label={`Leg ${i + 1} person`}
-                    value={leg.assigneeId}
-                    onChange={(e) => setLeg(i, { assigneeId: e.target.value })}
-                    className="col-start-2 sm:col-start-auto"
-                  >
-                    <option value="">Who?</option>
-                    {people.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </Select>
-                  <Input
-                    aria-label={`Leg ${i + 1} expected days`}
-                    type="number"
-                    min={1}
-                    step={1}
-                    value={leg.expectedDays}
-                    onChange={(e) => setLeg(i, { expectedDays: Number(e.target.value) })}
-                    className="text-center font-mono"
-                  />
-                  <IconButton
-                    aria-label={`Remove leg ${i + 1}`}
-                    tone="danger"
-                    onClick={() => setLegs((c) => c.filter((_, index) => index !== i))}
-                    disabled={legs.length === 1}
-                  >
-                    <X className="size-4" />
-                  </IconButton>
-                </div>
-              ))}
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="mt-2"
-              onClick={() => setLegs((c) => [...c, { ...BLANK_LEG }])}
-            >
-              <Plus className="size-4" /> Add a leg
-            </Button>
-          </div>
-
-          <FormMessage error={error} />
-
-          <div className="flex justify-end">
-            <Button onClick={submit} disabled={pending || legs.length === 0}>
-              {pending ? "Opening…" : "Open the trail"}
-            </Button>
-          </div>
+        <div>
+          <Label>Departments</Label>
+          <p className="text-muted mt-0.5 mb-2 text-xs">
+            Pick every department this touches — a trail can cross more than one.
+          </p>
+          <DepartmentPicker
+            departments={departments}
+            selected={departmentIds}
+            onChange={setDepartmentIds}
+          />
         </div>
-      )}
+
+        <div>
+          <Label>Activities — what happens, who does it, how many days</Label>
+          <div className="mt-2 space-y-2">
+            {legs.map((leg, i) => (
+              <div
+                key={i}
+                className="grid grid-cols-[1.5rem_1fr_2.5rem] items-center gap-2 sm:grid-cols-[1.5rem_minmax(0,1.4fr)_minmax(0,1fr)_4.5rem_2.5rem]"
+              >
+                <span className="text-muted text-center font-mono text-xs">{i + 1}</span>
+                <Select
+                  aria-label={`Step ${i + 1} activity`}
+                  value={leg.activityId}
+                  onChange={(e) => pickActivityForLeg(i, e.target.value)}
+                  className="col-span-2 sm:col-span-1"
+                >
+                  <option value="">Which activity?</option>
+                  {activities.map((a) => (
+                    <option
+                      key={a.id}
+                      value={a.id}
+                      // The same activity twice would send the baton
+                      // through identical steps; the action refuses it
+                      // and this stops it being offered in the first place.
+                      disabled={a.id !== leg.activityId && legs.some((l) => l.activityId === a.id)}
+                    >
+                      {a.name}
+                    </option>
+                  ))}
+                </Select>
+                <Select
+                  aria-label={`Step ${i + 1} person`}
+                  value={leg.assigneeId}
+                  onChange={(e) => setLeg(i, { assigneeId: e.target.value })}
+                  className="col-start-2 sm:col-start-auto"
+                >
+                  <option value="">Who?</option>
+                  {people.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </Select>
+                <Input
+                  aria-label={`Step ${i + 1} expected days`}
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={leg.expectedDays}
+                  onChange={(e) => setLeg(i, { expectedDays: Number(e.target.value) })}
+                  className="text-center font-mono"
+                />
+                <IconButton
+                  aria-label={`Remove step ${i + 1}`}
+                  tone="danger"
+                  onClick={() => setLegs((c) => c.filter((_, index) => index !== i))}
+                  disabled={legs.length === 1}
+                >
+                  <X className="size-4" />
+                </IconButton>
+              </div>
+            ))}
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mt-2"
+            onClick={() => setLegs((c) => [...c, { ...BLANK_LEG }])}
+          >
+            <Plus className="size-4" /> Add an activity
+          </Button>
+        </div>
+
+        <FormMessage error={error} />
+
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          {/* The queue, kept by the founder: lay a house's trail out
+                now and begin it when the site is actually ready. */}
+          <label className="text-muted flex cursor-pointer items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={startNow}
+              onChange={(e) => setStartNow(e.target.checked)}
+              className="accent-accent size-4"
+            />
+            Start it now
+          </label>
+          <Button onClick={submit} disabled={pending || legs.length === 0}>
+            {pending ? "Opening…" : startNow ? "Open the trail" : "Lay it out"}
+          </Button>
+        </div>
+      </div>
     </Card>
   );
 }

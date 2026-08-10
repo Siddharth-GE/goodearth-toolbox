@@ -246,13 +246,14 @@ export async function getLegsFor(chainIds: string[]): Promise<Map<string, Leg[]>
   const rows = await fetchAll<{
     chain_id: string;
     leg_no: number;
-    label: string;
+    activity_id: string;
+    label: string | null;
     assignee_id: string;
     expected_days: number;
   }>((from, to) =>
     supabase
       .from("pusher_chain_legs")
-      .select("chain_id, leg_no, label, assignee_id, expected_days")
+      .select("chain_id, leg_no, activity_id, label, assignee_id, expected_days")
       .in("chain_id", chainIds)
       .order("chain_id")
       .order("leg_no")
@@ -263,6 +264,7 @@ export async function getLegsFor(chainIds: string[]): Promise<Map<string, Leg[]>
     const list = byChain.get(row.chain_id) ?? [];
     list.push({
       leg_no: row.leg_no,
+      activity_id: row.activity_id,
       label: row.label,
       assignee_id: row.assignee_id,
       expected_days: row.expected_days,
@@ -315,14 +317,19 @@ export const getTrail = cache(async (chainId: string): Promise<TrailDetail | nul
   // need to be COMPLETE, because a missing event silently changes who the
   // holder is. fetchAll throws rather than answering with half a log.
   const [legRows, eventRows, names] = await Promise.all([
-    fetchAll<{ leg_no: number; label: string; assignee_id: string; expected_days: number }>(
-      (from, to) =>
-        supabase
-          .from("pusher_chain_legs")
-          .select("leg_no, label, assignee_id, expected_days")
-          .eq("chain_id", chainId)
-          .order("leg_no")
-          .range(from, to),
+    fetchAll<{
+      leg_no: number;
+      activity_id: string;
+      label: string | null;
+      assignee_id: string;
+      expected_days: number;
+    }>((from, to) =>
+      supabase
+        .from("pusher_chain_legs")
+        .select("leg_no, activity_id, label, assignee_id, expected_days")
+        .eq("chain_id", chainId)
+        .order("leg_no")
+        .range(from, to),
     ),
     fetchAll<Omit<ChainEvent, "kind"> & { kind: string }>((from, to) =>
       supabase
@@ -339,6 +346,7 @@ export const getTrail = cache(async (chainId: string): Promise<TrailDetail | nul
 
   const legs: Leg[] = legRows.map((l) => ({
     leg_no: l.leg_no,
+    activity_id: l.activity_id,
     label: l.label,
     assignee_id: l.assignee_id,
     expected_days: l.expected_days,
@@ -409,98 +417,99 @@ export async function listActivities(includeInactive = false) {
   return data ?? [];
 }
 
-export type PrefillLeg = { label: string; assigneeId: string; expectedDays: number };
-
-/** What a repeat of an activity starts from: its last run's legs and departments. */
-export type Prefill = { legs: PrefillLeg[]; departmentIds: string[] };
-
 /**
- * For every activity, the legs of the last trail anyone ran with it —
- * what a new trail prefills with, so opening a repeat is about thirty
- * seconds' work.
+ * What one activity normally looks like: who last carried it and how
+ * many days it was given.
  *
- * Computed for ALL activities in two queries and handed to the form up
- * front, rather than fetched per activity when the picker changes. There
- * are a couple of dozen activities at most, and this repo has already
- * learned that a Server Action is the wrong shape for a read (it
- * serialises per client and re-renders the route) — see the catalogue
- * route handler.
- *
- * Assignees who have since been switched off come back blank rather than
- * pre-chosen: the guard refuses to land a baton on a deactivated
- * account, so prefilling one would only produce a refusal at the last
- * step, on the screen furthest from the cause.
+ * The unit of prefill is the ACTIVITY, not the trail (0043). A trail is
+ * now a list of activities, so "who normally does the Fire NOC, and how
+ * long does it normally take" is the question worth answering — and the
+ * answer comes from the most recent LEG of that activity anywhere, which
+ * is far better evidence than the last whole trail that happened to
+ * mention it.
  */
-export async function getPrefillsByActivity(): Promise<Map<string, Prefill>> {
+export type ActivityDefault = { assigneeId: string; expectedDays: number };
+
+export async function getActivityDefaults(): Promise<Map<string, ActivityDefault>> {
   await requireTool("/pusher");
   const supabase = await createClient();
 
-  const [chains, people] = await Promise.all([
-    // Read through the state view, not pusher_chains, for one reason:
-    // is_queued. A queued trail has never run — its own legs are a copy
-    // of an earlier prefill — so letting it seed the next one would let a
-    // single edit made while queueing propagate to every future trail of
-    // that activity, with no run behind it to justify the change.
-    // Nullable all the way down: every column of a view comes back
-    // nullable from the type generator, so it is normalised right here at
-    // the read boundary rather than asserted away.
-    fetchAll<{ chain_id: string | null; activity_id: string | null; created_at: string | null }>(
-      (from, to) =>
-        supabase
-          .from("pusher_chain_state")
-          .select("chain_id, activity_id, created_at")
-          .eq("is_queued", false)
-          .order("created_at", { ascending: false })
-          .order("chain_id")
-          .range(from, to),
+  const [legs, people] = await Promise.all([
+    // Completeness matters: a missing leg means an activity silently
+    // prefills with the wrong person, which is worse than not at all.
+    fetchAll<{
+      activity_id: string;
+      assignee_id: string;
+      expected_days: number;
+      created_at: string;
+    }>((from, to) =>
+      supabase
+        .from("pusher_chain_legs")
+        .select("activity_id, assignee_id, expected_days, created_at")
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(from, to),
     ),
     listPeople(),
   ]);
 
-  // First row per activity wins — the list is already newest-first.
-  const latestByActivity = new Map<string, string>();
-  for (const chain of chains) {
-    if (!chain.activity_id || !chain.chain_id) continue;
-    if (!latestByActivity.has(chain.activity_id)) {
-      latestByActivity.set(chain.activity_id, chain.chain_id);
-    }
-  }
-
-  const chainIds = [...latestByActivity.values()];
-  const [legsByChain, deptRows] = await Promise.all([
-    getLegsFor(chainIds),
-    chainIds.length === 0
-      ? Promise.resolve([] as { chain_id: string; department_id: string }[])
-      : fetchAll<{ chain_id: string; department_id: string }>((from, to) =>
-          supabase
-            .from("pusher_chain_departments")
-            .select("chain_id, department_id")
-            .in("chain_id", chainIds)
-            .order("chain_id")
-            .range(from, to),
-        ),
-  ]);
-
-  const deptsByChain = new Map<string, string[]>();
-  for (const row of deptRows) {
-    deptsByChain.set(row.chain_id, [...(deptsByChain.get(row.chain_id) ?? []), row.department_id]);
-  }
-
   const active = new Set(people.map((p) => p.id));
+  const byActivity = new Map<string, ActivityDefault>();
 
-  return new Map(
-    [...latestByActivity].map(([activityId, chainId]) => [
-      activityId,
-      {
-        legs: (legsByChain.get(chainId) ?? []).map((leg) => ({
-          label: leg.label,
-          assigneeId: active.has(leg.assignee_id) ? leg.assignee_id : "",
-          expectedDays: leg.expected_days,
-        })),
-        departmentIds: deptsByChain.get(chainId) ?? [],
-      },
-    ]),
+  for (const leg of legs) {
+    if (byActivity.has(leg.activity_id)) continue;
+    byActivity.set(leg.activity_id, {
+      // Someone switched off comes back blank rather than pre-chosen:
+      // the guard refuses to land a baton on a deactivated account, so
+      // prefilling one only produces a refusal at the last step, on the
+      // screen furthest from the cause.
+      assigneeId: active.has(leg.assignee_id) ? leg.assignee_id : "",
+      expectedDays: leg.expected_days,
+    });
+  }
+
+  return byActivity;
+}
+
+/** Departments used by the last trail of a given type — prefilled like the legs. */
+export async function getDepartmentsByTrailSet(): Promise<Map<string, string[]>> {
+  await requireTool("/pusher");
+  const supabase = await createClient();
+
+  const chains = await fetchAll<{ chain_id: string | null; trail_set_id: string | null }>(
+    (from, to) =>
+      supabase
+        .from("pusher_chain_state")
+        .select("chain_id, trail_set_id")
+        .not("trail_set_id", "is", null)
+        .order("created_at", { ascending: false })
+        .order("chain_id")
+        .range(from, to),
   );
+
+  const latest = new Map<string, string>();
+  for (const c of chains) {
+    if (!c.trail_set_id || !c.chain_id) continue;
+    if (!latest.has(c.trail_set_id)) latest.set(c.trail_set_id, c.chain_id);
+  }
+
+  const chainIds = [...latest.values()];
+  if (chainIds.length === 0) return new Map();
+
+  const rows = await fetchAll<{ chain_id: string; department_id: string }>((from, to) =>
+    supabase
+      .from("pusher_chain_departments")
+      .select("chain_id, department_id")
+      .in("chain_id", chainIds)
+      .order("chain_id")
+      .range(from, to),
+  );
+
+  const byChain = new Map<string, string[]>();
+  for (const r of rows)
+    byChain.set(r.chain_id, [...(byChain.get(r.chain_id) ?? []), r.department_id]);
+
+  return new Map([...latest].map(([setId, chainId]) => [setId, byChain.get(chainId) ?? []]));
 }
 
 /** Projects and their units, for the "where does this trail live" picker. */
@@ -518,7 +527,7 @@ export async function getTrailFormOptions() {
     listActivities(),
     listDepartments(),
     listPeople(),
-    getPrefillsByActivity(),
+    getActivityDefaults(),
   ]);
 
   return {
@@ -529,7 +538,7 @@ export async function getTrailFormOptions() {
     people,
     // A plain object, not the Map: this crosses into a Client Component,
     // and React only serialises plain data as props.
-    prefills: Object.fromEntries(prefills) as Record<string, Prefill>,
+    activityDefaults: Object.fromEntries(prefills) as Record<string, ActivityDefault>,
   };
 }
 
@@ -710,7 +719,14 @@ export type TrailSet = {
   name: string;
   isActive: boolean;
   sortOrder: number;
-  activities: { itemId: string; activityId: string; activityName: string; sortOrder: number }[];
+  activities: {
+    itemId: string;
+    activityId: string;
+    activityName: string;
+    /** How long this step is given when the type is laid down. Editable after. */
+    expectedDays: number;
+    sortOrder: number;
+  }[];
 };
 
 /**
@@ -738,10 +754,16 @@ export async function listTrailSets(includeInactive = false): Promise<TrailSet[]
     // Completeness matters: an activity missing from a set is work that
     // silently never lands on a house, with nothing on screen to explain
     // the gap.
-    fetchAll<{ id: string; set_id: string; activity_id: string; sort_order: number }>((from, to) =>
+    fetchAll<{
+      id: string;
+      set_id: string;
+      activity_id: string;
+      sort_order: number;
+      expected_days: number;
+    }>((from, to) =>
       supabase
         .from("pusher_trail_set_items")
-        .select("id, set_id, activity_id, sort_order")
+        .select("id, set_id, activity_id, sort_order, expected_days")
         .order("id")
         .range(from, to),
     ),
@@ -767,6 +789,7 @@ export async function listTrailSets(includeInactive = false): Promise<TrailSet[]
         itemId: i.id,
         activityId: i.activity_id,
         activityName: nameById.get(i.activity_id) ?? "—",
+        expectedDays: i.expected_days,
         sortOrder: i.sort_order,
       })),
   }));

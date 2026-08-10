@@ -1,11 +1,20 @@
 import { PageTitle } from "@/components/ui/page-title";
-import { getTrailFormOptions } from "@/lib/pusher/queries";
+import { getTrailFormOptions, listTrailSets } from "@/lib/pusher/queries";
 
 import { PusherNav } from "../_components/pusher-nav";
 import { OpenTrailForm } from "./_components/open-trail-form";
 
-export default async function OpenTrailPage() {
-  const options = await getTrailFormOptions();
+export default async function OpenTrailPage({
+  searchParams,
+}: {
+  // Set when this is reached from a house, so both pickers arrive answered.
+  searchParams: Promise<{ project?: string; unit?: string }>;
+}) {
+  const [options, params, trailSets] = await Promise.all([
+    getTrailFormOptions(),
+    searchParams,
+    listTrailSets(),
+  ]);
 
   return (
     <div className="space-y-5">
@@ -22,7 +31,10 @@ export default async function OpenTrailPage() {
         activities={options.activities}
         departments={options.departments}
         people={options.people}
-        prefills={options.prefills}
+        trailSets={trailSets}
+        activityDefaults={options.activityDefaults}
+        initialProjectId={params.project}
+        initialUnitId={params.unit}
       />
     </div>
   );

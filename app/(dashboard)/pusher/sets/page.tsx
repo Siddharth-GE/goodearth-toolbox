@@ -24,8 +24,8 @@ export default async function TrailSetsPage() {
   return (
     <div className="space-y-5">
       <PageTitle
-        title="Standard sets"
-        description="The trails a house normally runs, ready to lay down in one click."
+        title="Trail types"
+        description="A named trail with its activities fixed — ready to lay down on a house in one click."
       />
       <PusherNav active="sets" />
 
@@ -36,8 +36,8 @@ export default async function TrailSetsPage() {
       {sets.length === 0 ? (
         <EmptyState
           icon={Layers}
-          title="No standard sets yet"
-          description="Build one from the activities you already have — the drawing approvals, the NOCs, the handover — and every new house can start from it."
+          title="No trail types yet"
+          description="Build one from the activities you already have — the drawing approvals, the NOCs, the handover — in the order they happen. Every new house can then start from it."
         />
       ) : (
         <div className="space-y-4">

@@ -10,7 +10,7 @@ export function PusherNav({ active }: { active: string }) {
         { key: "projects", href: "/pusher/projects", label: "Projects" },
         { key: "court", href: "/pusher/court", label: "Your court" },
         { key: "trails", href: "/pusher/trails", label: "All trails" },
-        { key: "sets", href: "/pusher/sets", label: "Standard sets" },
+        { key: "sets", href: "/pusher/sets", label: "Trail types" },
         { key: "activities", href: "/pusher/activities", label: "Activities" },
       ]}
     />
