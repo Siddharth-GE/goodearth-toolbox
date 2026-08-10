@@ -98,6 +98,26 @@ screen that deserves delight (a successful save, a completed action).
 Don't add a second one to the same flow, and don't add motion anywhere
 else "to make it feel nice" — restraint is the point.
 
+**Pusher is the one stated exception, and it stays one.** In that tool
+moving a baton _is_ the product, and the reward for moving it is the
+adoption strategy — a relay nobody enjoys opening tracks nothing. So
+Pusher gets four keyframes of its own (`pusher-breathe`,
+`pusher-float`, `pusher-banner`, `pusher-confetti`), all namespaced,
+all confined to `app/(dashboard)/pusher/`. The one worth copying is
+`pusher-breathe`: a stuck trail **breathes rather than blinks**, because
+the signal has to be unmissable _and_ calm — an alarm that fires on a
+third of the board every morning is an alarm everyone learns to ignore.
+Don't extend this licence to another tool without the same argument.
+
+**`prefers-reduced-motion` is honoured globally** (bottom of
+`globals.css`), and it covers every tool, not just Pusher: someone who
+has asked their operating system for stillness gets it. Confetti, the
+banner and the points float are skipped outright rather than merely
+shortened; the toast still appears, because they should still learn the
+push worked. The one opt-out is `Spinner`, via the
+`spinner-keeps-turning` class — a spinner that stops looks like a broken
+page, and it is a functional signal rather than decoration.
+
 ## Loading states
 
 `Spinner` (`components/ui/spinner.tsx`) — a large spinning ring in the

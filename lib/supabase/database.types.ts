@@ -1914,6 +1914,64 @@ export type Database = {
           },
         ]
       }
+      project_stages: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          project_id: string
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+          weeks: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          project_id: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+          weeks: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          project_id?: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+          weeks?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_stages_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_stages_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_stages_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           code: string | null
@@ -2210,6 +2268,500 @@ export type Database = {
             columns: ["vendor_id"]
             isOneToOne: false
             referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pusher_activities: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pusher_activities_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pusher_activities_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pusher_chain_departments: {
+        Row: {
+          chain_id: string
+          created_at: string
+          created_by: string | null
+          department_id: string
+          id: string
+        }
+        Insert: {
+          chain_id: string
+          created_at?: string
+          created_by?: string | null
+          department_id: string
+          id?: string
+        }
+        Update: {
+          chain_id?: string
+          created_at?: string
+          created_by?: string | null
+          department_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pusher_chain_departments_chain_id_fkey"
+            columns: ["chain_id"]
+            isOneToOne: false
+            referencedRelation: "pusher_chain_state"
+            referencedColumns: ["chain_id"]
+          },
+          {
+            foreignKeyName: "pusher_chain_departments_chain_id_fkey"
+            columns: ["chain_id"]
+            isOneToOne: false
+            referencedRelation: "pusher_chains"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pusher_chain_departments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pusher_chain_departments_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "pusher_departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pusher_chain_events: {
+        Row: {
+          actor_id: string
+          chain_id: string
+          from_leg: number | null
+          id: string
+          kind: string
+          note: string | null
+          occurred_at: string
+          reason: string | null
+          seq: number
+          to_assignee_id: string | null
+          to_expected_days: number | null
+          to_leg: number | null
+        }
+        Insert: {
+          actor_id?: string
+          chain_id: string
+          from_leg?: number | null
+          id?: string
+          kind: string
+          note?: string | null
+          occurred_at?: string
+          reason?: string | null
+          seq?: number
+          to_assignee_id?: string | null
+          to_expected_days?: number | null
+          to_leg?: number | null
+        }
+        Update: {
+          actor_id?: string
+          chain_id?: string
+          from_leg?: number | null
+          id?: string
+          kind?: string
+          note?: string | null
+          occurred_at?: string
+          reason?: string | null
+          seq?: number
+          to_assignee_id?: string | null
+          to_expected_days?: number | null
+          to_leg?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pusher_chain_events_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pusher_chain_events_chain_id_fkey"
+            columns: ["chain_id"]
+            isOneToOne: false
+            referencedRelation: "pusher_chain_state"
+            referencedColumns: ["chain_id"]
+          },
+          {
+            foreignKeyName: "pusher_chain_events_chain_id_fkey"
+            columns: ["chain_id"]
+            isOneToOne: false
+            referencedRelation: "pusher_chains"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pusher_chain_events_to_assignee_id_fkey"
+            columns: ["to_assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pusher_chain_legs: {
+        Row: {
+          assignee_id: string
+          chain_id: string
+          created_at: string
+          created_by: string | null
+          expected_days: number
+          id: string
+          label: string
+          leg_no: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          assignee_id: string
+          chain_id: string
+          created_at?: string
+          created_by?: string | null
+          expected_days: number
+          id?: string
+          label: string
+          leg_no: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          assignee_id?: string
+          chain_id?: string
+          created_at?: string
+          created_by?: string | null
+          expected_days?: number
+          id?: string
+          label?: string
+          leg_no?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pusher_chain_legs_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pusher_chain_legs_chain_id_fkey"
+            columns: ["chain_id"]
+            isOneToOne: false
+            referencedRelation: "pusher_chain_state"
+            referencedColumns: ["chain_id"]
+          },
+          {
+            foreignKeyName: "pusher_chain_legs_chain_id_fkey"
+            columns: ["chain_id"]
+            isOneToOne: false
+            referencedRelation: "pusher_chains"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pusher_chain_legs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pusher_chain_legs_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pusher_chain_links: {
+        Row: {
+          chain_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          label: string
+          target_id: string
+          target_kind: string
+        }
+        Insert: {
+          chain_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          label: string
+          target_id: string
+          target_kind: string
+        }
+        Update: {
+          chain_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          label?: string
+          target_id?: string
+          target_kind?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pusher_chain_links_chain_id_fkey"
+            columns: ["chain_id"]
+            isOneToOne: false
+            referencedRelation: "pusher_chain_state"
+            referencedColumns: ["chain_id"]
+          },
+          {
+            foreignKeyName: "pusher_chain_links_chain_id_fkey"
+            columns: ["chain_id"]
+            isOneToOne: false
+            referencedRelation: "pusher_chains"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pusher_chain_links_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pusher_chains: {
+        Row: {
+          activity_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          note: string | null
+          project_id: string
+          project_stage_id: string | null
+          title: string | null
+          unit_id: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          activity_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          project_id: string
+          project_stage_id?: string | null
+          title?: string | null
+          unit_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          activity_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          project_id?: string
+          project_stage_id?: string | null
+          title?: string | null
+          unit_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pusher_chains_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "pusher_activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pusher_chains_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pusher_chains_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pusher_chains_project_id_unit_id_fkey"
+            columns: ["project_id", "unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["project_id", "id"]
+          },
+          {
+            foreignKeyName: "pusher_chains_project_stage_fkey"
+            columns: ["project_id", "project_stage_id"]
+            isOneToOne: false
+            referencedRelation: "project_stages"
+            referencedColumns: ["project_id", "id"]
+          },
+          {
+            foreignKeyName: "pusher_chains_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pusher_chains_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pusher_departments: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pusher_departments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pusher_departments_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pusher_project_plans: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          project_id: string
+          start_date: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          project_id: string
+          start_date: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          project_id?: string
+          start_date?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pusher_project_plans_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pusher_project_plans_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pusher_project_plans_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -3326,6 +3878,80 @@ export type Database = {
           },
         ]
       }
+      pusher_chain_state: {
+        Row: {
+          activity_id: string | null
+          activity_name: string | null
+          chain_id: string | null
+          created_at: string | null
+          current_leg: number | null
+          days_in_leg: number | null
+          department_ids: string[] | null
+          department_names: string[] | null
+          entered_at: string | null
+          expected_days: number | null
+          holder_id: string | null
+          is_finished: boolean | null
+          is_stuck: boolean | null
+          last_kind: string | null
+          last_seq: number | null
+          leg_count: number | null
+          planned_days: number | null
+          project_code: string | null
+          project_id: string | null
+          project_name: string | null
+          project_stage_id: string | null
+          project_start_date: string | null
+          started_at: string | null
+          title: string | null
+          unit_id: string | null
+          unit_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pusher_chain_events_to_assignee_id_fkey"
+            columns: ["holder_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pusher_chains_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "pusher_activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pusher_chains_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pusher_chains_project_id_unit_id_fkey"
+            columns: ["project_id", "unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["project_id", "id"]
+          },
+          {
+            foreignKeyName: "pusher_chains_project_stage_fkey"
+            columns: ["project_id", "project_stage_id"]
+            isOneToOne: false
+            referencedRelation: "project_stages"
+            referencedColumns: ["project_id", "id"]
+          },
+          {
+            foreignKeyName: "pusher_chains_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock_by_location: {
         Row: {
           item_id: string | null
@@ -3458,6 +4084,10 @@ export type Database = {
         Args: { p_selection_id: string }
         Returns: undefined
       }
+      hand_baton: {
+        Args: { p_chain_id: string; p_note: string; p_to_user: string }
+        Returns: undefined
+      }
       has_app: { Args: { slug: string }; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
       issue_selection: { Args: { p_selection_id: string }; Returns: undefined }
@@ -3493,8 +4123,27 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      open_chain: {
+        Args: {
+          p_activity_id: string
+          p_legs: Json
+          p_note: string
+          p_project_id: string
+          p_title: string
+          p_unit_id: string
+        }
+        Returns: string
+      }
       profile_is_active: { Args: { uid: string }; Returns: boolean }
       reopen_budget: { Args: { p_budget_id: string }; Returns: undefined }
+      replace_future_legs: {
+        Args: { p_chain_id: string; p_legs: Json }
+        Returns: undefined
+      }
+      set_chain_departments: {
+        Args: { p_chain_id: string; p_department_ids: string[] }
+        Returns: undefined
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       stock_qty_on_hand: {

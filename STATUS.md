@@ -11,18 +11,30 @@ rules in `CLAUDE.md`; full history in git. Stays lean by design.
 Purchase Orders → Inventory → Bills, the last merged 2026-08-04 after
 the founder's browser gates and the single-grant probe smoke). The
 chain runs design → price → indent → PO → goods in / stock / goods
-out → bill → paid. **Next: Phase 9** — Overview fully real + one real
-project run end-to-end.
+out → bill → paid.
 
-|                    |                                                                                                                         |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
-| Last worked        | 2026-08-10                                                                                                              |
-| Branch             | `master` — clean                                                                                                        |
-| Migrations applied | `0001`–`0035` (next is `0036`)                                                                                          |
-| Items in database  | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands                                          |
-| Thumbnails         | 897 in Supabase Storage; 1,736 items use the colour placeholder                                                         |
-| Built tools        | Marathon, Settings, Masters, Selections, Budgets (Interiors + Construction), Indents, Purchase Orders, Inventory, Bills |
-| Tests              | `npm test` — 136, all pure logic                                                                                        |
+**Pusher is built through the project schedule** on
+`feature/pusher-relay` (**PR #2, CI green, NOT merged**): the relay,
+departments (many per trail), and a per-project overview whose dates are
+all calculated. It is **waiting on the founder's browser pass** — see
+TODO.md, which opens with that. **Next after the merge:** unit-level
+stages rolling up into the project picture, then the leaderboard, then
+links + Google Chat.
+
+Note for a cold start: migrations `0036`–`0040` are **already applied to
+the live database**, so schema is in step with production and only the
+code is unmerged. The branch's test data has been cleared and the probe
+account put back to `/inventory`.
+
+|                    |                                                                                                                                 |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| Last worked        | 2026-08-10                                                                                                                      |
+| Branch             | `feature/pusher-relay` — built, CI green, PR #2 open, not merged                                                                |
+| Migrations applied | `0001`–`0040` (next is `0041`)                                                                                                  |
+| Items in database  | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands                                                  |
+| Thumbnails         | 897 in Supabase Storage; 1,736 items use the colour placeholder                                                                 |
+| Built tools        | Marathon, Settings, Masters, Selections, Budgets (Interiors + Construction), Indents, Purchase Orders, Inventory, Bills, Pusher |
+| Tests              | `npm test` — 186, all pure logic                                                                                                |
 
 ## Next up
 
@@ -50,6 +62,35 @@ project run end-to-end.
 
 ## Decisions locked in
 
+- **Pusher replaces Project Management and Design Management** (founder,
+  2026-08-10). One module is the whole design- and project-management
+  layer; both stubs are deleted, their slugs left inert in the CHECKs.
+  UI keeps the shared nouns **Project** and **Unit** — a villa must not
+  be a "Unit" in Selections and a "Territory" here — and uses game words
+  only for Pusher's own ideas (trail, baton, leg, cold, flow). Code and
+  data speak plainly throughout: chain, leg, stuck, points.
+- **Pusher dates are worked out, never typed** (founder, 2026-08-10).
+  The only stored inputs are a project's start date and each stage's
+  length in weeks; every date on screen is calculated on read. Inserting
+  a stage moves every later date by itself, and no two dates can
+  contradict each other. **A trail can be in several departments at
+  once** — cross-department is the normal case, so it is a join table.
+- **Pusher's event log IS its state.** No status column, no stored
+  holder, no stored points — all derived by replay. Events snapshot the
+  assignee and expected days at the moment the baton lands, which is what
+  stops a leg edit rewriting whether a past push was on time, and what
+  lets the guard rule on a new event from the last event row alone.
+  Bouncing is rewarded (+5) and never punished; it is impossible without
+  a reason and a note, at the database. Expected days are whole days,
+  because elapsed time is counted in **IST calendar days**.
+- **A queued trail has no clock** (founder, 2026-08-10; designed, not yet
+  built — see TODO.md). Standard trails laid down on a house arrive
+  dormant and go live only when someone starts them. "Not started" is
+  derived, not stored: a queued trail has **no events yet**, which is why
+  this costs no status column. Opening a whole set live would start every
+  clock at once and turn each house solid cold within a fortnight, on
+  work nobody meant to begin — and a cold signal that cries wolf is worth
+  nothing.
 - One `items` table for products and materials, split by `kind`.
 - Prices are **snapshotted onto lines at pick time**; master edits
   never rewrite existing lines. Same principle for PO `gst_pct`.
@@ -164,6 +205,17 @@ project run end-to-end.
   service-role key). Its `@goodearth.test` domain is not real, so
   password-recovery and magic-link emails can never arrive — the
   dashboard's user menu only offers those, and won't get you in.
+- **The probe smoke DID run on 2026-08-10**, twice — the password reset
+  via the auth admin API was not blocked this time, unlike the two
+  sessions before it. So the block is not permanent; try it before
+  assuming a browser pass is impossible. Both runs drove the local
+  production build as a `/pusher`-only user.
+- A three-line Node script that POSTs a `.sql` file to the management
+  API's `/database/query` is the whole migration workflow; keep it in the
+  session scratchpad. Two traps when generating SQL through JavaScript:
+  `String.replace` treats `$$` in the replacement as an escape and will
+  silently turn `do $$` into `do $`, and `LIKE 'pusher_%dept%'` is not a
+  reliable way to check a table list.
 - Pre-push smoke: Playwright installed in the session scratchpad,
   `npm run build && npm start`, drive localhost as the probe user
   (reset its password via the auth admin API; never stored).
@@ -187,6 +239,88 @@ project run end-to-end.
 
 One line per day; full detail in git history and the PLAN.md files.
 
+- **2026-08-10 (Pusher — two fixes from the founder's browser test)** —
+  same branch, no migration. The founder opened two trails on Saarang
+  Villa 6, one under Design and one under Construction, finished the
+  Construction one, and the progress bar grew **from the left edge**,
+  painting over a Design stage where nothing had happened. The number was
+  right and the picture was a lie: `actualPct` weights each stage by its
+  length — deliberately, so a 40-week stage moves it more than a 1-week
+  one — and the SVG then drew that weighted total as one bar starting at
+  x=0. **The rule this establishes: a weighted total is a number, not a
+  position — never draw one as a bar growing from the left.** Each stage
+  now fills inside its own block, so Construction reads as moving while
+  Design reads as untouched; nothing in `schedule.ts` changed and all 15
+  of its tests passed unedited, which is the tell that the maths was
+  never the problem. The trap is waiting for the leaderboard and the
+  Dashboard, so it is written into Pusher's PLAN.md. Second fix: **Pusher
+  opens on Projects**, then Your court, then All trails — `/pusher`
+  redirects to `/pusher/projects` and the court moves to `/pusher/court`,
+  the same shape `/masters` already uses. "Your court" keeps its name
+  (founder's call — court is one of Pusher's own game words, and the
+  empty state already says "Court cleared").
+- **2026-08-10 (Pusher — departments and the project schedule)** — same
+  branch, migrations `0038`–`0040` applied. The founder added two things
+  to the relay. **Departments**, with the correction that makes the
+  design: "a trail can be cross department as well" — so it is a
+  many-to-many join, not a column, because a selections handoff really is
+  Design _and_ Purchase and a single department would force a lie on
+  exactly the trails worth watching. They prefill from the activity's
+  last run alongside the legs, sit on the state view as arrays so
+  "every cold Design trail" is one server-side filter, and freeze when a
+  trail finishes. Six seeded, all renameable. **The project schedule**,
+  where the founder chose "dates are worked out, never typed": the only
+  stored inputs are a project's start date and each stage's length in
+  weeks, and every date on screen is calculated on read. Stretch Design
+  from 10 weeks to 20 and Approvals, Construction and Handover all move
+  by themselves; two dates can never contradict each other. The overview
+  compares work done (weighted by stage length, with partial credit for a
+  stage in progress) against plan elapsed — the gap is the slip — and
+  calls out trails filed under no stage rather than letting them count
+  for nothing silently. 15 new tests on the calculation.
+  **Two bugs the browser found and nothing else would have:** `0039`
+  attached `audit_row()` to a table with no `id` column, so every write
+  to it raised and no schedule could be saved at all — it typechecks, it
+  builds, the SQL is valid (`0040` adds the surrogate id, the 0018/0031
+  precedent); and `router.refresh()` inside a `useTransition` left
+  `isPending` true on a form that stays mounted, greying out the whole
+  schedule editor permanently. A sweep confirmed no other audited table
+  lacks an `id`. Note for whoever reads this next: the Playwright script
+  kept asserting faster than the page could redraw, so four of its checks
+  read as failures — each was verified correct directly against the
+  database instead. Trust the database check, not that script's tail.
+- **2026-08-10 (Pusher Phase 1 — the relay)** — built on
+  `feature/pusher-relay`, migrations `0036`–`0037` applied. The founder
+  brought a concept and a working mockup for **Pusher**, and it
+  supersedes two planned Management tools: it is the whole design- and
+  project-management layer, one module. A trail is a task with ordered
+  legs, each a person plus expected days; the baton sits with one person
+  who can push, bounce (reason + note mandatory) or finish it. Past its
+  expected days it goes **cold**, loudly, everywhere.
+  **The event log is the state** — every guard rule, and the ability to
+  rule on a new event from the last event row alone, falls out of events
+  snapshotting the assignee and expected days when the baton lands. All
+  18 guard rules were exercised against the live database in a rolled-back
+  transaction before a line of app code was written: a non-holder cannot
+  push, a stale `from_leg` is refused by name, a bounce with no reason or
+  a whitespace note is impossible, the log cannot be edited or deleted
+  even by the owner, and the current leg cannot be restretched.
+  Four pure modules (`day`, `events`, `chain`, `points`) carry 35 of the
+  tests; `day.ts` exists because Vercel and Postgres run UTC and the
+  office is +05:30, which is wrong in the _other_ direction for five and
+  a half hours of every day. **Driving the running app found three things
+  no test would have:** the route SVG was stretched into flat ellipses,
+  the leg list read across instead of down, and — the serious one —
+  `revalidatePath` left the mover's own page showing the old leg after a
+  successful push, now fixed with `router.refresh()` on every write.
+  A single-grant probe smoke (30 checks, `/pusher` only) passed against
+  the production build, including both bounce refusals, the full
+  push/bounce/push/push/finish relay and no sideways scroll at 390px.
+  DESIGN.md gains Pusher as its **one stated motion exception** (a stuck
+  trail breathes rather than blinks) and, with it, the app's first
+  `prefers-reduced-motion` guard — which covers every tool, not just this
+  one. Phases 2–4 (stages and the map, the leaderboard, links + Google
+  Chat) are in TODO.md.
 - **2026-08-10 (independence audit — kernel failure modes)** — audited
   the whole repo against the toolbox doctrine; merged to `master` (PR #1)
   after the founder reproduced the redirect loop on production and

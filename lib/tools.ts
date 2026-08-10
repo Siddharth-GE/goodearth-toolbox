@@ -1,8 +1,6 @@
 import {
   Boxes,
   ClipboardList,
-  Compass,
-  FolderKanban,
   Footprints,
   GraduationCap,
   Handshake,
@@ -12,6 +10,7 @@ import {
   Palette,
   PiggyBank,
   Receipt,
+  Route,
   Settings as SettingsIcon,
   ShoppingCart,
   Target,
@@ -27,8 +26,6 @@ import {
 export const TOOL_ICONS = {
   Boxes,
   ClipboardList,
-  Compass,
-  FolderKanban,
   Footprints,
   GraduationCap,
   Handshake,
@@ -37,6 +34,7 @@ export const TOOL_ICONS = {
   Palette,
   PiggyBank,
   Receipt,
+  Route,
   Settings: SettingsIcon,
   ShoppingCart,
   Target,
@@ -154,27 +152,23 @@ export const TOOLS: Tool[] = [
     group: "Admin",
     built: true,
   },
+  // Pusher is the whole design-management AND project-management layer:
+  // it replaced both of those planned tools rather than sitting beside
+  // them. Their slugs stay in the database CHECKs (0036 §1 says why) but
+  // nothing links to them any more.
+  {
+    name: "Pusher",
+    description: "Who is holding each task, and for how long.",
+    href: "/pusher",
+    icon: "Route",
+    group: "Management",
+    built: true,
+  },
   {
     name: "Dashboard",
     description: "One leadership view across projects, money and people.",
     href: "/management-dashboard",
     icon: "LayoutDashboard",
-    group: "Management",
-    built: false,
-  },
-  {
-    name: "Project Management",
-    description: "Track every project's schedule, milestones and health.",
-    href: "/project-management",
-    icon: "FolderKanban",
-    group: "Management",
-    built: false,
-  },
-  {
-    name: "Design Management",
-    description: "Design revisions, drawings and approvals in one place.",
-    href: "/design-management",
-    icon: "Compass",
     group: "Management",
     built: false,
   },
