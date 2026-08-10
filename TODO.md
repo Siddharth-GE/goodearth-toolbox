@@ -4,10 +4,24 @@ Read `STATUS.md` first. Phase 9 (Overview fully real + one real project
 run end to end) still has no approved plan; this file gets one when the
 founder approves it.
 
-## Right now: nothing in flight
+## Right now: Business Planning, awaiting the browser pass
 
-Relay is merged and live through standard trails. The next build is the
-first item below. One thing to watch when real work starts landing:
+Built on `feature/business-planning`, migration `0048` applied, CI
+green, pushed for a preview. What the founder needs to do before it can
+merge: grant themselves the tool in Settings, build a plan (the checklist
+is in the session's hand-off), and check the ₹ Cr figures against
+`Vihara_BusinessPlan_JV.xlsx` side by side. Then the single-grant probe
+smoke, then merge and delete the branch.
+
+**One finding to confirm with the founder, because it changes a number
+they have been quoting:** the workbook's "peak funding" of ₹5.91 Cr is
+`-MIN(closing cash)` and comes out negative — the cash never goes below
+zero. That is ₹5.91 Cr of headroom at the worst month, not money to
+raise. The tool reports peak funding as zero and shows the trough
+separately. See `app/(dashboard)/business-planning/PLAN.md`.
+
+After it merges, Relay is the next build. One thing to watch when real
+work starts landing:
 a trail's unfinished activities count in the project picture as
 planned-but-not-done, so a house with a full villa trail reads further
 behind. The founder has seen this and accepted it; revisit only if it
@@ -48,11 +62,16 @@ and what will bite.
 
 ## Management group — plan one tool at a time
 
-Four Management stubs remain (sidebar + homepage vision cards). Each
+Three Management stubs remain (sidebar + homepage vision cards). Each
 gets its own planning session with the founder before any code:
-Dashboard, Client Relations, Financial Management, Business Planning. No
-order agreed yet — ask which comes first. (Project Management and Design
-Management are gone: Relay is that layer.)
+Dashboard, Client Relations, Financial Management. No order agreed yet —
+ask which comes first. (Project Management and Design Management are
+gone: Relay is that layer. Business Planning is built.)
+
+Wanted later on Business Planning, none of it asked for yet: a one-page
+PDF of a plan; itemised charge and running-cost lines on a HOLD line
+(the plan-level costs are already itemised); a cash curve, which by
+DESIGN.md would be hand-rolled inline SVG rather than a chart library.
 
 ## Smaller, any session
 

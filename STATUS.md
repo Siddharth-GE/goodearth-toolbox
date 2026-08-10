@@ -22,18 +22,27 @@ Every project is born with the eight default stages over three years.
 **Next:** unit-level stages rolling up into the project picture, then
 the leaderboard, then links + Google Chat.
 
-Note for a cold start: the probe account holds `/inventory`, not
-`/relay`. Nothing is in flight.
+**Business Planning is built and awaiting the founder's browser pass**
+(`feature/business-planning`, migration `0048`). The founder's
+`Vihara_BusinessPlan_JV.xlsx` as a tool: a plan is a set of LINES —
+SALE ones you build and sell, HOLD ones you build and keep earning
+from — plus what the whole project owns, with a pure engine that
+recalculates as you type. Verified figure-for-figure against the
+workbook (PBT ₹26.66 Cr at 22.2%; senior living HOLD at 17.92% IRR).
+Completely independent: no foreign key to any other tool.
 
-|                    |                                                                                                                                |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| Last worked        | 2026-08-10                                                                                                                     |
-| Branch             | `master` — Relay merged and deployed; nothing in flight                                                                        |
-| Migrations applied | `0001`–`0047` (next is `0048`)                                                                                                 |
-| Items in database  | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands                                                 |
-| Thumbnails         | 897 in Supabase Storage; 1,736 items use the colour placeholder                                                                |
-| Built tools        | Marathon, Settings, Masters, Selections, Budgets (Interiors + Construction), Indents, Purchase Orders, Inventory, Bills, Relay |
-| Tests              | `npm test` — 186, all pure logic                                                                                               |
+Note for a cold start: the probe account holds `/inventory`, not
+`/relay` or `/business-planning`.
+
+|                    |                                                                                                                                                   |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Last worked        | 2026-08-10                                                                                                                                        |
+| Branch             | `feature/business-planning` — built, CI green, awaiting the founder's browser pass                                                                |
+| Migrations applied | `0001`–`0048` (next is `0049`)                                                                                                                    |
+| Items in database  | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands                                                                    |
+| Thumbnails         | 897 in Supabase Storage; 1,736 items use the colour placeholder                                                                                   |
+| Built tools        | Marathon, Settings, Masters, Selections, Budgets (Interiors + Construction), Indents, Purchase Orders, Inventory, Bills, Relay, Business Planning |
+| Tests              | `npm test` — 233, all pure logic                                                                                                                  |
 
 ## Next up
 
@@ -253,6 +262,35 @@ Entries before 2026-08-10 evening were written when Relay was called
 the applied migrations still say pusher, and the tables always will —
 `0047` records why renaming them was refused.
 
+- **2026-08-10 (Business Planning)** — the founder handed over
+  `Vihara_BusinessPlan_JV.xlsx`, thirteen sheets of eco-village
+  feasibility, and asked for it as a tool "for quick plans". Its own
+  Guide sheet said to reuse it by cloning the file per village, which is
+  the spreadsheet problem this toolbox exists to end. Shape set by the
+  founder in one sentence: **a plan is a set of LINES** — row house,
+  plotted, apartment, commercial, senior living — each with its own land,
+  revenues, expenses and velocity-driven interest, some projects one
+  thing and some a mix, collated in a summary, and **"keep this app
+  simple and independent completely"**. Two line kinds cover all five:
+  SALE and HOLD. Migration `0048`: one table, the whole document as jsonb,
+  SELECT grant-gated the way Budgets guards money, and **no foreign key
+  outside `profiles`** — independence taken literally, so a plan can be
+  for land nobody has bought.
+  The engine is pure and runs in the browser and on the server, so the
+  list page and the plan cannot show different numbers. **It reproduces
+  the workbook figure for figure** — PBT ₹26.66 Cr at 22.2%, the Base
+  construction of ₹39.43 Cr that is short because the last row houses
+  sell too late to finish inside six years, and the senior-living HOLD
+  verdict at 17.92% IRR — which is the acceptance test, since the
+  workbook was arrived at independently by hand.
+  **Four things the port found in the workbook**, each commented where it
+  differs: its "peak funding" of ₹5.91 Cr is `-MIN(closing cash)` and is
+  NEGATIVE — the cash never goes below zero, so that is headroom at the
+  worst month and nothing needs raising; its ex-SL block charges no
+  interest at all because Excel makes that a circular reference; its
+  collection convolution drops instalments past a fixed 31-month window;
+  and its Venture IRR reads 1150% and −52% off flows that open positive.
+  Awaiting the founder's browser pass.
 - **2026-08-10 (Relay, built and shipped in one day)** — merged in two
   PRs, migrations `0036`–`0047`. The founder brought a concept and a
   mockup; it supersedes the planned Project Management and Design

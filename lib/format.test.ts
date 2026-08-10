@@ -12,6 +12,7 @@ import { test } from "node:test";
 import {
   formatAmount,
   formatCount,
+  formatCrore,
   formatDate,
   formatLongDate,
   formatMoney,
@@ -97,4 +98,25 @@ test("times show hour and minute", () => {
 test("counts group without a currency symbol", () => {
   assert.equal(formatCount(2633), "2,633");
   assert.ok(!formatCount(2633).includes("₹"));
+});
+
+test("crore formatting picks the scale a plan is discussed at", () => {
+  // The three figures the founder reads off a business plan summary.
+  assert.equal(formatCrore(266_596_000), "₹26.66 Cr");
+  assert.equal(formatCrore(1_198_225_000), "₹119.82 Cr");
+  assert.equal(formatCrore(59_118_147.73), "₹5.91 Cr");
+
+  // Below a crore it steps down rather than rounding to ₹0.06 Cr.
+  assert.equal(formatCrore(1_250_000), "₹12.5 L");
+  // And below a lakh it stops abbreviating, where one decimal of a lakh
+  // would swallow the number whole.
+  assert.equal(formatCrore(4_500), "₹4,500");
+
+  // The sign goes before the symbol, the way a person writes it.
+  assert.equal(formatCrore(-59_118_147.73), "−₹5.91 Cr");
+
+  // Missing is a dash, not ₹0 Cr — same rule as formatMoney.
+  assert.equal(formatCrore(null), "—");
+  assert.equal(formatCrore(undefined), "—");
+  assert.equal(formatCrore(Number.NaN), "—");
 });

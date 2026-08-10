@@ -63,6 +63,50 @@ export function formatAmount(value: number | null | undefined): string {
   return Math.round(value).toLocaleString(LOCALE, { maximumFractionDigits: 0 });
 }
 
+/**
+ * Rupees at the scale a business plan is discussed in: `₹26.66 Cr`,
+ * `₹12.5 L`, `₹4,500`.
+ *
+ * Not a stylistic flourish. A development plan's figures run to ten
+ * digits, and `₹1,19,82,25,000` next to `₹1,29,77,74,045` is two numbers
+ * nobody can tell apart at a glance — which is the entire job of a
+ * summary. The founder's own workbook ends with a block headed "KEY
+ * OUTPUTS IN ₹ CRORE" for exactly this reason.
+ *
+ * Two decimals in crore (₹0.01 Cr is ₹1 lakh — the resolution a plan is
+ * actually decided at), one in lakh, and plain rupees below that, where
+ * rounding to "₹0.0 L" would lose the number entirely. Negatives keep
+ * their sign: `−₹5.91 Cr`. Missing is a dash, never `₹0 Cr`.
+ *
+ * Use this on summaries and headline figures. Line-item tables that must
+ * add up still use formatMoney — a column of rounded crore figures does
+ * not tally, and looking like it should is worse than being long.
+ */
+export function formatCrore(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "—";
+
+  const CRORE = 10_000_000;
+  const LAKH = 100_000;
+  const magnitude = Math.abs(value);
+  // The minus goes before the ₹, the way a person writes it, rather than
+  // inside the number where toLocaleString would put it.
+  const sign = value < 0 ? "−" : "";
+
+  if (magnitude >= CRORE) {
+    return `${sign}₹${(magnitude / CRORE).toLocaleString(LOCALE, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })} Cr`;
+  }
+  if (magnitude >= LAKH) {
+    return `${sign}₹${(magnitude / LAKH).toLocaleString(LOCALE, {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    })} L`;
+  }
+  return formatMoney(value);
+}
+
 // ---------------------------------------------------------------------
 // Quantities and percentages
 // ---------------------------------------------------------------------
