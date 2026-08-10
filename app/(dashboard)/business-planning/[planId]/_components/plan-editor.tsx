@@ -5,9 +5,11 @@ import { savePlan } from "@/lib/business-planning/actions";
 import type { PlanInputs, ScenarioIndex } from "@/lib/business-planning/inputs";
 import { runPlan } from "@/lib/business-planning/model";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CashflowTable } from "./cashflow-table";
 import { LinesTab } from "./lines-tab";
 import { SetupTab } from "./setup-tab";
 import { SummaryStrip } from "./summary-strip";
+import { SummaryTab } from "./summary-tab";
 
 /**
  * The plan editor: one client component that owns the whole document.
@@ -117,10 +119,15 @@ export function PlanEditor({ planId, initial }: { planId: string; initial: PlanI
         saveState={saveState}
       />
 
+      {/* Radix Tabs, not NavTabs: switching panels must not navigate.
+          A round trip between changing an assumption and seeing the
+          answer is the thing this tool exists to remove. */}
       <Tabs defaultValue="lines" className="space-y-4">
         <TabsList>
           <TabsTrigger value="lines">Lines</TabsTrigger>
           <TabsTrigger value="setup">Setup</TabsTrigger>
+          <TabsTrigger value="cashflow">Cashflow</TabsTrigger>
+          <TabsTrigger value="summary">Summary</TabsTrigger>
         </TabsList>
 
         <TabsContent value="lines">
@@ -128,6 +135,12 @@ export function PlanEditor({ planId, initial }: { planId: string; initial: PlanI
         </TabsContent>
         <TabsContent value="setup">
           <SetupTab inputs={inputs} onChange={update} />
+        </TabsContent>
+        <TabsContent value="cashflow">
+          <CashflowTable result={result.active} />
+        </TabsContent>
+        <TabsContent value="summary">
+          <SummaryTab result={result} activeScenario={inputs.activeScenario} />
         </TabsContent>
       </Tabs>
     </div>
