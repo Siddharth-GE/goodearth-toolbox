@@ -196,9 +196,9 @@ One line per day; full detail in git history and the PLAN.md files.
   **reachable today by switching off a signed-in colleague** (setActive
   flips a flag and leaves the session alive). Same class as the
   2026-08-05 login loop; that fix added logging and left the mechanism.
-  **This machine's clock ran 5 days slow all session** (reading
-  2026-08-05 — GitHub's run timestamps are the truth), so every commit
-  on this branch is misdated; worth resyncing before the next session.
+  (Housekeeping: the laptop resumed from a 5-day sleep with a stale
+  clock, so the first eight commits on this branch are stamped
+  2026-08-05. Windows resynced itself mid-session; nothing to fix.)
   A read error now throws, and the `/login` bounce is deleted, so the
   two real turn-aways reach the login page — where the login action
   already names a deactivated account. Also: the home page no longer
