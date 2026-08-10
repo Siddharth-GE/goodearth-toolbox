@@ -22,22 +22,22 @@ Every project is born with the eight default stages over three years.
 **Next:** unit-level stages rolling up into the project picture, then
 the leaderboard, then links + Google Chat.
 
-**Business Planning is built and awaiting the founder's browser pass**
-(`feature/business-planning`, migration `0048`). The founder's
-`Vihara_BusinessPlan_JV.xlsx` as a tool: a plan is a set of LINES —
-SALE ones you build and sell, HOLD ones you build and keep earning
-from — plus what the whole project owns, with a pure engine that
-recalculates as you type. Verified figure-for-figure against the
+**Business Planning is live** (PR #4 merged 2026-08-10 after the
+founder's browser pass, CI green, branch deleted; migration `0048`).
+The founder's `Vihara_BusinessPlan_JV.xlsx` as a tool: a plan is a set
+of LINES — SALE ones you build and sell, HOLD ones you build and keep
+earning from — plus what the whole project owns, with a pure engine
+that recalculates as you type. Verified figure-for-figure against the
 workbook (PBT ₹26.66 Cr at 22.2%; senior living HOLD at 17.92% IRR).
 Completely independent: no foreign key to any other tool.
 
 Note for a cold start: the probe account holds `/inventory`, not
-`/relay` or `/business-planning`.
+`/relay` or `/business-planning`. Nothing is in flight.
 
 |                    |                                                                                                                                                   |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Last worked        | 2026-08-10                                                                                                                                        |
-| Branch             | `feature/business-planning` — built, CI green, awaiting the founder's browser pass                                                                |
+| Branch             | `master` — Business Planning merged and deployed; nothing in flight                                                                               |
 | Migrations applied | `0001`–`0048` (next is `0049`)                                                                                                                    |
 | Items in database  | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands                                                                    |
 | Thumbnails         | 897 in Supabase Storage; 1,736 items use the colour placeholder                                                                                   |
@@ -110,6 +110,23 @@ Note for a cold start: the probe account holds `/inventory`, not
   "Not started" is derived, not stored: a queued trail has **no events
   yet**, which is why it costs no status column — and why both 0036
   guards already handled it without a line of change.
+- **A business plan is a set of LINES** (founder, 2026-08-10). Two kinds
+  cover every product: SALE, which you build and sell, and HOLD, which
+  you build and keep earning from. Some projects are one line, most a
+  mix. Each line carries its own land, costs, velocity, cashflow and
+  interest and is readable standing alone; the plan owns the horizon, the
+  financing rate, the land DEAL, overheads and common infrastructure.
+  **Business Planning is completely independent** — the founder's word —
+  so `0048` has no foreign key outside `profiles`, nothing in the tool
+  reads another tool's data, and it has no row in the cross-tool contract
+  table. A plan can be for land nobody has bought.
+- **A plan's inputs are one jsonb document** (`0048`), the first in this
+  schema. A modelling tool gains assumptions constantly, and a column per
+  assumption means a migration each time against an additive-only rule.
+  The trade is that Postgres cannot check the contents, so
+  `parsePlanInputs` is the only door in — it defaults and clamps every
+  field, on the way out AND on the way in — and `schema_version` is
+  stored so an old document can be carried forward in code.
 - One `items` table for products and materials, split by `kind`.
 - Prices are **snapshotted onto lines at pick time**; master edits
   never rewrite existing lines. Same principle for PO `gst_pct`.
@@ -290,7 +307,11 @@ the applied migrations still say pusher, and the tables always will —
   interest at all because Excel makes that a circular reference; its
   collection convolution drops instalments past a fixed 31-month window;
   and its Venture IRR reads 1150% and −52% off flows that open positive.
-  Awaiting the founder's browser pass.
+  Merged as PR #4 after the founder's browser pass. The permission
+  boundary was exercised against the live database in a rolled-back
+  transaction, both ways: a real staff account without the grant sees
+  zero plans and cannot insert (42501); granted, the same account reads,
+  writes and deletes.
 - **2026-08-10 (Relay, built and shipped in one day)** — merged in two
   PRs, migrations `0036`–`0047`. The founder brought a concept and a
   mockup; it supersedes the planned Project Management and Design

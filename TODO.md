@@ -4,24 +4,25 @@ Read `STATUS.md` first. Phase 9 (Overview fully real + one real project
 run end to end) still has no approved plan; this file gets one when the
 founder approves it.
 
-## Right now: Business Planning, awaiting the browser pass
+## Right now: nothing in flight
 
-Built on `feature/business-planning`, migration `0048` applied, CI
-green, pushed for a preview. What the founder needs to do before it can
-merge: grant themselves the tool in Settings, build a plan (the checklist
-is in the session's hand-off), and check the ₹ Cr figures against
-`Vihara_BusinessPlan_JV.xlsx` side by side. Then the single-grant probe
-smoke, then merge and delete the branch.
+Business Planning is merged and live (PR #4). Relay is merged and live
+through standard trails; the next build is the first item below.
 
-**One finding to confirm with the founder, because it changes a number
-they have been quoting:** the workbook's "peak funding" of ₹5.91 Cr is
-`-MIN(closing cash)` and comes out negative — the cash never goes below
-zero. That is ₹5.91 Cr of headroom at the worst month, not money to
-raise. The tool reports peak funding as zero and shows the trough
-separately. See `app/(dashboard)/business-planning/PLAN.md`.
+Two things to pick up on Business Planning when the founder next uses it
+in anger, neither blocking:
 
-After it merges, Relay is the next build. One thing to watch when real
-work starts landing:
+- **Grant it to whoever needs it.** Only admins can see it today. It
+  carries land cost, profit and peak funding, so the grant is the whole
+  boundary — SELECT is gated, not just writes.
+- **The peak-funding finding is worth carrying into how plans are
+  discussed.** The workbook's "peak funding ₹5.91 Cr" is
+  `-MIN(closing cash)` and comes out negative: the cash never goes below
+  zero, so that is headroom at the worst month, not money to raise. The
+  tool reports peak funding as zero and the trough separately. See
+  `app/(dashboard)/business-planning/PLAN.md`.
+
+One thing to watch on Relay when real work starts landing:
 a trail's unfinished activities count in the project picture as
 planned-but-not-done, so a house with a full villa trail reads further
 behind. The founder has seen this and accepted it; revisit only if it
