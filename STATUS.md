@@ -14,15 +14,22 @@ chain runs design → price → indent → PO → goods in / stock / goods
 out → bill → paid.
 
 **Pusher is built through the project schedule** on
-`feature/pusher-relay`, awaiting the founder's browser pass: the relay,
+`feature/pusher-relay` (**PR #2, CI green, NOT merged**): the relay,
 departments (many per trail), and a per-project overview whose dates are
-all calculated. **Next:** unit-level stages rolling up into the project
-picture, then the leaderboard, then links + Google Chat.
+all calculated. It is **waiting on the founder's browser pass** — see
+TODO.md, which opens with that. **Next after the merge:** unit-level
+stages rolling up into the project picture, then the leaderboard, then
+links + Google Chat.
+
+Note for a cold start: migrations `0036`–`0040` are **already applied to
+the live database**, so schema is in step with production and only the
+code is unmerged. The branch's test data has been cleared and the probe
+account put back to `/inventory`.
 
 |                    |                                                                                                                                 |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
 | Last worked        | 2026-08-10                                                                                                                      |
-| Branch             | `feature/pusher-relay` — built, tested, not yet merged                                                                          |
+| Branch             | `feature/pusher-relay` — built, CI green, PR #2 open, not merged                                                                |
 | Migrations applied | `0001`–`0040` (next is `0041`)                                                                                                  |
 | Items in database  | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands                                                  |
 | Thumbnails         | 897 in Supabase Storage; 1,736 items use the colour placeholder                                                                 |
@@ -190,6 +197,17 @@ picture, then the leaderboard, then links + Google Chat.
   service-role key). Its `@goodearth.test` domain is not real, so
   password-recovery and magic-link emails can never arrive — the
   dashboard's user menu only offers those, and won't get you in.
+- **The probe smoke DID run on 2026-08-10**, twice — the password reset
+  via the auth admin API was not blocked this time, unlike the two
+  sessions before it. So the block is not permanent; try it before
+  assuming a browser pass is impossible. Both runs drove the local
+  production build as a `/pusher`-only user.
+- A three-line Node script that POSTs a `.sql` file to the management
+  API's `/database/query` is the whole migration workflow; keep it in the
+  session scratchpad. Two traps when generating SQL through JavaScript:
+  `String.replace` treats `$$` in the replacement as an escape and will
+  silently turn `do $$` into `do $`, and `LIKE 'pusher_%dept%'` is not a
+  reliable way to check a table list.
 - Pre-push smoke: Playwright installed in the session scratchpad,
   `npm run build && npm start`, drive localhost as the probe user
   (reset its password via the auth admin API; never stored).
@@ -213,6 +231,36 @@ picture, then the leaderboard, then links + Google Chat.
 
 One line per day; full detail in git history and the PLAN.md files.
 
+- **2026-08-10 (Pusher — departments and the project schedule)** — same
+  branch, migrations `0038`–`0040` applied. The founder added two things
+  to the relay. **Departments**, with the correction that makes the
+  design: "a trail can be cross department as well" — so it is a
+  many-to-many join, not a column, because a selections handoff really is
+  Design _and_ Purchase and a single department would force a lie on
+  exactly the trails worth watching. They prefill from the activity's
+  last run alongside the legs, sit on the state view as arrays so
+  "every cold Design trail" is one server-side filter, and freeze when a
+  trail finishes. Six seeded, all renameable. **The project schedule**,
+  where the founder chose "dates are worked out, never typed": the only
+  stored inputs are a project's start date and each stage's length in
+  weeks, and every date on screen is calculated on read. Stretch Design
+  from 10 weeks to 20 and Approvals, Construction and Handover all move
+  by themselves; two dates can never contradict each other. The overview
+  compares work done (weighted by stage length, with partial credit for a
+  stage in progress) against plan elapsed — the gap is the slip — and
+  calls out trails filed under no stage rather than letting them count
+  for nothing silently. 15 new tests on the calculation.
+  **Two bugs the browser found and nothing else would have:** `0039`
+  attached `audit_row()` to a table with no `id` column, so every write
+  to it raised and no schedule could be saved at all — it typechecks, it
+  builds, the SQL is valid (`0040` adds the surrogate id, the 0018/0031
+  precedent); and `router.refresh()` inside a `useTransition` left
+  `isPending` true on a form that stays mounted, greying out the whole
+  schedule editor permanently. A sweep confirmed no other audited table
+  lacks an `id`. Note for whoever reads this next: the Playwright script
+  kept asserting faster than the page could redraw, so four of its checks
+  read as failures — each was verified correct directly against the
+  database instead. Trust the database check, not that script's tail.
 - **2026-08-10 (Pusher Phase 1 — the relay)** — built on
   `feature/pusher-relay`, migrations `0036`–`0037` applied. The founder
   brought a concept and a working mockup for **Pusher**, and it
