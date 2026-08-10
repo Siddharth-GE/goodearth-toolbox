@@ -700,3 +700,171 @@ export async function getPusherPulse(userId: string) {
     mine: mine.count ?? 0,
   };
 }
+
+// ---------------------------------------------------------------------
+// Standard trails at the house level
+// ---------------------------------------------------------------------
+
+export type TrailSet = {
+  id: string;
+  name: string;
+  isActive: boolean;
+  sortOrder: number;
+  activities: { itemId: string; activityId: string; activityName: string; sortOrder: number }[];
+};
+
+/**
+ * The named standard sets, each with its ordered activities.
+ *
+ * Two reads, however many sets — the same shape as the schedule reads.
+ * A set is a list of ACTIVITIES, never a frozen copy of people and days:
+ * the legs are prefilled from each activity's last run at the moment the
+ * set is applied, so a leaver's name cannot ride along on every new
+ * house forever.
+ */
+export async function listTrailSets(includeInactive = false): Promise<TrailSet[]> {
+  await requireTool("/pusher");
+  const supabase = await createClient();
+
+  let setQuery = supabase
+    .from("pusher_trail_sets")
+    .select("id, name, is_active, sort_order")
+    .order("sort_order")
+    .order("name");
+  if (!includeInactive) setQuery = setQuery.eq("is_active", true);
+
+  const [sets, items] = await Promise.all([
+    setQuery,
+    // Completeness matters: an activity missing from a set is work that
+    // silently never lands on a house, with nothing on screen to explain
+    // the gap.
+    fetchAll<{ id: string; set_id: string; activity_id: string; sort_order: number }>((from, to) =>
+      supabase
+        .from("pusher_trail_set_items")
+        .select("id, set_id, activity_id, sort_order")
+        .order("id")
+        .range(from, to),
+    ),
+  ]);
+
+  if (sets.error) {
+    console.error("pusher listTrailSets failed:", sets.error);
+    return [];
+  }
+
+  const activities = await listActivities(true);
+  const nameById = new Map(activities.map((a) => [a.id, a.name]));
+
+  return (sets.data ?? []).map((set) => ({
+    id: set.id,
+    name: set.name,
+    isActive: set.is_active,
+    sortOrder: set.sort_order,
+    activities: items
+      .filter((i) => i.set_id === set.id)
+      .sort((a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id))
+      .map((i) => ({
+        itemId: i.id,
+        activityId: i.activity_id,
+        activityName: nameById.get(i.activity_id) ?? "—",
+        sortOrder: i.sort_order,
+      })),
+  }));
+}
+
+export type HouseRow = {
+  unitId: string;
+  unitName: string;
+  live: number;
+  cold: number;
+  queued: number;
+  finished: number;
+};
+
+/**
+ * Every house in a project with its four counts — the list on the
+ * project page, and the way into each house.
+ *
+ * Units come from Masters and are listed even when they have no trails
+ * at all: a villa nobody has started work on is exactly the one worth
+ * seeing, and leaving it out would make "nothing here yet" invisible.
+ */
+export async function listProjectHouses(projectId: string): Promise<HouseRow[]> {
+  await requireTool("/pusher");
+  const supabase = await createClient();
+
+  const [units, trails] = await Promise.all([
+    fetchAll<{ id: string; name: string }>((from, to) =>
+      supabase
+        .from("units")
+        .select("id, name")
+        .eq("project_id", projectId)
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAll<{
+      unit_id: string | null;
+      is_finished: boolean | null;
+      is_stuck: boolean | null;
+      is_queued: boolean | null;
+    }>((from, to) =>
+      supabase
+        .from("pusher_chain_state")
+        .select("unit_id, is_finished, is_stuck, is_queued")
+        .eq("project_id", projectId)
+        .order("chain_id")
+        .range(from, to),
+    ),
+  ]);
+
+  return units
+    .map((unit) => {
+      const mine = trails.filter((t) => t.unit_id === unit.id);
+      const running = mine.filter((t) => !t.is_finished && !t.is_queued);
+      return {
+        unitId: unit.id,
+        unitName: unit.name,
+        live: running.length,
+        cold: running.filter((t) => t.is_stuck).length,
+        queued: mine.filter((t) => t.is_queued).length,
+        finished: mine.filter((t) => t.is_finished).length,
+      };
+    })
+    .sort((a, b) => a.unitName.localeCompare(b.unitName, undefined, { numeric: true }));
+}
+
+/** One house: its trails split into what is running and what is waiting. */
+export async function getHouse(projectId: string, unitId: string) {
+  await requireTool("/pusher");
+  const supabase = await createClient();
+
+  const [unit, project, trails, names] = await Promise.all([
+    supabase.from("units").select("id, name").eq("id", unitId).maybeSingle(),
+    supabase.from("projects").select("id, name").eq("id", projectId).maybeSingle(),
+    fetchAll<StateRow & { project_stage_id: string | null }>((from, to) =>
+      supabase
+        .from("pusher_chain_state")
+        .select(`${STATE_COLUMNS}, project_stage_id`)
+        .eq("project_id", projectId)
+        .eq("unit_id", unitId)
+        .order("chain_id")
+        .range(from, to),
+    ),
+    nameMap(),
+  ]);
+
+  if (!unit.data || !project.data) return null;
+
+  const rows = trails.map((t) => ({ ...toRow(t, names), projectStageId: t.project_stage_id }));
+
+  return {
+    unit: unit.data,
+    project: project.data,
+    // Cold first among the running ones — the tool's standing order.
+    running: rows
+      .filter((r) => !r.isQueued && !r.isFinished)
+      .sort((a, b) => Number(b.isStuck) - Number(a.isStuck) || b.daysInLeg - a.daysInLeg),
+    queued: rows.filter((r) => r.isQueued),
+    finished: rows.filter((r) => r.isFinished),
+  };
+}

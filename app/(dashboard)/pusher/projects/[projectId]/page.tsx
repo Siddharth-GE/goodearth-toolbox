@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { PageTitle } from "@/components/ui/page-title";
 import { formatDate } from "@/lib/format";
-import { getProjectSchedule } from "@/lib/pusher/queries";
+import { getProjectSchedule, listProjectHouses } from "@/lib/pusher/queries";
 import { slipLabel } from "@/lib/pusher/schedule";
 import { cn } from "@/lib/utils";
 import { notFound } from "next/navigation";
@@ -20,7 +20,10 @@ export default async function ProjectSchedulePage({
   params: Promise<{ projectId: string }>;
 }) {
   const { projectId } = await params;
-  const data = await getProjectSchedule(projectId);
+  const [data, houses] = await Promise.all([
+    getProjectSchedule(projectId),
+    listProjectHouses(projectId),
+  ]);
   if (!data) notFound();
 
   const { project, schedule, trails, stages } = data;
@@ -67,6 +70,39 @@ export default async function ProjectSchedulePage({
         </Card>
       )}
 
+      {houses.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-muted text-xs font-semibold tracking-widest uppercase">
+            Houses — {houses.length}
+          </h2>
+          <Card className="divide-border divide-y">
+            {houses.map((house) => (
+              <Link
+                key={house.unitId}
+                href={`/pusher/projects/${projectId}/houses/${house.unitId}`}
+                className="flex items-center gap-3 p-3.5 transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.04]"
+              >
+                <p className="text-foreground min-w-0 flex-1 text-sm font-medium">
+                  {house.unitName}
+                </p>
+                {house.cold > 0 && <Badge variant="danger">{house.cold} cold</Badge>}
+                <span className="text-muted text-xs">
+                  {house.live + house.queued + house.finished === 0 ? (
+                    "nothing yet"
+                  ) : (
+                    <>
+                      {house.live} running
+                      {house.queued > 0 ? ` · ${house.queued} waiting` : ""}
+                      {house.finished > 0 ? ` · ${house.finished} done` : ""}
+                    </>
+                  )}
+                </span>
+              </Link>
+            ))}
+          </Card>
+        </div>
+      )}
+
       <ScheduleEditor projectId={projectId} startDate={data.startDate} stages={schedule.stages} />
 
       {schedule.stages.length > 0 && (
@@ -98,11 +134,15 @@ export default async function ProjectSchedulePage({
                       <Badge variant="danger">{stage.trailsStuck} cold</Badge>
                     )}
                     {/* Reads the same as the dashed block on the track:
-                        nothing filed is not the same as nothing done. */}
+                        nothing filed is not the same as nothing done.
+                        Queued is called out separately because it is the
+                        reason a stage can look far behind and be fine —
+                        the work is written down, not started. */}
                     <span className="text-muted text-xs">
                       {stage.trailsTotal === 0
                         ? "Nothing filed here yet"
                         : `${stage.trailsFinished} of ${stage.trailsTotal} done`}
+                      {stage.trailsQueued > 0 ? ` · ${stage.trailsQueued} waiting` : ""}
                     </span>
                   </span>
                 </div>
@@ -154,6 +194,7 @@ function TrailLine({
     expectedDays: number;
     isFinished: boolean;
     isStuck: boolean;
+    isQueued: boolean;
     projectStageId: string | null;
   };
   stages: { id: string; name: string }[];
@@ -167,7 +208,11 @@ function TrailLine({
         </p>
         <p className="text-muted mt-0.5 text-xs">
           {trail.unitName ?? "The project as a whole"}
-          {trail.isFinished ? " · finished" : ` · with ${trail.holderName ?? "nobody"}`}
+          {trail.isFinished
+            ? " · finished"
+            : trail.isQueued
+              ? " · not started"
+              : ` · with ${trail.holderName ?? "nobody"}`}
         </p>
       </Link>
       <StagePicker
@@ -178,6 +223,10 @@ function TrailLine({
       />
       {trail.isFinished ? (
         <Badge variant="success">Done</Badge>
+      ) : trail.isQueued ? (
+        // No dial: it would read "0 of 4 days" and look like a clock that
+        // had started, which is the one thing the queue must never imply.
+        <Badge variant="neutral">Waiting</Badge>
       ) : (
         <TimerDial days={trail.daysInLeg} expectedDays={trail.expectedDays} />
       )}

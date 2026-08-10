@@ -5,6 +5,12 @@ import { getCurrentUser } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
+// Applying a standard set needs two reads before it can write — the set's
+// activities, and each one's legs from its last run. Both live in
+// queries.ts; this is a plain server-to-server import, and it stays a
+// one-way street (queries.ts never imports from here).
+import { getPrefillsByActivity, listTrailSets } from "./queries";
+
 // Type-only import, and deliberately NOT re-exported — a bare
 // `export type { X };` in a "use server" file crashes every action in its
 // compiled chunk at load time (npm run check:actions enforces this).
@@ -516,5 +522,213 @@ export async function setActivityActive(id: string, isActive: boolean): Promise<
 
   if (error) return { error: "Could not change this activity." };
   revalidatePath("/pusher/activities");
+  return undefined;
+}
+
+// ---------------------------------------------------------------------
+// Standard trails at the house level
+// ---------------------------------------------------------------------
+
+function revalidateHouse(projectId: string, unitId?: string) {
+  revalidatePath("/pusher/projects");
+  revalidatePath(`/pusher/projects/${projectId}`);
+  if (unitId) revalidatePath(`/pusher/projects/${projectId}/houses/${unitId}`);
+  revalidatePath("/pusher/trails");
+}
+
+/**
+ * Lay a standard set down on a house.
+ *
+ * Every trail arrives QUEUED — created, staffed, and with no clock
+ * running. That is the whole point: twelve live trails would be twelve
+ * clocks started at once, and the Handover trail at three expected days
+ * would be cold within the week, on work nobody meant to begin.
+ *
+ * One RPC, so a set either lands whole or not at all. The legs come from
+ * each activity's last run, exactly as the Open-a-trail form fills them
+ * in — a set says WHAT work happens, the last run says who tends to do
+ * it. An activity nobody has ever run has no prefill, so it is reported
+ * by name rather than silently skipped or landed with an empty leg.
+ */
+export async function applyTrailSet(
+  projectId: string,
+  unitId: string,
+  setId: string,
+): Promise<ActionState> {
+  await requireTool("/pusher");
+
+  if (!projectId || !unitId) return { error: "Pick a house first." };
+  if (!setId) return { error: "Pick a standard set first." };
+
+  const [sets, prefills] = await Promise.all([listTrailSets(true), getPrefillsByActivity()]);
+  const set = sets.find((s) => s.id === setId);
+  if (!set) return { error: "That standard set no longer exists." };
+  if (set.activities.length === 0) {
+    return { error: `"${set.name}" has no activities in it yet — add some first.` };
+  }
+
+  const unstaffed: string[] = [];
+  const chains = set.activities.map((item) => {
+    const legs = prefills.get(item.activityId)?.legs ?? [];
+    const usable = legs.filter((l) => l.label.trim() && l.assigneeId);
+    if (usable.length === 0) unstaffed.push(item.activityName);
+    return {
+      activity_id: item.activityId,
+      title: null,
+      legs: usable.map((l) => ({
+        label: l.label.trim(),
+        assignee_id: l.assigneeId,
+        expected_days: l.expectedDays,
+      })),
+    };
+  });
+
+  if (unstaffed.length > 0) {
+    // Naming them is the whole value of this message: the fix is to run
+    // one of each by hand first, and a person cannot do that without
+    // being told which.
+    return {
+      error: `No one has ever run ${unstaffed.join(", ")}, so there are no legs to copy. Open one of each by hand first — after that this set will fill itself in.`,
+    };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("create_chains", {
+    p_project_id: projectId,
+    p_unit_id: unitId,
+    p_chains: chains,
+  });
+
+  if (error) return guardError(error, "Could not add this standard set.") ?? {};
+
+  revalidateHouse(projectId, unitId);
+  return undefined;
+}
+
+/**
+ * Start a queued trail: the baton lands on leg 1 and the clock begins.
+ *
+ * Anyone holding /pusher may do this, deliberately matching what the
+ * tool already allows — the Open-a-trail form has always let one person
+ * open a trail whose first leg belongs to someone else. A stricter rule
+ * would let a coordinator lay down a house's whole set and then be
+ * unable to begin any of it.
+ */
+export async function startTrail(chainId: string, projectId: string, unitId: string) {
+  await requireTool("/pusher");
+  if (!chainId) return { error: "Pick a trail first." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("start_chain", { p_chain_id: chainId });
+  if (error) return guardError(error, "Could not start this trail.") ?? {};
+
+  revalidate(chainId);
+  revalidateHouse(projectId, unitId);
+  return undefined;
+}
+
+/**
+ * Throw away a queued trail — the one honest exception to "never delete
+ * a chain" (0036 §7), and only because it has no history to destroy.
+ *
+ * The database refuses the moment it has started, so the button is a
+ * courtesy and the guard is the boundary, as everywhere else here.
+ */
+export async function discardTrail(chainId: string, projectId: string, unitId: string) {
+  await requireTool("/pusher");
+  if (!chainId) return { error: "Pick a trail first." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("discard_chain", { p_chain_id: chainId });
+  if (error) return guardError(error, "Could not remove this trail.") ?? {};
+
+  revalidateHouse(projectId, unitId);
+  return undefined;
+}
+
+export async function createTrailSet(
+  _state: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireTool("/pusher");
+
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return { error: "A standard set needs a name." };
+
+  const supabase = await createClient();
+  const user = await getCurrentUser();
+  const { error } = await supabase
+    .from("pusher_trail_sets")
+    .insert({ name, created_by: user?.id, updated_by: user?.id });
+
+  if (error) {
+    if (error.code === "23505") return { error: `"${name}" is already a standard set.` };
+    return { error: "Could not add this standard set." };
+  }
+
+  revalidatePath("/pusher/sets");
+  return undefined;
+}
+
+/** Sets are switched off, never deleted — the houses they built stay readable. */
+export async function setTrailSetActive(id: string, isActive: boolean): Promise<ActionState> {
+  await requireTool("/pusher");
+
+  const supabase = await createClient();
+  const user = await getCurrentUser();
+  const { error } = await supabase
+    .from("pusher_trail_sets")
+    .update({ is_active: isActive, updated_by: user?.id })
+    .eq("id", id);
+
+  if (error) return { error: "Could not change this standard set." };
+  revalidatePath("/pusher/sets");
+  return undefined;
+}
+
+/**
+ * Replace a set's activities wholesale — which is also how it is
+ * reordered, because sort_order is rewritten from the array's position.
+ *
+ * Delete-then-insert rather than a diff: the list is a dozen rows at
+ * most, and a diff would have to reason about a row that moved AND
+ * changed, which is exactly where an ordering bug hides.
+ */
+export async function setTrailSetActivities(
+  setId: string,
+  activityIds: string[],
+): Promise<ActionState> {
+  await requireTool("/pusher");
+  if (!setId) return { error: "Pick a standard set first." };
+
+  // A set with the same activity twice would put two identical trails on
+  // every house — the database refuses it, and this says so first.
+  if (new Set(activityIds).size !== activityIds.length) {
+    return { error: "That activity is already in this set." };
+  }
+
+  const supabase = await createClient();
+  const user = await getCurrentUser();
+
+  const { error: clearError } = await supabase
+    .from("pusher_trail_set_items")
+    .delete()
+    .eq("set_id", setId);
+  if (clearError) return { error: "Could not update this standard set." };
+
+  if (activityIds.length > 0) {
+    const { error } = await supabase.from("pusher_trail_set_items").insert(
+      activityIds.map((activityId, i) => ({
+        set_id: setId,
+        activity_id: activityId,
+        sort_order: (i + 1) * 10,
+        created_by: user?.id,
+        updated_by: user?.id,
+      })),
+    );
+    if (error) return { error: "Could not update this standard set." };
+  }
+
+  revalidatePath("/pusher/sets");
   return undefined;
 }
