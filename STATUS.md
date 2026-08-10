@@ -83,6 +83,14 @@ account put back to `/inventory`.
   Bouncing is rewarded (+5) and never punished; it is impossible without
   a reason and a note, at the database. Expected days are whole days,
   because elapsed time is counted in **IST calendar days**.
+- **A queued trail has no clock** (founder, 2026-08-10; designed, not yet
+  built — see TODO.md). Standard trails laid down on a house arrive
+  dormant and go live only when someone starts them. "Not started" is
+  derived, not stored: a queued trail has **no events yet**, which is why
+  this costs no status column. Opening a whole set live would start every
+  clock at once and turn each house solid cold within a fortnight, on
+  work nobody meant to begin — and a cold signal that cries wolf is worth
+  nothing.
 - One `items` table for products and materials, split by `kind`.
 - Prices are **snapshotted onto lines at pick time**; master edits
   never rewrite existing lines. Same principle for PO `gst_pct`.
