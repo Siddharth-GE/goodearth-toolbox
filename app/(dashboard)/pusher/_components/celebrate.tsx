@@ -147,7 +147,10 @@ export function CelebrateProvider({ children }: { children: ReactNode }) {
           aria-hidden="true"
           className="pointer-events-none fixed inset-0 z-[70] flex items-center justify-center"
         >
-          <div className="bg-surface-raised text-foreground [animation:pusher-banner_1.9s_cubic-bezier(.34,1.4,.44,1)_forwards] rounded-3xl px-10 py-6 text-3xl font-extrabold tracking-tight shadow-2xl md:text-4xl">
+          {/* Smooth ease-out, not a back/overshoot curve: the overshoot
+              is already in the keyframes (0.88 -> 1.03 -> 1.0), and a
+              springy easing on top of it double-bounces. */}
+          <div className="bg-surface-raised text-foreground [animation:pusher-banner_1.9s_cubic-bezier(.22,1,.36,1)_forwards] rounded-3xl px-10 py-6 text-3xl font-extrabold tracking-tight shadow-2xl md:text-4xl">
             {bannerText}
           </div>
         </div>
