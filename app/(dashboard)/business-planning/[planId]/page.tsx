@@ -4,6 +4,7 @@ import { getPlan } from "@/lib/business-planning/queries";
 import { formatDate } from "@/lib/format";
 import { notFound } from "next/navigation";
 import { PlanEditor } from "./_components/plan-editor";
+import { RenamePlanDialog } from "./_components/rename-plan-dialog";
 
 export default async function PlanPage({ params }: { params: Promise<{ planId: string }> }) {
   const { planId } = await params;
@@ -20,9 +21,12 @@ export default async function PlanPage({ params }: { params: Promise<{ planId: s
         backHref="/business-planning"
         backLabel="All plans"
         actions={
-          <div className="text-muted flex items-center gap-2 text-xs">
-            <span>Edited {formatDate(plan.updated_at)}</span>
-            <Attribution name={plan.updated_by_name} label="Last edited by" />
+          <div className="flex items-center gap-3">
+            <div className="text-muted flex items-center gap-2 text-xs">
+              <span>Edited {formatDate(plan.updated_at)}</span>
+              <Attribution name={plan.updated_by_name} label="Last edited by" />
+            </div>
+            <RenamePlanDialog planId={plan.id} name={plan.name} location={plan.location} />
           </div>
         }
       />
