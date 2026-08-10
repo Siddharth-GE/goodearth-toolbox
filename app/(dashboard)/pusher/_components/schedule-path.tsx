@@ -2,11 +2,22 @@ import type { ScheduleSummary } from "@/lib/pusher/schedule";
 
 /**
  * The project schedule as one picture: a track of stages sized by their
- * length in weeks, a dark bar showing how far the work has actually got,
- * and a marker showing where the plan says today is.
+ * length in weeks, each stage filled by its OWN progress, and a marker
+ * showing where the plan says today is.
  *
- * The distance between the bar and the marker IS the slip. Everything
- * else on the overview is detail underneath that one comparison.
+ * Each stage fills in place, and that is the whole point. The first
+ * version drew the weighted total (`actualPct`) as one bar from the left
+ * edge — so finishing a Construction trail, which earns Construction's
+ * large share of the weeks, painted straight over Design and Approvals
+ * where nothing had happened. A bar from the left edge claims
+ * "everything up to here is done"; only a per-stage fill can say
+ * "Construction is moving and Design has not started".
+ *
+ * THE RULE THIS ESTABLISHED: a weighted total is a number, not a
+ * position. Never draw one as a bar growing from the left.
+ *
+ * The slip still reads off the figures underneath and the verdict badge,
+ * which say it in words.
  *
  * Uniform scaling, like the trail route — a stretched viewBox turns
  * every marker into a smear.
@@ -22,20 +33,35 @@ export function SchedulePath({ schedule }: { schedule: ScheduleSummary }) {
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" aria-hidden="true">
-      {/* One block per stage, width proportional to its weeks. */}
+      {/* One block per stage, width proportional to its weeks, filled by
+          how much of that stage's own work is done. */}
       {schedule.stages.map((stage) => {
         const x = pxOf((stage.weekFrom / schedule.totalWeeks) * 100);
         const w = pxOf((stage.weeks / schedule.totalWeeks) * 100);
+        const trackW = Math.max(2, w - 2);
+        // A stage barely started still shows a sliver rather than
+        // vanishing on a narrow block.
+        const fillW = stage.progress > 0 ? Math.max(3, stage.progress * trackW) : 0;
         return (
           <g key={stage.id}>
             <rect
               x={x + 1}
               y={TRACK_Y}
-              width={Math.max(2, w - 2)}
+              width={trackW}
               height={TRACK_H}
               rx="3"
               fill="var(--border)"
             />
+            {fillW > 0 && (
+              <rect
+                x={x + 1}
+                y={TRACK_Y}
+                width={Math.min(trackW, fillW)}
+                height={TRACK_H}
+                rx="3"
+                fill="var(--foreground)"
+              />
+            )}
             <text
               x={x + w / 2}
               y={TRACK_Y - 8}
@@ -59,17 +85,8 @@ export function SchedulePath({ schedule }: { schedule: ScheduleSummary }) {
         );
       })}
 
-      {/* How far the work has actually got — the ground truth. */}
-      <rect
-        x="0"
-        y={TRACK_Y}
-        width={pxOf(schedule.actualPct)}
-        height={TRACK_H}
-        rx="3"
-        fill="var(--foreground)"
-      />
-
-      {/* Where the plan says today is. The gap to the bar is the slip. */}
+      {/* Where the plan says today is — drawn last so it sits above the
+          fills rather than behind them. */}
       <g>
         <line
           x1={pxOf(schedule.planPct)}
