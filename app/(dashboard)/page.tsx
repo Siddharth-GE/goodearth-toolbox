@@ -1,6 +1,7 @@
 import { Spinner } from "@/components/ui/spinner";
 import { requireUser } from "@/lib/auth/dal";
 import { formatLongDate } from "@/lib/format";
+import { visibleTools } from "@/lib/tools";
 import { Suspense } from "react";
 import { ActivityFeed } from "./_components/activity-feed";
 import { BudgetVsActual } from "./_components/budget-vs-actual";
@@ -23,6 +24,9 @@ export default async function DashboardHome() {
   const user = await requireUser();
   const firstName = user.profile?.full_name?.split(" ")[0];
   const today = formatLongDate(new Date());
+  // Same rule the sidebar uses, so a card and a nav row never disagree
+  // about whether someone can open a tool.
+  const openableHrefs = visibleTools(user.profile, user.grantedApps).map((tool) => tool.href);
 
   return (
     <div>
@@ -40,7 +44,7 @@ export default async function DashboardHome() {
       </div>
 
       <div className="space-y-5">
-        <ManagementVision />
+        <ManagementVision openableHrefs={openableHrefs} />
         {/* Fetches its own counts now that Indents is real, so it gets
             its own boundary rather than holding up the whole page. */}
         <Suspense
