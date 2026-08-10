@@ -16,18 +16,22 @@ out → bill → paid.
 **Pusher Phase 1 is live** (PR #2 merged 2026-08-10 after the founder's
 browser pass, CI green, branch deleted): the relay, departments (many per
 trail), and a per-project overview whose dates are all calculated.
-**Next:** standard trails at the house level (designed, decisions in
-TODO.md — build this first), then unit-level stages rolling up into the
-project picture, then the leaderboard, then links + Google Chat.
+**Standard trails are built** on `feature/pusher-standard-trails`
+(migrations `0041`–`0042` **already applied live**), waiting on the
+founder's browser pass. **Next after that merges:** unit-level stages
+rolling up into the project picture, then the leaderboard, then links +
+Google Chat.
 
 Note for a cold start: the probe account holds `/inventory`, not
-`/pusher`, and the branch's test data has been cleared.
+`/pusher`, and the branch's test data has been cleared. `0041`/`0042`
+being live while their code is unmerged is safe and deliberate — the
+view kept every column production reads.
 
 |                    |                                                                                                                                 |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
 | Last worked        | 2026-08-10                                                                                                                      |
-| Branch             | `master` — Pusher merged and deployed; nothing in flight                                                                        |
-| Migrations applied | `0001`–`0040` (next is `0041`)                                                                                                  |
+| Branch             | `feature/pusher-standard-trails` — built, awaiting the founder's browser pass                                                   |
+| Migrations applied | `0001`–`0042` (next is `0043`)                                                                                                  |
 | Items in database  | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands                                                  |
 | Thumbnails         | 897 in Supabase Storage; 1,736 items use the colour placeholder                                                                 |
 | Built tools        | Marathon, Settings, Masters, Selections, Budgets (Interiors + Construction), Indents, Purchase Orders, Inventory, Bills, Pusher |
@@ -236,6 +240,31 @@ Note for a cold start: the probe account holds `/inventory`, not
 
 One line per day; full detail in git history and the PLAN.md files.
 
+- **2026-08-10 (Pusher — standard trails at the house level)** —
+  `feature/pusher-standard-trails`, migrations `0041`–`0042` applied.
+  One click on a house lays down the usual set of trails, staffed from
+  each activity's last run, **all queued with no clock running**.
+  The build was much smaller than expected because **the event log
+  already had the state and nothing used it**: a chain with no events.
+  Both 0036 guards handled it unchanged — the events guard accepts only
+  `started` on an eventless chain, the legs guard waves every edit
+  through — so `open_chain()` merely split into `create_chain()` +
+  `start_chain()`. Nine checks in a rolled-back block against the live
+  database proved it before any app code. New: a Standard sets tab, a
+  house page under its project, a house list on the project page.
+  **The mistake worth remembering:** `0041` recreated
+  `pusher_chain_state` from **0036's** definition, but `0038` had already
+  replaced that whole view to add the department arrays — a `create view`
+  is a replacement, not a patch — so both columns vanished and All trails
+  was broken against the live database until `0042` put them back within
+  minutes. `npm run typecheck` caught it, because types were regenerated
+  straight after applying rather than at the end. That view has now been
+  defined in four migrations; PLAN.md says to read `pg_get_viewdef` first,
+  always. **The judgement call to sanity-check in the browser:** queued
+  work counts in the project picture as planned-but-not-done, so laying a
+  set down makes a project look further behind. That is the honest
+  reading — the flattering number before it came from the work not being
+  written down — but it surprises, and it is the founder's call.
 - **2026-08-10 (Pusher — the founder's browser test, then the merge)** —
   **PR #2 merged to `master` and deployed**, branch deleted, CI green on
   master. Four fixes first, no migration. The founder opened two trails on Saarang

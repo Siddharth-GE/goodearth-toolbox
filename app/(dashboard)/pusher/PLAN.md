@@ -61,6 +61,37 @@ server-stamped columns), **`0038`** (departments, many per trail),
 **`0039`** (the project schedule), **`0040`** (the surrogate id
 `pusher_project_plans` needed to be auditable).
 
+## Standard trails, and the queue (0041)
+
+Every villa runs roughly the same handoffs, so a **standard set** — a
+named, ordered list of activities — lands them on a house in one click.
+A set is a list of **activities**, never a frozen copy of people and
+days: legs prefill from each activity's last run at the moment it is
+applied, so a leaver's name cannot ride onto every new house forever.
+
+**Queued trails have no clock**, and that is the point. Twelve live
+trails is twelve clocks started at once; Handover at three expected days
+would be cold within the week, on work nobody meant to begin, and a cold
+signal that cries wolf is worth nothing.
+
+This needed almost no new machinery, because **the event log already had
+this state and nothing used it**: a chain with no events. `open_chain()`
+split into `create_chain()` + `start_chain()` and both 0036 guards
+already handled it — the events guard accepts only `started` on an
+eventless chain, and the legs guard waves every edit through because
+"before the trail is opened there is nothing to protect".
+
+Queued work **counts in the project picture as planned-but-not-done**.
+Laying a set down makes a project look further behind, and that is
+correct: the flattering number before it came from the work not being
+written down. Anything else would let a house record twelve jobs and
+still read 100% done.
+
+**Anyone with `/pusher` can start a queued trail** — matching what the
+tool already allows, since Open-a-trail has always let one person open a
+trail whose first leg belongs to someone else. A stricter rule would let
+a coordinator lay a set down and then be unable to begin any of it.
+
 ## Two rules that arrived with the founder's next round
 
 **A trail can be in several departments at once.** A selections handoff
@@ -101,9 +132,22 @@ how inserting one stage silently orphans every date after it.
 - **Don't put `router.refresh()` inside a `useTransition` on a form that
   stays mounted.** `isPending` stays true while the refresh is in flight
   and the whole form greys out. A plain boolean is the right tool.
-- **Don't delete a chain.** Every chain has history from the moment
-  `open_chain()` writes its `started` event. One opened by mistake is
-  _finished_ with a note. There is no delete policy, on purpose.
+- **Don't delete a chain — unless it never started.** Every chain that
+  has run has history from its `started` event, and one opened by mistake
+  is _finished_ with a note. The single exception (0041 §9) is a **queued**
+  trail, which has no events and therefore no history to destroy;
+  `discard_chain()` refuses the instant one starts.
+- **Never rebuild `pusher_chain_state` from an older migration.** It has
+  been defined in **four** files now (0036, 0038, 0039, 0041/0042), and a
+  `create view` is a full replacement, not a patch. 0041 was written from
+  0036's copy and silently dropped the department columns 0038 had added,
+  breaking All trails against the live database until 0042. Always start
+  from the live definition:
+  `select pg_get_viewdef('pusher_chain_state'::regclass, true);`
+- **A queued trail must never show a timer.** A `TimerDial` reading
+  "0 of 4 days" looks like a clock that has started, which is precisely
+  what the queue exists to avoid. Queued rows read "Waiting" / "not
+  started".
 
 ## What is not built yet
 
