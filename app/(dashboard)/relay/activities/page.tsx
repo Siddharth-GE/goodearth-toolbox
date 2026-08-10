@@ -7,7 +7,7 @@ import {
 } from "@/lib/relay/actions";
 import { listActivities, listDepartments } from "@/lib/relay/queries";
 
-import { RelayNav } from "../_components/relay-nav";
+import { RelayNav, RelaySetupNav } from "../_components/relay-nav";
 import { SimpleMaster } from "./_components/simple-master";
 
 export default async function ActivitiesPage() {
@@ -23,6 +23,7 @@ export default async function ActivitiesPage() {
         description="The kinds of work a trail can be, and the parts of the company it belongs to."
       />
       <RelayNav active="activities" />
+      <RelaySetupNav active="activities" />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <SimpleMaster

@@ -9,8 +9,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 
 import { RelayNav } from "../../_components/relay-nav";
-import { SchedulePath } from "../../_components/schedule-path";
 import { TimerDial } from "../../_components/timer-dial";
+import { ScheduleCard } from "./_components/schedule-card";
 import { ScheduleEditor } from "./_components/schedule-editor";
 import { StagePicker } from "./_components/stage-picker";
 
@@ -54,21 +54,18 @@ export default async function ProjectSchedulePage({
       />
       <RelayNav active="projects" />
 
-      {schedule.hasSchedule && (
-        <Card className="p-5">
-          <SchedulePath schedule={schedule} />
-          <div className="border-border mt-3 grid grid-cols-2 gap-3 border-t pt-3 sm:grid-cols-4">
-            <Figure label="work done" value={`${schedule.actualPct}%`} />
-            <Figure label="of the plan elapsed" value={`${schedule.planPct}%`} tone="warning" />
-            <Figure
-              label={schedule.verdict === "ahead" ? "weeks ahead" : "weeks behind"}
-              value={String(Math.abs(schedule.slipWeeks))}
-              tone={schedule.verdict === "behind" ? "danger" : undefined}
-            />
-            <Figure label="finishes" value={schedule.endDay ? formatDate(schedule.endDay) : "—"} />
-          </div>
-        </Card>
-      )}
+      {/* The picture, and the button that edits it. The editor used to
+          sit open below here on every visit. */}
+      <ScheduleCard
+        schedule={schedule}
+        editor={
+          <ScheduleEditor
+            projectId={projectId}
+            startDate={data.startDate}
+            stages={schedule.stages}
+          />
+        }
+      />
 
       {houses.length > 0 && (
         <div className="space-y-2">
@@ -102,8 +99,6 @@ export default async function ProjectSchedulePage({
           </Card>
         </div>
       )}
-
-      <ScheduleEditor projectId={projectId} startDate={data.startDate} stages={schedule.stages} />
 
       {schedule.stages.length > 0 && (
         <div className="space-y-3">

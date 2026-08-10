@@ -5,7 +5,7 @@ import { createTrailSet } from "@/lib/relay/actions";
 import { listActivities, listTrailSets } from "@/lib/relay/queries";
 import { Layers } from "lucide-react";
 
-import { RelayNav } from "../_components/relay-nav";
+import { RelayNav, RelaySetupNav } from "../_components/relay-nav";
 import { NewSetForm } from "./_components/new-set-form";
 import { SetEditor } from "./_components/set-editor";
 
@@ -28,6 +28,7 @@ export default async function TrailSetsPage() {
         description="A named trail with its activities fixed — ready to lay down on a house in one click."
       />
       <RelayNav active="sets" />
+      <RelaySetupNav active="sets" />
 
       <Card className="p-5">
         <NewSetForm action={createTrailSet} />
