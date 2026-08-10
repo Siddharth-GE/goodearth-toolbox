@@ -55,10 +55,35 @@ means flipping `built: true` and replacing the stub `page.tsx`.
   a second SELECT policy on gated tables. Cross-tool lines anchor on
   stable ids (`purchase_order_lines.id`, `indent_lines.id`) or the
   `(budget_id, line_key)` composite FK — never a bare `line_key`.
+- **What each tool reads from outside itself.** Tools coordinate only
+  through the database, so this list IS the contract between them — a
+  column here cannot be renamed or dropped without checking every tool
+  in its row. Keep it current when a tool starts reading something new.
+
+  | Tool            | Reads from other tools                                                                                                                             |
+  | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | Bills           | `po_facts`, `po_billing_totals`                                                                                                                    |
+  | Budgets         | `selections`, `selection_lines`, `spaces`                                                                                                          |
+  | Indents         | `approved_budgets`, `approved_budget_lines`, `construction_budgets`, `construction_budget_lines`, `selections`, `selection_lines`, `po_line_facts` |
+  | Purchase Orders | `indents`, `indent_lines`, `goods_receipts`, `goods_receipt_lines`, `po_billing_totals`                                                            |
+  | Inventory       | `po_facts`, `po_line_facts`                                                                                                                        |
+  | Selections      | `indents`, `indent_lines`, `po_line_facts` (the drift and impact panels)                                                                           |
+  | Masters         | `po_facts`, `bill_facts`, `approved_budgets`, `indents`, `selections`, `selection_lines`                                                           |
+  | Overview        | `indents`, `indent_lines`, `po_facts`, `bill_facts`, `goods_receipts` (counts only)                                                                |
+
+  Money never crosses on a base table — always a fact view. The
+  non-money handoffs above cross on raw tables, which is allowed but is
+  exactly why they are listed here. Everything in this table is a
+  `SELECT`: **no tool ever writes another tool's table.** Masters,
+  `profiles` and the `items` catalogue are shared, not another tool's,
+  so they are not listed.
+
 - **Reads.** PostgREST silently caps selects at 1,000 rows. Anything
   needing completeness (merges, lookups, carry-forward) goes through
-  `fetchAll` (`lib/supabase/fetch-all.ts`); on-screen lists state a
-  limit and show "N of M" from a real count, never `rows.length`.
+  `fetchAll` (`lib/supabase/fetch-all.ts`), which returns the rows and
+  **throws** if a page fails — there is no partial answer to ignore.
+  On-screen lists state a limit and show "N of M" from a real count,
+  never `rows.length`.
 - **Database.** Every schema change is a numbered SQL file in
   `supabase/migrations/`, additive only, never edited once applied.
   Apply in Supabase Studio **before** deploying dependent code, then
@@ -72,8 +97,11 @@ means flipping `built: true` and replacing the stub `page.tsx`.
   picker, add its grant to the allow-list in
   `app/api/catalogue/route.ts` or the picker silently 403s.
 - **Tests** cover pure logic only (`npm test`, node:test via tsx) — no
-  database, no browser; extract pure modules to test them. CI
-  (typecheck, prettier, build, check:actions) is the gate; no hooks.
+  database, no browser; extract pure modules to test them. CI is the
+  gate; no hooks. It runs, in this order: prettier, **lint**, typecheck,
+  test, build, check:actions — and stops at the first failure, so a
+  trivial lint error silently skips every check that matters. Check
+  `gh run list` is actually green, not just that a push succeeded.
 - **Smoke-test as a real single-grant user** (the probe account, one
   tool's grant only) before merging — an admin passes every check and
   never sees grant bugs. After any deploy that changes server actions,

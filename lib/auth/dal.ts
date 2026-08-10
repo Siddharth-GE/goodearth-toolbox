@@ -63,9 +63,17 @@ export const getCurrentUser = cache(async () => {
     .eq("id", userId)
     .single();
 
-  // Never fail silently here: a broken query looks exactly like "no such
-  // user", which logs a real person out with no trace of why.
-  if (error) console.error("getCurrentUser profile read failed:", error);
+  // A broken query is NOT a statement about who someone is. Returning
+  // null here used to answer "the database is unreachable" with
+  // redirect("/login") — and proxy.ts sent anyone holding a valid JWT
+  // straight back to "/", so a transient failure looped the browser
+  // until it gave up with ERR_TOO_MANY_REDIRECTS. Every tool down, the
+  // shell down, nothing on screen saying why. Throwing instead puts it
+  // in front of an error boundary, where a failure belongs.
+  if (error) {
+    console.error("getCurrentUser profile read failed:", error);
+    throw new Error("Could not read your profile.", { cause: error });
+  }
 
   // No profile row means no such staff member — every real user gets one
   // from the handle_new_user trigger at signup (0001_profiles.sql). This
@@ -80,6 +88,10 @@ export const getCurrentUser = cache(async () => {
   // database agrees independently — is_admin() and has_app() (0032) both
   // answer false for them, so this is the polite half of the rule, not
   // the enforcing half.
+  //
+  // Their Supabase Auth session stays valid until it expires — setActive
+  // only flips this column. So this redirect happens with a good JWT in
+  // the cookie, which is exactly the case proxy.ts must not bounce back.
   if (!data.is_active) return null;
 
   // Effective access is the union, computed here on every request

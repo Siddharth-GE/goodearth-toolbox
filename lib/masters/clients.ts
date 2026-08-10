@@ -20,10 +20,10 @@ export type ClientRow = {
 // here promises completeness, so none of them get to silently cap.
 export async function listClients(): Promise<ClientRow[]> {
   const supabase = await createClient();
-  const { data } = await fetchAll((from, to) =>
+  const data = await fetchAll((from, to) =>
     supabase.from("clients").select("*").order("name").order("id").range(from, to),
   );
-  return (data ?? []) as ClientRow[];
+  return data as ClientRow[];
 }
 
 export const CLIENTS_PAGE_SIZE = 50;

@@ -38,7 +38,8 @@ export function BilledSection({ totals }: { totals: PoBilledTotals }) {
         </div>
         {over && (
           <p className="text-warning mt-3 text-xs font-medium" role="alert">
-            Billed past the order's value — deliberate over-billing is allowed, but worth a look.
+            Billed past the order&apos;s value — deliberate over-billing is allowed, but worth a
+            look.
           </p>
         )}
       </div>

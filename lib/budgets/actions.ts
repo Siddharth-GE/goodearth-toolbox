@@ -123,8 +123,34 @@ export async function startPricing(selectionId: string): Promise<ActionState> {
  * The decision rules live in carry-forward.ts, pure and tested. This
  * function only fetches and writes.
  */
+type BudgetsClient = Awaited<ReturnType<typeof createClient>>;
+
+// Split out only so carryForward's three completeness-critical reads can
+// be named in a `let` above the try that catches them.
+function readPreviousBudgetLines(supabase: BudgetsClient, budgetId: string) {
+  return fetchAll((from, to) =>
+    supabase
+      .from("budget_lines")
+      .select("line_key, quantity, expected_vendor_id, unit_cost, margin_pct, notes")
+      .eq("budget_id", budgetId)
+      .order("line_key")
+      .range(from, to),
+  );
+}
+
+function readSelectionQuantities(supabase: BudgetsClient, selectionId: string) {
+  return fetchAll((from, to) =>
+    supabase
+      .from("selection_lines")
+      .select("line_key, quantity")
+      .eq("selection_id", selectionId)
+      .order("line_key")
+      .range(from, to),
+  );
+}
+
 async function carryForward(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: BudgetsClient,
   {
     budgetId,
     selectionId,
@@ -162,43 +188,24 @@ async function carryForward(
   // truncated read here doesn't fail — it quietly hands the budget team a
   // blank sheet for lines they already priced, which is the single most
   // likely reason they'd abandon the tool for a spreadsheet.
-  const [previousBudgetLines, previousSelectionLines, currentSelectionLines] = await Promise.all([
-    fetchAll((from, to) =>
-      supabase
-        .from("budget_lines")
-        .select("line_key, quantity, expected_vendor_id, unit_cost, margin_pct, notes")
-        .eq("budget_id", previous.id)
-        .order("line_key")
-        .range(from, to),
-    ),
-    fetchAll((from, to) =>
-      supabase
-        .from("selection_lines")
-        .select("line_key, quantity")
-        .eq("selection_id", previous.selection_id)
-        .order("line_key")
-        .range(from, to),
-    ),
-    fetchAll((from, to) =>
-      supabase
-        .from("selection_lines")
-        .select("line_key, quantity")
-        .eq("selection_id", selectionId)
-        .order("line_key")
-        .range(from, to),
-    ),
-  ]);
-
-  if (previousBudgetLines.error || previousSelectionLines.error || currentSelectionLines.error) {
-    console.error(
-      "carryForward read failed:",
-      previousBudgetLines.error ?? previousSelectionLines.error ?? currentSelectionLines.error,
-    );
+  // fetchAll raises rather than handing back a partial list; caught here
+  // because this feeds a Server Action, which answers with a message.
+  let previousBudgetLines: Awaited<ReturnType<typeof readPreviousBudgetLines>>;
+  let previousSelectionLines: Awaited<ReturnType<typeof readSelectionQuantities>>;
+  let currentSelectionLines: Awaited<ReturnType<typeof readSelectionQuantities>>;
+  try {
+    [previousBudgetLines, previousSelectionLines, currentSelectionLines] = await Promise.all([
+      readPreviousBudgetLines(supabase, previous.id),
+      readSelectionQuantities(supabase, previous.selection_id),
+      readSelectionQuantities(supabase, selectionId),
+    ]);
+  } catch (error) {
+    console.error("carryForward read failed:", error);
     return "Could not read the previous budget. Try again.";
   }
 
   const plan = planCarryForward({
-    previousBudgetLines: (previousBudgetLines.data ?? []).map((line) => ({
+    previousBudgetLines: previousBudgetLines.map((line) => ({
       line_key: line.line_key,
       quantity: Number(line.quantity),
       expected_vendor_id: line.expected_vendor_id,
@@ -206,11 +213,11 @@ async function carryForward(
       margin_pct: line.margin_pct === null ? null : Number(line.margin_pct),
       notes: line.notes,
     })),
-    previousSelectionLines: (previousSelectionLines.data ?? []).map((line) => ({
+    previousSelectionLines: previousSelectionLines.map((line) => ({
       line_key: line.line_key,
       quantity: Number(line.quantity),
     })),
-    currentSelectionLines: (currentSelectionLines.data ?? []).map((line) => ({
+    currentSelectionLines: currentSelectionLines.map((line) => ({
       line_key: line.line_key,
       quantity: Number(line.quantity),
     })),

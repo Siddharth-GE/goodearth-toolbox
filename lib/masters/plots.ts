@@ -22,12 +22,12 @@ export type PlotRow = {
 // likely to cross PostgREST's silent 1,000-row cap as real data lands.
 export async function listPlots(projectId?: string): Promise<PlotRow[]> {
   const supabase = await createClient();
-  const { data } = await fetchAll((from, to) => {
+  const data = await fetchAll((from, to) => {
     let query = supabase.from("plots").select("*").order("name").order("id").range(from, to);
     if (projectId) query = query.eq("project_id", projectId);
     return query;
   });
-  return (data ?? []) as PlotRow[];
+  return data as PlotRow[];
 }
 
 export const PLOTS_PAGE_SIZE = 50;

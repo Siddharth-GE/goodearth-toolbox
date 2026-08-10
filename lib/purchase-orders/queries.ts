@@ -77,7 +77,7 @@ export async function listPurchaseOrders({
 
   const total = count ?? 0;
   return {
-    orders: (data ?? []).map((row) => ({
+    orders: data.map((row) => ({
       id: row.id,
       reference: row.reference ?? "—",
       status: row.status as PoStatus,
@@ -196,7 +196,7 @@ export const getPurchaseOrder = cache(async (poId: string): Promise<PoDetail | n
   await requireTool("/purchase-orders");
   const supabase = await createClient();
 
-  const [{ data: po }, { data: lines }] = await Promise.all([
+  const [{ data: po }, lines] = await Promise.all([
     supabase
       .from("purchase_orders")
       .select(
@@ -230,7 +230,7 @@ export const getPurchaseOrder = cache(async (poId: string): Promise<PoDetail | n
         po.issued_by,
         po.deletion_requested_by,
         po.cancelled_by,
-        ...(lines ?? []).map((line) => line.updated_by ?? line.created_by),
+        ...lines.map((line) => line.updated_by ?? line.created_by),
       ].filter((id): id is string => id != null),
     ),
   ];
@@ -240,7 +240,7 @@ export const getPurchaseOrder = cache(async (poId: string): Promise<PoDetail | n
   const names = new Map((profiles ?? []).map((profile) => [profile.id, profile.full_name]));
   const nameOf = (id: string | null | undefined) => (id ? (names.get(id) ?? null) : null);
 
-  const mapped: PoLineRow[] = (lines ?? []).map((line) => {
+  const mapped: PoLineRow[] = lines.map((line) => {
     const item = line.items as {
       name: string;
       code: string | null;
@@ -320,11 +320,12 @@ export async function getPoBilledTotals(poId: string): Promise<PoBilledTotals> {
   await requireTool("/purchase-orders");
   const supabase = await createClient();
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("po_billing_totals")
     .select("ordered_total, billed_total, bill_count")
     .eq("po_id", poId)
     .maybeSingle();
+  if (error) console.error("getPoBilledTotals failed:", error);
 
   // Every view column is typed nullable by the generator — normalise
   // once at the boundary.
@@ -446,7 +447,7 @@ export async function getIndentPool(poId: string): Promise<IndentPool | null> {
   // lines, which reads as "already ordered" and leaves material unbought.
   // The query is built fresh per callback: fetchAll pages by calling it
   // again, and a reused builder would stack duplicate clauses.
-  const { data: indents } = await fetchAll((from, to) => {
+  const indents = await fetchAll((from, to) => {
     let query = supabase
       .from("indents")
       .select("id, reference, stage")
@@ -468,10 +469,10 @@ export async function getIndentPool(poId: string): Promise<IndentPool | null> {
       ? `plot ${(po.plots as { name: string } | null)?.name ?? ""}`.trim()
       : "general (no plot or unit)";
 
-  if ((indents ?? []).length === 0) return { scope_label, groups: [] };
+  if (indents.length === 0) return { scope_label, groups: [] };
 
-  const indentIds = (indents ?? []).map((indent) => indent.id);
-  const { data: lines } = await fetchAll((from, to) =>
+  const indentIds = indents.map((indent) => indent.id);
+  const lines = await fetchAll((from, to) =>
     supabase
       .from("indent_lines")
       .select(
@@ -483,8 +484,8 @@ export async function getIndentPool(poId: string): Promise<IndentPool | null> {
       .range(from, to),
   );
 
-  const lineIds = (lines ?? []).map((line) => line.id);
-  const { data: ordered } = lineIds.length
+  const lineIds = lines.map((line) => line.id);
+  const ordered = lineIds.length
     ? await fetchAll((from, to) =>
         supabase
           .from("purchase_order_lines")
@@ -493,11 +494,11 @@ export async function getIndentPool(poId: string): Promise<IndentPool | null> {
           .order("id")
           .range(from, to),
       )
-    : { data: [] };
+    : [];
 
   const orderedByLine = new Map<string, number>();
   const onThisPo = new Set<string>();
-  for (const row of ordered ?? []) {
+  for (const row of ordered) {
     const status = (row.purchase_orders as { status: string } | null)?.status;
     if (status === "cancelled") continue;
     orderedByLine.set(
@@ -508,7 +509,7 @@ export async function getIndentPool(poId: string): Promise<IndentPool | null> {
   }
 
   const byIndent = new Map<string, PoolLineRow[]>();
-  for (const line of lines ?? []) {
+  for (const line of lines) {
     const item = line.items as {
       name: string;
       code: string | null;
@@ -536,7 +537,7 @@ export async function getIndentPool(poId: string): Promise<IndentPool | null> {
 
   return {
     scope_label,
-    groups: (indents ?? [])
+    groups: indents
       .filter((indent) => byIndent.has(indent.id))
       .map((indent) => ({
         indent_id: indent.id,
@@ -561,10 +562,10 @@ async function labelsById(
 ): Promise<Map<string, string>> {
   const unique = [...new Set(ids.filter((id): id is string => id != null))];
   if (unique.length === 0) return new Map();
-  const { data } = await fetchAll((from, to) =>
+  const data = await fetchAll((from, to) =>
     supabase.from(table).select("id, name").in("id", unique).order("id").range(from, to),
   );
-  return new Map((data ?? []).map((row) => [row.id, row.name]));
+  return new Map(data.map((row) => [row.id, row.name]));
 }
 
 /** Actor names for a set of profile ids — the attribution rule. */
@@ -585,10 +586,10 @@ async function namesById(
 async function itemNamesById(supabase: Client, ids: string[]): Promise<Map<string, string>> {
   const unique = [...new Set(ids)];
   if (unique.length === 0) return new Map();
-  const { data } = await fetchAll((from, to) =>
+  const data = await fetchAll((from, to) =>
     supabase.from("items").select("id, name").in("id", unique).order("id").range(from, to),
   );
-  return new Map((data ?? []).map((row) => [row.id, row.name]));
+  return new Map(data.map((row) => [row.id, row.name]));
 }
 
 function describeDestination(
@@ -629,7 +630,7 @@ export async function getPoReceipts(poId: string): Promise<PoReceiptRow[]> {
   await requireTool("/purchase-orders");
   const supabase = await createClient();
 
-  const { data: receipts } = await fetchAll((from, to) =>
+  const receipts = await fetchAll((from, to) =>
     supabase
       .from("goods_receipts")
       .select(
@@ -640,10 +641,10 @@ export async function getPoReceipts(poId: string): Promise<PoReceiptRow[]> {
       .order("id")
       .range(from, to),
   );
-  if ((receipts ?? []).length === 0) return [];
+  if (receipts.length === 0) return [];
 
-  const receiptIds = (receipts ?? []).map((receipt) => receipt.id);
-  const { data: lines } = await fetchAll((from, to) =>
+  const receiptIds = receipts.map((receipt) => receipt.id);
+  const lines = await fetchAll((from, to) =>
     supabase
       .from("goods_receipt_lines")
       .select("receipt_id, item_id, quantity, uom")
@@ -655,31 +656,31 @@ export async function getPoReceipts(poId: string): Promise<PoReceiptRow[]> {
   const [items, stores, plots, units, nameOf] = await Promise.all([
     itemNamesById(
       supabase,
-      (lines ?? []).map((line) => line.item_id),
+      lines.map((line) => line.item_id),
     ),
     labelsById(
       supabase,
       "stores",
-      (receipts ?? []).map((r) => r.store_id),
+      receipts.map((r) => r.store_id),
     ),
     labelsById(
       supabase,
       "plots",
-      (receipts ?? []).map((r) => r.plot_id),
+      receipts.map((r) => r.plot_id),
     ),
     labelsById(
       supabase,
       "units",
-      (receipts ?? []).map((r) => r.unit_id),
+      receipts.map((r) => r.unit_id),
     ),
     namesById(
       supabase,
-      (receipts ?? []).map((r) => r.created_by),
+      receipts.map((r) => r.created_by),
     ),
   ]);
 
   const linesByReceipt = new Map<string, { item_name: string; quantity: number; uom: string }[]>();
-  for (const line of lines ?? []) {
+  for (const line of lines) {
     const group = linesByReceipt.get(line.receipt_id) ?? [];
     group.push({
       item_name: items.get(line.item_id) ?? "—",
@@ -689,7 +690,7 @@ export async function getPoReceipts(poId: string): Promise<PoReceiptRow[]> {
     linesByReceipt.set(line.receipt_id, group);
   }
 
-  return (receipts ?? []).map((receipt) => ({
+  return receipts.map((receipt) => ({
     id: receipt.id,
     reference: receipt.reference ?? "—",
     destination: describeDestination(receipt, stores, plots, units),

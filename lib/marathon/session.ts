@@ -116,10 +116,11 @@ export async function requireAdminSession() {
 
 export async function verifyAdminPin(pin: string) {
   const supabase = createAdminClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("marathon_config")
     .select("admin_pin_hash, admin_pin_salt")
     .single();
+  if (error) console.error("verifyAdminPin failed:", error);
 
   if (!data) return false;
   return verifyPinHash(pin, data.admin_pin_hash, data.admin_pin_salt);

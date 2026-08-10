@@ -14,15 +14,15 @@ chain runs design → price → indent → PO → goods in / stock / goods
 out → bill → paid. **Next: Phase 9** — Overview fully real + one real
 project run end-to-end.
 
-|                    |                                                                                                                         |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
-| Last worked        | 2026-08-05                                                                                                              |
-| Branch             | `master` — clean                                                                                                        |
-| Migrations applied | `0001`–`0035` (next is `0036`)                                                                                          |
-| Items in database  | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands                                          |
-| Thumbnails         | 897 in Supabase Storage; 1,736 items use the colour placeholder                                                         |
-| Built tools        | Marathon, Settings, Masters, Selections, Budgets (Interiors + Construction), Indents, Purchase Orders, Inventory, Bills |
-| Tests              | `npm test` — 136, all pure logic                                                                                        |
+|                    |                                                                                                                                                         |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Last worked        | 2026-08-10                                                                                                                                              |
+| Branch             | `feature/audit-kernel-failure-modes` — [PR #1](https://github.com/Siddharth-GE/goodearth-toolbox/pull/1), CI green, awaiting the founder's browser pass |
+| Migrations applied | `0001`–`0035` (next is `0036`)                                                                                                                          |
+| Items in database  | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands                                                                          |
+| Thumbnails         | 897 in Supabase Storage; 1,736 items use the colour placeholder                                                                                         |
+| Built tools        | Marathon, Settings, Masters, Selections, Budgets (Interiors + Construction), Indents, Purchase Orders, Inventory, Bills                                 |
+| Tests              | `npm test` — 136, all pure logic                                                                                                                        |
 
 ## Next up
 
@@ -131,6 +131,15 @@ project run end-to-end.
 - `space_views` storage orphans (deleted spaces leave JPEGs) — someday.
 - Two accepted races: `moveSpaceView` sort swap (self-heals) and
   Marathon PIN lockout (fix rides the next Marathon migration).
+- **Inventory's partial-write window.** A goods receipt (and a stock
+  issue) mints its header in an RPC, then inserts lines one at a time so
+  the over-receipt / negative-stock guard can name the line it refused.
+  A refusal part-way therefore leaves a note holding fewer lines than
+  arrived, and nothing can add lines to it afterwards — the recovery is
+  a second receipt against the same PO, which the guards make safe, and
+  which the message now says. Folding the lines into the RPC would close
+  the window but lose the per-line refusal. Revisit if a store-keeper
+  actually hits it.
 - `lib/selections/views.ts` stays put until a third consumer appears.
 - Full CI browser smoke **costed and declined** (2026-08-03);
   `check:actions` covers the known outage class — revisit only if a
@@ -156,6 +165,9 @@ project run end-to-end.
 - `npm test`'s glob is shell-dependent — check that before assuming
   green. Git Bash rewrites `/budgets`-style args into Windows paths —
   use PowerShell for REST calls with app slugs.
+- **CI stops at the first failing step, and Lint is second.** A green
+  push is not a green build — two apostrophes hid the whole gate for
+  five days. `gh run list` after pushing.
 - Lessons that stuck: Server Actions are wrong for reads (catalogue
   search is a Route Handler) and cap bodies at 1 MB; Storage has its
   own RLS and service-role checks prove nothing about real users;
@@ -168,6 +180,42 @@ project run end-to-end.
 
 One line per day; full detail in git history and the PLAN.md files.
 
+- **2026-08-10 (independence audit — kernel failure modes)** — audited
+  the whole repo against the toolbox doctrine;
+  `feature/audit-kernel-failure-modes`, PR #1, **not merged** — CI green,
+  waiting on the founder's browser pass. **The tool boundaries hold:**
+  the only cross-tool imports in the app are the two sanctioned ones
+  (overview→marathon, budgets quote→selections views), every cross-tool
+  table touch is a `SELECT`, the service-role client appears only in
+  Marathon and `inviteUser`, and every sequential number is minted in
+  plpgsql under a counter row lock. Every finding was in the **shared
+  kernel's failure modes**. The live one: `dal.ts` answered a failed
+  profile read with `redirect("/login")` while `proxy.ts` bounced any
+  session-holder off `/login` back to `/` — an unbounded redirect loop
+  ending in `ERR_TOO_MANY_REDIRECTS`, the whole toolbox unreachable, and
+  **reachable today by switching off a signed-in colleague** (setActive
+  flips a flag and leaves the session alive). Same class as the
+  2026-08-05 login loop; that fix added logging and left the mechanism.
+  (Housekeeping: the laptop resumed from a 5-day sleep with a stale
+  clock, so the first eight commits on this branch are stamped
+  2026-08-05. Windows resynced itself mid-session; nothing to fix.)
+  A read error now throws, and the `/login` bounce is deleted, so the
+  two real turn-aways reach the login page — where the login action
+  already names a deactivated account. Also: the home page no longer
+  dies with Marathon's service-role env var; **`fetchAll` returns rows
+  and throws** instead of handing back a partial array with an error
+  only 4 of ~70 call sites checked (net 13 lines fewer); the
+  half-recorded-delivery message stopped telling store-keepers to "open
+  it to finish" when nothing can; one round trip off the Settings person
+  page; and the cross-tool read contract is now a table in CLAUDE.md.
+  **CI had been red on every push to master since 2026-08-04** — two
+  unescaped apostrophes failing the Lint step, which runs second, so
+  Types, Tests, Build and `check:actions` never ran for days; fixed, and
+  PR #1 is the first all-green run since. The founder's call on the six
+  illustrative Overview cards: leave them (Phase 9 makes them real).
+  The authenticated smoke did NOT run — the probe password reset was
+  again blocked by the assistant's permission mode — so the redirect
+  loop is proven by code path and CI, not by a browser.
 - **2026-08-05 (masters & settings upgrade)** — merged to `master`.
   Seven shippable pieces plus two fixes, migrations `0031`–`0035`.
   **Masters:** the last admins-only write (gst_rates) fixed, audit

@@ -166,8 +166,22 @@ export async function countBillsPipeline(): Promise<{
  * The four fields the home page's live card shows — the dashboard's
  * only window into Marathon. The service-role client stays confined to
  * lib/marathon; this adapter just narrows what leaves it.
+ *
+ * Returns null rather than throwing, and the card renders nothing.
+ * Marathon is the one tool on this page reached through the service-role
+ * client, so it is the one read that can throw outright — createAdminClient
+ * does, the moment SUPABASE_SERVICE_ROLE_KEY is missing. The card sits
+ * inside <Suspense>, which handles pending and catches nothing, so that
+ * throw took down the signed-in home page of every member of staff. A
+ * kiosk tool's environment variable must not be able to do that: the
+ * shell does not depend on a tool.
  */
 export async function getMarathonPulse() {
-  const { eventName, totalEntries, groupCount, runCounts } = await getMarathonHome();
-  return { eventName, totalEntries, groupCount, runCounts };
+  try {
+    const { eventName, totalEntries, groupCount, runCounts } = await getMarathonHome();
+    return { eventName, totalEntries, groupCount, runCounts };
+  } catch (error) {
+    console.error("getMarathonPulse failed — hiding the live card:", error);
+    return null;
+  }
 }

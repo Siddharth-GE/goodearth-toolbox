@@ -28,12 +28,12 @@ export type UnitRow = {
 // below instead.
 export async function listUnits(projectId?: string): Promise<UnitRow[]> {
   const supabase = await createClient();
-  const { data } = await fetchAll((from, to) => {
+  const data = await fetchAll((from, to) => {
     let query = supabase.from("units").select("*").order("name").order("id").range(from, to);
     if (projectId) query = query.eq("project_id", projectId);
     return query;
   });
-  return (data ?? []) as UnitRow[];
+  return data as UnitRow[];
 }
 
 export const UNITS_LIST_LIMIT = 50;

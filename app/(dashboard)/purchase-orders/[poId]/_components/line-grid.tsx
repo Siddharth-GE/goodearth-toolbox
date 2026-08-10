@@ -145,7 +145,7 @@ export function LineGrid({
               <p className="text-warning text-xs font-medium">
                 {formatCount(totals.pendingCount)}{" "}
                 {totals.pendingCount === 1 ? "line still needs" : "lines still need"} a rate and GST
-                — they're not in these totals.
+                — they&apos;re not in these totals.
               </p>
             )}
           </div>
