@@ -2,7 +2,7 @@
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { SCENARIOS, type PlanInputs, type SaleLine } from "@/lib/business-planning/inputs";
-import type { LineResult } from "@/lib/business-planning/model";
+import type { SaleLineResult } from "@/lib/business-planning/model";
 import { formatCrore, formatQuantity } from "@/lib/format";
 import { useId } from "react";
 import { MonthField, NumberField, PercentField, SectionLabel, TextField } from "./fields";
@@ -25,7 +25,7 @@ export function SaleLineForm({
 }: {
   line: SaleLine;
   plan: PlanInputs;
-  result: LineResult | undefined;
+  result: SaleLineResult | undefined;
   otherLineCount: number;
   onChange: (patch: Partial<SaleLine>) => void;
 }) {
@@ -252,7 +252,7 @@ export function SaleLineForm({
  * — pooled, a line in surplus funds a line in deficit. The Summary tab
  * shows both and names the gap.
  */
-function LineOutcome({ result, units }: { result: LineResult; units: number }) {
+function LineOutcome({ result, units }: { result: SaleLineResult; units: number }) {
   const shortfall = result.unitsUnsold > 0.0001;
 
   return (

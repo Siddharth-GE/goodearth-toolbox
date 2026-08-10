@@ -6,7 +6,9 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { IconButton } from "@/components/ui/icon-button";
 import {
+  newHoldLine,
   newSaleLine,
+  type HoldLine,
   type PlanInputs,
   type PlanLine,
   type SaleLine,
@@ -15,6 +17,7 @@ import type { ScenarioResult } from "@/lib/business-planning/model";
 import { formatCrore, formatQuantity } from "@/lib/format";
 import { ChevronDown, ChevronRight, Layers, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { HoldLineForm } from "./hold-line-form";
 import { SaleLineForm } from "./sale-line-form";
 
 /**
@@ -22,10 +25,15 @@ import { SaleLineForm } from "./sale-line-form";
  * be a mix of some" — so this is a list you add to, not a fixed set of
  * columns.
  *
- * Each card's header carries that line's live revenue and profit, so
- * what a line contributes is readable without opening it. One line is
- * open at a time: these are twenty-field forms, and three of them
- * unfolded at once is a page nobody can find anything in.
+ * Two kinds cover every product the founder named. A SALE line is
+ * plotted development, row houses, villas, apartments or commercial you
+ * sell; a HOLD line is senior living, leased commercial or hospitality.
+ * The name is yours — two SALE lines can behave completely differently.
+ *
+ * Each card's header carries that line's live figures, so what a line
+ * contributes is readable without opening it. One line is open at a
+ * time: these are twenty-field forms, and three of them unfolded at once
+ * is a page nobody can find anything in.
  */
 export function LinesTab({
   inputs,
@@ -39,13 +47,14 @@ export function LinesTab({
   const [openId, setOpenId] = useState<string | null>(inputs.lines[0]?.id ?? null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
-  function addSaleLine() {
-    const line = newSaleLine(`Line ${inputs.lines.length + 1}`);
+  function addLine(kind: "sale" | "hold") {
+    const name = `Line ${inputs.lines.length + 1}`;
+    const line = kind === "sale" ? newSaleLine(name) : newHoldLine(name);
     onChange({ lines: [...inputs.lines, line] });
     setOpenId(line.id);
   }
 
-  function updateLine(id: string, patch: Partial<SaleLine>) {
+  function updateLine(id: string, patch: Partial<SaleLine> | Partial<HoldLine>) {
     onChange({
       lines: inputs.lines.map((line) =>
         line.id === id ? ({ ...line, ...patch } as PlanLine) : line,
@@ -64,8 +73,15 @@ export function LinesTab({
       <EmptyState
         icon={Layers}
         title="No lines yet"
-        description="A line is one product: plotted development, row houses, apartments, commercial. Add the first and the summary starts filling in."
-        action={<Button onClick={addSaleLine}>Add a line</Button>}
+        description="A line is one product. Add one you SELL — plotted development, row houses, apartments, commercial — or one you HOLD and earn from, like senior living. The summary fills in as you go."
+        action={
+          <div className="flex gap-2">
+            <Button onClick={() => addLine("sale")}>Add a line you sell</Button>
+            <Button variant="secondary" onClick={() => addLine("hold")}>
+              Add one you hold
+            </Button>
+          </div>
+        }
       />
     );
   }
@@ -95,9 +111,14 @@ export function LinesTab({
                   <span className="text-foreground truncate font-medium">
                     {line.name || "Untitled line"}
                   </span>
-                  <Badge variant="neutral">Sale</Badge>
+                  <Badge variant="neutral">{line.kind === "sale" ? "Sale" : "Hold"}</Badge>
+                  {lineResult?.kind === "hold" && lineResult.capex > 0 ? (
+                    <Badge variant={lineResult.verdict === "hold" ? "success" : "warning"}>
+                      {lineResult.verdict === "hold" ? "Hold it" : "Sell it"}
+                    </Badge>
+                  ) : null}
                 </div>
-                {lineResult ? (
+                {lineResult?.kind === "sale" ? (
                   <div className="text-muted mt-1 flex flex-wrap gap-x-4 gap-y-0.5 pl-6 text-xs">
                     <span>
                       {formatQuantity(lineResult.unitsSold)} units ·{" "}
@@ -117,6 +138,29 @@ export function LinesTab({
                         {formatQuantity(lineResult.unitsUnsold)} unsold at the horizon
                       </span>
                     ) : null}
+                  </div>
+                ) : null}
+                {lineResult?.kind === "hold" ? (
+                  <div className="text-muted mt-1 flex flex-wrap gap-x-4 gap-y-0.5 pl-6 text-xs">
+                    <span>
+                      {formatQuantity(line.kind === "hold" ? line.units : 0)} units · capex{" "}
+                      <span className="text-foreground font-mono">
+                        {formatCrore(lineResult.capex)}
+                      </span>
+                    </span>
+                    <span>
+                      NOI{" "}
+                      <span className="text-foreground font-mono">
+                        {formatCrore(lineResult.stabilisedNoi)}
+                      </span>{" "}
+                      a year
+                    </span>
+                    <span>
+                      worth{" "}
+                      <span className="text-foreground font-mono">
+                        {formatCrore(Math.max(lineResult.holdValue, lineResult.sellValue))}
+                      </span>
+                    </span>
                   </div>
                 ) : null}
               </button>
@@ -146,29 +190,46 @@ export function LinesTab({
               </div>
             ) : null}
 
-            {open && line.kind === "sale" ? (
+            {open ? (
               <div className="border-border border-t px-4 pt-3 pb-4">
-                <SaleLineForm
-                  line={line}
-                  plan={inputs}
-                  result={lineResult}
-                  otherLineCount={inputs.lines.length - 1}
-                  onChange={(patch) => updateLine(line.id, patch)}
-                />
+                {line.kind === "sale" ? (
+                  <SaleLineForm
+                    line={line}
+                    plan={inputs}
+                    result={lineResult?.kind === "sale" ? lineResult : undefined}
+                    otherLineCount={inputs.lines.length - 1}
+                    onChange={(patch) => updateLine(line.id, patch)}
+                  />
+                ) : (
+                  <HoldLineForm
+                    line={line}
+                    result={lineResult?.kind === "hold" ? lineResult : undefined}
+                    onChange={(patch) => updateLine(line.id, patch)}
+                  />
+                )}
               </div>
             ) : null}
           </Card>
         );
       })}
 
-      <button
-        type="button"
-        onClick={addSaleLine}
-        className="border-border text-muted hover:border-accent hover:text-accent flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed py-3 text-sm font-medium transition-colors"
-      >
-        <Plus className="size-4" />
-        Add a line
-      </button>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <AddLineButton onClick={() => addLine("sale")} label="Add a line you sell" />
+        <AddLineButton onClick={() => addLine("hold")} label="Add a line you hold" />
+      </div>
     </div>
+  );
+}
+
+function AddLineButton({ onClick, label }: { onClick: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="border-border text-muted hover:border-accent hover:text-accent flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed py-3 text-sm font-medium transition-colors"
+    >
+      <Plus className="size-4" />
+      {label}
+    </button>
   );
 }

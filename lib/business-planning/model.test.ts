@@ -12,13 +12,22 @@ import { test } from "node:test";
 
 import {
   defaultPlanInputs,
+  newHoldLine,
   newSaleLine,
   parsePlanInputs,
   type PlanInputs,
   type SaleLine,
 } from "./inputs";
-import { collectionSchedule, constructionSchedule, irr, runPlan, runScenario } from "./model";
-import { viharaPlan } from "./vihara-fixture";
+import {
+  collectionSchedule,
+  constructionSchedule,
+  irr,
+  runPlan,
+  runScenario,
+  type SaleLineResult,
+  type ScenarioResult,
+} from "./model";
+import { viharaConsolidatedPlan, viharaPlan, viharaSeniorLivingPlan } from "./vihara-fixture";
 
 /** ₹1,000 on figures in the hundreds of crore — six significant figures. */
 const RUPEE_TOLERANCE = 1_000;
@@ -28,6 +37,13 @@ function closeTo(actual: number, expected: number, tolerance = RUPEE_TOLERANCE) 
     Math.abs(actual - expected) <= tolerance,
     `expected ${expected.toLocaleString()}, got ${actual.toLocaleString()} (off by ${(actual - expected).toLocaleString()})`,
   );
+}
+
+/** Narrow a line result to the SALE kind, failing loudly if it isn't. */
+function sale(result: ScenarioResult, index = 0): SaleLineResult {
+  const line = result.lines[index];
+  assert.ok(line.kind === "sale", `line ${index} is not a sale line`);
+  return line;
 }
 
 // ---------------------------------------------------------------------
@@ -78,14 +94,14 @@ test("Vihara, Base: slower selling leaves units and construction unfinished", ()
   closeTo(result.lines[0].revenue, 868_350_000);
   // 41.999999999999993 — the workbook's own total reads the same, for
   // the same reason: forty-odd additions of 0.8.
-  closeTo(result.lines[0].unitsSold, 42, 1e-9);
+  closeTo(sale(result).unitsSold, 42, 1e-9);
 
   // Summary!B7 — the row houses do NOT. They wait for the villas to
   // cross 70% (month 37 at this pace) and then have 36 months left,
   // which is 28.8 units, not 35. This is the horizon doing its job.
   closeTo(result.lines[1].revenue, 271_440_000);
-  closeTo(result.lines[1].unitsSold, 28.8, 0.001);
-  closeTo(result.lines[1].unitsUnsold, 6.2, 0.001);
+  closeTo(sale(result, 1).unitsSold, 28.8, 0.001);
+  closeTo(sale(result, 1).unitsUnsold, 6.2, 0.001);
 
   closeTo(result.revenue, 1_139_790_000);
 
@@ -195,7 +211,7 @@ test("a line never sells more units than it has", () => {
     velocity: [3, 3, 3],
   });
   const result = runScenario(planWith([line]), 0);
-  assert.equal(result.lines[0].unitsSold, 10);
+  assert.equal(sale(result).unitsSold, 10);
   closeTo(result.revenue, 10_000_000);
   // Four months of 3, 3, 3, 1 — the last month is the remainder.
   closeTo(result.monthly.unitsSold[3], 1, 1e-9);
@@ -240,7 +256,7 @@ test("a trigger on the only line in a plan launches rather than deadlocking", ()
     launchTriggerPct: 70,
   });
   const result = runScenario(planWith([only]), 0);
-  assert.equal(result.lines[0].unitsSold, 5);
+  assert.equal(sale(result).unitsSold, 5);
 });
 
 test("sales start month holds a line back without a trigger", () => {
@@ -390,4 +406,132 @@ test("zero instalments and a zero build cycle don't divide by zero", () => {
   assert.ok(Number.isFinite(result.revenue));
   assert.ok(Number.isFinite(result.pbt));
   closeTo(result.revenue, 2_000_000);
+});
+
+// ---------------------------------------------------------------------
+// HOLD lines — the workbook's Block 2
+// ---------------------------------------------------------------------
+
+test("Vihara senior living: the capex build-up matches the workbook", () => {
+  const result = runScenario(viharaSeniorLivingPlan(), 1);
+  const line = result.lines[0];
+  assert.ok(line.kind === "hold");
+
+  // SL_Capex!B7, B9, B11 — three areas doing three jobs. Built-up is
+  // twice carpet at 50% efficiency, and it is what construction costs.
+  closeTo(line.carpetTotal, 27_200, 1e-6);
+  closeTo(line.buaTotal, 54_400, 1e-6);
+  closeTo(line.sbaTotal, 54_400, 1e-6);
+
+  // SL_Capex!B33:B35
+  closeTo(line.capex, 290_982_720);
+  assert.ok(line.capexPerUnit !== null);
+  closeTo(line.capexPerUnit, 8_558_315.29, 1);
+  assert.ok(line.capexPerBuaSqft !== null);
+  closeTo(line.capexPerBuaSqft, 5_348.95, 0.01);
+});
+
+test("Vihara senior living: stabilised NOI and the terminal value match", () => {
+  const result = runScenario(viharaSeniorLivingPlan(), 1);
+  const line = result.lines[0];
+  assert.ok(line.kind === "hold");
+
+  // SL_Operations!B36, B37, B39
+  closeTo(line.stabilisedNoi, 27_549_600);
+  closeTo(line.terminalValue, 306_106_666.67);
+  assert.ok(line.yieldOnCostPct !== null);
+  closeTo(line.yieldOnCostPct, 9.4677787052097118, 0.0001);
+});
+
+test("Vihara senior living: HOLD beats SELL, and by how much", () => {
+  const result = runScenario(viharaSeniorLivingPlan(), 1);
+  const line = result.lines[0];
+  assert.ok(line.kind === "hold");
+
+  // SL_Hold!B28:B34 — twenty years of escalating charges and entry fees,
+  // discounted at 11%, against selling the super built-up area at
+  // 8,000/sqft on day one.
+  closeTo(line.holdValue, 543_370_321.02);
+  closeTo(line.sellValue, 430_848_000);
+  assert.equal(line.verdict, "hold");
+  assert.ok(line.holdIrrPct !== null);
+  closeTo(line.holdIrrPct, 17.919765676767963, 0.0001);
+  assert.ok(line.equityMultiple !== null);
+  closeTo(line.equityMultiple, 8.0869827254307651, 0.0001);
+});
+
+test("Vihara senior living: the monthly operations inside the horizon match", () => {
+  const result = runScenario(viharaSeniorLivingPlan(), 1);
+  const line = result.lines[0];
+  assert.ok(line.kind === "hold");
+
+  // Engine_Moderate!B35, B36, B32 — ready in month 30, filling three
+  // units a month to 90% of 34, so 43 months of charges on a ramp.
+  closeTo(line.entryFees, 30_600_000);
+  closeTo(line.recurringCharges, 158_598_000);
+  closeTo(line.operatingOpex, 72_991_600);
+});
+
+test("a sell verdict flips when the sale price is high enough", () => {
+  const plan = viharaSeniorLivingPlan();
+  const line = plan.lines[0];
+  assert.ok(line.kind === "hold");
+  // ₹54.4 Cr of saleable area: at ₹12,000/sqft the sale beats a
+  // twenty-year hold, and the tool should say so rather than always
+  // preferring the asset.
+  const selling = runScenario({ ...plan, lines: [{ ...line, sellPricePsf: 12_000 }] }, 1);
+  const result = selling.lines[0];
+  assert.ok(result.kind === "hold");
+  assert.equal(result.verdict, "sell");
+  assert.ok(result.sellValue > result.holdValue);
+});
+
+test("an empty hold line doesn't divide by zero on any of its rates", () => {
+  const plan = { ...defaultPlanInputs(), lines: [newHoldLine("Nothing yet")] };
+  const result = runScenario(plan, 1);
+  const line = result.lines[0];
+  assert.ok(line.kind === "hold");
+  assert.equal(line.capex, 0);
+  assert.equal(line.buaTotal, 0);
+  assert.equal(line.terminalValue, 0);
+  assert.equal(line.capexPerUnit, null);
+  assert.equal(line.holdIrrPct, null);
+  assert.equal(line.equityMultiple, null);
+  assert.ok(Number.isFinite(result.pbt));
+});
+
+// ---------------------------------------------------------------------
+// A mixed plan — the workbook's Block 3
+// ---------------------------------------------------------------------
+
+test("a mixed plan collates both kinds without double-counting", () => {
+  const consolidated = runScenario(viharaConsolidatedPlan(), 1);
+  const saleOnly = runScenario(viharaPlan(), 1);
+  const holdOnly = runScenario(viharaSeniorLivingPlan(), 1);
+
+  // Engine_Moderate!B46 — residential bookings plus senior-living entry
+  // fees and charges.
+  closeTo(consolidated.revenue, 1_387_423_000);
+  closeTo(consolidated.revenue, saleOnly.revenue + holdOnly.revenue);
+
+  // The senior-living capex joins construction; its running costs get
+  // their own line rather than being buried in it.
+  const held = holdOnly.lines[0];
+  assert.ok(held.kind === "hold");
+  closeTo(consolidated.constructionCost, saleOnly.constructionCost + held.capex);
+  closeTo(consolidated.operatingCost, 72_991_600);
+
+  // Terminal value is deliberately NOT in PBT: it is an asset still
+  // owned, not money that has moved.
+  closeTo(consolidated.terminalValue, 306_106_666.67);
+  closeTo(consolidated.pbtWithHeldValue, consolidated.pbt + consolidated.terminalValue);
+});
+
+test("selling cost is charged on sales, never on a held asset's income", () => {
+  // A resident's monthly charge does not attract brokerage. Adding a
+  // hold line must not increase the selling cost by a rupee.
+  const saleOnly = runScenario(viharaPlan(), 1);
+  const consolidated = runScenario(viharaConsolidatedPlan(), 1);
+  closeTo(consolidated.overheadsVariable, saleOnly.overheadsVariable, 1e-6);
+  closeTo(consolidated.overheadsVariable, 47_929_000);
 });

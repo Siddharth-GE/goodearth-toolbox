@@ -98,14 +98,77 @@ export type SaleLine = {
 };
 
 /**
- * Placeholder for the HOLD kind so the union, the parser and every
- * `switch` are shaped for it from day one. Fields land with the engine
- * that uses them.
+ * A line you build and keep earning from: senior living, leased
+ * commercial, hospitality.
+ *
+ * The area build-up is the founder's, and the order matters because
+ * three different areas do three different jobs:
+ *
+ *   carpet  — what a resident occupies, and what charges are set against
+ *   BUA     — carpet ÷ efficiency. What CONSTRUCTION is costed on, and
+ *             always the largest, because walls and circulation are real
+ *   SBA     — carpet × (1 + loading). What it would SELL for, if sold
+ *
+ * Costing construction on carpet instead of BUA is the classic way to
+ * understate a build by a third, which is why these are three fields
+ * rather than one.
  */
 export type HoldLine = {
   id: string;
   kind: "hold";
   name: string;
+
+  /** The parcel. Acquisition follows the plan's land terms, as SALE does. */
+  landAreaSqft: number;
+  landCostPsf: number;
+  /** Development of the parcel. Part of capex, not spread like a SALE line's. */
+  devCostPsf: number;
+
+  units: number;
+  carpetSqftPerUnit: number;
+  /** Carpet ÷ built-up. Lower means more walls and circulation. */
+  efficiencyPct: number;
+  /** Common area added on top of carpet to give saleable area. */
+  loadingPct: number;
+  basementSqft: number;
+
+  buaCostPsf: number;
+  basementCostPsf: number;
+  amenitiesLumpsum: number;
+  /** Of hard cost. */
+  mepPct: number;
+  /** Both of hard cost + MEP. */
+  professionalPct: number;
+  contingencyPct: number;
+
+  buildStartMonth: number;
+  buildMonths: number;
+  /** Units filled per month once it is ready. */
+  fillRatePerMonth: number;
+  /** Share of units occupied at steady state. */
+  occupancyPct: number;
+
+  /** Per occupied unit, per month. */
+  chargePerUnitMonth: number;
+  /** Per unit, once, on move-in. */
+  entryFeePerUnit: number;
+  varOpexPerUnitMonth: number;
+  /** Whatever the occupancy: management, security, insurance, reserve. */
+  fixedOpexMonth: number;
+
+  /** The long-horizon hold question, in years and rates. */
+  holdYears: number;
+  discountRatePct: number;
+  exitCapRatePct: number;
+  chargeEscalationPct: number;
+  opexEscalationPct: number;
+  entryEscalationPct: number;
+  /** Residents leaving and being replaced each year — new entry fees. */
+  turnoverPct: number;
+
+  /** The alternative: sell the saleable area at completion instead. */
+  sellPricePsf: number;
+  sellingCostPct: number;
 };
 
 export type PlanLine = SaleLine | HoldLine;
@@ -252,8 +315,52 @@ export function newSaleLine(name = "New line"): SaleLine {
   };
 }
 
+/**
+ * A hold line starts with the shape of the thing filled in — efficiency,
+ * loading, escalations, a cap rate — and every rupee at zero.
+ *
+ * Those are conventions, not somebody else's numbers: 50% efficiency and
+ * 100% loading are what a serviced-residence build actually runs at, and
+ * a plan with them blank would divide by zero rather than tell you
+ * anything. Prices and areas stay at zero, where you have to type them.
+ */
 export function newHoldLine(name = "New line"): HoldLine {
-  return { id: newId(), kind: "hold", name };
+  return {
+    id: newId(),
+    kind: "hold",
+    name,
+    landAreaSqft: 0,
+    landCostPsf: 0,
+    devCostPsf: 0,
+    units: 0,
+    carpetSqftPerUnit: 0,
+    efficiencyPct: 50,
+    loadingPct: 100,
+    basementSqft: 0,
+    buaCostPsf: 0,
+    basementCostPsf: 0,
+    amenitiesLumpsum: 0,
+    mepPct: 2,
+    professionalPct: 1,
+    contingencyPct: 1,
+    buildStartMonth: 1,
+    buildMonths: 12,
+    fillRatePerMonth: 1,
+    occupancyPct: 90,
+    chargePerUnitMonth: 0,
+    entryFeePerUnit: 0,
+    varOpexPerUnitMonth: 0,
+    fixedOpexMonth: 0,
+    holdYears: 20,
+    discountRatePct: 11,
+    exitCapRatePct: 9,
+    chargeEscalationPct: 6,
+    opexEscalationPct: 5,
+    entryEscalationPct: 6,
+    turnoverPct: 12,
+    sellPricePsf: 0,
+    sellingCostPct: 1,
+  };
 }
 
 export function newOverhead(): OverheadItem {
@@ -367,7 +474,53 @@ function parseSaleLine(raw: Record<string, unknown>): SaleLine {
 }
 
 function parseHoldLine(raw: Record<string, unknown>): HoldLine {
-  return { id: id(raw.id), kind: "hold", name: str(raw.name, "Line") };
+  const base = newHoldLine();
+  return {
+    id: id(raw.id),
+    kind: "hold",
+    name: str(raw.name, "Line"),
+
+    landAreaSqft: Math.max(0, num(raw.landAreaSqft, 0)),
+    landCostPsf: Math.max(0, num(raw.landCostPsf, 0)),
+    devCostPsf: Math.max(0, num(raw.devCostPsf, 0)),
+
+    units: Math.max(0, num(raw.units, 0)),
+    carpetSqftPerUnit: Math.max(0, num(raw.carpetSqftPerUnit, 0)),
+    // Never zero: built-up area is carpet DIVIDED by this.
+    efficiencyPct: clamped(raw.efficiencyPct, base.efficiencyPct, 1, 100),
+    loadingPct: clamped(raw.loadingPct, base.loadingPct, 0, 500),
+    basementSqft: Math.max(0, num(raw.basementSqft, 0)),
+
+    buaCostPsf: Math.max(0, num(raw.buaCostPsf, 0)),
+    basementCostPsf: Math.max(0, num(raw.basementCostPsf, 0)),
+    amenitiesLumpsum: Math.max(0, num(raw.amenitiesLumpsum, 0)),
+    mepPct: clamped(raw.mepPct, base.mepPct, 0, 100),
+    professionalPct: clamped(raw.professionalPct, base.professionalPct, 0, 100),
+    contingencyPct: clamped(raw.contingencyPct, base.contingencyPct, 0, 100),
+
+    buildStartMonth: month(raw.buildStartMonth, base.buildStartMonth),
+    buildMonths: month(raw.buildMonths, base.buildMonths),
+    fillRatePerMonth: Math.max(0, num(raw.fillRatePerMonth, base.fillRatePerMonth)),
+    occupancyPct: clamped(raw.occupancyPct, base.occupancyPct, 0, 100),
+
+    chargePerUnitMonth: Math.max(0, num(raw.chargePerUnitMonth, 0)),
+    entryFeePerUnit: Math.max(0, num(raw.entryFeePerUnit, 0)),
+    varOpexPerUnitMonth: Math.max(0, num(raw.varOpexPerUnitMonth, 0)),
+    fixedOpexMonth: Math.max(0, num(raw.fixedOpexMonth, 0)),
+
+    holdYears: Math.round(clamped(raw.holdYears, base.holdYears, 1, 50)),
+    discountRatePct: clamped(raw.discountRatePct, base.discountRatePct, 0, 100),
+    // Never zero: the terminal value is NOI DIVIDED by this, and a zero
+    // cap rate values the asset at infinity.
+    exitCapRatePct: clamped(raw.exitCapRatePct, base.exitCapRatePct, 0.1, 100),
+    chargeEscalationPct: clamped(raw.chargeEscalationPct, base.chargeEscalationPct, 0, 100),
+    opexEscalationPct: clamped(raw.opexEscalationPct, base.opexEscalationPct, 0, 100),
+    entryEscalationPct: clamped(raw.entryEscalationPct, base.entryEscalationPct, 0, 100),
+    turnoverPct: clamped(raw.turnoverPct, base.turnoverPct, 0, 100),
+
+    sellPricePsf: Math.max(0, num(raw.sellPricePsf, 0)),
+    sellingCostPct: clamped(raw.sellingCostPct, base.sellingCostPct, 0, 100),
+  };
 }
 
 function parseLine(raw: unknown): PlanLine | null {

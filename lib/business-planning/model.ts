@@ -48,6 +48,7 @@
 import {
   MAX_HORIZON_MONTHS,
   SCENARIOS,
+  type HoldLine,
   type PlanInputs,
   type SaleLine,
   type ScenarioIndex,
@@ -65,6 +66,8 @@ export type MonthlySeries = {
   land: number[];
   development: number[];
   construction: number[];
+  /** Running an asset you kept: staff, food, utilities, maintenance. */
+  operating: number[];
   overheads: number[];
   commonInfra: number[];
   outflow: number[];
@@ -77,18 +80,15 @@ export type MonthlySeries = {
   revolver: number[];
 };
 
-export type LineResult = {
+/** What every line reports, whichever kind it is. */
+type LineResultBase = {
   id: string;
   name: string;
-  kind: "sale";
-  unitsSold: number;
-  unitsUnsold: number;
-  /** Booking value. Recognised when a unit sells, not when it is paid for. */
+  /** Money earned inside the horizon. */
   revenue: number;
+  /** Acquiring the parcel. Follows the plan's land terms. */
   landCost: number;
-  developmentCost: number;
-  constructionCost: number;
-  /** Land + development + construction. This line's own costs only. */
+  /** Everything this line spends. Excludes plan-level overheads. */
   directCost: number;
   /** Revenue − direct cost. Before plan-level overheads and interest. */
   grossProfit: number;
@@ -105,6 +105,50 @@ export type LineResult = {
   monthly: MonthlySeries;
 };
 
+export type SaleLineResult = LineResultBase & {
+  kind: "sale";
+  unitsSold: number;
+  unitsUnsold: number;
+  developmentCost: number;
+  constructionCost: number;
+};
+
+export type HoldLineResult = LineResultBase & {
+  kind: "hold";
+
+  /** The three areas, because they do three different jobs. */
+  carpetTotal: number;
+  /** Built-up. What construction is costed on. */
+  buaTotal: number;
+  /** Super built-up. What it would sell for, if sold. */
+  sbaTotal: number;
+
+  /** Land development, hard cost, MEP, fees and contingency. */
+  capex: number;
+  capexPerUnit: number | null;
+  capexPerBuaSqft: number | null;
+
+  /** Inside the plan's horizon. */
+  entryFees: number;
+  recurringCharges: number;
+  operatingOpex: number;
+
+  /** At steady state, whatever the horizon. */
+  stabilisedNoi: number;
+  yieldOnCostPct: number | null;
+  /** Stabilised NOI ÷ exit cap rate. What the asset is worth, held. */
+  terminalValue: number;
+
+  /** The own-versus-sell question, over the full hold period. */
+  holdValue: number;
+  sellValue: number;
+  verdict: "hold" | "sell";
+  holdIrrPct: number | null;
+  equityMultiple: number | null;
+};
+
+export type LineResult = SaleLineResult | HoldLineResult;
+
 export type ScenarioResult = {
   index: ScenarioIndex;
   name: string;
@@ -113,7 +157,10 @@ export type ScenarioResult = {
   revenue: number;
   landCost: number;
   developmentCost: number;
+  /** SALE construction plus HOLD capex — everything built. */
   constructionCost: number;
+  /** Running the held assets, inside the horizon. */
+  operatingCost: number;
   overheadsFixed: number;
   overheadsVariable: number;
   overheadsOneTime: number;
@@ -129,6 +176,16 @@ export type ScenarioResult = {
   standaloneInterest: number;
 
   pbt: number;
+  /**
+   * What the held assets are worth at the end, on top of PBT.
+   *
+   * Kept OUT of pbt on purpose. PBT is money that has actually moved;
+   * this is an asset you still own, and adding the two without saying so
+   * is how a plan reports a profit that nobody can spend. Shown beside
+   * PBT as `pbtWithHeldValue`, which is the workbook's Block 3 row 41.
+   */
+  terminalValue: number;
+  pbtWithHeldValue: number;
   marginPct: number | null;
   /** The lowest the pooled balance gets. Positive means it never ran out. */
   cashTrough: number;
@@ -169,6 +226,7 @@ function emptySeries(months: number): MonthlySeries {
     land: zeros(months),
     development: zeros(months),
     construction: zeros(months),
+    operating: zeros(months),
     overheads: zeros(months),
     commonInfra: zeros(months),
     outflow: zeros(months),
@@ -177,6 +235,28 @@ function emptySeries(months: number): MonthlySeries {
     closing: zeros(months),
     revolver: zeros(months),
   };
+}
+
+/**
+ * Land, by the plan's terms.
+ *
+ * The deal is one deal — cash at month 1, or deferred to a settlement
+ * month at a premium — so the terms come from the plan and only the area
+ * and rate come from the line. Both kinds of line pay for land the same
+ * way, which is why this is shared.
+ */
+function landSpend(areaSqft: number, costPsf: number, plan: PlanInputs, months: number): number[] {
+  const spend = zeros(months);
+  const base = areaSqft * costPsf;
+  if (base <= 0) return spend;
+
+  const isJv = plan.landTerms === "jv";
+  const payable = isJv ? base * (1 + plan.landPremiumPct / 100) : base;
+  const payMonth = isJv ? plan.landSettlementMonth : 1;
+  // A settlement month past the horizon means this land is genuinely
+  // never paid for inside the plan. The Setup tab says so on the field.
+  if (payMonth >= 1 && payMonth <= months) spend[payMonth - 1] += payable;
+  return spend;
 }
 
 /**
@@ -395,7 +475,7 @@ function runSaleLine(
   unitsSold: number[],
   months: number,
   monthlyRate: number,
-): LineResult {
+): SaleLineResult {
   const revenuePerUnit =
     line.plotSqftPerUnit * line.landPricePsf + line.buaSqftPerUnit * line.housePricePsf;
   const constructionPerUnit = line.buaSqftPerUnit * line.constructionPsf;
@@ -418,17 +498,7 @@ function runSaleLine(
     months,
   ).map((value) => value);
 
-  // Land: one deal for the whole plan, so the terms come from the plan
-  // and only the area and rate are the line's. Cash pays at month 1;
-  // a JV defers to the settlement month and pays the premium for it.
-  const land = zeros(months);
-  const landBase = line.landAreaSqft * line.landCostPsf;
-  if (landBase > 0) {
-    const isJv = plan.landTerms === "jv";
-    const payable = isJv ? landBase * (1 + plan.landPremiumPct / 100) : landBase;
-    const payMonth = isJv ? plan.landSettlementMonth : 1;
-    if (payMonth >= 1 && payMonth <= months) land[payMonth - 1] += payable;
-  }
+  const land = landSpend(line.landAreaSqft, line.landCostPsf, plan, months);
 
   // Development and infrastructure: this line's parcel, spread evenly
   // over the plan's development period from month 1.
@@ -460,6 +530,7 @@ function runSaleLine(
     land,
     development,
     construction,
+    operating: zeros(months),
     overheads: zeros(months),
     commonInfra: zeros(months),
     outflow,
@@ -495,6 +566,236 @@ function runSaleLine(
     cashTrough: cash.cashTrough,
     peakFunding: cash.peakFunding,
     monthly,
+  };
+}
+
+// ---------------------------------------------------------------------
+// HOLD lines
+// ---------------------------------------------------------------------
+
+/**
+ * Carpet → built-up → super built-up, and what building it costs.
+ *
+ * The order is the whole point. Construction is costed on BUILT-UP area
+ * (carpet ÷ efficiency), which is always the largest of the three;
+ * costing it on carpet is how a build gets understated by a third.
+ * Super built-up (carpet × (1 + loading)) is only used if the thing is
+ * SOLD rather than kept.
+ */
+export function holdAreasAndCapex(line: HoldLine) {
+  const carpetTotal = line.units * line.carpetSqftPerUnit;
+  const buaTotal = carpetTotal / (line.efficiencyPct / 100);
+  const sbaTotal = carpetTotal * (1 + line.loadingPct / 100);
+
+  const landDevelopment = line.landAreaSqft * line.devCostPsf;
+  const buaCost = buaTotal * line.buaCostPsf;
+  const basementCost = line.basementSqft * line.basementCostPsf;
+  const hard = buaCost + basementCost + line.amenitiesLumpsum;
+  const mep = hard * (line.mepPct / 100);
+  const professional = (hard + mep) * (line.professionalPct / 100);
+  const contingency = (hard + mep) * (line.contingencyPct / 100);
+  const capex = landDevelopment + hard + mep + professional + contingency;
+
+  return {
+    carpetTotal,
+    buaTotal,
+    sbaTotal,
+    landDevelopment,
+    buaCost,
+    basementCost,
+    hard,
+    mep,
+    professional,
+    contingency,
+    capex,
+  };
+}
+
+/**
+ * The long-horizon question: is this worth more held or sold?
+ *
+ * Annual, in years from completion, and independent of the plan's
+ * monthly horizon — a 20-year hold is a different question from a 6-year
+ * development, and squeezing it into the same grid would answer neither.
+ *
+ * Occupancy ramps at the fill rate to a stabilised level. Charges, opex
+ * and entry fees each escalate at their own rate. Turnover matters
+ * because a resident leaving and being replaced earns another entry fee.
+ * Exit is the following year's NOI capitalised at the exit cap rate, in
+ * the final year only.
+ */
+export function holdEconomics(line: HoldLine, capex: number, sbaTotal: number) {
+  const years = Math.max(1, Math.round(line.holdYears));
+  const stabilisedUnits = line.units * (line.occupancyPct / 100);
+  const chargeEsc = 1 + line.chargeEscalationPct / 100;
+  const opexEsc = 1 + line.opexEscalationPct / 100;
+  const entryEsc = 1 + line.entryEscalationPct / 100;
+  const discount = 1 + line.discountRatePct / 100;
+
+  // Index 0 is completion: nothing occupied, nothing earned.
+  const occupied = [0];
+  const netCash = [0];
+  const noi = [0];
+  for (let y = 1; y <= years; y += 1) {
+    const filled = Math.min(stabilisedUnits, line.fillRatePerMonth * 12 * y);
+    const average = (occupied[y - 1] + filled) / 2;
+    const moveIns = Math.max(0, filled - occupied[y - 1]) + (line.turnoverPct / 100) * average;
+
+    const revenue = average * line.chargePerUnitMonth * 12 * chargeEsc ** (y - 1);
+    const entry = moveIns * line.entryFeePerUnit * entryEsc ** (y - 1);
+    const opex =
+      (line.fixedOpexMonth * 12 + average * line.varOpexPerUnitMonth * 12) * opexEsc ** (y - 1);
+
+    occupied.push(filled);
+    noi.push(revenue - opex);
+    netCash.push(revenue - opex + entry);
+  }
+
+  const exitValue = (noi[years] * chargeEsc) / (line.exitCapRatePct / 100);
+
+  let holdValue = 0;
+  const irrFlow = [-capex];
+  for (let y = 1; y <= years; y += 1) {
+    const cash = netCash[y] + (y === years ? exitValue : 0);
+    holdValue += cash / discount ** y;
+    irrFlow.push(cash);
+  }
+
+  const sellValue = sbaTotal * line.sellPricePsf * (1 - line.sellingCostPct / 100);
+  const totalCash = netCash.reduce((a, b) => a + b, 0) + exitValue;
+
+  return {
+    holdValue,
+    sellValue,
+    // A tie goes to selling: holding costs attention, and a model that
+    // says "hold" on an identical number is telling you nothing.
+    verdict: (holdValue > sellValue ? "hold" : "sell") as "hold" | "sell",
+    holdIrrPct: capex > 0 ? (irr(irrFlow) ?? Number.NaN) * 100 || null : null,
+    equityMultiple: capex > 0 ? totalCash / capex : null,
+    exitValue,
+  };
+}
+
+function runHoldLine(
+  line: HoldLine,
+  plan: PlanInputs,
+  months: number,
+  monthlyRate: number,
+): HoldLineResult {
+  const areas = holdAreasAndCapex(line);
+
+  // Capex spreads evenly across the build, from the month it starts.
+  const construction = zeros(months);
+  const buildMonths = Math.max(1, Math.round(line.buildMonths));
+  for (let i = 0; i < buildMonths; i += 1) {
+    const m = line.buildStartMonth - 1 + i;
+    if (m >= 0 && m < months) construction[m] += areas.capex / buildMonths;
+  }
+
+  const land = landSpend(line.landAreaSqft, line.landCostPsf, plan, months);
+
+  // Ready the month after the last month of building.
+  const readyMonth = line.buildStartMonth + buildMonths;
+  const stabilisedUnits = line.units * (line.occupancyPct / 100);
+
+  const entry = zeros(months);
+  const recurring = zeros(months);
+  const operating = zeros(months);
+  let previousOccupied = 0;
+  for (let m = 0; m < months; m += 1) {
+    const monthNumber = m + 1;
+    if (monthNumber < readyMonth) continue;
+
+    const occupied = Math.min(
+      stabilisedUnits,
+      (monthNumber - readyMonth + 1) * line.fillRatePerMonth,
+    );
+    // Inside the plan's horizon there is no turnover — that is a
+    // long-horizon effect, and it belongs to holdEconomics. Here an
+    // entry fee is earned only by a unit filling for the first time.
+    entry[m] = Math.max(0, occupied - previousOccupied) * line.entryFeePerUnit;
+    recurring[m] = occupied * line.chargePerUnitMonth;
+    operating[m] = line.fixedOpexMonth + occupied * line.varOpexPerUnitMonth;
+    previousOccupied = occupied;
+  }
+
+  const bookings = zeros(months);
+  const collections = zeros(months);
+  const outflow = zeros(months);
+  const net = zeros(months);
+  for (let m = 0; m < months; m += 1) {
+    // A held asset earns as the money arrives — there is nothing to
+    // recognise up front, so bookings and collections are the same.
+    bookings[m] = entry[m] + recurring[m];
+    collections[m] = bookings[m];
+    outflow[m] = land[m] + construction[m] + operating[m];
+    net[m] = collections[m] - outflow[m];
+  }
+
+  const cash = runCash(net, monthlyRate, 0);
+
+  // Stabilised, whatever the horizon: what it earns in a steady year.
+  const stabilisedRevenue = stabilisedUnits * line.chargePerUnitMonth * 12;
+  const stabilisedOpex = (line.fixedOpexMonth + stabilisedUnits * line.varOpexPerUnitMonth) * 12;
+  const stabilisedNoi = stabilisedRevenue - stabilisedOpex;
+  const terminalValue = stabilisedNoi / (line.exitCapRatePct / 100);
+
+  const economics = holdEconomics(line, areas.capex, areas.sbaTotal);
+
+  const entryFees = sum(entry);
+  const recurringCharges = sum(recurring);
+  const operatingOpex = sum(operating);
+  const landCost = sum(land);
+  const capexInHorizon = sum(construction);
+  const revenue = entryFees + recurringCharges;
+  const directCost = landCost + capexInHorizon + operatingOpex;
+
+  return {
+    id: line.id,
+    name: line.name,
+    kind: "hold",
+    carpetTotal: areas.carpetTotal,
+    buaTotal: areas.buaTotal,
+    sbaTotal: areas.sbaTotal,
+    capex: areas.capex,
+    capexPerUnit: line.units > 0 ? areas.capex / line.units : null,
+    capexPerBuaSqft: areas.buaTotal > 0 ? areas.capex / areas.buaTotal : null,
+    entryFees,
+    recurringCharges,
+    operatingOpex,
+    stabilisedNoi,
+    yieldOnCostPct: areas.capex > 0 ? (stabilisedNoi / areas.capex) * 100 : null,
+    terminalValue,
+    holdValue: economics.holdValue,
+    sellValue: economics.sellValue,
+    verdict: economics.verdict,
+    holdIrrPct: economics.holdIrrPct,
+    equityMultiple: economics.equityMultiple,
+    revenue,
+    landCost,
+    directCost,
+    grossProfit: revenue - directCost,
+    interest: cash.totalInterest,
+    profit: revenue - directCost - cash.totalInterest,
+    marginPct: revenue > 0 ? ((revenue - directCost - cash.totalInterest) / revenue) * 100 : null,
+    cashTrough: cash.cashTrough,
+    peakFunding: cash.peakFunding,
+    monthly: {
+      unitsSold: zeros(months),
+      bookings,
+      collections,
+      land,
+      development: zeros(months),
+      construction,
+      operating,
+      overheads: zeros(months),
+      commonInfra: zeros(months),
+      outflow,
+      net,
+      interest: cash.interest,
+      closing: cash.closing,
+      revolver: cash.revolver,
+    },
   };
 }
 
@@ -559,14 +860,23 @@ export function runScenario(plan: PlanInputs, scenario: ScenarioIndex): Scenario
   const months = Math.min(Math.max(1, Math.round(plan.horizonMonths)), MAX_HORIZON_MONTHS);
   const monthlyRate = plan.financingRatePct / 100 / 12;
 
+  // Sales first, together, because a launch trigger makes them
+  // interdependent; then each line's own series.
   const saleLines = plan.lines.filter(isSaleLine);
   const sold = unitsSoldByMonth(saleLines, scenario, months);
-  const lines = saleLines.map((line, index) =>
-    runSaleLine(line, plan, sold[index], months, monthlyRate),
+  let saleIndex = 0;
+  const lines: LineResult[] = plan.lines.map((line) =>
+    line.kind === "sale"
+      ? runSaleLine(line, plan, sold[saleIndex++], months, monthlyRate)
+      : runHoldLine(line, plan, months, monthlyRate),
   );
 
   // Consolidate the lines, then add what no line owns.
   const monthly = emptySeries(months);
+  // Selling cost is a percentage of SALE bookings only. A senior-living
+  // resident's monthly charge does not attract brokerage, and folding
+  // hold income into the base would quietly tax it.
+  const saleBookings = zeros(months);
   for (const line of lines) {
     for (let m = 0; m < months; m += 1) {
       monthly.unitsSold[m] += line.monthly.unitsSold[m];
@@ -575,10 +885,12 @@ export function runScenario(plan: PlanInputs, scenario: ScenarioIndex): Scenario
       monthly.land[m] += line.monthly.land[m];
       monthly.development[m] += line.monthly.development[m];
       monthly.construction[m] += line.monthly.construction[m];
+      monthly.operating[m] += line.monthly.operating[m];
+      if (line.kind === "sale") saleBookings[m] += line.monthly.bookings[m];
     }
   }
 
-  const planCosts = runPlanCosts(plan, monthly.bookings, months);
+  const planCosts = runPlanCosts(plan, saleBookings, months);
   for (let m = 0; m < months; m += 1) {
     monthly.overheads[m] = planCosts.overheads[m];
     monthly.commonInfra[m] = planCosts.commonInfra[m];
@@ -586,6 +898,7 @@ export function runScenario(plan: PlanInputs, scenario: ScenarioIndex): Scenario
       monthly.land[m] +
       monthly.development[m] +
       monthly.construction[m] +
+      monthly.operating[m] +
       monthly.overheads[m] +
       monthly.commonInfra[m];
     monthly.net[m] = monthly.collections[m] - monthly.outflow[m];
@@ -602,13 +915,18 @@ export function runScenario(plan: PlanInputs, scenario: ScenarioIndex): Scenario
   const landCost = sum(monthly.land);
   const developmentCost = sum(monthly.development);
   const constructionCost = sum(monthly.construction);
+  const operatingCost = sum(monthly.operating);
+  const terminalValue = lines.reduce(
+    (total, line) => total + (line.kind === "hold" ? line.terminalValue : 0),
+    0,
+  );
   const planCost =
     planCosts.fixedTotal +
     planCosts.variableTotal +
     planCosts.oneTimeTotal +
     planCosts.infraCapexTotal +
     planCosts.infraOpexTotal;
-  const totalCost = landCost + developmentCost + constructionCost + planCost;
+  const totalCost = landCost + developmentCost + constructionCost + operatingCost + planCost;
   const pbt = revenue - totalCost - cash.totalInterest;
 
   // The workbook's "money multiple": every rupee that came in over every
@@ -628,6 +946,7 @@ export function runScenario(plan: PlanInputs, scenario: ScenarioIndex): Scenario
     landCost,
     developmentCost,
     constructionCost,
+    operatingCost,
     overheadsFixed: planCosts.fixedTotal,
     overheadsVariable: planCosts.variableTotal,
     overheadsOneTime: planCosts.oneTimeTotal,
@@ -638,6 +957,8 @@ export function runScenario(plan: PlanInputs, scenario: ScenarioIndex): Scenario
     interest: cash.totalInterest,
     standaloneInterest: sum(lines.map((line) => line.interest)),
     pbt,
+    terminalValue,
+    pbtWithHeldValue: pbt + terminalValue,
     marginPct: revenue > 0 ? (pbt / revenue) * 100 : null,
     cashTrough: cash.cashTrough,
     peakFunding: cash.peakFunding,

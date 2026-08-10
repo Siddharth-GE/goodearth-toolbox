@@ -27,7 +27,7 @@
  *      The biodiversity park IS included, as Block 1 includes it.
  */
 
-import type { PlanInputs, SaleLine } from "./inputs";
+import type { HoldLine, PlanInputs, SaleLine } from "./inputs";
 
 /** 42 × 6,500 + 35 × 1,500 — the plotted area the site's ₹13.2 Cr buys. */
 const TOTAL_PLOT_SQFT = 42 * 6500 + 35 * 1500;
@@ -77,6 +77,74 @@ const rowHouses: SaleLine = {
   bookingPct: null,
   instalments: null,
 };
+
+/**
+ * The workbook's Block 2, as a HOLD line: 34 serviced two-bed units,
+ * built months 19–30, filling at three a month, held twenty years.
+ *
+ * The workbook works this per PAX (two beds a unit, so half the per-unit
+ * charge and twice the count). Beds cancel out of every figure — the
+ * charge is halved and the count doubled — so this line is per UNIT and
+ * reaches the same answers with one fewer input to get wrong.
+ *
+ * Land here is development only, at ₹200/sqft over 15,000 sqft: the
+ * site's acquisition cost already sits on the residential lines, and
+ * charging it twice would double-count ₹13.2 Cr.
+ */
+const seniorLiving: HoldLine = {
+  id: "fixture-senior-living",
+  kind: "hold",
+  name: "Senior living",
+
+  landAreaSqft: 15_000,
+  landCostPsf: 0,
+  devCostPsf: 200,
+
+  units: 34,
+  carpetSqftPerUnit: 800,
+  efficiencyPct: 50,
+  loadingPct: 100,
+  basementSqft: 10_000,
+
+  buaCostPsf: 4500,
+  basementCostPsf: 1700,
+  amenitiesLumpsum: 15_000_000,
+  mepPct: 2,
+  professionalPct: 1,
+  contingencyPct: 1,
+
+  buildStartMonth: 18,
+  buildMonths: 12,
+  fillRatePerMonth: 3,
+  occupancyPct: 90,
+
+  chargePerUnitMonth: 135_000,
+  entryFeePerUnit: 1_000_000,
+  varOpexPerUnitMonth: 42_000,
+  fixedOpexMonth: 550_000,
+
+  holdYears: 20,
+  discountRatePct: 11,
+  exitCapRatePct: 9,
+  chargeEscalationPct: 6,
+  opexEscalationPct: 5,
+  entryEscalationPct: 6,
+  turnoverPct: 12,
+
+  sellPricePsf: 8000,
+  sellingCostPct: 1,
+};
+
+/** Block 2 on its own — the senior-living line and nothing else. */
+export function viharaSeniorLivingPlan(): PlanInputs {
+  return { ...viharaPlan(), lines: [seniorLiving] };
+}
+
+/** Blocks 1 and 2 together — the whole village, which is Block 3. */
+export function viharaConsolidatedPlan(): PlanInputs {
+  const plan = viharaPlan();
+  return { ...plan, lines: [...plan.lines, seniorLiving] };
+}
 
 export function viharaPlan(): PlanInputs {
   return {

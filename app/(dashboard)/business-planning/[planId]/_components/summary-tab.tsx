@@ -50,11 +50,10 @@ export function SummaryTab({
             <TableHead>
               <TableRow>
                 <TableHeaderCell>Line</TableHeaderCell>
-                <TableHeaderCell className="text-right">Units</TableHeaderCell>
                 <TableHeaderCell className="text-right">Revenue</TableHeaderCell>
                 <TableHeaderCell className="text-right">Land</TableHeaderCell>
-                <TableHeaderCell className="text-right">Development</TableHeaderCell>
-                <TableHeaderCell className="text-right">Construction</TableHeaderCell>
+                <TableHeaderCell className="text-right">Built</TableHeaderCell>
+                <TableHeaderCell className="text-right">Running</TableHeaderCell>
                 <TableHeaderCell className="text-right">Gross profit</TableHeaderCell>
                 <TableHeaderCell className="text-right">Margin</TableHeaderCell>
               </TableRow>
@@ -63,21 +62,44 @@ export function SummaryTab({
               {active.lines.map((line) => {
                 const grossMarginPct =
                   line.revenue > 0 ? (line.grossProfit / line.revenue) * 100 : null;
+                // The two kinds spend on different things — a SALE line
+                // builds and infras, a HOLD line has capex and running
+                // costs — so the columns are the shape they share and
+                // the detail sits in the sub-line.
+                const built =
+                  line.kind === "sale" ? line.developmentCost + line.constructionCost : line.capex;
+                const running = line.kind === "sale" ? 0 : line.operatingOpex;
                 return (
                   <TableRow key={line.id}>
                     <TableCell className="text-foreground font-medium">
                       {line.name || "Untitled line"}
-                      {line.unitsUnsold > 0.0001 ? (
-                        <span className="text-warning ml-2 text-xs">
-                          {formatQuantity(line.unitsUnsold)} unsold
-                        </span>
-                      ) : null}
+                      <div className="text-muted text-xs font-normal">
+                        {line.kind === "sale" ? (
+                          <>
+                            {formatQuantity(line.unitsSold)} units sold
+                            {line.unitsUnsold > 0.0001 ? (
+                              <span className="text-warning">
+                                {" "}
+                                · {formatQuantity(line.unitsUnsold)} unsold
+                              </span>
+                            ) : null}
+                          </>
+                        ) : (
+                          <>
+                            held · NOI {formatCrore(line.stabilisedNoi)}/yr ·{" "}
+                            <span
+                              className={line.verdict === "hold" ? "text-success" : "text-warning"}
+                            >
+                              {line.verdict === "hold" ? "hold it" : "sell it"}
+                            </span>
+                          </>
+                        )}
+                      </div>
                     </TableCell>
-                    <Money value={line.unitsSold} raw />
                     <Money value={line.revenue} />
                     <Money value={line.landCost} />
-                    <Money value={line.developmentCost} />
-                    <Money value={line.constructionCost} />
+                    <Money value={built} />
+                    <Money value={running} />
                     <Money value={line.grossProfit} strong />
                     <TableCell className="text-right font-mono">
                       {formatPercent(grossMarginPct)}
@@ -87,17 +109,17 @@ export function SummaryTab({
               })}
               <TableRow className="border-border border-t-2">
                 <TableCell className="text-foreground font-semibold">All lines</TableCell>
-                <Money value={active.lines.reduce((t, l) => t + l.unitsSold, 0)} raw strong />
                 <Money value={active.revenue} strong />
                 <Money value={active.landCost} strong />
-                <Money value={active.developmentCost} strong />
-                <Money value={active.constructionCost} strong />
+                <Money value={active.developmentCost + active.constructionCost} strong />
+                <Money value={active.operatingCost} strong />
                 <Money
                   value={
                     active.revenue -
                     active.landCost -
                     active.developmentCost -
-                    active.constructionCost
+                    active.constructionCost -
+                    active.operatingCost
                   }
                   strong
                 />
@@ -155,6 +177,13 @@ export function SummaryTab({
                 pick={(s) => formatCrore(-s.constructionCost)}
               />
               <ScenarioRow
+                label="Running held assets"
+                scenarios={result.scenarios}
+                active={activeScenario}
+                pick={(s) => formatCrore(-s.operatingCost)}
+                hideWhenAllZero={(s) => s.operatingCost}
+              />
+              <ScenarioRow
                 label="Overheads"
                 scenarios={result.scenarios}
                 active={activeScenario}
@@ -186,6 +215,22 @@ export function SummaryTab({
                 scenarios={result.scenarios}
                 active={activeScenario}
                 pick={(s) => formatPercent(s.marginPct)}
+              />
+              {/* An asset you still own is not profit you can spend, so
+                  it sits below PBT and is added in a row of its own. */}
+              <ScenarioRow
+                label="Value of what's held"
+                scenarios={result.scenarios}
+                active={activeScenario}
+                pick={(s) => formatCrore(s.terminalValue)}
+                hideWhenAllZero={(s) => s.terminalValue}
+              />
+              <ScenarioRow
+                label="PBT + held value"
+                scenarios={result.scenarios}
+                active={activeScenario}
+                pick={(s) => formatCrore(s.pbtWithHeldValue)}
+                hideWhenAllZero={(s) => s.terminalValue}
               />
               <ScenarioRow
                 label="Peak funding"
@@ -294,13 +339,19 @@ function ScenarioRow({
   active,
   pick,
   strong,
+  hideWhenAllZero,
 }: {
   label: string;
   scenarios: readonly ScenarioResult[];
   active: ScenarioIndex;
   pick: (scenario: ScenarioResult) => string;
   strong?: boolean;
+  /** Drop the row entirely when this is zero everywhere — a plan with no
+      held lines shouldn't carry three empty rows about held value. */
+  hideWhenAllZero?: (scenario: ScenarioResult) => number;
 }) {
+  if (hideWhenAllZero && scenarios.every((s) => Math.abs(hideWhenAllZero(s)) < 0.5)) return null;
+
   return (
     <TableRow className={strong ? "border-border border-t-2" : undefined}>
       <TableCell
