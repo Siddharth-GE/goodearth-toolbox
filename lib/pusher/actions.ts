@@ -44,7 +44,7 @@ function guardError(error: { message: string }, fallback: string): ActionState {
 }
 
 function revalidate(chainId?: string) {
-  revalidatePath("/pusher");
+  revalidatePath("/pusher/court");
   revalidatePath("/pusher/trails");
   if (chainId) revalidatePath(`/pusher/trails/${chainId}`);
 }

@@ -10,7 +10,7 @@ export default async function OpenTrailPage() {
   return (
     <div className="space-y-5">
       <PageTitle
-        backHref="/pusher"
+        backHref="/pusher/court"
         backLabel="Your court"
         title="Open a trail"
         description="A task, and the people it has to travel through."

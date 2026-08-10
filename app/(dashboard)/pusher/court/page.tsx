@@ -13,12 +13,17 @@ import {
 } from "@/lib/pusher/queries";
 import { CheckCircle2 } from "lucide-react";
 
-import { BatonCard } from "./_components/baton-card";
-import { CelebrateProvider } from "./_components/celebrate";
-import { MoveBatonButtons } from "./_components/move-baton";
-import { PusherNav } from "./_components/pusher-nav";
-import { StrandedPanel } from "./_components/stranded-panel";
+import { BatonCard } from "../_components/baton-card";
+import { CelebrateProvider } from "../_components/celebrate";
+import { MoveBatonButtons } from "../_components/move-baton";
+import { PusherNav } from "../_components/pusher-nav";
+import { StrandedPanel } from "../_components/stranded-panel";
 
+/**
+ * Your court. Lives at /pusher/court rather than at /pusher because the
+ * tool opens on Projects — a leader wants the project picture first, and
+ * this page is the one you come to when a baton is in your hand.
+ */
 export default async function PusherCourtPage() {
   const user = await requireUser();
   const isAdmin = user.profile?.role === "admin";
@@ -38,8 +43,8 @@ export default async function PusherCourtPage() {
     <CelebrateProvider>
       <div className="space-y-5">
         <PageTitle
-          title="Pusher"
-          description="Where every task is, who is holding it, and for how long."
+          title="Your court"
+          description="The batons in your hand, and how long each has been there."
           actions={<LinkButton href="/pusher/new">Open a trail</LinkButton>}
         />
         <PusherNav active="court" />
