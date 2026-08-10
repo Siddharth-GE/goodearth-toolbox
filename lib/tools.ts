@@ -190,11 +190,11 @@ export const TOOLS: Tool[] = [
   },
   {
     name: "Business Planning",
-    description: "Targets, forecasts and the year's plan in one place.",
+    description: "Model a project before you build it — line by line, to profit and funding.",
     href: "/business-planning",
     icon: "Target",
     group: "Management",
-    built: false,
+    built: true,
   },
 ];
 
