@@ -4311,6 +4311,10 @@ export type Database = {
         Args: { p_chain_id: string; p_legs: Json }
         Returns: undefined
       }
+      seed_default_project_stages: {
+        Args: { p_project_id: string }
+        Returns: undefined
+      }
       set_chain_departments: {
         Args: { p_chain_id: string; p_department_ids: string[] }
         Returns: undefined
