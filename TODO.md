@@ -4,28 +4,18 @@ Read `STATUS.md` first. Phase 9 (Overview fully real + one real project
 run end to end) still has no approved plan; this file gets one when the
 founder approves it.
 
-## Right now: Pusher is waiting on a browser test
+## Right now: standard trails at the house level
 
-`feature/pusher-relay` is built, CI green, **not merged** — PR #2. It
-carries the relay, departments, the project schedule, and the four fixes
-the founder's own browser test produced. Migrations `0036`–`0040` are
-**already applied to the live database**, so the branch and production
-are in step on schema and only the code is waiting.
+Pusher Phase 1 is **merged and live** (PR #2, 2026-08-10) — nothing is in
+flight. The next build is the first item below, already designed with the
+founder. Two things to settle before writing code:
 
-**Before anything else in the next session: ask whether the founder has
-clicked through the preview.** If yes and they are happy, merge and
-delete the branch. If they found something, fix it on the branch. The
-founder has already chosen (2026-08-10) that standard trails wait for
-this merge rather than stacking on top of it.
-
-The browser checklist, if it needs repeating: open a trail with three
-legs, push it, bounce it without a reason (must refuse), bounce it
-properly, let one go cold, finish it; then set a project start date and
-stages, change one stage's weeks and watch every later date move. Then
-the four fixes: Pusher opens on Projects; finishing a trail in one stage
-fills **that** stage and no other; a stage with nothing filed under it
-shows as a dashed outline, not an empty solid block; and finishing a
-baton clears it from Your court without a reload.
+- **Where the house screen lives.** Pusher has no unit-level screen, and
+  both standard trails and the per-unit stage breakdown need one. Design
+  them together rather than building that page twice.
+- **Who can start a queued trail** — anyone holding `/pusher`, or only
+  the person its first leg is assigned to? It decides whether the queue
+  is a shared plan or a personal to-do list.
 
 ## Pusher — what is left, in order
 
@@ -33,8 +23,8 @@ The relay, departments and the project schedule are built; see
 `app/(dashboard)/pusher/PLAN.md` for how it works and what will bite.
 
 - **Standard trails at the house level** (founder, 2026-08-10 — approved
-  shape, no code yet; build this first, on a fresh branch after PR #2
-  merges). Every villa runs roughly the same set of handoffs. One click
+  shape, no code yet; build this first, on a fresh branch). Every villa
+  runs roughly the same set of handoffs. One click
   on a house should lay the whole set down, staffed, and then let you
   rearrange it. Three decisions already made:
 

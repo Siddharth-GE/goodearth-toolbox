@@ -13,23 +13,20 @@ the founder's browser gates and the single-grant probe smoke). The
 chain runs design → price → indent → PO → goods in / stock / goods
 out → bill → paid.
 
-**Pusher is built through the project schedule** on
-`feature/pusher-relay` (**PR #2, CI green, NOT merged**): the relay,
-departments (many per trail), and a per-project overview whose dates are
-all calculated. It is **waiting on the founder's browser pass** — see
-TODO.md, which opens with that. **Next after the merge:** unit-level
-stages rolling up into the project picture, then the leaderboard, then
-links + Google Chat.
+**Pusher Phase 1 is live** (PR #2 merged 2026-08-10 after the founder's
+browser pass, CI green, branch deleted): the relay, departments (many per
+trail), and a per-project overview whose dates are all calculated.
+**Next:** standard trails at the house level (designed, decisions in
+TODO.md — build this first), then unit-level stages rolling up into the
+project picture, then the leaderboard, then links + Google Chat.
 
-Note for a cold start: migrations `0036`–`0040` are **already applied to
-the live database**, so schema is in step with production and only the
-code is unmerged. The branch's test data has been cleared and the probe
-account put back to `/inventory`.
+Note for a cold start: the probe account holds `/inventory`, not
+`/pusher`, and the branch's test data has been cleared.
 
 |                    |                                                                                                                                 |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
 | Last worked        | 2026-08-10                                                                                                                      |
-| Branch             | `feature/pusher-relay` — built, CI green, PR #2 open, not merged                                                                |
+| Branch             | `master` — Pusher merged and deployed; nothing in flight                                                                        |
 | Migrations applied | `0001`–`0040` (next is `0041`)                                                                                                  |
 | Items in database  | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands                                                  |
 | Thumbnails         | 897 in Supabase Storage; 1,736 items use the colour placeholder                                                                 |
@@ -239,8 +236,9 @@ account put back to `/inventory`.
 
 One line per day; full detail in git history and the PLAN.md files.
 
-- **2026-08-10 (Pusher — two fixes from the founder's browser test)** —
-  same branch, no migration. The founder opened two trails on Saarang
+- **2026-08-10 (Pusher — the founder's browser test, then the merge)** —
+  **PR #2 merged to `master` and deployed**, branch deleted, CI green on
+  master. Four fixes first, no migration. The founder opened two trails on Saarang
   Villa 6, one under Design and one under Construction, finished the
   Construction one, and the progress bar grew **from the left edge**,
   painting over a Design stage where nothing had happened. The number was
@@ -258,7 +256,29 @@ One line per day; full detail in git history and the PLAN.md files.
   redirects to `/pusher/projects` and the court moves to `/pusher/court`,
   the same shape `/masters` already uses. "Your court" keeps its name
   (founder's call — court is one of Pusher's own game words, and the
-  empty state already says "Court cleared").
+  empty state already says "Court cleared"). Third: **a stage with
+  nothing filed under it no longer looks like a stage with nothing done**
+  — a dashed outline and "Nothing filed here yet", because those two read
+  identically and need opposite fixes. Fourth, riding the route move:
+  finishing a baton revalidates `/pusher/court`, so a mover's own court
+  empties.
+  **Merge gates.** The founder's browser pass, CI green, and — since the
+  route move landed after the day's two probe smokes — a check that the
+  new routes still turn people away: signed-out visitors bounce to
+  `/login` on the production build, and a signed-in colleague without the
+  grant goes `/pusher` → `/pusher/projects` → `requireTool` → home, a
+  chain that terminates. That last check is deliberate: an unbounded
+  redirect loop has taken the whole toolbox down twice. Not re-run: the
+  full single-grant probe smoke (no Playwright in the session scratchpad,
+  probe holds `/inventory`) — the new routes are argued from the code
+  path, not driven in a browser. **A trap for the next reader:** while
+  signed out, production returns 200 for _every_ path including nonsense
+  ones, because the middleware bounces to `/login` before routing
+  resolves. Curling a URL proves nothing about whether it exists. Use the
+  GitHub deployments API (`/deployments/<id>/statuses`) to confirm what
+  Vercel actually shipped.
+  Also designed but deliberately not built: **standard trails at the
+  house level**, in TODO.md, waiting on this merge by the founder's call.
 - **2026-08-10 (Pusher — departments and the project schedule)** — same
   branch, migrations `0038`–`0040` applied. The founder added two things
   to the relay. **Departments**, with the correction that makes the
