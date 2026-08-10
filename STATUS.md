@@ -34,9 +34,6 @@ project run end-to-end.
   1:1 — a double link fails loudly on the unique index); the
   project/plot **status value lists are my defaults, never
   confirmed** — ask first. Source files go in `data/` (git-ignored).
-- **Switch the probe account back on** — still off after the 2026-08-10
-  redirect-loop test (Settings → People → Probe (test) → Reactivate
-  account). Every future pre-merge smoke needs it.
 - **Grant `/bills`** in Settings to accounts (and tick their "Approve
   bills" box), **`/inventory`** to store-keepers (and site engineers if
   wanted — its reads carry no money).
