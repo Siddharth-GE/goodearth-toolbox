@@ -49,6 +49,8 @@ export type PlannedStage = ProjectStage & {
   trailsTotal: number;
   trailsFinished: number;
   trailsStuck: number;
+  /** Filed and planned, but never started — no clock running on any of them. */
+  trailsQueued: number;
   status: "done" | "current" | "ahead";
 };
 
@@ -80,6 +82,17 @@ export type StageTrail = {
   projectStageId: string | null;
   isFinished: boolean;
   isStuck: boolean;
+  /**
+   * Created but not started. Counted as planned work that is NOT done —
+   * which is the honest reading, and worth stating because it surprises.
+   *
+   * Laying a standard set down on a house makes its project look further
+   * behind, and that is correct: the work was always coming, and the
+   * flattering number before it was an artefact of the work not being
+   * written down. A queued trail that did not count at all would let a
+   * house record twelve jobs and still read 100% done.
+   */
+  isQueued: boolean;
 };
 
 export function buildSchedule(
@@ -142,6 +155,7 @@ export function buildSchedule(
       trailsTotal: mine.length,
       trailsFinished: finished,
       trailsStuck: mine.filter((t) => t.isStuck && !t.isFinished).length,
+      trailsQueued: mine.filter((t) => t.isQueued).length,
       status: weeksElapsed >= weekTo ? "done" : isCurrent ? "current" : "ahead",
     };
   });

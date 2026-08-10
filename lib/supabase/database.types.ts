@@ -3996,6 +3996,8 @@ export type Database = {
           created_at: string | null
           current_leg: number | null
           days_in_leg: number | null
+          department_ids: string[] | null
+          department_names: string[] | null
           entered_at: string | null
           expected_days: number | null
           holder_id: string | null

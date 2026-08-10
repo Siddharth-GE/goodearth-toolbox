@@ -24,6 +24,15 @@ const trail = (stageId: string | null, finished = false, stuck = false): StageTr
   projectStageId: stageId,
   isFinished: finished,
   isStuck: stuck,
+  isQueued: false,
+});
+
+/** Created but never started — planned work with no clock running. */
+const queued = (stageId: string | null): StageTrail => ({
+  projectStageId: stageId,
+  isFinished: false,
+  isStuck: false,
+  isQueued: true,
 });
 
 test("with no start date there is simply no schedule", () => {
@@ -169,6 +178,43 @@ test("stuck trails are reported per stage", () => {
   );
   const construction = s.stages.find((x) => x.id === "s3")!;
   assert.equal(construction.trailsStuck, 2, "a finished trail is never counted as stuck");
+});
+
+test("queued trails are planned work that is not done", () => {
+  // Laying a standard set down on a house MUST move the project picture.
+  // The alternative -- queued work counting for nothing -- would let a
+  // house record a dozen jobs and still read 100% done, which is the
+  // flattering lie this tool exists to stop telling.
+  const before = buildSchedule(stages, [trail("s1", true)], START, at("2026-01-01"));
+  const after = buildSchedule(
+    stages,
+    [trail("s1", true), queued("s1"), queued("s1"), queued("s1")],
+    START,
+    at("2026-01-01"),
+  );
+
+  assert.equal(before.stages.find((s) => s.id === "s1")!.progress, 1);
+  assert.equal(after.stages.find((s) => s.id === "s1")!.progress, 0.25);
+  assert.ok(after.actualPct < before.actualPct, "queued work lowers the honest number");
+});
+
+test("a queued trail is counted, and never counted as cold", () => {
+  const s = buildSchedule(
+    stages,
+    [queued("s3"), queued("s3"), trail("s3", false, true)],
+    START,
+    at("2026-06-01"),
+  );
+  const construction = s.stages.find((x) => x.id === "s3")!;
+  assert.equal(construction.trailsQueued, 2);
+  assert.equal(construction.trailsTotal, 3);
+  assert.equal(construction.trailsStuck, 1, "only the started one can be cold");
+});
+
+test("queued trails filed under no stage are surfaced like any other", () => {
+  const s = buildSchedule(stages, [queued(null), queued("s1")], START, at("2026-01-01"));
+  assert.equal(s.unfiledTrails, 1);
+  assert.equal(s.stages.find((x) => x.id === "s1")!.trailsQueued, 1);
 });
 
 test("stages order by sort_order, with a stable tie-break", () => {

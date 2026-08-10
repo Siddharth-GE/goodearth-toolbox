@@ -43,6 +43,8 @@ export type ChainRow = {
   expectedDays: number;
   isStuck: boolean;
   isFinished: boolean;
+  /** Created but never started: no events, no clock, no holder. */
+  isQueued: boolean;
   startedAt: string | null;
   departments: string[];
 };
@@ -61,12 +63,13 @@ type StateRow = {
   expected_days: number | null;
   is_stuck: boolean | null;
   is_finished: boolean | null;
+  is_queued: boolean | null;
   started_at: string | null;
   department_names: string[] | null;
 };
 
 const STATE_COLUMNS =
-  "chain_id, project_id, project_name, unit_name, activity_name, title, leg_count, current_leg, holder_id, days_in_leg, expected_days, is_stuck, is_finished, started_at, department_names";
+  "chain_id, project_id, project_name, unit_name, activity_name, title, leg_count, current_leg, holder_id, days_in_leg, expected_days, is_stuck, is_finished, is_queued, started_at, department_names";
 
 function toRow(row: StateRow, names: Map<string, string>): ChainRow {
   return {
@@ -84,6 +87,7 @@ function toRow(row: StateRow, names: Map<string, string>): ChainRow {
     expectedDays: row.expected_days ?? 0,
     isStuck: row.is_stuck ?? false,
     isFinished: row.is_finished ?? false,
+    isQueued: row.is_queued ?? false,
     startedAt: row.started_at,
     departments: row.department_names ?? [],
   };
@@ -116,8 +120,17 @@ export type TrailFilters = {
   holderId?: string;
   activityId?: string;
   departmentId?: string;
-  /** "running" (default), "finished", or "all". */
-  status?: "running" | "finished" | "all";
+  /**
+   * "running" (default), "finished", "queued", or "all".
+   *
+   * Queued trails are excluded from "running" deliberately: a house with
+   * a standard set laid down has a dozen of them, and letting them into
+   * the running list would bury the trails someone is actually holding
+   * under work nobody has started. They are findable — that is what
+   * "queued" and "all" are for — but they are never the default answer
+   * to "what is in flight".
+   */
+  status?: "running" | "finished" | "queued" | "all";
 };
 
 export async function listTrails(filters: TrailFilters = {}) {
@@ -136,7 +149,11 @@ export async function listTrails(filters: TrailFilters = {}) {
     .order("chain_id");
 
   const status = filters.status ?? "running";
-  if (status !== "all") query = query.eq("is_finished", status === "finished");
+  if (status === "queued") {
+    query = query.eq("is_queued", true);
+  } else if (status !== "all") {
+    query = query.eq("is_queued", false).eq("is_finished", status === "finished");
+  }
   if (filters.stuckOnly) query = query.eq("is_stuck", true);
   if (filters.projectId) query = query.eq("project_id", filters.projectId);
   if (filters.holderId) query = query.eq("holder_id", filters.holderId);
@@ -419,13 +436,23 @@ export async function getPrefillsByActivity(): Promise<Map<string, Prefill>> {
   const supabase = await createClient();
 
   const [chains, people] = await Promise.all([
-    fetchAll<{ id: string; activity_id: string; created_at: string }>((from, to) =>
-      supabase
-        .from("pusher_chains")
-        .select("id, activity_id, created_at")
-        .order("created_at", { ascending: false })
-        .order("id")
-        .range(from, to),
+    // Read through the state view, not pusher_chains, for one reason:
+    // is_queued. A queued trail has never run — its own legs are a copy
+    // of an earlier prefill — so letting it seed the next one would let a
+    // single edit made while queueing propagate to every future trail of
+    // that activity, with no run behind it to justify the change.
+    // Nullable all the way down: every column of a view comes back
+    // nullable from the type generator, so it is normalised right here at
+    // the read boundary rather than asserted away.
+    fetchAll<{ chain_id: string | null; activity_id: string | null; created_at: string | null }>(
+      (from, to) =>
+        supabase
+          .from("pusher_chain_state")
+          .select("chain_id, activity_id, created_at")
+          .eq("is_queued", false)
+          .order("created_at", { ascending: false })
+          .order("chain_id")
+          .range(from, to),
     ),
     listPeople(),
   ]);
@@ -433,8 +460,9 @@ export async function getPrefillsByActivity(): Promise<Map<string, Prefill>> {
   // First row per activity wins — the list is already newest-first.
   const latestByActivity = new Map<string, string>();
   for (const chain of chains) {
+    if (!chain.activity_id || !chain.chain_id) continue;
     if (!latestByActivity.has(chain.activity_id)) {
-      latestByActivity.set(chain.activity_id, chain.id);
+      latestByActivity.set(chain.activity_id, chain.chain_id);
     }
   }
 
@@ -532,10 +560,11 @@ export async function listProjectSchedules() {
       project_stage_id: string | null;
       is_finished: boolean | null;
       is_stuck: boolean | null;
+      is_queued: boolean | null;
     }>((from, to) =>
       supabase
         .from("pusher_chain_state")
-        .select("project_id, project_stage_id, is_finished, is_stuck")
+        .select("project_id, project_stage_id, is_finished, is_stuck, is_queued")
         .order("chain_id")
         .range(from, to),
     ),
@@ -552,6 +581,7 @@ export async function listProjectSchedules() {
         projectStageId: t.project_stage_id,
         isFinished: t.is_finished ?? false,
         isStuck: t.is_stuck ?? false,
+        isQueued: t.is_queued ?? false,
       }));
 
     return {
@@ -559,7 +589,10 @@ export async function listProjectSchedules() {
       name: project.name,
       code: project.code,
       status: project.status,
-      liveTrails: projectTrails.filter((t) => !t.isFinished).length,
+      // "Live" is a baton with someone. Queued work is counted separately
+      // rather than folded in — it is real, but it is not in flight.
+      liveTrails: projectTrails.filter((t) => !t.isFinished && !t.isQueued).length,
+      queuedTrails: projectTrails.filter((t) => t.isQueued).length,
       stuckTrails: projectTrails.filter((t) => !t.isFinished && t.isStuck).length,
       schedule: buildSchedule(
         stages.filter((s) => s.project_id === project.id),
@@ -620,6 +653,7 @@ export async function getProjectSchedule(projectId: string) {
         projectStageId: r.projectStageId,
         isFinished: r.isFinished,
         isStuck: r.isStuck,
+        isQueued: r.isQueued,
       })),
       (plan.data?.start_date as string | undefined) ?? null,
       new Date().toISOString(),
@@ -632,9 +666,14 @@ export async function getPusherPulse(userId: string) {
   await requireTool("/pusher");
   const supabase = await createClient();
 
+  // "Live" means a baton is actually with someone. A queued trail is
+  // real planned work but nobody is holding it and no clock is running,
+  // so counting it here would inflate the one number that is supposed to
+  // mean "in flight right now".
   const running = supabase
     .from("pusher_chain_state")
     .select("chain_id", { count: "exact", head: true })
+    .eq("is_queued", false)
     .eq("is_finished", false);
 
   const [live, cold, mine] = await Promise.all([
@@ -642,11 +681,15 @@ export async function getPusherPulse(userId: string) {
     supabase
       .from("pusher_chain_state")
       .select("chain_id", { count: "exact", head: true })
+      .eq("is_queued", false)
       .eq("is_finished", false)
       .eq("is_stuck", true),
+    // holder_id is null on a queued trail, so this one is already safe —
+    // stated anyway so the three counts read as one rule, not two.
     supabase
       .from("pusher_chain_state")
       .select("chain_id", { count: "exact", head: true })
+      .eq("is_queued", false)
       .eq("is_finished", false)
       .eq("holder_id", userId),
   ]);
