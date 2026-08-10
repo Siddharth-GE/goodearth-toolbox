@@ -4,20 +4,14 @@ Read `STATUS.md` first. Phase 9 (Overview fully real + one real project
 run end to end) still has no approved plan; this file gets one when the
 founder approves it.
 
-## Right now: standard trails is waiting on a browser test
+## Right now: nothing in flight
 
-`feature/pusher-standard-trails` is built, CI green, **not merged**.
-Migrations `0041`–`0047` are **already applied to the live database**,
-and that is safe while the code is unmerged: the state view kept every
-column production reads (0042 exists because 0041 briefly did not — see
-STATUS.md).
-
-**Before anything else next session: ask whether the founder has clicked
-through the preview.** One judgement call needs their eye specifically —
-queued work counts in the project picture as planned-but-not-done, so
-laying a standard set on a house makes its project read further behind.
-That is the honest number, but it surprises, and it is theirs to accept
-or overrule.
+Relay is merged and live through standard trails. The next build is the
+first item below. One thing to watch when real work starts landing:
+a trail's unfinished activities count in the project picture as
+planned-but-not-done, so a house with a full villa trail reads further
+behind. The founder has seen this and accepted it; revisit only if it
+turns out to mislead in practice.
 
 ## Relay — what is left, in order
 

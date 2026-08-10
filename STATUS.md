@@ -16,16 +16,14 @@ out → bill → paid.
 **Relay Phase 1 is live** (PR #2 merged 2026-08-10 after the founder's
 browser pass, CI green, branch deleted): the relay, departments (many per
 trail), and a per-project overview whose dates are all calculated.
-**Standard trails are built** on `feature/pusher-standard-trails`
-(migrations `0041`–`0047` **already applied live**), waiting on the
-founder's browser pass. **Next after that merges:** unit-level stages
-rolling up into the project picture, then the leaderboard, then links +
-Google Chat.
+**Standard trails and the Relay rename are live** (PR #3 merged
+2026-08-10 after the founder's browser pass, migrations `0041`–`0047`).
+Every project is born with the eight default stages over three years.
+**Next:** unit-level stages rolling up into the project picture, then
+the leaderboard, then links + Google Chat.
 
 Note for a cold start: the probe account holds `/inventory`, not
-`/relay`, and the branch's test data has been cleared. `0041`/`0042`
-being live while their code is unmerged is safe and deliberate — the
-view kept every column production reads.
+`/relay`. Nothing is in flight.
 
 |                    |                                                                                                                                |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
@@ -255,6 +253,28 @@ Entries before 2026-08-10 evening were written when Relay was called
 the applied migrations still say pusher, and the tables always will —
 `0047` records why renaming them was refused.
 
+- **2026-08-10 (Relay — the rename, the seed data, and the hierarchy)** —
+  **PR #3 merged and deployed.** The tool is now **Relay** (`0047`): the
+  URL, the folders, the tool name and the **grant slug**, with the grants
+  and all 27 policies moved in one transaction — a half-done permission
+  rename denies everyone silently, with no error to find. The migration
+  refuses to commit unless zero policies still mention the old slug.
+  The **tables stay `pusher_*`** and that is a decision, not laziness:
+  renaming them is not additive and would have broken production from the
+  moment it applied until the branch merged. Seed data (`0045`/`0046`):
+  22 activities, 3 trail types, and the founder's eight stages —
+  Masterplan → Handover, 156 weeks — backfilled onto every project and
+  given to every future one by a SECURITY DEFINER trigger, definer
+  because projects are created under the `/masters` grant and the stage
+  tables are written under Relay's. `0045` never overwrites a schedule
+  someone has worked on, which left Saarang with only the two stages the
+  founder made while testing, so `0046` fills what is missing BY NAME —
+  Saarang keeps both, their weeks, and the trails filed under them.
+  No trails, people or progress were seeded: a fake baton in a real
+  person's court is exactly the lie this tool exists to stop.
+  Also, the founder's clutter note: activities and trail types nest
+  behind a gear (they are vocabulary, not work), and the schedule editor
+  moved from permanently-open to one button on the picture it edits.
 - **2026-08-10 (Relay — standard trails at the house level)** —
   `feature/pusher-standard-trails`, migrations `0041`–`0042` applied.
   One click on a house lays down the usual set of trails, staffed from
