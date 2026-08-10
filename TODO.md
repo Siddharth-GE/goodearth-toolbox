@@ -11,13 +11,11 @@ up" list holds the loose ends and Phase 9's shape (Overview fully real
 Phase 1 (the relay) is built; see `app/(dashboard)/pusher/PLAN.md` for
 how it works and what will bite. The remaining phases, in order:
 
-- **Phase 2 — stages and the map.** Project stages and unit stages, both
-  user-editable, ordered, with week counts; every unit stage maps to one
-  project stage, which is how ground-truth progress rolls up into the
-  macro timeline. Chains then live in a stage. Quests (a current stage
-  with nothing running), clearing a finished stage, and the winding path
-  with a pennant for where the plan says today is — the gap is the slip.
-  All additive: new tables plus nullable columns on `pusher_chains`.
+- **Unit-level stages.** Project stages and the overview are built. Still
+  to come: a per-unit breakdown (each unit stage mapping to one project
+  stage) so a villa's own progress rolls up into the project picture,
+  plus quests — a current stage with nothing running — and clearing a
+  finished stage. Additive on top of `project_stages`.
 - **Phase 3 — the game.** Leaderboard, podium, ranks, the **clean
   streak** (a day counts if you neither ended it holding an overdue baton
   nor let one go overdue — the mockup's "empty court" version is

@@ -56,8 +56,22 @@ moving the trail — the rescue hatch when the holder has left or is away.
 | `lib/pusher/actions.ts`   | Writes. Push/bounce/finish are **one insert each**; the guard does the rest.                                                                                                                                                                                                |
 | `app/(dashboard)/pusher/` | Your court (phone-first), All trails, trail detail, Open a trail, Activities.                                                                                                                                                                                               |
 
-Migrations: **`0036_pusher.sql`** (everything) and **`0037`** (defaults on
-the two server-stamped columns, so callers stop sending placeholders).
+Migrations: **`0036`** (the relay), **`0037`** (defaults on the two
+server-stamped columns), **`0038`** (departments, many per trail),
+**`0039`** (the project schedule), **`0040`** (the surrogate id
+`pusher_project_plans` needed to be auditable).
+
+## Two rules that arrived with the founder's next round
+
+**A trail can be in several departments at once.** A selections handoff
+is Design _and_ Purchase. That is why it is a join table and not a
+column — a single department would force a lie on exactly the trails
+worth watching. They prefill from the activity's last run, like the legs.
+
+**Dates are worked out, never typed.** The only stored inputs are a
+project's start date and each stage's length in weeks. Every date on
+screen is calculated. Do not add a stored date "for convenience": that is
+how inserting one stage silently orphans every date after it.
 
 ## Things that will bite
 
@@ -74,6 +88,13 @@ the two server-stamped columns, so callers stop sending placeholders).
   every node into a flat ellipse.
 - **`fetchAll` where completeness matters** — a missing event silently
   changes who the holder is, which is worse than an error.
+- **Anything audited needs an `id` column.** `audit_row()` reads
+  `new.id` and raises at runtime otherwise — 0039 shipped a table without
+  one and every write to it failed until 0040. It typechecks and builds;
+  only opening the page finds it.
+- **Don't put `router.refresh()` inside a `useTransition` on a form that
+  stays mounted.** `isPending` stays true while the refresh is in flight
+  and the whole form greys out. A plain boolean is the right tool.
 - **Don't delete a chain.** Every chain has history from the moment
   `open_chain()` writes its `started` event. One opened by mistake is
   _finished_ with a note. There is no delete policy, on purpose.

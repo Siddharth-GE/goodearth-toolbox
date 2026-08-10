@@ -13,20 +13,21 @@ the founder's browser gates and the single-grant probe smoke). The
 chain runs design → price → indent → PO → goods in / stock / goods
 out → bill → paid.
 
-**Pusher Phase 1 (the relay) is built** on `feature/pusher-relay`,
-awaiting the founder's browser pass. **Next:** Pusher Phase 2 (stages
-and the map), then Phase 9 — Overview fully real + one real project run
-end-to-end.
+**Pusher is built through the project schedule** on
+`feature/pusher-relay`, awaiting the founder's browser pass: the relay,
+departments (many per trail), and a per-project overview whose dates are
+all calculated. **Next:** unit-level stages rolling up into the project
+picture, then the leaderboard, then links + Google Chat.
 
 |                    |                                                                                                                                 |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
 | Last worked        | 2026-08-10                                                                                                                      |
 | Branch             | `feature/pusher-relay` — built, tested, not yet merged                                                                          |
-| Migrations applied | `0001`–`0037` (next is `0038`)                                                                                                  |
+| Migrations applied | `0001`–`0040` (next is `0041`)                                                                                                  |
 | Items in database  | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands                                                  |
 | Thumbnails         | 897 in Supabase Storage; 1,736 items use the colour placeholder                                                                 |
 | Built tools        | Marathon, Settings, Masters, Selections, Budgets (Interiors + Construction), Indents, Purchase Orders, Inventory, Bills, Pusher |
-| Tests              | `npm test` — 171, all pure logic                                                                                                |
+| Tests              | `npm test` — 186, all pure logic                                                                                                |
 
 ## Next up
 
@@ -61,6 +62,12 @@ end-to-end.
   be a "Unit" in Selections and a "Territory" here — and uses game words
   only for Pusher's own ideas (trail, baton, leg, cold, flow). Code and
   data speak plainly throughout: chain, leg, stuck, points.
+- **Pusher dates are worked out, never typed** (founder, 2026-08-10).
+  The only stored inputs are a project's start date and each stage's
+  length in weeks; every date on screen is calculated on read. Inserting
+  a stage moves every later date by itself, and no two dates can
+  contradict each other. **A trail can be in several departments at
+  once** — cross-department is the normal case, so it is a join table.
 - **Pusher's event log IS its state.** No status column, no stored
   holder, no stored points — all derived by replay. Events snapshot the
   assignee and expected days at the moment the baton lands, which is what
