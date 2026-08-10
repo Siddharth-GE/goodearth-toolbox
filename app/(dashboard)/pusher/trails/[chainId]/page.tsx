@@ -118,7 +118,10 @@ export default async function TrailPage({ params }: { params: Promise<{ chainId:
             <TrailRoute legs={state.legActuals} />
           </div>
 
-          <div className="grid grid-cols-1 gap-x-6 gap-y-2 px-4 pb-4 sm:grid-cols-2">
+          {/* One column, always. A trail is a sequence, and two columns
+              made it read 1, 2 across then 3 below — the wrong order for
+              the one thing this list is for. */}
+          <div className="space-y-1.5 px-4 pb-4">
             {trail.legs.map((leg) => {
               const actual = state.legActuals.find((a) => a.legNo === leg.leg_no);
               const over = (actual?.overBy ?? 0) > 0;

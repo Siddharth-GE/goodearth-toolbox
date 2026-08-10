@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
 import { createActivity, setActivityActive } from "@/lib/pusher/actions";
+import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useTransition } from "react";
 
 /**
@@ -23,6 +24,7 @@ export function ActivityList({
 }) {
   const [state, formAction, pending] = useActionState(createActivity, undefined);
   const [busy, startTransition] = useTransition();
+  const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const wasPending = useRef(false);
 
@@ -68,8 +70,9 @@ export function ActivityList({
               size="sm"
               disabled={busy}
               onClick={() =>
-                startTransition(() => {
-                  void setActivityActive(activity.id, !activity.is_active);
+                startTransition(async () => {
+                  await setActivityActive(activity.id, !activity.is_active);
+                  router.refresh();
                 })
               }
             >

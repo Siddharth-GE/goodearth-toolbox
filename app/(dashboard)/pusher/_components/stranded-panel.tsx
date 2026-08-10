@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { handBaton } from "@/lib/pusher/actions";
 import type { ChainRow } from "@/lib/pusher/queries";
 import { AlertTriangle } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 /**
@@ -39,6 +40,7 @@ export function StrandedPanel({
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const router = useRouter();
 
   const close = () => {
     setTarget(null);
@@ -140,8 +142,12 @@ export function StrandedPanel({
                 onClick={() =>
                   startTransition(async () => {
                     const result = await handBaton(target.chainId, toUser, note);
-                    if (result?.error) setError(result.error);
-                    else close();
+                    if (result?.error) {
+                      setError(result.error);
+                      return;
+                    }
+                    router.refresh();
+                    close();
                   })
                 }
               >

@@ -1,25 +1,29 @@
 import type { LegActual } from "@/lib/pusher/chain";
 
 /**
- * The trail drawn as a route: a node per leg, filled behind the baton,
+ * The trail drawn as a route: a node per leg, filled in behind the baton,
  * ringed in accent where it is standing now.
  *
  * Inline SVG, which is unprecedented in this codebase outside the logo —
  * justified here because the shape IS the information. A row of pills
  * would say the same words and none of the same thing.
  *
- * viewBox is a fixed 100-wide coordinate space with
- * preserveAspectRatio="none", so it stretches to any container width
- * while the stroke weights stay readable.
+ * The viewBox is wide and scaled UNIFORMLY. The first version stretched
+ * it with preserveAspectRatio="none" to fill any width, which turned
+ * every node into a flat ellipse — the numbers inside them smeared out
+ * sideways. Uniform scaling keeps circles circular; the cost is that the
+ * strip gets short on a phone, which is the right trade because the leg
+ * list underneath carries the same information in words.
  */
 export function TrailRoute({ legs }: { legs: LegActual[] }) {
   const n = legs.length;
   if (n === 0) return null;
 
-  const H = 26;
-  const x = (i: number) => (n === 1 ? 50 : 8 + (84 * i) / (n - 1));
-  // A gentle weave for longer trails; a straight line reads better for
-  // one or two legs than a pointless curve.
+  const W = 900;
+  const H = 60;
+  const x = (i: number) => (n === 1 ? W / 2 : 40 + ((W - 80) * i) / (n - 1));
+  // A gentle weave once there are enough legs to weave; a straight line
+  // reads better than a pointless curve for one or two.
   const y = (i: number) => (n <= 2 ? H / 2 : i % 2 ? H * 0.68 : H * 0.32);
 
   const points = legs.map((_, i) => ({ x: x(i), y: y(i) }));
@@ -36,28 +40,19 @@ export function TrailRoute({ legs }: { legs: LegActual[] }) {
 
   return (
     <svg
-      viewBox={`0 0 100 ${H}`}
-      preserveAspectRatio="none"
-      className="block h-16 w-full"
+      viewBox={`0 0 ${W} ${H}`}
+      className="mx-auto block h-auto w-full max-w-3xl"
       aria-hidden="true"
     >
-      <path
-        d={d}
-        fill="none"
-        stroke="var(--border)"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        vectorEffect="non-scaling-stroke"
-      />
+      <path d={d} fill="none" stroke="var(--border)" strokeWidth="4" strokeLinecap="round" />
       <path
         d={d}
         fill="none"
         stroke="var(--foreground)"
-        strokeWidth="2.4"
+        strokeWidth="4"
         strokeLinecap="round"
         pathLength={100}
         strokeDasharray={`${progress} 100`}
-        vectorEffect="non-scaling-stroke"
       />
       {points.map((p, i) => {
         const leg = legs[i];
@@ -68,17 +63,16 @@ export function TrailRoute({ legs }: { legs: LegActual[] }) {
             <circle
               cx={p.x}
               cy={p.y}
-              r="4"
+              r="13"
               fill={done ? "var(--foreground)" : "var(--surface)"}
               stroke={current ? "var(--accent)" : done ? "var(--foreground)" : "var(--border)"}
-              strokeWidth={current ? 1.6 : 1}
-              vectorEffect="non-scaling-stroke"
+              strokeWidth={current ? 3 : 2}
             />
             <text
               x={p.x}
-              y={p.y + 1.5}
+              y={p.y + 5}
               textAnchor="middle"
-              fontSize="4.5"
+              fontSize="14"
               fontWeight="600"
               fill={done ? "var(--surface)" : current ? "var(--accent)" : "var(--muted)"}
             >

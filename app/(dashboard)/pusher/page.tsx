@@ -3,6 +3,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { LinkButton } from "@/components/ui/button";
 import { PageTitle } from "@/components/ui/page-title";
 import { requireUser } from "@/lib/auth/dal";
+import { cn } from "@/lib/utils";
 import {
   getLegsFor,
   getPusherPulse,
@@ -43,11 +44,13 @@ export default async function PusherCourtPage() {
         />
         <PusherNav active="court" />
 
-        <div className="grid grid-cols-3 gap-3">
+        {/* One band, not three stretched cards: these are three small
+            numbers that belong together, and read as a single glance. */}
+        <Card className="divide-border grid grid-cols-3 divide-x">
           <Stat label="live" value={pulse.live} />
           <Stat label="cold" value={pulse.cold} tone={pulse.cold > 0 ? "danger" : undefined} />
           <Stat label="in your hand" value={pulse.mine} />
-        </div>
+        </Card>
 
         {isAdmin && stranded.length > 0 && <StrandedPanel rows={stranded} people={people} />}
 
@@ -120,17 +123,16 @@ export default async function PusherCourtPage() {
 
 function Stat({ label, value, tone }: { label: string; value: number; tone?: "danger" }) {
   return (
-    <Card className="p-4">
+    <div className="px-4 py-3.5">
       <p
-        className={
-          tone === "danger"
-            ? "text-danger text-3xl font-extrabold tracking-tight"
-            : "text-foreground text-3xl font-extrabold tracking-tight"
-        }
+        className={cn(
+          "text-3xl font-extrabold tracking-tight",
+          tone === "danger" ? "text-danger" : "text-foreground",
+        )}
       >
         {value}
       </p>
-      <p className="text-muted mt-1 text-xs font-medium">{label}</p>
-    </Card>
+      <p className="text-muted mt-0.5 text-xs font-medium">{label}</p>
+    </div>
   );
 }

@@ -17,6 +17,7 @@ import { bounceBaton, finishTrail, handBaton, pushBaton } from "@/lib/pusher/act
 import { BOUNCE_REASONS } from "@/lib/pusher/events";
 import { POINTS, previewPoints } from "@/lib/pusher/points";
 import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { useCelebrate } from "./celebrate";
@@ -115,6 +116,7 @@ function MoveDialog({
   const [toUser, setToUser] = useState<string>("");
   const [pending, startTransition] = useTransition();
   const celebrate = useCelebrate();
+  const router = useRouter();
 
   const close = () => {
     setError(null);
@@ -152,6 +154,13 @@ function MoveDialog({
         setError(result.error);
         return;
       }
+
+      // revalidatePath in the action marks the data stale, but the page
+      // the mover is standing on is rendered dynamically and its RSC
+      // payload is already in the router cache — without this the baton
+      // moves in the database and the screen keeps showing the old leg,
+      // which is the one thing this tool cannot afford to get wrong.
+      router.refresh();
 
       if (mode === "finish") {
         celebrate.banner("TRAIL COMPLETE");
