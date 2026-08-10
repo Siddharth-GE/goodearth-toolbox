@@ -231,6 +231,26 @@ account put back to `/inventory`.
 
 One line per day; full detail in git history and the PLAN.md files.
 
+- **2026-08-10 (Pusher — two fixes from the founder's browser test)** —
+  same branch, no migration. The founder opened two trails on Saarang
+  Villa 6, one under Design and one under Construction, finished the
+  Construction one, and the progress bar grew **from the left edge**,
+  painting over a Design stage where nothing had happened. The number was
+  right and the picture was a lie: `actualPct` weights each stage by its
+  length — deliberately, so a 40-week stage moves it more than a 1-week
+  one — and the SVG then drew that weighted total as one bar starting at
+  x=0. **The rule this establishes: a weighted total is a number, not a
+  position — never draw one as a bar growing from the left.** Each stage
+  now fills inside its own block, so Construction reads as moving while
+  Design reads as untouched; nothing in `schedule.ts` changed and all 15
+  of its tests passed unedited, which is the tell that the maths was
+  never the problem. The trap is waiting for the leaderboard and the
+  Dashboard, so it is written into Pusher's PLAN.md. Second fix: **Pusher
+  opens on Projects**, then Your court, then All trails — `/pusher`
+  redirects to `/pusher/projects` and the court moves to `/pusher/court`,
+  the same shape `/masters` already uses. "Your court" keeps its name
+  (founder's call — court is one of Pusher's own game words, and the
+  empty state already says "Court cleared").
 - **2026-08-10 (Pusher — departments and the project schedule)** — same
   branch, migrations `0038`–`0040` applied. The founder added two things
   to the relay. **Departments**, with the correction that makes the

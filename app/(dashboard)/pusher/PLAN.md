@@ -54,7 +54,7 @@ moving the trail — the rescue hatch when the holder has left or is away.
 | `lib/pusher/points.ts`    | The economy, ranks, on-time. `scoreChain` takes a whole chain because on-time needs the _previous_ event.                                                                                                                                                                   |
 | `lib/pusher/queries.ts`   | Reads. Lists go through the `pusher_chain_state` view; only the detail page reads a full log.                                                                                                                                                                               |
 | `lib/pusher/actions.ts`   | Writes. Push/bounce/finish are **one insert each**; the guard does the rest.                                                                                                                                                                                                |
-| `app/(dashboard)/pusher/` | Your court (phone-first), All trails, trail detail, Open a trail, Activities.                                                                                                                                                                                               |
+| `app/(dashboard)/pusher/` | Projects (the landing page — `/pusher` redirects to `/pusher/projects`, the Masters pattern), Your court at `/pusher/court` (phone-first), All trails, trail detail, Open a trail, Activities.                                                                              |
 
 Migrations: **`0036`** (the relay), **`0037`** (defaults on the two
 server-stamped columns), **`0038`** (departments, many per trail),
@@ -86,6 +86,12 @@ how inserting one stage silently orphans every date after it.
 - **Draw uniformly.** The trail route SVG scales with its aspect ratio
   preserved. The first version stretched to fill its container and turned
   every node into a flat ellipse.
+- **A weighted total is a number, not a position.** Never draw one as a
+  bar growing from the left edge. `actualPct` weights each stage by its
+  length, so finishing one 40-week Construction trail is a big number —
+  drawn from x=0 it painted straight over an untouched Design stage and
+  claimed work nobody had done. Each stage now fills in its own block.
+  The same trap is waiting for the leaderboard and the Dashboard.
 - **`fetchAll` where completeness matters** — a missing event silently
   changes who the holder is, which is worse than an error.
 - **Anything audited needs an `id` column.** `audit_row()` reads
