@@ -17,7 +17,7 @@ out → bill → paid.
 browser pass, CI green, branch deleted): the relay, departments (many per
 trail), and a per-project overview whose dates are all calculated.
 **Standard trails are built** on `feature/pusher-standard-trails`
-(migrations `0041`–`0042` **already applied live**), waiting on the
+(migrations `0041`–`0044` **already applied live**), waiting on the
 founder's browser pass. **Next after that merges:** unit-level stages
 rolling up into the project picture, then the leaderboard, then links +
 Google Chat.
@@ -31,7 +31,7 @@ view kept every column production reads.
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
 | Last worked        | 2026-08-10                                                                                                                      |
 | Branch             | `feature/pusher-standard-trails` — built, awaiting the founder's browser pass                                                   |
-| Migrations applied | `0001`–`0042` (next is `0043`)                                                                                                  |
+| Migrations applied | `0001`–`0044` (next is `0045`)                                                                                                  |
 | Items in database  | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands                                                  |
 | Thumbnails         | 897 in Supabase Storage; 1,736 items use the colour placeholder                                                                 |
 | Built tools        | Marathon, Settings, Masters, Selections, Budgets (Interiors + Construction), Indents, Purchase Orders, Inventory, Bills, Pusher |
@@ -84,14 +84,19 @@ view kept every column production reads.
   Bouncing is rewarded (+5) and never punished; it is impossible without
   a reason and a note, at the database. Expected days are whole days,
   because elapsed time is counted in **IST calendar days**.
-- **A queued trail has no clock** (founder, 2026-08-10; designed, not yet
-  built — see TODO.md). Standard trails laid down on a house arrive
-  dormant and go live only when someone starts them. "Not started" is
-  derived, not stored: a queued trail has **no events yet**, which is why
-  this costs no status column. Opening a whole set live would start every
-  clock at once and turn each house solid cold within a fortnight, on
-  work nobody meant to begin — and a cold signal that cries wolf is worth
-  nothing.
+- **The leg IS the activity** (founder, 2026-08-10; `0043`). A trail is
+  an ordered list of activities, each with a person and days — no
+  sub-legs, nothing to type. A **trail type** is a named trail with its
+  activities fixed, so a whole villa's run lands in one click and only
+  the people need choosing. The first cut made a type produce twelve
+  separate trails; one trail with twelve activity-legs has **one baton
+  and one clock**, which is both simpler and what stops a house going
+  cold on work nobody started.
+- **A queued trail has no clock** (founder, 2026-08-10; `0041`). A trail
+  can be laid out today and begun when the site is actually ready.
+  "Not started" is derived, not stored: a queued trail has **no events
+  yet**, which is why it costs no status column — and why both 0036
+  guards already handled it without a line of change.
 - One `items` table for products and materials, split by `kind`.
 - Prices are **snapshotted onto lines at pick time**; master edits
   never rewrite existing lines. Same principle for PO `gst_pct`.

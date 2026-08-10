@@ -13,9 +13,14 @@ drawing, a decision, or a document.
 
 ## The model, in one paragraph
 
-A **chain** (UI: "trail") is a task with an ordered list of **legs**;
-each leg is a person plus a number of expected days. The baton sits with
-exactly one person, who can **push** it forward one leg, **bounce** it
+A **chain** (UI: "trail") is an ordered list of **activities**; each leg
+IS an activity, plus a person and a number of expected days (0043 —
+"there needn't be sub legs to an activity"). A **trail type** (table:
+`pusher_trail_sets`) is a named trail with its activities fixed, so a
+whole villa's run lands in one click and only the people need choosing.
+
+The baton sits with exactly one person, who can **push** it forward one
+leg, **bounce** it
 back to any earlier leg (reason + note both mandatory), or **finish** it
 from the last leg. Time in a leg beyond its expected days is **stuck**
 (UI: "cold"). An admin can **hand** a baton to someone else without
@@ -59,26 +64,35 @@ moving the trail — the rescue hatch when the holder has left or is away.
 Migrations: **`0036`** (the relay), **`0037`** (defaults on the two
 server-stamped columns), **`0038`** (departments, many per trail),
 **`0039`** (the project schedule), **`0040`** (the surrogate id
-`pusher_project_plans` needed to be auditable).
+`pusher_project_plans` needed to be auditable), **`0041`** (trail types
+and the queue), **`0042`** (a regression fix — see below), **`0043`**
+(the leg IS the activity), **`0044`** (`replace_future_legs` catches up).
 
-## Standard trails, and the queue (0041)
+## Trail types, and the queue (0041, reshaped by 0043)
 
-Every villa runs roughly the same handoffs, so a **standard set** — a
-named, ordered list of activities — lands them on a house in one click.
-A set is a list of **activities**, never a frozen copy of people and
-days: legs prefill from each activity's last run at the moment it is
-applied, so a leaver's name cannot ride onto every new house forever.
+**The leg is the activity.** A trail type is a named trail whose
+activities are fixed; picking one fills in the whole list with whoever
+last carried each activity and the days that type gives it. Nothing is
+typed, and everything is editable until the baton reaches it.
 
-**Queued trails have no clock**, and that is the point. Twelve live
-trails is twelve clocks started at once; Handover at three expected days
-would be cold within the week, on work nobody meant to begin, and a cold
-signal that cries wolf is worth nothing.
+A type is a list of **activities**, never a frozen copy of people: the
+people come from the most recent leg of each activity at the moment the
+type is laid down, so a leaver's name cannot ride onto every new house
+forever.
 
-This needed almost no new machinery, because **the event log already had
-this state and nothing used it**: a chain with no events. `open_chain()`
-split into `create_chain()` + `start_chain()` and both 0036 guards
-already handled it — the events guard accepts only `started` on an
-eventless chain, and the legs guard waves every edit through because
+**One trail, one clock.** The first cut of this made a set produce
+TWELVE trails on a house, which is twelve clocks started at once —
+Handover at three expected days would have been cold within the week, on
+work nobody meant to begin. One trail with twelve activity-legs has one
+baton and one clock, and the problem simply does not arise.
+
+**The queue survives anyway** (founder's choice) and now means something
+better: a house's trail can be laid out today and begun when the site is
+actually ready. It needed almost no machinery, because **the event log
+already had the state and nothing used it** — a chain with no events.
+`open_chain()` split into `create_chain()` + `start_chain()` and both
+0036 guards already handled it: the events guard accepts only `started`
+on an eventless chain, the legs guard waves every edit through because
 "before the trail is opened there is nothing to protect".
 
 Queued work **counts in the project picture as planned-but-not-done**.
@@ -138,7 +152,8 @@ how inserting one stage silently orphans every date after it.
   trail, which has no events and therefore no history to destroy;
   `discard_chain()` refuses the instant one starts.
 - **Never rebuild `pusher_chain_state` from an older migration.** It has
-  been defined in **four** files now (0036, 0038, 0039, 0041/0042), and a
+  been defined in **five** files now (0036, 0038, 0039, 0041/0042, 0043),
+  and a
   `create view` is a full replacement, not a patch. 0041 was written from
   0036's copy and silently dropped the department columns 0038 had added,
   breaking All trails against the live database until 0042. Always start

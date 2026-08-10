@@ -7,7 +7,7 @@ founder approves it.
 ## Right now: standard trails is waiting on a browser test
 
 `feature/pusher-standard-trails` is built, CI green, **not merged**.
-Migrations `0041`–`0042` are **already applied to the live database**,
+Migrations `0041`–`0044` are **already applied to the live database**,
 and that is safe while the code is unmerged: the state view kept every
 column production reads (0042 exists because 0041 briefly did not — see
 STATUS.md).
