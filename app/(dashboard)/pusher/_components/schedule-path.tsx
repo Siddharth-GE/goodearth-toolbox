@@ -42,16 +42,35 @@ export function SchedulePath({ schedule }: { schedule: ScheduleSummary }) {
         // A stage barely started still shows a sliver rather than
         // vanishing on a narrow block.
         const fillW = stage.progress > 0 ? Math.max(3, stage.progress * trackW) : 0;
+        // Nothing filed under it at all is a different thing from filed
+        // and not done, and it needs a different fix: file some trails,
+        // not chase someone. A dashed outline says "nothing here yet";
+        // a solid block says "work is waiting".
+        const nothingFiled = stage.trailsTotal === 0;
         return (
           <g key={stage.id}>
-            <rect
-              x={x + 1}
-              y={TRACK_Y}
-              width={trackW}
-              height={TRACK_H}
-              rx="3"
-              fill="var(--border)"
-            />
+            {nothingFiled ? (
+              <rect
+                x={x + 1.75}
+                y={TRACK_Y + 0.75}
+                width={Math.max(1, trackW - 1.5)}
+                height={TRACK_H - 1.5}
+                rx="3"
+                fill="none"
+                stroke="var(--border)"
+                strokeWidth="1.5"
+                strokeDasharray="4 3"
+              />
+            ) : (
+              <rect
+                x={x + 1}
+                y={TRACK_Y}
+                width={trackW}
+                height={TRACK_H}
+                rx="3"
+                fill="var(--border)"
+              />
+            )}
             {fillW > 0 && (
               <rect
                 x={x + 1}

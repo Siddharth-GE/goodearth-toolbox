@@ -97,8 +97,12 @@ export default async function ProjectSchedulePage({
                     {stage.trailsStuck > 0 && (
                       <Badge variant="danger">{stage.trailsStuck} cold</Badge>
                     )}
+                    {/* Reads the same as the dashed block on the track:
+                        nothing filed is not the same as nothing done. */}
                     <span className="text-muted text-xs">
-                      {stage.trailsFinished} of {stage.trailsTotal} done
+                      {stage.trailsTotal === 0
+                        ? "Nothing filed here yet"
+                        : `${stage.trailsFinished} of ${stage.trailsTotal} done`}
                     </span>
                   </span>
                 </div>
