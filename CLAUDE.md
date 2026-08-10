@@ -97,8 +97,11 @@ means flipping `built: true` and replacing the stub `page.tsx`.
   picker, add its grant to the allow-list in
   `app/api/catalogue/route.ts` or the picker silently 403s.
 - **Tests** cover pure logic only (`npm test`, node:test via tsx) — no
-  database, no browser; extract pure modules to test them. CI
-  (typecheck, prettier, build, check:actions) is the gate; no hooks.
+  database, no browser; extract pure modules to test them. CI is the
+  gate; no hooks. It runs, in this order: prettier, **lint**, typecheck,
+  test, build, check:actions — and stops at the first failure, so a
+  trivial lint error silently skips every check that matters. Check
+  `gh run list` is actually green, not just that a push succeeded.
 - **Smoke-test as a real single-grant user** (the probe account, one
   tool's grant only) before merging — an admin passes every check and
   never sees grant bugs. After any deploy that changes server actions,
