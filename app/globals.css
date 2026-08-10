@@ -93,3 +93,96 @@ body {
     transform: scale(1);
   }
 }
+
+/* ---------------------------------------------------------------------
+   Pusher's motion. See DESIGN.md — Pusher is the one deliberate
+   exception to "one payoff moment per flow", because moving a baton IS
+   the product and the reward for moving it is the adoption strategy.
+   Everything below is confined to /pusher.
+
+   All of it is switched off wholesale by the reduced-motion block at the
+   bottom of this file. The breathing "cold" indicator is the one that
+   matters most: it must read as calm and unmissable, never as an alarm.
+   --------------------------------------------------------------------- */
+
+/* A stuck trail breathes rather than blinks. */
+@keyframes pusher-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 0%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--danger) 12%, transparent);
+  }
+}
+
+/* The points earned float up and away from the button that earned them. */
+@keyframes pusher-float {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  15% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -26px);
+  }
+}
+
+/* Finishing a trail is the one moment big enough for the whole screen. */
+@keyframes pusher-banner {
+  0% {
+    opacity: 0;
+    transform: scale(0.88);
+  }
+  14% {
+    opacity: 1;
+    transform: scale(1.03);
+  }
+  24% {
+    transform: scale(1);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
+@keyframes pusher-confetti {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx), var(--dy)) rotate(var(--rot));
+  }
+}
+
+/* The app had no reduced-motion guard at all before Pusher. It does now,
+   and it covers everything, not just Pusher's additions — a spinner is a
+   functional signal and keeps turning, but nothing else moves for
+   someone who has asked the operating system for stillness. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .spinner-keeps-turning {
+    animation-duration: 0.9s !important;
+    animation-iteration-count: infinite !important;
+  }
+}

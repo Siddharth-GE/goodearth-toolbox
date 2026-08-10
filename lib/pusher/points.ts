@@ -207,7 +207,10 @@ export type FlowTotals = {
 };
 
 export function totalsByActor(scored: readonly ScoredEvent[]): Map<string, FlowTotals> {
-  const acc = new Map<string, { points: number; moves: number; bounces: number; timed: number; onTime: number }>();
+  const acc = new Map<
+    string,
+    { points: number; moves: number; bounces: number; timed: number; onTime: number }
+  >();
 
   for (const s of scored) {
     const row = acc.get(s.actorId) ?? { points: 0, moves: 0, bounces: 0, timed: 0, onTime: 0 };

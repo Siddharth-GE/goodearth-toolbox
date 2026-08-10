@@ -37,7 +37,13 @@ const ev = (e: Partial<ChainEvent> & Pick<ChainEvent, "kind" | "occurred_at">): 
 });
 
 const started = (day: number) =>
-  ev({ kind: "started", to_leg: 1, to_assignee_id: ANNA, to_expected_days: 3, occurred_at: at(day) });
+  ev({
+    kind: "started",
+    to_leg: 1,
+    to_assignee_id: ANNA,
+    to_expected_days: 3,
+    occurred_at: at(day),
+  });
 
 test("a freshly opened trail sits on leg 1 with its first person", () => {
   seq = 0;

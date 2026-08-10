@@ -21,8 +21,7 @@ import {
 const ANNA = "anna";
 const RAVI = "ravi";
 
-const at = (day: number, hour = 10) =>
-  new Date(Date.UTC(2026, 7, day, hour - 5, 30)).toISOString(); // hour is IST
+const at = (day: number, hour = 10) => new Date(Date.UTC(2026, 7, day, hour - 5, 30)).toISOString(); // hour is IST
 
 let seq = 0;
 const ev = (e: Partial<ChainEvent> & Pick<ChainEvent, "kind" | "occurred_at">): ChainEvent => ({
@@ -40,7 +39,13 @@ const ev = (e: Partial<ChainEvent> & Pick<ChainEvent, "kind" | "occurred_at">): 
 test("an on-time push pays more than a late one", () => {
   seq = 0;
   const onTime = scoreChain("c1", [
-    ev({ kind: "started", to_leg: 1, to_assignee_id: ANNA, to_expected_days: 3, occurred_at: at(1) }),
+    ev({
+      kind: "started",
+      to_leg: 1,
+      to_assignee_id: ANNA,
+      to_expected_days: 3,
+      occurred_at: at(1),
+    }),
     ev({
       kind: "pushed",
       from_leg: 1,
@@ -55,7 +60,13 @@ test("an on-time push pays more than a late one", () => {
 
   seq = 0;
   const late = scoreChain("c1", [
-    ev({ kind: "started", to_leg: 1, to_assignee_id: ANNA, to_expected_days: 3, occurred_at: at(1) }),
+    ev({
+      kind: "started",
+      to_leg: 1,
+      to_assignee_id: ANNA,
+      to_expected_days: 3,
+      occurred_at: at(1),
+    }),
     ev({
       kind: "pushed",
       from_leg: 1,
@@ -74,8 +85,21 @@ test("on time uses the expected days snapshotted when the baton landed", () => {
   // recorded 10 — a later edit to the leg row must not change this.
   seq = 0;
   const scored = scoreChain("c1", [
-    ev({ kind: "started", to_leg: 1, to_assignee_id: ANNA, to_expected_days: 10, occurred_at: at(1) }),
-    ev({ kind: "pushed", from_leg: 1, to_leg: 2, to_assignee_id: RAVI, to_expected_days: 2, occurred_at: at(8) }),
+    ev({
+      kind: "started",
+      to_leg: 1,
+      to_assignee_id: ANNA,
+      to_expected_days: 10,
+      occurred_at: at(1),
+    }),
+    ev({
+      kind: "pushed",
+      from_leg: 1,
+      to_leg: 2,
+      to_assignee_id: RAVI,
+      to_expected_days: 2,
+      occurred_at: at(8),
+    }),
   ]);
   assert.equal(scored[0].onTime, true, "7 days against the 10 it was actually given");
 });
@@ -83,7 +107,13 @@ test("on time uses the expected days snapshotted when the baton landed", () => {
 test("finishing on time is the biggest single award", () => {
   seq = 0;
   const scored = scoreChain("c1", [
-    ev({ kind: "started", to_leg: 1, to_assignee_id: ANNA, to_expected_days: 4, occurred_at: at(1) }),
+    ev({
+      kind: "started",
+      to_leg: 1,
+      to_assignee_id: ANNA,
+      to_expected_days: 4,
+      occurred_at: at(1),
+    }),
     ev({ kind: "completed", from_leg: 1, actor_id: ANNA, occurred_at: at(3) }),
   ]);
   assert.equal(scored[0].points, POINTS.finishOnTime);
@@ -93,7 +123,13 @@ test("finishing on time is the biggest single award", () => {
 test("an honest bounce pays, and never counts against on-time", () => {
   seq = 0;
   const scored = scoreChain("c1", [
-    ev({ kind: "started", to_leg: 1, to_assignee_id: ANNA, to_expected_days: 1, occurred_at: at(1) }),
+    ev({
+      kind: "started",
+      to_leg: 1,
+      to_assignee_id: ANNA,
+      to_expected_days: 1,
+      occurred_at: at(1),
+    }),
     ev({
       kind: "pushed",
       from_leg: 1,
@@ -122,8 +158,21 @@ test("an honest bounce pays, and never counts against on-time", () => {
 test("bouncing the same trail twice in a day pays only once", () => {
   seq = 0;
   const scored = scoreChain("c1", [
-    ev({ kind: "started", to_leg: 1, to_assignee_id: ANNA, to_expected_days: 1, occurred_at: at(1) }),
-    ev({ kind: "pushed", from_leg: 1, to_leg: 2, to_assignee_id: RAVI, to_expected_days: 1, occurred_at: at(2, 9) }),
+    ev({
+      kind: "started",
+      to_leg: 1,
+      to_assignee_id: ANNA,
+      to_expected_days: 1,
+      occurred_at: at(1),
+    }),
+    ev({
+      kind: "pushed",
+      from_leg: 1,
+      to_leg: 2,
+      to_assignee_id: RAVI,
+      to_expected_days: 1,
+      occurred_at: at(2, 9),
+    }),
     ev({
       kind: "bounced",
       from_leg: 2,
@@ -135,7 +184,15 @@ test("bouncing the same trail twice in a day pays only once", () => {
       note: "again",
       occurred_at: at(2, 11),
     }),
-    ev({ kind: "pushed", from_leg: 1, to_leg: 2, actor_id: ANNA, to_assignee_id: RAVI, to_expected_days: 1, occurred_at: at(2, 13) }),
+    ev({
+      kind: "pushed",
+      from_leg: 1,
+      to_leg: 2,
+      actor_id: ANNA,
+      to_assignee_id: RAVI,
+      to_expected_days: 1,
+      occurred_at: at(2, 13),
+    }),
     ev({
       kind: "bounced",
       from_leg: 2,
@@ -158,16 +215,51 @@ test("bouncing the same trail twice in a day pays only once", () => {
 test("a bounce the next day pays again", () => {
   seq = 0;
   const scored = scoreChain("c1", [
-    ev({ kind: "started", to_leg: 1, to_assignee_id: ANNA, to_expected_days: 1, occurred_at: at(1) }),
-    ev({ kind: "pushed", from_leg: 1, to_leg: 2, to_assignee_id: RAVI, to_expected_days: 1, occurred_at: at(2, 9) }),
     ev({
-      kind: "bounced", from_leg: 2, to_leg: 1, actor_id: RAVI, to_assignee_id: ANNA,
-      to_expected_days: 1, reason: "rework", note: "a", occurred_at: at(2, 11),
+      kind: "started",
+      to_leg: 1,
+      to_assignee_id: ANNA,
+      to_expected_days: 1,
+      occurred_at: at(1),
     }),
-    ev({ kind: "pushed", from_leg: 1, to_leg: 2, actor_id: ANNA, to_assignee_id: RAVI, to_expected_days: 1, occurred_at: at(3, 9) }),
     ev({
-      kind: "bounced", from_leg: 2, to_leg: 1, actor_id: RAVI, to_assignee_id: ANNA,
-      to_expected_days: 1, reason: "rework", note: "b", occurred_at: at(3, 11),
+      kind: "pushed",
+      from_leg: 1,
+      to_leg: 2,
+      to_assignee_id: RAVI,
+      to_expected_days: 1,
+      occurred_at: at(2, 9),
+    }),
+    ev({
+      kind: "bounced",
+      from_leg: 2,
+      to_leg: 1,
+      actor_id: RAVI,
+      to_assignee_id: ANNA,
+      to_expected_days: 1,
+      reason: "rework",
+      note: "a",
+      occurred_at: at(2, 11),
+    }),
+    ev({
+      kind: "pushed",
+      from_leg: 1,
+      to_leg: 2,
+      actor_id: ANNA,
+      to_assignee_id: RAVI,
+      to_expected_days: 1,
+      occurred_at: at(3, 9),
+    }),
+    ev({
+      kind: "bounced",
+      from_leg: 2,
+      to_leg: 1,
+      actor_id: RAVI,
+      to_assignee_id: ANNA,
+      to_expected_days: 1,
+      reason: "rework",
+      note: "b",
+      occurred_at: at(3, 11),
     }),
   ]);
   const bounces = scored.filter((s) => s.kind === "bounced");
@@ -178,10 +270,22 @@ test("a bounce the next day pays again", () => {
 test("an admin hand-off is worth nothing to anybody", () => {
   seq = 0;
   const scored = scoreChain("c1", [
-    ev({ kind: "started", to_leg: 1, to_assignee_id: ANNA, to_expected_days: 3, occurred_at: at(1) }),
     ev({
-      kind: "handed", from_leg: 1, to_leg: 1, actor_id: "boss", to_assignee_id: RAVI,
-      to_expected_days: 3, note: "Anna is away", occurred_at: at(2),
+      kind: "started",
+      to_leg: 1,
+      to_assignee_id: ANNA,
+      to_expected_days: 3,
+      occurred_at: at(1),
+    }),
+    ev({
+      kind: "handed",
+      from_leg: 1,
+      to_leg: 1,
+      actor_id: "boss",
+      to_assignee_id: RAVI,
+      to_expected_days: 3,
+      note: "Anna is away",
+      occurred_at: at(2),
     }),
   ]);
   assert.equal(scored[0].points, 0);
@@ -191,12 +295,32 @@ test("an admin hand-off is worth nothing to anybody", () => {
 test("a hand-off does not restart the clock for the next push", () => {
   seq = 0;
   const scored = scoreChain("c1", [
-    ev({ kind: "started", to_leg: 1, to_assignee_id: ANNA, to_expected_days: 2, occurred_at: at(1) }),
     ev({
-      kind: "handed", from_leg: 1, to_leg: 1, actor_id: "boss", to_assignee_id: RAVI,
-      to_expected_days: 2, note: "Anna is away", occurred_at: at(6),
+      kind: "started",
+      to_leg: 1,
+      to_assignee_id: ANNA,
+      to_expected_days: 2,
+      occurred_at: at(1),
     }),
-    ev({ kind: "pushed", from_leg: 1, to_leg: 2, actor_id: RAVI, to_assignee_id: ANNA, to_expected_days: 1, occurred_at: at(7) }),
+    ev({
+      kind: "handed",
+      from_leg: 1,
+      to_leg: 1,
+      actor_id: "boss",
+      to_assignee_id: RAVI,
+      to_expected_days: 2,
+      note: "Anna is away",
+      occurred_at: at(6),
+    }),
+    ev({
+      kind: "pushed",
+      from_leg: 1,
+      to_leg: 2,
+      actor_id: RAVI,
+      to_assignee_id: ANNA,
+      to_expected_days: 1,
+      occurred_at: at(7),
+    }),
   ]);
   const push = scored.find((s) => s.kind === "pushed")!;
   assert.equal(push.onTime, false, "6 days on a 2-day leg, whoever ended up holding it");
@@ -206,13 +330,42 @@ test("a hand-off does not restart the clock for the next push", () => {
 test("totals separate who did what, and on-time ignores bounces", () => {
   seq = 0;
   const scored = scoreChain("c1", [
-    ev({ kind: "started", to_leg: 1, to_assignee_id: ANNA, to_expected_days: 3, occurred_at: at(1) }),
-    ev({ kind: "pushed", from_leg: 1, to_leg: 2, actor_id: ANNA, to_assignee_id: RAVI, to_expected_days: 2, occurred_at: at(2) }),
     ev({
-      kind: "bounced", from_leg: 2, to_leg: 1, actor_id: RAVI, to_assignee_id: ANNA,
-      to_expected_days: 3, reason: "rework", note: "no", occurred_at: at(3),
+      kind: "started",
+      to_leg: 1,
+      to_assignee_id: ANNA,
+      to_expected_days: 3,
+      occurred_at: at(1),
     }),
-    ev({ kind: "pushed", from_leg: 1, to_leg: 2, actor_id: ANNA, to_assignee_id: RAVI, to_expected_days: 2, occurred_at: at(20) }),
+    ev({
+      kind: "pushed",
+      from_leg: 1,
+      to_leg: 2,
+      actor_id: ANNA,
+      to_assignee_id: RAVI,
+      to_expected_days: 2,
+      occurred_at: at(2),
+    }),
+    ev({
+      kind: "bounced",
+      from_leg: 2,
+      to_leg: 1,
+      actor_id: RAVI,
+      to_assignee_id: ANNA,
+      to_expected_days: 3,
+      reason: "rework",
+      note: "no",
+      occurred_at: at(3),
+    }),
+    ev({
+      kind: "pushed",
+      from_leg: 1,
+      to_leg: 2,
+      actor_id: ANNA,
+      to_assignee_id: RAVI,
+      to_expected_days: 2,
+      occurred_at: at(20),
+    }),
   ]);
   const totals = totalsByActor(scored);
 
@@ -253,9 +406,30 @@ test("the preview promises what the score will actually pay", () => {
 test("a window keeps only the days inside it", () => {
   seq = 0;
   const scored = scoreChain("c1", [
-    ev({ kind: "started", to_leg: 1, to_assignee_id: ANNA, to_expected_days: 3, occurred_at: at(1) }),
-    ev({ kind: "pushed", from_leg: 1, to_leg: 2, to_assignee_id: RAVI, to_expected_days: 2, occurred_at: at(2) }),
-    ev({ kind: "pushed", from_leg: 2, to_leg: 3, actor_id: RAVI, to_assignee_id: ANNA, to_expected_days: 2, occurred_at: at(20) }),
+    ev({
+      kind: "started",
+      to_leg: 1,
+      to_assignee_id: ANNA,
+      to_expected_days: 3,
+      occurred_at: at(1),
+    }),
+    ev({
+      kind: "pushed",
+      from_leg: 1,
+      to_leg: 2,
+      to_assignee_id: RAVI,
+      to_expected_days: 2,
+      occurred_at: at(2),
+    }),
+    ev({
+      kind: "pushed",
+      from_leg: 2,
+      to_leg: 3,
+      actor_id: RAVI,
+      to_assignee_id: ANNA,
+      to_expected_days: 2,
+      occurred_at: at(20),
+    }),
   ]);
   assert.equal(since(scored, "2026-08-15").length, 1);
   assert.equal(since(scored, "2026-08-01").length, 2);

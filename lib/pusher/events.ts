@@ -18,12 +18,7 @@
 
 export type EventKind = "started" | "pushed" | "bounced" | "completed" | "handed";
 
-export type BounceReason =
-  | "rework"
-  | "missing_info"
-  | "wrong_person"
-  | "client_change"
-  | "other";
+export type BounceReason = "rework" | "missing_info" | "wrong_person" | "client_change" | "other";
 
 /** Order matters — this is the order the chips render in. */
 export const BOUNCE_REASONS: readonly { value: BounceReason; label: string }[] = [

@@ -2278,7 +2278,7 @@ export type Database = {
           to_leg: number | null
         }
         Insert: {
-          actor_id: string
+          actor_id?: string
           chain_id: string
           from_leg?: number | null
           id?: string
@@ -2286,7 +2286,7 @@ export type Database = {
           note?: string | null
           occurred_at?: string
           reason?: string | null
-          seq: number
+          seq?: number
           to_assignee_id?: string | null
           to_expected_days?: number | null
           to_leg?: number | null

@@ -177,7 +177,9 @@ export function replayChain(
   const finishedAt = finished ? (last?.occurred_at ?? null) : null;
   const plannedDays = byLeg.reduce((sum, l) => sum + l.expected_days, 0);
   const remainingDays =
-    currentLeg === null ? 0 : byLeg.filter((l) => l.leg_no >= currentLeg).reduce((s, l) => s + l.expected_days, 0);
+    currentLeg === null
+      ? 0
+      : byLeg.filter((l) => l.leg_no >= currentLeg).reduce((s, l) => s + l.expected_days, 0);
 
   const daysInLeg = open?.days ?? 0;
   const expectedDays = open?.expectedDays ?? 0;
