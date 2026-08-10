@@ -4,66 +4,40 @@ Read `STATUS.md` first. Phase 9 (Overview fully real + one real project
 run end to end) still has no approved plan; this file gets one when the
 founder approves it.
 
-## Right now: standard trails at the house level
+## Right now: standard trails is waiting on a browser test
 
-Pusher Phase 1 is **merged and live** (PR #2, 2026-08-10) — nothing is in
-flight. The next build is the first item below, already designed with the
-founder. Two things to settle before writing code:
+`feature/pusher-standard-trails` is built, CI green, **not merged**.
+Migrations `0041`–`0047` are **already applied to the live database**,
+and that is safe while the code is unmerged: the state view kept every
+column production reads (0042 exists because 0041 briefly did not — see
+STATUS.md).
 
-- **Where the house screen lives.** Pusher has no unit-level screen, and
-  both standard trails and the per-unit stage breakdown need one. Design
-  them together rather than building that page twice.
-- **Who can start a queued trail** — anyone holding `/pusher`, or only
-  the person its first leg is assigned to? It decides whether the queue
-  is a shared plan or a personal to-do list.
+**Before anything else next session: ask whether the founder has clicked
+through the preview.** One judgement call needs their eye specifically —
+queued work counts in the project picture as planned-but-not-done, so
+laying a standard set on a house makes its project read further behind.
+That is the honest number, but it surprises, and it is theirs to accept
+or overrule.
 
-## Pusher — what is left, in order
+## Relay — what is left, in order
 
 The relay, departments and the project schedule are built; see
-`app/(dashboard)/pusher/PLAN.md` for how it works and what will bite.
+`app/(dashboard)/relay/PLAN.md` for how it works and what will bite.
 
-- **Standard trails at the house level** (founder, 2026-08-10 — approved
-  shape, no code yet; build this first, on a fresh branch). Every villa
-  runs roughly the same set of handoffs. One click
-  on a house should lay the whole set down, staffed, and then let you
-  rearrange it. Three decisions already made:
-
-  - **Queued trails have no clock.** The set arrives dormant; a trail
-    goes live only when someone starts it. This is not a status column
-    and does not break the doctrine — a queued trail simply **has no
-    events yet**, so "not started" stays derived like everything else,
-    and `open_chain()` splits into "create it" and "start it" (the
-    `started` event it writes today). Why it matters: opening twelve
-    trails live would start twelve clocks at once, and the Handover trail
-    at 3 expected days would be cold within the week. Cold is the loudest
-    signal in the tool; if it cries wolf on work nobody meant to start,
-    people stop believing it, and that is the one thing Pusher does.
-  - **Named sets, not one list.** "Standard villa", "Plot only",
-    "Apartment" — each an ordered list of activities, managed next to
-    Activities, offered on any house. Legs still prefill from the
-    activity's last run, so a set is a list of activities, not a frozen
-    copy of people and days.
-  - **Rearranging means the queue**: reorder, remove, edit legs, start —
-    all before a trail goes live. Nothing behind the baton ever becomes
-    editable.
-
-  Still to design: where the one click lives. Pusher has no house-level
-  screen today, so this needs one, and that screen is also where the
-  per-unit stage breakdown below belongs. Plan the two together.
-
-- **Unit-level stages.** A per-unit breakdown (each unit stage mapping to
-  one project stage) so a villa's own progress rolls up into the project
-  picture, plus quests — a current stage with nothing running — and
-  clearing a finished stage. Additive on top of `project_stages`. Shares
-  the house screen with standard trails above.
+- **Unit-level stages.** Each unit stage maps to one project stage, so a
+  villa's own progress rolls up into the project picture; plus quests — a
+  current stage with nothing running — and clearing a finished stage.
+  Additive on top of `project_stages`. **The house screen already exists**
+  (`/relay/projects/[projectId]/houses/[unitId]`) — build this into it
+  rather than adding another page.
 - **The game.** Leaderboard, podium, ranks, the **clean streak** (a day
   counts if you neither ended it holding an overdue baton nor let one go
   overdue — the mockup's "empty court" version is unreachable for anyone
-  on a long leg) and active days. `lib/pusher/points.ts` is written and
+  on a long leg) and active days. `lib/relay/points.ts` is written and
   tested already; this is mostly screens plus the two scoring views.
 - **The seams.** `pusher_chain_links` surfaced both ways, Google Chat
   notifications (greenfield — fire-and-forget, never block a write), and
-  `getPusherPulse()` grown into what the collated Dashboard reads.
+  `getRelayPulse()` grown into what the collated Dashboard reads.
 
 ## Management group — plan one tool at a time
 
@@ -71,7 +45,7 @@ Four Management stubs remain (sidebar + homepage vision cards). Each
 gets its own planning session with the founder before any code:
 Dashboard, Client Relations, Financial Management, Business Planning. No
 order agreed yet — ask which comes first. (Project Management and Design
-Management are gone: Pusher is that layer.)
+Management are gone: Relay is that layer.)
 
 ## Smaller, any session
 

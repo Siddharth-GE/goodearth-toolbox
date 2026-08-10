@@ -152,14 +152,14 @@ export const TOOLS: Tool[] = [
     group: "Admin",
     built: true,
   },
-  // Pusher is the whole design-management AND project-management layer:
+  // Relay is the whole design-management AND project-management layer:
   // it replaced both of those planned tools rather than sitting beside
   // them. Their slugs stay in the database CHECKs (0036 §1 says why) but
   // nothing links to them any more.
   {
-    name: "Pusher",
+    name: "Relay",
     description: "Who is holding each task, and for how long.",
-    href: "/pusher",
+    href: "/relay",
     icon: "Route",
     group: "Management",
     built: true,

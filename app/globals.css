@@ -98,7 +98,7 @@ body {
    Pusher's motion. See DESIGN.md — Pusher is the one deliberate
    exception to "one payoff moment per flow", because moving a baton IS
    the product and the reward for moving it is the adoption strategy.
-   Everything below is confined to /pusher.
+   Everything below is confined to /relay.
 
    All of it is switched off wholesale by the reduced-motion block at the
    bottom of this file. The breathing "cold" indicator is the one that
@@ -106,7 +106,7 @@ body {
    --------------------------------------------------------------------- */
 
 /* A stuck trail breathes rather than blinks. */
-@keyframes pusher-breathe {
+@keyframes relay-breathe {
   0%,
   100% {
     box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 0%, transparent);
@@ -117,7 +117,7 @@ body {
 }
 
 /* The points earned float up and away from the button that earned them. */
-@keyframes pusher-float {
+@keyframes relay-float {
   0% {
     opacity: 0;
     transform: translate(-50%, 8px);
@@ -135,7 +135,7 @@ body {
 }
 
 /* Finishing a trail is the one moment big enough for the whole screen. */
-@keyframes pusher-banner {
+@keyframes relay-banner {
   0% {
     opacity: 0;
     transform: scale(0.88);
@@ -156,7 +156,7 @@ body {
   }
 }
 
-@keyframes pusher-confetti {
+@keyframes relay-confetti {
   0% {
     opacity: 1;
     transform: translate(0, 0) rotate(0);

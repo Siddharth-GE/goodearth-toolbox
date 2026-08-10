@@ -2449,42 +2449,52 @@ export type Database = {
       }
       pusher_chain_legs: {
         Row: {
+          activity_id: string
           assignee_id: string
           chain_id: string
           created_at: string
           created_by: string | null
           expected_days: number
           id: string
-          label: string
+          label: string | null
           leg_no: number
           updated_at: string
           updated_by: string | null
         }
         Insert: {
+          activity_id: string
           assignee_id: string
           chain_id: string
           created_at?: string
           created_by?: string | null
           expected_days: number
           id?: string
-          label: string
+          label?: string | null
           leg_no: number
           updated_at?: string
           updated_by?: string | null
         }
         Update: {
+          activity_id?: string
           assignee_id?: string
           chain_id?: string
           created_at?: string
           created_by?: string | null
           expected_days?: number
           id?: string
-          label?: string
+          label?: string | null
           leg_no?: number
           updated_at?: string
           updated_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "pusher_chain_legs_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "pusher_activities"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "pusher_chain_legs_assignee_id_fkey"
             columns: ["assignee_id"]
@@ -2576,7 +2586,7 @@ export type Database = {
       }
       pusher_chains: {
         Row: {
-          activity_id: string
+          activity_id: string | null
           created_at: string
           created_by: string | null
           id: string
@@ -2584,12 +2594,13 @@ export type Database = {
           project_id: string
           project_stage_id: string | null
           title: string | null
+          trail_set_id: string | null
           unit_id: string | null
           updated_at: string
           updated_by: string | null
         }
         Insert: {
-          activity_id: string
+          activity_id?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -2597,12 +2608,13 @@ export type Database = {
           project_id: string
           project_stage_id?: string | null
           title?: string | null
+          trail_set_id?: string | null
           unit_id?: string | null
           updated_at?: string
           updated_by?: string | null
         }
         Update: {
-          activity_id?: string
+          activity_id?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -2610,6 +2622,7 @@ export type Database = {
           project_id?: string
           project_stage_id?: string | null
           title?: string | null
+          trail_set_id?: string | null
           unit_id?: string | null
           updated_at?: string
           updated_by?: string | null
@@ -2649,6 +2662,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "project_stages"
             referencedColumns: ["project_id", "id"]
+          },
+          {
+            foreignKeyName: "pusher_chains_trail_set_id_fkey"
+            columns: ["trail_set_id"]
+            isOneToOne: false
+            referencedRelation: "pusher_trail_sets"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "pusher_chains_unit_id_fkey"
@@ -2759,6 +2779,119 @@ export type Database = {
           },
           {
             foreignKeyName: "pusher_project_plans_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pusher_trail_set_items: {
+        Row: {
+          activity_id: string
+          created_at: string
+          created_by: string | null
+          expected_days: number
+          id: string
+          set_id: string
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          activity_id: string
+          created_at?: string
+          created_by?: string | null
+          expected_days?: number
+          id?: string
+          set_id: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          activity_id?: string
+          created_at?: string
+          created_by?: string | null
+          expected_days?: number
+          id?: string
+          set_id?: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pusher_trail_set_items_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "pusher_activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pusher_trail_set_items_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pusher_trail_set_items_set_id_fkey"
+            columns: ["set_id"]
+            isOneToOne: false
+            referencedRelation: "pusher_trail_sets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pusher_trail_set_items_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pusher_trail_sets: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pusher_trail_sets_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pusher_trail_sets_updated_by_fkey"
             columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -3892,18 +4025,19 @@ export type Database = {
           expected_days: number | null
           holder_id: string | null
           is_finished: boolean | null
+          is_queued: boolean | null
           is_stuck: boolean | null
           last_kind: string | null
           last_seq: number | null
           leg_count: number | null
-          planned_days: number | null
           project_code: string | null
           project_id: string | null
           project_name: string | null
           project_stage_id: string | null
-          project_start_date: string | null
           started_at: string | null
           title: string | null
+          trail_set_id: string | null
+          trail_set_name: string | null
           unit_id: string | null
           unit_name: string | null
         }
@@ -3942,6 +4076,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "project_stages"
             referencedColumns: ["project_id", "id"]
+          },
+          {
+            foreignKeyName: "pusher_chains_trail_set_id_fkey"
+            columns: ["trail_set_id"]
+            isOneToOne: false
+            referencedRelation: "pusher_trail_sets"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "pusher_chains_unit_id_fkey"
@@ -3998,6 +4139,21 @@ export type Database = {
           p_total_amount: number
         }
         Returns: string
+      }
+      create_chain: {
+        Args: {
+          p_activity_id: string
+          p_legs: Json
+          p_note: string
+          p_project_id: string
+          p_title: string
+          p_unit_id: string
+        }
+        Returns: string
+      }
+      create_chains: {
+        Args: { p_chains: Json; p_project_id: string; p_unit_id: string }
+        Returns: number
       }
       create_goods_receipt: {
         Args: {
@@ -4084,6 +4240,7 @@ export type Database = {
         Args: { p_selection_id: string }
         Returns: undefined
       }
+      discard_chain: { Args: { p_chain_id: string }; Returns: undefined }
       hand_baton: {
         Args: { p_chain_id: string; p_note: string; p_to_user: string }
         Returns: undefined
@@ -4123,21 +4280,39 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      open_chain: {
-        Args: {
-          p_activity_id: string
-          p_legs: Json
-          p_note: string
-          p_project_id: string
-          p_title: string
-          p_unit_id: string
-        }
-        Returns: string
-      }
+      open_chain:
+        | {
+            Args: {
+              p_activity_id: string
+              p_legs: Json
+              p_note: string
+              p_project_id: string
+              p_title: string
+              p_unit_id: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_activity_id: string
+              p_legs: Json
+              p_note: string
+              p_project_id: string
+              p_start: boolean
+              p_title: string
+              p_trail_set_id: string
+              p_unit_id: string
+            }
+            Returns: string
+          }
       profile_is_active: { Args: { uid: string }; Returns: boolean }
       reopen_budget: { Args: { p_budget_id: string }; Returns: undefined }
       replace_future_legs: {
         Args: { p_chain_id: string; p_legs: Json }
+        Returns: undefined
+      }
+      seed_default_project_stages: {
+        Args: { p_project_id: string }
         Returns: undefined
       }
       set_chain_departments: {
@@ -4146,6 +4321,7 @@ export type Database = {
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      start_chain: { Args: { p_chain_id: string }; Returns: undefined }
       stock_qty_on_hand: {
         Args: { p_item_id: string; p_store_id: string }
         Returns: number
