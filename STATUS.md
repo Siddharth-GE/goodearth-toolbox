@@ -14,15 +14,15 @@ chain runs design → price → indent → PO → goods in / stock / goods
 out → bill → paid. **Next: Phase 9** — Overview fully real + one real
 project run end-to-end.
 
-|                    |                                                                                                                                                         |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Last worked        | 2026-08-10                                                                                                                                              |
-| Branch             | `feature/audit-kernel-failure-modes` — [PR #1](https://github.com/Siddharth-GE/goodearth-toolbox/pull/1), CI green, awaiting the founder's browser pass |
-| Migrations applied | `0001`–`0035` (next is `0036`)                                                                                                                          |
-| Items in database  | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands                                                                          |
-| Thumbnails         | 897 in Supabase Storage; 1,736 items use the colour placeholder                                                                                         |
-| Built tools        | Marathon, Settings, Masters, Selections, Budgets (Interiors + Construction), Indents, Purchase Orders, Inventory, Bills                                 |
-| Tests              | `npm test` — 136, all pure logic                                                                                                                        |
+|                    |                                                                                                                         |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| Last worked        | 2026-08-10                                                                                                              |
+| Branch             | `master` — clean                                                                                                        |
+| Migrations applied | `0001`–`0035` (next is `0036`)                                                                                          |
+| Items in database  | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands                                          |
+| Thumbnails         | 897 in Supabase Storage; 1,736 items use the colour placeholder                                                         |
+| Built tools        | Marathon, Settings, Masters, Selections, Budgets (Interiors + Construction), Indents, Purchase Orders, Inventory, Bills |
+| Tests              | `npm test` — 136, all pure logic                                                                                        |
 
 ## Next up
 
@@ -34,9 +34,14 @@ project run end-to-end.
   1:1 — a double link fails loudly on the unique index); the
   project/plot **status value lists are my defaults, never
   confirmed** — ask first. Source files go in `data/` (git-ignored).
-- **Post-deploy button press** — after the Bills merge deploys, press
-  one real write-button on production (approve or pay a bill) per the
-  CLAUDE.md habit.
+- **Post-deploy button press** — still owed, and now for two deploys:
+  the Bills merge, and the 2026-08-10 audit merge, which changed
+  `lib/inventory/actions.ts`, `lib/budgets/actions.ts` and
+  `lib/selections/actions.ts`. Press one real write-button on production
+  (approve or pay a bill) per the CLAUDE.md habit.
+- **Switch the probe account back on** — left deactivated after the
+  2026-08-10 redirect-loop test (Settings → People → Probe (test) →
+  Reactivate account). Every future pre-merge smoke needs it.
 - **Grant `/bills`** in Settings to accounts (and tick their "Approve
   bills" box), **`/inventory`** to store-keepers (and site engineers if
   wanted — its reads carry no money).
@@ -181,9 +186,9 @@ project run end-to-end.
 One line per day; full detail in git history and the PLAN.md files.
 
 - **2026-08-10 (independence audit — kernel failure modes)** — audited
-  the whole repo against the toolbox doctrine;
-  `feature/audit-kernel-failure-modes`, PR #1, **not merged** — CI green,
-  waiting on the founder's browser pass. **The tool boundaries hold:**
+  the whole repo against the toolbox doctrine; merged to `master` (PR #1)
+  after the founder reproduced the redirect loop on production and
+  confirmed the fix on the preview. **The tool boundaries hold:**
   the only cross-tool imports in the app are the two sanctioned ones
   (overview→marathon, budgets quote→selections views), every cross-tool
   table touch is a `SELECT`, the service-role client appears only in
