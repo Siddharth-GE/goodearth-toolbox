@@ -16,7 +16,7 @@ project run end-to-end.
 
 |                    |                                                                                                                                                         |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Last worked        | 2026-08-05                                                                                                                                              |
+| Last worked        | 2026-08-10                                                                                                                                              |
 | Branch             | `feature/audit-kernel-failure-modes` — [PR #1](https://github.com/Siddharth-GE/goodearth-toolbox/pull/1), CI green, awaiting the founder's browser pass |
 | Migrations applied | `0001`–`0035` (next is `0036`)                                                                                                                          |
 | Items in database  | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands                                                                          |
@@ -180,7 +180,7 @@ project run end-to-end.
 
 One line per day; full detail in git history and the PLAN.md files.
 
-- **2026-08-05 (independence audit — kernel failure modes)** — audited
+- **2026-08-10 (independence audit — kernel failure modes)** — audited
   the whole repo against the toolbox doctrine;
   `feature/audit-kernel-failure-modes`, PR #1, **not merged** — CI green,
   waiting on the founder's browser pass. **The tool boundaries hold:**
@@ -196,6 +196,9 @@ One line per day; full detail in git history and the PLAN.md files.
   **reachable today by switching off a signed-in colleague** (setActive
   flips a flag and leaves the session alive). Same class as the
   2026-08-05 login loop; that fix added logging and left the mechanism.
+  **This machine's clock ran 5 days slow all session** (reading
+  2026-08-05 — GitHub's run timestamps are the truth), so every commit
+  on this branch is misdated; worth resyncing before the next session.
   A read error now throws, and the `/login` bounce is deleted, so the
   two real turn-aways reach the login page — where the login action
   already names a deactivated account. Also: the home page no longer
