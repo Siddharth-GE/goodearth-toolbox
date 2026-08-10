@@ -7,7 +7,7 @@ import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
 import type { ActionState } from "@/lib/action-state";
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useRef, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 
 /**
  * A name and an on/off switch — the shape both of Pusher's little
@@ -35,7 +35,9 @@ export function SimpleMaster({
   setActiveAction: (id: string, isActive: boolean) => Promise<ActionState>;
 }) {
   const [state, formAction, pending] = useActionState(createAction, undefined);
-  const [busy, startTransition] = useTransition();
+  // See schedule-editor.tsx: a refresh inside a transition keeps a
+  // still-mounted control disabled while it runs.
+  const [busy, setBusy] = useState(false);
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const wasPending = useRef(false);
@@ -88,12 +90,15 @@ export function SimpleMaster({
               variant="ghost"
               size="sm"
               disabled={busy}
-              onClick={() =>
-                startTransition(async () => {
+              onClick={async () => {
+                setBusy(true);
+                try {
                   await setActiveAction(row.id, !row.is_active);
                   router.refresh();
-                })
-              }
+                } finally {
+                  setBusy(false);
+                }
+              }}
             >
               {row.is_active ? "Switch off" : "Switch on"}
             </Button>

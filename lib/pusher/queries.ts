@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { cache } from "react";
 
 import { replayChain } from "./chain";
+import { buildSchedule, orderStages, type ProjectStage } from "./schedule";
 import type { ChainEvent, EventKind, Leg } from "./events";
 
 /**
@@ -501,6 +502,128 @@ export async function getTrailFormOptions() {
     // A plain object, not the Map: this crosses into a Client Component,
     // and React only serialises plain data as props.
     prefills: Object.fromEntries(prefills) as Record<string, Prefill>,
+  };
+}
+
+/**
+ * Every project with a one-line verdict — the list behind the Projects
+ * tab. Three reads for the whole page, however many projects there are.
+ */
+export async function listProjectSchedules() {
+  await requireTool("/pusher");
+  const supabase = await createClient();
+
+  const [projects, stages, plans, trails] = await Promise.all([
+    supabase.from("projects").select("id, name, code, status").order("name"),
+    fetchAll<ProjectStage & { project_id: string }>((from, to) =>
+      supabase
+        .from("project_stages")
+        .select("id, project_id, name, weeks, sort_order")
+        .order("id")
+        .range(from, to),
+    ),
+    supabase.from("pusher_project_plans").select("project_id, start_date"),
+    // Every trail in the company, but only the four fields the schedule
+    // needs. This crosses 1,000 on the first real project, so it pages.
+    // project_id is nullable here only because every view column comes
+    // back nullable from the type generator — normalised just below.
+    fetchAll<{
+      project_id: string | null;
+      project_stage_id: string | null;
+      is_finished: boolean | null;
+      is_stuck: boolean | null;
+    }>((from, to) =>
+      supabase
+        .from("pusher_chain_state")
+        .select("project_id, project_stage_id, is_finished, is_stuck")
+        .order("chain_id")
+        .range(from, to),
+    ),
+  ]);
+
+  const startByProject = new Map(
+    (plans.data ?? []).map((p) => [p.project_id, p.start_date as string]),
+  );
+
+  return (projects.data ?? []).map((project) => {
+    const projectTrails = trails
+      .filter((t) => t.project_id === project.id)
+      .map((t) => ({
+        projectStageId: t.project_stage_id,
+        isFinished: t.is_finished ?? false,
+        isStuck: t.is_stuck ?? false,
+      }));
+
+    return {
+      id: project.id,
+      name: project.name,
+      code: project.code,
+      status: project.status,
+      liveTrails: projectTrails.filter((t) => !t.isFinished).length,
+      stuckTrails: projectTrails.filter((t) => !t.isFinished && t.isStuck).length,
+      schedule: buildSchedule(
+        stages.filter((s) => s.project_id === project.id),
+        projectTrails,
+        startByProject.get(project.id) ?? null,
+        new Date().toISOString(),
+      ),
+    };
+  });
+}
+
+/** One project: its schedule, its stages, and the trails filed under each. */
+export async function getProjectSchedule(projectId: string) {
+  await requireTool("/pusher");
+  const supabase = await createClient();
+
+  const [project, stages, plan, trails, names] = await Promise.all([
+    supabase.from("projects").select("id, name, code").eq("id", projectId).maybeSingle(),
+    fetchAll<ProjectStage>((from, to) =>
+      supabase
+        .from("project_stages")
+        .select("id, name, weeks, sort_order")
+        .eq("project_id", projectId)
+        .order("id")
+        .range(from, to),
+    ),
+    supabase
+      .from("pusher_project_plans")
+      .select("start_date")
+      .eq("project_id", projectId)
+      .maybeSingle(),
+    fetchAll<StateRow & { project_stage_id: string | null }>((from, to) =>
+      supabase
+        .from("pusher_chain_state")
+        .select(`${STATE_COLUMNS}, project_stage_id`)
+        .eq("project_id", projectId)
+        .order("chain_id")
+        .range(from, to),
+    ),
+    nameMap(),
+  ]);
+
+  if (!project.data) return null;
+
+  const rows = trails.map((t) => ({
+    ...toRow(t, names),
+    projectStageId: t.project_stage_id,
+  }));
+
+  return {
+    project: project.data,
+    startDate: (plan.data?.start_date as string | undefined) ?? null,
+    stages: orderStages(stages),
+    trails: rows,
+    schedule: buildSchedule(
+      stages,
+      rows.map((r) => ({
+        projectStageId: r.projectStageId,
+        isFinished: r.isFinished,
+        isStuck: r.isStuck,
+      })),
+      (plan.data?.start_date as string | undefined) ?? null,
+      new Date().toISOString(),
+    ),
   };
 }
 

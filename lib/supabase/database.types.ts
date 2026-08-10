@@ -1914,6 +1914,64 @@ export type Database = {
           },
         ]
       }
+      project_stages: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          project_id: string
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+          weeks: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          project_id: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+          weeks: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          project_id?: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+          weeks?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_stages_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_stages_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_stages_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           code: string | null
@@ -2524,6 +2582,7 @@ export type Database = {
           id: string
           note: string | null
           project_id: string
+          project_stage_id: string | null
           title: string | null
           unit_id: string | null
           updated_at: string
@@ -2536,6 +2595,7 @@ export type Database = {
           id?: string
           note?: string | null
           project_id: string
+          project_stage_id?: string | null
           title?: string | null
           unit_id?: string | null
           updated_at?: string
@@ -2548,6 +2608,7 @@ export type Database = {
           id?: string
           note?: string | null
           project_id?: string
+          project_stage_id?: string | null
           title?: string | null
           unit_id?: string | null
           updated_at?: string
@@ -2580,6 +2641,13 @@ export type Database = {
             columns: ["project_id", "unit_id"]
             isOneToOne: false
             referencedRelation: "units"
+            referencedColumns: ["project_id", "id"]
+          },
+          {
+            foreignKeyName: "pusher_chains_project_stage_fkey"
+            columns: ["project_id", "project_stage_id"]
+            isOneToOne: false
+            referencedRelation: "project_stages"
             referencedColumns: ["project_id", "id"]
           },
           {
@@ -2639,6 +2707,58 @@ export type Database = {
           },
           {
             foreignKeyName: "pusher_departments_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pusher_project_plans: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          project_id: string
+          start_date: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          project_id: string
+          start_date: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          project_id?: string
+          start_date?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pusher_project_plans_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pusher_project_plans_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pusher_project_plans_updated_by_fkey"
             columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -3776,9 +3896,12 @@ export type Database = {
           last_kind: string | null
           last_seq: number | null
           leg_count: number | null
+          planned_days: number | null
           project_code: string | null
           project_id: string | null
           project_name: string | null
+          project_stage_id: string | null
+          project_start_date: string | null
           started_at: string | null
           title: string | null
           unit_id: string | null
@@ -3811,6 +3934,13 @@ export type Database = {
             columns: ["project_id", "unit_id"]
             isOneToOne: false
             referencedRelation: "units"
+            referencedColumns: ["project_id", "id"]
+          },
+          {
+            foreignKeyName: "pusher_chains_project_stage_fkey"
+            columns: ["project_id", "project_stage_id"]
+            isOneToOne: false
+            referencedRelation: "project_stages"
             referencedColumns: ["project_id", "id"]
           },
           {
