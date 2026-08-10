@@ -43,6 +43,7 @@ export type ChainRow = {
   isStuck: boolean;
   isFinished: boolean;
   startedAt: string | null;
+  departments: string[];
 };
 
 type StateRow = {
@@ -60,10 +61,11 @@ type StateRow = {
   is_stuck: boolean | null;
   is_finished: boolean | null;
   started_at: string | null;
+  department_names: string[] | null;
 };
 
 const STATE_COLUMNS =
-  "chain_id, project_id, project_name, unit_name, activity_name, title, leg_count, current_leg, holder_id, days_in_leg, expected_days, is_stuck, is_finished, started_at";
+  "chain_id, project_id, project_name, unit_name, activity_name, title, leg_count, current_leg, holder_id, days_in_leg, expected_days, is_stuck, is_finished, started_at, department_names";
 
 function toRow(row: StateRow, names: Map<string, string>): ChainRow {
   return {
@@ -82,6 +84,7 @@ function toRow(row: StateRow, names: Map<string, string>): ChainRow {
     isStuck: row.is_stuck ?? false,
     isFinished: row.is_finished ?? false,
     startedAt: row.started_at,
+    departments: row.department_names ?? [],
   };
 }
 
@@ -111,6 +114,7 @@ export type TrailFilters = {
   projectId?: string;
   holderId?: string;
   activityId?: string;
+  departmentId?: string;
   /** "running" (default), "finished", or "all". */
   status?: "running" | "finished" | "all";
 };
@@ -136,6 +140,10 @@ export async function listTrails(filters: TrailFilters = {}) {
   if (filters.projectId) query = query.eq("project_id", filters.projectId);
   if (filters.holderId) query = query.eq("holder_id", filters.holderId);
   if (filters.activityId) query = query.eq("activity_id", filters.activityId);
+  // Departments are an array on the view precisely so this stays one
+  // server-side containment filter rather than a second query and a
+  // merge in Node — a trail can be in several at once.
+  if (filters.departmentId) query = query.contains("department_ids", [filters.departmentId]);
 
   const { data, error, count } = await query.range(from, from + PUSHER_LIST_LIMIT - 1);
 
@@ -252,6 +260,7 @@ export type TrailDetail = {
   projectName: string;
   unitName: string | null;
   activityName: string;
+  departments: { id: string; name: string }[];
   title: string | null;
   note: string | null;
   legs: (Leg & { assigneeName: string })[];
@@ -272,7 +281,7 @@ export const getTrail = cache(async (chainId: string): Promise<TrailDetail | nul
   const { data: chain, error } = await supabase
     .from("pusher_chains")
     .select(
-      "id, project_id, title, note, projects(name), units!pusher_chains_unit_id_fkey(name), pusher_activities(name)",
+      "id, project_id, activity_id, title, note, projects(name), units!pusher_chains_unit_id_fkey(name), pusher_activities(name), pusher_chain_departments(department_id, pusher_departments(id, name))",
     )
     .eq("id", chainId)
     .maybeSingle();
@@ -328,6 +337,10 @@ export const getTrail = cache(async (chainId: string): Promise<TrailDetail | nul
     projectName: chain.projects?.name ?? "—",
     unitName: chain.units?.name ?? null,
     activityName: chain.pusher_activities?.name ?? "—",
+    departments: (chain.pusher_chain_departments ?? [])
+      .map((row) => row.pusher_departments)
+      .filter((d): d is { id: string; name: string } => d !== null)
+      .sort((a, b) => a.name.localeCompare(b.name)),
     title: chain.title,
     note: chain.note,
     legs: legs.map((l) => ({ ...l, assigneeName: names.get(l.assignee_id) ?? "Unnamed" })),
@@ -339,6 +352,25 @@ export const getTrail = cache(async (chainId: string): Promise<TrailDetail | nul
     state: replayChain(events, legs, new Date().toISOString()),
   };
 });
+
+export async function listDepartments(includeInactive = false) {
+  await requireTool("/pusher");
+  const supabase = await createClient();
+
+  let query = supabase
+    .from("pusher_departments")
+    .select("id, name, is_active, sort_order")
+    .order("sort_order")
+    .order("name");
+  if (!includeInactive) query = query.eq("is_active", true);
+
+  const { data, error } = await query;
+  if (error) {
+    console.error("pusher listDepartments failed:", error);
+    return [];
+  }
+  return data ?? [];
+}
 
 export async function listActivities(includeInactive = false) {
   await requireTool("/pusher");
@@ -361,6 +393,9 @@ export async function listActivities(includeInactive = false) {
 
 export type PrefillLeg = { label: string; assigneeId: string; expectedDays: number };
 
+/** What a repeat of an activity starts from: its last run's legs and departments. */
+export type Prefill = { legs: PrefillLeg[]; departmentIds: string[] };
+
 /**
  * For every activity, the legs of the last trail anyone ran with it —
  * what a new trail prefills with, so opening a repeat is about thirty
@@ -378,7 +413,7 @@ export type PrefillLeg = { label: string; assigneeId: string; expectedDays: numb
  * account, so prefilling one would only produce a refusal at the last
  * step, on the screen furthest from the cause.
  */
-export async function getPrefillsByActivity(): Promise<Map<string, PrefillLeg[]>> {
+export async function getPrefillsByActivity(): Promise<Map<string, Prefill>> {
   await requireTool("/pusher");
   const supabase = await createClient();
 
@@ -402,17 +437,39 @@ export async function getPrefillsByActivity(): Promise<Map<string, PrefillLeg[]>
     }
   }
 
-  const legsByChain = await getLegsFor([...latestByActivity.values()]);
+  const chainIds = [...latestByActivity.values()];
+  const [legsByChain, deptRows] = await Promise.all([
+    getLegsFor(chainIds),
+    chainIds.length === 0
+      ? Promise.resolve([] as { chain_id: string; department_id: string }[])
+      : fetchAll<{ chain_id: string; department_id: string }>((from, to) =>
+          supabase
+            .from("pusher_chain_departments")
+            .select("chain_id, department_id")
+            .in("chain_id", chainIds)
+            .order("chain_id")
+            .range(from, to),
+        ),
+  ]);
+
+  const deptsByChain = new Map<string, string[]>();
+  for (const row of deptRows) {
+    deptsByChain.set(row.chain_id, [...(deptsByChain.get(row.chain_id) ?? []), row.department_id]);
+  }
+
   const active = new Set(people.map((p) => p.id));
 
   return new Map(
     [...latestByActivity].map(([activityId, chainId]) => [
       activityId,
-      (legsByChain.get(chainId) ?? []).map((leg) => ({
-        label: leg.label,
-        assigneeId: active.has(leg.assignee_id) ? leg.assignee_id : "",
-        expectedDays: leg.expected_days,
-      })),
+      {
+        legs: (legsByChain.get(chainId) ?? []).map((leg) => ({
+          label: leg.label,
+          assigneeId: active.has(leg.assignee_id) ? leg.assignee_id : "",
+          expectedDays: leg.expected_days,
+        })),
+        departmentIds: deptsByChain.get(chainId) ?? [],
+      },
     ]),
   );
 }
@@ -422,7 +479,7 @@ export async function getTrailFormOptions() {
   await requireTool("/pusher");
   const supabase = await createClient();
 
-  const [projects, units, activities, people, prefills] = await Promise.all([
+  const [projects, units, activities, departments, people, prefills] = await Promise.all([
     supabase.from("projects").select("id, name").order("name"),
     // Completeness matters: a unit missing from this list is a unit
     // nobody can open a trail on, with no error to explain why.
@@ -430,6 +487,7 @@ export async function getTrailFormOptions() {
       supabase.from("units").select("id, name, project_id").order("id").range(from, to),
     ),
     listActivities(),
+    listDepartments(),
     listPeople(),
     getPrefillsByActivity(),
   ]);
@@ -438,10 +496,11 @@ export async function getTrailFormOptions() {
     projects: projects.data ?? [],
     units: units.sort((a, b) => a.name.localeCompare(b.name)),
     activities,
+    departments,
     people,
     // A plain object, not the Map: this crosses into a Client Component,
     // and React only serialises plain data as props.
-    prefills: Object.fromEntries(prefills) as Record<string, PrefillLeg[]>,
+    prefills: Object.fromEntries(prefills) as Record<string, Prefill>,
   };
 }
 

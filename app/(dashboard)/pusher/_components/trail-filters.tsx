@@ -13,9 +13,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 export function TrailFilters({
   people,
   activities,
+  departments,
 }: {
   people: { id: string; name: string }[];
   activities: { id: string; name: string }[];
+  departments: { id: string; name: string }[];
 }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -32,7 +34,12 @@ export function TrailFilters({
 
   const cold = params.get("cold") === "1";
   const status = params.get("status") ?? "running";
-  const hasAny = cold || params.get("project") || params.get("person") || params.get("activity");
+  const hasAny =
+    cold ||
+    params.get("project") ||
+    params.get("person") ||
+    params.get("activity") ||
+    params.get("department");
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -84,6 +91,20 @@ export function TrailFilters({
         {activities.map((a) => (
           <option key={a.id} value={a.id}>
             {a.name}
+          </option>
+        ))}
+      </Select>
+
+      <Select
+        aria-label="Filter by department"
+        value={params.get("department") ?? ""}
+        onChange={(e) => set("department", e.target.value)}
+        className="h-9 max-w-44 text-xs"
+      >
+        <option value="">Any department</option>
+        {departments.map((d) => (
+          <option key={d.id} value={d.id}>
+            {d.name}
           </option>
         ))}
       </Select>

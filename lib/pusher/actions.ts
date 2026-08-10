@@ -58,6 +58,8 @@ export type OpenTrailInput = {
   title: string | null;
   note: string | null;
   legs: LegInput[];
+  /** A trail can be in several at once — a selections handoff is Design and Purchase. */
+  departmentIds: string[];
 };
 
 export async function openTrail(
@@ -96,8 +98,22 @@ export async function openTrail(
 
   if (error) return guardError(error, "Could not open this trail.") ?? {};
 
+  const chainId = data as string;
+
+  // A second call rather than a parameter on open_chain: the trail
+  // existing without its tags is a cosmetic gap someone can fix on the
+  // trail page, whereas failing the whole open because a department is
+  // missing would lose the legs they just typed.
+  if (input.departmentIds.length > 0) {
+    const { error: deptError } = await supabase.rpc("set_chain_departments", {
+      p_chain_id: chainId,
+      p_department_ids: input.departmentIds,
+    });
+    if (deptError) console.error("pusher openTrail departments failed:", deptError);
+  }
+
   revalidate();
-  return { chainId: data as string };
+  return { chainId };
 }
 
 /**
@@ -228,6 +244,64 @@ export async function replaceFutureLegs(chainId: string, legs: LegInput[]): Prom
 
   if (error) return guardError(error, "Could not change the legs ahead.");
   revalidate(chainId);
+  return undefined;
+}
+
+/** Replaces the whole set — the UI edits departments as chips, not one at a time. */
+export async function setTrailDepartments(
+  chainId: string,
+  departmentIds: string[],
+): Promise<ActionState> {
+  await requireTool("/pusher");
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_chain_departments", {
+    p_chain_id: chainId,
+    p_department_ids: departmentIds,
+  });
+
+  if (error) return guardError(error, "Could not change this trail's departments.");
+  revalidate(chainId);
+  return undefined;
+}
+
+export async function createDepartment(
+  _state: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireTool("/pusher");
+
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return { error: "A department needs a name." };
+
+  const supabase = await createClient();
+  const user = await getCurrentUser();
+  const { error } = await supabase
+    .from("pusher_departments")
+    .insert({ name, created_by: user?.id, updated_by: user?.id });
+
+  if (error) {
+    if (error.code === "23505") return { error: `"${name}" is already on the list.` };
+    return { error: "Could not add this department." };
+  }
+
+  revalidatePath("/pusher/activities");
+  return undefined;
+}
+
+/** Departments are switched off, never deleted — past trails must stay readable. */
+export async function setDepartmentActive(id: string, isActive: boolean): Promise<ActionState> {
+  await requireTool("/pusher");
+
+  const supabase = await createClient();
+  const user = await getCurrentUser();
+  const { error } = await supabase
+    .from("pusher_departments")
+    .update({ is_active: isActive, updated_by: user?.id })
+    .eq("id", id);
+
+  if (error) return { error: "Could not change this department." };
+  revalidatePath("/pusher/activities");
   return undefined;
 }
 

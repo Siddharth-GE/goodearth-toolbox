@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageTitle } from "@/components/ui/page-title";
 import { Pagination } from "@/components/ui/pagination";
-import { listActivities, listPeople, listTrails } from "@/lib/pusher/queries";
+import { listActivities, listDepartments, listPeople, listTrails } from "@/lib/pusher/queries";
 import { Route } from "lucide-react";
 import Link from "next/link";
 
@@ -21,6 +21,7 @@ export default async function AllTrailsPage({
     project?: string;
     person?: string;
     activity?: string;
+    department?: string;
     status?: string;
   }>;
 }) {
@@ -28,17 +29,19 @@ export default async function AllTrailsPage({
   const status =
     params.status === "finished" || params.status === "all" ? params.status : "running";
 
-  const [result, people, activities] = await Promise.all([
+  const [result, people, activities, departments] = await Promise.all([
     listTrails({
       page: Number(params.page) || 1,
       stuckOnly: params.cold === "1",
       projectId: params.project,
       holderId: params.person,
       activityId: params.activity,
+      departmentId: params.department,
       status,
     }),
     listPeople(),
     listActivities(),
+    listDepartments(),
   ]);
 
   const query = new URLSearchParams(
@@ -59,7 +62,7 @@ export default async function AllTrailsPage({
       />
       <PusherNav active="trails" />
 
-      <TrailFilters people={people} activities={activities} />
+      <TrailFilters people={people} activities={activities} departments={departments} />
 
       {result.rows.length === 0 ? (
         <EmptyState
@@ -100,6 +103,15 @@ export default async function AllTrailsPage({
                       </>
                     )}
                   </p>
+                  {row.departments.length > 0 && (
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {row.departments.map((d) => (
+                        <Badge key={d} variant="info">
+                          {d}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 {row.isFinished ? (
                   <Badge variant="success">Done</Badge>

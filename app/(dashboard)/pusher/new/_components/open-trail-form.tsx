@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { openTrail } from "@/lib/pusher/actions";
 import { Plus, X } from "lucide-react";
+
+import { DepartmentPicker } from "../../_components/department-picker";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -26,15 +28,17 @@ export function OpenTrailForm({
   projects,
   units,
   activities,
+  departments,
   people,
   prefills,
 }: {
   projects: { id: string; name: string }[];
   units: { id: string; name: string; project_id: string }[];
   activities: { id: string; name: string }[];
+  departments: { id: string; name: string }[];
   people: { id: string; name: string }[];
-  /** Last-run legs per activity, sent with the page so picking one is instant. */
-  prefills: Record<string, Leg[]>;
+  /** Last run per activity — legs and departments — sent with the page so picking one is instant. */
+  prefills: Record<string, { legs: Leg[]; departmentIds: string[] }>;
 }) {
   const router = useRouter();
   const [projectId, setProjectId] = useState("");
@@ -42,6 +46,7 @@ export function OpenTrailForm({
   const [activityId, setActivityId] = useState("");
   const [title, setTitle] = useState("");
   const [legs, setLegs] = useState<Leg[]>([]);
+  const [departmentIds, setDepartmentIds] = useState<string[]>([]);
   const [prefilled, setPrefilled] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -52,12 +57,17 @@ export function OpenTrailForm({
     setActivityId(id);
     if (!id) {
       setLegs([]);
+      setDepartmentIds([]);
       setPrefilled(false);
       return;
     }
-    const previous = prefills[id] ?? [];
-    setLegs(previous.length > 0 ? previous.map((leg) => ({ ...leg })) : [{ ...BLANK_LEG }]);
-    setPrefilled(previous.length > 0);
+    const previous = prefills[id];
+    const previousLegs = previous?.legs ?? [];
+    setLegs(previousLegs.length > 0 ? previousLegs.map((leg) => ({ ...leg })) : [{ ...BLANK_LEG }]);
+    // Departments prefill alongside the legs, for the same reason: a
+    // Fire NOC is the same two departments every time it runs.
+    setDepartmentIds(previous?.departmentIds ?? []);
+    setPrefilled(previousLegs.length > 0);
   };
 
   const setLeg = (index: number, patch: Partial<Leg>) =>
@@ -73,6 +83,7 @@ export function OpenTrailForm({
         title: title.trim() || null,
         note: null,
         legs,
+        departmentIds,
       });
       if (result.error) {
         setError(result.error);
@@ -168,6 +179,18 @@ export function OpenTrailForm({
               . Change anything before you open it.
             </p>
           )}
+
+          <div>
+            <Label>Departments</Label>
+            <p className="text-muted mt-0.5 mb-2 text-xs">
+              Pick every department this touches — a trail can cross more than one.
+            </p>
+            <DepartmentPicker
+              departments={departments}
+              selected={departmentIds}
+              onChange={setDepartmentIds}
+            />
+          </div>
 
           <div>
             <Label>Legs — what happens, who does it, how many days</Label>

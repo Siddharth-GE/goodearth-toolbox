@@ -13,17 +13,23 @@ import {
   lastEvent,
 } from "@/lib/pusher/events";
 import { projectedFinishDay } from "@/lib/pusher/chain";
-import { getTrail, listPeople } from "@/lib/pusher/queries";
+import { getTrail, listDepartments, listPeople } from "@/lib/pusher/queries";
 import { cn } from "@/lib/utils";
 import { notFound } from "next/navigation";
 
 import { CelebrateProvider } from "../../_components/celebrate";
 import { MoveBatonButtons } from "../../_components/move-baton";
 import { TrailRoute } from "../../_components/trail-route";
+import { TrailDepartments } from "./_components/trail-departments";
 
 export default async function TrailPage({ params }: { params: Promise<{ chainId: string }> }) {
   const { chainId } = await params;
-  const [user, trail, people] = await Promise.all([requireUser(), getTrail(chainId), listPeople()]);
+  const [user, trail, people, departments] = await Promise.all([
+    requireUser(),
+    getTrail(chainId),
+    listPeople(),
+    listDepartments(),
+  ]);
   if (!trail) notFound();
 
   const actor = { userId: user.id, isAdmin: user.profile?.role === "admin" };
@@ -68,6 +74,13 @@ export default async function TrailPage({ params }: { params: Promise<{ chainId:
               <Badge variant="neutral">Warm</Badge>
             )
           }
+        />
+
+        <TrailDepartments
+          chainId={chainId}
+          departments={departments}
+          selected={trail.departments}
+          editable={state.status === "running"}
         />
 
         {state.status === "running" && current && (

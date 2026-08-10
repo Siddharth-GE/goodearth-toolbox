@@ -2262,6 +2262,59 @@ export type Database = {
           },
         ]
       }
+      pusher_chain_departments: {
+        Row: {
+          chain_id: string
+          created_at: string
+          created_by: string | null
+          department_id: string
+          id: string
+        }
+        Insert: {
+          chain_id: string
+          created_at?: string
+          created_by?: string | null
+          department_id: string
+          id?: string
+        }
+        Update: {
+          chain_id?: string
+          created_at?: string
+          created_by?: string | null
+          department_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pusher_chain_departments_chain_id_fkey"
+            columns: ["chain_id"]
+            isOneToOne: false
+            referencedRelation: "pusher_chain_state"
+            referencedColumns: ["chain_id"]
+          },
+          {
+            foreignKeyName: "pusher_chain_departments_chain_id_fkey"
+            columns: ["chain_id"]
+            isOneToOne: false
+            referencedRelation: "pusher_chains"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pusher_chain_departments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pusher_chain_departments_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "pusher_departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pusher_chain_events: {
         Row: {
           actor_id: string
@@ -2538,6 +2591,54 @@ export type Database = {
           },
           {
             foreignKeyName: "pusher_chains_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pusher_departments: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pusher_departments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pusher_departments_updated_by_fkey"
             columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -3665,6 +3766,8 @@ export type Database = {
           created_at: string | null
           current_leg: number | null
           days_in_leg: number | null
+          department_ids: string[] | null
+          department_names: string[] | null
           entered_at: string | null
           expected_days: number | null
           holder_id: string | null
@@ -3905,6 +4008,10 @@ export type Database = {
       reopen_budget: { Args: { p_budget_id: string }; Returns: undefined }
       replace_future_legs: {
         Args: { p_chain_id: string; p_legs: Json }
+        Returns: undefined
+      }
+      set_chain_departments: {
+        Args: { p_chain_id: string; p_department_ids: string[] }
         Returns: undefined
       }
       show_limit: { Args: never; Returns: number }

@@ -20,6 +20,7 @@ export default async function OpenTrailPage() {
         projects={options.projects}
         units={options.units}
         activities={options.activities}
+        departments={options.departments}
         people={options.people}
         prefills={options.prefills}
       />
