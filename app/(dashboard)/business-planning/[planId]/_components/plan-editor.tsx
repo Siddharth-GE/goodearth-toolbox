@@ -7,6 +7,7 @@ import { runPlan } from "@/lib/business-planning/model";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CashflowTable } from "./cashflow-table";
 import { LinesTab } from "./lines-tab";
+import { SensitivityGrid } from "./sensitivity-grid";
 import { SetupTab } from "./setup-tab";
 import { SummaryStrip } from "./summary-strip";
 import { SummaryTab } from "./summary-tab";
@@ -139,8 +140,9 @@ export function PlanEditor({ planId, initial }: { planId: string; initial: PlanI
         <TabsContent value="cashflow">
           <CashflowTable result={result.active} />
         </TabsContent>
-        <TabsContent value="summary">
+        <TabsContent value="summary" className="space-y-4">
           <SummaryTab result={result} activeScenario={inputs.activeScenario} />
+          {inputs.lines.length > 0 ? <SensitivityGrid inputs={inputs} /> : null}
         </TabsContent>
       </Tabs>
     </div>

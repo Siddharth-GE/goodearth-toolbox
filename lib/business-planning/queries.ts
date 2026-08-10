@@ -4,7 +4,8 @@ import { requireTool } from "@/lib/auth/access";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { cache } from "react";
-import { parsePlanInputs, type PlanInputs } from "./inputs";
+import { parsePlanInputs, SCENARIOS, type PlanInputs } from "./inputs";
+import { runScenario } from "./model";
 
 /**
  * Reads for Business Planning.
@@ -25,6 +26,13 @@ export type PlanSummaryRow = {
   name: string;
   location: string | null;
   lineCount: number;
+  /** The ACTIVE scenario's headline figures, from the same engine the
+      editor uses — so the list and the plan can never disagree. */
+  scenarioName: string;
+  revenue: number;
+  pbt: number;
+  marginPct: number | null;
+  peakFunding: number;
   updated_at: string;
   updated_by_name: string | null;
 };
@@ -60,14 +68,27 @@ export async function listPlans(): Promise<PlanSummaryRow[]> {
 
   const names = await lookupNames(rows.map((row) => row.updated_by));
 
-  return rows.map((row) => ({
-    id: row.id,
-    name: row.name,
-    location: row.location,
-    lineCount: parsePlanInputs(row.inputs).lines.length,
-    updated_at: row.updated_at,
-    updated_by_name: row.updated_by ? (names.get(row.updated_by) ?? null) : null,
-  }));
+  return rows.map((row) => {
+    const inputs = parsePlanInputs(row.inputs);
+    // The engine is pure, so it runs here as happily as it does in the
+    // browser — and running it is the only way the figure on this list
+    // and the figure inside the plan cannot drift apart. Plans are
+    // counted in dozens; this is microseconds.
+    const active = runScenario(inputs, inputs.activeScenario);
+    return {
+      id: row.id,
+      name: row.name,
+      location: row.location,
+      lineCount: inputs.lines.length,
+      scenarioName: SCENARIOS[inputs.activeScenario],
+      revenue: active.revenue,
+      pbt: active.pbt,
+      marginPct: active.marginPct,
+      peakFunding: active.peakFunding,
+      updated_at: row.updated_at,
+      updated_by_name: row.updated_by ? (names.get(row.updated_by) ?? null) : null,
+    };
+  });
 }
 
 /**

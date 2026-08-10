@@ -10,7 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { listPlans } from "@/lib/business-planning/queries";
-import { formatDate } from "@/lib/format";
+import { formatCrore, formatDate, formatPercent } from "@/lib/format";
 import { Target } from "lucide-react";
 import Link from "next/link";
 import { NewPlanDialog } from "./_components/new-plan-dialog";
@@ -39,8 +39,11 @@ export default async function BusinessPlanningPage() {
           <TableHead>
             <TableRow>
               <TableHeaderCell>Plan</TableHeaderCell>
-              <TableHeaderCell>Location</TableHeaderCell>
               <TableHeaderCell>Lines</TableHeaderCell>
+              <TableHeaderCell className="text-right">Revenue</TableHeaderCell>
+              <TableHeaderCell className="text-right">Profit</TableHeaderCell>
+              <TableHeaderCell className="text-right">Margin</TableHeaderCell>
+              <TableHeaderCell className="text-right">To raise</TableHeaderCell>
               <TableHeaderCell>Last edited</TableHeaderCell>
               <TableHeaderCell></TableHeaderCell>
             </TableRow>
@@ -55,12 +58,36 @@ export default async function BusinessPlanningPage() {
                   >
                     {plan.name}
                   </Link>
+                  {plan.location ? <div className="text-muted text-xs">{plan.location}</div> : null}
                 </TableCell>
-                <TableCell className="text-muted">{plan.location ?? "—"}</TableCell>
                 <TableCell className="text-muted">
+                  {plan.lineCount === 0 ? (
+                    "None yet"
+                  ) : (
+                    <>
+                      {plan.lineCount} {plan.lineCount === 1 ? "line" : "lines"}
+                      <div className="text-muted text-xs">{plan.scenarioName}</div>
+                    </>
+                  )}
+                </TableCell>
+                {/* Figures come from the same pure engine the plan page
+                    runs in the browser, so the list and the plan cannot
+                    show different numbers. */}
+                <TableCell className="text-right font-mono">
+                  {plan.lineCount === 0 ? "—" : formatCrore(plan.revenue)}
+                </TableCell>
+                <TableCell className="text-foreground text-right font-mono font-medium">
+                  {plan.lineCount === 0 ? "—" : formatCrore(plan.pbt)}
+                </TableCell>
+                <TableCell className="text-right font-mono">
+                  {formatPercent(plan.marginPct)}
+                </TableCell>
+                <TableCell className="text-right font-mono">
                   {plan.lineCount === 0
-                    ? "None yet"
-                    : `${plan.lineCount} ${plan.lineCount === 1 ? "line" : "lines"}`}
+                    ? "—"
+                    : plan.peakFunding === 0
+                      ? "nothing"
+                      : formatCrore(plan.peakFunding)}
                 </TableCell>
                 <TableCell className="text-muted">
                   <div className="flex items-center gap-2">

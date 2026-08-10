@@ -977,3 +977,86 @@ export function runPlan(plan: PlanInputs): PlanResult {
   ];
   return { scenarios, active: scenarios[plan.activeScenario] };
 }
+
+// ---------------------------------------------------------------------
+// Sensitivity
+// ---------------------------------------------------------------------
+
+/**
+ * The same plan with every price, or every build cost, moved by a
+ * percentage.
+ *
+ * The workbook's two-way table swings two named cells — the plotted
+ * house price and the plotted construction cost. That cannot work here,
+ * because a plan has as many lines as it has, and there is no single
+ * "the price". So the axes are proportional and apply to every line:
+ * what you SELL for (and charge, on a held line) against what it costs
+ * to BUILD. Those are the two numbers a Kerala project is actually at
+ * the mercy of, and moving all of them together is the honest version of
+ * the question — prices do not fall on villas and hold on row houses.
+ */
+export function adjustPlan(
+  plan: PlanInputs,
+  { pricePct, buildCostPct }: { pricePct: number; buildCostPct: number },
+): PlanInputs {
+  const price = 1 + pricePct / 100;
+  const build = 1 + buildCostPct / 100;
+
+  return {
+    ...plan,
+    lines: plan.lines.map((line) =>
+      line.kind === "sale"
+        ? {
+            ...line,
+            landPricePsf: line.landPricePsf * price,
+            housePricePsf: line.housePricePsf * price,
+            constructionPsf: line.constructionPsf * build,
+          }
+        : {
+            ...line,
+            // What a held line earns moves with prices; what it would
+            // fetch if sold moves with them too.
+            chargePerUnitMonth: line.chargePerUnitMonth * price,
+            entryFeePerUnit: line.entryFeePerUnit * price,
+            sellPricePsf: line.sellPricePsf * price,
+            buaCostPsf: line.buaCostPsf * build,
+            basementCostPsf: line.basementCostPsf * build,
+            amenitiesLumpsum: line.amenitiesLumpsum * build,
+          },
+    ),
+  };
+}
+
+/** The percentage swings each axis of the sensitivity grid steps through. */
+export const SENSITIVITY_STEPS = [-10, -5, 0, 5, 10] as const;
+
+export type SensitivityCell = {
+  pricePct: number;
+  buildCostPct: number;
+  pbt: number;
+  marginPct: number | null;
+  peakFunding: number;
+};
+
+/**
+ * Twenty-five runs of the whole model, at the ACTIVE velocity.
+ *
+ * Cheap precisely because the engine is pure and takes no I/O: the grid
+ * is just the model called again with different numbers, so it can never
+ * drift from the headline figures the way a separate sensitivity formula
+ * in a spreadsheet does.
+ */
+export function sensitivityGrid(plan: PlanInputs): SensitivityCell[][] {
+  return SENSITIVITY_STEPS.map((buildCostPct) =>
+    SENSITIVITY_STEPS.map((pricePct) => {
+      const result = runScenario(adjustPlan(plan, { pricePct, buildCostPct }), plan.activeScenario);
+      return {
+        pricePct,
+        buildCostPct,
+        pbt: result.pbt,
+        marginPct: result.marginPct,
+        peakFunding: result.peakFunding,
+      };
+    }),
+  );
+}

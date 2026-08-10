@@ -19,11 +19,13 @@ import {
   type SaleLine,
 } from "./inputs";
 import {
+  adjustPlan,
   collectionSchedule,
   constructionSchedule,
   irr,
   runPlan,
   runScenario,
+  sensitivityGrid,
   type SaleLineResult,
   type ScenarioResult,
 } from "./model";
@@ -534,4 +536,57 @@ test("selling cost is charged on sales, never on a held asset's income", () => {
   const consolidated = runScenario(viharaConsolidatedPlan(), 1);
   closeTo(consolidated.overheadsVariable, saleOnly.overheadsVariable, 1e-6);
   closeTo(consolidated.overheadsVariable, 47_929_000);
+});
+
+// ---------------------------------------------------------------------
+// Sensitivity
+// ---------------------------------------------------------------------
+
+test("the sensitivity grid's centre cell is the plan itself", () => {
+  // The grid is the same engine called again, so 0% / 0% must be the
+  // headline figure exactly. A separate sensitivity formula is how a
+  // spreadsheet's stress test drifts from its own summary.
+  const plan = viharaPlan();
+  const grid = sensitivityGrid(plan);
+  const centre = grid[2][2];
+  assert.equal(centre.pricePct, 0);
+  assert.equal(centre.buildCostPct, 0);
+  closeTo(centre.pbt, runScenario(plan, plan.activeScenario).pbt, 1e-6);
+  closeTo(centre.pbt, 266_596_000);
+});
+
+test("prices up lifts profit, build costs up cuts it", () => {
+  const grid = sensitivityGrid(viharaPlan());
+  const centre = grid[2][2].pbt;
+  // Same row (build cost unchanged), price 10% higher.
+  assert.ok(grid[2][4].pbt > centre);
+  assert.ok(grid[2][0].pbt < centre);
+  // Same column (price unchanged), build cost 10% higher.
+  assert.ok(grid[4][2].pbt < centre);
+  assert.ok(grid[0][2].pbt > centre);
+});
+
+test("swinging prices moves every line, not just the first", () => {
+  const dearer = adjustPlan(viharaPlan(), { pricePct: 10, buildCostPct: 0 });
+  const base = viharaPlan();
+  for (let i = 0; i < base.lines.length; i += 1) {
+    const before = base.lines[i];
+    const after = dearer.lines[i];
+    assert.ok(before.kind === "sale" && after.kind === "sale");
+    closeTo(after.housePricePsf, before.housePricePsf * 1.1, 1e-9);
+    closeTo(after.landPricePsf, before.landPricePsf * 1.1, 1e-9);
+    // Build cost untouched on this axis.
+    closeTo(after.constructionPsf, before.constructionPsf, 1e-9);
+  }
+});
+
+test("a held line's charges swing with prices and its capex with build cost", () => {
+  const plan = viharaSeniorLivingPlan();
+  const adjusted = adjustPlan(plan, { pricePct: 10, buildCostPct: 20 });
+  const before = plan.lines[0];
+  const after = adjusted.lines[0];
+  assert.ok(before.kind === "hold" && after.kind === "hold");
+  closeTo(after.chargePerUnitMonth, before.chargePerUnitMonth * 1.1, 1e-9);
+  closeTo(after.sellPricePsf, before.sellPricePsf * 1.1, 1e-9);
+  closeTo(after.buaCostPsf, before.buaCostPsf * 1.2, 1e-9);
 });
