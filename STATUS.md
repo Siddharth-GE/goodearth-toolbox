@@ -13,29 +13,29 @@ the founder's browser gates and the single-grant probe smoke). The
 chain runs design → price → indent → PO → goods in / stock / goods
 out → bill → paid.
 
-**Pusher Phase 1 is live** (PR #2 merged 2026-08-10 after the founder's
+**Relay Phase 1 is live** (PR #2 merged 2026-08-10 after the founder's
 browser pass, CI green, branch deleted): the relay, departments (many per
 trail), and a per-project overview whose dates are all calculated.
 **Standard trails are built** on `feature/pusher-standard-trails`
-(migrations `0041`–`0044` **already applied live**), waiting on the
+(migrations `0041`–`0047` **already applied live**), waiting on the
 founder's browser pass. **Next after that merges:** unit-level stages
 rolling up into the project picture, then the leaderboard, then links +
 Google Chat.
 
 Note for a cold start: the probe account holds `/inventory`, not
-`/pusher`, and the branch's test data has been cleared. `0041`/`0042`
+`/relay`, and the branch's test data has been cleared. `0041`/`0042`
 being live while their code is unmerged is safe and deliberate — the
 view kept every column production reads.
 
-|                    |                                                                                                                                 |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| Last worked        | 2026-08-10                                                                                                                      |
-| Branch             | `feature/pusher-standard-trails` — built, awaiting the founder's browser pass                                                   |
-| Migrations applied | `0001`–`0044` (next is `0045`)                                                                                                  |
-| Items in database  | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands                                                  |
-| Thumbnails         | 897 in Supabase Storage; 1,736 items use the colour placeholder                                                                 |
-| Built tools        | Marathon, Settings, Masters, Selections, Budgets (Interiors + Construction), Indents, Purchase Orders, Inventory, Bills, Pusher |
-| Tests              | `npm test` — 186, all pure logic                                                                                                |
+|                    |                                                                                                                                |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| Last worked        | 2026-08-10                                                                                                                     |
+| Branch             | `feature/pusher-standard-trails` — built, awaiting the founder's browser pass                                                  |
+| Migrations applied | `0001`–`0047` (next is `0048`)                                                                                                 |
+| Items in database  | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands                                                 |
+| Thumbnails         | 897 in Supabase Storage; 1,736 items use the colour placeholder                                                                |
+| Built tools        | Marathon, Settings, Masters, Selections, Budgets (Interiors + Construction), Indents, Purchase Orders, Inventory, Bills, Relay |
+| Tests              | `npm test` — 186, all pure logic                                                                                               |
 
 ## Next up
 
@@ -63,20 +63,20 @@ view kept every column production reads.
 
 ## Decisions locked in
 
-- **Pusher replaces Project Management and Design Management** (founder,
+- **Relay replaces Project Management and Design Management** (founder,
   2026-08-10). One module is the whole design- and project-management
   layer; both stubs are deleted, their slugs left inert in the CHECKs.
   UI keeps the shared nouns **Project** and **Unit** — a villa must not
   be a "Unit" in Selections and a "Territory" here — and uses game words
-  only for Pusher's own ideas (trail, baton, leg, cold, flow). Code and
+  only for Relay's own ideas (trail, baton, leg, cold, flow). Code and
   data speak plainly throughout: chain, leg, stuck, points.
-- **Pusher dates are worked out, never typed** (founder, 2026-08-10).
+- **Relay dates are worked out, never typed** (founder, 2026-08-10).
   The only stored inputs are a project's start date and each stage's
   length in weeks; every date on screen is calculated on read. Inserting
   a stage moves every later date by itself, and no two dates can
   contradict each other. **A trail can be in several departments at
   once** — cross-department is the normal case, so it is a join table.
-- **Pusher's event log IS its state.** No status column, no stored
+- **Relay's event log IS its state.** No status column, no stored
   holder, no stored points — all derived by replay. Events snapshot the
   assignee and expected days at the moment the baton lands, which is what
   stops a leg edit rewriting whether a past push was on time, and what
@@ -84,6 +84,12 @@ view kept every column production reads.
   Bouncing is rewarded (+5) and never punished; it is impossible without
   a reason and a note, at the database. Expected days are whole days,
   because elapsed time is counted in **IST calendar days**.
+- **Relay was called Pusher until 2026-08-10** (`0047`). The URL, the
+  folders, the tool name and the **grant slug** all moved together —
+  grants and all 27 policies in one transaction, because a half-done
+  permission rename denies everyone silently. The **tables stay
+  `pusher_*`**: renaming them is not additive and would break production
+  from the moment it applied until the branch merged.
 - **The leg IS the activity** (founder, 2026-08-10; `0043`). A trail is
   an ordered list of activities, each with a person and days — no
   sub-legs, nothing to type. A **trail type** is a named trail with its
@@ -215,7 +221,7 @@ view kept every column production reads.
   via the auth admin API was not blocked this time, unlike the two
   sessions before it. So the block is not permanent; try it before
   assuming a browser pass is impossible. Both runs drove the local
-  production build as a `/pusher`-only user.
+  production build as a `/relay`-only user.
 - A three-line Node script that POSTs a `.sql` file to the management
   API's `/database/query` is the whole migration workflow; keep it in the
   session scratchpad. Two traps when generating SQL through JavaScript:
@@ -244,8 +250,12 @@ view kept every column production reads.
 ## Session log
 
 One line per day; full detail in git history and the PLAN.md files.
+Entries before 2026-08-10 evening were written when Relay was called
+**Pusher**; the name changed everywhere (`0047`) but the branch names and
+the applied migrations still say pusher, and the tables always will —
+`0047` records why renaming them was refused.
 
-- **2026-08-10 (Pusher — standard trails at the house level)** —
+- **2026-08-10 (Relay — standard trails at the house level)** —
   `feature/pusher-standard-trails`, migrations `0041`–`0042` applied.
   One click on a house lays down the usual set of trails, staffed from
   each activity's last run, **all queued with no clock running**.
@@ -270,7 +280,7 @@ One line per day; full detail in git history and the PLAN.md files.
   set down makes a project look further behind. That is the honest
   reading — the flattering number before it came from the work not being
   written down — but it surprises, and it is the founder's call.
-- **2026-08-10 (Pusher — the founder's browser test, then the merge)** —
+- **2026-08-10 (Relay — the founder's browser test, then the merge)** —
   **PR #2 merged to `master` and deployed**, branch deleted, CI green on
   master. Four fixes first, no migration. The founder opened two trails on Saarang
   Villa 6, one under Design and one under Construction, finished the
@@ -285,22 +295,22 @@ One line per day; full detail in git history and the PLAN.md files.
   Design reads as untouched; nothing in `schedule.ts` changed and all 15
   of its tests passed unedited, which is the tell that the maths was
   never the problem. The trap is waiting for the leaderboard and the
-  Dashboard, so it is written into Pusher's PLAN.md. Second fix: **Pusher
-  opens on Projects**, then Your court, then All trails — `/pusher`
-  redirects to `/pusher/projects` and the court moves to `/pusher/court`,
+  Dashboard, so it is written into Relay's PLAN.md. Second fix: **Relay
+  opens on Projects**, then Your court, then All trails — `/relay`
+  redirects to `/relay/projects` and the court moves to `/relay/court`,
   the same shape `/masters` already uses. "Your court" keeps its name
-  (founder's call — court is one of Pusher's own game words, and the
+  (founder's call — court is one of Relay's own game words, and the
   empty state already says "Court cleared"). Third: **a stage with
   nothing filed under it no longer looks like a stage with nothing done**
   — a dashed outline and "Nothing filed here yet", because those two read
   identically and need opposite fixes. Fourth, riding the route move:
-  finishing a baton revalidates `/pusher/court`, so a mover's own court
+  finishing a baton revalidates `/relay/court`, so a mover's own court
   empties.
   **Merge gates.** The founder's browser pass, CI green, and — since the
   route move landed after the day's two probe smokes — a check that the
   new routes still turn people away: signed-out visitors bounce to
   `/login` on the production build, and a signed-in colleague without the
-  grant goes `/pusher` → `/pusher/projects` → `requireTool` → home, a
+  grant goes `/relay` → `/relay/projects` → `requireTool` → home, a
   chain that terminates. That last check is deliberate: an unbounded
   redirect loop has taken the whole toolbox down twice. Not re-run: the
   full single-grant probe smoke (no Playwright in the session scratchpad,
@@ -313,7 +323,7 @@ One line per day; full detail in git history and the PLAN.md files.
   Vercel actually shipped.
   Also designed but deliberately not built: **standard trails at the
   house level**, in TODO.md, waiting on this merge by the founder's call.
-- **2026-08-10 (Pusher — departments and the project schedule)** — same
+- **2026-08-10 (Relay — departments and the project schedule)** — same
   branch, migrations `0038`–`0040` applied. The founder added two things
   to the relay. **Departments**, with the correction that makes the
   design: "a trail can be cross department as well" — so it is a
@@ -343,9 +353,9 @@ One line per day; full detail in git history and the PLAN.md files.
   kept asserting faster than the page could redraw, so four of its checks
   read as failures — each was verified correct directly against the
   database instead. Trust the database check, not that script's tail.
-- **2026-08-10 (Pusher Phase 1 — the relay)** — built on
+- **2026-08-10 (Relay Phase 1 — the relay)** — built on
   `feature/pusher-relay`, migrations `0036`–`0037` applied. The founder
-  brought a concept and a working mockup for **Pusher**, and it
+  brought a concept and a working mockup for **Relay**, and it
   supersedes two planned Management tools: it is the whole design- and
   project-management layer, one module. A trail is a task with ordered
   legs, each a person plus expected days; the baton sits with one person
@@ -367,10 +377,10 @@ One line per day; full detail in git history and the PLAN.md files.
   the leg list read across instead of down, and — the serious one —
   `revalidatePath` left the mover's own page showing the old leg after a
   successful push, now fixed with `router.refresh()` on every write.
-  A single-grant probe smoke (30 checks, `/pusher` only) passed against
+  A single-grant probe smoke (30 checks, `/relay` only) passed against
   the production build, including both bounce refusals, the full
   push/bounce/push/push/finish relay and no sideways scroll at 390px.
-  DESIGN.md gains Pusher as its **one stated motion exception** (a stuck
+  DESIGN.md gains Relay as its **one stated motion exception** (a stuck
   trail breathes rather than blinks) and, with it, the app's first
   `prefers-reduced-motion` guard — which covers every tool, not just this
   one. Phases 2–4 (stages and the map, the leaderboard, links + Google

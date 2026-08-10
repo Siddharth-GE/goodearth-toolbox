@@ -1,8 +1,8 @@
-# Pusher — build notes
+# Relay — build notes
 
 The relay layer for site and design. Read this before touching the tool.
 
-Pusher replaced the planned **Project Management** and **Design
+Relay replaced the planned **Project Management** and **Design
 Management** tools — it is that whole layer, one module. Drawing
 approvals, selections handoffs, fire NOCs, site handovers are all just
 **activities**, tracked identically.
@@ -44,22 +44,22 @@ moving the trail — the rescue hatch when the holder has left or is away.
    rather than replaying in plpgsql.
 
 3. **The trigger is the boundary; buttons are a courtesy.**
-   `lib/pusher/events.ts` mirrors the guard so the right buttons render.
+   `lib/relay/events.ts` mirrors the guard so the right buttons render.
    When the two disagree the database wins, and `guardError()` in
    `actions.ts` passes its message through intact — those messages were
    written to be read by a person.
 
 ## Layout
 
-| Path                      | What                                                                                                                                                                                                                                                                        |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `lib/pusher/day.ts`       | **The IST day, in one place.** Vercel and Postgres both run UTC; the office is +05:30. Elapsed days are IST calendar-day differences, not 24-hour blocks. Must agree exactly with `at time zone 'Asia/Kolkata'` in the state view — no test can catch a drift between them. |
-| `lib/pusher/events.ts`    | The vocabulary and the guard's mirror. Answers from last event + leg count + who is asking.                                                                                                                                                                                 |
-| `lib/pusher/chain.ts`     | `replayChain` / `stintsOf` — the replay. A stint is one person holding one leg once; a leg bounced back to has several.                                                                                                                                                     |
-| `lib/pusher/points.ts`    | The economy, ranks, on-time. `scoreChain` takes a whole chain because on-time needs the _previous_ event.                                                                                                                                                                   |
-| `lib/pusher/queries.ts`   | Reads. Lists go through the `pusher_chain_state` view; only the detail page reads a full log.                                                                                                                                                                               |
-| `lib/pusher/actions.ts`   | Writes. Push/bounce/finish are **one insert each**; the guard does the rest.                                                                                                                                                                                                |
-| `app/(dashboard)/pusher/` | Projects (the landing page — `/pusher` redirects to `/pusher/projects`, the Masters pattern), Your court at `/pusher/court` (phone-first), All trails, trail detail, Open a trail, Activities.                                                                              |
+| Path                     | What                                                                                                                                                                                                                                                                        |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lib/relay/day.ts`       | **The IST day, in one place.** Vercel and Postgres both run UTC; the office is +05:30. Elapsed days are IST calendar-day differences, not 24-hour blocks. Must agree exactly with `at time zone 'Asia/Kolkata'` in the state view — no test can catch a drift between them. |
+| `lib/relay/events.ts`    | The vocabulary and the guard's mirror. Answers from last event + leg count + who is asking.                                                                                                                                                                                 |
+| `lib/relay/chain.ts`     | `replayChain` / `stintsOf` — the replay. A stint is one person holding one leg once; a leg bounced back to has several.                                                                                                                                                     |
+| `lib/relay/points.ts`    | The economy, ranks, on-time. `scoreChain` takes a whole chain because on-time needs the _previous_ event.                                                                                                                                                                   |
+| `lib/relay/queries.ts`   | Reads. Lists go through the `pusher_chain_state` view; only the detail page reads a full log.                                                                                                                                                                               |
+| `lib/relay/actions.ts`   | Writes. Push/bounce/finish are **one insert each**; the guard does the rest.                                                                                                                                                                                                |
+| `app/(dashboard)/relay/` | Projects (the landing page — `/relay` redirects to `/relay/projects`, the Masters pattern), Your court at `/relay/court` (phone-first), All trails, trail detail, Open a trail, Activities.                                                                                 |
 
 Migrations: **`0036`** (the relay), **`0037`** (defaults on the two
 server-stamped columns), **`0038`** (departments, many per trail),
@@ -101,7 +101,7 @@ correct: the flattering number before it came from the work not being
 written down. Anything else would let a house record twelve jobs and
 still read 100% done.
 
-**Anyone with `/pusher` can start a queued trail** — matching what the
+**Anyone with `/relay` can start a queued trail** — matching what the
 tool already allows, since Open-a-trail has always let one person open a
 trail whose first leg belongs to someone else. A stricter rule would let
 a coordinator lay a set down and then be unable to begin any of it.
@@ -179,7 +179,7 @@ Phase 1 is the relay. Still to come, in order:
   below) and active days. `points.ts` is already written and tested.
 - **Phase 4 — the seams.** `pusher_chain_links` in the UI both ways,
   Google Chat notifications (greenfield — never block a write on them),
-  and `getPusherPulse()` grown into the seam the collated Dashboard reads.
+  and `getRelayPulse()` grown into the seam the collated Dashboard reads.
 
 **The streak, when Phase 3 lands.** The mockup's "consecutive days you
 ended with an empty court" is unreachable for anyone on a ten-day leg —

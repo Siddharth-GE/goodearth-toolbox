@@ -12,10 +12,10 @@ next). `DESIGN.md` before styling anything. Each tool keeps its own
 `PLAN.md` next to its code — check it before touching that tool.
 
 **Shipped:** Marathon (kiosk), Settings, Masters, Selections, Budgets,
-Indents, Purchase Orders, Inventory, Bills, **Pusher** (the relay —
+Indents, Purchase Orders, Inventory, Bills, **Relay** (the relay —
 Phase 1 of 4). **Next:** the rest of the Management group (Dashboard,
 Client Relations, Financial, Business Planning — planned with the
-founder one at a time), plus Directory and Training. **Pusher replaced
+founder one at a time), plus Directory and Training. **Relay replaced
 the planned Project Management and Design Management tools**: it is the
 whole design-management and project-management layer, one module, and
 those two stubs are deleted. Their slugs stay in the database CHECKs
