@@ -34,14 +34,9 @@ project run end-to-end.
   1:1 — a double link fails loudly on the unique index); the
   project/plot **status value lists are my defaults, never
   confirmed** — ask first. Source files go in `data/` (git-ignored).
-- **Post-deploy button press** — still owed, and now for two deploys:
-  the Bills merge, and the 2026-08-10 audit merge, which changed
-  `lib/inventory/actions.ts`, `lib/budgets/actions.ts` and
-  `lib/selections/actions.ts`. Press one real write-button on production
-  (approve or pay a bill) per the CLAUDE.md habit.
-- **Switch the probe account back on** — left deactivated after the
-  2026-08-10 redirect-loop test (Settings → People → Probe (test) →
-  Reactivate account). Every future pre-merge smoke needs it.
+- **Switch the probe account back on** — still off after the 2026-08-10
+  redirect-loop test (Settings → People → Probe (test) → Reactivate
+  account). Every future pre-merge smoke needs it.
 - **Grant `/bills`** in Settings to accounts (and tick their "Approve
   bills" box), **`/inventory`** to store-keepers (and site engineers if
   wanted — its reads carry no money).
@@ -162,6 +157,16 @@ project run end-to-end.
   an information_schema count, then `npm run db:types`. Use Node for
   the request — PowerShell's Invoke-RestMethod mangles large JSON
   bodies. Revoke/rotate the token from the Supabase dashboard anytime.
+- **Preview deployments sit behind Vercel's SSO wall** — a preview URL
+  302s to `vercel.com/sso-api` unless that browser is signed into
+  Vercel. So the two-browser probe smoke can't put the probe in a
+  private window on a preview: use the private window for **production**
+  and your own Vercel-authenticated browser for the preview.
+- **The probe's password is never stored.** Set a throwaway one via the
+  auth admin API each time (`PUT /auth/v1/admin/users/<id>` with the
+  service-role key). Its `@goodearth.test` domain is not real, so
+  password-recovery and magic-link emails can never arrive — the
+  dashboard's user menu only offers those, and won't get you in.
 - Pre-push smoke: Playwright installed in the session scratchpad,
   `npm run build && npm start`, drive localhost as the probe user
   (reset its password via the auth admin API; never stored).
