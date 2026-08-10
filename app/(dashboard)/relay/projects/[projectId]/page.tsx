@@ -228,31 +228,3 @@ function TrailLine({
     </div>
   );
 }
-
-function Figure({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone?: "warning" | "danger";
-}) {
-  return (
-    <div>
-      <p
-        className={cn(
-          "text-xl font-extrabold tracking-tight",
-          tone === "danger"
-            ? "text-danger"
-            : tone === "warning"
-              ? "text-warning"
-              : "text-foreground",
-        )}
-      >
-        {value}
-      </p>
-      <p className="text-muted mt-0.5 text-xs">{label}</p>
-    </div>
-  );
-}

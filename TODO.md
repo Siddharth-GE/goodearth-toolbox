@@ -15,8 +15,9 @@ turns out to mislead in practice.
 
 ## Relay — what is left, in order
 
-The relay, departments and the project schedule are built; see
-`app/(dashboard)/relay/PLAN.md` for how it works and what will bite.
+The relay, departments, the project schedule, trail types and the house
+screen are built; see `app/(dashboard)/relay/PLAN.md` for how it works
+and what will bite.
 
 - **Unit-level stages.** Each unit stage maps to one project stage, so a
   villa's own progress rolls up into the project picture; plus quests — a
@@ -32,6 +33,18 @@ The relay, departments and the project schedule are built; see
 - **The seams.** `pusher_chain_links` surfaced both ways, Google Chat
   notifications (greenfield — fire-and-forget, never block a write), and
   `getRelayPulse()` grown into what the collated Dashboard reads.
+
+## Relay — two known gaps, small
+
+- **Editing a queued trail's activities from the house page.** You can
+  open the trail itself to change them, but there is no inline editor in
+  the waiting list. The write path already exists and is current —
+  `replaceFutureLegs` in `lib/relay/actions.ts` and the
+  `replace_future_legs` RPC, updated for the activity model in `0044` —
+  and has simply never been wired to a screen. Deliberately kept for this.
+- **An "Open a trail" button on the Projects landing page.** It is one
+  click away via a house or All trails, so this is convenience, not a gap
+  in capability. The founder has not asked for it.
 
 ## Management group — plan one tool at a time
 

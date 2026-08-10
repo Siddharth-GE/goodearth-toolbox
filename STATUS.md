@@ -28,7 +28,7 @@ Note for a cold start: the probe account holds `/inventory`, not
 |                    |                                                                                                                                |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
 | Last worked        | 2026-08-10                                                                                                                     |
-| Branch             | `feature/pusher-standard-trails` — built, awaiting the founder's browser pass                                                  |
+| Branch             | `master` — Relay merged and deployed; nothing in flight                                                                        |
 | Migrations applied | `0001`–`0047` (next is `0048`)                                                                                                 |
 | Items in database  | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands                                                 |
 | Thumbnails         | 897 in Supabase Storage; 1,736 items use the colour placeholder                                                                |
@@ -253,158 +253,54 @@ Entries before 2026-08-10 evening were written when Relay was called
 the applied migrations still say pusher, and the tables always will —
 `0047` records why renaming them was refused.
 
-- **2026-08-10 (Relay — the rename, the seed data, and the hierarchy)** —
-  **PR #3 merged and deployed.** The tool is now **Relay** (`0047`): the
-  URL, the folders, the tool name and the **grant slug**, with the grants
-  and all 27 policies moved in one transaction — a half-done permission
-  rename denies everyone silently, with no error to find. The migration
-  refuses to commit unless zero policies still mention the old slug.
-  The **tables stay `pusher_*`** and that is a decision, not laziness:
-  renaming them is not additive and would have broken production from the
-  moment it applied until the branch merged. Seed data (`0045`/`0046`):
-  22 activities, 3 trail types, and the founder's eight stages —
-  Masterplan → Handover, 156 weeks — backfilled onto every project and
-  given to every future one by a SECURITY DEFINER trigger, definer
-  because projects are created under the `/masters` grant and the stage
-  tables are written under Relay's. `0045` never overwrites a schedule
-  someone has worked on, which left Saarang with only the two stages the
-  founder made while testing, so `0046` fills what is missing BY NAME —
-  Saarang keeps both, their weeks, and the trails filed under them.
-  No trails, people or progress were seeded: a fake baton in a real
-  person's court is exactly the lie this tool exists to stop.
-  Also, the founder's clutter note: activities and trail types nest
-  behind a gear (they are vocabulary, not work), and the schedule editor
-  moved from permanently-open to one button on the picture it edits.
-- **2026-08-10 (Relay — standard trails at the house level)** —
-  `feature/pusher-standard-trails`, migrations `0041`–`0042` applied.
-  One click on a house lays down the usual set of trails, staffed from
-  each activity's last run, **all queued with no clock running**.
-  The build was much smaller than expected because **the event log
-  already had the state and nothing used it**: a chain with no events.
-  Both 0036 guards handled it unchanged — the events guard accepts only
-  `started` on an eventless chain, the legs guard waves every edit
-  through — so `open_chain()` merely split into `create_chain()` +
-  `start_chain()`. Nine checks in a rolled-back block against the live
-  database proved it before any app code. New: a Standard sets tab, a
-  house page under its project, a house list on the project page.
-  **The mistake worth remembering:** `0041` recreated
-  `pusher_chain_state` from **0036's** definition, but `0038` had already
-  replaced that whole view to add the department arrays — a `create view`
-  is a replacement, not a patch — so both columns vanished and All trails
-  was broken against the live database until `0042` put them back within
-  minutes. `npm run typecheck` caught it, because types were regenerated
-  straight after applying rather than at the end. That view has now been
-  defined in four migrations; PLAN.md says to read `pg_get_viewdef` first,
-  always. **The judgement call to sanity-check in the browser:** queued
-  work counts in the project picture as planned-but-not-done, so laying a
-  set down makes a project look further behind. That is the honest
-  reading — the flattering number before it came from the work not being
-  written down — but it surprises, and it is the founder's call.
-- **2026-08-10 (Relay — the founder's browser test, then the merge)** —
-  **PR #2 merged to `master` and deployed**, branch deleted, CI green on
-  master. Four fixes first, no migration. The founder opened two trails on Saarang
-  Villa 6, one under Design and one under Construction, finished the
-  Construction one, and the progress bar grew **from the left edge**,
-  painting over a Design stage where nothing had happened. The number was
-  right and the picture was a lie: `actualPct` weights each stage by its
-  length — deliberately, so a 40-week stage moves it more than a 1-week
-  one — and the SVG then drew that weighted total as one bar starting at
-  x=0. **The rule this establishes: a weighted total is a number, not a
-  position — never draw one as a bar growing from the left.** Each stage
-  now fills inside its own block, so Construction reads as moving while
-  Design reads as untouched; nothing in `schedule.ts` changed and all 15
-  of its tests passed unedited, which is the tell that the maths was
-  never the problem. The trap is waiting for the leaderboard and the
-  Dashboard, so it is written into Relay's PLAN.md. Second fix: **Relay
-  opens on Projects**, then Your court, then All trails — `/relay`
-  redirects to `/relay/projects` and the court moves to `/relay/court`,
-  the same shape `/masters` already uses. "Your court" keeps its name
-  (founder's call — court is one of Relay's own game words, and the
-  empty state already says "Court cleared"). Third: **a stage with
-  nothing filed under it no longer looks like a stage with nothing done**
-  — a dashed outline and "Nothing filed here yet", because those two read
-  identically and need opposite fixes. Fourth, riding the route move:
-  finishing a baton revalidates `/relay/court`, so a mover's own court
-  empties.
-  **Merge gates.** The founder's browser pass, CI green, and — since the
-  route move landed after the day's two probe smokes — a check that the
-  new routes still turn people away: signed-out visitors bounce to
-  `/login` on the production build, and a signed-in colleague without the
-  grant goes `/relay` → `/relay/projects` → `requireTool` → home, a
-  chain that terminates. That last check is deliberate: an unbounded
-  redirect loop has taken the whole toolbox down twice. Not re-run: the
-  full single-grant probe smoke (no Playwright in the session scratchpad,
-  probe holds `/inventory`) — the new routes are argued from the code
-  path, not driven in a browser. **A trap for the next reader:** while
-  signed out, production returns 200 for _every_ path including nonsense
-  ones, because the middleware bounces to `/login` before routing
-  resolves. Curling a URL proves nothing about whether it exists. Use the
-  GitHub deployments API (`/deployments/<id>/statuses`) to confirm what
-  Vercel actually shipped.
-  Also designed but deliberately not built: **standard trails at the
-  house level**, in TODO.md, waiting on this merge by the founder's call.
-- **2026-08-10 (Relay — departments and the project schedule)** — same
-  branch, migrations `0038`–`0040` applied. The founder added two things
-  to the relay. **Departments**, with the correction that makes the
-  design: "a trail can be cross department as well" — so it is a
-  many-to-many join, not a column, because a selections handoff really is
-  Design _and_ Purchase and a single department would force a lie on
-  exactly the trails worth watching. They prefill from the activity's
-  last run alongside the legs, sit on the state view as arrays so
-  "every cold Design trail" is one server-side filter, and freeze when a
-  trail finishes. Six seeded, all renameable. **The project schedule**,
-  where the founder chose "dates are worked out, never typed": the only
-  stored inputs are a project's start date and each stage's length in
-  weeks, and every date on screen is calculated on read. Stretch Design
-  from 10 weeks to 20 and Approvals, Construction and Handover all move
-  by themselves; two dates can never contradict each other. The overview
-  compares work done (weighted by stage length, with partial credit for a
-  stage in progress) against plan elapsed — the gap is the slip — and
-  calls out trails filed under no stage rather than letting them count
-  for nothing silently. 15 new tests on the calculation.
-  **Two bugs the browser found and nothing else would have:** `0039`
-  attached `audit_row()` to a table with no `id` column, so every write
-  to it raised and no schedule could be saved at all — it typechecks, it
-  builds, the SQL is valid (`0040` adds the surrogate id, the 0018/0031
-  precedent); and `router.refresh()` inside a `useTransition` left
-  `isPending` true on a form that stays mounted, greying out the whole
-  schedule editor permanently. A sweep confirmed no other audited table
-  lacks an `id`. Note for whoever reads this next: the Playwright script
-  kept asserting faster than the page could redraw, so four of its checks
-  read as failures — each was verified correct directly against the
-  database instead. Trust the database check, not that script's tail.
-- **2026-08-10 (Relay Phase 1 — the relay)** — built on
-  `feature/pusher-relay`, migrations `0036`–`0037` applied. The founder
-  brought a concept and a working mockup for **Relay**, and it
-  supersedes two planned Management tools: it is the whole design- and
-  project-management layer, one module. A trail is a task with ordered
-  legs, each a person plus expected days; the baton sits with one person
-  who can push, bounce (reason + note mandatory) or finish it. Past its
-  expected days it goes **cold**, loudly, everywhere.
-  **The event log is the state** — every guard rule, and the ability to
-  rule on a new event from the last event row alone, falls out of events
-  snapshotting the assignee and expected days when the baton lands. All
-  18 guard rules were exercised against the live database in a rolled-back
-  transaction before a line of app code was written: a non-holder cannot
-  push, a stale `from_leg` is refused by name, a bounce with no reason or
-  a whitespace note is impossible, the log cannot be edited or deleted
-  even by the owner, and the current leg cannot be restretched.
-  Four pure modules (`day`, `events`, `chain`, `points`) carry 35 of the
-  tests; `day.ts` exists because Vercel and Postgres run UTC and the
-  office is +05:30, which is wrong in the _other_ direction for five and
-  a half hours of every day. **Driving the running app found three things
-  no test would have:** the route SVG was stretched into flat ellipses,
-  the leg list read across instead of down, and — the serious one —
-  `revalidatePath` left the mover's own page showing the old leg after a
-  successful push, now fixed with `router.refresh()` on every write.
-  A single-grant probe smoke (30 checks, `/relay` only) passed against
-  the production build, including both bounce refusals, the full
-  push/bounce/push/push/finish relay and no sideways scroll at 390px.
+- **2026-08-10 (Relay, built and shipped in one day)** — merged in two
+  PRs, migrations `0036`–`0047`. The founder brought a concept and a
+  mockup; it supersedes the planned Project Management and Design
+  Management tools and is now the whole layer. Built in this order:
+  the **relay** (trails, legs, the baton, cold), **departments**
+  (many-to-many — a selections handoff really is Design _and_ Purchase),
+  the **project schedule** (dates worked out, never typed), **trail
+  types** laid down on a **house**, and finally the **rename to Relay**.
+  All 18 guard rules were exercised against the live database in a
+  rolled-back transaction before a line of app code, and the queue's nine
+  the same way. `day.ts` exists because Vercel and Postgres run UTC and
+  the office is +05:30, which is wrong in the _other_ direction for five
+  and a half hours of every day.
+  **What only the browser found**, across three rounds: a stretched route
+  SVG, a leg list reading across instead of down, `revalidatePath`
+  leaving the mover's own page stale, `audit_row()` on a table with no
+  `id` (0039 → 0040) so no schedule could be saved at all, a
+  `router.refresh()` inside `useTransition` greying out a form
+  permanently, and the progress bar painting a **weighted total from the
+  left edge** — claiming work on stages nobody had touched.
+  **What only typecheck found:** `0041` rebuilt `pusher_chain_state` from
+  **0036's** copy, silently dropping the department columns `0038` had
+  added, and broke All trails against the live database until `0042`.
+  That view has now been defined five times; always read
+  `pg_get_viewdef` first.
+  **The founder's two corrections, both of which simplified the design:**
+  "the leg IS the activity" (`0043`) collapsed a trail to an ordered list
+  of activities and turned a twelve-trail standard set into one trail
+  with twelve steps — one baton, one clock, and the cold-early problem
+  stopped existing rather than being managed; and "reduce the clutter"
+  moved activities and trail types behind a gear and the schedule editor
+  onto a button on the picture it edits.
+  Seed data (`0045`/`0046`): 22 activities, 3 trail types, and eight
+  default stages over three years on every project, given to future ones
+  by a `security definer` trigger — definer because projects are created
+  under `/masters` while the stage tables are written under `/relay`.
+  **No trails, people or progress were seeded**: a fake baton in a real
+  person's court is the exact lie this tool exists to stop.
+  Two notes for whoever reads this next. The single-grant probe smoke did
+  **not** re-run after the route move — the new routes are argued from
+  the code path, not driven in a browser. And while signed out,
+  production answers **200 for every path**, including nonsense ones,
+  because the middleware bounces to `/login` before routing resolves:
+  curling a URL proves nothing about whether it exists. Use the GitHub
+  deployments API to confirm what Vercel actually shipped.
   DESIGN.md gains Relay as its **one stated motion exception** (a stuck
   trail breathes rather than blinks) and, with it, the app's first
-  `prefers-reduced-motion` guard — which covers every tool, not just this
-  one. Phases 2–4 (stages and the map, the leaderboard, links + Google
-  Chat) are in TODO.md.
+  `prefers-reduced-motion` guard, which covers every tool.
 - **2026-08-10 (independence audit — kernel failure modes)** — audited
   the whole repo against the toolbox doctrine; merged to `master` (PR #1)
   after the founder reproduced the redirect loop on production and

@@ -12,8 +12,9 @@ next). `DESIGN.md` before styling anything. Each tool keeps its own
 `PLAN.md` next to its code — check it before touching that tool.
 
 **Shipped:** Marathon (kiosk), Settings, Masters, Selections, Budgets,
-Indents, Purchase Orders, Inventory, Bills, **Relay** (the relay —
-Phase 1 of 4). **Next:** the rest of the Management group (Dashboard,
+Indents, Purchase Orders, Inventory, Bills, **Relay** (the baton relay:
+trails, departments, project schedules and standard trail types — the
+leaderboard and the outward links are what remain). **Next:** the rest of the Management group (Dashboard,
 Client Relations, Financial, Business Planning — planned with the
 founder one at a time), plus Directory and Training. **Relay replaced
 the planned Project Management and Design Management tools**: it is the
@@ -79,9 +80,22 @@ building one means flipping `built: true` and replacing the stub
   Money never crosses on a base table — always a fact view. The
   non-money handoffs above cross on raw tables, which is allowed but is
   exactly why they are listed here. Everything in this table is a
-  `SELECT`: **no tool ever writes another tool's table.** Masters,
+  `SELECT`: **no tool's CODE ever writes another tool's table.** Masters,
   `profiles` and the `items` catalogue are shared, not another tool's,
-  so they are not listed.
+  so they are not listed. Relay needs no row: it reads only `projects`,
+  `units` and `profiles`, all of which are shared.
+
+  **The one sanctioned cross-tool write, and it is a trigger, not code**
+  (`0045`): inserting a project in Masters fires `projects_seed_schedule`,
+  which writes Relay's `project_stages` and `pusher_project_plans` so
+  every project is born with a schedule. It is declared by Relay's own
+  migration, so the coupling points the right way — Masters knows
+  nothing about it — and it is `security definer` because the person
+  creating the project holds `/masters`, not `/relay`. Without definer
+  rights they would create a project and silently get no schedule. If a
+  second one of these is ever wanted, write it the same way and add it
+  here; a trigger that writes across tools and is NOT listed here is the
+  kind of thing nobody finds until it misfires.
 
 - **Reads.** PostgREST silently caps selects at 1,000 rows. Anything
   needing completeness (merges, lookups, carry-forward) goes through

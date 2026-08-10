@@ -12,6 +12,14 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Assistant tooling. Gitignored, so CI never sees it — but it sits
+    // on disk locally and buried the app's own output under 300
+    // warnings, which is how a real one goes unnoticed.
+    ".claude/**",
+    ".impeccable/**",
+    ".github/skills/**",
+    ".github/agents/**",
+    ".github/hooks/**",
   ]),
 ]);
 

@@ -50,3 +50,11 @@ REPO-MAP.md
 # source CSVs for one-off imports (scripts/import-catalogue.ts) — business
 # data belongs in the database, not in git history
 /data
+
+# assistant tooling — local working files, not part of the project.
+# (.github/workflows IS the project's CI and stays tracked.)
+/.claude
+/.impeccable
+/.github/skills
+/.github/agents
+/.github/hooks
