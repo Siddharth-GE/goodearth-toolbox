@@ -167,10 +167,21 @@ async function carryForward(
   // Filtered and sorted here rather than in the query: a unit has a
   // handful of revisions, and ordering by an embedded column is more
   // trouble in PostgREST than it's worth.
-  const { data: priorBudgets } = await supabase
+  const { data: priorBudgets, error: priorBudgetsError } = await supabase
     .from("budgets")
     .select("id, selection_id, selections(revision_no)")
     .eq("unit_id", unitId);
+
+  // Checked, because "no rows" and "the read failed" mean opposite
+  // things three lines below: an empty list is read as "a first budget
+  // for this unit, nothing to carry" and returns null, so an unchecked
+  // failure here would silently hand the budget team a blank sheet for
+  // lines they had already priced — the same data loss fetchAll exists
+  // to prevent, arriving by a different door.
+  if (priorBudgetsError) {
+    console.error("carryForward read failed:", priorBudgetsError);
+    return "Could not read the previous budget. Try again.";
+  }
 
   const previous = (priorBudgets ?? [])
     .map((budget) => ({

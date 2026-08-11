@@ -270,10 +270,21 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
     ...new Set(lines.map((line) => line.budget_id).filter((id): id is string => id != null)),
   ];
   if (anchoredBudgetIds.length > 0) {
-    const { data: anchorBudgets } = await supabase
+    const { data: anchorBudgets, error: anchorBudgetsError } = await supabase
       .from("approved_budgets")
       .select("id, selection_id, unit_id")
       .in("id", anchoredBudgetIds);
+    // Throw rather than fall through to an empty list: no rows here reads
+    // as "nothing drifted", so a failed read would clear every drift flag
+    // on the screen and tell the site team an indent is safe to order
+    // when the design under it has changed. Same rule as fetchAll — a
+    // read that failed has no partial answer worth showing.
+    if (anchorBudgetsError) {
+      console.error("indent drift read failed:", anchorBudgetsError);
+      throw new Error("Could not check this indent for design changes.", {
+        cause: anchorBudgetsError,
+      });
+    }
     const budgets = (anchorBudgets ?? []).filter(
       (row): row is { id: string; selection_id: string; unit_id: string } =>
         row.id != null && row.selection_id != null && row.unit_id != null,
