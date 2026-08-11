@@ -95,30 +95,51 @@ column list _are_ the boundary, so a careless column crosses it silently.
 This table IS the contract. A column here can't be renamed or dropped without
 checking every tool in its row. Keep it current.
 
-| Tool            | Reads                                                                                                        |
-| --------------- | ------------------------------------------------------------------------------------------------------------ |
-| Bills           | `po_facts`, `po_billing_totals`                                                                              |
-| Budgets         | `selections`, `selection_lines`, `spaces`                                                                    |
-| Indents         | `approved_budgets(_lines)`, `construction_budgets(_lines)`, `selections`, `selection_lines`, `po_line_facts` |
-| Purchase Orders | `indents`, `indent_lines`, `goods_receipts(_lines)`, `po_billing_totals`                                     |
-| Inventory       | `po_facts`, `po_line_facts`                                                                                  |
-| Selections      | `indents`, `indent_lines`, `po_line_facts`                                                                   |
-| Masters         | `po_facts`, `bill_facts`, `approved_budgets`, `indents`, `selections`, `selection_lines`                     |
-| Overview        | `indents`, `indent_lines`, `po_facts`, `bill_facts`, `goods_receipts` (counts only)                          |
+| Tool             | Reads                                                                                                        |
+| ---------------- | ------------------------------------------------------------------------------------------------------------ |
+| Bills            | `po_facts`, `po_billing_totals`                                                                              |
+| Budgets          | `selections`, `selection_lines`, `spaces`                                                                    |
+| Indents          | `approved_budgets(_lines)`, `construction_budgets(_lines)`, `selections`, `selection_lines`, `po_line_facts` |
+| Purchase Orders  | `indents`, `indent_lines`, `goods_receipts(_lines)`, `po_billing_totals`                                     |
+| Inventory        | `po_facts`, `po_line_facts`                                                                                  |
+| Selections       | `indents`, `indent_lines`, `po_line_facts`                                                                   |
+| Masters          | `po_facts`, `bill_facts`, `approved_budgets`, `indents`, `selections`, `selection_lines`                     |
+| Overview         | `indents`, `indent_lines`, `po_facts`, `bill_facts`, `goods_receipts` (counts only)                          |
+| Client Relations | `pusher_chain_state`, `selections`                                                                           |
 
 Relay reads only shared `projects`/`units`/`profiles`; Business Planning reads
-nothing. Masters, `profiles` and `items` are shared, not another tool's.
+nothing. Client Relations also reads the shared
+`units`/`plots`/`projects`/`clients`/`profiles`. Masters, `profiles` and
+`items` are shared, not another tool's.
+
+`pusher_chain_state` has now been redefined five times (see `0042`'s warning)
+and has a consumer outside Relay. A sixth definition must check Client
+Relations too.
 
 Everything above is a `SELECT`: **no tool's code writes another tool's table.**
-Two documented exceptions: **`indent_approvers`/`bill_approvers` are
-Settings-owned** despite living in Indents'/Bills' migrations (both
-admin-gated; deciding who approves is Settings' job); and **one cross-tool
-write, a trigger** (`0045`) — creating a project in Masters fires
-`projects_seed_schedule`, writing Relay's `project_stages` and
-`pusher_project_plans`. It's declared by _Relay's_ migration so the coupling
-points the right way, and is `security definer` because the creator holds
-`/masters`, not `/relay`. A cross-tool trigger not listed here is what nobody
-finds until it misfires.
+Three documented exceptions:
+
+1. **`indent_approvers`/`bill_approvers` are Settings-owned** despite living in
+   Indents'/Bills' migrations (both admin-gated; deciding who approves is
+   Settings' job).
+2. **A cross-tool trigger, `projects_seed_schedule`** (`0045`) — creating a
+   project in Masters writes Relay's `project_stages` and
+   `pusher_project_plans`. Declared by _Relay's_ migration so the coupling
+   points the right way, `security definer` because the creator holds
+   `/masters`, not `/relay`.
+3. **Client Relations writing Masters** (`0050`, `0051`) — three pieces.
+   `clients` gains extra INSERT/UPDATE policies for `/client-relations`
+   (permissive policies OR together; Masters keeps what it had).
+   `crm_assign_unit`/`crm_release_unit` are `security definer` functions
+   touching only `units.client_id` and `units.status`, because an UPDATE
+   policy on `units` cannot be narrowed to two columns. And
+   `units_seed_engagement` is a second cross-tool trigger: a unit created in
+   Masters gets its CRM record and nine-rung payment schedule. **Each
+   `security definer` function checks `has_app('/client-relations')` in its
+   own body — that check is the entire permission boundary.**
+
+A cross-tool trigger or definer function not listed here is what nobody finds
+until it misfires.
 
 ## Reads
 

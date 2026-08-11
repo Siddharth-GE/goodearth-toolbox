@@ -298,7 +298,11 @@ warm (a platform setting, not a code change) is the single biggest lever.
 After that, moving the greeting `<h1>` above the auth await so the shell
 paints before the profile query resolves.
 
-### PERF-02 · MEDIUM · Five missing indexes — preventative, not the cause
+### PERF-02 · ~~MEDIUM~~ CLOSED · Five missing indexes — preventative, not the cause
+
+**Closed 2026-08-11.** Migration `0049` applied ahead of `0050`, and all five
+indexes verified present in production. The finding below stands as written —
+it changed nothing measurable, which was always the point.
 
 `indents.created_at`, `indent_lines.created_at`, `purchase_orders.issued_at`,
 `bills.created_at`, `bills.paid_at` are all filtered by the thirteen
@@ -444,7 +448,7 @@ Five commits, each verified:
 | 1   | `51e0154` | Deleted the unused browser Supabase client — the one easy way client-side DB access could return              |
 | 2   | `b612415` | Error checks on the two reads whose silent failure looked like good news (QUAL-01)                            |
 | 3   | `d105596` | PO screen filters GST rates in the database; dead export retired (QUAL-02)                                    |
-| 4   | `f5fda05` | Migration `0049` — five Overview indexes, **committed but not applied** (PERF-02)                             |
+| 4   | `f5fda05` | Migration `0049` — five Overview indexes. **Applied 2026-08-11** ahead of `0050`; PERF-02 closed.             |
 | 5   | —         | Documentation consolidated: CLAUDE.md, STATUS.md, TODO.md rewritten; README.md, PRODUCT.md, AGENTS.md removed |
 
 Nothing above changes behaviour, except that two previously-silent failures
