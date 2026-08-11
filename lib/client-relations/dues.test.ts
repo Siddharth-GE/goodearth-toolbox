@@ -5,15 +5,42 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { allocateReceipts, summariseDues, type MilestoneInput, type ReceiptInput } from "./dues";
+import {
+  allocateReceipts,
+  combineSummaries,
+  summariseDues,
+  type MilestoneInput,
+  type ReceiptInput,
+} from "./dues";
 
 const TODAY = "2026-08-11";
 
 const schedule = (over: Partial<MilestoneInput>[] = []): MilestoneInput[] =>
   [
-    { id: "m1", stage: "plot", sortOrder: 10, dueAmount: 1000, dueOn: "2026-01-01", invoicedOn: "2026-01-01" },
-    { id: "m2", stage: "booking", sortOrder: 20, dueAmount: 2000, dueOn: "2026-12-01", invoicedOn: null },
-    { id: "m3", stage: "foundation", sortOrder: 30, dueAmount: null, dueOn: null, invoicedOn: null },
+    {
+      id: "m1",
+      stage: "plot",
+      sortOrder: 10,
+      dueAmount: 1000,
+      dueOn: "2026-01-01",
+      invoicedOn: "2026-01-01",
+    },
+    {
+      id: "m2",
+      stage: "booking",
+      sortOrder: 20,
+      dueAmount: 2000,
+      dueOn: "2026-12-01",
+      invoicedOn: null,
+    },
+    {
+      id: "m3",
+      stage: "foundation",
+      sortOrder: 30,
+      dueAmount: null,
+      dueOn: null,
+      invoicedOn: null,
+    },
   ].map((row, i) => ({ ...row, ...(over[i] ?? {}) })) as MilestoneInput[];
 
 const receipt = (over: Partial<ReceiptInput>): ReceiptInput => ({
@@ -47,11 +74,7 @@ test("a directly allocated receipt settles its own milestone only", () => {
 });
 
 test("an unallocated receipt spills across milestones, oldest rung first", () => {
-  const rows = allocateReceipts(
-    schedule(),
-    [receipt({ id: "r1", amount: 1500 })],
-    TODAY,
-  );
+  const rows = allocateReceipts(schedule(), [receipt({ id: "r1", amount: 1500 })], TODAY);
   assert.equal(rows[0].received, 1000, "fills the first rung");
   assert.equal(rows[0].isSettled, true);
   assert.equal(rows[1].received, 500, "spills the remainder into the second");
@@ -75,11 +98,7 @@ test("a past due date with money outstanding is overdue; a future one is not", (
 });
 
 test("a milestone due exactly today is not yet late", () => {
-  const rows = allocateReceipts(
-    schedule([{ dueOn: TODAY }]),
-    [],
-    TODAY,
-  );
+  const rows = allocateReceipts(schedule([{ dueOn: TODAY }]), [], TODAY);
   assert.equal(rows[0].isOverdue, false);
 });
 
@@ -125,10 +144,7 @@ test("overpayment floors outstanding at zero and is reported separately", () => 
 test("received counts every receipt, including ones not yet filed against a rung", () => {
   const summary = summariseDues(
     schedule(),
-    [
-      receipt({ id: "r1", milestoneId: "m1", amount: 1000 }),
-      receipt({ id: "r2", amount: 250 }),
-    ],
+    [receipt({ id: "r1", milestoneId: "m1", amount: 1000 }), receipt({ id: "r2", amount: 250 })],
     TODAY,
   );
   assert.equal(summary.received, 1250);
@@ -152,6 +168,81 @@ test("rows come back in schedule order however they were handed in", () => {
     rows.map((r) => r.stage),
     ["plot", "booking", "foundation"],
   );
+});
+
+// -------------------------------------------------------------------
+// Rolling several plots together
+// -------------------------------------------------------------------
+
+test("combining summaries adds the money and keeps the soonest due date", () => {
+  const villa17 = summariseDues(schedule(), [], TODAY);
+  const villa39 = summariseDues(
+    schedule([{ id: "x1", dueAmount: 500, dueOn: "2026-09-01" }, { dueOn: null }]),
+    [],
+    TODAY,
+  );
+
+  const total = combineSummaries([villa17, villa39]);
+  assert.equal(total.scheduled, villa17.scheduled + villa39.scheduled);
+  assert.equal(total.received, villa17.received + villa39.received);
+  assert.equal(total.overdue, villa17.overdue + villa39.overdue);
+  assert.equal(total.overdueCount, villa17.overdueCount + villa39.overdueCount);
+  // Villa 17's plot rung fell due in January; villa 39's earliest is
+  // September. The soonest across both wins, not the first in the list.
+  assert.equal(villa39.nextDueOn, "2026-09-01");
+  assert.equal(total.nextDueOn, "2026-01-01");
+});
+
+test("combining an empty set is all zeroes rather than a crash", () => {
+  const total = combineSummaries([]);
+  assert.equal(total.scheduled, 0);
+  assert.equal(total.outstanding, 0);
+  assert.equal(total.nextDueOn, null);
+});
+
+/**
+ * The bug this pins: rolling up by MERGING two plots' milestones and
+ * receipts lets an unallocated receipt on one villa settle the other
+ * villa's instalment. Each plot is its own ledger; only the answers add.
+ */
+test("one villa's unallocated payment never settles another villa's instalment", () => {
+  // Villa 17 owes on a rung that is not due yet.
+  const villa17: MilestoneInput[] = [
+    {
+      id: "a1",
+      stage: "booking",
+      sortOrder: 20,
+      dueAmount: 1000,
+      dueOn: "2026-12-01",
+      invoicedOn: null,
+    },
+  ];
+  // Villa 39 owes on a rung that is already late.
+  const villa39: MilestoneInput[] = [
+    {
+      id: "b1",
+      stage: "plot",
+      sortOrder: 10,
+      dueAmount: 1000,
+      dueOn: "2026-01-01",
+      invoicedOn: null,
+    },
+  ];
+  // The money arrived against VILLA 17, and nobody has filed it yet.
+  const paid = [receipt({ id: "r1", amount: 1000 })];
+
+  const correct = combineSummaries([
+    summariseDues(villa17, paid, TODAY),
+    summariseDues(villa39, [], TODAY),
+  ]);
+  assert.equal(correct.overdue, 1000, "villa 39 is still late — that money was not theirs");
+  assert.equal(correct.overdueCount, 1);
+
+  // Merging the inputs sorts villa 39's older rung to the front, so villa
+  // 17's payment settles it and the late plot vanishes off the dues board.
+  const wrong = summariseDues([...villa17, ...villa39], paid, TODAY);
+  assert.equal(wrong.overdue, 0, "the bug: villa 39 looks paid");
+  assert.notEqual(wrong.overdue, correct.overdue, "which is exactly why merging is refused");
 });
 
 test("a rounding-sized shortfall counts as settled, not as a due of half a paisa", () => {

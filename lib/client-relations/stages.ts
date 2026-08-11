@@ -123,9 +123,7 @@ export function normaliseBottlenecks(raw: readonly string[]): Bottleneck[] {
   for (const value of raw) {
     if (BOTTLENECK_ORDER.has(value as Bottleneck)) seen.add(value as Bottleneck);
   }
-  return [...seen].sort(
-    (a, b) => (BOTTLENECK_ORDER.get(a) ?? 0) - (BOTTLENECK_ORDER.get(b) ?? 0),
-  );
+  return [...seen].sort((a, b) => (BOTTLENECK_ORDER.get(a) ?? 0) - (BOTTLENECK_ORDER.get(b) ?? 0));
 }
 
 // ---------------------------------------------------------------------

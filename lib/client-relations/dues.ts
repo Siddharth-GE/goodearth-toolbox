@@ -132,10 +132,7 @@ export function summariseDues(
   const rows = allocateReceipts(milestones, receipts, today);
 
   const scheduled = rows.reduce((sum, row) => sum + (row.dueAmount ?? 0), 0);
-  const invoiced = rows.reduce(
-    (sum, row) => sum + (row.invoicedOn ? (row.dueAmount ?? 0) : 0),
-    0,
-  );
+  const invoiced = rows.reduce((sum, row) => sum + (row.invoicedOn ? (row.dueAmount ?? 0) : 0), 0);
   // Every receipt, not just the allocated ones: money in the bank is money
   // in the bank whether or not it has been filed against a rung yet.
   const received = receipts.reduce((sum, receipt) => sum + receipt.amount, 0);
@@ -157,6 +154,54 @@ export function summariseDues(
     overpaid: Math.max(0, received - scheduled),
     nextDueOn: nextDue?.dueOn ?? null,
     nextDueAmount: nextDue?.outstanding ?? null,
+  };
+}
+
+/**
+ * Add up summaries that were each worked out on their own.
+ *
+ * THIS IS NOT THE SAME as merging every plot's milestones and receipts
+ * into one list and summarising that, and the difference is a real bug
+ * rather than a nicety: an unallocated receipt spills into the oldest
+ * unpaid rung it can find, so a merged run would let money received
+ * against Villa 17 quietly settle Villa 39's foundation instalment. Each
+ * plot's schedule is its own ledger. Roll up the answers, never the inputs.
+ */
+export function combineSummaries(summaries: readonly DuesSummary[]): DuesSummary {
+  const total = summaries.reduce(
+    (acc, one) => ({
+      scheduled: acc.scheduled + one.scheduled,
+      invoiced: acc.invoiced + one.invoiced,
+      received: acc.received + one.received,
+      outstanding: acc.outstanding + one.outstanding,
+      overdue: acc.overdue + one.overdue,
+      overdueCount: acc.overdueCount + one.overdueCount,
+      overpaid: acc.overpaid + one.overpaid,
+      nextDueOn: null,
+      nextDueAmount: null,
+    }),
+    {
+      scheduled: 0,
+      invoiced: 0,
+      received: 0,
+      outstanding: 0,
+      overdue: 0,
+      overdueCount: 0,
+      overpaid: 0,
+      nextDueOn: null,
+      nextDueAmount: null,
+    } as DuesSummary,
+  );
+
+  // The soonest date anyone owes anything, and what is owed on that date.
+  const next = summaries
+    .filter((one): one is DuesSummary & { nextDueOn: string } => one.nextDueOn !== null)
+    .sort((a, b) => a.nextDueOn.localeCompare(b.nextDueOn))[0];
+
+  return {
+    ...total,
+    nextDueOn: next?.nextDueOn ?? null,
+    nextDueAmount: next?.nextDueAmount ?? null,
   };
 }
 

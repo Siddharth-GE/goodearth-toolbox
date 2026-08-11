@@ -4579,6 +4579,7 @@ export type Database = {
         Args: { p_client_id: string; p_status: string; p_unit_id: string }
         Returns: undefined
       }
+      crm_release_unit: { Args: { p_unit_id: string }; Returns: undefined }
       delete_draft_indent: { Args: { p_indent_id: string }; Returns: undefined }
       delete_draft_purchase_order: {
         Args: { p_po_id: string }
