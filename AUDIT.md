@@ -10,6 +10,10 @@ Marathon kiosk's admin PIN is still the seeded default `2026`, published in
 plaintext in a public GitHub repository. That needs ten minutes today. See
 SEC-01.
 
+> **Update, evening of 2026-08-11:** the admin PIN has been rotated and
+> verified. Two agent accounts remain on the published test PIN `1234` —
+> SEC-01 carries the correction and `TODO.md` §1 the remaining steps.
+
 The architecture itself held up better than expected. The line chain is
 anchored on real foreign keys at every hop, every table has row-level
 security, every server action and route handler checks permission, and no
@@ -140,7 +144,22 @@ Everything else is data-empty degradation, which is the design working.
 
 ## 2. Security
 
-### SEC-01 · CRITICAL · The Marathon admin PIN is the published default, live right now
+### SEC-01 · CRITICAL · PARTLY RESOLVED 2026-08-11 · The Marathon PINs are published defaults
+
+> **Admin PIN: closed.** Rotated by the founder on the evening of
+> 2026-08-11 and verified against production — `2026` no longer matches
+> the stored hash, `marathon_config.updated_at` is 09:10 UTC that day.
+>
+> **Agent PINs: still open**, and the table below was wrong about them.
+> The same verification found **Ravi and yema still on the published test
+> PIN `1234`**, and "Test Agent" still present (its own PIN since reset).
+> The audit recorded all four real agents as having rotated PINs; that was
+> not checked against the hashes at the time, only assumed. See `TODO.md`
+> §1. An agent reaches entry capture, not the admin panel, so the exposure
+> is narrower than what follows — but it is the same published default.
+>
+> The rest of this finding is left as written, because the reasoning about
+> why rotation is the only remedy still stands.
 
 `supabase/migrations/0002_marathon.sql:154-170`, in a **public** repository:
 
@@ -158,11 +177,11 @@ state the plaintext. No cracking required, just reading.
 
 **I checked production. Both are still live:**
 
-| Check                                                          | Result                   |
-| -------------------------------------------------------------- | ------------------------ |
-| `marathon_config` admin PIN still the seeded hash **and** salt | **yes**                  |
-| "Test Agent" row still present with the seeded PIN `1234`      | **yes**                  |
-| Real agents added since (Mathew, Ravi, rega, yema)             | 4, all with rotated PINs |
+| Check                                                          | Result                                             |
+| -------------------------------------------------------------- | -------------------------------------------------- |
+| `marathon_config` admin PIN still the seeded hash **and** salt | ~~yes~~ **rotated 2026-08-11**                     |
+| "Test Agent" row still present with the seeded PIN `1234`      | row still there; its PIN reset                     |
+| Real agents added since (Mathew, Ravi, rega, yema)             | ~~4, all rotated~~ **Ravi and yema are on `1234`** |
 
 So the migration's own instruction — "delete this row once real field agents
 are added" — was never carried out, and the admin PIN was never changed.
@@ -460,7 +479,7 @@ Ranked by what I'd do first.
 
 | #   | Item                                                                                                                                                                                                                | Why it's yours                                                                                         |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| 1   | **SEC-01 — rotate the Marathon admin PIN and delete "Test Agent". Today.**                                                                                                                                          | A live production credential. Ten minutes in the running app; I can't and shouldn't do it for you.     |
+| 1   | ~~SEC-01 admin PIN~~ **done 2026-08-11.** What is left: **reset Ravi's and yema's PINs (both `1234`) and delete "Test Agent".**                                                                                     | Live production credentials. Minutes in the running app; I can't and shouldn't do it for you.          |
 | 2   | **PERF-01 — cold starts.** Enable Fluid compute / keep-warm on Vercel, then re-measure.                                                                                                                             | A billing and platform decision. Biggest single lever on the slow first load.                          |
 | 3   | **MOD-01 — untangle the Budgets → Selections import.** Either move `listSpaceViews`/`downloadSpaceView` into a shared surface (`lib/masters/` or a new `lib/space-views/`), or have Budgets read the bucket itself. | Moves code between tools; the brief says not to without asking. First option is cleaner and ~20 lines. |
 | 4   | **SEC-02 — CI check pinning the money-free views' column lists.**                                                                                                                                                   | Needs a decision on where the authoritative list lives.                                                |

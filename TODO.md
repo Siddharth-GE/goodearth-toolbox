@@ -3,20 +3,26 @@
 Read `STATUS.md` first. Anything finished moves to `STATUS.md`, not struck
 through here. Audit findings are in `AUDIT.md` with full reasoning.
 
-## 1. Do today — the Marathon PINs are live defaults
+## 1. Do today — two Marathon agents are on the published PIN
 
-`AUDIT.md` SEC-01. The kiosk admin PIN is still the seeded `2026`, and its
-plaintext sits in a comment in a **public** GitHub repo
-(`supabase/migrations/0002_marathon.sql:154`). Verified still live in
-production on 2026-08-11. Anyone who reads the repo can open
-`/marathon/admin` and see every runner's name, mobile, age and gender.
+**The admin PIN is done.** Rotated by the founder on 2026-08-11; verified
+against production the same evening — `2026` no longer matches the stored
+hash, and `marathon_config.updated_at` is 09:10 UTC that day. `AUDIT.md`
+SEC-01's headline is closed.
 
-In the running app, no deploy needed:
+What the same check turned up, and what is left:
 
-1. `/marathon/admin` → sign in with `2026` → **Change admin PIN**.
-2. Delete the seeded **"Test Agent"** member (PIN `1234`, still present; the
-   migration said to delete it once real agents existed — four now do).
-3. Decide whether the runner list needs telling.
+1. **Two active agents still have PIN `1234`** — Ravi and yema. That is the
+   seeded test PIN, in plaintext in a **public** repo
+   (`supabase/migrations/0002_marathon.sql:151`), and the first PIN anyone
+   guesses. `/marathon/admin` → Members → **Reset PIN** on both.
+2. **"Test Agent" is still on the list** (5 agents). Its PIN has been reset,
+   so it is no longer the published one, but the migration's instruction was
+   to delete the row once real agents existed. Delete it.
+
+Smaller than the admin hole — an agent reaches entry capture, not the admin
+panel and not the full runner list — but it is the same shape: a published
+default, still live. Both are fixes in the running app, no deploy needed.
 
 Rewriting the migration would fix nothing — it is in public git history
 permanently, and editing an applied migration breaks the additive-only rule.
