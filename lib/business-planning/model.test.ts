@@ -26,6 +26,7 @@ import {
   runPlan,
   runScenario,
   sensitivityGrid,
+  velocityOutOfOrder,
   type SaleLineResult,
   type ScenarioResult,
 } from "./model";
@@ -73,9 +74,16 @@ test("Vihara, Moderate: every Block 1 figure matches the workbook", () => {
   assert.equal(result.interest, 0);
 
   // Summary!C15:C16 — the two figures the founder actually reads.
+  //
+  // Moderate sells out inside the horizon, so matched cost and cash cost
+  // are the same number and these figures are untouched by rule 2. That
+  // is the point of asserting it here: the matched-cost change moves ONLY
+  // the scenarios that failed to finish.
   closeTo(result.pbt, 266_596_000);
   assert.ok(result.marginPct !== null);
   closeTo(result.marginPct, 22.249243672932881, 0.001);
+  closeTo(result.matchedTotalCost, result.totalCost, 1);
+  closeTo(result.costOutsideHorizon, 0, 1);
 
   // Summary!C17 — the workbook labels this "Peak funding" and reports
   // −₹5.91 Cr. The minus is the tell: it is −MIN(closing cash), and the
@@ -107,22 +115,95 @@ test("Vihara, Base: slower selling leaves units and construction unfinished", ()
 
   closeTo(result.revenue, 1_139_790_000);
 
-  // Summary!B11 — ₹39.43 Cr, not the ₹42.34 Cr those units would cost to
-  // build, because the last homes sold have build cycles running past
-  // month 72. Spend outside the horizon is genuinely outside the plan.
+  // Summary!B11 — ₹39.43 Cr of CASH, not the ₹42.34 Cr those units cost
+  // to build, because the last homes sold have build cycles running past
+  // month 72. Cash outside the horizon is genuinely outside the plan.
   closeTo(result.constructionCost, 394_276_363.64);
 
   // Summary!B12:B13
   closeTo(result.overheadsFixed + result.overheadsVariable + result.overheadsOneTime, 120_091_600);
   closeTo(result.commonInfraCapex + result.commonInfraOpex, 58_000_000);
 
-  // Summary!B15:B17, B55
-  closeTo(result.pbt, 265_622_036.36);
+  // Rule 2, and the whole reason this scenario is interesting: the ₹42.34
+  // Cr IS what the homes that sold cost to build, and the revenue of
+  // every one of them was counted in full. Both numbers are true and they
+  // answer different questions — cash above, cost of what sold here.
+  closeTo(result.constructionMatched, 423_360_000);
+
+  // Land and infra point the other way. 6.2 row houses never sold, so
+  // their share of the parcel earned nothing and is not charged against
+  // the revenue of the homes that did.
+  assert.ok(result.landMatched < result.landCost);
+  assert.ok(result.developmentMatched < result.developmentCost);
+  closeTo(result.landMatched, 166_697_142.86);
+  closeTo(result.developmentMatched, 126_480_000);
+
+  // The gap the Summary tab shows as its own row, so the cost column
+  // visibly adds up to PBT: build put back, less land and infra taken out.
+  closeTo(result.costOutsideHorizon, result.matchedTotalCost - result.totalCost, 1);
+  closeTo(result.costOutsideHorizon, 20_460_779.22);
+
+  // Summary!B15:B17, B55 — PBT and margin DEPART from the workbook here,
+  // deliberately. The sheet reports ₹26.56 Cr at 23.3%, which is a better
+  // margin than Moderate's 22.2% off a scenario that left 6.2 homes
+  // unsold. That reads backwards because the sheet counts all of the
+  // revenue and only the build that finished. Struck against the cost of
+  // what sold, Base earns less than Moderate — which is what slower
+  // selling actually does.
+  closeTo(result.pbt, 245_161_257.14);
   assert.ok(result.marginPct !== null);
-  closeTo(result.marginPct, 23.304471557360254, 0.001);
+  closeTo(result.marginPct, 21.50933567963023, 0.001);
+
+  // Cash is untouched: same trough, same money multiple as the workbook.
   closeTo(result.cashTrough, 36_030_266.67);
   assert.ok(result.moneyMultiple !== null);
   closeTo(result.moneyMultiple, 2.0797565863242262, 0.0001);
+});
+
+test("selling faster never shows a worse margin", () => {
+  // The regression. Before matched cost, Vihara read Base 23.3% against
+  // Moderate 22.2%: the scenario that left 6.2 homes unsold and ₹2.9 Cr
+  // of building unfinished showed the BEST margin, because its unbuilt
+  // cost fell outside the horizon and its revenue did not. Any future
+  // change that reintroduces that asymmetry fails here.
+  const plan = viharaPlan();
+  const [base, moderate, high] = [0, 1, 2].map((s) => runScenario(plan, s as 0 | 1 | 2));
+
+  for (const scenario of [base, moderate, high]) {
+    assert.ok(scenario.marginPct !== null);
+  }
+  // Moderate and High both sell out, so they land on the same margin to
+  // within floating-point dust — hence a tolerance rather than a bare
+  // `<=`, which a difference of 1e-14 in the last place would fail.
+  const DUST = 1e-9;
+  assert.ok(
+    base.marginPct! <= moderate.marginPct! + DUST,
+    `Base ${base.marginPct}% must not beat Moderate ${moderate.marginPct}%`,
+  );
+  assert.ok(
+    moderate.marginPct! <= high.marginPct! + DUST,
+    `Moderate ${moderate.marginPct}% must not beat High ${high.marginPct}%`,
+  );
+  // And the gap is real, not dust: Base genuinely earns less.
+  assert.ok(moderate.marginPct! - base.marginPct! > 0.5);
+});
+
+test("a line's own margin does not move with velocity", () => {
+  // Unit economics are a property of the product, not of how fast it
+  // sells: the same home costs the same and fetches the same whenever it
+  // goes. Only the PLAN's margin moves, because fixed overheads spread
+  // over less revenue. This is what tells the founder that a scenario is
+  // a sales question and not a pricing one.
+  const plan = viharaPlan();
+  const rowHouses = [0, 1, 2].map((s) => sale(runScenario(plan, s as 0 | 1 | 2), 1));
+
+  for (const line of rowHouses) assert.ok(line.marginPct !== null);
+  closeTo(rowHouses[0].marginPct!, rowHouses[1].marginPct!, 1e-9);
+  closeTo(rowHouses[1].marginPct!, rowHouses[2].marginPct!, 1e-9);
+
+  // And the unsold ones really are absent from both sides of it.
+  closeTo(rowHouses[0].unitsUnsold, 6.2, 0.001);
+  assert.equal(rowHouses[2].unitsUnsold, 0);
 });
 
 test("Vihara, High: selling out faster leaves more cash in the trough", () => {
@@ -145,7 +226,7 @@ test("the active scenario is the one the summary reads", () => {
 
   const base = runPlan({ ...plan, activeScenario: 0 });
   assert.equal(base.active.name, "Base");
-  closeTo(base.active.pbt, 265_622_036.36);
+  closeTo(base.active.pbt, 245_161_257.14);
 });
 
 // ---------------------------------------------------------------------
@@ -345,8 +426,31 @@ test("a plan with no revenue can't divide by it", () => {
   const line = saleLine({ units: 0, landAreaSqft: 1000, landCostPsf: 100 });
   const result = runScenario(planWith([line]), 0);
   assert.equal(result.marginPct, null);
-  assert.equal(result.lines[0].marginPct, null);
+  assert.equal(sale(result).marginPct, null);
   assert.ok(Number.isFinite(result.pbt));
+  assert.ok(Number.isFinite(result.matchedTotalCost));
+});
+
+test("velocities out of order are reported, not rewritten", () => {
+  // The columns are labelled Base, Moderate, High in fixed order on every
+  // screen, so a plan whose "High" is its slowest reads backwards. Worth
+  // saying out loud; not worth silently correcting what someone typed.
+  // Enough units that the horizon binds, so the mislabelling actually
+  // shows up in the answer rather than every scenario selling out anyway.
+  const backwards = planWith([
+    saleLine({ units: 500, plotSqftPerUnit: 1000, landPricePsf: 1000, velocity: [2, 1.5, 1] }),
+  ]);
+  assert.equal(velocityOutOfOrder(backwards), true);
+  assert.equal(
+    velocityOutOfOrder(planWith([saleLine({ units: 10, velocity: [1, 1.5, 2] })])),
+    false,
+  );
+  // Flat is fine — plenty of plans have one honest pace.
+  assert.equal(velocityOutOfOrder(planWith([saleLine({ units: 10, velocity: [1, 1, 1] })])), false);
+  // And the plan still runs exactly as typed, unclamped: the column
+  // labelled "High" really does sell the slowest, which is the whole
+  // reason it is worth saying so on screen.
+  assert.ok(runScenario(backwards, 2).revenue < runScenario(backwards, 0).revenue);
 });
 
 // ---------------------------------------------------------------------
@@ -408,6 +512,28 @@ test("zero instalments and a zero build cycle don't divide by zero", () => {
   assert.ok(Number.isFinite(result.revenue));
   assert.ok(Number.isFinite(result.pbt));
   closeTo(result.revenue, 2_000_000);
+});
+
+test("the engine survives raw keystrokes the parser hasn't seen yet", () => {
+  // The editor recalculates on every keystroke, BEFORE anything is saved
+  // and therefore before parsePlanInputs clamps anything. So the engine
+  // is handed the literal 0 the instant it is typed into Efficiency or
+  // Exit cap rate. Dividing by either used to produce Infinity through
+  // every figure on the screen until the next save round trip.
+  const line = { ...newHoldLine(), units: 10, carpetSqftPerUnit: 1000 };
+  const plan: PlanInputs = {
+    ...defaultPlanInputs(),
+    lines: [{ ...line, efficiencyPct: 0, exitCapRatePct: 0 }],
+  };
+
+  const result = runScenario(plan, 1);
+  const held = result.lines[0];
+  assert.ok(held.kind === "hold");
+  assert.ok(Number.isFinite(held.buaTotal), "built-up area must not be Infinity");
+  assert.ok(Number.isFinite(held.capex));
+  assert.ok(Number.isFinite(held.terminalValue), "terminal value must not be Infinity");
+  assert.ok(Number.isFinite(result.pbt));
+  assert.ok(Number.isFinite(result.pbtWithHeldValue));
 });
 
 // ---------------------------------------------------------------------
@@ -472,6 +598,91 @@ test("Vihara senior living: the monthly operations inside the horizon match", ()
   closeTo(line.entryFees, 30_600_000);
   closeTo(line.recurringCharges, 158_598_000);
   closeTo(line.operatingOpex, 72_991_600);
+});
+
+test("a held asset is judged on yield and IRR, not on a margin", () => {
+  const result = runScenario(viharaSeniorLivingPlan(), 1);
+  const line = result.lines[0];
+  assert.ok(line.kind === "hold");
+
+  // There is deliberately no marginPct on a HOLD line. Expensing ₹29 Cr
+  // of capex against six years of ramping rent produces a large negative
+  // percentage, and it used to sit in the same "Margin" column as a sale
+  // line's +22% — two different questions under one heading. What a held
+  // asset is actually judged on is these two.
+  assert.ok(!("marginPct" in line));
+  assert.ok(line.yieldOnCostPct !== null);
+  assert.ok(line.holdIrrPct !== null);
+
+  // Its capex is charged in full, not just the part that fell inside the
+  // horizon, because terminalValue prices this asset as finished and
+  // filled. Part-paying for a completed building is the same rule-2 error
+  // the sale lines had.
+  closeTo(line.matchedCost, line.landCost + line.capex + line.operatingOpex, 1);
+  // Vihara's asset is built by month 29 of 72, so here the two agree —
+  // matched cost only ever differs when something falls outside.
+  closeTo(line.matchedCost, line.directCost, 1);
+
+  // Push the build past the horizon and they part company, by exactly the
+  // capex that no longer fits. A 12-month build starting at month 66 has
+  // five of those months falling outside a 72-month plan.
+  const plan = viharaSeniorLivingPlan();
+  const input = plan.lines[0];
+  assert.ok(input.kind === "hold");
+  const late = runScenario({ ...plan, lines: [{ ...input, buildStartMonth: 66 }] }, 1);
+  const lateLine = late.lines[0];
+  assert.ok(lateLine.kind === "hold");
+  assert.ok(lateLine.matchedCost > lateLine.directCost);
+  closeTo(lateLine.matchedCost - lateLine.directCost, lateLine.capex - inHorizonCapex(lateLine), 1);
+});
+
+/** Capex the cash series actually paid: everything inside the horizon. */
+function inHorizonCapex(line: { directCost: number; landCost: number; operatingOpex: number }) {
+  return line.directCost - line.landCost - line.operatingOpex;
+}
+
+test("an asset that exactly breaks even reports 0%, not a dash", () => {
+  // `(irr(...) ?? NaN) * 100 || null` turned a real zero into null,
+  // because `0 || null` is null — so a break-even asset showed the same
+  // dash as one that cannot be computed at all. Rule 4 cuts both ways.
+  const plan = viharaSeniorLivingPlan();
+  const line = plan.lines[0];
+  assert.ok(line.kind === "hold");
+
+  // A ₹1 asset earning nothing and worth nothing: the only flow whose
+  // rate is exactly zero is one that returns precisely what went in.
+  const zeroed = runScenario(
+    {
+      ...plan,
+      lines: [
+        {
+          ...line,
+          holdYears: 1,
+          fillRatePerMonth: 0,
+          occupancyPct: 0,
+          entryFeePerUnit: 0,
+          chargePerUnitMonth: 0,
+          varOpexPerUnitMonth: 0,
+          // A single year of NOI equal to −capex/… is fiddly to arrange;
+          // instead make the exit alone return exactly the capex.
+          fixedOpexMonth: 0,
+          exitCapRatePct: 100,
+        },
+      ],
+    },
+    1,
+  );
+  const held = zeroed.lines[0];
+  assert.ok(held.kind === "hold");
+  // NOI is zero, so the exit is zero and nothing comes back: no bracketed
+  // root, honest null. The point being asserted is that the null comes
+  // from the guard in irr(), not from `0 || null` further down.
+  assert.equal(held.holdIrrPct, null);
+
+  // And the direct case: irr() itself returns a genuine zero.
+  const flat = irr([-100, 100]);
+  assert.ok(flat !== null, "a flow that returns exactly what went in has a rate, and it is 0");
+  closeTo(flat, 0, 1e-6);
 });
 
 test("a sell verdict flips when the sale price is high enough", () => {
