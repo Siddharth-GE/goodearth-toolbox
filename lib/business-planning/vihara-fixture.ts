@@ -47,6 +47,10 @@ const plottedVillas: SaleLine = {
   landPricePsf: 1150,
   housePricePsf: 5500,
   constructionPsf: 3000,
+  // Plotted villas and row houses are built to order — the workbook
+  // spends nothing ahead of a buyer, and neither does this.
+  buildMode: "on-sale" as const,
+  buildStartMonth: 1,
   buildMonths: 22,
   salesStartMonth: 1,
   velocity: [0.8, 1.3, 2],
@@ -68,6 +72,10 @@ const rowHouses: SaleLine = {
   landPricePsf: 1150,
   housePricePsf: 5500,
   constructionPsf: 3000,
+  // Plotted villas and row houses are built to order — the workbook
+  // spends nothing ahead of a buyer, and neither does this.
+  buildMode: "on-sale" as const,
+  buildStartMonth: 1,
   buildMonths: 18,
   salesStartMonth: 1,
   velocity: [0.8, 1.3, 2],

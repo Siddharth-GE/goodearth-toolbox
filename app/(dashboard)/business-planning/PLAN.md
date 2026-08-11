@@ -156,8 +156,62 @@ identical to the rupee); and the senior-living line carries development
 cost only, because the site acquisition already sits on the residential
 lines and charging it twice would double-count ₹13.2 Cr.
 
+## Two businesses, not one — `buildMode`
+
+Added 2026-08-11. The engine originally had exactly one construction
+rule: a unit is built _because it sold_, spread over `buildMonths` from
+its sale month. That is the plotted-development business, and Vihara is
+entirely that. It cannot describe an apartment tower, where the whole
+building goes up on its own calendar and you cannot put up the 14th
+floor to order.
+
+So a SALE line now says which it is:
+
+- **`on-sale`** (default, unchanged) — nothing is spent ahead of a
+  buyer. Collections largely fund the build. `buildMonths` is one unit's
+  cycle.
+- **`scheduled`** — the whole line is built from `buildStartMonth` over
+  `buildMonths`, sold or not. Every rupee is carried until a buyer turns
+  up.
+
+The second one is where the money actually goes. A 100-flat tower, built
+months 1–30, selling from month 6, **zero equity at 15%**:
+
+| Sold at | Interest  | Peak funding | Unsold stock | PBT       | Margin |
+| ------- | --------- | ------------ | ------------ | --------- | ------ |
+| 1/mo    | ₹30.42 Cr | ₹44.97 Cr    | ₹11.88 Cr    | −₹4.96 Cr | −8.8%  |
+| 1.5/mo  | ₹19.54 Cr | ₹38.24 Cr    | —            | ₹18.46 Cr | 22.0%  |
+| 2.3/mo  | ₹11.15 Cr | ₹27.61 Cr    | —            | ₹26.85 Cr | 32.0%  |
+| 4/mo    | ₹5.51 Cr  | ₹18.66 Cr    | —            | ₹32.49 Cr | 38.7%  |
+
+The same tower at 1/mo built to order instead: **+₹21.78 Cr against
+−₹4.96 Cr**. A ₹26.7 Cr swing from _when_ you build, nothing else.
+
+Note what this does and does not touch:
+
+- **`unsoldStock`** is new on `SaleLineResult`: build cost of units put
+  up but not sold. Always 0 on an `on-sale` line. On a scheduled line it
+  is the whole risk of the mode, and the reason cash spent exceeds cost
+  of sales — those flats are stock, not expense, so `costOutsideHorizon`
+  goes NEGATIVE here. Both directions are correct; read the label.
+- **Zero equity needed no code.** `runCash` already charges interest from
+  the first month the balance is negative, so a cash land payment in
+  month 1 against an empty account starts the meter immediately. What was
+  missing was only that the cashflow never SHOWED the equity, so a plan
+  funded entirely by debt looked the same as one that wasn't.
+  `MonthlySeries.equity` and the "Equity in" row fix that.
+- **Collections still spread over `buildMonths` from each sale.** On a
+  scheduled line that is now the whole building's duration rather than
+  one unit's, which is a fair approximation of a construction-linked
+  payment plan but not the same thing. If pre-launch and
+  post-completion sales ever need different terms, that is the next
+  field, not a tweak to this one.
+
 ## Things that will bite
 
+- **`buildMode` changes what `buildMonths` MEANS** — one unit's cycle on
+  an on-sale line, the whole building on a scheduled one. Any code
+  reading it has to know which mode it is in.
 - **There are two cost totals and they are both right.** Cash on the
   Cashflow tab, matched on the Summary tab, `costOutsideHorizon` naming
   the gap. If a new figure is added, decide which question it answers

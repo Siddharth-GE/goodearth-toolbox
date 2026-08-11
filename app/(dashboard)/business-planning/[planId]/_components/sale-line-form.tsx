@@ -3,6 +3,7 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Figure, ResultPanel } from "@/components/ui/figure";
 import { FieldRow, Section } from "@/components/ui/section";
+import { Select } from "@/components/ui/select";
 import { SCENARIOS, type PlanInputs, type SaleLine } from "@/lib/business-planning/inputs";
 import type { SaleLineResult } from "@/lib/business-planning/model";
 import { formatCrore, formatPercent, formatQuantity } from "@/lib/format";
@@ -39,6 +40,19 @@ export function SaleLineForm({
 }) {
   const triggerId = useId();
   const overrideId = useId();
+  const buildModeId = useId();
+
+  const scheduled = line.buildMode === "scheduled";
+  // At the ACTIVE velocity, roughly when the last unit goes. Only ever a
+  // sanity check against the build calendar, so the arithmetic is the
+  // simple one rather than the engine's launch-trigger-aware version.
+  const activeVelocity = line.velocity[plan.activeScenario];
+  const sellsOutMonth =
+    activeVelocity > 0 && line.units > 0
+      ? line.salesStartMonth + Math.ceil(line.units / activeVelocity) - 1
+      : 0;
+  const buildDoneMonth = line.buildStartMonth + line.buildMonths - 1;
+  const fundingGapMonths = sellsOutMonth > buildDoneMonth ? sellsOutMonth - buildDoneMonth : 0;
 
   const plotArea = line.units * line.plotSqftPerUnit;
   const revenuePerUnit =
@@ -119,13 +133,69 @@ export function SaleLineForm({
             suffix="sqft"
             hint="zero for bare plots"
           />
-          <MonthField
-            label="Build cycle"
-            value={line.buildMonths}
-            onChange={(buildMonths) => onChange({ buildMonths })}
-            hint="per unit, from the month it sells"
-          />
         </FieldRow>
+
+        <div className="border-border bg-surface mt-3 rounded-xl border p-3">
+          <div className="space-y-1">
+            <label htmlFor={buildModeId} className="text-muted block text-xs font-medium">
+              When is it built?
+            </label>
+            <Select
+              id={buildModeId}
+              value={line.buildMode}
+              onChange={(event) =>
+                onChange({
+                  buildMode: event.target.value === "scheduled" ? "scheduled" : "on-sale",
+                })
+              }
+              className="h-9 w-full sm:max-w-xs"
+            >
+              <option value="on-sale">Built to order — one unit at a time, once it sells</option>
+              <option value="scheduled">Built on a schedule — the whole thing, sold or not</option>
+            </Select>
+            <p className="text-muted text-xs">
+              {scheduled
+                ? "An apartment tower: you cannot build the 14th floor to order. Every rupee is carried until a buyer turns up."
+                : "Plots, villas, row houses: nothing is spent ahead of a buyer, so collections largely fund the build."}
+            </p>
+          </div>
+
+          <FieldRow cols={3} className="mt-3">
+            {scheduled ? (
+              <MonthField
+                label="Build starts"
+                value={line.buildStartMonth}
+                onChange={(buildStartMonth) => onChange({ buildStartMonth })}
+                hint={
+                  line.buildStartMonth < line.salesStartMonth
+                    ? `${line.salesStartMonth - line.buildStartMonth} months of building before the first sale`
+                    : "at or after the first sale"
+                }
+              />
+            ) : null}
+            <MonthField
+              label={scheduled ? "Build takes" : "Build cycle"}
+              value={line.buildMonths}
+              onChange={(buildMonths) => onChange({ buildMonths })}
+              hint={
+                scheduled
+                  ? `the whole building — done by month ${line.buildStartMonth + line.buildMonths - 1}`
+                  : "per unit, from the month it sells"
+              }
+            />
+          </FieldRow>
+
+          {scheduled && fundingGapMonths > 0 ? (
+            <p className="text-warning mt-2 flex items-start gap-1.5 text-xs">
+              <AlertTriangle className="mt-px size-3.5 shrink-0" aria-hidden />
+              <span>
+                Building finishes in month {line.buildStartMonth + line.buildMonths - 1} but selling
+                runs to about month {sellsOutMonth}. That is {fundingGapMonths} months of finished,
+                unsold stock to carry — check the interest and peak funding above.
+              </span>
+            </p>
+          ) : null}
+        </div>
 
         <FieldRow cols={3} className="mt-3">
           <NumberField
@@ -346,6 +416,19 @@ function LineOutcome({ result, units }: { result: SaleLineResult; units: number 
           hint="unfunded, on its own"
         />
       </div>
+
+      {/* Only a scheduled line can have this, and when it does it is the
+          whole risk of building ahead of the buyers. */}
+      {result.unsoldStock > 0 ? (
+        <p className="text-warning mt-3 flex items-start gap-1.5 text-xs">
+          <AlertTriangle className="mt-px size-3.5 shrink-0" aria-hidden />
+          <span>
+            <strong>{formatCrore(result.unsoldStock)}</strong> of this is built and unsold at the
+            end of the plan — finished stock the money is already in. It is not counted as a cost
+            above, because it is still yours to sell.
+          </span>
+        </p>
+      ) : null}
     </ResultPanel>
   );
 }

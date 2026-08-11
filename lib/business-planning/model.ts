@@ -96,6 +96,14 @@ export type MonthlySeries = {
   outflow: number[];
   /** collections − outflow. Excludes interest and the equity injection. */
   net: number[];
+  /**
+   * Equity put in, by month. Today that is the whole opening balance in
+   * month 1, and it is a row of its own because a plan run on ZERO
+   * equity — every rupee borrowed, land included — is the normal shape
+   * here, and the cashflow has to show that the money came from
+   * somewhere. Zero throughout means the revolver funded everything.
+   */
+  equity: number[];
   interest: number[];
   /** Balance at the end of the month, after interest. */
   closing: number[];
@@ -148,6 +156,13 @@ export type SaleLineResult = LineResultBase & {
   /** The sold share of land and of development. */
   landMatched: number;
   developmentMatched: number;
+  /**
+   * Build cost of units put up but not sold — finished stock the money
+   * is already in. Always 0 on an "on-sale" line, where nothing is built
+   * without a buyer; on a "scheduled" line it is the whole risk of the
+   * mode, and the reason cash spent exceeds cost of sales.
+   */
+  unsoldStock: number;
   /**
    * Matched profit over revenue, as a percent. Gross — before plan
    * overheads and before interest, which is reported separately because
@@ -318,6 +333,7 @@ function emptySeries(months: number): MonthlySeries {
     commonInfra: zeros(months),
     outflow: zeros(months),
     net: zeros(months),
+    equity: zeros(months),
     interest: zeros(months),
     closing: zeros(months),
     revolver: zeros(months),
@@ -579,11 +595,27 @@ function runSaleLine(
     months,
   );
 
-  const construction = spreadForward(
-    unitsSold.map((units) => units * constructionPerUnit),
-    constructionSchedule(line.buildMonths),
-    months,
-  ).map((value) => value);
+  // The two businesses. On-sale, a unit is built because it sold, so the
+  // spend follows the sales curve and the project largely funds itself.
+  // Scheduled, the whole building goes up on its own calendar whether
+  // anything has sold or not — and every rupee of it is carried until a
+  // buyer turns up. That gap is the entire point of the mode.
+  const construction = zeros(months);
+  if (line.buildMode === "scheduled") {
+    const buildMonths = Math.max(1, Math.round(line.buildMonths));
+    const total = line.units * constructionPerUnit;
+    for (let i = 0; i < buildMonths; i += 1) {
+      const m = line.buildStartMonth - 1 + i;
+      if (m >= 0 && m < months) construction[m] += total / buildMonths;
+    }
+  } else {
+    const spread = spreadForward(
+      unitsSold.map((units) => units * constructionPerUnit),
+      constructionSchedule(line.buildMonths),
+      months,
+    );
+    for (let m = 0; m < months; m += 1) construction[m] = spread[m];
+  }
 
   const land = landSpend(line.landAreaSqft, line.landCostPsf, plan, months);
 
@@ -622,6 +654,8 @@ function runSaleLine(
     commonInfra: zeros(months),
     outflow,
     net,
+    // A line stands alone with no equity behind it — see runCash above.
+    equity: zeros(months),
     interest: cash.interest,
     closing: cash.closing,
     revolver: cash.revolver,
@@ -650,6 +684,16 @@ function runSaleLine(
   const developmentMatched = developmentCost * soldShare;
   const matchedCost = landMatched + developmentMatched + constructionMatched;
 
+  // Built and not sold. On a SCHEDULED line the whole tower goes up
+  // regardless, so unsold flats are finished stock the money is already
+  // sunk into — the "if we don't sell we have a problem" number, and the
+  // reason a scheduled line's cash cost exceeds its cost of sales. On an
+  // on-sale line it is always zero: nothing is built without a buyer.
+  const unsoldStock =
+    line.buildMode === "scheduled"
+      ? Math.max(0, line.units - totalUnitsSold) * constructionPerUnit
+      : 0;
+
   return {
     id: line.id,
     name: line.name,
@@ -663,6 +707,7 @@ function runSaleLine(
     landMatched,
     developmentMatched,
     constructionMatched,
+    unsoldStock,
     directCost,
     grossProfit,
     matchedCost,
@@ -921,6 +966,7 @@ function runHoldLine(
       commonInfra: zeros(months),
       outflow,
       net,
+      equity: zeros(months),
       interest: cash.interest,
       closing: cash.closing,
       revolver: cash.revolver,
@@ -1060,6 +1106,11 @@ export function runScenario(plan: PlanInputs, scenario: ScenarioIndex): Scenario
     monthly.closing[m] = cash.closing[m];
     monthly.revolver[m] = cash.revolver[m];
   }
+  // Where the money came from, as its own row. runCash puts the whole
+  // opening balance in at month 1; on a zero-equity plan this row is
+  // empty all the way across and the revolver funded every rupee,
+  // starting with the land.
+  if (months > 0) monthly.equity[0] = plan.openingEquity;
 
   const revenue = sum(monthly.bookings);
   const collected = sum(monthly.collections);

@@ -268,6 +268,114 @@ test("an overhead that ends with sales survives a plan with no sales", () => {
   assert.ok(Number.isFinite(result.pbt));
 });
 
+// ---------------------------------------------------------------------
+// The apartment case — built on a schedule, funded by debt
+// ---------------------------------------------------------------------
+
+/** A tower: 100 flats, built months 1-30, sold from month 6. */
+function apartmentPlan(velocity: number, openingEquity = 0): PlanInputs {
+  return {
+    ...defaultPlanInputs(),
+    horizonMonths: 72,
+    financingRatePct: 15,
+    openingEquity,
+    landTerms: "cash",
+    lines: [
+      {
+        ...newSaleLine("Tower A"),
+        landAreaSqft: 50_000,
+        landCostPsf: 2_000, // ₹10 Cr of land, paid month 1
+        devCostPsf: 0,
+        units: 100,
+        plotSqftPerUnit: 0,
+        buaSqftPerUnit: 1_200,
+        housePricePsf: 7_000, // ₹84 L a flat
+        constructionPsf: 3_000, // ₹36 L to build one
+        buildMode: "scheduled",
+        buildStartMonth: 1,
+        buildMonths: 30,
+        salesStartMonth: 6,
+        velocity: [velocity, velocity, velocity],
+      } as SaleLine,
+    ],
+  };
+}
+
+test("an apartment tower is built whether or not it has sold", () => {
+  // The case the tool could not express at all. Built to order, nothing
+  // is spent ahead of a buyer; on a schedule, the whole tower goes up on
+  // its own calendar. Same inputs, two completely different businesses.
+  const slow = runScenario(apartmentPlan(1), 0);
+  const tower = sale(slow);
+
+  // ₹36 Cr of construction — all 100 flats — spent inside months 1-30,
+  // even though only 67 of them have sold by the horizon.
+  closeTo(tower.constructionCost, 360_000_000);
+  closeTo(tower.unitsSold, 67);
+  // Cost of sales counts only what sold; the rest is stock, not expense.
+  closeTo(tower.constructionMatched, 67 * 3_600_000);
+  closeTo(tower.unsoldStock, 33 * 3_600_000);
+
+  // Built to order, the same line spends only on what sold, and spreads
+  // even that across each flat's own cycle.
+  const toOrder = sale(
+    runScenario(
+      {
+        ...apartmentPlan(1),
+        lines: apartmentPlan(1).lines.map((l) => ({ ...l, buildMode: "on-sale" }) as SaleLine),
+      },
+      0,
+    ),
+  );
+  assert.ok(
+    toOrder.constructionCost < tower.constructionCost,
+    "building to order spends less inside the horizon than building it all",
+  );
+  assert.equal(toOrder.unsoldStock, 0, "nothing is built without a buyer");
+});
+
+test("with no equity the interest starts at the land and compounds", () => {
+  // The founder's shape: zero equity, everything borrowed including the
+  // acquisition. Month 1 pays ₹10 Cr for land against an empty account,
+  // so the revolver is drawn from the very first month and the interest
+  // runs the whole way.
+  const funded = runScenario(apartmentPlan(1, 500_000_000), 0);
+  const unfunded = runScenario(apartmentPlan(1, 0), 0);
+
+  assert.equal(unfunded.monthly.equity[0], 0, "no equity went in");
+  assert.ok(unfunded.monthly.revolver[0] > 0, "borrowing starts in month 1");
+  assert.ok(unfunded.monthly.interest[0] > 0, "and so does the interest");
+  assert.ok(unfunded.interest > funded.interest, "a plan with equity behind it pays less interest");
+  // The equity row exists and says where the money came from.
+  closeTo(funded.monthly.equity[0], 500_000_000);
+  closeTo(sum(funded.monthly.equity), 500_000_000);
+
+  // And it is the ONLY thing separating the two: same revenue, same
+  // build, profit apart by exactly the interest.
+  closeTo(unfunded.revenue, funded.revenue, 1);
+  closeTo(unfunded.pbt, funded.pbt - (unfunded.interest - funded.interest), 1);
+});
+
+test("on a tower, selling faster is worth real money", () => {
+  // The whole reason the mode matters. The build is a sunk calendar, so
+  // every month a flat sits unsold is a month of interest on money
+  // already spent — and here, unlike the plotted case, that shows up in
+  // the profit immediately without touching a single overhead.
+  const slow = runScenario(apartmentPlan(1), 0);
+  const fast = runScenario(apartmentPlan(4), 0);
+
+  assert.ok(fast.interest < slow.interest, "selling out sooner carries the debt for less time");
+  assert.ok(fast.pbt > slow.pbt, "and that lands in the profit");
+  assert.ok(sale(fast).unsoldStock < sale(slow).unsoldStock);
+  assert.ok(fast.marginPct !== null && slow.marginPct !== null);
+  assert.ok(fast.marginPct! > slow.marginPct!);
+});
+
+/** Local sum, so the test does not reach into the engine's private one. */
+function sum(values: number[]): number {
+  return values.reduce((a, b) => a + b, 0);
+}
+
 test("selling faster never shows a worse margin", () => {
   // The regression. Before matched cost, Vihara read Base 23.3% against
   // Moderate 22.2%: the scenario that left 6.2 homes unsold and ₹2.9 Cr
