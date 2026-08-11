@@ -147,6 +147,21 @@ body {
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
 
+/* The light/dark switch crossfades the page instead of snapping it.
+   The browser does the work — components/ui/theme-toggle.tsx asks for a
+   view transition and these two rules only set its pace. Kept short: this
+   is a control responding to a tap, not a moment of delight, and a slow
+   fade would make the switch feel unresponsive rather than smooth.
+
+   Deliberately not a `transition` on colours. That would fade every other
+   colour change in the app too — every hover, every focus ring — and turn
+   the whole interface soggy to touch. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 220ms;
+  animation-timing-function: ease;
+}
+
 /* One deliberate moment of delight: the bib card's entrance after a
    successful save — the payoff of the whole registration flow. */
 @keyframes card-in {
@@ -250,5 +265,14 @@ body {
   .spinner-keeps-turning {
     animation-duration: 0.9s !important;
     animation-iteration-count: infinite !important;
+  }
+
+  /* The `*` above does not reach these — view-transition pseudo-elements
+     sit outside the document tree, so they need saying again. The switch
+     also checks reduced-motion in JavaScript and skips the transition
+     entirely; this is the belt to that pair of braces. */
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
   }
 }

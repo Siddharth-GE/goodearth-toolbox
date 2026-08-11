@@ -166,6 +166,22 @@ push worked. The one opt-out is `Spinner`, via the
 `spinner-keeps-turning` class — a spinner that stops looks like a broken
 page, and it is a functional signal rather than decoration.
 
+**The light/dark switch crossfades** (220ms) rather than snapping, via
+the View Transitions API — one call in `theme-toggle.tsx`, paced by two
+rules in `globals.css`. The browser fades a snapshot of the whole page,
+so background, text, borders and the switch's own icon all change
+together for no state and no library. A browser without it applies the
+change instantly, which is a working switch either way.
+
+Two traps live here. **Don't reach for a `transition` on colours
+instead** — it would fade every other colour change in the app, every
+hover and every focus ring, and make the whole interface feel soggy.
+And **the global reduced-motion block does not cover this**: it selects
+`*`, and `::view-transition-*` are pseudo-elements outside the document
+tree that `*` never matches. They are named again in that block, and the
+switch also checks reduced-motion in JavaScript before asking for a
+transition at all.
+
 ## Loading states
 
 `Spinner` (`components/ui/spinner.tsx`) — a large spinning ring in the

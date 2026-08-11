@@ -28,11 +28,34 @@ function flip() {
   );
   const next = nextTheme(current);
 
-  // Repaints the page.
-  root.dataset.theme = next;
-  // Survives the next full load, and is read on the server so that load
-  // paints the right colour immediately. See lib/theme.ts.
-  document.cookie = themeCookie(next);
+  const apply = () => {
+    // Repaints the page.
+    root.dataset.theme = next;
+    // Survives the next full load, where the root layout's script reads
+    // it back before the first paint. See lib/theme.ts.
+    document.cookie = themeCookie(next);
+  };
+
+  // Crossfade the whole page rather than snapping it. The browser
+  // snapshots before and after and fades between them, which covers
+  // everything at once — background, text, borders, and the switch's own
+  // icon swapping — for one call and no state.
+  //
+  // Both guards fall through to applying it instantly, which is the
+  // behaviour this replaced: an older browser still gets a working
+  // switch, and someone who asked their operating system for stillness
+  // gets no animation. The global reduced-motion block in globals.css
+  // cannot do that job here — it selects `*`, and these are
+  // ::view-transition pseudo-elements, which `*` never matches.
+  const start = document.startViewTransition?.bind(document);
+  const wantsStillness = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  if (!start || wantsStillness) {
+    apply();
+    return;
+  }
+
+  start(apply);
 }
 
 /** Shown only in light mode — it offers the other one. */
