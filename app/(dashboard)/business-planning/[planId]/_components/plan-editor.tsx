@@ -3,7 +3,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { savePlan } from "@/lib/business-planning/actions";
 import type { PlanInputs, ScenarioIndex } from "@/lib/business-planning/inputs";
-import { runPlan } from "@/lib/business-planning/model";
+import { runPlan, velocityOutOfOrder } from "@/lib/business-planning/model";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CashflowTable } from "./cashflow-table";
 import { LinesTab } from "./lines-tab";
@@ -118,6 +118,7 @@ export function PlanEditor({ planId, initial }: { planId: string; initial: PlanI
         activeScenario={inputs.activeScenario}
         onScenarioChange={(activeScenario: ScenarioIndex) => update({ activeScenario })}
         saveState={saveState}
+        velocityWarning={velocityOutOfOrder(inputs)}
       />
 
       {/* Radix Tabs, not NavTabs: switching panels must not navigate.

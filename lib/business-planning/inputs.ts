@@ -79,7 +79,31 @@ export type SaleLine = {
   /** Construction cost, ₹ per sqft of built-up area. */
   constructionPsf: number;
 
-  /** How long one unit takes to build, from the month it sells. */
+  /**
+   * WHEN the building work happens, which is the difference between two
+   * completely different businesses.
+   *
+   *   "on-sale"   — a unit is built because it sold. Plotted development,
+   *                 villas, row houses: `buildMonths` is one unit's cycle,
+   *                 starting the month that unit goes. Nothing is spent
+   *                 ahead of a buyer, so the project largely funds itself
+   *                 out of collections.
+   *
+   *   "scheduled" — the WHOLE line is built on its own calendar whether
+   *                 anything has sold or not. An apartment tower: you
+   *                 cannot build the 14th floor to order. `buildMonths`
+   *                 is the whole building, from `buildStartMonth`.
+   *
+   * The second is the case the tool could not express at all, and it is
+   * the one that actually hurts: construction finishes in month 30 while
+   * sales run to month 60, so the entire build is carried on debt against
+   * flats nobody has bought yet. With no equity the interest starts at
+   * land acquisition and compounds for the whole gap.
+   */
+  buildMode: "on-sale" | "scheduled";
+  /** First month of construction. `scheduled` only; ignored on-sale. */
+  buildStartMonth: number;
+  /** On-sale: one unit's build cycle. Scheduled: the whole building's. */
   buildMonths: number;
   /** First month this line can sell anything. 1-based. */
   salesStartMonth: number;
@@ -184,6 +208,21 @@ export type OverheadItem = {
   monthly: number;
   startMonth: number;
   endMonth: number;
+  /**
+   * Stop paying this the month the last unit sells, if that comes first.
+   *
+   * The difference between a cost the PROJECT carries and one the COMPANY
+   * carries. A marketing retainer and a site sales office end when there
+   * is nothing left to sell; head-office salaries do not. Until this
+   * existed every overhead ran to a fixed calendar month, so a plan that
+   * sold out in month 16 still paid the marketing retainer for another
+   * forty-four months — and profit came out identical whatever the
+   * velocity, which is what made the scenarios look broken.
+   *
+   * This is the ONLY plan-level cost that varies by scenario, because the
+   * last sale month does.
+   */
+  endsWithSales: boolean;
 };
 
 /** Selling cost that scales with bookings: brokerage, ads, referrals. */
@@ -306,6 +345,8 @@ export function newSaleLine(name = "New line"): SaleLine {
     landPricePsf: 0,
     housePricePsf: 0,
     constructionPsf: 0,
+    buildMode: "on-sale",
+    buildStartMonth: 1,
     buildMonths: 18,
     salesStartMonth: 1,
     velocity: [1, 1.5, 2],
@@ -364,7 +405,9 @@ export function newHoldLine(name = "New line"): HoldLine {
 }
 
 export function newOverhead(): OverheadItem {
-  return { id: newId(), name: "", monthly: 0, startMonth: 1, endMonth: 60 };
+  // Off by default: a new overhead behaves the way every existing one
+  // does, and turning it on is a deliberate statement about that cost.
+  return { id: newId(), name: "", monthly: 0, startMonth: 1, endMonth: 60, endsWithSales: false };
 }
 
 export function newVariableCost(): VariableCostItem {
@@ -457,6 +500,10 @@ function parseSaleLine(raw: Record<string, unknown>): SaleLine {
     constructionPsf: Math.max(0, num(raw.constructionPsf, 0)),
     // At least one month: a build cycle of zero divides by zero when the
     // construction spend is spread across it.
+    // Anything that isn't the literal "scheduled" is on-sale, so a plan
+    // written before this field existed keeps behaving exactly as it did.
+    buildMode: raw.buildMode === "scheduled" ? "scheduled" : "on-sale",
+    buildStartMonth: month(raw.buildStartMonth, 1),
     buildMonths: month(raw.buildMonths, 18),
     salesStartMonth: month(raw.salesStartMonth, 1),
     velocity: [
@@ -558,6 +605,9 @@ export function parsePlanInputs(raw: unknown): PlanInputs {
         monthly: Math.max(0, num(item.monthly, 0)),
         startMonth: month(item.startMonth, 1),
         endMonth: month(item.endMonth, horizonMonths),
+        // A plan saved before this field existed keeps behaving exactly
+        // as it did — rule 5, the parser is the only door in.
+        endsWithSales: item.endsWithSales === true,
       })),
 
     variableCosts: array(raw.variableCosts)

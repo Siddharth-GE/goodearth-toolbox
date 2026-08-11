@@ -14,7 +14,7 @@ import {
   type SaleLine,
 } from "@/lib/business-planning/inputs";
 import type { ScenarioResult } from "@/lib/business-planning/model";
-import { formatCrore, formatQuantity } from "@/lib/format";
+import { formatCrore, formatPercent, formatQuantity } from "@/lib/format";
 import { ChevronDown, ChevronRight, Layers, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { HoldLineForm } from "./hold-line-form";
@@ -130,7 +130,11 @@ export function LinesTab({
                     <span>
                       gross{" "}
                       <span className="text-foreground font-mono">
-                        {formatCrore(lineResult.grossProfit)}
+                        {formatCrore(lineResult.matchedProfit)}
+                      </span>{" "}
+                      at{" "}
+                      <span className="text-foreground font-mono">
+                        {formatPercent(lineResult.marginPct)}
                       </span>
                     </span>
                     {lineResult.unitsUnsold > 0.0001 ? (

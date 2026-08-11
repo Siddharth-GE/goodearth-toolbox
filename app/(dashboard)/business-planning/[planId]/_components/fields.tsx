@@ -243,8 +243,3 @@ export function TextField({
     </FieldShell>
   );
 }
-
-/** The heading above a group of fields inside a card. */
-export function SectionLabel({ children }: { children: ReactNode }) {
-  return <p className="text-muted text-xs font-semibold tracking-widest uppercase">{children}</p>;
-}

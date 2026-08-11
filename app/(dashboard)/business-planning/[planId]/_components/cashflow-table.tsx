@@ -99,10 +99,23 @@ export function CashflowTable({ result }: { result: ScenarioResult }) {
           </TableRow>
         </TableHead>
         <TableBody>
+          {/* Where the money came from, before where it went. On a plan
+              run entirely on debt this row is empty and the Borrowed row
+              at the bottom carries the whole project. */}
+          {showPlanRows ? (
+            <Row label="Equity in" values={buckets.map((b) => b.equity)} tone="in" />
+          ) : null}
           <Row label="Collections" values={buckets.map((b) => b.collections)} tone="in" />
           <Row label="Land" values={buckets.map((b) => -b.land)} />
           <Row label="Development" values={buckets.map((b) => -b.development)} />
           <Row label="Construction" values={buckets.map((b) => -b.construction)} />
+          {/* Only a HOLD line has running costs, so the row would be a
+              line of zeros on a purely residential plan. It was missing
+              altogether, which meant a held asset's rows did not add up
+              to its own Net. */}
+          {buckets.some((b) => b.operating !== 0) ? (
+            <Row label="Running held assets" values={buckets.map((b) => -b.operating)} />
+          ) : null}
           {showPlanRows ? (
             <>
               <Row label="Overheads" values={buckets.map((b) => -b.overheads)} />
@@ -139,6 +152,11 @@ type Bucket = {
   land: number;
   development: number;
   construction: number;
+  /** Money put in rather than borrowed. Zero all the way across on a
+      plan funded entirely by debt, which is the normal shape here. */
+  equity: number;
+  /** Running a held asset: staff, food, utilities, maintenance. */
+  operating: number;
   overheads: number;
   commonInfra: number;
   interest: number;
@@ -160,6 +178,8 @@ function bucketise(series: MonthlySeries, size: number): Bucket[] {
       land: 0,
       development: 0,
       construction: 0,
+      equity: 0,
+      operating: 0,
       overheads: 0,
       commonInfra: 0,
       interest: 0,
@@ -174,6 +194,8 @@ function bucketise(series: MonthlySeries, size: number): Bucket[] {
       bucket.land += series.land[m];
       bucket.development += series.development[m];
       bucket.construction += series.construction[m];
+      bucket.equity += series.equity[m];
+      bucket.operating += series.operating[m];
       bucket.overheads += series.overheads[m];
       bucket.commonInfra += series.commonInfra[m];
       bucket.interest += series.interest[m];

@@ -77,10 +77,51 @@ Each of these is commented at the point it happens in `model.ts`.
 | Products      | Two hard-coded columns                                                                                   | A list you add to                                                                                                                          |
 | Senior living | Its own five sheets                                                                                      | One HOLD line among however many                                                                                                           |
 | Sensitivity   | Two named cells swung by an Excel data table                                                             | Both axes proportional across every line — prices do not fall on villas and hold on row houses                                             |
+| Margin        | Revenue booked in full at sale, cost truncated at the horizon, so Base out-margins Moderate              | Profit is struck against the cost of WHAT SOLD; cash keeps the truncation. See below                                                       |
 
 **Tell the founder about the peak-funding one.** ₹5.91 Cr was read as
 money to raise; it is ₹5.91 Cr of headroom at the worst month. The
 equity covers the whole project.
+
+## The margin one, at length
+
+Found 2026-08-11, because the founder noticed the scenarios reading
+backwards. The sheet — and this tool, until now — booked 100% of a
+home's price the month it sold, but spread its build over `buildMonths`
+and dropped whatever fell past month 72. So a scenario counted all of
+its revenue and only part of its cost, and the SLOWER it sold the better
+its margin looked:
+
+| Vihara Block 1 | Base                    | Moderate | High  |
+| -------------- | ----------------------- | -------- | ----- |
+| Was            | **23.3%** (6.2 unsold!) | 22.2%    | 22.2% |
+| Now            | 21.5%                   | 22.2%    | 22.2% |
+
+There are now two cost totals, and the whole fix is keeping them apart:
+
+- **Cash** (`landCost`, `constructionCost`, the monthly series) — what
+  leaves the account inside the horizon. Truncation is CORRECT here, it
+  drives interest and the trough and peak funding, and it is unchanged
+  to the rupee. This is the Cashflow tab.
+- **Matched** (`matchedCost`, `constructionMatched`, …) — the cost of
+  what sold: every rupee of build for every home whose price was
+  counted, whenever spent, plus only the SOLD SHARE of land and infra.
+  This drives PBT and margin, and it is the Summary tab.
+
+`costOutsideHorizon` is the difference, shown as its own row so the
+Summary column visibly adds up to the PBT in the strip rather than
+quietly not. For Base that is ₹2.05 Cr: ₹2.91 Cr of building put back,
+less ₹0.86 Cr of land and infra taken out from under 6.2 unsold homes.
+
+**Base therefore no longer ties to Summary!B15:B16.** That is deliberate
+and `model.test.ts` says so at the assertion. Moderate and High tie
+exactly, because they sell out and the two totals coincide.
+
+A held asset has **no margin at all** now. Expensing ₹29 Cr of capex
+against six years of ramping rent gave a large negative percentage
+sitting in the same column as a sale line's +22%. It reports yield on
+cost and IRR, which is what a held asset is judged on, and the column is
+headed "Margin / yield".
 
 ## Verified against the workbook
 
@@ -95,10 +136,12 @@ dev/infra ₹13.02 Cr · land ₹17.16 Cr · overheads ₹12.24 Cr ·
 biodiversity ₹5.80 Cr · interest ₹0 · **PBT ₹26.66 Cr at 22.2%** · cash
 trough ₹5.91 Cr · 2.56× money.
 
-**Block 1, Base:** PBT ₹26.56 Cr at 23.3% · trough ₹3.60 Cr · 2.08×.
-And construction ₹39.43 Cr rather than the ₹42.34 Cr those units cost to
-build, because the last row houses sell too late to finish inside six
-years — the horizon doing its job.
+**Block 1, Base:** trough ₹3.60 Cr · 2.08× — cash, and it ties. Its
+construction is ₹39.43 Cr of cash rather than the ₹42.34 Cr those homes
+cost to build, because the last row houses sell too late to finish
+inside six years: the horizon doing its job. **PBT and margin here
+deliberately differ from the sheet's ₹26.56 Cr at 23.3%** — see "The
+margin one" above. The tool reports ₹24.52 Cr at 21.5%.
 
 **Block 2 (the HOLD line):** capex ₹29.10 Cr · stabilised NOI ₹2.75 Cr ·
 yield on cost 9.47% · terminal value ₹30.61 Cr · hold ₹54.34 Cr against
@@ -113,8 +156,76 @@ identical to the rupee); and the senior-living line carries development
 cost only, because the site acquisition already sits on the residential
 lines and charging it twice would double-count ₹13.2 Cr.
 
+## Two businesses, not one — `buildMode`
+
+Added 2026-08-11. The engine originally had exactly one construction
+rule: a unit is built _because it sold_, spread over `buildMonths` from
+its sale month. That is the plotted-development business, and Vihara is
+entirely that. It cannot describe an apartment tower, where the whole
+building goes up on its own calendar and you cannot put up the 14th
+floor to order.
+
+So a SALE line now says which it is:
+
+- **`on-sale`** (default, unchanged) — nothing is spent ahead of a
+  buyer. Collections largely fund the build. `buildMonths` is one unit's
+  cycle.
+- **`scheduled`** — the whole line is built from `buildStartMonth` over
+  `buildMonths`, sold or not. Every rupee is carried until a buyer turns
+  up.
+
+The second one is where the money actually goes. A 100-flat tower, built
+months 1–30, selling from month 6, **zero equity at 15%**:
+
+| Sold at | Interest  | Peak funding | Unsold stock | PBT       | Margin |
+| ------- | --------- | ------------ | ------------ | --------- | ------ |
+| 1/mo    | ₹30.42 Cr | ₹44.97 Cr    | ₹11.88 Cr    | −₹4.96 Cr | −8.8%  |
+| 1.5/mo  | ₹19.54 Cr | ₹38.24 Cr    | —            | ₹18.46 Cr | 22.0%  |
+| 2.3/mo  | ₹11.15 Cr | ₹27.61 Cr    | —            | ₹26.85 Cr | 32.0%  |
+| 4/mo    | ₹5.51 Cr  | ₹18.66 Cr    | —            | ₹32.49 Cr | 38.7%  |
+
+The same tower at 1/mo built to order instead: **+₹21.78 Cr against
+−₹4.96 Cr**. A ₹26.7 Cr swing from _when_ you build, nothing else.
+
+Note what this does and does not touch:
+
+- **`unsoldStock`** is new on `SaleLineResult`: build cost of units put
+  up but not sold. Always 0 on an `on-sale` line. On a scheduled line it
+  is the whole risk of the mode, and the reason cash spent exceeds cost
+  of sales — those flats are stock, not expense, so `costOutsideHorizon`
+  goes NEGATIVE here. Both directions are correct; read the label.
+- **Zero equity needed no code.** `runCash` already charges interest from
+  the first month the balance is negative, so a cash land payment in
+  month 1 against an empty account starts the meter immediately. What was
+  missing was only that the cashflow never SHOWED the equity, so a plan
+  funded entirely by debt looked the same as one that wasn't.
+  `MonthlySeries.equity` and the "Equity in" row fix that.
+- **Collections still spread over `buildMonths` from each sale.** On a
+  scheduled line that is now the whole building's duration rather than
+  one unit's, which is a fair approximation of a construction-linked
+  payment plan but not the same thing. If pre-launch and
+  post-completion sales ever need different terms, that is the next
+  field, not a tweak to this one.
+
 ## Things that will bite
 
+- **`buildMode` changes what `buildMonths` MEANS** — one unit's cycle on
+  an on-sale line, the whole building on a scheduled one. Any code
+  reading it has to know which mode it is in.
+- **There are two cost totals and they are both right.** Cash on the
+  Cashflow tab, matched on the Summary tab, `costOutsideHorizon` naming
+  the gap. If a new figure is added, decide which question it answers
+  before picking which total to build it from — quietly using cash for a
+  profit figure is the exact bug this tool shipped with.
+- **A HOLD line has no `marginPct`.** Deliberate; the type does not carry
+  the field. Reach for `yieldOnCostPct` or `holdIrrPct`.
+- **Velocities are not sorted.** `velocityOutOfOrder` flags a line whose
+  "High" is its slowest and both the strip and the sale form say so, but
+  nothing rewrites it. Clamping what someone typed is worse.
+- **The engine clamps efficiency and the exit cap rate at the point of
+  use**, not only in `parsePlanInputs`, because the editor recalculates
+  on raw keystrokes — before the parser sees anything. Any new divisor
+  taken straight off a `line.*` field needs the same treatment.
 - **Units are fractional.** 0.8 units a month is how velocity works, and
   totals read `41.999999999999993`. The workbook does the same. Don't
   "fix" it with rounding — rounding units up is how a plan sells 43
