@@ -184,6 +184,21 @@ export type OverheadItem = {
   monthly: number;
   startMonth: number;
   endMonth: number;
+  /**
+   * Stop paying this the month the last unit sells, if that comes first.
+   *
+   * The difference between a cost the PROJECT carries and one the COMPANY
+   * carries. A marketing retainer and a site sales office end when there
+   * is nothing left to sell; head-office salaries do not. Until this
+   * existed every overhead ran to a fixed calendar month, so a plan that
+   * sold out in month 16 still paid the marketing retainer for another
+   * forty-four months — and profit came out identical whatever the
+   * velocity, which is what made the scenarios look broken.
+   *
+   * This is the ONLY plan-level cost that varies by scenario, because the
+   * last sale month does.
+   */
+  endsWithSales: boolean;
 };
 
 /** Selling cost that scales with bookings: brokerage, ads, referrals. */
@@ -364,7 +379,9 @@ export function newHoldLine(name = "New line"): HoldLine {
 }
 
 export function newOverhead(): OverheadItem {
-  return { id: newId(), name: "", monthly: 0, startMonth: 1, endMonth: 60 };
+  // Off by default: a new overhead behaves the way every existing one
+  // does, and turning it on is a deliberate statement about that cost.
+  return { id: newId(), name: "", monthly: 0, startMonth: 1, endMonth: 60, endsWithSales: false };
 }
 
 export function newVariableCost(): VariableCostItem {
@@ -558,6 +575,9 @@ export function parsePlanInputs(raw: unknown): PlanInputs {
         monthly: Math.max(0, num(item.monthly, 0)),
         startMonth: month(item.startMonth, 1),
         endMonth: month(item.endMonth, horizonMonths),
+        // A plan saved before this field existed keeps behaving exactly
+        // as it did — rule 5, the parser is the only door in.
+        endsWithSales: item.endsWithSales === true,
       })),
 
     variableCosts: array(raw.variableCosts)

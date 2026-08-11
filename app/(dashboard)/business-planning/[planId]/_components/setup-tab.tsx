@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { IconButton } from "@/components/ui/icon-button";
 import { FieldRow, Section } from "@/components/ui/section";
 import { Select } from "@/components/ui/select";
@@ -13,7 +14,7 @@ import {
 } from "@/lib/business-planning/inputs";
 import { formatCrore } from "@/lib/format";
 import { Plus, Trash2 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { MoneyField, MonthField, NumberField, PercentField, TextField } from "./fields";
 
 /**
@@ -158,7 +159,7 @@ export function SetupTab({
 
       <Section
         title="Overheads"
-        note="Retainers and salaries that run every month, whatever sells."
+        note="Retainers and salaries that run every month. Tick an item to stop it when the last unit sells — that is what makes selling faster worth anything."
         collapsible
         defaultOpen={false}
         aside={
@@ -175,7 +176,7 @@ export function SetupTab({
           {inputs.overheads.map((item, index) => (
             <Row
               key={item.id}
-              cols={5}
+              cols={6}
               onRemove={() =>
                 onChange({ overheads: inputs.overheads.filter((row) => row.id !== item.id) })
               }
@@ -213,7 +214,16 @@ export function SetupTab({
                 hint={
                   item.endMonth < item.startMonth
                     ? "ends before it starts — costs nothing"
-                    : undefined
+                    : item.endsWithSales
+                      ? "or the last sale, whichever is first"
+                      : undefined
+                }
+              />
+              <EndsWithSalesToggle
+                checked={item.endsWithSales}
+                label={item.name || "this overhead"}
+                onChange={(endsWithSales) =>
+                  onChange({ overheads: patch(inputs.overheads, index, { endsWithSales }) })
                 }
               />
             </Row>
@@ -396,6 +406,40 @@ export function SetupTab({
 /** Replace one row of a list, leaving the rest alone. */
 function patch<T>(rows: T[], index: number, changes: Partial<T>): T[] {
   return rows.map((row, i) => (i === index ? { ...row, ...changes } : row));
+}
+
+/**
+ * Whether an overhead is a cost of the PROJECT or of the COMPANY.
+ *
+ * Built as a field with a blank label so it sits on the same baseline as
+ * the inputs beside it, the same trick the delete button uses.
+ */
+function EndsWithSalesToggle({
+  checked,
+  label,
+  onChange,
+}: {
+  checked: boolean;
+  label: string;
+  onChange: (value: boolean) => void;
+}) {
+  const id = useId();
+  return (
+    <div className="min-w-0 space-y-1">
+      <span className="text-muted block text-xs font-medium" aria-hidden>
+        &nbsp;
+      </span>
+      <label htmlFor={id} className="flex h-9 items-center gap-2 text-xs">
+        <Checkbox
+          id={id}
+          checked={checked}
+          aria-label={`Stop ${label} when the last unit sells`}
+          onChange={(event) => onChange(event.target.checked)}
+        />
+        <span className={checked ? "text-foreground" : "text-muted"}>Stops with sales</span>
+      </label>
+    </div>
+  );
 }
 
 /**

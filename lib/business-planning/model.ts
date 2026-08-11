@@ -929,17 +929,38 @@ function runHoldLine(
 }
 
 /** Overheads, selling cost, one-timers and common infrastructure, by month. */
-function runPlanCosts(plan: PlanInputs, bookings: number[], months: number) {
+/**
+ * The month the last unit sells, or `months` if selling never stops
+ * inside the horizon.
+ *
+ * `months` rather than 0 for a plan with no sales at all: an overhead
+ * that "ends with sales" on a plan that has not sold anything has no
+ * earlier date to end on, and cutting it to zero would silently make an
+ * empty plan look profitable.
+ */
+function lastSaleMonth(unitsSold: number[], months: number): number {
+  for (let m = unitsSold.length - 1; m >= 0; m -= 1) {
+    if (unitsSold[m] > 0) return m + 1;
+  }
+  return months;
+}
+
+function runPlanCosts(plan: PlanInputs, bookings: number[], unitsSold: number[], months: number) {
   const fixed = zeros(months);
   const variable = zeros(months);
   const oneTime = zeros(months);
   const infraCapex = zeros(months);
   const infraOpex = zeros(months);
 
+  // The only plan-level figure that differs between Base, Moderate and
+  // High — see OverheadItem.endsWithSales.
+  const soldOut = lastSaleMonth(unitsSold, months);
+
   for (const item of plan.overheads) {
+    const until = item.endsWithSales ? Math.min(item.endMonth, soldOut) : item.endMonth;
     for (let m = 0; m < months; m += 1) {
       const monthNumber = m + 1;
-      if (monthNumber >= item.startMonth && monthNumber <= item.endMonth) fixed[m] += item.monthly;
+      if (monthNumber >= item.startMonth && monthNumber <= until) fixed[m] += item.monthly;
     }
   }
 
@@ -1019,7 +1040,7 @@ export function runScenario(plan: PlanInputs, scenario: ScenarioIndex): Scenario
     }
   }
 
-  const planCosts = runPlanCosts(plan, saleBookings, months);
+  const planCosts = runPlanCosts(plan, saleBookings, monthly.unitsSold, months);
   for (let m = 0; m < months; m += 1) {
     monthly.overheads[m] = planCosts.overheads[m];
     monthly.commonInfra[m] = planCosts.commonInfra[m];

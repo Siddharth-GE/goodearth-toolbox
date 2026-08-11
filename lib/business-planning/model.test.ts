@@ -206,6 +206,68 @@ test("money sold but not yet banked is reported, not lost", () => {
   closeTo(fast.collected, fast.revenue, 1);
 });
 
+test("an overhead that ends with sales is what makes velocity worth anything", () => {
+  // The finding behind the field. Vihara's overheads all run to a fixed
+  // calendar month, so selling out in month 16 pays exactly as much
+  // marketing retainer as selling out in month 64 — and with equity
+  // covering the whole project there is no interest to save either. PBT
+  // came out IDENTICAL at 1/mo and 4/mo, which is what made the
+  // scenarios look broken.
+  const plan = viharaPlan();
+  const at = (v: number, endsWithSales: boolean): PlanInputs => ({
+    ...plan,
+    overheads: plan.overheads.map((item) => ({ ...item, endsWithSales })),
+    lines: plan.lines.map((line) =>
+      line.kind === "sale" ? { ...line, velocity: [v, v, v] as [number, number, number] } : line,
+    ),
+  });
+
+  // Fixed to the calendar: identical, however fast it goes.
+  const slowFixed = runScenario(at(1, false), 0);
+  const fastFixed = runScenario(at(4, false), 0);
+  closeTo(slowFixed.overheadsFixed, fastFixed.overheadsFixed, 1);
+  closeTo(slowFixed.pbt, fastFixed.pbt, 1);
+
+  // Ending with sales: the fast plan stops paying for the months it no
+  // longer needs, and the profit finally responds.
+  const slowTracking = runScenario(at(1, true), 0);
+  const fastTracking = runScenario(at(4, true), 0);
+  assert.ok(
+    fastTracking.overheadsFixed < slowTracking.overheadsFixed,
+    "selling out sooner should pay fewer months of overhead",
+  );
+  assert.ok(
+    fastTracking.pbt > slowTracking.pbt + 10_000_000,
+    `selling four times faster should be worth crore, got ${fastTracking.pbt - slowTracking.pbt}`,
+  );
+
+  // It never charges MORE than the calendar schedule would — the item's
+  // own end month is still a ceiling.
+  assert.ok(fastTracking.overheadsFixed <= fastFixed.overheadsFixed);
+  assert.ok(slowTracking.overheadsFixed <= slowFixed.overheadsFixed);
+});
+
+test("an overhead that ends with sales survives a plan with no sales", () => {
+  // Nothing has sold, so there is no earlier month to end on. Falling
+  // back to zero would silently make an empty plan look profitable.
+  const plan: PlanInputs = {
+    ...defaultPlanInputs(),
+    overheads: [
+      {
+        id: "o",
+        name: "Retainer",
+        monthly: 100_000,
+        startMonth: 1,
+        endMonth: 12,
+        endsWithSales: true,
+      },
+    ],
+  };
+  const result = runScenario(plan, 1);
+  closeTo(result.overheadsFixed, 1_200_000, 1);
+  assert.ok(Number.isFinite(result.pbt));
+});
+
 test("selling faster never shows a worse margin", () => {
   // The regression. Before matched cost, Vihara read Base 23.3% against
   // Moderate 22.2%: the scenario that left 6.2 homes unsold and ₹2.9 Cr
