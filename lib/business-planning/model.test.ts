@@ -160,6 +160,52 @@ test("Vihara, Base: slower selling leaves units and construction unfinished", ()
   closeTo(result.moneyMultiple, 2.0797565863242262, 0.0001);
 });
 
+test("money sold but not yet banked is reported, not lost", () => {
+  // The mirror of costOutsideHorizon, on the income side. A home sold
+  // near the end books its whole price that month but collects it over
+  // the following build, and spreadForward drops whatever lands past the
+  // horizon. That never touches PBT — struck on bookings — but it makes
+  // the CASH look worse, and `peakFunding` is read as "money to raise".
+  //
+  // At half a unit a month Vihara appears to need ₹9.7 Cr of funding
+  // while ₹11.2 Cr of collections sit just past month 72. Reporting the
+  // receivable is what lets that be read correctly.
+  const plan = viharaPlan();
+  const slow = runScenario(
+    {
+      ...plan,
+      lines: plan.lines.map((line) =>
+        line.kind === "sale"
+          ? { ...line, velocity: [0.5, 0.5, 0.5] as [number, number, number] }
+          : line,
+      ),
+    },
+    0,
+  );
+
+  assert.ok(slow.receivableAtHorizon > 0, "slow selling leaves money uncollected");
+  closeTo(slow.receivableAtHorizon, slow.revenue - slow.collected, 1);
+  closeTo(slow.receivableAtHorizon, 111_900_000, 1_000_000);
+  assert.ok(
+    slow.receivableAtHorizon > slow.peakFunding,
+    "the whole apparent funding gap is late collections",
+  );
+
+  // A plan that sells out early collects everything, and the figure is
+  // zero rather than a small rounding ghost.
+  const fast = runScenario(
+    {
+      ...plan,
+      lines: plan.lines.map((line) =>
+        line.kind === "sale" ? { ...line, velocity: [4, 4, 4] as [number, number, number] } : line,
+      ),
+    },
+    0,
+  );
+  closeTo(fast.receivableAtHorizon, 0, 1);
+  closeTo(fast.collected, fast.revenue, 1);
+});
+
 test("selling faster never shows a worse margin", () => {
   // The regression. Before matched cost, Vihara read Base 23.3% against
   // Moderate 22.2%: the scenario that left 6.2 homes unsold and ₹2.9 Cr

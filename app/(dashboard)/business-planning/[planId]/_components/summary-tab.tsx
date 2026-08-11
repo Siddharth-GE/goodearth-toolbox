@@ -260,6 +260,17 @@ export function SummaryTab({
               active={activeScenario}
               pick={(s) => formatCrore(s.peakFunding)}
             />
+            {/* Sold, owed, and not banked before the horizon ends. It is
+                in the profit but not in the cash, so it makes the funding
+                gap above look bigger than it is. */}
+            <ScenarioRow
+              label="of which still to collect"
+              scenarios={result.scenarios}
+              active={activeScenario}
+              pick={(s) => formatCrore(s.receivableAtHorizon)}
+              hideWhenAllZero={(s) => s.receivableAtHorizon}
+              muted
+            />
             <ScenarioRow
               label="Cash trough"
               scenarios={result.scenarios}

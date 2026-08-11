@@ -12,6 +12,11 @@ import type { ReactNode } from "react";
  * `size` is the whole point of having it. A screen where every figure is
  * `text-sm` has no hierarchy, and the reader has to work out which number
  * is the answer. One `hero` per screen, a few `lg`, the rest `sm`.
+ *
+ * The steps are deliberately close together. `hero` only has to be the
+ * FIRST thing read, not a billboard — a working screen someone stares at
+ * all afternoon is not a landing page, and an oversized number crowds out
+ * the figures that qualify it.
  */
 export function Figure({
   label,
@@ -36,8 +41,8 @@ export function Figure({
         className={cn(
           "truncate font-mono tabular-nums",
           size === "sm" && "text-sm font-semibold",
-          size === "lg" && "text-xl font-bold tracking-tight",
-          size === "hero" && "text-3xl font-extrabold tracking-tight",
+          size === "lg" && "text-base font-semibold",
+          size === "hero" && "text-xl font-bold tracking-tight",
           tone === "good" && "text-success",
           tone === "warn" && "text-warning",
           tone === "bad" && "text-danger",

@@ -17,10 +17,10 @@ import type { ReactNode } from "react";
  * picker lives here rather than in Setup for the same reason: flipping
  * Base to High is a thing you do while looking at the answer.
  *
- * Profit is deliberately much larger than everything else. This used to
- * be six equal figures at body-text size, which meant the screen never
- * said which number was the point of it — you had to read all six labels
- * to find the one you came for.
+ * Profit and margin lead, at a size a step above the rest rather than a
+ * billboard. This used to be six equal figures at body-text size, which
+ * meant the screen never said which number was the point of it — you had
+ * to read all six labels to find the one you came for.
  */
 export function SummaryStrip({
   result,
@@ -53,7 +53,7 @@ export function SummaryStrip({
               tone={profitable ? "good" : "bad"}
               size="hero"
             />
-            <Figure label="Margin" value={formatPercent(result.marginPct)} size="lg" />
+            <Figure label="Margin" value={formatPercent(result.marginPct)} size="hero" />
           </div>
 
           <div className="flex items-center gap-3">
@@ -89,7 +89,13 @@ export function SummaryStrip({
             <Figure
               label="Peak funding"
               value={formatCrore(result.peakFunding)}
-              hint={result.peakFunding === 0 ? "equity covers it" : "to be raised"}
+              hint={
+                result.peakFunding === 0
+                  ? "equity covers it"
+                  : result.receivableAtHorizon > 0
+                    ? `${formatCrore(result.receivableAtHorizon)} still to collect`
+                    : "to be raised"
+              }
               tone={result.peakFunding === 0 ? "good" : "warn"}
             />
           </FigureBandCell>
@@ -117,6 +123,15 @@ export function SummaryStrip({
           <Note>
             {result.name} leaves <strong>{formatQuantity(unsold)}</strong> unsold by the end of the
             plan. Their share of the land and infrastructure is charged; their revenue is not.
+          </Note>
+        ) : null}
+
+        {result.receivableAtHorizon > 0 ? (
+          <Note>
+            <strong>{formatCrore(result.receivableAtHorizon)}</strong> is sold but not yet collected
+            when the plan ends — instalments falling after month {result.monthly.closing.length}. It
+            counts in the profit above, but not in the cash below it
+            {result.peakFunding > 0 ? ", so the funding gap reads worse than it is" : ""}.
           </Note>
         ) : null}
 

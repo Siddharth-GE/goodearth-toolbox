@@ -235,6 +235,21 @@ export type ScenarioResult = {
   totalCost: number;
   /** Every MATCHED cost except interest. What PBT is struck against. */
   matchedTotalCost: number;
+  /** Money actually banked inside the horizon. */
+  collected: number;
+  /**
+   * Sold, owed, and NOT yet banked when the horizon ends.
+   *
+   * The mirror of `costOutsideHorizon` on the income side. A home sold in
+   * month 70 books its whole price that month but collects it over the
+   * following build, and `spreadForward` drops whatever lands past the
+   * last month — so the cash series is short by money that is
+   * contractually due. It never touches PBT (which is struck on
+   * bookings), but it inflates the funding gap, and `peakFunding` is
+   * read as "money to raise". On Vihara at 0.5 units a month the whole
+   * ₹9.70 Cr of apparent peak funding is ₹11.19 Cr of late collections.
+   */
+  receivableAtHorizon: number;
   /**
    * `matchedTotalCost − totalCost`: cost the plan owes on what it sold but
    * does not pay inside the horizon, less the share of land and infra
@@ -1026,6 +1041,7 @@ export function runScenario(plan: PlanInputs, scenario: ScenarioIndex): Scenario
   }
 
   const revenue = sum(monthly.bookings);
+  const collected = sum(monthly.collections);
   const landCost = sum(monthly.land);
   const developmentCost = sum(monthly.development);
   const constructionCost = sum(monthly.construction);
@@ -1101,6 +1117,8 @@ export function runScenario(plan: PlanInputs, scenario: ScenarioIndex): Scenario
     totalCost,
     matchedTotalCost,
     costOutsideHorizon: matchedTotalCost - totalCost,
+    collected,
+    receivableAtHorizon: Math.max(0, revenue - collected),
     interest: cash.totalInterest,
     standaloneInterest: sum(lines.map((line) => line.interest)),
     pbt,
