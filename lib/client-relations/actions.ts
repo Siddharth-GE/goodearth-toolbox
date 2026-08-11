@@ -136,6 +136,48 @@ export async function updateClientRecord(
   return undefined;
 }
 
+/**
+ * The two FormData shims RecordFormDialog needs.
+ *
+ * That component drives every create/edit dialog in the app and hands its
+ * action a (state, formData) pair, so the typed functions above get a thin
+ * adapter rather than a second dialog being written by hand. `?? null`
+ * everywhere because an untouched input arrives as "" and a blank mobile
+ * is not the empty string.
+ */
+function clientFromForm(formData: FormData): ClientInput {
+  const text = (key: string) => {
+    const value = formData.get(key);
+    return typeof value === "string" && value.trim() ? value : null;
+  };
+  return {
+    name: (formData.get("name") as string) ?? "",
+    mobile: text("mobile"),
+    email: text("email"),
+    stage: (formData.get("stage") as string) ?? "prospect",
+    ownerId: text("ownerId"),
+    source: text("source"),
+    firstContactOn: text("firstContactOn"),
+    lostReason: text("lostReason"),
+    notes: text("notes"),
+  };
+}
+
+export async function createClientForm(
+  _state: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  return createClientRecord(clientFromForm(formData));
+}
+
+export async function updateClientForm(
+  clientId: string,
+  _state: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  return updateClientRecord(clientId, clientFromForm(formData));
+}
+
 // ---------------------------------------------------------------------
 // Adding them to the master
 // ---------------------------------------------------------------------

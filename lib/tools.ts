@@ -174,11 +174,11 @@ export const TOOLS: Tool[] = [
   },
   {
     name: "Client Relations",
-    description: "Every client and enquiry, from first visit to handover.",
+    description: "Every client and plot, from first visit to the last payment.",
     href: "/client-relations",
     icon: "Handshake",
     group: "Management",
-    built: false,
+    built: true,
   },
   {
     name: "Financial Management",
