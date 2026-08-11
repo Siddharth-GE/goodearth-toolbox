@@ -1,509 +1,78 @@
-# Goodearth Toolbox — status & session log
+# Status — what exists and works
 
-Where we are: what's shipped, settled decisions, the session log.
-Updated at the end of every session; finished work moves here from
-`TODO.md`. Per-tool detail lives in each tool's `PLAN.md`; durable
-rules in `CLAUDE.md`; full history in git. Stays lean by design.
+A snapshot, not a changelog. Durable rules live in `CLAUDE.md`, next tasks in
+`TODO.md`, open findings in `AUDIT.md`, per-tool detail in each tool's
+`PLAN.md`, and full history in git.
 
-## Now
+_Last reviewed: 2026-08-11 (full architecture, security and performance audit)._
 
-**Phases 1–8 shipped** (Masters → Selections → Budgets → Indents →
-Purchase Orders → Inventory → Bills, the last merged 2026-08-04 after
-the founder's browser gates and the single-grant probe smoke). The
-chain runs design → price → indent → PO → goods in / stock / goods
-out → bill → paid.
+## Platform
 
-**Relay Phase 1 is live** (PR #2 merged 2026-08-10 after the founder's
-browser pass, CI green, branch deleted): the relay, departments (many per
-trail), and a per-project overview whose dates are all calculated.
-**Standard trails and the Relay rename are live** (PR #3 merged
-2026-08-10 after the founder's browser pass, migrations `0041`–`0047`).
-Every project is born with the eight default stages over three years.
-**Next:** unit-level stages rolling up into the project picture, then
-the leaderboard, then links + Google Chat.
+|               |                                                                                                                                                              |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Production    | `goodearth-toolbox.vercel.app` — `master` auto-deploys on push                                                                                               |
+| Region        | Vercel `bom1` + Supabase `ap-south-1` — both Mumbai                                                                                                          |
+| Stack         | Next.js 16.2 (Turbopack) · React 19.2 · Tailwind 4 · Supabase Postgres                                                                                       |
+| Migrations    | `0001`–`0048` applied; **`0049` committed but NOT applied** (indexes, preventative)                                                                          |
+| Access model  | **Settled and live.** Per-user grants (`user_apps`) + role bundles (`role_apps`), enforced in the database by `has_app()`. `profiles.team` is a dead column. |
+| Backups       | Supabase managed backups only. No independent export — see TODO.                                                                                             |
+| Measured perf | Warm TTFB ~0.16s; cold ~1.14s. Cold starts dominate. Bundle, fonts, CSS, region all verified fine.                                                           |
 
-**Business Planning is live** (PR #4 merged 2026-08-10 after the
-founder's browser pass, CI green, branch deleted; migration `0048`).
-The founder's `Vihara_BusinessPlan_JV.xlsx` as a tool: a plan is a set
-of LINES — SALE ones you build and sell, HOLD ones you build and keep
-earning from — plus what the whole project owns, with a pure engine
-that recalculates as you type. Verified figure-for-figure against the
-workbook (PBT ₹26.66 Cr at 22.2%; senior living HOLD at 17.92% IRR).
-Completely independent: no foreign key to any other tool.
+## Tools
 
-Note for a cold start: the probe account holds `/inventory`, not
-`/relay` or `/business-planning`. Nothing is in flight.
+| Tool                  | State      | What it does                                                                                                                                                                                                                           |
+| --------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Marathon**          | Production | Race-day kiosk: PIN login, entry capture, bib numbering, admin panel. Live since 30 Jul. Own auth, service-role client, `app/marathon/` — the one kiosk pattern, not to be copied.                                                     |
+| **Masters**           | Production | Shared reference data: projects, plots, units, clients, vendors, stores, items, categories, brands, GST rates, item requests. Reads ungated; writes need `/masters`.                                                                   |
+| **Settings**          | Production | People, per-user grants, role templates, approver lists. Admin-only. Holds the single sanctioned service-role call (`inviteUser`).                                                                                                     |
+| **Selections**        | Production | What design specifies per space. Revisions are immutable once issued; drift and downstream-impact panels show what a change would hit.                                                                                                 |
+| **Budgets**           | Production | Prices an issued revision (interiors) plus a construction stage tree. Carry-forward reuses prior prices across revisions. Money RLS-gated.                                                                                             |
+| **Indents**           | Production | Site requests pulled from approved budgets or raised direct. Carries **no money** by design.                                                                                                                                           |
+| **Purchase Orders**   | Production | Raised from indents only. The money entry point; RLS-gated to `/purchase-orders`. Per-line quantity guard prevents over-ordering.                                                                                                      |
+| **Inventory**         | Production | Goods receipts against POs, stock issues, adjustments, stock by location. Quantities only, never cost.                                                                                                                                 |
+| **Bills**             | Production | PO-anchored, labour-contract and NMR bills. A bill has no lines — the paper invoice's figures are the record.                                                                                                                          |
+| **Relay**             | Production | The baton relay: trails, departments, project schedules, standard trail types. Replaced the planned Project Management and Design Management tools. Every project is born with eight default stages over three years.                  |
+| **Business Planning** | Production | The founder's `Vihara_BusinessPlan_JV.xlsx` as a tool — SALE and HOLD lines, pure recalculating engine, sensitivity grid. Verified figure-for-figure (PBT ₹26.66 Cr at 22.2%; senior living HOLD 17.92% IRR). No FK to any other tool. |
+| Management Dashboard  | Stub       | Coming Soon. Route + sidebar entry exist.                                                                                                                                                                                              |
+| Client Relations      | Stub       | Coming Soon.                                                                                                                                                                                                                           |
+| Financial Management  | Stub       | Coming Soon.                                                                                                                                                                                                                           |
+| Directory             | Stub       | Coming Soon.                                                                                                                                                                                                                           |
+| Training              | Stub       | Coming Soon.                                                                                                                                                                                                                           |
 
-|                    |                                                                                                                                                   |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Last worked        | 2026-08-10                                                                                                                                        |
-| Branch             | `master` — Business Planning merged and deployed; nothing in flight                                                                               |
-| Migrations applied | `0001`–`0048` (next is `0049`)                                                                                                                    |
-| Items in database  | 2,633 (2,631 imported catalogue + 2 material seeds); 14 categories / 21 brands                                                                    |
-| Thumbnails         | 897 in Supabase Storage; 1,736 items use the colour placeholder                                                                                   |
-| Built tools        | Marathon, Settings, Masters, Selections, Budgets (Interiors + Construction), Indents, Purchase Orders, Inventory, Bills, Relay, Business Planning |
-| Tests              | `npm test` — 233, all pure logic                                                                                                                  |
+The chain runs end to end: design → price → indent → PO → goods in / stock /
+goods out → bill → paid.
 
-## Next up
+## Notable facts worth not rediscovering
 
-- **Load the founder's master data** — clients, plots, units, from
-  spreadsheets, the `scripts/import-catalogue.ts` way (re-runnable,
-  dry-run default, skip existing, verify counts). Watch: plots/units
-  need their project per row and `unique (project_id, name)` holds;
-  since `0029` **every unit needs its plot** (create plots first, pair
-  1:1 — a double link fails loudly on the unique index); the
-  project/plot **status value lists are my defaults, never
-  confirmed** — ask first. Source files go in `data/` (git-ignored).
-- **Grant `/bills`** in Settings to accounts (and tick their "Approve
-  bills" box), **`/inventory`** to store-keepers (and site engineers if
-  wanted — its reads carry no money).
-- **Letterhead assets** — logo, address, GST number, PO terms → swap
-  into `lib/pdf/document.tsx`'s `Letterhead` (one place); a Geist
-  `.ttf` registered there lifts every PDF at once.
-- **Set up the real roles** once the Masters & Settings branch merges —
-  Site Engineer, Purchase, Accounts, and whatever else matches how the
-  office actually splits work; then assign a role instead of ticking
-  apps one at a time.
-- Smaller, any session: Selections paste-from-Excel; database clean-up
-  once rolling (test indents `IND/SAA/001`–`005`, the inert probe
-  account — both need SQL in Studio, the app refuses by design).
+- **Migrations are applied from this machine** via the management API's
+  `/database/query` endpoint (`SUPABASE_ACCESS_TOKEN` in git-ignored
+  `.env.local`) — not by hand in Studio. Verify, then `npm run db:types`.
+  Use Node for the request; PowerShell's `Invoke-RestMethod` mangles large
+  JSON bodies.
+- **Preview deployments sit behind Vercel's SSO wall** — a preview URL 302s
+  unless that browser is signed into Vercel. So the two-browser probe smoke
+  uses the private window for **production**, and your Vercel-authenticated
+  browser for the preview.
+- **The probe account holds `/inventory` only.** Its password is never stored
+  — set a throwaway one via the auth admin API each time. Its
+  `@goodearth.test` domain isn't real, so recovery emails can never arrive.
+  The reset did work on 2026-08-10; try it before assuming a browser pass is
+  impossible.
+- **Relay's `replaceFutureLegs`, `editableFromLeg` and `scoreAll` are unused
+  on purpose** — tested write paths not yet wired to a screen. Don't let a
+  cleanup delete them.
+- **Line pulls are deliberately non-atomic** — row-by-row so the quantity
+  guard can refuse one line with a useful message rather than failing the
+  whole basket. Each reports partial success honestly.
+- **Full CI browser smoke was costed and declined** (2026-08-03);
+  `check:actions` covers the known outage class.
 
-## Decisions locked in
+## Settled decisions
 
-- **Relay replaces Project Management and Design Management** (founder,
-  2026-08-10). One module is the whole design- and project-management
-  layer; both stubs are deleted, their slugs left inert in the CHECKs.
-  UI keeps the shared nouns **Project** and **Unit** — a villa must not
-  be a "Unit" in Selections and a "Territory" here — and uses game words
-  only for Relay's own ideas (trail, baton, leg, cold, flow). Code and
-  data speak plainly throughout: chain, leg, stuck, points.
-- **Relay dates are worked out, never typed** (founder, 2026-08-10).
-  The only stored inputs are a project's start date and each stage's
-  length in weeks; every date on screen is calculated on read. Inserting
-  a stage moves every later date by itself, and no two dates can
-  contradict each other. **A trail can be in several departments at
-  once** — cross-department is the normal case, so it is a join table.
-- **Relay's event log IS its state.** No status column, no stored
-  holder, no stored points — all derived by replay. Events snapshot the
-  assignee and expected days at the moment the baton lands, which is what
-  stops a leg edit rewriting whether a past push was on time, and what
-  lets the guard rule on a new event from the last event row alone.
-  Bouncing is rewarded (+5) and never punished; it is impossible without
-  a reason and a note, at the database. Expected days are whole days,
-  because elapsed time is counted in **IST calendar days**.
-- **Relay was called Pusher until 2026-08-10** (`0047`). The URL, the
-  folders, the tool name and the **grant slug** all moved together —
-  grants and all 27 policies in one transaction, because a half-done
-  permission rename denies everyone silently. The **tables stay
-  `pusher_*`**: renaming them is not additive and would break production
-  from the moment it applied until the branch merged.
-- **The leg IS the activity** (founder, 2026-08-10; `0043`). A trail is
-  an ordered list of activities, each with a person and days — no
-  sub-legs, nothing to type. A **trail type** is a named trail with its
-  activities fixed, so a whole villa's run lands in one click and only
-  the people need choosing. The first cut made a type produce twelve
-  separate trails; one trail with twelve activity-legs has **one baton
-  and one clock**, which is both simpler and what stops a house going
-  cold on work nobody started.
-- **A queued trail has no clock** (founder, 2026-08-10; `0041`). A trail
-  can be laid out today and begun when the site is actually ready.
-  "Not started" is derived, not stored: a queued trail has **no events
-  yet**, which is why it costs no status column — and why both 0036
-  guards already handled it without a line of change.
-- **A business plan is a set of LINES** (founder, 2026-08-10). Two kinds
-  cover every product: SALE, which you build and sell, and HOLD, which
-  you build and keep earning from. Some projects are one line, most a
-  mix. Each line carries its own land, costs, velocity, cashflow and
-  interest and is readable standing alone; the plan owns the horizon, the
-  financing rate, the land DEAL, overheads and common infrastructure.
-  **Business Planning is completely independent** — the founder's word —
-  so `0048` has no foreign key outside `profiles`, nothing in the tool
-  reads another tool's data, and it has no row in the cross-tool contract
-  table. A plan can be for land nobody has bought.
-- **A plan's inputs are one jsonb document** (`0048`), the first in this
-  schema. A modelling tool gains assumptions constantly, and a column per
-  assumption means a migration each time against an additive-only rule.
-  The trade is that Postgres cannot check the contents, so
-  `parsePlanInputs` is the only door in — it defaults and clamps every
-  field, on the way out AND on the way in — and `schema_version` is
-  stored so an old document can be carried forward in code.
-- One `items` table for products and materials, split by `kind`.
-- Prices are **snapshotted onto lines at pick time**; master edits
-  never rewrite existing lines. Same principle for PO `gst_pct`.
-- An issued selection revision is **immutable** (trigger, `0006`); no
-  soft deletes anywhere — history is revisions + the audit log.
-- `line_key` is a line's cross-revision identity; Budgets prices
-  against it; downstream anchors use `(budget_id, line_key)`.
-- Margin is `/budgets`-only, PO money `/purchase-orders`-only; the only
-  sanctioned windows are the `approved_*` and `po_*facts` views (see
-  CLAUDE.md — column lists are the boundary).
-- Indents carry no money; numbered `IND/<project code>/NNN`, minted in
-  the database, gaps accepted; **approved is terminal** — no delete.
-- Construction plans are materials + quantities only — free-form
-  stages, no approval, one living plan per unit, QS-owned.
-- Approvers (indents and bills) are named lists managed in Settings,
-  enforced by DB guards — **triggers are the boundary, buttons are a
-  courtesy**.
-- POs come from approved indents only; one vendor + one plot/unit
-  ("GEN" for general); `PO/<project>/<scope>/NNN` minted per scope.
-  Over-ordering is impossible at the database (unique + advisory-lock
-  guard); a PO line's uom is locked to its indent line's.
-- Deleting an issued PO is request → admin approves, trigger-enforced.
-- Bills (Phase 8, 2026-08-04): a bill is one of **three kinds** — an
-  issued PO, an **approved** labour contract, or **NMR daily wages**
-  (no anchor, vendor optional — nothing when the muster roll is paid
-  directly); numbered `BILL/<project>/<scope>/NNN`, the scope derived
-  from the anchor (NMR picks it directly); amounts stored **as
-  entered** from the paper (no total-equals-sum CHECK); over-billing
-  **warns, never blocks** (NMR never warns — no ceiling exists);
-  **self-approval allowed**; paying needs one free-text `payment_ref`;
-  "Unpaid" = `status <> 'paid'`; recorded bills are recorder-or-admin
-  deletable, approved/paid are permanent. **Labour contracts live in
-  the Bills tool** (`/bills/contracts`, moved out of Masters in 0026):
-  any `/bills` holder records one, a bill approver or admin approves
-  it, terms lock on approval, deactivating is the off-switch. Bill
-  money is `/bills`-gated; the windows are `bill_facts` (money-free,
-  open) and `po_billing_totals` (`/purchase-orders` OR `/bills`, one
-  totals row per PO).
-- Attribution everywhere: `components/ui/attribution.tsx` + stamp
-  `updated_by`.
-- **Plot ↔ unit is strictly 1:1** (founder, 2026-08-04; migration
-  `0029`): every unit sits on exactly one plot, one unit per plot,
-  same project both sides. Forms ask one "For" question via the shared
-  `SitePicker` (`components/masters/site-picker.tsx` +
-  `lib/masters/site-options.ts`) — a pair submits the unit id, a
-  unit-less plot the plot id, so scope codes and RPCs are untouched.
-  Stock folds 'unit' rows into their plot. Every-plot-has-a-unit is
-  the soft side — surfaced on the plots list, not DB-enforced.
-- Item codes are 4-letter sub-type + 3 digits (`BENS001`); nothing
-  auto-generates today — any future generator follows this, not
-  categories.
-- Images: grid tiles load `thumb_url` only (ours, in Storage);
-  `image_url` stays a borrowed vendor link (no `remotePatterns` entry
-  yet, deliberate); 1,736 image-less items use the `color-hash`
-  placeholder — the majority case, designed for. Image fetching is
-  never bundled into a data import.
-- The three documents: **A** design document (Selections, no prices,
-  client) · **B** budget sheet (cost + margin, internal) · **C** client
-  quote (client rates only). C renders from `QuoteData`
-  (`lib/budgets/quote.ts`), which has **no cost/margin fields** — a
-  template mistake is a compile error, not a leaked margin.
-
-## Open decisions — ask at the phase that needs them
-
-- Phase 2 (dormant): can a design start on an unsold unit?
-- From Phase 1: the project/plot/unit status value lists (defaults,
-  unconfirmed — see master-data load above).
-
-## Deferred, with the trigger for revisiting
-
-- `audit_log` retention — revisit past a few million rows.
-- Actions trust their inputs' relationships (DB constraints are the
-  boundary; ~200 trusted staff) — revisit only if outsiders arrive.
-- Actor FKs are `NO ACTION` so past actors can't be deleted from auth —
-  flip to `on delete set null` when offboarding first needs it.
-- `space_views` storage orphans (deleted spaces leave JPEGs) — someday.
-- Two accepted races: `moveSpaceView` sort swap (self-heals) and
-  Marathon PIN lockout (fix rides the next Marathon migration).
-- **Inventory's partial-write window.** A goods receipt (and a stock
-  issue) mints its header in an RPC, then inserts lines one at a time so
-  the over-receipt / negative-stock guard can name the line it refused.
-  A refusal part-way therefore leaves a note holding fewer lines than
-  arrived, and nothing can add lines to it afterwards — the recovery is
-  a second receipt against the same PO, which the guards make safe, and
-  which the message now says. Folding the lines into the RPC would close
-  the window but lose the per-line refusal. Revisit if a store-keeper
-  actually hits it.
-- `lib/selections/views.ts` stays put until a third consumer appears.
-- Full CI browser smoke **costed and declined** (2026-08-03);
-  `check:actions` covers the known outage class — revisit only if a
-  different runtime action failure reaches production.
-
-## Environment & working notes
-
-- Production: `goodearth-toolbox.vercel.app`. Post-deploy and pre-merge
-  verification habits are in CLAUDE.md (probe-user smoke, the
-  write-button press).
-- Migrations are applied from this machine since 2026-08-04: the
-  `toolbox-cli` personal access token sits in git-ignored `.env.local`
-  (`SUPABASE_ACCESS_TOKEN`); POST the SQL to the management API's
-  `/database/query` endpoint (what Studio's editor does), verify with
-  an information_schema count, then `npm run db:types`. Use Node for
-  the request — PowerShell's Invoke-RestMethod mangles large JSON
-  bodies. Revoke/rotate the token from the Supabase dashboard anytime.
-- **Preview deployments sit behind Vercel's SSO wall** — a preview URL
-  302s to `vercel.com/sso-api` unless that browser is signed into
-  Vercel. So the two-browser probe smoke can't put the probe in a
-  private window on a preview: use the private window for **production**
-  and your own Vercel-authenticated browser for the preview.
-- **The probe's password is never stored.** Set a throwaway one via the
-  auth admin API each time (`PUT /auth/v1/admin/users/<id>` with the
-  service-role key). Its `@goodearth.test` domain is not real, so
-  password-recovery and magic-link emails can never arrive — the
-  dashboard's user menu only offers those, and won't get you in.
-- **The probe smoke DID run on 2026-08-10**, twice — the password reset
-  via the auth admin API was not blocked this time, unlike the two
-  sessions before it. So the block is not permanent; try it before
-  assuming a browser pass is impossible. Both runs drove the local
-  production build as a `/relay`-only user.
-- A three-line Node script that POSTs a `.sql` file to the management
-  API's `/database/query` is the whole migration workflow; keep it in the
-  session scratchpad. Two traps when generating SQL through JavaScript:
-  `String.replace` treats `$$` in the replacement as an escape and will
-  silently turn `do $$` into `do $`, and `LIKE 'pusher_%dept%'` is not a
-  reliable way to check a table list.
-- Pre-push smoke: Playwright installed in the session scratchpad,
-  `npm run build && npm start`, drive localhost as the probe user
-  (reset its password via the auth admin API; never stored).
-- `sharp` can't load its win32 binary locally — Selections' upload
-  action fails **locally only**; Vercel is fine. Not an app bug.
-- `npm test`'s glob is shell-dependent — check that before assuming
-  green. Git Bash rewrites `/budgets`-style args into Windows paths —
-  use PowerShell for REST calls with app slugs.
-- **CI stops at the first failing step, and Lint is second.** A green
-  push is not a green build — two apostrophes hid the whole gate for
-  five days. `gh run list` after pushing.
-- Lessons that stuck: Server Actions are wrong for reads (catalogue
-  search is a Route Handler) and cap bodies at 1 MB; Storage has its
-  own RLS and service-role checks prove nothing about real users;
-  Postgres view columns come back nullable from the type generator —
-  normalise at the read boundary; on Windows kill servers by port, not
-  `pkill`; audited tables need a surrogate `id`; PDFs print digits-only
-  (`formatAmount` — Helvetica has no ₹).
-
-## Session log
-
-One line per day; full detail in git history and the PLAN.md files.
-Entries before 2026-08-10 evening were written when Relay was called
-**Pusher**; the name changed everywhere (`0047`) but the branch names and
-the applied migrations still say pusher, and the tables always will —
-`0047` records why renaming them was refused.
-
-- **2026-08-10 (Business Planning)** — the founder handed over
-  `Vihara_BusinessPlan_JV.xlsx`, thirteen sheets of eco-village
-  feasibility, and asked for it as a tool "for quick plans". Its own
-  Guide sheet said to reuse it by cloning the file per village, which is
-  the spreadsheet problem this toolbox exists to end. Shape set by the
-  founder in one sentence: **a plan is a set of LINES** — row house,
-  plotted, apartment, commercial, senior living — each with its own land,
-  revenues, expenses and velocity-driven interest, some projects one
-  thing and some a mix, collated in a summary, and **"keep this app
-  simple and independent completely"**. Two line kinds cover all five:
-  SALE and HOLD. Migration `0048`: one table, the whole document as jsonb,
-  SELECT grant-gated the way Budgets guards money, and **no foreign key
-  outside `profiles`** — independence taken literally, so a plan can be
-  for land nobody has bought.
-  The engine is pure and runs in the browser and on the server, so the
-  list page and the plan cannot show different numbers. **It reproduces
-  the workbook figure for figure** — PBT ₹26.66 Cr at 22.2%, the Base
-  construction of ₹39.43 Cr that is short because the last row houses
-  sell too late to finish inside six years, and the senior-living HOLD
-  verdict at 17.92% IRR — which is the acceptance test, since the
-  workbook was arrived at independently by hand.
-  **Four things the port found in the workbook**, each commented where it
-  differs: its "peak funding" of ₹5.91 Cr is `-MIN(closing cash)` and is
-  NEGATIVE — the cash never goes below zero, so that is headroom at the
-  worst month and nothing needs raising; its ex-SL block charges no
-  interest at all because Excel makes that a circular reference; its
-  collection convolution drops instalments past a fixed 31-month window;
-  and its Venture IRR reads 1150% and −52% off flows that open positive.
-  Merged as PR #4 after the founder's browser pass. The permission
-  boundary was exercised against the live database in a rolled-back
-  transaction, both ways: a real staff account without the grant sees
-  zero plans and cannot insert (42501); granted, the same account reads,
-  writes and deletes.
-- **2026-08-10 (Relay, built and shipped in one day)** — merged in two
-  PRs, migrations `0036`–`0047`. The founder brought a concept and a
-  mockup; it supersedes the planned Project Management and Design
-  Management tools and is now the whole layer. Built in this order:
-  the **relay** (trails, legs, the baton, cold), **departments**
-  (many-to-many — a selections handoff really is Design _and_ Purchase),
-  the **project schedule** (dates worked out, never typed), **trail
-  types** laid down on a **house**, and finally the **rename to Relay**.
-  All 18 guard rules were exercised against the live database in a
-  rolled-back transaction before a line of app code, and the queue's nine
-  the same way. `day.ts` exists because Vercel and Postgres run UTC and
-  the office is +05:30, which is wrong in the _other_ direction for five
-  and a half hours of every day.
-  **What only the browser found**, across three rounds: a stretched route
-  SVG, a leg list reading across instead of down, `revalidatePath`
-  leaving the mover's own page stale, `audit_row()` on a table with no
-  `id` (0039 → 0040) so no schedule could be saved at all, a
-  `router.refresh()` inside `useTransition` greying out a form
-  permanently, and the progress bar painting a **weighted total from the
-  left edge** — claiming work on stages nobody had touched.
-  **What only typecheck found:** `0041` rebuilt `pusher_chain_state` from
-  **0036's** copy, silently dropping the department columns `0038` had
-  added, and broke All trails against the live database until `0042`.
-  That view has now been defined five times; always read
-  `pg_get_viewdef` first.
-  **The founder's two corrections, both of which simplified the design:**
-  "the leg IS the activity" (`0043`) collapsed a trail to an ordered list
-  of activities and turned a twelve-trail standard set into one trail
-  with twelve steps — one baton, one clock, and the cold-early problem
-  stopped existing rather than being managed; and "reduce the clutter"
-  moved activities and trail types behind a gear and the schedule editor
-  onto a button on the picture it edits.
-  Seed data (`0045`/`0046`): 22 activities, 3 trail types, and eight
-  default stages over three years on every project, given to future ones
-  by a `security definer` trigger — definer because projects are created
-  under `/masters` while the stage tables are written under `/relay`.
-  **No trails, people or progress were seeded**: a fake baton in a real
-  person's court is the exact lie this tool exists to stop.
-  Two notes for whoever reads this next. The single-grant probe smoke did
-  **not** re-run after the route move — the new routes are argued from
-  the code path, not driven in a browser. And while signed out,
-  production answers **200 for every path**, including nonsense ones,
-  because the middleware bounces to `/login` before routing resolves:
-  curling a URL proves nothing about whether it exists. Use the GitHub
-  deployments API to confirm what Vercel actually shipped.
-  DESIGN.md gains Relay as its **one stated motion exception** (a stuck
-  trail breathes rather than blinks) and, with it, the app's first
-  `prefers-reduced-motion` guard, which covers every tool.
-- **2026-08-10 (independence audit — kernel failure modes)** — audited
-  the whole repo against the toolbox doctrine; merged to `master` (PR #1)
-  after the founder reproduced the redirect loop on production and
-  confirmed the fix on the preview. **The tool boundaries hold:**
-  the only cross-tool imports in the app are the two sanctioned ones
-  (overview→marathon, budgets quote→selections views), every cross-tool
-  table touch is a `SELECT`, the service-role client appears only in
-  Marathon and `inviteUser`, and every sequential number is minted in
-  plpgsql under a counter row lock. Every finding was in the **shared
-  kernel's failure modes**. The live one: `dal.ts` answered a failed
-  profile read with `redirect("/login")` while `proxy.ts` bounced any
-  session-holder off `/login` back to `/` — an unbounded redirect loop
-  ending in `ERR_TOO_MANY_REDIRECTS`, the whole toolbox unreachable, and
-  **reachable today by switching off a signed-in colleague** (setActive
-  flips a flag and leaves the session alive). Same class as the
-  2026-08-05 login loop; that fix added logging and left the mechanism.
-  (Housekeeping: the laptop resumed from a 5-day sleep with a stale
-  clock, so the first eight commits on this branch are stamped
-  2026-08-05. Windows resynced itself mid-session; nothing to fix.)
-  A read error now throws, and the `/login` bounce is deleted, so the
-  two real turn-aways reach the login page — where the login action
-  already names a deactivated account. Also: the home page no longer
-  dies with Marathon's service-role env var; **`fetchAll` returns rows
-  and throws** instead of handing back a partial array with an error
-  only 4 of ~70 call sites checked (net 13 lines fewer); the
-  half-recorded-delivery message stopped telling store-keepers to "open
-  it to finish" when nothing can; one round trip off the Settings person
-  page; and the cross-tool read contract is now a table in CLAUDE.md.
-  **CI had been red on every push to master since 2026-08-04** — two
-  unescaped apostrophes failing the Lint step, which runs second, so
-  Types, Tests, Build and `check:actions` never ran for days; fixed, and
-  PR #1 is the first all-green run since. The founder's call on the six
-  illustrative Overview cards: leave them (Phase 9 makes them real).
-  The authenticated smoke did NOT run — the probe password reset was
-  again blocked by the assistant's permission mode — so the redirect
-  loop is proven by code path and CI, not by a browser.
-- **2026-08-05 (masters & settings upgrade)** — merged to `master`.
-  Seven shippable pieces plus two fixes, migrations `0031`–`0035`.
-  **Masters:** the last admins-only write (gst_rates) fixed, audit
-  trails and `updated_at`/`updated_by` on every master, an off-switch
-  for clients/categories/brands, search + filters + paging on vendors /
-  clients / plots / units, and detail pages for vendors, clients and
-  projects reading only the money-free views. **Settings:** the one
-  wide checkbox matrix became People / Roles / Overview — a page per
-  person with grouped apps, approval rights and an access history from
-  `audit_log`; invite (the one sanctioned service-role call) and
-  deactivate, with the last active admin protected at the database;
-  bill approval **limits**; and **role templates**, where `has_app()`
-  learned about bundles so ~80 RLS policies followed with no policy
-  edits. Backward compatibility checked against the live database by
-  impersonating each real user. **Two fixes after the founder's
-  browser test:** the `roles` embed was ambiguous (three FKs back to
-  `profiles`), which made every signed-in person look like nobody and
-  produced a login redirect loop — the query now names the FK, and a
-  failed profile read is logged rather than silently signing someone
-  out; and role-granted approval rights reached the database but not
-  the buttons, so the bill and indent deciders now call the same
-  `can_approve_*` functions the guards do (`0035` also closes those
-  helpers to `anon`). A 4-minute Vercel build was investigated and
-  ruled a queue blip — the eight builds around it all ran ~60s.
-- **2026-08-04 (management group)** — the founder set the vision for
-  the next layer: a **Management** sidebar group above Operations with
-  six Coming Soon tools — Dashboard (a leadership view, distinct from
-  Overview), Project Management, Design Management, Client Relations,
-  Financial Management, Business Planning
-  (`feature/management-group`). Each is a registry entry + stub route
-  (the Directory pattern); the homepage opens with six vision cards
-  drawn from the registry (icon, name, one-liner, Coming Soon badge —
-  no fake numbers). Migration `0030` applied: the six slugs join the
-  `user_apps_app_known` CHECK so Settings can grant them. Names and
-  slugs are now locked in the DB; each tool gets planned with the
-  founder one at a time before any is built.
-- **2026-08-04 (structure pass)** — the audit's bucket C, merged to
-  `master` after the founder's browser pass: new
-  `lib/overview/queries.ts` owns the home page's
-  five reads (the one module allowed to import other tools' queries);
-  catalogue types → `lib/masters/catalogue.ts`; `getPoReceipts` →
-  Purchase Orders; inventory reads split into
-  `receipts-/stock-/issues-queries.ts` over a shared-lookups core;
-  Marathon's `PageHeader`/`AnimatedReveal` → `app/marathon/_components`;
-  one `PageLoading` replaces 16 loading.tsx copies; Selections migrated
-  onto the shared catalogue picker (space chips and request-item kept,
-  421-line copy deleted); `/selections` and `/masters/units` page 50 at
-  a time (the unit dialog still gets the complete list for its
-  plot-uniqueness check). Post-merge the founder found every
-  attribution rendering a dash — not a regression: no profile ever had
-  a `full_name` (dashboard-created accounts aren't asked). Fixed the
-  data by SQL (both founder accounts "Siddharth", the probe
-  "Probe (test)") and Settings gained a per-person name field
-  (save-on-blur → `setFullName`) — naming a person there is now part
-  of onboarding. The pre-merge probe smoke did NOT run this session:
-  resetting the probe password (auth admin API) was blocked by the
-  assistant's permission mode; founder verified in the browser instead.
-- **2026-08-04 (night)** — **Plot ↔ unit 1:1** (Stream A of the
-  founder's three asks; `feature/plot-unit-one-to-one`, migration
-  `0029` applied): units.plot_id NOT NULL + unique + same-project FK;
-  indents gain the scope XOR (11 test indents carried both — unit
-  kept); the four scope forms (indents' two dropdowns, PO, NMR bill,
-  contract) collapse onto one shared SitePicker; unit dialog requires
-  a free plot; plots list shows its unit; Stock drops the 'unit'
-  location kind. Streams B (plot at every goods destination) and C
-  (attribution everywhere) are next, per the approved plan.
-- **2026-08-04 (evening)** — **Indents revision-safety fix**
-  (`feature/indents-revision-guard`, migration `0028` applied): the
-  founder reported that the interiors pull offered every approved
-  budget, old revisions included, and "already asked" was scoped to one
-  budget — the same line could be indented twice across revisions. Pull
-  chooser now offers only each unit's issued revision (paused units say
-  "R2 issued — budget pending approval"), scoped to the indent's unit;
-  dedupe spans all of a unit's budgets by line_key; a DB trigger
-  backstops stale pulls; drift badges on indent lines and a
-  "affects IND/…, PO/…" impact panel on the Selections diff page warn
-  when a revision touches live orders.
-- **2026-08-04 (later)** — **Architecture audit** (three parallel
-  sweeps: independence, boundaries, performance; verdict: holds).
-  Fixed on `feature/audit-fixes`: the Marathon walk-any-bib read, four
-  guardless Settings queries, every remaining silent 1,000-row cap
-  (worst: selection lines feeding the PDF/CSV/diff), middleware auth
-  now verified locally (getClaims) instead of a network call per
-  request, the construction full-table read, Bills' double scans and
-  over-broad options, inventory history location pushdown, four page
-  waterfalls. `0027` written (contract values → `/bills`). Bucket C
-  (structure moves) queued in TODO.md for its own session. Probe smoke
-  passed locally against the production build.
-- **2026-08-04** — **Bills shipped** (`0025` + `0026`, merged after the
-  founder's browser gates and a 12-check single-grant probe smoke at
-  the RLS boundary): record/approve/send-back/pay, over-billing
-  warning, bill approvers in Settings, PO billed picture, Overview
-  04–05 real. Founder corrections mid-build (`0026`): labour contracts
-  moved from Masters into Bills with their own approval step, and
-  **NMR daily-wage bills** added (no anchor, vendor optional). The
-  Studio bottleneck fell: migrations now apply from this machine via
-  the management API (token in `.env.local`). Also: docs slimmed
-  earlier the same day.
-- **2026-08-03** — three phases in one day. **Indents** (5 gates) — and
-  the production outage found, hotfixed and permanently guarded
-  (`check:actions`); margin secrecy proved as a real single-grant user.
-  **Purchase Orders** (`0020`–`0022`). **Inventory** (`0023`, then
-  `0024` when the founder wanted plots on Stock) — the store-keeper
-  smoke caught the catalogue-allowlist 403. `PLAN.md` → `STATUS.md` +
-  `TODO.md` split.
-- **2026-08-01** — Selections, design views, Budgets shipped; the
-  five-stage audit merged (escalation closed, 1,000-row bug killed,
-  shared primitives extracted); CI + Prettier added.
-- **2026-07-31** — Masters shipped; the real 2,631-item catalogue
-  imported and thumbnailed (3 vendor URLs already dead — the link-rot
-  that justified our own thumbnails).
+- Relay replaced Project Management and Design Management. Their slugs remain
+  in the database CHECKs (additive-only) but nothing links to them.
+- A bill has no line items, by founder decision.
+- POs come from indents only — never directly from a budget.
+- Indents and Inventory never carry money.
+- English-only UI is sufficient for all staff (founder-confirmed 2026-08-04).
+- Site staff use phones at site; site-facing tools must genuinely work there.
