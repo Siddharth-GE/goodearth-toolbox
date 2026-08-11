@@ -298,7 +298,11 @@ warm (a platform setting, not a code change) is the single biggest lever.
 After that, moving the greeting `<h1>` above the auth await so the shell
 paints before the profile query resolves.
 
-### PERF-02 · MEDIUM · Five missing indexes — preventative, not the cause
+### PERF-02 · ~~MEDIUM~~ CLOSED · Five missing indexes — preventative, not the cause
+
+**Closed 2026-08-11.** Migration `0049` applied ahead of `0050`, and all five
+indexes verified present in production. The finding below stands as written —
+it changed nothing measurable, which was always the point.
 
 `indents.created_at`, `indent_lines.created_at`, `purchase_orders.issued_at`,
 `bills.created_at`, `bills.paid_at` are all filtered by the thirteen

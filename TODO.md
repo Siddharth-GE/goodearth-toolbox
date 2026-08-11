@@ -69,9 +69,24 @@ away already; not asked for).
 
 ## 5. Management group — plan one tool at a time
 
-Three stubs remain: Dashboard, Client Relations, Financial Management. Each
-gets its own planning session with the founder before any code. **No order
-agreed — ask which comes first.**
+Client Relations shipped 2026-08-11 (migrations `0050`/`0051`; see its own
+`PLAN.md`). **Two stubs remain: Dashboard and Financial Management.** Each gets
+its own planning session with the founder before any code. **No order agreed —
+ask which comes first.**
+
+Financial Management now has an obvious first question: Client Relations
+already holds every rupee coming in, and Bills holds every rupee going out.
+Whatever that tool becomes, it reads those two rather than re-recording either
+— and CRM's tables are grant-gated on SELECT, so it needs a money-free view
+with a hand-written column list, never a second policy.
+
+Two follow-ups the founder asked to defer on Client Relations:
+
+- **Grant `/client-relations` in Settings** to Anu, Sayooj and Sebastina.
+  Until then only admins can see the tool at all.
+- **The sheet's "Blocked" plots (34, 35, 43) are `reserved`** — the schema has
+  no blocked status and `import-saarang.ts` mapped them across. Nobody has
+  confirmed that reads right on screen.
 
 ## 6. Business Planning follow-ups
 
@@ -92,8 +107,8 @@ per `DESIGN.md`, not a chart library).
 
 ## 7. From the audit — lower priority
 
-- **Apply migration `0049`** (five Overview indexes). Preventative only —
-  tables hold under 100 rows, so it changes nothing today. Nothing waits on it.
+- ~~**Apply migration `0049`**~~ — applied 2026-08-11, ahead of `0050`. All
+  five indexes verified present. Closes AUDIT.md PERF-02.
 - **CI check pinning the money-free views' column lists** (`AUDIT.md` SEC-02).
   Those views bypass RLS by design; their column list _is_ the boundary and a
   comment is currently the only guard. ~30 lines. Needs a decision on where
