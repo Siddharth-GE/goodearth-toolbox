@@ -194,6 +194,20 @@ export async function listClientsPage(
 // The plot register — the spreadsheet, as rows
 // ---------------------------------------------------------------------
 
+/**
+ * NOTE THE `!units_plot_id_fkey` ON `plots`, and do not drop it.
+ *
+ * `units` has TWO foreign keys to `plots` — the plain `units_plot_id_fkey`
+ * and the composite `units_plot_same_project` added by 0029 to guarantee a
+ * unit's plot belongs to the unit's project. PostgREST cannot choose
+ * between them, so a bare `plots(...)` embed returns HTTP 300 PGRST201,
+ * "Could not embed because more than one relationship was found", and
+ * every screen using this select dies on the error boundary.
+ *
+ * Nothing local catches this: it is not a type error, `next build` compiles
+ * it happily, and the tests are pure logic with no database. It is only
+ * visible by running the query against PostgREST.
+ */
 const ENGAGEMENT_SELECT = `
   id, unit_id, project_id, crm_owner_id,
   sale_deed_status, sale_deed_original_with, sale_deed_ack, sale_deed_signed_on,
@@ -203,7 +217,7 @@ const ENGAGEMENT_SELECT = `
   plot_value, construction_value, updated_at,
   units!inner (
     id, name, code, status, client_id,
-    plots ( name, code ),
+    plots!units_plot_id_fkey ( name, code ),
     clients ( id, name ),
     projects ( id, name )
   )

@@ -98,6 +98,17 @@ column anywhere, and there must never be one.**
   than per-villa (`0039` deferred that deliberately). "3 running, 1 stuck" is
   honest. "Foundation complete" would be a lie, and the panel is written to
   make that lie hard to add later.
+- **The `plots` embed must name its foreign key: `plots!units_plot_id_fkey`.**
+  `units` has had two FKs to `plots` since `0029` — the plain one and the
+  composite `units_plot_same_project` guard — so a bare `plots(...)` embed
+  through `units` is ambiguous and PostgREST answers HTTP 300 PGRST201. It
+  shipped broken: the plot register, both detail pages and Collections all
+  died on the error boundary while `format → lint → typecheck → test → build`
+  was fully green. **Nothing local catches this class of bug** — it is not a
+  type error, `next build` compiles it, and the tests are pure logic with no
+  database. Other tools embed `plots(name)` safely because they hang it off
+  `bills`/`indents`/`purchase_orders`, which have one FK each; only a path
+  through `units` is ambiguous. The only real check is running the query.
 - **`lib/relay/queries.ts` is unusable from here** — every function in it opens
   `requireTool("/relay")`, and one tool never imports another tool's code.
   `getRelayForUnits` reads `pusher_chain_state` directly, which is granted to
