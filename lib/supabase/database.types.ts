@@ -540,41 +540,330 @@ export type Database = {
           },
         ]
       }
-      clients: {
+      client_engagements: {
+        Row: {
+          bottlenecks: string[]
+          ca_ack: string | null
+          ca_original_with: string | null
+          ca_signed_on: string | null
+          ca_status: string
+          check_in_on: string | null
+          construction_value: number | null
+          created_at: string
+          created_by: string | null
+          crm_owner_id: string | null
+          design_support: string | null
+          details: string | null
+          id: string
+          plot_value: number | null
+          project_id: string
+          registration_note: string | null
+          registration_on: string | null
+          registration_stage: string
+          sale_deed_ack: string | null
+          sale_deed_original_with: string | null
+          sale_deed_signed_on: string | null
+          sale_deed_status: string
+          unit_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          bottlenecks?: string[]
+          ca_ack?: string | null
+          ca_original_with?: string | null
+          ca_signed_on?: string | null
+          ca_status?: string
+          check_in_on?: string | null
+          construction_value?: number | null
+          created_at?: string
+          created_by?: string | null
+          crm_owner_id?: string | null
+          design_support?: string | null
+          details?: string | null
+          id?: string
+          plot_value?: number | null
+          project_id: string
+          registration_note?: string | null
+          registration_on?: string | null
+          registration_stage?: string
+          sale_deed_ack?: string | null
+          sale_deed_original_with?: string | null
+          sale_deed_signed_on?: string | null
+          sale_deed_status?: string
+          unit_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          bottlenecks?: string[]
+          ca_ack?: string | null
+          ca_original_with?: string | null
+          ca_signed_on?: string | null
+          ca_status?: string
+          check_in_on?: string | null
+          construction_value?: number | null
+          created_at?: string
+          created_by?: string | null
+          crm_owner_id?: string | null
+          design_support?: string | null
+          details?: string | null
+          id?: string
+          plot_value?: number | null
+          project_id?: string
+          registration_note?: string | null
+          registration_on?: string | null
+          registration_stage?: string
+          sale_deed_ack?: string | null
+          sale_deed_original_with?: string | null
+          sale_deed_signed_on?: string | null
+          sale_deed_status?: string
+          unit_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_engagements_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_engagements_crm_owner_id_fkey"
+            columns: ["crm_owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_engagements_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_engagements_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: true
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_engagements_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_payment_milestones: {
         Row: {
           created_at: string
-          email: string | null
+          created_by: string | null
+          due_amount: number | null
+          due_on: string | null
+          engagement_id: string
           id: string
-          is_active: boolean
-          mobile: string | null
-          name: string
-          notes: string | null
-          updated_at: string | null
+          invoice_no: string | null
+          invoiced_on: string | null
+          note: string | null
+          sort_order: number
+          stage: string
+          updated_at: string
           updated_by: string | null
         }
         Insert: {
           created_at?: string
-          email?: string | null
+          created_by?: string | null
+          due_amount?: number | null
+          due_on?: string | null
+          engagement_id: string
           id?: string
-          is_active?: boolean
-          mobile?: string | null
-          name: string
-          notes?: string | null
-          updated_at?: string | null
+          invoice_no?: string | null
+          invoiced_on?: string | null
+          note?: string | null
+          sort_order?: number
+          stage: string
+          updated_at?: string
           updated_by?: string | null
         }
         Update: {
           created_at?: string
+          created_by?: string | null
+          due_amount?: number | null
+          due_on?: string | null
+          engagement_id?: string
+          id?: string
+          invoice_no?: string | null
+          invoiced_on?: string | null
+          note?: string | null
+          sort_order?: number
+          stage?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_payment_milestones_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_payment_milestones_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "client_engagements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_payment_milestones_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_receipts: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          engagement_id: string
+          id: string
+          milestone_id: string | null
+          mode: string
+          note: string | null
+          received_on: string
+          reference: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          engagement_id: string
+          id?: string
+          milestone_id?: string | null
+          mode?: string
+          note?: string | null
+          received_on?: string
+          reference?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          engagement_id?: string
+          id?: string
+          milestone_id?: string | null
+          mode?: string
+          note?: string | null
+          received_on?: string
+          reference?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_receipts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_receipts_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "client_engagements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_receipts_milestone_fkey"
+            columns: ["milestone_id", "engagement_id"]
+            isOneToOne: false
+            referencedRelation: "client_payment_milestones"
+            referencedColumns: ["id", "engagement_id"]
+          },
+          {
+            foreignKeyName: "client_receipts_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clients: {
+        Row: {
+          converted_on: string | null
+          created_at: string
+          crm_owner_id: string | null
+          email: string | null
+          first_contact_on: string | null
+          id: string
+          is_active: boolean
+          lost_reason: string | null
+          mobile: string | null
+          name: string
+          notes: string | null
+          source: string | null
+          stage: string
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          converted_on?: string | null
+          created_at?: string
+          crm_owner_id?: string | null
           email?: string | null
+          first_contact_on?: string | null
           id?: string
           is_active?: boolean
+          lost_reason?: string | null
+          mobile?: string | null
+          name: string
+          notes?: string | null
+          source?: string | null
+          stage?: string
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          converted_on?: string | null
+          created_at?: string
+          crm_owner_id?: string | null
+          email?: string | null
+          first_contact_on?: string | null
+          id?: string
+          is_active?: boolean
+          lost_reason?: string | null
           mobile?: string | null
           name?: string
           notes?: string | null
+          source?: string | null
+          stage?: string
           updated_at?: string | null
           updated_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "clients_crm_owner_id_fkey"
+            columns: ["crm_owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "clients_updated_by_fkey"
             columns: ["updated_by"]
@@ -4206,6 +4495,10 @@ export type Database = {
         Args: { p_chains: Json; p_project_id: string; p_unit_id: string }
         Returns: number
       }
+      create_client_engagement: {
+        Args: { p_owner_id?: string; p_unit_id: string }
+        Returns: string
+      }
       create_goods_receipt: {
         Args: {
           p_challan_no: string
@@ -4281,6 +4574,10 @@ export type Database = {
           p_to_store_id: string
         }
         Returns: string
+      }
+      crm_assign_unit: {
+        Args: { p_client_id: string; p_status: string; p_unit_id: string }
+        Returns: undefined
       }
       delete_draft_indent: { Args: { p_indent_id: string }; Returns: undefined }
       delete_draft_purchase_order: {
