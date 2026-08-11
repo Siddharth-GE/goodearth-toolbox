@@ -67,18 +67,48 @@ waiting list (the write path `replaceFutureLegs` exists and is current, just
 unwired), and no "Open a trail" button on the Projects landing page (one click
 away already; not asked for).
 
-## 5. Management group — plan one tool at a time
+## 5. Reporter — planned, ready to build
 
-Client Relations shipped 2026-08-11 (migrations `0050`/`0051`; see its own
-`PLAN.md`). **Two stubs remain: Dashboard and Financial Management.** Each gets
-its own planning session with the founder before any code. **No order agreed —
-ask which comes first.**
+**Dashboard becomes Reporter**, and the stub becomes a report builder: pick a
+data set, choose columns, filters, grouping and sorting, see it as a chart and a
+table, save it by name, download it. Planned with the founder 2026-08-11; the
+full plan is **`app/(dashboard)/management-dashboard/PLAN.md`** (that folder
+becomes `reporter/` in Stage 1 and the file travels with it). Read it before
+touching anything below.
 
-Financial Management now has an obvious first question: Client Relations
-already holds every rupee coming in, and Bills holds every rupee going out.
-Whatever that tool becomes, it reads those two rather than re-recording either
-— and CRM's tables are grant-gated on SELECT, so it needs a money-free view
-with a hand-written column list, never a second policy.
+Ten stages, each shippable and browser-testable on its own:
+
+1. **The rename, alone** — `0052`, `lib/tools.ts`, folder move. No behaviour.
+2. **One dataset, table on screen** — the registry, the spec parser, the builder.
+3. **Charts** — `recharts`, `--chart-1…8` tokens, `components/ui/chart/*`.
+4. **CSV** — `lib/csv.ts` extracted from the Selections route, reused.
+5. **Saved reports** — `0053`, plus the money-free starters.
+6. **The money — ships alone** — `0054`.
+7. **Sales & collections** — `0055`, two CRM fact views.
+8. **The remaining datasets** and their starters.
+9. **PDF** — Recharts → `sharp` → PNG → react-pdf.
+10. **Plan vs actual** — `0056`, Business Planning publishes targets.
+
+Three things the founder decided that are easy to lose:
+
+- **Reporter shows full line-level money, including client rate and margin %.**
+  After Stages 6 and 7, granting `/reporter` shows every vendor rate, every bill
+  amount and the markup on every quoted line. One grant, grantable to anyone in
+  Settings — so the Settings copy beside the checkbox must say so. This is the
+  widest permission change the app has made.
+- **It is a builder, not a fixed shelf of reports.** Seven starting points ship
+  as code constants you can bend and "Save a copy" of.
+- **Charts are core, not a nice-to-have**, and a report is a composed page —
+  headline figures, chart, then the table with subtotals.
+
+**Financial Management is now the one Management stub with no plan**, and it gets
+its own session with the founder before any code. It has an obvious first
+question: Client Relations already holds every rupee coming in, and Bills holds
+every rupee going out. Whatever that tool becomes, it reads those two rather than
+re-recording either — and CRM's tables are grant-gated on SELECT, so it needs a
+money-free view with a hand-written column list, never a second policy. Note that
+Reporter's `0055` will already have built two such CRM fact views; check them
+before writing a third.
 
 Two follow-ups the founder asked to defer on Client Relations:
 
@@ -102,8 +132,15 @@ Neither blocking, both for when the founder next uses it in anger:
   trough separately.
 
 Wanted later, none asked for yet: a one-page PDF of a plan; itemised charge
-and running-cost lines on a HOLD line; a cash curve (hand-rolled inline SVG
-per `DESIGN.md`, not a chart library).
+and running-cost lines on a HOLD line; a cash curve.
+
+**The cash curve's instruction has changed.** This line used to say "hand-rolled
+inline SVG per `DESIGN.md`, not a chart library". Reporter's Stage 3 adds
+`recharts` and the shared `components/ui/chart/*` wrappers, so once that lands
+the cash curve uses those like every other chart — a second, hand-rolled charting
+approach in the same app is exactly the drift the shared components exist to
+prevent. If Business Planning gets there first, build the wrappers as part of it
+and Reporter reuses them.
 
 ## 7. From the audit — lower priority
 
