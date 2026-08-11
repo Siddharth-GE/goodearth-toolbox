@@ -8,13 +8,13 @@
  * app/globals.css falls through to its prefers-color-scheme rule.
  *
  * Nothing about the choice is stored on the person's account: it is a
- * cookie on that browser and nothing more. The cookie is read on the
- * server so the first paint is already the right colour — a theme
- * restored by JavaScript after hydration shows a white flash first.
+ * cookie on that browser and nothing more. It is read by a blocking
+ * inline script in app/layout.tsx, before the page paints — see the note
+ * there for why that rather than reading it in the layout itself.
  *
  * Deliberately pure and import-free so it can be tested (see CLAUDE.md:
- * tests are logic only, no browser), and so both the server layout and
- * the client switch can share one definition of what a valid value is.
+ * tests are logic only, no browser), and so the layout's script and the
+ * client switch share one definition of what a valid value is.
  */
 
 export type Theme = "light" | "dark";
