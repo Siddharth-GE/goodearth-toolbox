@@ -133,8 +133,11 @@ lines and cleared design-drift warnings.
 
 ## Database
 
-Numbered SQL files in `supabase/migrations/`, applied by hand in the Supabase
-Studio SQL editor. No CLI, no local Postgres, no rollback tooling.
+Numbered SQL files in `supabase/migrations/`, applied **from this machine** via
+the management API's `/database/query` endpoint (`SUPABASE_ACCESS_TOKEN` in
+`.env.local`) — not by hand in Studio, and no handover needed. Same endpoint
+reads production when you need to check what is actually there. No CLI, no
+local Postgres, no rollback tooling.
 
 - **Apply the migration first, then merge the code needing it.**
 - **Additive only** — never rename or drop something in use.
@@ -146,8 +149,10 @@ Studio SQL editor. No CLI, no local Postgres, no rollback tooling.
 - New tool → extend **both** `user_apps_app_known` and `role_apps_app_known`
   CHECKs in the same migration, or granting fails at the database.
 
-Make an admin (deliberately no UI):
-`update profiles set role = 'admin' where id = '<uuid>';`
+Making an admin **has a UI now** — the toggle on a person's row in Settings
+(`setAdmin`, guarded by `profiles_guard()`, which refuses to remove the last
+active admin and audits every change). The old `update profiles set role =
+'admin' …` is the fallback for when nobody can get in at all.
 
 ## UI
 
@@ -169,8 +174,15 @@ Using the catalogue picker? Add the grant to the allow-list in
 `NEXT_PUBLIC_SUPABASE_*` vars are public — the anon key is safe _because_ RLS
 is on everywhere; not a secret, but not a permission either.
 `SUPABASE_SERVICE_ROLE_KEY` **bypasses RLS entirely** (server-only; Marathon +
-import scripts). `MARATHON_SESSION_SECRET` signs the kiosk PIN cookie —
-changing it signs everyone out of the kiosk.
+import scripts). `SUPABASE_ACCESS_TOKEN` is the management API key — migrations
+and production queries, local only, never in app code.
+`MARATHON_SESSION_SECRET` signs the kiosk PIN cookie — changing it signs
+everyone out of the kiosk.
+
+Data loads are scripts in `scripts/`, **dry run by default, `--commit` to
+write** (`import-catalogue.ts`, `import-saarang.ts`). Match on a natural key
+and update in place so a re-run is a no-op; never delete to re-insert, because
+live rows carry selections, budgets and indents.
 
 ## Tests & CI
 
