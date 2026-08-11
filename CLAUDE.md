@@ -152,6 +152,14 @@ page fails. Lists state a limit and show "N of M" from a real count, never
 mean opposite things; conflating them has silently destroyed priced budget
 lines and cleared design-drift warnings.
 
+**An embed through a table with two FKs to the same target must name the key**
+— `plots!units_plot_id_fkey`, because `units` has had two paths to `plots`
+since `0029`. A bare embed answers HTTP 300 (`PGRST201`) at runtime. **No local
+gate catches a bad `select` string**: it is not a type error, `next build`
+compiles it, and the tests are pure logic with no database. Client Relations
+shipped four dead screens through a fully green CI this way. Open the page, or
+run the query.
+
 ## Database
 
 Numbered SQL files in `supabase/migrations/`, applied **from this machine** via

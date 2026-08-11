@@ -298,11 +298,11 @@ warm (a platform setting, not a code change) is the single biggest lever.
 After that, moving the greeting `<h1>` above the auth await so the shell
 paints before the profile query resolves.
 
-### PERF-02 · ~~MEDIUM~~ CLOSED · Five missing indexes — preventative, not the cause
+### PERF-02 · MEDIUM · Five missing indexes — preventative, not the cause — **applied**
 
-**Closed 2026-08-11.** Migration `0049` applied ahead of `0050`, and all five
-indexes verified present in production. The finding below stands as written —
-it changed nothing measurable, which was always the point.
+Migration `0049` went in on 2026-08-11 ahead of `0050`, all five indexes
+verified present. The finding below stands as written: it changed nothing
+measurable, which was always the point.
 
 `indents.created_at`, `indent_lines.created_at`, `purchase_orders.issued_at`,
 `bills.created_at`, `bills.paid_at` are all filtered by the thirteen
@@ -448,7 +448,7 @@ Five commits, each verified:
 | 1   | `51e0154` | Deleted the unused browser Supabase client — the one easy way client-side DB access could return              |
 | 2   | `b612415` | Error checks on the two reads whose silent failure looked like good news (QUAL-01)                            |
 | 3   | `d105596` | PO screen filters GST rates in the database; dead export retired (QUAL-02)                                    |
-| 4   | `f5fda05` | Migration `0049` — five Overview indexes. **Applied 2026-08-11** ahead of `0050`; PERF-02 closed.             |
+| 4   | `f5fda05` | Migration `0049` — five Overview indexes, written here and applied 2026-08-11 (PERF-02)                       |
 | 5   | —         | Documentation consolidated: CLAUDE.md, STATUS.md, TODO.md rewritten; README.md, PRODUCT.md, AGENTS.md removed |
 
 Nothing above changes behaviour, except that two previously-silent failures
@@ -465,9 +465,8 @@ Ranked by what I'd do first.
 | 3   | **MOD-01 — untangle the Budgets → Selections import.** Either move `listSpaceViews`/`downloadSpaceView` into a shared surface (`lib/masters/` or a new `lib/space-views/`), or have Budgets read the bucket itself. | Moves code between tools; the brief says not to without asking. First option is cleaner and ~20 lines. |
 | 4   | **SEC-02 — CI check pinning the money-free views' column lists.**                                                                                                                                                   | Needs a decision on where the authoritative list lives.                                                |
 | 5   | **MOD-03 — confirm `indent_approvers`/`bill_approvers` are Settings-owned.**                                                                                                                                        | I documented it that way. Say if you disagree and it should move instead.                              |
-| 6   | **Apply migration `0049`** whenever convenient.                                                                                                                                                                     | Preventative only; nothing waits on it.                                                                |
-| 7   | **PERF-03 — Marathon per-run counts via a database function.**                                                                                                                                                      | Schema change, low value at 11 rows.                                                                   |
-| 8   | **QUAL-03 — line pulls atomic via server-side loop functions.**                                                                                                                                                     | Real design change to a working, reasoned trade-off.                                                   |
+| 6   | **PERF-03 — Marathon per-run counts via a database function.**                                                                                                                                                      | Schema change, low value at 11 rows.                                                                   |
+| 7   | **QUAL-03 — line pulls atomic via server-side loop functions.**                                                                                                                                                     | Real design change to a working, reasoned trade-off.                                                   |
 
 ## Already true — things this audit was asked to find and didn't
 

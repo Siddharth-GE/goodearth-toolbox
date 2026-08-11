@@ -107,8 +107,6 @@ per `DESIGN.md`, not a chart library).
 
 ## 7. From the audit — lower priority
 
-- ~~**Apply migration `0049`**~~ — applied 2026-08-11, ahead of `0050`. All
-  five indexes verified present. Closes AUDIT.md PERF-02.
 - **CI check pinning the money-free views' column lists** (`AUDIT.md` SEC-02).
   Those views bypass RLS by design; their column list _is_ the boundary and a
   comment is currently the only guard. ~30 lines. Needs a decision on where
