@@ -7,6 +7,7 @@ import { SCENARIOS, type ScenarioIndex } from "@/lib/business-planning/inputs";
 import type { ScenarioResult } from "@/lib/business-planning/model";
 import { formatCrore, formatPercent, formatQuantity } from "@/lib/format";
 import { AlertTriangle } from "lucide-react";
+import type { ReactNode } from "react";
 
 /**
  * The answer, pinned above the tabs and recomputed on every keystroke.
@@ -131,7 +132,7 @@ export function SummaryStrip({
 }
 
 /** A plain sentence about something that will mislead if left unsaid. */
-function Note({ children }: { children: React.ReactNode }) {
+function Note({ children }: { children: ReactNode }) {
   return (
     <p className="border-warning/40 bg-warning/5 text-foreground mt-3 flex items-start gap-2 rounded-xl border px-3 py-2 text-xs">
       <AlertTriangle className="text-warning mt-px size-3.5 shrink-0" aria-hidden />

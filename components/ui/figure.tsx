@@ -61,9 +61,13 @@ export function Figure({
 export function FigureBand({ className, children }: { className?: string; children: ReactNode }) {
   return (
     <div
+      // The hairlines are the 1px gaps of the grid with the border colour
+      // showing through, so they land in both directions when it wraps —
+      // divide-x would only rule the columns and leave a wrapped row
+      // touching the one above it.
       className={cn(
-        "divide-border border-border grid gap-px overflow-hidden rounded-xl border",
-        "bg-border sm:grid-cols-2 lg:grid-cols-4",
+        "border-border bg-border grid gap-px overflow-hidden rounded-xl border",
+        "sm:grid-cols-2 lg:grid-cols-4",
         className,
       )}
     >
