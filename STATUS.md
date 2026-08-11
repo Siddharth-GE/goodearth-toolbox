@@ -13,7 +13,7 @@ _Last reviewed: 2026-08-11 (full architecture, security and performance audit)._
 | Production    | `goodearth-toolbox.vercel.app` — `master` auto-deploys on push                                                                                               |
 | Region        | Vercel `bom1` + Supabase `ap-south-1` — both Mumbai                                                                                                          |
 | Stack         | Next.js 16.2 (Turbopack) · React 19.2 · Tailwind 4 · Supabase Postgres                                                                                       |
-| Migrations    | `0001`–`0048` applied; **`0049` committed but NOT applied** (indexes, preventative)                                                                          |
+| Migrations    | `0001`–`0051` all applied. `0049` (Overview indexes) went in ahead of `0050`/`0051` (Client Relations), closing AUDIT.md PERF-02.                            |
 | Access model  | **Settled and live.** Per-user grants (`user_apps`) + role bundles (`role_apps`), enforced in the database by `has_app()`. `profiles.team` is a dead column. |
 | Backups       | Supabase managed backups only. No independent export — see TODO.                                                                                             |
 | Measured perf | Warm TTFB ~0.16s; cold ~1.14s. Cold starts dominate. Bundle, fonts, CSS, region all verified fine.                                                           |

@@ -448,7 +448,7 @@ Five commits, each verified:
 | 1   | `51e0154` | Deleted the unused browser Supabase client — the one easy way client-side DB access could return              |
 | 2   | `b612415` | Error checks on the two reads whose silent failure looked like good news (QUAL-01)                            |
 | 3   | `d105596` | PO screen filters GST rates in the database; dead export retired (QUAL-02)                                    |
-| 4   | `f5fda05` | Migration `0049` — five Overview indexes, **committed but not applied** (PERF-02)                             |
+| 4   | `f5fda05` | Migration `0049` — five Overview indexes. **Applied 2026-08-11** ahead of `0050`; PERF-02 closed.             |
 | 5   | —         | Documentation consolidated: CLAUDE.md, STATUS.md, TODO.md rewritten; README.md, PRODUCT.md, AGENTS.md removed |
 
 Nothing above changes behaviour, except that two previously-silent failures
