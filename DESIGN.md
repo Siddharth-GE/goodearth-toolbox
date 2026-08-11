@@ -13,9 +13,49 @@ pattern repeats twice across tools, it belongs here, not copy-pasted.
 
 Defined as CSS variables in `app/globals.css`, registered in
 `@theme inline` so every one is a Tailwind utility
-(`bg-accent`, `text-danger`, `border-border`, etc.). Light/dark both
-handled there via `prefers-color-scheme` — never hardcode a hex value in
-a component.
+(`bg-accent`, `text-danger`, `border-border`, etc.) — never hardcode a
+hex value in a component.
+
+### Light and dark
+
+Both palettes live in `app/globals.css` and nowhere else. Dark is reached
+two ways, in this order:
+
+1. `data-theme="dark"` (or `"light"`) on `<html>` — an explicit choice,
+   made with the switch in the sidebar's user menu and on the login
+   screen (`components/ui/theme-toggle.tsx`), remembered in a cookie and
+   applied by a blocking inline script in the root layout before the page
+   paints.
+2. `prefers-color-scheme`, for anyone who never touches the switch.
+
+Three things follow from that, and each has bitten already:
+
+- **`@custom-variant dark` in `globals.css` teaches Tailwind the same two
+  rules.** Without it `dark:` utilities stay on the browser's media query
+  and ignore the switch — a dark page with light badges on it.
+- **The dark token block is written out twice**, once per selector,
+  because CSS cannot share a declaration block across a media query.
+  Change a value in one and change it in the other.
+- **`color-scheme` is declared next to the tokens, not as an
+  afterthought.** It is what makes the browser's own furniture follow —
+  date pickers, number steppers, select menus, scrollbars. The app
+  shipped ~30 forms with a white calendar popup on a dark page for want
+  of that one line, and no test or build can see it.
+
+`lib/theme.ts` holds the whole rule as pure functions, so the layout's
+script and the switch agree on what a valid value is. An unrecognised
+cookie means "follow the device", never a guessed colour — someone stuck
+in a theme they cannot read cannot find the switch either.
+
+**Don't move the cookie read into the layout body.** It reads tidier and
+costs the app static rendering: calling `cookies()` there turns `/login`,
+`/_not-found` and `/_global-error` from prerendered into
+server-rendered-on-demand — measured, not guessed — and cold starts are
+the app's known performance problem (`AUDIT.md` PERF-01).
+
+Two things deliberately do **not** follow the theme: PDFs
+(`lib/pdf/theme.ts` is a separate print palette) and the logo
+(`components/ui/logo.tsx` is brand artwork).
 
 | Token                                                       | Meaning                                                                   |
 | ----------------------------------------------------------- | ------------------------------------------------------------------------- |
@@ -37,6 +77,14 @@ semantic colors above, or with Marathon's category badges — those carry
 a third, independent palette keyed on a colour name stored in the
 database (`category-badge.tsx`, `bib-card.tsx`), which must stay a
 static class lookup and does not use `color-hash`.
+
+The palette is fixed, but how it is _applied_ is not: one set of colours
+has to sit on a white tile and a near-black one. `item-thumb.tsx` passes
+the hash colour in as a `--thumb` custom property and lets the mode pick
+the tint weight and lift the text, because at the light recipe the tint
+vanished on dark and the blue and indigo codes were close to unreadable.
+Adding another surface that paints with a hash colour needs the same
+treatment — check it on both, the colour itself will not tell you.
 
 `--gradient-hero-from/via/to` (also in `app/globals.css`) is a third,
 purely decorative system — the gradient behind a tool's hero number
@@ -117,6 +165,22 @@ shortened; the toast still appears, because they should still learn the
 push worked. The one opt-out is `Spinner`, via the
 `spinner-keeps-turning` class — a spinner that stops looks like a broken
 page, and it is a functional signal rather than decoration.
+
+**The light/dark switch crossfades** (220ms) rather than snapping, via
+the View Transitions API — one call in `theme-toggle.tsx`, paced by two
+rules in `globals.css`. The browser fades a snapshot of the whole page,
+so background, text, borders and the switch's own icon all change
+together for no state and no library. A browser without it applies the
+change instantly, which is a working switch either way.
+
+Two traps live here. **Don't reach for a `transition` on colours
+instead** — it would fade every other colour change in the app, every
+hover and every focus ring, and make the whole interface feel soggy.
+And **the global reduced-motion block does not cover this**: it selects
+`*`, and `::view-transition-*` are pseudo-elements outside the document
+tree that `*` never matches. They are named again in that block, and the
+switch also checks reduced-motion in JavaScript before asking for a
+transition at all.
 
 ## Loading states
 

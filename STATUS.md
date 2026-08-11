@@ -67,6 +67,22 @@ goods out → bill → paid.
   whole basket. Each reports partial success honestly.
 - **Full CI browser smoke was costed and declined** (2026-08-03);
   `check:actions` covers the known outage class.
+- **Dark mode is a switch, not a stored preference.** Sidebar user menu and
+  login screen; `data-theme` on `<html>`, remembered in a cookie and applied
+  by a blocking inline script before first paint. Untouched, it follows the
+  device as it always did. Nothing is stored on anyone's account — no
+  migration, no Settings screen. Rules in `DESIGN.md`, logic in `lib/theme.ts`.
+- **Reading the theme cookie in the root layout costs static rendering.**
+  Tried it: `cookies()` there turned `/login`, `/_not-found` and
+  `/_global-error` from prerendered into server-rendered-on-demand — the whole
+  app went dynamic. Hence the inline script. Worth re-measuring the same way
+  (`.next/prerender-manifest.json`) before adding any other `cookies()` or
+  `headers()` call to a root layout.
+- **`color-scheme` is why date pickers were white.** The app carried a full
+  dark palette from the start but never declared `color-scheme`, so the
+  browser drew its own furniture — date and number inputs, select menus,
+  scrollbars — in light colours on a dark page, across ~30 forms. One line
+  fixed all of them, and nothing in CI could ever have seen it.
 - **A broken PostgREST `select` passes every gate.** Client Relations shipped
   with four dead screens behind a fully green
   `format → lint → typecheck → test → build`: an ambiguous embed answers HTTP

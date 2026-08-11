@@ -1,6 +1,46 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------
+   Light and dark
+
+   Dark mode is chosen in two ways, and this file is the only place that
+   knows the difference:
+
+   - `data-theme` on <html>, written by the switch in the user menu
+     (see components/ui/theme-toggle.tsx). An explicit choice always wins.
+   - the device's own setting, for anyone who never touches the switch.
+     That was the ONLY way until the switch existed, and stays the default.
+
+   `color-scheme` is declared alongside the tokens on purpose. It is what
+   makes the BROWSER's own furniture follow us — date pickers, number
+   steppers, select menus, scrollbars. Without it those are drawn light on
+   a dark page, which is how ~30 forms shipped a white calendar popup.
+
+   The dark palette below is written out twice, once per selector. CSS has
+   no way to share one declaration block across a media query, and the
+   alternatives (light-dark(), a toggle hack) are either newer than some of
+   the site phones or too clever to keep straight. **Keep the two blocks
+   in step** — a value changed in one must change in the other.
+   --------------------------------------------------------------------- */
+
+/* Teach Tailwind's `dark:` variant the same two rules. Without this it
+   stays on its default `prefers-color-scheme` behaviour and every `dark:`
+   utility in the app would ignore the switch — a dark page with light
+   badges on it. */
+@custom-variant dark {
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) {
+      @slot;
+    }
+  }
+}
+
 :root {
+  color-scheme: light;
+
   --background: #fafaf9;
   --foreground: #1c1c1a;
   --surface: #ffffff;
@@ -53,8 +93,34 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* Dark, asked for. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --background: #121210;
+  --foreground: #f2f2ef;
+  --surface: #1a1a17;
+  --surface-raised: #242420;
+  --border: #2c2c28;
+  --accent: #34a37a;
+  --accent-foreground: #0a0a09;
+  --muted: #9a9a92;
+
+  --success: #22c55e;
+  --success-foreground: #0a0a09;
+  --warning: #f59e0b;
+  --warning-foreground: #0a0a09;
+  --danger: #ef4444;
+  --danger-foreground: #0a0a09;
+  --info: #3b82f6;
+  --info-foreground: #0a0a09;
+}
+
+/* Dark, inherited from the device — unless the switch says light. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
     --background: #121210;
     --foreground: #f2f2ef;
     --surface: #1a1a17;
@@ -79,6 +145,21 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* The light/dark switch crossfades the page instead of snapping it.
+   The browser does the work — components/ui/theme-toggle.tsx asks for a
+   view transition and these two rules only set its pace. Kept short: this
+   is a control responding to a tap, not a moment of delight, and a slow
+   fade would make the switch feel unresponsive rather than smooth.
+
+   Deliberately not a `transition` on colours. That would fade every other
+   colour change in the app too — every hover, every focus ring — and turn
+   the whole interface soggy to touch. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 220ms;
+  animation-timing-function: ease;
 }
 
 /* One deliberate moment of delight: the bib card's entrance after a
@@ -184,5 +265,14 @@ body {
   .spinner-keeps-turning {
     animation-duration: 0.9s !important;
     animation-iteration-count: infinite !important;
+  }
+
+  /* The `*` above does not reach these — view-transition pseudo-elements
+     sit outside the document tree, so they need saying again. The switch
+     also checks reduced-motion in JavaScript and skips the transition
+     entirely; this is the belt to that pair of braces. */
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
   }
 }
