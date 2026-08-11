@@ -2,7 +2,7 @@ import { Attribution } from "@/components/ui/attribution";
 import { LinkButton } from "@/components/ui/button";
 import { PageTitle } from "@/components/ui/page-title";
 import { formatDate } from "@/lib/format";
-import { listGstRates } from "@/lib/masters/gst-rates";
+import { listActiveGstRates } from "@/lib/masters/gst-rates";
 import { isFullyPriced } from "@/lib/purchase-orders/math";
 import {
   getCurrentPoActor,
@@ -26,7 +26,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
   const [po, actor, gstRates, receipts, billedTotals] = await Promise.all([
     getPurchaseOrder(poId),
     getCurrentPoActor(),
-    listGstRates(),
+    listActiveGstRates(),
     getPoReceipts(poId),
     getPoBilledTotals(poId),
   ]);
@@ -37,7 +37,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
   // views of a PO are of issued ones, and paid for the whole options
   // bag (all projects, plots, units, vendors, stores) without using it.
   const options = editable ? await getPoFormOptions() : { vendors: [], stores: [] };
-  const activeRates = gstRates.filter((rate) => rate.is_active).map((rate) => rate.rate);
+  const activeRates = gstRates.map((rate) => rate.rate);
   const fullyPriced = isFullyPriced(
     po.lines.map((line) => ({ quantity: line.quantity, rate: line.rate, gst_pct: line.gst_pct })),
   );
