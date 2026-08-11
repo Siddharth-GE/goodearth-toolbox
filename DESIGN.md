@@ -175,6 +175,27 @@ Shared domain components live in `components/masters/`: `item-thumb`,
 `project-picker`, and `record-form-dialog` — the create/edit shell every
 Masters record uses.
 
+**`Figure` and `Section` were the rule working.** A label-over-a-number
+block had been hand-written thirteen times across the app and a
+card-with-a-heading five times in Business Planning alone, drifting into
+four different label styles. Both are now in `components/ui`:
+
+- `Figure` — `{ label, value, hint?, tone?, size? }`. `size` is the
+  point of it: `sm` / `lg` / `hero`. A screen where every number is
+  `text-sm` has no hierarchy and never says which figure is the answer.
+  With `FigureBand` + `FigureBandCell` for a divided row of them, and
+  `ResultPanel` for the block a form uses to show what it worked out.
+- `Section` — `{ title, note?, aside?, collapsible?, defaultOpen?,
+nested? }`, plus `FieldRow` for a group of fields at a column count
+  that suits how many there are. `nested` recesses it for use inside
+  another `Card`, because `surface` and `surface-raised` are the same
+  white in light mode and a card on a card would be told apart by
+  nothing but its border.
+
+Only Business Planning uses them so far. The copies in the other tools
+are fine where they are; convert one when you are next in it for another
+reason, not as a sweep.
+
 **Formatting is not a component.** Money, quantities, percentages and
 dates all go through `lib/format.ts`, on screens and in PDFs alike.
 Never write `new Intl.NumberFormat` in a screen; that's how the same

@@ -77,10 +77,51 @@ Each of these is commented at the point it happens in `model.ts`.
 | Products      | Two hard-coded columns                                                                                   | A list you add to                                                                                                                          |
 | Senior living | Its own five sheets                                                                                      | One HOLD line among however many                                                                                                           |
 | Sensitivity   | Two named cells swung by an Excel data table                                                             | Both axes proportional across every line — prices do not fall on villas and hold on row houses                                             |
+| Margin        | Revenue booked in full at sale, cost truncated at the horizon, so Base out-margins Moderate              | Profit is struck against the cost of WHAT SOLD; cash keeps the truncation. See below                                                       |
 
 **Tell the founder about the peak-funding one.** ₹5.91 Cr was read as
 money to raise; it is ₹5.91 Cr of headroom at the worst month. The
 equity covers the whole project.
+
+## The margin one, at length
+
+Found 2026-08-11, because the founder noticed the scenarios reading
+backwards. The sheet — and this tool, until now — booked 100% of a
+home's price the month it sold, but spread its build over `buildMonths`
+and dropped whatever fell past month 72. So a scenario counted all of
+its revenue and only part of its cost, and the SLOWER it sold the better
+its margin looked:
+
+| Vihara Block 1 | Base                    | Moderate | High  |
+| -------------- | ----------------------- | -------- | ----- |
+| Was            | **23.3%** (6.2 unsold!) | 22.2%    | 22.2% |
+| Now            | 21.5%                   | 22.2%    | 22.2% |
+
+There are now two cost totals, and the whole fix is keeping them apart:
+
+- **Cash** (`landCost`, `constructionCost`, the monthly series) — what
+  leaves the account inside the horizon. Truncation is CORRECT here, it
+  drives interest and the trough and peak funding, and it is unchanged
+  to the rupee. This is the Cashflow tab.
+- **Matched** (`matchedCost`, `constructionMatched`, …) — the cost of
+  what sold: every rupee of build for every home whose price was
+  counted, whenever spent, plus only the SOLD SHARE of land and infra.
+  This drives PBT and margin, and it is the Summary tab.
+
+`costOutsideHorizon` is the difference, shown as its own row so the
+Summary column visibly adds up to the PBT in the strip rather than
+quietly not. For Base that is ₹2.05 Cr: ₹2.91 Cr of building put back,
+less ₹0.86 Cr of land and infra taken out from under 6.2 unsold homes.
+
+**Base therefore no longer ties to Summary!B15:B16.** That is deliberate
+and `model.test.ts` says so at the assertion. Moderate and High tie
+exactly, because they sell out and the two totals coincide.
+
+A held asset has **no margin at all** now. Expensing ₹29 Cr of capex
+against six years of ramping rent gave a large negative percentage
+sitting in the same column as a sale line's +22%. It reports yield on
+cost and IRR, which is what a held asset is judged on, and the column is
+headed "Margin / yield".
 
 ## Verified against the workbook
 
@@ -95,10 +136,12 @@ dev/infra ₹13.02 Cr · land ₹17.16 Cr · overheads ₹12.24 Cr ·
 biodiversity ₹5.80 Cr · interest ₹0 · **PBT ₹26.66 Cr at 22.2%** · cash
 trough ₹5.91 Cr · 2.56× money.
 
-**Block 1, Base:** PBT ₹26.56 Cr at 23.3% · trough ₹3.60 Cr · 2.08×.
-And construction ₹39.43 Cr rather than the ₹42.34 Cr those units cost to
-build, because the last row houses sell too late to finish inside six
-years — the horizon doing its job.
+**Block 1, Base:** trough ₹3.60 Cr · 2.08× — cash, and it ties. Its
+construction is ₹39.43 Cr of cash rather than the ₹42.34 Cr those homes
+cost to build, because the last row houses sell too late to finish
+inside six years: the horizon doing its job. **PBT and margin here
+deliberately differ from the sheet's ₹26.56 Cr at 23.3%** — see "The
+margin one" above. The tool reports ₹24.52 Cr at 21.5%.
 
 **Block 2 (the HOLD line):** capex ₹29.10 Cr · stabilised NOI ₹2.75 Cr ·
 yield on cost 9.47% · terminal value ₹30.61 Cr · hold ₹54.34 Cr against
@@ -115,6 +158,20 @@ lines and charging it twice would double-count ₹13.2 Cr.
 
 ## Things that will bite
 
+- **There are two cost totals and they are both right.** Cash on the
+  Cashflow tab, matched on the Summary tab, `costOutsideHorizon` naming
+  the gap. If a new figure is added, decide which question it answers
+  before picking which total to build it from — quietly using cash for a
+  profit figure is the exact bug this tool shipped with.
+- **A HOLD line has no `marginPct`.** Deliberate; the type does not carry
+  the field. Reach for `yieldOnCostPct` or `holdIrrPct`.
+- **Velocities are not sorted.** `velocityOutOfOrder` flags a line whose
+  "High" is its slowest and both the strip and the sale form say so, but
+  nothing rewrites it. Clamping what someone typed is worse.
+- **The engine clamps efficiency and the exit cap rate at the point of
+  use**, not only in `parsePlanInputs`, because the editor recalculates
+  on raw keystrokes — before the parser sees anything. Any new divisor
+  taken straight off a `line.*` field needs the same treatment.
 - **Units are fractional.** 0.8 units a month is how velocity works, and
   totals read `41.999999999999993`. The workbook does the same. Don't
   "fix" it with rounding — rounding units up is how a plan sells 43
