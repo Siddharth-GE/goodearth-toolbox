@@ -6,9 +6,11 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Logo } from "@/components/ui/logo";
+import { ThemeMenuItem } from "@/components/ui/theme-toggle";
 import { TOOL_ICONS, type Tool, type ToolGroup } from "@/lib/tools";
 import { cn } from "@/lib/utils";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
@@ -132,6 +134,8 @@ function SidebarContent({
             <span className="text-foreground truncate text-sm font-medium">{userName}</span>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-56">
+            <ThemeMenuItem />
+            <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => logout()}>
               <LogOut className="size-4" />
               Sign out
