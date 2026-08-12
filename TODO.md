@@ -73,33 +73,23 @@ waiting list (the write path `replaceFutureLegs` exists and is current, just
 unwired), and no "Open a trail" button on the Projects landing page (one click
 away already; not asked for).
 
-## 5. Reporter — FIRST: fix distinct-item counting, then Stage 4
+## 5. Reporter — next is Stage 5, saved reports
 
-**Before anything else next session** (founder, 2026-08-12): "Distinct count
-of Items" counts distinct item NAMES, and in this catalogue names repeat
-legitimately — five armchairs share the name "Armchair" and are told apart by
-item code, so the current count reads five items as one. Codes can be blank
-(the live cement line has none), so counting codes undercounts too. The fix:
-**count distinct items by the internal item id** — never blank, never shared —
-while the screen keeps showing names. Concretely: expose `item_id` in the
-`indent_lines` select, let a `FieldDef` carry a separate identity path for
-`count_distinct` (display path stays the name), give `item_code` its
-distinct count while at it, and add the test that two same-named items count
-as two. Same trap will apply to every future dataset that counts a
-name-labelled entity — units repeat names across projects too ("Villa 6"),
-so `unit`'s distinct count should move to `indents.unit_id` in the same pass.
+The Reporter is live through Stage 4: builder, dropdown filters, grouping,
+subtotals, charts (six forms, KPI band, the composed page) and CSV. The
+distinct-count fix the founder asked for on 2026-08-12 is done — a
+`FieldDef.identityPath` means a distinct count counts internal ids, so five
+items all named "Armchair" count as five; item, item code, unit and project
+all count by id. **Every future dataset counting a name-labelled entity has
+the same trap** — it is decision 9 in the plan now.
 
-The Reporter is otherwise live through Stage 3: builder, dropdown filters,
-grouping, subtotals — and charts (six forms, KPI band, the composed page;
-merged 2026-08-12 with the founder's sign-off, see `STATUS.md`). The full
-plan is **`app/(dashboard)/reporter/PLAN.md`**. Read it before touching
-anything below. Seven stages remain, each shippable and browser-testable on
-its own:
+The full plan is **`app/(dashboard)/reporter/PLAN.md`**. Read it before
+touching anything below. Six stages remain, each shippable and
+browser-testable on its own:
 
-4. **CSV** — `lib/csv.ts` extracted from the Selections route, reused.
-   Write `csv.test.ts` BEFORE the Selections refactor so that change is
-   provably a no-op, and the Selections CSV must stay byte-identical.
-5. **Saved reports** — `0054`, plus the money-free starters.
+5. **Saved reports** — `0054`, plus the money-free starters. Brings the
+   `[reportId]` screen, and with it the second CSV route
+   (`[reportId]/csv`) — `run/csv` is the only one so far.
 6. **The money — ships alone** — `0055`.
 7. **Sales & collections** — `0056`, two CRM fact views.
 8. **The remaining datasets** and their starters.
