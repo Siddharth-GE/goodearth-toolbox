@@ -7,7 +7,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { extractRows, runReport, type ReportRow } from "./aggregate";
+import { extractRows, identityKey, runReport, type ReportRow } from "./aggregate";
 import { DATASETS } from "./datasets";
 import { parseReportSpec } from "./spec";
 
@@ -143,6 +143,89 @@ test("sorting groups by a measure orders by the number, nulls last", () => {
   );
   const keys = result.groups!.map((g) => g.keys[0]);
   assert.deepEqual(keys, ["Malhar", "Chila"]);
+});
+
+test("a distinct count counts things, not labels", () => {
+  // Five armchairs share the name "Armchair" and are told apart by item
+  // code — and one has no code at all, which is why codes are not the
+  // identity either. Counting names says 2; counting items says 4.
+  const armchair = (id: string, code: string | null): ReportRow => ({
+    project: "Malhar",
+    item: id === "i4" ? "Cement" : "Armchair",
+    [identityKey("item")]: id,
+    item_code: code,
+    [identityKey("item_code")]: id,
+  });
+  const armchairs: ReportRow[] = [
+    armchair("i1", "ARM-1"),
+    armchair("i2", "ARM-2"),
+    armchair("i3", null),
+    armchair("i4", "CEM-1"),
+  ];
+  const result = runReport(
+    dataset,
+    spec({
+      groupBy: ["project"],
+      measures: [
+        { field: "item", agg: "count_distinct" },
+        { field: "item_code", agg: "count_distinct" },
+      ],
+    }),
+    armchairs,
+    armchairs.length,
+  );
+  assert.equal(result.totals["item:count_distinct"], 4);
+  // The blank code is still one item — counting codes would say 3.
+  assert.equal(result.totals["item_code:count_distinct"], 4);
+  assert.equal(result.groups?.[0].measures["item:count_distinct"], 4);
+});
+
+test("extractRows carries identity ids beside the names it displays", () => {
+  const raw = [
+    {
+      item_id: "i1",
+      quantity: 1,
+      items: { name: "Armchair", code: "ARM-1" },
+      indents: { project_id: "p1", unit_id: null, projects: { name: "Malhar" }, units: null },
+    },
+    {
+      item_id: "i2",
+      quantity: 1,
+      items: { name: "Armchair", code: "ARM-2" },
+      indents: {
+        project_id: "p1",
+        unit_id: "u9",
+        projects: { name: "Malhar" },
+        units: { name: "Villa 6" },
+      },
+    },
+  ];
+  const extracted = extractRows(dataset, raw);
+  assert.equal(extracted[0].item, "Armchair");
+  assert.equal(extracted[0]["#id:item"], "i1");
+  assert.equal(extracted[1]["#id:item"], "i2");
+  assert.equal(extracted[0]["#id:unit"], null);
+  assert.equal(extracted[1]["#id:unit"], "u9");
+
+  const result = runReport(
+    dataset,
+    spec({ measures: [{ field: "item", agg: "count_distinct" }] }),
+    extracted,
+    2,
+  );
+  // Two rows, one name, two items.
+  assert.equal(result.totals["item:count_distinct"], 2);
+});
+
+test("a field with no identityPath still counts its own values", () => {
+  // The indent reference IS the identity, so nothing changes for it.
+  const result = runReport(
+    dataset,
+    spec({ measures: [{ field: "indent", agg: "count_distinct" }] }),
+    [{ indent: "IND-1" }, { indent: "IND-1" }, { indent: "IND-2" }, { indent: null }],
+    4,
+  );
+  assert.equal(result.totals["indent:count_distinct"], 2);
 });
 
 test("extractRows flattens embeds, tolerates array-wrapped to-ones, nulls the rest", () => {

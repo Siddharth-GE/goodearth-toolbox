@@ -1,13 +1,15 @@
 # Reporter — build notes
 
-**Stages 1–3 are built and merged** (2026-08-12): the rename (`0052`), the
+**Stages 1–4 are built and merged** (2026-08-12): the rename (`0052`), the
 builder pipeline over one dataset (registry, `parseReportSpec`, the pure
-aggregation engine, the screens), and charts (`recharts`, the `--chart-1…8`
+aggregation engine, the screens), charts (`recharts`, the `--chart-1…8`
 tokens, `components/ui/chart/*`, `lib/charts/{palette,series}.ts`, KPI band —
-a report is a composed page). Two decisions arrived during build and bind the
-remaining stages: **every filter is a dropdown** (decision 8 below), and **a
-meter carries two measures** — the value, then the limit. Stages 4–10 are
-still to come. Read this before touching the tool.
+a report is a composed page), and CSV (`lib/csv.ts` shared with Selections,
+`lib/reporter/csv-rows.ts`). Three decisions arrived during build and bind the
+remaining stages: **every filter is a dropdown** (decision 8 below), **a
+meter carries two measures** — the value, then the limit — and **a distinct
+count counts things, not labels** (decision 9 below). Stages 5–10 are still to
+come. Read this before touching the tool.
 
 Planned with the founder on 2026-08-11. Ten stages, each shippable on its own.
 
@@ -38,6 +40,13 @@ Founder decisions taken during planning (all binding):
    (`filterOptions: "distinct"` + the dataset's `optionsSelect`), and a text
    field with neither is not filterable. Dates keep the date picker, numbers a
    number box. `datasets.test.ts` enforces it for every future dataset.
+9. **A distinct count counts things, not labels** (2026-08-12, on seeing Stage
+   3). Names repeat legitimately — five armchairs are all called "Armchair",
+   and every project has a "Villa 6" — so a `FieldDef` carries an
+   `identityPath` to the row's internal id and `count_distinct` counts that,
+   while the column on screen keeps showing the name. Codes are not identity
+   either: they can be blank, so counting codes undercounts. **Every future
+   dataset that counts a name-labelled entity has this trap.**
 
 **The consequence to say out loud before the money stages ship:** after Stages 6
 and 7, _granting `/reporter` grants sight of every vendor rate, every bill
@@ -273,6 +282,7 @@ lib/reporter/actions.ts     server-only — save / rename / delete, ActionState
 lib/charts/{palette,series}.ts         PURE — see above
 components/ui/chart/*                  themed Recharts wrappers ("use client")
 lib/csv.ts                  PURE, shared — csvCell/csvRow/safeFilename/csvResponse
+lib/reporter/csv-rows.ts    PURE — a ReportResult as CSV lines (added at Stage 4)
 lib/pdf/chart.tsx + lib/reporter/report-document.tsx   Stage 9
 ```
 
@@ -536,7 +546,7 @@ sees grant bugs.
 | **1**  | **The rename, alone.** `0052`; `lib/tools.ts` → `{name:"Reporter", href:"/reporter", icon:"FileChartColumn"}`, `FileChartColumn` into `TOOL_ICONS`, `LayoutDashboard` out (an unused import fails lint, and CI stops at the first failure); folder `management-dashboard/` → `reporter/`; docs | Sidebar says Reporter with the new icon; Settings shows a Reporter checkbox; grant to the probe, probe sees it; remove it, probe doesn't                                                                                                                    |
 | **2**  | **One dataset, table on screen.** Registry (`indent_lines` only), `spec.ts`, `aggregate.ts`, `derive.ts`, `queries.ts`, builder screens, `built: true`. Chosen because `indents`/`indent_lines` are already readable by all authenticated — **zero RLS risk**, full pipeline exercised         | Pick columns, filter by project, group by item, sort, see subtotals and a grand total — as the probe holding only `/reporter`                                                                                                                               |
 | **3**  | **Charts.** Add `recharts`; `--chart-1…8` tokens light+dark; `lib/charts/{palette,series}.ts`; `components/ui/chart/*` themed wrappers; the chart card; KPI band via `FigureBand`; chart picker in the builder                                                                                 | Bar, line, stacked and meter all render; hover tooltips; switch a report between forms; check light **and** dark; check on a phone; confirm the Reporter route is the only bundle that grew                                                                 |
-| **4**  | **CSV.** `lib/csv.ts` + tests, Selections route refactored (must be byte-identical), two routes                                                                                                                                                                                                | Download, open in Excel, no mangled characters, no formula rows; Selections' existing CSV unchanged                                                                                                                                                         |
+| **4**  | **CSV.** ✅ `lib/csv.ts` + tests, Selections route refactored (byte-identical), `lib/reporter/csv-rows.ts` + tests, `run/csv` route (the `[reportId]` one lands with Stage 5). The download carries EVERY matched line — the row limit is a screen setting                                     | Download, open in Excel, no mangled characters, no formula rows; Selections' existing CSV unchanged                                                                                                                                                         |
 | **5**  | **Saved reports.** `0054`, `actions.ts`, list screen, the money-free starters (Site & procurement, Design & delivery)                                                                                                                                                                          | Save, reopen, rename, "Save a copy" of a starter, be refused deleting someone else's                                                                                                                                                                        |
 | **6**  | **The money — ships alone.** `0055`; register `po_lines`, `bills`, `budget_report_lines`; starter: Spend vs budget                                                                                                                                                                             | Probe with only `/reporter` sees rates, bill amounts **and margin**; probe with only `/indents` sees no rates anywhere; probe with only `/reporter` still cannot open `/purchase-orders`; then press one real write button on Purchase Orders on production |
 | **7**  | **Sales & collections.** `0056`, two CRM datasets, starter                                                                                                                                                                                                                                     | Totals reconcile against Client Relations' own screens for one villa — if they don't, the fan-out bug is present                                                                                                                                            |
@@ -552,12 +562,13 @@ sees grant bugs.
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `datasets.test.ts`       | Every `filterColumn`/`sortColumn` appears in that dataset's `select`. **Every embed names its constraint** (regex: no bare relation after `(`; `plots` never embedded without `!units_plot_id_fkey`). `!inner` wherever `projectField` crosses an embed. No duplicate keys. No money field on a `money:false` dataset. _The only automated gate that would have caught the four dead Client Relations screens._    |
 | `spec.test.ts`           | Unknown dataset → safe empty spec. Unknown field dropped, alias resolved. Hostile strings (`"rate); drop table bills"`, `"*"`, `"a,b"`, `"__proto__"`, 10 kB of junk) never survive. Illegal op for a type dropped. `limit` clamped, `groupBy` capped at 2, chart measures capped at 8. A chart whose `category` is not in `groupBy` is dropped, not rendered wrong. A v1 spec still parses after v2 adds a field. |
-| `aggregate.test.ts`      | All six aggregates. **Nulls skipped, not zeroed** — an unpriced line and a free line are different things. Grand total equals the sum of subtotals. Two-level grouping. Empty input → empty result, not a crash.                                                                                                                                                                                                   |
+| `aggregate.test.ts`      | All six aggregates. **Nulls skipped, not zeroed** — an unpriced line and a free line are different things. **A distinct count counts ids, not names** — two items both called "Armchair" count as two. Grand total equals the sum of subtotals. Two-level grouping. Empty input → empty result, not a crash.                                                                                                       |
 | `derive.test.ts`         | Line value = `quantity × rate × (1 + gst/100)` at **full precision, rounded only at display** (`lib/purchase-orders/math.ts`'s rule). A null rate propagates null, never 0.                                                                                                                                                                                                                                        |
 | `charts/series.test.ts`  | `ReportResult` → chart series: the shaping Recharts is handed. Nulls stay null (a gap in the line), never 0. A single data point produces a valid series. Empty input produces an empty chart, not a crash. Meter clamps over-100%. Measures of wildly different magnitude are flagged for two charts rather than seated on one scale.                                                                             |
 | `charts/palette.test.ts` | Slot assignment follows entity order, **never rank** — a filter that drops a series must not repaint the survivors. Slot 9 folds into "Other". Status colours are never issued as a series.                                                                                                                                                                                                                        |
+| `csv-rows.test.ts`       | A grouped export carries subtotals and a grand total; two-level grouping repeats the outer key on every child row (the screen leaves it blank, a spreadsheet must not); numbers go in raw and dates as `YYYY-MM-DD`, so Excel can add a column up and read a date; a measure over nothing is an empty cell, never 0.                                                                                               |
 | `starters.test.ts`       | Every starter round-trips through `parseReportSpec` with zero loss; every dataset exists; every chart is valid for its grouping; ids unique and stable.                                                                                                                                                                                                                                                            |
-| `csv.test.ts`            | `=`/`+`/`-`/`@` prefixed with `'`; quotes doubled; null → empty; embedded newlines and commas survive; BOM present; `safeFilename` strips path separators. Written **before** the Selections refactor, so that change is provably a no-op.                                                                                                                                                                         |
+| `csv.test.ts`            | `=`/`+`/`-`/`@` prefixed with `'`; quotes doubled; null → empty; embedded newlines and commas survive; **BOM asserted as BYTES** (`response.text()` strips it, so a string check cannot see it go missing); `safeFilename` strips path separators. Written **before** the Selections refactor, so that change is provably a no-op.                                                                                 |
 
 Not covered by `npm test` and therefore **verified by opening the page**:
 `queries.ts`, `actions.ts`, the chart renderers, `report-document.tsx`, every

@@ -1,3 +1,6 @@
+import { Download } from "lucide-react";
+
+import { LinkButton } from "@/components/ui/button";
 import { PageTitle } from "@/components/ui/page-title";
 import { EmptyState } from "@/components/ui/empty-state";
 import { buildChartModel, type ChartModel } from "@/lib/charts/series";
@@ -13,6 +16,7 @@ import {
   decodeSpecParam,
   defaultSpec,
   describeSpecLoss,
+  encodeSpec,
   measureId,
   parseReportSpec,
 } from "@/lib/reporter/spec";
@@ -75,6 +79,23 @@ export default async function RunReportPage({
         description="Unsaved — the page link is the report. Share or bookmark it."
         backHref="/reporter"
         backLabel="Reporter"
+        actions={
+          outcome.ok && outcome.result.matched > 0 ? (
+            // The spec is re-encoded from what actually ran, so the file
+            // matches the page even if the URL was hand-edited. `plain`
+            // because next/link would prefetch the download on hover and
+            // build the whole file for a passing cursor.
+            <LinkButton
+              href={`/reporter/run/csv?spec=${encodeSpec(spec)}`}
+              variant="secondary"
+              size="md"
+              plain
+            >
+              <Download className="size-4" />
+              Download CSV
+            </LinkButton>
+          ) : null
+        }
       />
 
       {loss.length > 0 && (

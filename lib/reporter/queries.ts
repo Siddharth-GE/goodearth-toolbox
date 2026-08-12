@@ -137,6 +137,16 @@ export async function runSpec(spec: ReportSpec): Promise<RunOutcome> {
   return { ok: true, result: runReport(dataset, spec, extractRows(dataset, raw), matched) };
 }
 
+/**
+ * The same report for download. The spec's `limit` is a SCREEN setting
+ * — "rows shown" — so a CSV lifts it to the load ceiling and carries
+ * every matched line. Above that ceiling runSpec still refuses in
+ * plain English rather than handing back a quietly partial file.
+ */
+export async function runSpecForCsv(spec: ReportSpec): Promise<RunOutcome> {
+  return runSpec({ ...spec, limit: MAX_REPORT_ROWS });
+}
+
 export type ProjectOption = { id: string; name: string };
 
 /** Options for the project filter's picker. */
