@@ -29,6 +29,15 @@
  *   reason is commented at lib/inventory/stock-queries.ts:289).
  * - A field without `filterColumn` can never reach a filter; a field
  *   without `sortColumn` can never be sorted on. Absence is the guard.
+ * - FOUNDER, 2026-08-12: **a distinct count counts THINGS, not labels.**
+ *   Names repeat legitimately — five different armchairs are all called
+ *   "Armchair", and "Villa 6" exists in more than one project — so any
+ *   field whose `count_distinct` would otherwise count a repeating name
+ *   declares an `identityPath` pointing at the row's internal id. The
+ *   column on screen still shows the name; only the counting changes.
+ *   Codes are not identity either: they can be blank (the live cement
+ *   line has none), so counting codes undercounts. Every future dataset
+ *   counting a name-labelled entity has this same trap.
  * - FOUNDER, 2026-08-12: **every filter offers choices, never typing.**
  *   An id-backed field declares a `lookup` (a picker fed from masters);
  *   a categorical text field declares `filterOptions: "distinct"` (a
@@ -56,6 +65,14 @@ export type FieldDef = {
   type: FieldType;
   /** Dot path into the fetched row, e.g. "indents.projects.name". */
   path: string;
+  /**
+   * Dot path to what makes a row's value one THING rather than one
+   * label — used by `count_distinct` only, and only when `path` is a
+   * name that legitimately repeats. Never blank, never shared: an
+   * internal id. The display path is untouched, so the screen still
+   * shows names. Must appear in the dataset's `select`.
+   */
+  identityPath?: string;
   /**
    * PostgREST column a filter on this field pushes down to. Dotted for
    * embedded tables ("indents.status"). Absent = never filterable.
@@ -119,10 +136,13 @@ export type DatasetDef = {
 // readable by every authenticated user (0019) — zero RLS risk while the
 // whole pipeline is proven. Carries no money by design.
 
+// item_id, project_id and unit_id are selected for their fields'
+// identityPath, not for display — a distinct count of items counts ids
+// while the column keeps showing names.
 const INDENT_LINES_SELECT =
-  "id, quantity, uom, note, created_at, " +
+  "id, item_id, quantity, uom, note, created_at, " +
   "items!indent_lines_item_id_fkey!inner(name, code), " +
-  "indents!indent_lines_indent_id_fkey!inner(reference, status, stage, required_by, project_id, " +
+  "indents!indent_lines_indent_id_fkey!inner(reference, status, stage, required_by, project_id, unit_id, " +
   "projects!indents_project_id_fkey(name), units!indents_unit_id_fkey(name))";
 
 const INDENT_LINES_OPTIONS_SELECT =
@@ -145,6 +165,7 @@ const indentLines: DatasetDef = {
       label: "Project",
       type: "text",
       path: "indents.projects.name",
+      identityPath: "indents.project_id",
       filterColumn: "indents.project_id",
       sortColumn: "indents.projects.name",
       groupable: true,
@@ -154,7 +175,10 @@ const indentLines: DatasetDef = {
     unit: {
       label: "Unit",
       type: "text",
+      // Unit names repeat across projects — every project has a "Villa
+      // 6" — so the count follows the id.
       path: "indents.units.name",
+      identityPath: "indents.unit_id",
       // Filters by id on the inner-joined indents row — a name filter
       // would need units!inner, which drops unit-less lines everywhere.
       filterColumn: "indents.unit_id",
@@ -163,6 +187,8 @@ const indentLines: DatasetDef = {
       aggregates: ["count_distinct"],
       lookup: "units",
     },
+    // No identityPath: a reference IS the identity — generated, unique,
+    // never blank — so counting references counts indents.
     indent: {
       label: "Indent",
       type: "text",
@@ -191,10 +217,14 @@ const indentLines: DatasetDef = {
       aggregates: [],
       filterOptions: "distinct",
     },
+    // Item name and item code are two labels for the same thing, so
+    // both count by item_id: five armchairs all named "Armchair" are
+    // five items, and an item with no code is still an item.
     item: {
       label: "Item",
       type: "text",
       path: "items.name",
+      identityPath: "item_id",
       filterColumn: "items.name",
       sortColumn: "items.name",
       groupable: true,
@@ -205,10 +235,11 @@ const indentLines: DatasetDef = {
       label: "Item code",
       type: "text",
       path: "items.code",
+      identityPath: "item_id",
       filterColumn: "items.code",
       sortColumn: "items.code",
       groupable: true,
-      aggregates: [],
+      aggregates: ["count_distinct"],
       filterOptions: "distinct",
     },
     quantity: {

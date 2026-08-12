@@ -127,6 +127,37 @@ test("defaults, date fields and sorts all resolve against real fields", () => {
   }
 });
 
+test("every identityPath is fetched, and only count_distinct fields carry one", () => {
+  for (const [key, dataset] of entries) {
+    for (const [fieldKey, field] of Object.entries(dataset.fields)) {
+      if (!field.identityPath) continue;
+      const parts = field.identityPath.split(".");
+      assert.ok(
+        dataset.select.includes(parts[parts.length - 1]),
+        `${key}.${fieldKey}: identityPath "${field.identityPath}" is not in the select`,
+      );
+      for (const relation of parts.slice(0, -1)) {
+        assert.ok(
+          dataset.select.includes(`${relation}!`),
+          `${key}.${fieldKey}: identityPath embed "${relation}" is not in the select`,
+        );
+      }
+      assert.ok(
+        field.aggregates.includes("count_distinct"),
+        `${key}.${fieldKey}: identityPath does nothing without count_distinct`,
+      );
+    }
+  }
+});
+
+test("field keys are plain identifiers, so the #id: prefix can never collide", () => {
+  for (const [key, dataset] of entries) {
+    for (const fieldKey of Object.keys(dataset.fields)) {
+      assert.match(fieldKey, /^[a-z][a-z0-9_]*$/, `${key}: field key "${fieldKey}" is not plain`);
+    }
+  }
+});
+
 test("no money field on a money-free dataset", () => {
   for (const [key, dataset] of entries) {
     if (dataset.money) continue;

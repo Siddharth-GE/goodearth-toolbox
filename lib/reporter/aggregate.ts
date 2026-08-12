@@ -10,6 +10,11 @@
  * The rule the tests lock down: NULLS ARE SKIPPED, NOT ZEROED. An
  * unpriced line and a free line are different things, and a sum over
  * nothing is null, never 0.
+ *
+ * The second rule: A DISTINCT COUNT COUNTS THINGS, NOT LABELS. Where a
+ * field declares an `identityPath`, extractRows carries that id along
+ * beside the display value and `count_distinct` counts the ids — so
+ * five different armchairs all named "Armchair" count as five.
  */
 
 import type { Aggregate, DatasetDef } from "./datasets";
@@ -67,14 +72,28 @@ function valueAtPath(row: unknown, path: string): ReportValue {
 }
 
 /**
+ * Where a field's identity value sits in an extracted row. Field keys
+ * are plain lowercase identifiers (datasets.test.ts enforces it), so
+ * the "#" prefix can never collide with one.
+ */
+export function identityKey(fieldKey: string): string {
+  return `#id:${fieldKey}`;
+}
+
+/**
  * Raw PostgREST rows (nested embeds and all) flattened to one value per
  * registry field, keyed by field key. Missing anything becomes null.
+ * Fields declaring an `identityPath` also carry their id under
+ * `identityKey(field)`, for count_distinct — never displayed.
  */
 export function extractRows(dataset: DatasetDef, raw: unknown[]): ReportRow[] {
   const fields = Object.entries(dataset.fields);
   return raw.map((row) => {
     const flat: ReportRow = {};
-    for (const [key, field] of fields) flat[key] = valueAtPath(row, field.path);
+    for (const [key, field] of fields) {
+      flat[key] = valueAtPath(row, field.path);
+      if (field.identityPath) flat[identityKey(key)] = valueAtPath(row, field.identityPath);
+    }
     return flat;
   });
 }
@@ -104,11 +123,28 @@ function aggregateValues(values: ReportValue[], agg: Aggregate): number | null {
   }
 }
 
-function measuresOver(rows: ReportRow[], spec: ReportSpec): Record<string, number | null> {
+/**
+ * Which key a measure reads. Only a distinct count switches to the
+ * identity — a `count` counts values present, and every other aggregate
+ * is arithmetic on the value itself. The `in` check lets rows that did
+ * not come through extractRows (tests, and only tests) fall back to the
+ * display value rather than counting nothing.
+ */
+function sourceKey(dataset: DatasetDef, row: ReportRow, field: string, agg: Aggregate): string {
+  if (agg !== "count_distinct" || !dataset.fields[field]?.identityPath) return field;
+  const id = identityKey(field);
+  return id in row ? id : field;
+}
+
+function measuresOver(
+  dataset: DatasetDef,
+  rows: ReportRow[],
+  spec: ReportSpec,
+): Record<string, number | null> {
   const out: Record<string, number | null> = {};
   for (const measure of spec.measures) {
     out[measureId(measure)] = aggregateValues(
-      rows.map((row) => row[measure.field] ?? null),
+      rows.map((row) => row[sourceKey(dataset, row, measure.field, measure.agg)] ?? null),
       measure.agg,
     );
   }
@@ -169,7 +205,7 @@ function sortGroups(groups: GroupRow[], spec: ReportSpec, keyIndex: number): Gro
 // The report
 // ---------------------------------------------------------------------
 
-function groupRows(rows: ReportRow[], spec: ReportSpec): GroupRow[] {
+function groupRows(dataset: DatasetDef, rows: ReportRow[], spec: ReportSpec): GroupRow[] {
   const [outerField, innerField] = spec.groupBy;
 
   const outerMap = new Map<ReportValue, ReportRow[]>();
@@ -195,7 +231,7 @@ function groupRows(rows: ReportRow[], spec: ReportSpec): GroupRow[] {
       for (const [innerKey, innerRows] of innerMap) {
         children.push({
           keys: [key, innerKey],
-          measures: measuresOver(innerRows, spec),
+          measures: measuresOver(dataset, innerRows, spec),
           rowCount: innerRows.length,
           children: null,
         });
@@ -206,7 +242,7 @@ function groupRows(rows: ReportRow[], spec: ReportSpec): GroupRow[] {
     // combining child aggregates — an avg of avgs is wrong.
     outers.push({
       keys: [key],
-      measures: measuresOver(bucket, spec),
+      measures: measuresOver(dataset, bucket, spec),
       rowCount: bucket.length,
       children,
     });
@@ -233,7 +269,7 @@ export function runReport(
     detail,
     matched,
     truncated: detail.length < matched,
-    groups: spec.groupBy.length > 0 ? groupRows(sorted, spec) : null,
-    totals: measuresOver(rows, spec),
+    groups: spec.groupBy.length > 0 ? groupRows(dataset, sorted, spec) : null,
+    totals: measuresOver(dataset, rows, spec),
   };
 }
