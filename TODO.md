@@ -73,19 +73,13 @@ waiting list (the write path `replaceFutureLegs` exists and is current, just
 unwired), and no "Open a trail" button on the Projects landing page (one click
 away already; not asked for).
 
-## 5. Reporter — stages 1–2 built, awaiting browser sign-off
+## 5. Reporter — Stage 3, charts, is next
 
-**Dashboard becomes Reporter**, and the stub becomes a report builder: pick a
-data set, choose columns, filters, grouping and sorting, see it as a chart and a
-table, save it by name, download it. Planned with the founder 2026-08-11; the
-full plan is **`app/(dashboard)/reporter/PLAN.md`**. Read it before touching
-anything below.
-
-Ten stages, each shippable and browser-testable on its own. **Stages 1 and 2
-(the rename; one dataset with the registry, parser and builder) are built on
-`feature/reporter`** — migration `0052` applied 2026-08-12, the `indent_lines`
-select verified against production; see `STATUS.md`. Browser-test the preview,
-then merge and continue:
+The Reporter is live: pick a data set, choose columns, dropdown filters,
+grouping, sorting, subtotals and totals — stages 1–2 of ten, merged
+2026-08-12 with the founder's sign-off (see `STATUS.md`). The full plan is
+**`app/(dashboard)/reporter/PLAN.md`**. Read it before touching anything
+below. Eight stages remain, each shippable and browser-testable on its own:
 
 3. **Charts** — `recharts`, `--chart-1…8` tokens, `components/ui/chart/*`.
 4. **CSV** — `lib/csv.ts` extracted from the Selections route, reused.
