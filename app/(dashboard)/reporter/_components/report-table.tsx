@@ -134,9 +134,12 @@ function GroupedTable({ spec, result }: { spec: ReportSpec; result: ReportResult
     });
 
   const renderGroup = (group: GroupRow): ReactNode[] => {
-    const outerKey = String(group.keys.join("·"));
+    const outerKey = String(group.keys[0]);
     const rows: ReactNode[] = [
-      <TableRow key={outerKey} className={twoLevel ? "bg-black/[0.02] dark:bg-white/[0.03]" : ""}>
+      <TableRow
+        key={`group:${outerKey}`}
+        className={twoLevel ? "bg-black/[0.02] dark:bg-white/[0.03]" : ""}
+      >
         <TableCell className="font-medium">
           {formatValue(dataset.fields[spec.groupBy[0]].type, group.keys[0])}
         </TableCell>
@@ -149,7 +152,7 @@ function GroupedTable({ spec, result }: { spec: ReportSpec; result: ReportResult
     ];
     for (const child of group.children ?? []) {
       rows.push(
-        <TableRow key={`${outerKey}·${String(child.keys[1])}`}>
+        <TableRow key={`child:${outerKey}:${String(child.keys[1])}`}>
           <TableCell />
           <TableCell>{formatValue(dataset.fields[spec.groupBy[1]].type, child.keys[1])}</TableCell>
           <TableCell className="text-muted text-right font-mono text-xs tabular-nums">
