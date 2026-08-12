@@ -106,6 +106,7 @@ checking every tool in its row. Keep it current.
 | Masters          | `po_facts`, `bill_facts`, `approved_budgets`, `indents`, `selections`, `selection_lines`                     |
 | Overview         | `indents`, `indent_lines`, `po_facts`, `bill_facts`, `goods_receipts` (counts only)                          |
 | Client Relations | `pusher_chain_state`, `selections`                                                                           |
+| Reporter         | `indents`, `indent_lines` (dataset registry, `lib/reporter/datasets.ts` — grows a row per stage)             |
 
 Relay reads only shared `projects`/`units`/`profiles`; Business Planning reads
 nothing. Client Relations also reads the shared

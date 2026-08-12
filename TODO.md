@@ -73,27 +73,28 @@ waiting list (the write path `replaceFutureLegs` exists and is current, just
 unwired), and no "Open a trail" button on the Projects landing page (one click
 away already; not asked for).
 
-## 5. Reporter — planned, ready to build
+## 5. Reporter — stages 1–2 built, awaiting browser sign-off
 
 **Dashboard becomes Reporter**, and the stub becomes a report builder: pick a
 data set, choose columns, filters, grouping and sorting, see it as a chart and a
 table, save it by name, download it. Planned with the founder 2026-08-11; the
-full plan is **`app/(dashboard)/management-dashboard/PLAN.md`** (that folder
-becomes `reporter/` in Stage 1 and the file travels with it). Read it before
-touching anything below.
+full plan is **`app/(dashboard)/reporter/PLAN.md`**. Read it before touching
+anything below.
 
-Ten stages, each shippable and browser-testable on its own:
+Ten stages, each shippable and browser-testable on its own. **Stages 1 and 2
+(the rename; one dataset with the registry, parser and builder) are built on
+`feature/reporter`** — migration `0052` applied 2026-08-12, the `indent_lines`
+select verified against production; see `STATUS.md`. Browser-test the preview,
+then merge and continue:
 
-1. **The rename, alone** — `0052`, `lib/tools.ts`, folder move. No behaviour.
-2. **One dataset, table on screen** — the registry, the spec parser, the builder.
 3. **Charts** — `recharts`, `--chart-1…8` tokens, `components/ui/chart/*`.
 4. **CSV** — `lib/csv.ts` extracted from the Selections route, reused.
-5. **Saved reports** — `0053`, plus the money-free starters.
-6. **The money — ships alone** — `0054`.
-7. **Sales & collections** — `0055`, two CRM fact views.
+5. **Saved reports** — `0054`, plus the money-free starters.
+6. **The money — ships alone** — `0055`.
+7. **Sales & collections** — `0056`, two CRM fact views.
 8. **The remaining datasets** and their starters.
 9. **PDF** — Recharts → `sharp` → PNG → react-pdf.
-10. **Plan vs actual** — `0056`, Business Planning publishes targets.
+10. **Plan vs actual** — `0057`, Business Planning publishes targets.
 
 Three things the founder decided that are easy to lose:
 
@@ -113,7 +114,7 @@ question: Client Relations already holds every rupee coming in, and Bills holds
 every rupee going out. Whatever that tool becomes, it reads those two rather than
 re-recording either — and CRM's tables are grant-gated on SELECT, so it needs a
 money-free view with a hand-written column list, never a second policy. Note that
-Reporter's `0055` will already have built two such CRM fact views; check them
+Reporter's `0056` will already have built two such CRM fact views; check them
 before writing a third.
 
 Two follow-ups the founder asked to defer on Client Relations:
