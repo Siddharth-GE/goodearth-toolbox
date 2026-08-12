@@ -1,7 +1,12 @@
 import { PageTitle } from "@/components/ui/page-title";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DATASETS } from "@/lib/reporter/datasets";
-import { listProjectOptions, runSpec } from "@/lib/reporter/queries";
+import {
+  listFilterOptions,
+  listProjectOptions,
+  listUnitOptions,
+  runSpec,
+} from "@/lib/reporter/queries";
 import {
   builderDataset,
   decodeSpecParam,
@@ -27,7 +32,12 @@ export default async function RunReportPage({
   const spec = decoded === null ? defaultSpec("") : parseReportSpec(decoded);
   const loss = decoded === null ? [] : describeSpecLoss(decoded);
 
-  const [outcome, projects] = await Promise.all([runSpec(spec), listProjectOptions()]);
+  const [outcome, projects, units, options] = await Promise.all([
+    runSpec(spec),
+    listProjectOptions(),
+    listUnitOptions(),
+    listFilterOptions(spec.dataset),
+  ]);
   const dataset = DATASETS[spec.dataset];
 
   return (
@@ -57,6 +67,8 @@ export default async function RunReportPage({
         dataset={builderDataset(spec.dataset)}
         spec={spec}
         projects={projects}
+        units={units}
+        options={options}
       />
 
       {outcome.ok ? (

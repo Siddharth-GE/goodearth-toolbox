@@ -89,6 +89,22 @@ test("a lookup field takes an id with eq, never free text ops", () => {
   assert.equal(spec.filters[0].op, "eq");
 });
 
+test("dropdown fields refuse contains — choices, never typing", () => {
+  const spec = parseReportSpec({
+    dataset: "indent_lines",
+    filters: [
+      { field: "item", op: "contains", value: "cement" },
+      { field: "item", op: "eq", value: "OPC 53 Grade Cement" },
+      { field: "status", op: "neq", value: "draft" },
+      { field: "note", op: "contains", value: "urgent" }, // note filters nothing
+    ],
+  });
+  assert.deepEqual(spec.filters, [
+    { field: "item", op: "eq", value: "OPC 53 Grade Cement" },
+    { field: "status", op: "neq", value: "draft" },
+  ]);
+});
+
 test("limit is clamped and groupBy capped at two", () => {
   assert.equal(parseReportSpec({ limit: 10_000_000 }).limit, MAX_LIMIT);
   assert.equal(parseReportSpec({ limit: -5 }).limit, MIN_LIMIT);
@@ -167,7 +183,7 @@ test("the URL round trip is lossless, and a mangled param is just null", () => {
   const spec = parseReportSpec({
     dataset: "indent_lines",
     columns: ["item", "quantity"],
-    filters: [{ field: "item", op: "contains", value: "കല്ല്" }],
+    filters: [{ field: "item", op: "eq", value: "കല്ല്" }],
     groupBy: ["item"],
     measures: [{ field: "quantity", agg: "sum" }],
     sort: [{ field: "quantity", dir: "desc" }],

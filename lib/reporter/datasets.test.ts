@@ -18,12 +18,41 @@ test("the default dataset exists", () => {
 
 test("every embed names its constraint — no bare relation before (", () => {
   for (const [key, dataset] of entries) {
-    // Every `word(` or `word!inner(` must carry a named `!..._fkey`.
-    const embeds = dataset.select.matchAll(/([a-z_]+)((?:![a-z_]+)*)\(/g);
-    for (const [, relation, modifiers] of embeds) {
+    for (const select of [dataset.select, dataset.optionsSelect]) {
+      if (!select) continue;
+      // Every `word(` or `word!inner(` must carry a named `!..._fkey`.
+      const embeds = select.matchAll(/([a-z_]+)((?:![a-z_]+)*)\(/g);
+      for (const [, relation, modifiers] of embeds) {
+        assert.ok(
+          modifiers.includes("_fkey"),
+          `${key}: embed "${relation}${modifiers}(" does not name its FK constraint`,
+        );
+      }
+    }
+  }
+});
+
+test("every text filter is a dropdown — the founder's no-typing rule", () => {
+  for (const [key, dataset] of entries) {
+    for (const [fieldKey, field] of Object.entries(dataset.fields)) {
+      if (field.type !== "text" || !field.filterColumn) continue;
       assert.ok(
-        modifiers.includes("_fkey"),
-        `${key}: embed "${relation}${modifiers}(" does not name its FK constraint`,
+        field.lookup || field.filterOptions === "distinct",
+        `${key}.${fieldKey}: a filterable text field must declare lookup or filterOptions`,
+      );
+    }
+  }
+});
+
+test("distinct fields' columns are all present in the optionsSelect", () => {
+  for (const [key, dataset] of entries) {
+    for (const [fieldKey, field] of Object.entries(dataset.fields)) {
+      if (field.filterOptions !== "distinct") continue;
+      assert.ok(dataset.optionsSelect, `${key}: distinct fields but no optionsSelect`);
+      const leaf = field.path.split(".").pop()!;
+      assert.ok(
+        dataset.optionsSelect!.includes(leaf),
+        `${key}.${fieldKey}: "${leaf}" is not in the optionsSelect`,
       );
     }
   }
@@ -125,6 +154,7 @@ test("resolveFieldKey follows aliases and refuses everything else", () => {
     description: "",
     source: "fake",
     select: "id",
+    optionsSelect: null,
     projectField: null,
     dateFields: [],
     money: false,

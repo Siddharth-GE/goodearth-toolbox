@@ -28,6 +28,12 @@ Founder decisions taken during planning (all binding):
 6. **PDF export moves to a later stage.** CSV comes early.
 7. **Plan vs actual gets built properly**: Business Planning gains a project link
    and publishes its numbers so Reporter can put actuals beside them.
+8. **Every filter offers choices, never typing** (2026-08-12, on seeing Stage
+   2): id-backed fields get a `lookup` picker fed from masters, categorical
+   text fields get a picker of the data's own distinct values
+   (`filterOptions: "distinct"` + the dataset's `optionsSelect`), and a text
+   field with neither is not filterable. Dates keep the date picker, numbers a
+   number box. `datasets.test.ts` enforces it for every future dataset.
 
 **The consequence to say out loud before the money stages ship:** after Stages 6
 and 7, _granting `/reporter` grants sight of every vendor rate, every bill

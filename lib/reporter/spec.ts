@@ -92,9 +92,13 @@ export function measureId(measure: { field: string; agg: string }): string {
 
 /** Which operators a filter on this field may use. */
 export function opsForField(field: FieldDef): Op[] {
-  if (field.lookup) return ["eq", "neq"];
+  // Dropdown-backed fields (the founder's rule: choices, never typing)
+  // take exactly is / is-not.
+  if (field.lookup || field.filterOptions) return ["eq", "neq"];
   switch (field.type) {
     case "text":
+      // No current field reaches here with a filterColumn — `contains`
+      // is reserved for a future genuinely free-text search field.
       return ["eq", "neq", "contains"];
     case "number":
     case "money":
@@ -394,7 +398,9 @@ export type BuilderField = {
   groupable: boolean;
   aggregates: Aggregate[];
   sortable: boolean;
-  lookup?: "projects";
+  lookup?: "projects" | "units";
+  /** Value control is a dropdown of the data's own distinct values. */
+  distinct?: true;
 };
 
 export type BuilderDataset = {
@@ -422,6 +428,7 @@ export function builderDataset(datasetKey: string): BuilderDataset {
       aggregates: field.aggregates,
       sortable: Boolean(field.sortColumn),
       ...(field.lookup ? { lookup: field.lookup } : {}),
+      ...(field.filterOptions === "distinct" ? { distinct: true as const } : {}),
     })),
   };
 }

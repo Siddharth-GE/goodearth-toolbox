@@ -44,6 +44,7 @@ type UiMeasure = { field: string; agg: Aggregate };
 type UiSort = { field: string; dir: "asc" | "desc" };
 
 export type ProjectOption = { id: string; name: string };
+export type UnitOption = { id: string; name: string; projectId: string };
 
 function toUiFilters(spec: ReportSpec): UiFilter[] {
   return spec.filters.map((filter) => ({
@@ -57,10 +58,15 @@ export function ReportBuilder({
   dataset,
   spec,
   projects,
+  units,
+  options,
 }: {
   dataset: BuilderDataset;
   spec: ReportSpec;
   projects: ProjectOption[];
+  units: UnitOption[];
+  /** Distinct data values per field key, for the dropdown filters. */
+  options: Record<string, string[]>;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -230,6 +236,8 @@ export function ReportBuilder({
                   field={field}
                   value={filter.value}
                   projects={projects}
+                  units={units}
+                  options={options[field.key] ?? []}
                   onChange={(value) => setFilter(index, { value })}
                 />
                 <button
@@ -463,11 +471,15 @@ function FilterValue({
   field,
   value,
   projects,
+  units,
+  options,
   onChange,
 }: {
   field: BuilderField;
   value: string;
   projects: ProjectOption[];
+  units: UnitOption[];
+  options: string[];
   onChange: (value: string) => void;
 }) {
   if (field.lookup === "projects") {
@@ -482,6 +494,50 @@ function FilterValue({
         {projects.map((project) => (
           <option key={project.id} value={project.id}>
             {project.name}
+          </option>
+        ))}
+      </Select>
+    );
+  }
+  if (field.lookup === "units") {
+    // The same unit name recurs across projects, so the list groups by
+    // project rather than trusting the name to identify anything.
+    return (
+      <Select
+        aria-label="Unit"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-9 w-auto min-w-40 text-xs"
+      >
+        <option value="">Pick a unit…</option>
+        {projects.map((project) => {
+          const own = units.filter((unit) => unit.projectId === project.id);
+          if (own.length === 0) return null;
+          return (
+            <optgroup key={project.id} label={project.name}>
+              {own.map((unit) => (
+                <option key={unit.id} value={unit.id}>
+                  {unit.name}
+                </option>
+              ))}
+            </optgroup>
+          );
+        })}
+      </Select>
+    );
+  }
+  if (field.distinct) {
+    return (
+      <Select
+        aria-label={field.label}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-9 w-auto min-w-40 text-xs"
+      >
+        <option value="">Pick…</option>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
           </option>
         ))}
       </Select>
@@ -504,11 +560,10 @@ function FilterValue({
   return (
     <Input
       aria-label="Value"
-      type={field.type === "date" ? "date" : field.type === "text" ? "text" : "number"}
+      type={field.type === "date" ? "date" : "number"}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       className="h-9 w-auto min-w-36 text-xs"
-      placeholder={field.type === "text" ? "Type a value…" : undefined}
     />
   );
 }

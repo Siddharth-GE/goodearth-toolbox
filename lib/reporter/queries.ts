@@ -3,6 +3,7 @@ import "server-only";
 import { requireTool } from "@/lib/auth/access";
 import { cleanSearch } from "@/lib/masters/paged";
 import { listProjects } from "@/lib/masters/projects";
+import { listUnits } from "@/lib/masters/units";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { formatCount } from "@/lib/format";
@@ -143,4 +144,65 @@ export async function listProjectOptions(): Promise<ProjectOption[]> {
   await requireTool("/reporter");
   const projects = await listProjects();
   return projects.map((project) => ({ id: project.id, name: project.name }));
+}
+
+export type UnitOption = { id: string; name: string; projectId: string };
+
+/** Options for the unit filter's picker, grouped by project on screen. */
+export async function listUnitOptions(): Promise<UnitOption[]> {
+  await requireTool("/reporter");
+  const units = await listUnits();
+  return units.map((unit) => ({ id: unit.id, name: unit.name, projectId: unit.project_id }));
+}
+
+// Enough pages that every value a filter could need is present at
+// today's scale, without re-reading the whole dataset just to fill
+// dropdowns. If a dataset ever outgrows this, its rare values drop off
+// the list — revisit with a real DISTINCT source then, not a bigger cap.
+const OPTIONS_MAX_PAGES = 5;
+
+/**
+ * The distinct values behind every `filterOptions: "distinct"` field of
+ * a dataset, keyed by field key — what the builder's dropdowns show.
+ */
+export async function listFilterOptions(datasetKey: string): Promise<Record<string, string[]>> {
+  await requireTool("/reporter");
+  const dataset = DATASETS[datasetKey];
+  if (!dataset || !dataset.optionsSelect) return {};
+
+  const distinctFields = Object.entries(dataset.fields).filter(
+    ([, field]) => field.filterOptions === "distinct",
+  );
+  if (distinctFields.length === 0) return {};
+
+  const supabase = await createClient();
+  const source = dataset.source as "indent_lines";
+
+  const PAGE_SIZE = 1000;
+  const raw: unknown[] = [];
+  for (let page = 0; page < OPTIONS_MAX_PAGES; page++) {
+    const { data, error } = await supabase
+      .from(source)
+      .select(dataset.optionsSelect)
+      .order("id")
+      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+    if (error) {
+      console.error("listFilterOptions failed:", error);
+      throw new Error(`The filter choices could not be read: ${error.message}`);
+    }
+    raw.push(...(data ?? []));
+    if ((data ?? []).length < PAGE_SIZE) break;
+  }
+
+  const rows = extractRows(dataset, raw);
+  const options: Record<string, string[]> = {};
+  for (const [key] of distinctFields) {
+    const values = new Set<string>();
+    for (const row of rows) {
+      const value = row[key];
+      if (typeof value === "string" && value.trim() !== "") values.add(value);
+    }
+    options[key] = [...values].sort((a, b) => a.localeCompare(b));
+  }
+  return options;
 }

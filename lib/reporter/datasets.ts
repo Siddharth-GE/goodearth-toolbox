@@ -29,6 +29,14 @@
  *   reason is commented at lib/inventory/stock-queries.ts:289).
  * - A field without `filterColumn` can never reach a filter; a field
  *   without `sortColumn` can never be sorted on. Absence is the guard.
+ * - FOUNDER, 2026-08-12: **every filter offers choices, never typing.**
+ *   An id-backed field declares a `lookup` (a picker fed from masters);
+ *   a categorical text field declares `filterOptions: "distinct"` (a
+ *   picker fed from the values actually in the data). A text field with
+ *   neither is simply not filterable. `contains` exists for a genuinely
+ *   free-text search field; no current field earns it. Dates keep the
+ *   date picker and numbers keep a number box — those are not lists.
+ *   datasets.test.ts enforces this for every future dataset.
  * - The registry is a display decision, not a boundary. The grant and
  *   RLS are the boundary — a dataset here shows only what the signed-in
  *   user's policies let through.
@@ -68,7 +76,12 @@ export type FieldDef = {
    * The filter renders as a bounded picker instead of free text, and its
    * ops are fixed to eq/neq. The picker's options come from queries.ts.
    */
-  lookup?: "projects";
+  lookup?: "projects" | "units";
+  /**
+   * The filter renders as a picker of the distinct values present in
+   * the data (fetched via the dataset's `optionsSelect`), ops eq/neq.
+   */
+  filterOptions?: "distinct";
 };
 
 export type DatasetDef = {
@@ -80,6 +93,12 @@ export type DatasetDef = {
   source: string;
   /** Hand-authored select constant. Never composed at runtime. */
   select: string;
+  /**
+   * Hand-authored select fetching ONLY the columns behind
+   * `filterOptions: "distinct"` fields, for the filter dropdowns.
+   * Null when the dataset has none.
+   */
+  optionsSelect: string | null;
   /** Field key whose filter scopes the report to a project, if any. */
   projectField: string | null;
   /** Field keys the user may range on — a report picks WHICH date. */
@@ -106,11 +125,16 @@ const INDENT_LINES_SELECT =
   "indents!indent_lines_indent_id_fkey!inner(reference, status, stage, required_by, project_id, " +
   "projects!indents_project_id_fkey(name), units!indents_unit_id_fkey(name))";
 
+const INDENT_LINES_OPTIONS_SELECT =
+  "uom, items!indent_lines_item_id_fkey!inner(name, code), " +
+  "indents!indent_lines_indent_id_fkey!inner(status, stage)";
+
 const indentLines: DatasetDef = {
   label: "Indent lines",
   description: "Every material line site teams have requested, item by item.",
   source: "indent_lines",
   select: INDENT_LINES_SELECT,
+  optionsSelect: INDENT_LINES_OPTIONS_SELECT,
   projectField: "project",
   dateFields: ["requested_on", "required_by"],
   money: false,
@@ -131,9 +155,13 @@ const indentLines: DatasetDef = {
       label: "Unit",
       type: "text",
       path: "indents.units.name",
+      // Filters by id on the inner-joined indents row — a name filter
+      // would need units!inner, which drops unit-less lines everywhere.
+      filterColumn: "indents.unit_id",
       sortColumn: "indents.units.name",
       groupable: true,
       aggregates: ["count_distinct"],
+      lookup: "units",
     },
     indent: {
       label: "Indent",
@@ -151,6 +179,7 @@ const indentLines: DatasetDef = {
       sortColumn: "indents.status",
       groupable: true,
       aggregates: [],
+      filterOptions: "distinct",
     },
     stage: {
       label: "Stage",
@@ -160,6 +189,7 @@ const indentLines: DatasetDef = {
       sortColumn: "indents.stage",
       groupable: true,
       aggregates: [],
+      filterOptions: "distinct",
     },
     item: {
       label: "Item",
@@ -169,6 +199,7 @@ const indentLines: DatasetDef = {
       sortColumn: "items.name",
       groupable: true,
       aggregates: ["count_distinct"],
+      filterOptions: "distinct",
     },
     item_code: {
       label: "Item code",
@@ -178,6 +209,7 @@ const indentLines: DatasetDef = {
       sortColumn: "items.code",
       groupable: true,
       aggregates: [],
+      filterOptions: "distinct",
     },
     quantity: {
       label: "Quantity",
@@ -196,12 +228,15 @@ const indentLines: DatasetDef = {
       sortColumn: "uom",
       groupable: true,
       aggregates: [],
+      filterOptions: "distinct",
     },
+    // A note is prose — a dropdown of whole notes would be nonsense and
+    // typing is out by the founder's rule, so it displays but never
+    // filters (no filterColumn).
     note: {
       label: "Note",
       type: "text",
       path: "note",
-      filterColumn: "note",
       groupable: false,
       aggregates: [],
     },
