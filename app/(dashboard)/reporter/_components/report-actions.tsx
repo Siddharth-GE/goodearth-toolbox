@@ -146,8 +146,8 @@ export function ReportActions({
           <DialogHeader>
             <DialogTitle>Delete this report?</DialogTitle>
             <DialogDescription>
-              “{name}” will be removed for everyone. The data it reads is untouched — only the
-              saved question goes.
+              “{name}” will be removed for everyone. The data it reads is untouched — only the saved
+              question goes.
             </DialogDescription>
           </DialogHeader>
           <FormMessage error={error} />
@@ -196,7 +196,14 @@ function RenameForm({
       <fieldset disabled={busy} className="min-w-0 space-y-3">
         <div className="space-y-1.5">
           <Label htmlFor="rename-name">Name</Label>
-          <Input id="rename-name" name="name" required maxLength={120} defaultValue={name} autoFocus />
+          <Input
+            id="rename-name"
+            name="name"
+            required
+            maxLength={120}
+            defaultValue={name}
+            autoFocus
+          />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="rename-description">What it answers</Label>
