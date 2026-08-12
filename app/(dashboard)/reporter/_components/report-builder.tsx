@@ -30,18 +30,30 @@ import {
   MAX_SORTS,
   defaultSpec,
   encodeSpec,
+  measureId,
   parseReportSpec,
   type BuilderDataset,
   type BuilderField,
+  type ChartType,
   type Op,
   type ReportSpec,
 } from "@/lib/reporter/spec";
 
-import { aggLabel, opLabel } from "./labels";
+import { aggLabel, measureLabel, opLabel } from "./labels";
 
 type UiFilter = { field: string; op: Op; value: string };
 type UiMeasure = { field: string; agg: Aggregate };
 type UiSort = { field: string; dir: "asc" | "desc" };
+type UiChart = { type: ChartType | ""; category: string; measures: string[]; emphasis: string };
+
+const CHART_TYPE_LABELS: [ChartType, string][] = [
+  ["bar", "Bars"],
+  ["hbar", "Bars, sideways"],
+  ["line", "Line"],
+  ["area", "Area"],
+  ["stacked", "Stacked bars"],
+  ["meter", "Meter — value against a limit"],
+];
 
 export type ProjectOption = { id: string; name: string };
 export type UnitOption = { id: string; name: string; projectId: string };
@@ -77,6 +89,12 @@ export function ReportBuilder({
   const [measures, setMeasures] = useState<UiMeasure[]>(spec.measures);
   const [sort, setSort] = useState<UiSort[]>(spec.sort);
   const [limit, setLimit] = useState<number>(spec.limit);
+  const [chart, setChart] = useState<UiChart>({
+    type: spec.chart?.type ?? "",
+    category: spec.chart?.category ?? "",
+    measures: spec.chart?.measures ?? [],
+    emphasis: spec.chart?.emphasis ?? "",
+  });
 
   const byKey = new Map(dataset.fields.map((field) => [field.key, field]));
   const filterable = dataset.fields.filter((field) => field.ops.length > 0);
@@ -87,6 +105,8 @@ export function ReportBuilder({
   const run = () => {
     // An unfinished filter row (blank value) is dropped quietly here —
     // sending it would only earn a "left out" note from the parser.
+    const measureIds = measures.map((measure) => measureId(measure));
+    const chartMeasures = chart.measures.filter((id) => measureIds.includes(id));
     const draft = parseReportSpec({
       ...spec,
       dataset: dataset.key,
@@ -107,6 +127,17 @@ export function ReportBuilder({
       measures,
       sort,
       limit,
+      chart:
+        chart.type && groupBy.length > 0 && chartMeasures.length > 0
+          ? {
+              type: chart.type,
+              category: groupBy.includes(chart.category) ? chart.category : groupBy[0],
+              measures: chartMeasures,
+              ...(chart.emphasis && chartMeasures.includes(chart.emphasis)
+                ? { emphasis: chart.emphasis }
+                : {}),
+            }
+          : null,
     });
     startTransition(() => {
       router.push(`/reporter/run?spec=${encodeSpec(draft)}`);
@@ -121,6 +152,7 @@ export function ReportBuilder({
     setMeasures([]);
     setSort(blank.sort);
     setLimit(blank.limit);
+    setChart({ type: "", category: "", measures: [], emphasis: "" });
   };
 
   const toggleColumn = (key: string) => {
@@ -374,6 +406,116 @@ export function ReportBuilder({
             </Button>
           )}
         </div>
+      </div>
+
+      {/* Chart */}
+      <div className="space-y-2">
+        <p className={sectionLabel}>Chart</p>
+        {groupBy.length === 0 || measures.length === 0 ? (
+          <p className="text-muted text-xs">
+            Group by a field and add a measure, and the report can carry a chart.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Select
+                aria-label="Chart type"
+                value={chart.type}
+                onChange={(e) => setChart({ ...chart, type: e.target.value as ChartType | "" })}
+                className={compactSelect}
+              >
+                <option value="">No chart</option>
+                {CHART_TYPE_LABELS.map(([type, label]) => (
+                  <option key={type} value={type}>
+                    {label}
+                  </option>
+                ))}
+              </Select>
+              {chart.type && chart.type !== "meter" && (
+                <>
+                  <span className="text-muted text-xs">by</span>
+                  <Select
+                    aria-label="Chart category"
+                    value={groupBy.includes(chart.category) ? chart.category : groupBy[0]}
+                    onChange={(e) => setChart({ ...chart, category: e.target.value })}
+                    className={compactSelect}
+                  >
+                    {groupBy.map((key) => (
+                      <option key={key} value={key}>
+                        {byKey.get(key)?.label ?? key}
+                      </option>
+                    ))}
+                  </Select>
+                </>
+              )}
+            </div>
+
+            {chart.type && (
+              <div className="space-y-1.5">
+                <p className="text-muted text-xs">
+                  {chart.type === "meter"
+                    ? "Pick two measures — the value first, then the limit it runs against."
+                    : "Which measures go on the chart — the order sets the colours."}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {measures.map((measure) => {
+                    const id = measureId(measure);
+                    const on = chart.measures.includes(id);
+                    const field = byKey.get(measure.field);
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() =>
+                          setChart({
+                            ...chart,
+                            measures: on
+                              ? chart.measures.filter((m) => m !== id)
+                              : [...chart.measures, id],
+                            emphasis: on && chart.emphasis === id ? "" : chart.emphasis,
+                          })
+                        }
+                        className={cn(
+                          "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                          on
+                            ? "border-accent bg-accent text-accent-foreground"
+                            : "border-border text-muted hover:text-foreground",
+                        )}
+                      >
+                        {measureLabel(field?.label ?? measure.field, measure.agg)}
+                      </button>
+                    );
+                  })}
+                </div>
+                {chart.type !== "meter" && chart.measures.length >= 2 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted text-xs">Emphasise</span>
+                    <Select
+                      aria-label="Emphasised measure"
+                      value={chart.emphasis}
+                      onChange={(e) => setChart({ ...chart, emphasis: e.target.value })}
+                      className={compactSelect}
+                    >
+                      <option value="">Nothing — all colours</option>
+                      {chart.measures.map((id) => {
+                        const measure = measures.find((m) => measureId(m) === id);
+                        const field = measure ? byKey.get(measure.field) : undefined;
+                        return (
+                          <option key={id} value={id}>
+                            {measure
+                              ? measureLabel(field?.label ?? measure.field, measure.agg)
+                              : id}
+                          </option>
+                        );
+                      })}
+                    </Select>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Sort & size */}

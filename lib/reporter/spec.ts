@@ -300,8 +300,9 @@ function parseWithLoss(raw: unknown): ParseOutcome {
       .filter((m): m is string => typeof m === "string" && measureIds.includes(m))
       .filter((m, i, all) => all.indexOf(m) === i)
       .slice(0, MAX_MEASURES);
-    // A meter is one ratio against a limit — it carries one measure.
-    if (type === "meter") chartMeasures = chartMeasures.slice(0, 1);
+    // A meter is one ratio against a limit — the value, then the limit,
+    // and nothing else.
+    if (type === "meter") chartMeasures = chartMeasures.slice(0, 2);
     if (type && category && groupBy.includes(category) && chartMeasures.length > 0) {
       const emphasis =
         typeof raw.chart.emphasis === "string" && chartMeasures.includes(raw.chart.emphasis)
