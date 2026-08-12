@@ -1,9 +1,9 @@
 # Reporter — build notes
 
-**Nothing here is built yet.** This folder is still the `Dashboard` stub
-(`/management-dashboard`). Stage 1 below renames the tool to **Reporter**,
-moves this folder to `app/(dashboard)/reporter/`, and this file travels with
-it. Read this before touching the tool.
+**Stages 1–2 are built** (2026-08-12, `feature/reporter`): the rename (`0052`),
+and the full builder pipeline over one dataset — registry, `parseReportSpec`,
+the pure aggregation engine and the three screens. Stages 3–10 below are still
+to come. Read this before touching the tool.
 
 Planned with the founder on 2026-08-11. Ten stages, each shippable on its own.
 

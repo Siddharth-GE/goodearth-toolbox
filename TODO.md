@@ -73,19 +73,20 @@ waiting list (the write path `replaceFutureLegs` exists and is current, just
 unwired), and no "Open a trail" button on the Projects landing page (one click
 away already; not asked for).
 
-## 5. Reporter — planned, ready to build
+## 5. Reporter — stages 1–2 built, awaiting browser sign-off
 
 **Dashboard becomes Reporter**, and the stub becomes a report builder: pick a
 data set, choose columns, filters, grouping and sorting, see it as a chart and a
 table, save it by name, download it. Planned with the founder 2026-08-11; the
-full plan is **`app/(dashboard)/management-dashboard/PLAN.md`** (that folder
-becomes `reporter/` in Stage 1 and the file travels with it). Read it before
-touching anything below.
+full plan is **`app/(dashboard)/reporter/PLAN.md`**. Read it before touching
+anything below.
 
-Ten stages, each shippable and browser-testable on its own:
+Ten stages, each shippable and browser-testable on its own. **Stages 1 and 2
+(the rename; one dataset with the registry, parser and builder) are built on
+`feature/reporter`** — migration `0052` applied 2026-08-12, the `indent_lines`
+select verified against production; see `STATUS.md`. Browser-test the preview,
+then merge and continue:
 
-1. **The rename, alone** — `0052`, `lib/tools.ts`, folder move. No behaviour.
-2. **One dataset, table on screen** — the registry, the spec parser, the builder.
 3. **Charts** — `recharts`, `--chart-1…8` tokens, `components/ui/chart/*`.
 4. **CSV** — `lib/csv.ts` extracted from the Selections route, reused.
 5. **Saved reports** — `0053`, plus the money-free starters.
