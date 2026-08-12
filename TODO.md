@@ -73,16 +73,17 @@ waiting list (the write path `replaceFutureLegs` exists and is current, just
 unwired), and no "Open a trail" button on the Projects landing page (one click
 away already; not asked for).
 
-## 5. Reporter — Stage 3, charts, is next
+## 5. Reporter — Stage 4, CSV download, is next
 
-The Reporter is live: pick a data set, choose columns, dropdown filters,
-grouping, sorting, subtotals and totals — stages 1–2 of ten, merged
-2026-08-12 with the founder's sign-off (see `STATUS.md`). The full plan is
+The Reporter is live through Stage 3: builder, dropdown filters, grouping,
+subtotals — and now charts (six forms, KPI band, the composed page; merged
+2026-08-12 with the founder's sign-off, see `STATUS.md`). The full plan is
 **`app/(dashboard)/reporter/PLAN.md`**. Read it before touching anything
-below. Eight stages remain, each shippable and browser-testable on its own:
+below. Seven stages remain, each shippable and browser-testable on its own:
 
-3. **Charts** — `recharts`, `--chart-1…8` tokens, `components/ui/chart/*`.
 4. **CSV** — `lib/csv.ts` extracted from the Selections route, reused.
+   Write `csv.test.ts` BEFORE the Selections refactor so that change is
+   provably a no-op, and the Selections CSV must stay byte-identical.
 5. **Saved reports** — `0054`, plus the money-free starters.
 6. **The money — ships alone** — `0055`.
 7. **Sales & collections** — `0056`, two CRM fact views.

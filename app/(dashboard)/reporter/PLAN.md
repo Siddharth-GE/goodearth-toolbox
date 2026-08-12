@@ -1,9 +1,13 @@
 # Reporter — build notes
 
-**Stages 1–2 are built** (2026-08-12, `feature/reporter`): the rename (`0052`),
-and the full builder pipeline over one dataset — registry, `parseReportSpec`,
-the pure aggregation engine and the three screens. Stages 3–10 below are still
-to come. Read this before touching the tool.
+**Stages 1–3 are built and merged** (2026-08-12): the rename (`0052`), the
+builder pipeline over one dataset (registry, `parseReportSpec`, the pure
+aggregation engine, the screens), and charts (`recharts`, the `--chart-1…8`
+tokens, `components/ui/chart/*`, `lib/charts/{palette,series}.ts`, KPI band —
+a report is a composed page). Two decisions arrived during build and bind the
+remaining stages: **every filter is a dropdown** (decision 8 below), and **a
+meter carries two measures** — the value, then the limit. Stages 4–10 are
+still to come. Read this before touching the tool.
 
 Planned with the founder on 2026-08-11. Ten stages, each shippable on its own.
 
