@@ -39,7 +39,7 @@ import {
   type ReportSpec,
 } from "@/lib/reporter/spec";
 
-import { aggLabel, measureLabel, opLabel } from "./labels";
+import { aggLabel, measureLabel, opLabel } from "@/lib/reporter/labels";
 
 type UiFilter = { field: string; op: Op; value: string };
 type UiMeasure = { field: string; agg: Aggregate };
@@ -69,12 +69,20 @@ function toUiFilters(spec: ReportSpec): UiFilter[] {
 export function ReportBuilder({
   dataset,
   spec,
+  basePath,
   projects,
   units,
   options,
 }: {
   dataset: BuilderDataset;
   spec: ReportSpec;
+  /**
+   * Where "Run report" pushes the new spec — `/reporter/run` for an
+   * unsaved report, `/reporter/<id>` for a saved one, so reshaping a
+   * saved report stays on that report's page instead of dropping the
+   * person into an unsaved copy of it.
+   */
+  basePath: string;
   projects: ProjectOption[];
   units: UnitOption[];
   /** Distinct data values per field key, for the dropdown filters. */
@@ -140,7 +148,7 @@ export function ReportBuilder({
           : null,
     });
     startTransition(() => {
-      router.push(`/reporter/run?spec=${encodeSpec(draft)}`);
+      router.push(`${basePath}?spec=${encodeSpec(draft)}`);
     });
   };
 

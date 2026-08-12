@@ -10,7 +10,7 @@ import { DATASETS } from "@/lib/reporter/datasets";
 import { measureId, type ReportSpec } from "@/lib/reporter/spec";
 import type { ReportResult } from "@/lib/reporter/aggregate";
 
-import { measureLabel } from "./labels";
+import { measureLabel } from "@/lib/reporter/labels";
 
 function formatTotal(value: number | null, fieldType: string, agg: string): string {
   if (value === null) return "—";

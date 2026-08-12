@@ -1,13 +1,10 @@
-import { csvResponse } from "@/lib/csv";
-import { reportCsvFilename, reportCsvRows } from "@/lib/reporter/csv-rows";
+import { reportCsvResponse } from "@/lib/reporter/csv-rows";
 import { DATASETS } from "@/lib/reporter/datasets";
 import { runSpecForCsv } from "@/lib/reporter/queries";
-import { decodeSpecParam, defaultSpec, measureId, parseReportSpec } from "@/lib/reporter/spec";
-
-import { measureLabel } from "../../_components/labels";
+import { decodeSpecParam, defaultSpec, parseReportSpec } from "@/lib/reporter/spec";
 
 /**
- * A run report as a spreadsheet. Same `?spec=` as the page, so the
+ * An unsaved report as a spreadsheet. Same `?spec=` as the page, so the
  * download is exactly the report on screen — with every matched line
  * rather than the first N, because the row limit is a screen setting.
  *
@@ -28,21 +25,5 @@ export async function GET(request: Request) {
     });
   }
 
-  const dataset = DATASETS[spec.dataset];
-  const rows = reportCsvRows(
-    dataset,
-    spec,
-    outcome.result,
-    // The same headings the table and the chart use — built from the
-    // one measureLabel(), so the three can never disagree.
-    Object.fromEntries(
-      spec.measures.map((measure) => [
-        measureId(measure),
-        measureLabel(dataset.fields[measure.field].label, measure.agg),
-      ]),
-    ),
-  );
-
-  const today = new Date().toISOString().slice(0, 10);
-  return csvResponse(rows, reportCsvFilename(dataset, today));
+  return reportCsvResponse(DATASETS[spec.dataset], spec, outcome.result);
 }

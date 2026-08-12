@@ -1,10 +1,15 @@
 /**
- * The plain-English words the builder and the table share. Presentation
- * only — the legal ops and aggregates come from the registry via
+ * The plain-English words every part of a report shares — the builder,
+ * the table, the chart legend and the CSV headings. Presentation only:
+ * the legal ops and aggregates come from the registry via
  * builderDataset(); these are just what they are called on screen.
+ *
+ * It lives in lib rather than beside the screens because the CSV routes
+ * need it too, and a column called one thing on the page and another in
+ * the download is the kind of small lie that costs an afternoon.
  */
-import type { Aggregate, FieldType } from "@/lib/reporter/datasets";
-import type { Op } from "@/lib/reporter/spec";
+import type { Aggregate, FieldType } from "./datasets";
+import type { Op } from "./spec";
 
 export function opLabel(op: Op, type: FieldType): string {
   if (type === "date") {
