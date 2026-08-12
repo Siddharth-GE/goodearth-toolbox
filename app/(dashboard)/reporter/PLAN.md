@@ -492,7 +492,7 @@ app/(dashboard)/reporter/PLAN.md
 + loading.tsx in every route segment (shared Spinner, house rule)
 ```
 
-`[reportId]` accepts a `reports.id` uuid **or** a `starter:*` id — one screen, one
+`[reportId]` accepts a `reports.id` uuid **or** a `starter-*` id — one screen, one
 code path, resolved by `getReport(id)`.
 
 Client components in `_components/`: `report-builder` (owns spec state, writes
@@ -515,10 +515,13 @@ surface gap between bars and stacked segments, tooltip on `surface-raised` with
 
 ## The seven starters are code constants, not seeded rows
 
-`lib/reporter/starters.ts`, ids `starter:project-scorecard`,
-`starter:sales-collections`, `starter:spend-vs-budget`,
-`starter:site-procurement`, `starter:stock-position`, `starter:plan-vs-actual`,
-`starter:design-delivery` — **each shipping with its chart already configured**,
+`lib/reporter/starters.ts`, ids `starter-project-scorecard`,
+`starter-sales-collections`, `starter-spend-vs-budget`,
+`starter-site-procurement`, `starter-stock-position`, `starter-plan-vs-actual`,
+`starter-design-delivery` — **each shipping with its chart already configured**.
+_(Hyphens, not the colons this plan first specified: a starter id is a URL path
+segment, and a colon read fine to Next's own routing but 404'd on the deployed
+preview. `starters.test.ts` now asserts an id survives a URL untouched.)_
 so a starting point opens as a designed page rather than a blank grid.
 
 Because: a seeded row cannot be corrected under additive-only migrations

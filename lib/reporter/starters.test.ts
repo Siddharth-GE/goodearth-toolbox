@@ -67,6 +67,21 @@ test("every starter's chart is valid for its own grouping", () => {
   }
 });
 
+test("a starter id survives a URL untouched", () => {
+  // It is a path segment (`/reporter/<id>`). A colon here read fine to
+  // Next's own routing and still 404'd on the deployed preview — the
+  // platform in front of the app does not treat it as an ordinary
+  // character — so an id that needs any encoding at all is a bug.
+  for (const starter of STARTERS) {
+    assert.equal(
+      encodeURIComponent(starter.id),
+      starter.id,
+      `${starter.id}: would be re-encoded inside a URL`,
+    );
+    assert.match(starter.id, /^[a-z0-9-]+$/, `${starter.id}: not a plain URL-safe id`);
+  }
+});
+
 test("ids are unique, prefixed, and never mistakable for a saved report", () => {
   const seen = new Set<string>();
   for (const starter of STARTERS) {
@@ -78,7 +93,7 @@ test("ids are unique, prefixed, and never mistakable for a saved report", () => 
     // shadowed by one.
     assert.doesNotMatch(starter.id, /^[0-9a-f-]{36}$/);
   }
-  assert.equal(getStarter("starter:nothing-like-this"), null);
+  assert.equal(getStarter("starter-nothing-like-this"), null);
   assert.equal(isStarterId("3f1b6a4e-0000-4000-8000-000000000000"), false);
 });
 

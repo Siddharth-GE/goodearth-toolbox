@@ -32,7 +32,17 @@
 import { parseReportSpec, type ReportSpec } from "./spec";
 
 export type Starter = {
-  /** "starter:site-procurement" — stable, and never a `reports.id`. */
+  /**
+   * "starter-site-procurement" — stable, and never a `reports.id`.
+   *
+   * A HYPHEN, not the colon this plan first specified. A starter id is
+   * a URL path segment (`/reporter/<id>`), and a colon there survived
+   * Next's own routing perfectly in local testing but 404'd on the
+   * deployed preview — the platform layer in front of the app treats
+   * it as something other than an ordinary character. It is also what
+   * stops some chat apps making a shared report link clickable. The id
+   * must now survive a URL untouched, and starters.test.ts asserts it.
+   */
   id: string;
   name: string;
   /** One line saying what the report answers. Shown on the tile. */
@@ -40,8 +50,8 @@ export type Starter = {
   spec: ReportSpec;
 };
 
-/** Everything before the colon of a starter id. */
-export const STARTER_PREFIX = "starter:";
+/** What marks an id as a starting point rather than a saved report. */
+export const STARTER_PREFIX = "starter-";
 
 export function isStarterId(id: string): boolean {
   return id.startsWith(STARTER_PREFIX);
@@ -75,7 +85,7 @@ const SITE_PROCUREMENT = {
 
 export const STARTERS: Starter[] = [
   {
-    id: "starter:site-procurement",
+    id: "starter-site-procurement",
     name: "Site & procurement activity",
     description:
       "What site has asked for, project by project, and where each request has got to. Counts indents and items rather than quantities, which mix units.",
@@ -85,7 +95,7 @@ export const STARTERS: Starter[] = [
 
 /** The raw specs, for the test that proves they parse without loss. */
 export const STARTER_SOURCES: Record<string, unknown> = {
-  "starter:site-procurement": SITE_PROCUREMENT,
+  "starter-site-procurement": SITE_PROCUREMENT,
 };
 
 /** A starter by id, or null. Never throws on an unknown id. */

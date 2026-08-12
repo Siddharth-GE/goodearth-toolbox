@@ -181,7 +181,7 @@ export type LoadedReport = {
   name: string;
   description: string | null;
   spec: ReportSpec;
-  /** True for a `starter:*` id — read-only, "Save a copy" only. */
+  /** True for a `starter-*` id — read-only, "Save a copy" only. */
   starter: boolean;
   /** Whether THIS user may delete it: their own, or an admin. */
   canDelete: boolean;
@@ -224,7 +224,7 @@ export async function listReports(): Promise<ReportSummary[]> {
 }
 
 /**
- * One report by id — a `reports.id` uuid OR a `starter:*` id. One
+ * One report by id — a `reports.id` uuid OR a `starter-*` id. One
  * screen, one code path, resolved here.
  *
  * Returns null for "no such report" AND for "not visible to you": RLS

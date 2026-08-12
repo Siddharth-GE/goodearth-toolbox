@@ -12,7 +12,7 @@ import { SaveReportDialog } from "../_components/save-report-dialog";
 import { SpecLoss } from "../_components/spec-loss";
 
 /**
- * THE report page. `[reportId]` is a `reports.id` uuid OR a `starter:*`
+ * THE report page. `[reportId]` is a `reports.id` uuid OR a `starter-*`
  * id — one screen, one code path, resolved by getReport().
  *
  * A `?spec=` on this address is a report being reshaped in place: the
