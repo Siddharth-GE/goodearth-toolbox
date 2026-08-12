@@ -372,7 +372,10 @@ date to range on — a bill's `invoice_date` and `paid_at` are different questio
 
 Five migrations, each additive, each re-runnable, each applied via the management
 API **before** the code needing it merges. After each: `npm run db:types`, types
-committed with the migration.
+committed with the migration. _(Numbers shifted by one on 2026-08-12:
+`0053` went to the construction-stages master, which the founder asked for on
+seeing Stage 2. Numbers here are the plan's, and the next free number at build
+time always wins.)_
 
 **`0052_reporter_rename.sql`** — add `/reporter` to both `user_apps_app_known`
 and `role_apps_app_known` (re-listing the full set from `0047:31-37`;
@@ -383,7 +386,7 @@ Then a `0047`-style **`raise exception` proof** that no policy anywhere mentions
 `/management-dashboard`; the greps say none does, so assert it rather than trust
 it.
 
-**`0053_reports.sql`** — the saved-report table, shaped like
+**`0054_reports.sql`** — the saved-report table, shaped like
 `0048_business_plans.sql` (a spec is only ever read and written whole):
 
 ```sql
@@ -407,7 +410,7 @@ and no names; money appears only when it is run, through normal RLS. Delete is
 narrowed to `is_admin() or created_by = auth.uid()`, the `"recorded bills
 deletable by recorder"` precedent (`0025:561`).
 
-**`0054_reporter_money.sql`** — ships alone. `0025:470` already names the
+**`0055_reporter_money.sql`** — ships alone. `0025:470` already names the
 sanctioned move for a third consumer: **widen the qual, never add a policy** (two
 permissive policies OR together and nobody reading `pg_policies` would see it).
 Policies are renamed too, because `0047` is right that a surface half-labelled
@@ -434,7 +437,7 @@ holders can read _every_ column of those tables — `terms`, `note`,
 but stated plainly: **the registry is a display decision, not a boundary. The
 grant is the boundary.**
 
-**`0055_reporter_crm_facts.sql`** — CRM money **as views, not a widened policy**,
+**`0056_reporter_crm_facts.sql`** — CRM money **as views, not a widened policy**,
 because `0050:497-507` says the stronger reason those tables are gated is not
 money but `details`: notes about a family's bank and why they are stalling. Two
 views, `crm_milestone_facts` and `crm_receipt_facts`, joining
@@ -443,7 +446,7 @@ views, `crm_milestone_facts` and `crm_receipt_facts`, joining
 has_app('/reporter')`. **`details`, `registration_note`, `note` and `bottlenecks`
 do not appear. That omission is the boundary.**
 
-**`0056_business_plan_targets.sql`** — declared by _Business Planning_, so the
+**`0057_business_plan_targets.sql`** — declared by _Business Planning_, so the
 coupling points the right way (the `0045` precedent). Adds a nullable
 `business_plans.project_id references projects(id)` and a
 `business_plan_targets` table (headline revenue / cost / PBT / peak funding plus
@@ -530,12 +533,12 @@ sees grant bugs.
 | **2**  | **One dataset, table on screen.** Registry (`indent_lines` only), `spec.ts`, `aggregate.ts`, `derive.ts`, `queries.ts`, builder screens, `built: true`. Chosen because `indents`/`indent_lines` are already readable by all authenticated — **zero RLS risk**, full pipeline exercised         | Pick columns, filter by project, group by item, sort, see subtotals and a grand total — as the probe holding only `/reporter`                                                                                                                               |
 | **3**  | **Charts.** Add `recharts`; `--chart-1…8` tokens light+dark; `lib/charts/{palette,series}.ts`; `components/ui/chart/*` themed wrappers; the chart card; KPI band via `FigureBand`; chart picker in the builder                                                                                 | Bar, line, stacked and meter all render; hover tooltips; switch a report between forms; check light **and** dark; check on a phone; confirm the Reporter route is the only bundle that grew                                                                 |
 | **4**  | **CSV.** `lib/csv.ts` + tests, Selections route refactored (must be byte-identical), two routes                                                                                                                                                                                                | Download, open in Excel, no mangled characters, no formula rows; Selections' existing CSV unchanged                                                                                                                                                         |
-| **5**  | **Saved reports.** `0053`, `actions.ts`, list screen, the money-free starters (Site & procurement, Design & delivery)                                                                                                                                                                          | Save, reopen, rename, "Save a copy" of a starter, be refused deleting someone else's                                                                                                                                                                        |
-| **6**  | **The money — ships alone.** `0054`; register `po_lines`, `bills`, `budget_report_lines`; starter: Spend vs budget                                                                                                                                                                             | Probe with only `/reporter` sees rates, bill amounts **and margin**; probe with only `/indents` sees no rates anywhere; probe with only `/reporter` still cannot open `/purchase-orders`; then press one real write button on Purchase Orders on production |
-| **7**  | **Sales & collections.** `0055`, two CRM datasets, starter                                                                                                                                                                                                                                     | Totals reconcile against Client Relations' own screens for one villa — if they don't, the fan-out bug is present                                                                                                                                            |
+| **5**  | **Saved reports.** `0054`, `actions.ts`, list screen, the money-free starters (Site & procurement, Design & delivery)                                                                                                                                                                          | Save, reopen, rename, "Save a copy" of a starter, be refused deleting someone else's                                                                                                                                                                        |
+| **6**  | **The money — ships alone.** `0055`; register `po_lines`, `bills`, `budget_report_lines`; starter: Spend vs budget                                                                                                                                                                             | Probe with only `/reporter` sees rates, bill amounts **and margin**; probe with only `/indents` sees no rates anywhere; probe with only `/reporter` still cannot open `/purchase-orders`; then press one real write button on Purchase Orders on production |
+| **7**  | **Sales & collections.** `0056`, two CRM datasets, starter                                                                                                                                                                                                                                     | Totals reconcile against Client Relations' own screens for one villa — if they don't, the fan-out bug is present                                                                                                                                            |
 | **8**  | **The rest.** `goods_receipt_lines`, `stock`, `selection_lines`, `relay_chains`, `units`; starters: Project scorecard, Stock position                                                                                                                                                          | Open every one of the five new datasets by hand — a bad `select` is invisible to lint, types, tests and build                                                                                                                                               |
 | **9**  | **PDF.** `lib/pdf/chart.tsx` — `renderToStaticMarkup` → `sharp` → PNG → react-pdf `<Image>`; print palette (literal hexes) in `lib/pdf/theme.ts`; `report-document.tsx`; two routes                                                                                                            | The same report on screen and on paper, chart included, and they match; **check the rasterised axis/label typeface on a real PDF** — `sharp` will not have Geist                                                                                            |
-| **10** | **Plan vs actual.** `0056`, Business Planning gains the project field and publishes targets, Reporter reads the view, starter                                                                                                                                                                  | Set a plan's project, save, see planned vs real side by side                                                                                                                                                                                                |
+| **10** | **Plan vs actual.** `0057`, Business Planning gains the project field and publishes targets, Reporter reads the view, starter                                                                                                                                                                  | Set a plan's project, save, see planned vs real side by side                                                                                                                                                                                                |
 
 ---
 
