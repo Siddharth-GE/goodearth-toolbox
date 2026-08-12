@@ -191,6 +191,15 @@ styles, no raw colour classes. Formatting through `lib/format.ts`. Every route
 gets a `loading.tsx` with the shared `Spinner`. Read `DESIGN.md` (Warm
 Minimalism) before styling.
 
+**Charts are `recharts`** (added for Reporter Stage 3 on two explicit founder
+requests — the "no new libraries" bar cleared, not lowered). It is imported
+ONLY by `components/ui/chart/*`; screens use those wrappers, never Recharts
+directly, and Next code-splits it to the routes that chart. The data shaping
+lives in `lib/charts/{palette,series}.ts` (pure, tested); the PDF path
+(Stage 9) rasterises the same charts through `sharp`, never a second
+implementation. Chart colours are the `--chart-1…8` tokens — a fourth
+deliberate palette; `DESIGN.md` says why its order must not be touched.
+
 **Site engineers and store-keepers use this on phones at site** — Indents,
 Inventory and site-facing flows must genuinely work on a phone. English-only
 UI is confirmed sufficient. Plain English in all copy and error messages.

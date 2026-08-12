@@ -92,6 +92,32 @@ purely decorative system — the gradient behind a tool's hero number
 variable rather than a hardcoded hex in the component, so it's one
 place to change rather than a silent exception to "colors are tokens."
 
+### The chart palette — the fourth colour system
+
+`--chart-1` … `--chart-8` (both modes in `app/globals.css`) are the
+categorical series colours, assigned by `lib/charts/palette.ts`. **The
+slot order is a measured accessibility mechanism, not a taste choice**
+— validated on this app's real chart surfaces for colour-blind and
+normal-vision separation and for contrast in dark mode, with two other
+orderings measured and rejected. Never re-order the list by eye;
+re-measure and pick only among passing orders. The rules that ride on
+it: single-series and emphasis charts use `--accent` (so most charts
+read as Goodearth green); eight series is the ceiling and the tail
+folds into "Other"; status colours are **never** issued as series
+colours; and no pie or donut, ever — part-to-whole is a stacked bar, a
+two-slice pie is a meter.
+
+Chart marks follow one spec, carried by `components/ui/chart/*`: thin
+bars with 4px rounded data-ends anchored to the baseline, gaps between
+adjacent bars and stacked segments, 2px lines with gaps at nulls (a
+missing value is never drawn as zero), hairline grid in `--border`,
+axis labels in `--muted`, tooltip on `surface-raised`. **Screens use
+those wrappers and never import Recharts directly** — the wrappers pass
+colours as CSS-variable tokens, which Recharts hands straight to SVG,
+so light/dark swap in one file and the no-hex rule holds. Every chart
+in Reporter renders beside its own table, so colour never carries a
+value alone.
+
 ## Typography
 
 Geist Sans throughout (already loaded in the root layout). No new font.
@@ -227,7 +253,10 @@ Built: `avatar`, `badge` (+ status variants), `button`, `card`,
 `checkbox`, `dialog`, `dropdown-menu`, `empty-state`, `form-message`,
 `icon-button`, `input`, `label`, `page-loading`, `page-title`,
 `pagination`, `select`, `spinner`, `table`, `tabs` (+ `NavTabs`),
-`textarea`.
+`textarea`, and the `chart/` family (`chart-card`, `chart-theme`,
+`bar-chart`, `line-chart`, `stacked-bar`, `meter`) — thin themed
+wrappers over Recharts (the meter is a CSS bar, deliberately not
+Recharts); see "The chart palette" above for the rules they carry.
 
 `PageTitle` vs `PageHeader`: `PageTitle` is the static h1/description/
 back-link block every dashboard screen starts with; `PageHeader`

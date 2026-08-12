@@ -156,17 +156,22 @@ test("a chart whose category is not in groupBy is dropped, not rendered wrong", 
   assert.deepEqual(kept.chart, { type: "bar", category: "project", measures: ["quantity:sum"] });
 });
 
-test("a meter keeps exactly one measure", () => {
+test("a meter keeps exactly two measures — the value and the limit", () => {
   const spec = parseReportSpec({
     dataset: "indent_lines",
     groupBy: ["project"],
     measures: [
       { field: "quantity", agg: "sum" },
       { field: "quantity", agg: "avg" },
+      { field: "quantity", agg: "max" },
     ],
-    chart: { type: "meter", category: "project", measures: ["quantity:sum", "quantity:avg"] },
+    chart: {
+      type: "meter",
+      category: "project",
+      measures: ["quantity:sum", "quantity:avg", "quantity:max"],
+    },
   });
-  assert.deepEqual(spec.chart?.measures, ["quantity:sum"]);
+  assert.deepEqual(spec.chart?.measures, ["quantity:sum", "quantity:avg"]);
 });
 
 test("a v1 spec still parses after a later version adds fields", () => {
