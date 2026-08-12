@@ -1,10 +1,33 @@
-import { ComingSoon } from "../_components/coming-soon";
-import { TOOL_ICONS, TOOLS } from "@/lib/tools";
+import { FileChartColumn } from "lucide-react";
 
-const tool = TOOLS.find((t) => t.href === "/reporter")!;
+import { LinkButton } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageTitle } from "@/components/ui/page-title";
+import { requireTool } from "@/lib/auth/access";
 
-export default function ReporterPage() {
+// The landing grows with the stages: saved reports and the seven
+// starting points both list here once they exist (Stage 5). Until then
+// the one honest thing on it is the way in.
+export default async function ReporterPage() {
+  await requireTool("/reporter");
+
   return (
-    <ComingSoon icon={TOOL_ICONS[tool.icon]} title={tool.name} description={tool.description} />
+    <div className="space-y-6">
+      <PageTitle
+        title="Reporter"
+        description="Build a report over any data — pick columns, filter, group, and total."
+        actions={<LinkButton href="/reporter/new">New report</LinkButton>}
+      />
+      <EmptyState
+        icon={FileChartColumn}
+        title="No saved reports yet"
+        description="Start a report from a data set, shape it, and share the page link. Saving reports by name comes next."
+        action={
+          <LinkButton href="/reporter/new" variant="secondary">
+            Start a report
+          </LinkButton>
+        }
+      />
+    </div>
   );
 }

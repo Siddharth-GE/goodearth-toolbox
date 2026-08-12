@@ -170,7 +170,7 @@ export const TOOLS: Tool[] = [
     href: "/reporter",
     icon: "FileChartColumn",
     group: "Management",
-    built: false,
+    built: true,
   },
   {
     name: "Client Relations",

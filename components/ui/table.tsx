@@ -1,9 +1,25 @@
 import { cn } from "@/lib/utils";
 import type { HTMLAttributes, TdHTMLAttributes, ThHTMLAttributes } from "react";
 
-export function Table({ className, ...props }: HTMLAttributes<HTMLTableElement>) {
+export function Table({
+  className,
+  containerClassName,
+  ...props
+}: HTMLAttributes<HTMLTableElement> & {
+  /**
+   * Extra classes for the scroll wrapper — e.g. a max height plus
+   * `overflow-auto` so a long table scrolls under a sticky header row
+   * (the header cells then take `sticky top-0` themselves).
+   */
+  containerClassName?: string;
+}) {
   return (
-    <div className="border-border bg-surface overflow-x-auto rounded-2xl border">
+    <div
+      className={cn(
+        "border-border bg-surface overflow-x-auto rounded-2xl border",
+        containerClassName,
+      )}
+    >
       <table className={cn("w-full border-collapse text-sm", className)} {...props} />
     </div>
   );
