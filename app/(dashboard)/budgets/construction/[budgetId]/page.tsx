@@ -2,6 +2,7 @@ import { PageTitle } from "@/components/ui/page-title";
 import { getConstructionPlan } from "@/lib/budgets/construction";
 import { listBrands } from "@/lib/masters/brands";
 import { listItemCategories } from "@/lib/masters/item-categories";
+import { listActiveStageNames } from "@/lib/masters/stages";
 import { notFound } from "next/navigation";
 import { StageGrid } from "./_components/stage-grid";
 
@@ -11,10 +12,11 @@ export default async function ConstructionPlanPage({
   params: Promise<{ budgetId: string }>;
 }) {
   const { budgetId } = await params;
-  const [plan, categories, brands] = await Promise.all([
+  const [plan, categories, brands, stageOptions] = await Promise.all([
     getConstructionPlan(budgetId),
     listItemCategories(),
     listBrands(),
+    listActiveStageNames(),
   ]);
   if (!plan) notFound();
 
@@ -30,6 +32,7 @@ export default async function ConstructionPlanPage({
       <StageGrid
         planId={plan.id}
         stages={plan.stages}
+        stageOptions={stageOptions}
         categories={categories.map(({ id, name }) => ({ id, name }))}
         brands={brands.map(({ id, name }) => ({ id, name }))}
       />

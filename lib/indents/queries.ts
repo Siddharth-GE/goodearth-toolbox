@@ -5,6 +5,7 @@ import { cache } from "react";
 import { requireTool } from "@/lib/auth/access";
 import { listPlots } from "@/lib/masters/plots";
 import { listProjects } from "@/lib/masters/projects";
+import { listActiveStageNames } from "@/lib/masters/stages";
 import { listUnits } from "@/lib/masters/units";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
@@ -863,13 +864,20 @@ export type IndentFormOptions = {
   projects: ProjectOption[];
   plots: ScopedOption[];
   units: (ScopedOption & { plot_id: string | null })[];
+  /** The active construction stages (0053) — stage is picked, never typed. */
+  stages: string[];
 };
 
 /** Everything the new-indent form needs, in one gated call. The masters
  * reads themselves are ungated by design — this wrapper is the gate. */
 export async function getIndentFormOptions(): Promise<IndentFormOptions> {
   await requireTool("/indents");
-  const [projects, plots, units] = await Promise.all([listProjects(), listPlots(), listUnits()]);
+  const [projects, plots, units, stages] = await Promise.all([
+    listProjects(),
+    listPlots(),
+    listUnits(),
+    listActiveStageNames(),
+  ]);
   return {
     projects: projects.map(({ id, name, code }) => ({ id, name, code })),
     plots: plots.map(({ id, project_id, name, code }) => ({ id, project_id, name, code })),
@@ -880,5 +888,6 @@ export async function getIndentFormOptions(): Promise<IndentFormOptions> {
       name,
       code,
     })),
+    stages,
   };
 }

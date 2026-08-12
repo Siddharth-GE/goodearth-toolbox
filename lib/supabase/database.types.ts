@@ -935,6 +935,13 @@ export type Database = {
             referencedRelation: "items"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "construction_budget_lines_stage_fkey"
+            columns: ["stage"]
+            isOneToOne: false
+            referencedRelation: "construction_stages"
+            referencedColumns: ["name"]
+          },
         ]
       }
       construction_budgets: {
@@ -985,6 +992,54 @@ export type Database = {
             columns: ["unit_id"]
             isOneToOne: true
             referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      construction_stages: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construction_stages_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construction_stages_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1502,6 +1557,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "indents_stage_fkey"
+            columns: ["stage"]
+            isOneToOne: false
+            referencedRelation: "construction_stages"
+            referencedColumns: ["name"]
           },
           {
             foreignKeyName: "indents_submitted_by_fkey"

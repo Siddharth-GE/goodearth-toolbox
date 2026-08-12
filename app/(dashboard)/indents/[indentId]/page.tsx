@@ -5,6 +5,7 @@ import { getIndent, isCurrentUserApprover } from "@/lib/indents/queries";
 import { canEditIndent } from "@/lib/indents/workflow";
 import { listBrands } from "@/lib/masters/brands";
 import { listItemCategories } from "@/lib/masters/item-categories";
+import { listActiveStageNames } from "@/lib/masters/stages";
 import { notFound } from "next/navigation";
 import { IndentStatusBadge } from "../_components/status-badge";
 import { ActionButtons } from "./_components/action-buttons";
@@ -13,11 +14,12 @@ import { LineGrid } from "./_components/line-grid";
 
 export default async function IndentPage({ params }: { params: Promise<{ indentId: string }> }) {
   const { indentId } = await params;
-  const [indent, decider, categories, brands] = await Promise.all([
+  const [indent, decider, categories, brands, stages] = await Promise.all([
     getIndent(indentId),
     isCurrentUserApprover(),
     listItemCategories(),
     listBrands(),
+    listActiveStageNames(),
   ]);
   if (!indent) notFound();
 
@@ -92,6 +94,7 @@ export default async function IndentPage({ params }: { params: Promise<{ indentI
       <HeaderFields
         indentId={indent.id}
         stage={indent.stage}
+        stages={stages}
         requiredBy={indent.required_by}
         note={indent.note}
         editable={editable}

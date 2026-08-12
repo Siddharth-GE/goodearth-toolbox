@@ -15,6 +15,7 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/components/ui/table";
+import { Select } from "@/components/ui/select";
 import type { ConstructionLineRow, ConstructionStageGroup } from "@/lib/budgets/construction";
 import {
   addConstructionLines,
@@ -32,24 +33,31 @@ type Option = { id: string; name: string };
 /**
  * The stage-wise plan editor: one section per stage, rows saved on blur,
  * items added through the shared catalogue picker — a stage is nothing
- * but the text its lines carry, so "adding a stage" is just naming one
- * and putting the first items in it.
+ * but the text its lines carry, so "adding a stage" is picking one from
+ * the construction stages master (0053; managed in Masters → Stages)
+ * and putting the first items in it. Picked, never typed — the founder's
+ * rule, and the database enforces it either way.
  */
 export function StageGrid({
   planId,
   stages,
+  stageOptions,
   categories,
   brands,
 }: {
   planId: string;
   stages: ConstructionStageGroup[];
+  /** Active names from the construction stages master. */
+  stageOptions: string[];
   categories: Option[];
   brands: Option[];
 }) {
-  // Which stage the picker is open for — an existing one, or the name
-  // just typed into the add-stage form below.
+  // Which stage the picker is open for — an existing one, or the one
+  // just picked in the add-stage form below.
   const [pickerStage, setPickerStage] = useState<string | null>(null);
   const [newStage, setNewStage] = useState("");
+
+  const unusedStages = stageOptions.filter((name) => !stages.some((group) => group.stage === name));
 
   return (
     <div className="space-y-6">
@@ -66,13 +74,14 @@ export function StageGrid({
           key={group.stage}
           planId={planId}
           group={group}
+          stageOptions={stageOptions}
           onAddItems={() => setPickerStage(group.stage)}
         />
       ))}
 
-      {/* Adding a stage = naming it and picking its first items. Nothing
-          is created until the picker commits, so an abandoned name costs
-          nothing. */}
+      {/* Adding a stage = picking it and choosing its first items.
+          Nothing is created until the picker commits, so an abandoned
+          pick costs nothing. */}
       <div className="border-border bg-surface flex flex-wrap items-end gap-2 rounded-2xl border p-4">
         <div className="min-w-[220px] flex-1 space-y-1.5">
           <label
@@ -81,19 +90,22 @@ export function StageGrid({
           >
             {stages.length === 0 ? "First stage" : "Add a stage"}
           </label>
-          <Input
+          <Select
             id="new-stage"
             value={newStage}
             onChange={(event) => setNewStage(event.target.value)}
-            placeholder="Foundation"
-            autoComplete="off"
-          />
+          >
+            <option value="">
+              {unusedStages.length === 0 ? "Every stage is already in the plan" : "Pick a stage…"}
+            </option>
+            {unusedStages.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </Select>
         </div>
-        <Button
-          variant="secondary"
-          disabled={!newStage.trim()}
-          onClick={() => setPickerStage(newStage.trim())}
-        >
+        <Button variant="secondary" disabled={!newStage} onClick={() => setPickerStage(newStage)}>
           Add items…
         </Button>
       </div>
@@ -125,16 +137,18 @@ export function StageGrid({
 function StageSection({
   planId,
   group,
+  stageOptions,
   onAddItems,
 }: {
   planId: string;
   group: ConstructionStageGroup;
+  stageOptions: string[];
   onAddItems: () => void;
 }) {
   return (
     <section className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <StageName planId={planId} stage={group.stage} />
+        <StageName planId={planId} stage={group.stage} stageOptions={stageOptions} />
         <div className="flex items-center gap-3">
           <span className="text-muted text-xs">
             {formatCount(group.lines.length)} {group.lines.length === 1 ? "line" : "lines"}
@@ -169,47 +183,52 @@ function StageSection({
   );
 }
 
-/** The stage heading, renameable in place — a rename is one UPDATE over
- * the stage's lines, and renaming onto another stage's name merges them. */
-function StageName({ planId, stage }: { planId: string; stage: string }) {
+/** The stage heading, movable to another stage from the master list —
+ * one UPDATE over the stage's lines, and moving onto a stage already in
+ * the plan merges the two sections. */
+function StageName({
+  planId,
+  stage,
+  stageOptions,
+}: {
+  planId: string;
+  stage: string;
+  stageOptions: string[];
+}) {
   const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState(stage);
   const [error, setError] = useState<string>();
   const [pending, startTransition] = useTransition();
 
-  const commit = () => {
+  const commit = (next: string) => {
     setEditing(false);
-    const next = value.trim();
-    if (!next || next === stage) {
-      setValue(stage);
-      return;
-    }
+    if (!next || next === stage) return;
     startTransition(async () => {
       const result = await renameStage(planId, stage, next);
-      if (result?.error) {
-        setError(result.error);
-        setValue(stage);
-      }
+      if (result?.error) setError(result.error);
     });
   };
 
   if (editing) {
     return (
-      <Input
-        value={value}
-        onChange={(event) => setValue(event.target.value)}
-        onBlur={commit}
+      <Select
+        value={stage}
+        onChange={(event) => commit(event.target.value)}
+        onBlur={() => setEditing(false)}
         onKeyDown={(event) => {
-          if (event.key === "Enter") event.currentTarget.blur();
-          if (event.key === "Escape") {
-            setValue(stage);
-            setEditing(false);
-          }
+          if (event.key === "Escape") setEditing(false);
         }}
         autoFocus
         className="h-9 w-56"
-        aria-label={`Rename stage ${stage}`}
-      />
+        aria-label={`Move the ${stage} lines to another stage`}
+      >
+        {/* The current name stays pickable even if deactivated since. */}
+        {!stageOptions.includes(stage) && <option value={stage}>{stage}</option>}
+        {stageOptions.map((name) => (
+          <option key={name} value={name}>
+            {name}
+          </option>
+        ))}
+      </Select>
     );
   }
 
@@ -218,9 +237,12 @@ function StageName({ planId, stage }: { planId: string; stage: string }) {
       <h2
         className={`text-foreground text-lg font-bold tracking-tight ${pending ? "opacity-50" : ""}`}
       >
-        {value}
+        {stage}
       </h2>
-      <IconButton aria-label={`Rename stage ${stage}`} onClick={() => setEditing(true)}>
+      <IconButton
+        aria-label={`Move the ${stage} lines to another stage`}
+        onClick={() => setEditing(true)}
+      >
         <Pencil className="size-3.5" />
       </IconButton>
       <FormMessage error={error} size="xs" />
