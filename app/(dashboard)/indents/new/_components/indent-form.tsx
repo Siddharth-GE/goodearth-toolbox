@@ -93,13 +93,18 @@ export function IndentForm({ options }: { options: IndentFormOptions }) {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="indent-stage">Stage (optional)</Label>
-          <Input
+          <Select
             id="indent-stage"
             value={stage}
             onChange={(event) => setStage(event.target.value)}
-            placeholder="Foundation"
-            autoComplete="off"
-          />
+          >
+            <option value="">No stage</option>
+            {options.stages.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </Select>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="indent-required-by">Required by</Label>
