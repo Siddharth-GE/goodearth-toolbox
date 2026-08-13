@@ -54,6 +54,13 @@ export type Tool = {
   // shared ComingSoon stub (app/(dashboard)/_components/coming-soon.tsx)
   // instead of a real tool.
   built: boolean;
+  /**
+   * Shown in AMBER beside this tool's checkbox everywhere it can be
+   * granted (a person's page, the role editor). For the one grant whose
+   * consequence is easy to under-imagine — the founder's requirement
+   * that Settings says it out loud, next to the tick, not in a doc.
+   */
+  grantWarning?: string;
 };
 
 // A tool is visible to admins (always, every tool), and to staff who've
@@ -171,6 +178,10 @@ export const TOOLS: Tool[] = [
     icon: "FileChartColumn",
     group: "Management",
     built: true,
+    // The founder's decision (Reporter PLAN.md, decisions 3 and 4;
+    // policies widened by 0055) and the copy that decision requires.
+    grantWarning:
+      "Shows all money: every vendor rate, every bill amount, and the margin on every quoted line.",
   },
   {
     name: "Client Relations",

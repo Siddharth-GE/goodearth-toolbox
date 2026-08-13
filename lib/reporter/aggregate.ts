@@ -18,6 +18,7 @@
  */
 
 import type { Aggregate, DatasetDef } from "./datasets";
+import { DERIVED } from "./derive";
 import { measureId, type ReportSpec } from "./spec";
 
 export type ReportValue = string | number | boolean | null;
@@ -88,11 +89,20 @@ export function identityKey(fieldKey: string): string {
  */
 export function extractRows(dataset: DatasetDef, raw: unknown[]): ReportRow[] {
   const fields = Object.entries(dataset.fields);
+  // Columns first, derived second, so a derived field reads the row's
+  // other fields after every one of them exists. datasets.test.ts
+  // asserts a derived field never reads another derived field.
+  const columnFields = fields.filter(([, field]) => !field.derive);
+  const derivedFields = fields.filter(([, field]) => field.derive);
   return raw.map((row) => {
     const flat: ReportRow = {};
-    for (const [key, field] of fields) {
+    for (const [key, field] of columnFields) {
       flat[key] = valueAtPath(row, field.path);
       if (field.identityPath) flat[identityKey(key)] = valueAtPath(row, field.identityPath);
+    }
+    for (const [key, field] of derivedFields) {
+      const compute = DERIVED[field.derive!];
+      flat[key] = compute ? compute(flat) : null;
     }
     return flat;
   });

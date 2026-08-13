@@ -6,6 +6,7 @@ import { requireTool } from "@/lib/auth/access";
 import { cleanSearch } from "@/lib/masters/paged";
 import { listProjects } from "@/lib/masters/projects";
 import { listUnits } from "@/lib/masters/units";
+import { listVendors } from "@/lib/masters/vendors";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { formatCount } from "@/lib/format";
@@ -104,8 +105,11 @@ export async function runSpec(spec: ReportSpec): Promise<RunOutcome> {
 
   // The registry's source is a hand-authored table/view name, but the
   // typed client's .from() overloads want a schema literal it cannot
-  // get from a string field. One documented bridge; what actually
-  // guards the read is RLS plus the registry whitelist, not this type.
+  // get from a string field — and tables and views are SEPARATE
+  // overloads, so even the honest KnownSource union does not fit. One
+  // documented bridge through a single literal; what actually guards
+  // the read is RLS plus the registry whitelist (datasets.test.ts pins
+  // every source to KNOWN_SOURCES), not this type.
   const source = dataset.source as "indent_lines";
 
   // The probe: how many rows would this report load? `head: true` moves
@@ -328,6 +332,19 @@ export async function listUnitOptions(): Promise<UnitOption[]> {
   await requireTool("/reporter");
   const units = await listUnits();
   return units.map((unit) => ({ id: unit.id, name: unit.name, projectId: unit.project_id }));
+}
+
+export type VendorOption = { id: string; name: string };
+
+/**
+ * Options for the vendor filter's picker (the money datasets). All
+ * vendors, not active-only: reports are history, and last year's lines
+ * belong to vendors nobody buys from any more.
+ */
+export async function listVendorOptions(): Promise<VendorOption[]> {
+  await requireTool("/reporter");
+  const vendors = await listVendors();
+  return vendors.map((vendor) => ({ id: vendor.id, name: vendor.name }));
 }
 
 // Enough pages that every value a filter could need is present at

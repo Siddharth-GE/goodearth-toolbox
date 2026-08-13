@@ -8,7 +8,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { DATASETS, DEFAULT_DATASET, resolveFieldKey, type DatasetDef } from "./datasets";
+import {
+  DATASETS,
+  DEFAULT_DATASET,
+  KNOWN_SOURCES,
+  resolveFieldKey,
+  type DatasetDef,
+} from "./datasets";
+import { DERIVED } from "./derive";
 
 const entries = Object.entries(DATASETS);
 
@@ -154,6 +161,49 @@ test("field keys are plain identifiers, so the #id: prefix can never collide", (
   for (const [key, dataset] of entries) {
     for (const fieldKey of Object.keys(dataset.fields)) {
       assert.match(fieldKey, /^[a-z][a-z0-9_]*$/, `${key}: field key "${fieldKey}" is not plain`);
+    }
+  }
+});
+
+test("every dataset's source is a known table or view", () => {
+  // queries.ts casts source through KnownSource for the typed client;
+  // a source missing from that union would compile into a runtime 404.
+  for (const [key, dataset] of entries) {
+    assert.ok(
+      (KNOWN_SOURCES as readonly string[]).includes(dataset.source),
+      `${key}: source "${dataset.source}" is not in KNOWN_SOURCES`,
+    );
+  }
+});
+
+test("derived fields name a real function, read only columns, and never push down", () => {
+  for (const [key, dataset] of entries) {
+    for (const [fieldKey, field] of Object.entries(dataset.fields)) {
+      if (!field.derive) continue;
+      assert.ok(DERIVED[field.derive], `${key}.${fieldKey}: derive "${field.derive}" not in DERIVED`); // prettier-ignore
+      // No column to push a filter or sort to, and no identity to count.
+      assert.ok(!field.filterColumn, `${key}.${fieldKey}: a derived field cannot filter`);
+      assert.ok(!field.sortColumn, `${key}.${fieldKey}: a derived field cannot sort`);
+      assert.ok(!field.identityPath, `${key}.${fieldKey}: a derived field cannot carry identity`);
+      assert.ok(!field.groupable, `${key}.${fieldKey}: a derived number is not a grouping`);
+    }
+  }
+});
+
+test("a derived field never reads another derived field", () => {
+  // extractRows computes columns first, derived second, in one pass —
+  // so a derived-on-derived chain would read null. Prove no derive
+  // function changes its answer when handed only the column fields.
+  for (const [key, dataset] of entries) {
+    const columnRow: Record<string, unknown> = {};
+    for (const [fieldKey, field] of Object.entries(dataset.fields)) {
+      if (!field.derive) columnRow[fieldKey] = 2; // any number
+    }
+    for (const [fieldKey, field] of Object.entries(dataset.fields)) {
+      if (!field.derive) continue;
+      const fromColumns = DERIVED[field.derive](columnRow);
+      const withDerivedNulled = DERIVED[field.derive]({ ...columnRow, [fieldKey]: null });
+      assert.equal(fromColumns, withDerivedNulled, `${key}.${fieldKey} reads a derived field`);
     }
   }
 });

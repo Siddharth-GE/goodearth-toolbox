@@ -228,6 +228,66 @@ test("a field with no identityPath still counts its own values", () => {
   assert.equal(result.totals["indent:count_distinct"], 2);
 });
 
+test("extractRows computes derived fields from the flattened row", () => {
+  const poLines = DATASETS.po_lines;
+  const raw = [
+    {
+      item_id: "i1",
+      quantity: 2,
+      rate: 100,
+      gst_pct: 18,
+      uom: "bag",
+      items: { name: "Cement", code: "CEM-1" },
+      purchase_orders: {
+        reference: "PO-1",
+        status: "issued",
+        project_id: "p1",
+        unit_id: null,
+        vendor_id: "v1",
+        projects: { name: "Malhar" },
+        units: null,
+        vendors: { name: "Sharma Traders" },
+      },
+    },
+    // An unpriced line: the derived value must be null, not 0.
+    {
+      item_id: "i2",
+      quantity: 5,
+      rate: null,
+      gst_pct: null,
+      uom: "kg",
+      items: { name: "Steel", code: null },
+      purchase_orders: {
+        reference: "PO-1",
+        status: "issued",
+        project_id: "p1",
+        unit_id: null,
+        vendor_id: "v1",
+        projects: { name: "Malhar" },
+        units: null,
+        vendors: { name: "Sharma Traders" },
+      },
+    },
+  ];
+  const [priced, unpriced] = extractRows(poLines, raw);
+  assert.equal(priced.line_value, 2 * 100 * 1.18);
+  assert.equal(priced.vendor, "Sharma Traders");
+  assert.equal(unpriced.line_value, null);
+
+  const result = runReport(
+    poLines,
+    parseReportSpec({
+      dataset: "po_lines",
+      groupBy: ["project"],
+      measures: [{ field: "line_value", agg: "sum" }],
+    }),
+    [priced, unpriced],
+    2,
+  );
+  // The null line is skipped, not zeroed — the sum is the priced line.
+  assert.equal(result.totals["line_value:sum"], 236);
+});
+
 test("extractRows flattens embeds, tolerates array-wrapped to-ones, nulls the rest", () => {
   const raw = [
     {

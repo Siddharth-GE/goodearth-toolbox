@@ -83,6 +83,31 @@ const SITE_PROCUREMENT = {
   },
 };
 
+// "Spend vs budget" reads the budget side: what approved budgets commit
+// us to spend, beside the client value quoted on the same lines, and
+// the margin between them in rupees. It is NOT budget-versus-PO-actuals
+// — that comparison needs two datasets on one page, which is the
+// dashboard-composer product this plan defers. The filter pins it to
+// approved budgets so a draft nobody has signed cannot inflate it.
+const SPEND_VS_BUDGET = {
+  dataset: "budget_report_lines",
+  columns: ["project", "unit", "item", "quantity", "uom", "unit_cost", "client_rate", "margin_pct"],
+  filters: [{ field: "budget_status", op: "eq", value: "approved" }],
+  groupBy: ["project"],
+  measures: [
+    { field: "cost_value", agg: "sum" },
+    { field: "client_value", agg: "sum" },
+    { field: "margin_value", agg: "sum" },
+  ],
+  sort: [{ field: "cost_value", dir: "desc" }],
+  limit: 100,
+  chart: {
+    type: "bar",
+    category: "project",
+    measures: ["cost_value:sum", "client_value:sum"],
+  },
+};
+
 export const STARTERS: Starter[] = [
   {
     id: "starter-site-procurement",
@@ -91,11 +116,19 @@ export const STARTERS: Starter[] = [
       "What site has asked for, project by project, and where each request has got to. Counts indents and items rather than quantities, which mix units.",
     spec: parseReportSpec(SITE_PROCUREMENT),
   },
+  {
+    id: "starter-spend-vs-budget",
+    name: "Spend vs budget",
+    description:
+      "What each approved budget commits us to spend, project by project, beside the client value quoted on the same lines — and the margin between them.",
+    spec: parseReportSpec(SPEND_VS_BUDGET),
+  },
 ];
 
 /** The raw specs, for the test that proves they parse without loss. */
 export const STARTER_SOURCES: Record<string, unknown> = {
   "starter-site-procurement": SITE_PROCUREMENT,
+  "starter-spend-vs-budget": SPEND_VS_BUDGET,
 };
 
 /** A starter by id, or null. Never throws on an unknown id. */

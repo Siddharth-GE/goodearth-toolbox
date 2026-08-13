@@ -8,6 +8,7 @@ import {
   listFilterOptions,
   listProjectOptions,
   listUnitOptions,
+  listVendorOptions,
   runSpec,
 } from "@/lib/reporter/queries";
 import { builderDataset, encodeSpec, measureId, type ReportSpec } from "@/lib/reporter/spec";
@@ -36,10 +37,11 @@ export async function ReportView({
   /** Where "Run report" pushes, and what `/csv` hangs off. */
   basePath: string;
 }) {
-  const [outcome, projects, units, options] = await Promise.all([
+  const [outcome, projects, units, vendors, options] = await Promise.all([
     runSpec(spec),
     listProjectOptions(),
     listUnitOptions(),
+    listVendorOptions(),
     listFilterOptions(spec.dataset),
   ]);
   const dataset = DATASETS[spec.dataset];
@@ -72,6 +74,7 @@ export async function ReportView({
         basePath={basePath}
         projects={projects}
         units={units}
+        vendors={vendors}
         options={options}
       />
 

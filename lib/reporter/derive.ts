@@ -33,3 +33,36 @@ export function lineValue(
   const gst = gstPct === null || gstPct === undefined || !Number.isFinite(gstPct) ? 0 : gstPct;
   return quantity * rate * (1 + gst / 100);
 }
+
+// ---------------------------------------------------------------------
+// Derived fields
+// ---------------------------------------------------------------------
+// A registry field whose value is arithmetic over the row's other
+// fields rather than a column. The FieldDef names one of these keys in
+// `derive` (a plain string there, to keep datasets.ts import-free;
+// datasets.test.ts asserts every named key exists here), and
+// extractRows computes it from the already-flattened row. Derived
+// fields have no filterColumn and no sortColumn — nothing to push down.
+
+function num(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+export const DERIVED: Record<string, (row: Record<string, unknown>) => number | null> = {
+  /** A PO line's ordered value: quantity × rate × (1 + gst/100). */
+  po_line_value: (row) => lineValue(num(row.quantity), num(row.rate), num(row.gst_pct)),
+  /** A budget line's cost: quantity × unit cost. No GST at budget level. */
+  budget_cost_value: (row) => lineValue(num(row.quantity), num(row.unit_cost), 0),
+  /** The same line at the client's rate. */
+  budget_client_value: (row) => lineValue(num(row.quantity), num(row.client_rate), 0),
+  /**
+   * Margin in rupees: client value − cost value. Null if EITHER side is
+   * missing — a margin over an unpriced cost is not 100%, it is unknown.
+   */
+  budget_margin_value: (row) => {
+    const cost = lineValue(num(row.quantity), num(row.unit_cost), 0);
+    const client = lineValue(num(row.quantity), num(row.client_rate), 0);
+    if (cost === null || client === null) return null;
+    return client - cost;
+  },
+};

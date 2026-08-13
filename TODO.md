@@ -73,27 +73,26 @@ waiting list (the write path `replaceFutureLegs` exists and is current, just
 unwired), and no "Open a trail" button on the Projects landing page (one click
 away already; not asked for).
 
-## 5. Reporter — next is Stage 6, and it is the money
+## 5. Reporter — next is Stage 7, Sales & collections
 
-The Reporter is live through Stage 5: builder, dropdown filters, grouping,
-subtotals, charts (six forms, KPI band, the composed page), CSV, and saved
-reports by name with copyable starting points. The distinct-count fix the
-founder asked for on 2026-08-12 is done — a `FieldDef.identityPath` means a
-distinct count counts internal ids, so five items all named "Armchair" count
-as five. **Every future dataset counting a name-labelled entity has the same
-trap** — it is decision 9 in the plan now.
+The Reporter is live through Stage 6: builder, dropdown filters, grouping,
+subtotals, charts, CSV, saved reports with copyable starting points — and
+**the money**. `0055` is applied (founder's go-ahead 2026-08-12): holding
+`/reporter` now reads PO rates, bill amounts, budget cost, client rate and
+margin, via widened quals, never a second policy. The Settings checkbox says
+so in amber. Before Stage 6 merged, only one non-admin held the grant (the
+probe) — worth remembering when granting it next.
 
-**Only one starting point ships so far.** The other six each need a dataset
-that does not exist yet; a starter over a missing dataset fails its own test
-and would be a broken tile. Each now ships with its data.
+**Two starting points ship so far** (Site & procurement, Spend vs budget).
+The rest each need a dataset that does not exist yet; a starter ships with
+its data. Note Spend vs budget reads the budget side (cost vs client value vs
+margin) — true budget-vs-PO-actuals needs two datasets on one page, which is
+the deferred dashboard composer.
 
 The full plan is **`app/(dashboard)/reporter/PLAN.md`**. Read it before
-touching anything below. Five stages remain, each shippable and
-browser-testable on its own — but **Stage 6 needs the founder's word before a
-line of it is written**, because it is the permission change described at the
-bottom of this section, and `0055` cannot be un-applied by deleting code.
+touching anything below. Four stages remain, each shippable and
+browser-testable on its own:
 
-6. **The money — ships alone** — `0055`.
 7. **Sales & collections** — `0056`, two CRM fact views.
 8. **The remaining datasets** and their starters.
 9. **PDF** — Recharts → `sharp` → PNG → react-pdf.

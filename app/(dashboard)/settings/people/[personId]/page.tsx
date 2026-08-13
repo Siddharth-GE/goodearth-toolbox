@@ -196,6 +196,11 @@ export default async function PersonPage({ params }: { params: Promise<{ personI
                           ) : (
                             <span className="text-muted block text-xs">{tool.description}</span>
                           )}
+                          {tool.grantWarning && (
+                            <span className="text-warning block text-xs font-medium">
+                              {tool.grantWarning}
+                            </span>
+                          )}
                         </span>
                       </label>
                     );

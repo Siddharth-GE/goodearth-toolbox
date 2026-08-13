@@ -86,6 +86,16 @@ Indents and Inventory carry no money. PO money is RLS-gated to
 `/purchase-orders`; consumers read the money-free views (`po_facts`,
 `po_line_facts`, `approved_budgets(_lines)`, `bill_facts`, `po_billing_totals`).
 
+**One named exception, by founder decision: `/reporter` reads PO, bill,
+budget and margin money** (`0055`, deliberately reversing `0011`'s margin
+boundary). Done by _widening each table's one SELECT qual_ to
+`has_app('/x') or has_app('/reporter')` — never a second policy, which ORs
+in invisibly. `0055` ends by asserting exactly seven widened policies and no
+doubles; keep that true. `budget_report_lines` is `security_invoker` — the
+one view that must _inherit_ RLS rather than bypass it, because it carries
+rupees. Settings shows an amber warning beside the Reporter checkbox
+(`grantWarning` in `lib/tools.ts`); don't remove it.
+
 **Never add a money column to a fact view; never add a second SELECT policy to
 a gated table.** These views deliberately bypass RLS — their `WHERE` clause and
 column list _are_ the boundary, so a careless column crosses it silently.
@@ -95,18 +105,18 @@ column list _are_ the boundary, so a careless column crosses it silently.
 This table IS the contract. A column here can't be renamed or dropped without
 checking every tool in its row. Keep it current.
 
-| Tool             | Reads                                                                                                        |
-| ---------------- | ------------------------------------------------------------------------------------------------------------ |
-| Bills            | `po_facts`, `po_billing_totals`                                                                              |
-| Budgets          | `selections`, `selection_lines`, `spaces`                                                                    |
-| Indents          | `approved_budgets(_lines)`, `construction_budgets(_lines)`, `selections`, `selection_lines`, `po_line_facts` |
-| Purchase Orders  | `indents`, `indent_lines`, `goods_receipts(_lines)`, `po_billing_totals`                                     |
-| Inventory        | `po_facts`, `po_line_facts`                                                                                  |
-| Selections       | `indents`, `indent_lines`, `po_line_facts`                                                                   |
-| Masters          | `po_facts`, `bill_facts`, `approved_budgets`, `indents`, `selections`, `selection_lines`                     |
-| Overview         | `indents`, `indent_lines`, `po_facts`, `bill_facts`, `goods_receipts` (counts only)                          |
-| Client Relations | `pusher_chain_state`, `selections`                                                                           |
-| Reporter         | `indents`, `indent_lines` (dataset registry, `lib/reporter/datasets.ts` — grows a row per stage)             |
+| Tool             | Reads                                                                                                                                                                                                                          |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Bills            | `po_facts`, `po_billing_totals`                                                                                                                                                                                                |
+| Budgets          | `selections`, `selection_lines`, `spaces`                                                                                                                                                                                      |
+| Indents          | `approved_budgets(_lines)`, `construction_budgets(_lines)`, `selections`, `selection_lines`, `po_line_facts`                                                                                                                   |
+| Purchase Orders  | `indents`, `indent_lines`, `goods_receipts(_lines)`, `po_billing_totals`                                                                                                                                                       |
+| Inventory        | `po_facts`, `po_line_facts`                                                                                                                                                                                                    |
+| Selections       | `indents`, `indent_lines`, `po_line_facts`                                                                                                                                                                                     |
+| Masters          | `po_facts`, `bill_facts`, `approved_budgets`, `indents`, `selections`, `selection_lines`                                                                                                                                       |
+| Overview         | `indents`, `indent_lines`, `po_facts`, `bill_facts`, `goods_receipts` (counts only)                                                                                                                                            |
+| Client Relations | `pusher_chain_state`, `selections`                                                                                                                                                                                             |
+| Reporter         | `indents`, `indent_lines`, `purchase_orders(_lines)`, `bills`, `budget_report_lines` + masters lookups (`projects`, `units`, `vendors`, `items` via embeds; dataset registry `lib/reporter/datasets.ts` grows a row per stage) |
 
 Relay reads only shared `projects`/`units`/`profiles`; Business Planning reads
 nothing. Client Relations also reads the shared

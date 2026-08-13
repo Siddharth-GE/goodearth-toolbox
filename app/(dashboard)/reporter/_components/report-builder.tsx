@@ -57,6 +57,7 @@ const CHART_TYPE_LABELS: [ChartType, string][] = [
 
 export type ProjectOption = { id: string; name: string };
 export type UnitOption = { id: string; name: string; projectId: string };
+export type VendorOption = { id: string; name: string };
 
 function toUiFilters(spec: ReportSpec): UiFilter[] {
   return spec.filters.map((filter) => ({
@@ -72,6 +73,7 @@ export function ReportBuilder({
   basePath,
   projects,
   units,
+  vendors,
   options,
 }: {
   dataset: BuilderDataset;
@@ -85,6 +87,7 @@ export function ReportBuilder({
   basePath: string;
   projects: ProjectOption[];
   units: UnitOption[];
+  vendors: VendorOption[];
   /** Distinct data values per field key, for the dropdown filters. */
   options: Record<string, string[]>;
 }) {
@@ -277,6 +280,7 @@ export function ReportBuilder({
                   value={filter.value}
                   projects={projects}
                   units={units}
+                  vendors={vendors}
                   options={options[field.key] ?? []}
                   onChange={(value) => setFilter(index, { value })}
                 />
@@ -622,6 +626,7 @@ function FilterValue({
   value,
   projects,
   units,
+  vendors,
   options,
   onChange,
 }: {
@@ -629,6 +634,7 @@ function FilterValue({
   value: string;
   projects: ProjectOption[];
   units: UnitOption[];
+  vendors: VendorOption[];
   options: string[];
   onChange: (value: string) => void;
 }) {
@@ -673,6 +679,23 @@ function FilterValue({
             </optgroup>
           );
         })}
+      </Select>
+    );
+  }
+  if (field.lookup === "vendors") {
+    return (
+      <Select
+        aria-label="Vendor"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-9 w-auto min-w-40 text-xs"
+      >
+        <option value="">Pick a vendor…</option>
+        {vendors.map((vendor) => (
+          <option key={vendor.id} value={vendor.id}>
+            {vendor.name}
+          </option>
+        ))}
       </Select>
     );
   }
