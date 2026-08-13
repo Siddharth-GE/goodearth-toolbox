@@ -1429,6 +1429,13 @@ export type Database = {
             referencedColumns: ["budget_id", "line_key"]
           },
           {
+            foreignKeyName: "indent_lines_budget_id_line_key_fkey"
+            columns: ["budget_id", "line_key"]
+            isOneToOne: false
+            referencedRelation: "budget_report_lines"
+            referencedColumns: ["budget_id", "line_key"]
+          },
+          {
             foreignKeyName: "indent_lines_construction_line_id_fkey"
             columns: ["construction_line_id"]
             isOneToOne: false
@@ -4334,6 +4341,86 @@ export type Database = {
             columns: ["vendor_id"]
             isOneToOne: false
             referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      budget_report_lines: {
+        Row: {
+          approved_at: string | null
+          budget_id: string | null
+          budget_status: string | null
+          client_rate: number | null
+          created_at: string | null
+          expected_vendor_id: string | null
+          id: string | null
+          item_code: string | null
+          item_id: string | null
+          item_name: string | null
+          line_key: string | null
+          line_status: string | null
+          margin_pct: number | null
+          needs_review: boolean | null
+          priced_at: string | null
+          project_id: string | null
+          project_name: string | null
+          quantity: number | null
+          selection_id: string | null
+          unit_cost: number | null
+          unit_id: string | null
+          unit_name: string | null
+          uom: string | null
+          vendor_name: string | null
+          version: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_lines_budget_id_selection_id_fkey"
+            columns: ["budget_id", "selection_id"]
+            isOneToOne: false
+            referencedRelation: "approved_budgets"
+            referencedColumns: ["id", "selection_id"]
+          },
+          {
+            foreignKeyName: "budget_lines_budget_id_selection_id_fkey"
+            columns: ["budget_id", "selection_id"]
+            isOneToOne: false
+            referencedRelation: "budgets"
+            referencedColumns: ["id", "selection_id"]
+          },
+          {
+            foreignKeyName: "budget_lines_expected_vendor_id_fkey"
+            columns: ["expected_vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budget_lines_selection_id_line_key_fkey"
+            columns: ["selection_id", "line_key"]
+            isOneToOne: false
+            referencedRelation: "selection_lines"
+            referencedColumns: ["selection_id", "line_key"]
+          },
+          {
+            foreignKeyName: "budgets_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "selection_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "units_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]

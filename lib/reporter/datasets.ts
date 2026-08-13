@@ -56,6 +56,21 @@
 
 export type FieldType = "text" | "number" | "money" | "date" | "bool";
 
+/**
+ * The tables and views a dataset's `source` may name. queries.ts casts
+ * through this type to satisfy the typed client's .from() overloads,
+ * and datasets.test.ts asserts every dataset's source is listed — so a
+ * new dataset that forgets this union fails a test rather than
+ * compiling into a runtime 404.
+ */
+export const KNOWN_SOURCES = [
+  "indent_lines",
+  "purchase_order_lines",
+  "bills",
+  "budget_report_lines",
+] as const;
+export type KnownSource = (typeof KNOWN_SOURCES)[number];
+
 export const AGGREGATES = ["sum", "avg", "min", "max", "count", "count_distinct"] as const;
 export type Aggregate = (typeof AGGREGATES)[number];
 
@@ -93,7 +108,15 @@ export type FieldDef = {
    * The filter renders as a bounded picker instead of free text, and its
    * ops are fixed to eq/neq. The picker's options come from queries.ts.
    */
-  lookup?: "projects" | "units";
+  lookup?: "projects" | "units" | "vendors";
+  /**
+   * The value is arithmetic over the row's OTHER fields, not a column —
+   * a key of DERIVED in derive.ts (a plain string here so this file
+   * stays import-free; datasets.test.ts asserts the key exists).
+   * Computed by extractRows after flattening. Never filterable or
+   * sortable: there is no column to push down to.
+   */
+  derive?: string;
   /**
    * The filter renders as a picker of the distinct values present in
    * the data (fetched via the dataset's `optionsSelect`), ops eq/neq.
@@ -293,11 +316,560 @@ const indentLines: DatasetDef = {
 };
 
 // ---------------------------------------------------------------------
+// po_lines — every purchase-order line, with its rate and value
+// ---------------------------------------------------------------------
+// MONEY, by the founder's decision (PLAN.md decisions 3 and 4; policies
+// widened by 0055). Every PO has a vendor (checked in production before
+// this shipped), so the vendors embed could be !inner — but it is not
+// needed: the vendor FILTER pushes down on purchase_orders.vendor_id,
+// and the embed only supplies the display name.
+
+const PO_LINES_SELECT =
+  "id, item_id, quantity, uom, rate, gst_pct, note, created_at, " +
+  "items!purchase_order_lines_item_id_fkey!inner(name, code), " +
+  "purchase_orders!purchase_order_lines_po_id_fkey!inner(reference, status, project_id, unit_id, vendor_id, issued_at, expected_by, " +
+  "projects!purchase_orders_project_id_fkey(name), units!purchase_orders_unit_id_fkey(name), " +
+  "vendors!purchase_orders_vendor_id_fkey(name))";
+
+const PO_LINES_OPTIONS_SELECT =
+  "uom, items!purchase_order_lines_item_id_fkey!inner(name, code), " +
+  "purchase_orders!purchase_order_lines_po_id_fkey!inner(status)";
+
+const poLines: DatasetDef = {
+  label: "Purchase order lines",
+  description: "Every line ever ordered from a vendor, with its rate and value.",
+  source: "purchase_order_lines",
+  select: PO_LINES_SELECT,
+  optionsSelect: PO_LINES_OPTIONS_SELECT,
+  projectField: "project",
+  dateFields: ["ordered_on", "expected_by"],
+  money: true,
+  defaultColumns: ["project", "po", "vendor", "item", "quantity", "uom", "rate", "line_value", "status", "ordered_on"], // prettier-ignore
+  defaultSort: [{ field: "ordered_on", dir: "desc" }],
+  fields: {
+    project: {
+      label: "Project",
+      type: "text",
+      path: "purchase_orders.projects.name",
+      identityPath: "purchase_orders.project_id",
+      filterColumn: "purchase_orders.project_id",
+      sortColumn: "purchase_orders.projects.name",
+      groupable: true,
+      aggregates: ["count_distinct"],
+      lookup: "projects",
+    },
+    unit: {
+      label: "Unit",
+      type: "text",
+      path: "purchase_orders.units.name",
+      identityPath: "purchase_orders.unit_id",
+      filterColumn: "purchase_orders.unit_id",
+      sortColumn: "purchase_orders.units.name",
+      groupable: true,
+      aggregates: ["count_distinct"],
+      lookup: "units",
+    },
+    vendor: {
+      label: "Vendor",
+      type: "text",
+      path: "purchase_orders.vendors.name",
+      identityPath: "purchase_orders.vendor_id",
+      // By id, not name: a filter on the nested vendors embed would
+      // filter the EMBED, not the parent rows, and silently return
+      // every line. The id column sits on the inner-joined PO row.
+      filterColumn: "purchase_orders.vendor_id",
+      sortColumn: "purchase_orders.vendors.name",
+      groupable: true,
+      aggregates: ["count_distinct"],
+      lookup: "vendors",
+    },
+    // A reference is generated, unique, never blank — its own identity.
+    po: {
+      label: "PO",
+      type: "text",
+      path: "purchase_orders.reference",
+      sortColumn: "purchase_orders.reference",
+      groupable: true,
+      aggregates: ["count_distinct"],
+    },
+    status: {
+      label: "Status",
+      type: "text",
+      path: "purchase_orders.status",
+      filterColumn: "purchase_orders.status",
+      sortColumn: "purchase_orders.status",
+      groupable: true,
+      aggregates: [],
+      filterOptions: "distinct",
+    },
+    item: {
+      label: "Item",
+      type: "text",
+      path: "items.name",
+      identityPath: "item_id",
+      filterColumn: "items.name",
+      sortColumn: "items.name",
+      groupable: true,
+      aggregates: ["count_distinct"],
+      filterOptions: "distinct",
+    },
+    item_code: {
+      label: "Item code",
+      type: "text",
+      path: "items.code",
+      identityPath: "item_id",
+      filterColumn: "items.code",
+      sortColumn: "items.code",
+      groupable: true,
+      aggregates: ["count_distinct"],
+      filterOptions: "distinct",
+    },
+    quantity: {
+      label: "Quantity",
+      type: "number",
+      path: "quantity",
+      filterColumn: "quantity",
+      sortColumn: "quantity",
+      groupable: false,
+      aggregates: ["sum", "avg", "min", "max", "count"],
+    },
+    uom: {
+      label: "Unit of measure",
+      type: "text",
+      path: "uom",
+      filterColumn: "uom",
+      sortColumn: "uom",
+      groupable: true,
+      aggregates: [],
+      filterOptions: "distinct",
+    },
+    rate: {
+      label: "Rate",
+      type: "money",
+      path: "rate",
+      filterColumn: "rate",
+      sortColumn: "rate",
+      groupable: false,
+      aggregates: ["avg", "min", "max", "count"],
+    },
+    gst_pct: {
+      label: "GST %",
+      type: "number",
+      path: "gst_pct",
+      filterColumn: "gst_pct",
+      sortColumn: "gst_pct",
+      groupable: false,
+      aggregates: ["avg", "min", "max"],
+    },
+    line_value: {
+      label: "Line value",
+      type: "money",
+      path: "line_value",
+      derive: "po_line_value",
+      groupable: false,
+      aggregates: ["sum", "avg", "min", "max", "count"],
+    },
+    note: {
+      label: "Note",
+      type: "text",
+      path: "note",
+      groupable: false,
+      aggregates: [],
+    },
+    ordered_on: {
+      label: "Ordered on",
+      type: "date",
+      path: "created_at",
+      filterColumn: "created_at",
+      sortColumn: "created_at",
+      groupable: false,
+      aggregates: [],
+    },
+    expected_by: {
+      label: "Expected by",
+      type: "date",
+      path: "purchase_orders.expected_by",
+      filterColumn: "purchase_orders.expected_by",
+      sortColumn: "purchase_orders.expected_by",
+      groupable: false,
+      aggregates: [],
+    },
+  },
+};
+
+// ---------------------------------------------------------------------
+// bills — every bill recorded, header level
+// ---------------------------------------------------------------------
+// A bill has no lines by design (the paper invoice's figures are the
+// record), so this dataset IS the billed money. No purchase_orders
+// embed on purpose: bills.po_id resolves to three relations and nothing
+// here needs it.
+
+const BILLS_SELECT =
+  "id, bill_no, reference, invoice_no, invoice_date, taxable_amount, gst_amount, total_amount, " +
+  "status, kind, project_id, unit_id, vendor_id, created_at, paid_at, " +
+  "projects!bills_project_id_fkey(name), units!bills_unit_id_fkey(name), " +
+  "vendors!bills_vendor_id_fkey(name)";
+
+const BILLS_OPTIONS_SELECT = "status, kind";
+
+const bills: DatasetDef = {
+  label: "Bills",
+  description: "Every vendor and labour bill recorded, with its amounts and payment state.",
+  source: "bills",
+  select: BILLS_SELECT,
+  optionsSelect: BILLS_OPTIONS_SELECT,
+  projectField: "project",
+  dateFields: ["invoice_date", "paid_on", "recorded_on"],
+  money: true,
+  defaultColumns: ["project", "vendor", "bill_no", "kind", "status", "total_amount", "invoice_date"], // prettier-ignore
+  defaultSort: [{ field: "recorded_on", dir: "desc" }],
+  fields: {
+    project: {
+      label: "Project",
+      type: "text",
+      path: "projects.name",
+      identityPath: "project_id",
+      filterColumn: "project_id",
+      sortColumn: "projects.name",
+      groupable: true,
+      aggregates: ["count_distinct"],
+      lookup: "projects",
+    },
+    unit: {
+      label: "Unit",
+      type: "text",
+      path: "units.name",
+      identityPath: "unit_id",
+      filterColumn: "unit_id",
+      sortColumn: "units.name",
+      groupable: true,
+      aggregates: ["count_distinct"],
+      lookup: "units",
+    },
+    vendor: {
+      label: "Vendor",
+      type: "text",
+      path: "vendors.name",
+      identityPath: "vendor_id",
+      filterColumn: "vendor_id",
+      sortColumn: "vendors.name",
+      groupable: true,
+      aggregates: ["count_distinct"],
+      lookup: "vendors",
+    },
+    bill_no: {
+      label: "Bill",
+      type: "text",
+      path: "bill_no",
+      sortColumn: "bill_no",
+      groupable: false,
+      aggregates: ["count_distinct"],
+    },
+    invoice_no: {
+      label: "Invoice no.",
+      type: "text",
+      path: "invoice_no",
+      groupable: false,
+      aggregates: [],
+    },
+    kind: {
+      label: "Kind",
+      type: "text",
+      path: "kind",
+      filterColumn: "kind",
+      sortColumn: "kind",
+      groupable: true,
+      aggregates: [],
+      filterOptions: "distinct",
+    },
+    status: {
+      label: "Status",
+      type: "text",
+      path: "status",
+      filterColumn: "status",
+      sortColumn: "status",
+      groupable: true,
+      aggregates: [],
+      filterOptions: "distinct",
+    },
+    taxable_amount: {
+      label: "Taxable amount",
+      type: "money",
+      path: "taxable_amount",
+      filterColumn: "taxable_amount",
+      sortColumn: "taxable_amount",
+      groupable: false,
+      aggregates: ["sum", "avg", "min", "max", "count"],
+    },
+    gst_amount: {
+      label: "GST amount",
+      type: "money",
+      path: "gst_amount",
+      filterColumn: "gst_amount",
+      sortColumn: "gst_amount",
+      groupable: false,
+      aggregates: ["sum", "avg", "min", "max", "count"],
+    },
+    total_amount: {
+      label: "Total amount",
+      type: "money",
+      path: "total_amount",
+      filterColumn: "total_amount",
+      sortColumn: "total_amount",
+      groupable: false,
+      aggregates: ["sum", "avg", "min", "max", "count"],
+    },
+    invoice_date: {
+      label: "Invoice date",
+      type: "date",
+      path: "invoice_date",
+      filterColumn: "invoice_date",
+      sortColumn: "invoice_date",
+      groupable: false,
+      aggregates: [],
+    },
+    paid_on: {
+      label: "Paid on",
+      type: "date",
+      path: "paid_at",
+      filterColumn: "paid_at",
+      sortColumn: "paid_at",
+      groupable: false,
+      aggregates: [],
+    },
+    recorded_on: {
+      label: "Recorded on",
+      type: "date",
+      path: "created_at",
+      filterColumn: "created_at",
+      sortColumn: "created_at",
+      groupable: false,
+      aggregates: [],
+    },
+  },
+};
+
+// ---------------------------------------------------------------------
+// budget_report_lines — priced budget lines, including margin
+// ---------------------------------------------------------------------
+// Reads the 0055 view of the same name: flat columns, no embeds, no
+// chance of the ambiguous-embed trap. The view is security_invoker, so
+// this dataset sees exactly what the signed-in user's widened policies
+// allow — margin included, per the founder's explicit reversal of
+// 0011's margin boundary.
+
+const BUDGET_LINES_SELECT =
+  "id, quantity, uom, unit_cost, margin_pct, client_rate, line_status, needs_review, " +
+  "priced_at, approved_at, budget_status, version, unit_id, unit_name, project_id, " +
+  "project_name, item_id, item_name, item_code, expected_vendor_id, vendor_name";
+
+const BUDGET_LINES_OPTIONS_SELECT = "line_status, budget_status, uom, item_name, item_code";
+
+const budgetReportLines: DatasetDef = {
+  label: "Budget lines",
+  description: "Every priced budget line — cost, client rate, and the margin between them.",
+  source: "budget_report_lines",
+  select: BUDGET_LINES_SELECT,
+  optionsSelect: BUDGET_LINES_OPTIONS_SELECT,
+  projectField: "project",
+  dateFields: ["priced_on", "approved_on"],
+  money: true,
+  defaultColumns: ["project", "unit", "item", "quantity", "uom", "unit_cost", "margin_pct", "client_rate", "line_status"], // prettier-ignore
+  defaultSort: [{ field: "priced_on", dir: "desc" }],
+  fields: {
+    project: {
+      label: "Project",
+      type: "text",
+      path: "project_name",
+      identityPath: "project_id",
+      filterColumn: "project_id",
+      sortColumn: "project_name",
+      groupable: true,
+      aggregates: ["count_distinct"],
+      lookup: "projects",
+    },
+    unit: {
+      label: "Unit",
+      type: "text",
+      path: "unit_name",
+      identityPath: "unit_id",
+      filterColumn: "unit_id",
+      sortColumn: "unit_name",
+      groupable: true,
+      aggregates: ["count_distinct"],
+      lookup: "units",
+    },
+    item: {
+      label: "Item",
+      type: "text",
+      path: "item_name",
+      identityPath: "item_id",
+      filterColumn: "item_name",
+      sortColumn: "item_name",
+      groupable: true,
+      aggregates: ["count_distinct"],
+      filterOptions: "distinct",
+    },
+    item_code: {
+      label: "Item code",
+      type: "text",
+      path: "item_code",
+      identityPath: "item_id",
+      filterColumn: "item_code",
+      sortColumn: "item_code",
+      groupable: true,
+      aggregates: ["count_distinct"],
+      filterOptions: "distinct",
+    },
+    vendor: {
+      label: "Expected vendor",
+      type: "text",
+      path: "vendor_name",
+      identityPath: "expected_vendor_id",
+      filterColumn: "expected_vendor_id",
+      sortColumn: "vendor_name",
+      groupable: true,
+      aggregates: ["count_distinct"],
+      lookup: "vendors",
+    },
+    quantity: {
+      label: "Quantity",
+      type: "number",
+      path: "quantity",
+      filterColumn: "quantity",
+      sortColumn: "quantity",
+      groupable: false,
+      aggregates: ["sum", "avg", "min", "max", "count"],
+    },
+    uom: {
+      label: "Unit of measure",
+      type: "text",
+      path: "uom",
+      filterColumn: "uom",
+      sortColumn: "uom",
+      groupable: true,
+      aggregates: [],
+      filterOptions: "distinct",
+    },
+    unit_cost: {
+      label: "Unit cost",
+      type: "money",
+      path: "unit_cost",
+      filterColumn: "unit_cost",
+      sortColumn: "unit_cost",
+      groupable: false,
+      aggregates: ["avg", "min", "max", "count"],
+    },
+    margin_pct: {
+      label: "Margin %",
+      type: "number",
+      path: "margin_pct",
+      filterColumn: "margin_pct",
+      sortColumn: "margin_pct",
+      groupable: false,
+      aggregates: ["avg", "min", "max"],
+    },
+    client_rate: {
+      label: "Client rate",
+      type: "money",
+      path: "client_rate",
+      filterColumn: "client_rate",
+      sortColumn: "client_rate",
+      groupable: false,
+      aggregates: ["avg", "min", "max", "count"],
+    },
+    cost_value: {
+      label: "Cost value",
+      type: "money",
+      path: "cost_value",
+      derive: "budget_cost_value",
+      groupable: false,
+      aggregates: ["sum", "avg", "min", "max", "count"],
+    },
+    client_value: {
+      label: "Client value",
+      type: "money",
+      path: "client_value",
+      derive: "budget_client_value",
+      groupable: false,
+      aggregates: ["sum", "avg", "min", "max", "count"],
+    },
+    margin_value: {
+      label: "Margin value",
+      type: "money",
+      path: "margin_value",
+      derive: "budget_margin_value",
+      groupable: false,
+      aggregates: ["sum", "avg", "min", "max", "count"],
+    },
+    line_status: {
+      label: "Line status",
+      type: "text",
+      path: "line_status",
+      filterColumn: "line_status",
+      sortColumn: "line_status",
+      groupable: true,
+      aggregates: [],
+      filterOptions: "distinct",
+    },
+    budget_status: {
+      label: "Budget status",
+      type: "text",
+      path: "budget_status",
+      filterColumn: "budget_status",
+      sortColumn: "budget_status",
+      groupable: true,
+      aggregates: [],
+      filterOptions: "distinct",
+    },
+    needs_review: {
+      label: "Needs review",
+      type: "bool",
+      path: "needs_review",
+      filterColumn: "needs_review",
+      groupable: true,
+      aggregates: [],
+    },
+    version: {
+      label: "Budget version",
+      type: "number",
+      path: "version",
+      filterColumn: "version",
+      sortColumn: "version",
+      groupable: true,
+      aggregates: ["max", "count"],
+    },
+    priced_on: {
+      label: "Priced on",
+      type: "date",
+      path: "priced_at",
+      filterColumn: "priced_at",
+      sortColumn: "priced_at",
+      groupable: false,
+      aggregates: [],
+    },
+    approved_on: {
+      label: "Approved on",
+      type: "date",
+      path: "approved_at",
+      filterColumn: "approved_at",
+      sortColumn: "approved_at",
+      groupable: false,
+      aggregates: [],
+    },
+  },
+};
+
+// ---------------------------------------------------------------------
 // The registry
 // ---------------------------------------------------------------------
 
 export const DATASETS: Record<string, DatasetDef> = {
   indent_lines: indentLines,
+  po_lines: poLines,
+  bills,
+  budget_report_lines: budgetReportLines,
 };
 
 /** Where a blank or unrecognisable spec lands. */

@@ -399,7 +399,7 @@ export type BuilderField = {
   groupable: boolean;
   aggregates: Aggregate[];
   sortable: boolean;
-  lookup?: "projects" | "units";
+  lookup?: "projects" | "units" | "vendors";
   /** Value control is a dropdown of the data's own distinct values. */
   distinct?: true;
 };

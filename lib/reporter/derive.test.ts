@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { lineValue } from "./derive";
+import { DERIVED, lineValue } from "./derive";
 
 test("line value is quantity × rate × (1 + gst/100) at full precision", () => {
   // 3 × 1234.56 × 1.18 — no rounding until display (lib/format.ts).
@@ -23,4 +23,25 @@ test("a null GST means 0% — GST-free is real; unpriced is not free", () => {
 
 test("a free line is 0, which is different from unpriced", () => {
   assert.equal(lineValue(3, 0, 18), 0);
+});
+
+test("a PO line's value carries its GST; a budget line's does not", () => {
+  const row = { quantity: 2, rate: 100, gst_pct: 18, unit_cost: 100, client_rate: 130 };
+  assert.equal(DERIVED.po_line_value(row), 2 * 100 * 1.18);
+  assert.equal(DERIVED.budget_cost_value(row), 200);
+  assert.equal(DERIVED.budget_client_value(row), 260);
+});
+
+test("margin value is client minus cost, and unknown when either side is", () => {
+  assert.equal(DERIVED.budget_margin_value({ quantity: 2, unit_cost: 100, client_rate: 130 }), 60);
+  // An unpriced cost does not make the whole client value "margin".
+  assert.equal(DERIVED.budget_margin_value({ quantity: 2, unit_cost: null, client_rate: 130 }), null); // prettier-ignore
+  assert.equal(DERIVED.budget_margin_value({ quantity: 2, unit_cost: 100, client_rate: null }), null); // prettier-ignore
+  // Selling at cost is a real margin of zero, not a missing one.
+  assert.equal(DERIVED.budget_margin_value({ quantity: 2, unit_cost: 100, client_rate: 100 }), 0);
+});
+
+test("derived functions ignore junk in the row rather than crashing", () => {
+  assert.equal(DERIVED.po_line_value({ quantity: "3", rate: {}, gst_pct: [] }), null);
+  assert.equal(DERIVED.po_line_value({}), null);
 });

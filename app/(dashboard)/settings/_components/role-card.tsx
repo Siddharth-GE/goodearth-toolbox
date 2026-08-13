@@ -127,6 +127,7 @@ export function RoleCard({
                   roleId={role.id}
                   app={tool.href}
                   label={tool.name}
+                  warning={tool.grantWarning}
                   inBundle={role.apps.includes(tool.href)}
                 />
               ))}
@@ -189,11 +190,14 @@ function RoleAppToggle({
   roleId,
   app,
   label,
+  warning,
   inBundle,
 }: {
   roleId: string;
   app: string;
   label: string;
+  /** The tool's grantWarning — a role hands the grant to everyone in it. */
+  warning?: string;
   inBundle: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
@@ -223,6 +227,7 @@ function RoleAppToggle({
       />
       <span className="min-w-0">
         <span className="text-foreground block text-sm font-medium">{label}</span>
+        {warning && <span className="text-warning block text-xs font-medium">{warning}</span>}
         {error && (
           <span role="alert" className="text-danger block text-xs">
             {error}
