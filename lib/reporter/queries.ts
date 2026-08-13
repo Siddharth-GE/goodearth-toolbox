@@ -11,7 +11,7 @@ import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { formatCount } from "@/lib/format";
 
-import { extractRows, runReport, type ReportResult } from "./aggregate";
+import { extractRows, identityKey, runReport, type ReportResult, type ReportRow } from "./aggregate"; // prettier-ignore
 import { DATASETS } from "./datasets";
 import { getStarter, isStarterId } from "./starters";
 import {
@@ -137,17 +137,82 @@ export async function runSpec(spec: ReportSpec): Promise<RunOutcome> {
   }
 
   // fetchAll pages to completion and throws if a page fails. Ordered by
-  // id for a stable page order; the report's own sort happens in the
+  // the dataset's pageOrder (id unless the source is a view without
+  // one) for a stable page order; the report's own sort happens in the
   // pure engine, over the complete set.
-  const raw = await fetchAll((from, to) =>
-    applyFilters(
-      supabase.from(source).select(dataset.select).order("id").range(from, to),
-      spec.filters,
-      filterColumns,
-    ),
-  );
+  const raw = await fetchAll((from, to) => {
+    let query = supabase.from(source).select(dataset.select);
+    for (const column of dataset.pageOrder ?? ["id"]) query = query.order(column);
+    return applyFilters(query.range(from, to), spec.filters, filterColumns);
+  });
 
-  return { ok: true, result: runReport(dataset, spec, extractRows(dataset, raw), matched) };
+  let rows = extractRows(dataset, raw);
+  if (dataset.enrich === "stock_names") rows = await enrichStockNames(rows);
+
+  return { ok: true, result: runReport(dataset, spec, rows, matched) };
+}
+
+/**
+ * The stock view carries bare ids (a view declares no FKs, so PostgREST
+ * cannot embed through it). Item and location names come from bounded
+ * masters lookups instead — bounded because they fetch only the ids
+ * actually present in the report's rows, chunked under PostgREST's URL
+ * limits. A name that cannot be found renders as null, never a crash.
+ */
+async function enrichStockNames(rows: ReportRow[]): Promise<ReportRow[]> {
+  const supabase = await createClient();
+
+  const ids = (key: string) => [
+    ...new Set(
+      rows
+        .map((row) => row[identityKey(key)])
+        .filter((value): value is string => typeof value === "string"),
+    ),
+  ];
+
+  const CHUNK = 150;
+  async function lookup(
+    table: "items" | "stores" | "plots",
+    wanted: string[],
+    columns: string,
+  ): Promise<Map<string, Record<string, unknown>>> {
+    const found = new Map<string, Record<string, unknown>>();
+    for (let i = 0; i < wanted.length; i += CHUNK) {
+      const { data, error } = await supabase
+        .from(table)
+        .select(columns)
+        .in("id", wanted.slice(i, i + CHUNK));
+      if (error) {
+        console.error(`enrichStockNames ${table} lookup failed:`, error);
+        throw new Error(`The ${table} names could not be read: ${error.message}`);
+      }
+      for (const row of (data ?? []) as unknown as Record<string, unknown>[]) {
+        found.set(String(row.id), row);
+      }
+    }
+    return found;
+  }
+
+  const [items, stores, plots] = await Promise.all([
+    lookup("items", ids("item"), "id, name, code"),
+    lookup("stores", ids("location"), "id, name"),
+    lookup("plots", ids("location"), "id, name"),
+  ]);
+
+  return rows.map((row) => {
+    const item = items.get(String(row[identityKey("item")]));
+    const locationId = String(row[identityKey("location")]);
+    // The view's location_id is a store OR a plot id depending on kind;
+    // a unit-kind location also resolves through plots' sibling — but
+    // 0029 folded unit stock into plots, so stores and plots cover it.
+    const location = stores.get(locationId) ?? plots.get(locationId);
+    return {
+      ...row,
+      item: (item?.name as string | undefined) ?? null,
+      item_code: (item?.code as string | undefined) ?? null,
+      location: (location?.name as string | undefined) ?? null,
+    };
+  });
 }
 
 /**
@@ -373,11 +438,9 @@ export async function listFilterOptions(datasetKey: string): Promise<Record<stri
   const PAGE_SIZE = 1000;
   const raw: unknown[] = [];
   for (let page = 0; page < OPTIONS_MAX_PAGES; page++) {
-    const { data, error } = await supabase
-      .from(source)
-      .select(dataset.optionsSelect)
-      .order("id")
-      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+    let query = supabase.from(source).select(dataset.optionsSelect);
+    for (const column of dataset.pageOrder ?? ["id"]) query = query.order(column);
+    const { data, error } = await query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
     if (error) {
       console.error("listFilterOptions failed:", error);
       throw new Error(`The filter choices could not be read: ${error.message}`);

@@ -165,6 +165,30 @@ test("field keys are plain identifiers, so the #id: prefix can never collide", (
   }
 });
 
+test("every pageOrder column is in the select — a view without id must page on something real", () => {
+  for (const [key, dataset] of entries) {
+    for (const column of dataset.pageOrder ?? []) {
+      assert.ok(
+        dataset.select.includes(column),
+        `${key}: pageOrder column "${column}" is not in the select`,
+      );
+    }
+  }
+});
+
+test("enriched fields are display-only — no filter or sort column to lie about", () => {
+  // An enriched name exists only after the fetch, so a filterColumn or
+  // sortColumn on it would push a nonexistent column to PostgREST.
+  for (const [key, dataset] of entries) {
+    if (!dataset.enrich) continue;
+    for (const [fieldKey, field] of Object.entries(dataset.fields)) {
+      if (dataset.select.includes(field.path)) continue; // a real column
+      assert.ok(!field.filterColumn, `${key}.${fieldKey}: enriched field cannot filter`);
+      assert.ok(!field.sortColumn, `${key}.${fieldKey}: enriched field cannot sort`);
+    }
+  }
+});
+
 test("every dataset's source is a known table or view", () => {
   // queries.ts casts source through KnownSource for the typed client;
   // a source missing from that union would compile into a runtime 404.

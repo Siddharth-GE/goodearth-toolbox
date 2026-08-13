@@ -73,32 +73,31 @@ waiting list (the write path `replaceFutureLegs` exists and is current, just
 unwired), and no "Open a trail" button on the Projects landing page (one click
 away already; not asked for).
 
-## 5. Reporter — next is Stage 8, the remaining datasets
+## 5. Reporter — next is Stage 9, PDF
 
-The Reporter is live through Stage 7: builder, dropdown filters, grouping,
+The Reporter is live through Stage 8: builder, dropdown filters, grouping,
 subtotals, charts, CSV, saved reports with copyable starting points, **the
-money** (`0055`: PO rates, bill amounts, budget cost/client rate/margin via
-widened quals; amber warning beside the Settings checkbox) and **sales &
-collections** (`0056`: `crm_milestone_facts` + `crm_receipt_facts`, owner
-views whose WHERE and column list are the gate — the prose columns never
-leave the CRM). Two datasets, never one join: a milestone with three
-receipts would triple a sum; the view's own `received_amount` aggregate is
-the one sanctioned crossing. Before Stage 6 merged, only one non-admin held
+money** (`0055` + `0056` — the amber warning beside the Settings checkbox is
+the reminder of what the grant now means), and **all eleven datasets**:
+indents, PO lines, bills, budget lines, CRM milestones and receipts (two,
+never one join), goods receipts, stock, selection lines, relay trails and
+units. Five starting points. Before Stage 6 merged, only one non-admin held
 `/reporter` (the probe) — worth remembering when granting it next.
 
-**Three starting points ship so far** (Site & procurement, Spend vs budget,
-Sales & collections). The rest each need a dataset that does not exist yet; a
-starter ships with its data. No client receipts are recorded yet, so the
-receipts dataset shows an honest empty state until Client Relations records
-one.
+No client receipts are recorded yet, so the receipts dataset shows an honest
+empty state until Client Relations records one.
 
 The full plan is **`app/(dashboard)/reporter/PLAN.md`**. Read it before
-touching anything below. Three stages remain, each shippable and
-browser-testable on its own:
+touching anything below. Two stages remain:
 
-8. **The remaining datasets** and their starters.
-9. **PDF** — Recharts → `sharp` → PNG → react-pdf.
-10. **Plan vs actual** — `0057`, Business Planning publishes targets.
+9. **PDF** — Recharts → `renderToStaticMarkup` → SVG → `sharp` → PNG →
+   react-pdf. The plan flags three known traps: literal print hexes (CSS
+   variables don't resolve in a detached SVG), fixed chart dimensions
+   (`ResponsiveContainer` is browser-only), and checking the rasterised
+   typeface on a real PDF — `sharp` will not have Geist.
+10. **Plan vs actual** — `0057`, Business Planning publishes targets. The
+    migration is declared by Business Planning so the coupling points the
+    right way (the `0045` precedent).
 
 Three things the founder decided that are easy to lose:
 
