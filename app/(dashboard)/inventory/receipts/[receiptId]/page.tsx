@@ -24,8 +24,8 @@ export default async function ReceiptPage({ params }: { params: Promise<{ receip
       <PageTitle
         title={receipt.reference}
         description={`Received against ${receipt.po_reference} · ${receipt.project_name}`}
-        backHref="/inventory"
-        backLabel="Inventory"
+        backHref="/inventory/receive"
+        backLabel="Receive"
         actions={
           <Badge variant={receipt.to_site ? "info" : "success"}>{receipt.destination}</Badge>
         }

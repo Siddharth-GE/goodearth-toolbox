@@ -13,7 +13,7 @@ export function InventoryNav({
   return (
     <NavTabs
       tabs={[
-        { key: "receive", href: "/inventory", label: "Receive" },
+        { key: "receive", href: "/inventory/receive", label: "Receive" },
         { key: "stock", href: "/inventory/stock", label: "Stock" },
         { key: "issues", href: "/inventory/issues", label: "Issues" },
         { key: "adjustments", href: "/inventory/adjustments", label: "Adjustments" },
