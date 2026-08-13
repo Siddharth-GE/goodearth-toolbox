@@ -41,6 +41,8 @@ export type PlanDetail = {
   id: string;
   name: string;
   location: string | null;
+  /** Set = this plan's headline numbers are published as targets (0057). */
+  project_id: string | null;
   inputs: PlanInputs;
   updated_at: string;
   updated_by_name: string | null;
@@ -105,7 +107,7 @@ export const getPlan = cache(async (planId: string): Promise<PlanDetail | null> 
 
   const { data, error } = await supabase
     .from("business_plans")
-    .select("id, name, location, inputs, updated_at, updated_by")
+    .select("id, name, location, project_id, inputs, updated_at, updated_by")
     .eq("id", planId)
     .maybeSingle();
 
@@ -121,6 +123,7 @@ export const getPlan = cache(async (planId: string): Promise<PlanDetail | null> 
     id: data.id,
     name: data.name,
     location: data.location,
+    project_id: data.project_id,
     inputs: parsePlanInputs(data.inputs),
     updated_at: data.updated_at,
     updated_by_name: data.updated_by ? (names.get(data.updated_by) ?? null) : null,

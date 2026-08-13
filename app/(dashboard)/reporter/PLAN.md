@@ -25,7 +25,13 @@ source already readable by all authenticated — plus `DatasetDef.pageOrder`
 (stock_by_location has no `id`, so paging by id would 400) and
 `enrich: "stock_names"` (a view declares no FKs, so its names come from
 bounded lookups, not embeds). Starters: Stock position, Project scorecard.
-Stages 9–10 remain. Read this before touching the tool.
+**Stages 9 and 10 shipped 2026-08-13**: PDF (with the chart drawn by
+react-pdf primitives — see the Stage-9 correction in idea 2 below), and Plan
+vs actual (`0057` applied: `business_plans.project_id`,
+`business_plan_targets` written by Business Planning's own save,
+`business_plan_target_facts` carrying actuals as its own aggregates, the
+`plan_targets` dataset, and the last two starters — all seven now ship).
+**All ten stages are built.** Read this before touching the tool.
 
 Planned with the founder on 2026-08-11. Ten stages, each shippable on its own.
 
@@ -103,9 +109,20 @@ plain sentence** rather than silently truncating.
 
 ### 2. Charts use Recharts — one library, and it reaches the PDF too
 
-**This reverses an earlier draft of this plan, which argued for hand-rolled SVG.
-That argument was wrong on its central claim** and is recorded here so it is not
-re-litigated: a chart library was said to be unable to reach the PDF. It can.
+**Stage-9 correction (2026-08-13): the pipeline below did NOT survive contact
+with recharts@3.** `renderToStaticMarkup` of a Recharts chart returns an empty
+wrapper `<div>` — the SVG mounts only in a live browser, so the string this
+section planned to rasterise does not exist (verified: 127 characters, no
+`<svg>`). The planning verification checked that the APIs exist; frame zero of
+a chart that draws after mount is still empty. What actually shipped: the PDF
+draws the SAME tested ChartModel with react-pdf's own primitives
+(`lib/pdf/chart.tsx`) — bars as flex views, lines as native SVG polylines,
+nulls kept as gaps, values direct-labelled since paper has no tooltips. One
+data-shaping implementation still; vector output; no `sharp`, so the three
+Stage-9 traps flagged below (CSS variables, ResponsiveContainer, fonts) either
+still apply (literal print hexes) or dissolve (no rasterised text at all —
+chart text is the document's Helvetica). The section below is kept as written
+for the reasoning that still stands: one library on screen, one shaping.
 
 Verified during planning:
 
@@ -571,8 +588,8 @@ sees grant bugs.
 | **6**  | **The money — ships alone.** ✅ `0055` (applied; `budget_report_lines` built `security_invoker`, NOT owner-bypass — it carries rupees, so it must inherit the widened policies, unlike the fact views); `po_lines`, `bills`, `budget_report_lines` registered; derived values via `FieldDef.derive`; `vendors` lookup; starter: Spend vs budget (reads the budget side — budget-vs-PO-actuals needs two datasets on one page, the deferred dashboard composer) | Probe with only `/reporter` sees rates, bill amounts **and margin**; probe with only `/indents` sees no rates anywhere; probe with only `/reporter` still cannot open `/purchase-orders`; then press one real write button on Purchase Orders on production |
 | **7**  | **Sales & collections.** ✅ `0056`, two CRM datasets (milestones carry the view's own per-rung `received_amount` aggregate — the one sanctioned crossing; unallocated receipts live only in the receipts dataset), `crm_balance_due`, starter                                                                                                                                                                                                                  | Totals reconcile against Client Relations' own screens for one villa — if they don't, the fan-out bug is present                                                                                                                                            |
 | **8**  | **The rest.** ✅ `goods_receipt_lines`, `stock` (pageOrder + name enrichment — the view has no id and no FKs), `selection_lines` (composite-FK embed, two-level `!inner` project pushdown verified live: 87 Saarang lines filter to 87, another project to 0), `relay_chains` (pusher_chain_state's third consumer), `units`; starters: Project scorecard (single-dataset version — units by status), Stock position                                           | Open every one of the five new datasets by hand — a bad `select` is invisible to lint, types, tests and build                                                                                                                                               |
-| **9**  | **PDF.** `lib/pdf/chart.tsx` — `renderToStaticMarkup` → `sharp` → PNG → react-pdf `<Image>`; print palette (literal hexes) in `lib/pdf/theme.ts`; `report-document.tsx`; two routes                                                                                                                                                                                                                                                                            | The same report on screen and on paper, chart included, and they match; **check the rasterised axis/label typeface on a real PDF** — `sharp` will not have Geist                                                                                            |
-| **10** | **Plan vs actual.** `0057`, Business Planning gains the project field and publishes targets, Reporter reads the view, starter                                                                                                                                                                                                                                                                                                                                  | Set a plan's project, save, see planned vs real side by side                                                                                                                                                                                                |
+| **9**  | **PDF.** ✅ `lib/pdf/chart.tsx` — react-pdf primitives over the same ChartModel (the planned Recharts→sharp pipeline died on evidence: recharts@3 renders an empty div server-side — see idea 2's correction); print palette (literal hexes) in `lib/pdf/theme.ts`; `report-document.tsx`; `chart-model.ts` shared with the screen; two routes                                                                                                                 | The same report on screen and on paper, chart included, and they match; **check the rasterised axis/label typeface on a real PDF** — `sharp` will not have Geist                                                                                            |
+| **10** | **Plan vs actual.** ✅ `0057` (applied); the project link lives in Business Planning's rename dialog and `savePlan`/`renamePlan` publish or withdraw targets on every save (`syncPlanTargets`); the facts view carries `actual_spend`/`actual_collections` as its own per-project aggregates so nothing fans out; `plan_targets` dataset; starters: Plan vs actual, and Design & delivery (deferred from Stage 5 until its dataset existed)                    | Set a plan's project, save, see planned vs real side by side                                                                                                                                                                                                |
 
 ---
 

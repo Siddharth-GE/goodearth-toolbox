@@ -489,6 +489,76 @@ export type Database = {
           },
         ]
       }
+      business_plan_targets: {
+        Row: {
+          created_at: string
+          id: string
+          margin_pct: number | null
+          pbt: number
+          peak_funding: number
+          plan_id: string
+          plan_name: string
+          project_id: string
+          revenue: number
+          scenario_name: string
+          total_cost: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          margin_pct?: number | null
+          pbt: number
+          peak_funding: number
+          plan_id: string
+          plan_name: string
+          project_id: string
+          revenue: number
+          scenario_name: string
+          total_cost: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          margin_pct?: number | null
+          pbt?: number
+          peak_funding?: number
+          plan_id?: string
+          plan_name?: string
+          project_id?: string
+          revenue?: number
+          scenario_name?: string
+          total_cost?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_plan_targets_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: true
+            referencedRelation: "business_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_plan_targets_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_plan_targets_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       business_plans: {
         Row: {
           created_at: string
@@ -497,6 +567,7 @@ export type Database = {
           inputs: Json
           location: string | null
           name: string
+          project_id: string | null
           schema_version: number
           updated_at: string
           updated_by: string | null
@@ -508,6 +579,7 @@ export type Database = {
           inputs?: Json
           location?: string | null
           name: string
+          project_id?: string | null
           schema_version?: number
           updated_at?: string
           updated_by?: string | null
@@ -519,6 +591,7 @@ export type Database = {
           inputs?: Json
           location?: string | null
           name?: string
+          project_id?: string | null
           schema_version?: number
           updated_at?: string
           updated_by?: string | null
@@ -529,6 +602,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_plans_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
           {
@@ -4425,6 +4505,40 @@ export type Database = {
           },
           {
             foreignKeyName: "units_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      business_plan_target_facts: {
+        Row: {
+          actual_collections: number | null
+          actual_spend: number | null
+          id: string | null
+          margin_pct: number | null
+          pbt: number | null
+          peak_funding: number | null
+          plan_id: string | null
+          plan_name: string | null
+          project_id: string | null
+          project_name: string | null
+          published_at: string | null
+          revenue: number | null
+          scenario_name: string | null
+          total_cost: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_plan_targets_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: true
+            referencedRelation: "business_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_plan_targets_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
