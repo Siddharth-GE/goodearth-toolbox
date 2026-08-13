@@ -60,7 +60,7 @@ TODO.md required.
 
 - [x] 1. Migration 0058 (applied 2026-08-13) + types + shell: tabs,
       three placeholder pages, grant warning.
-- [ ] 2. Funding end to end: interest.ts + tests, facility/movement
+- [x] 2. Funding end to end: interest.ts + tests, facility/movement
       queries and actions, list + detail screens, dialogs.
 - [ ] 3. Cash dashboard: cashflow.ts + tests, KPI band, in/out grouped
       bars, money-out stack.
