@@ -15,13 +15,12 @@ const TABS = [
 
 export function CrmNav() {
   const pathname = usePathname();
-  // The tool root is the welcome screen — no tab lit there. Everything
-  // else (including a client's own page) belongs to Clients unless a
-  // longer href says otherwise.
+  // The tool root is the welcome screen, which carries its own doors —
+  // showing the tabs above them reads as two competing menus.
+  if (pathname === "/client-relations") return null;
+  // Everything else (including a client's own page) belongs to Clients
+  // unless a longer href says otherwise.
   const active =
-    pathname === "/client-relations"
-      ? ""
-      : (TABS.find((tab) => pathname.startsWith(tab.href) && tab.key !== "clients")?.key ??
-        "clients");
+    TABS.find((tab) => pathname.startsWith(tab.href) && tab.key !== "clients")?.key ?? "clients";
   return <NavTabs tabs={[...TABS]} active={active} />;
 }

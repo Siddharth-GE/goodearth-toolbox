@@ -16,7 +16,9 @@ const TABS = [
 
 export function FmNav() {
   const pathname = usePathname();
-  // The tool root is the welcome screen — no tab lit there.
-  const active = TABS.find((tab) => pathname.startsWith(tab.href))?.key ?? "";
+  // The tool root is the welcome screen, which carries its own doors —
+  // showing the tabs above them reads as two competing menus.
+  if (pathname === "/financial-management") return null;
+  const active = TABS.find((tab) => pathname.startsWith(tab.href))?.key ?? "cash";
   return <NavTabs tabs={[...TABS]} active={active} />;
 }
