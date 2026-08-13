@@ -150,22 +150,17 @@ export function ReportDocument({
         {result.groups ? (
           <GroupedTable dataset={dataset} spec={spec} result={result} />
         ) : (
-          <DetailTable dataset={dataset} spec={spec} result={result} />
+          <DetailTable dataset={dataset} result={result} />
         )}
       </DocumentPage>
     </Document>
   );
 }
 
-function DetailTable({
-  dataset,
-  spec,
-  result,
-}: {
-  dataset: DatasetDef;
-  spec: ReportSpec;
-  result: ReportResult;
-}) {
+// No `spec` here on purpose: an ungrouped report prints the columns the
+// result carries, so the detail table needs the dataset's labels and the
+// rows, nothing about how the report was specified.
+function DetailTable({ dataset, result }: { dataset: DatasetDef; result: ReportResult }) {
   const columns: Column<Record<string, ReportValue>>[] = result.columns.map((key) => {
     const field = dataset.fields[key];
     const numeric = field.type === "number" || field.type === "money";
