@@ -62,9 +62,9 @@ TODO.md required.
       three placeholder pages, grant warning.
 - [x] 2. Funding end to end: interest.ts + tests, facility/movement
       queries and actions, list + detail screens, dialogs.
-- [ ] 3. Cash dashboard: cashflow.ts + tests, KPI band, in/out grouped
+- [x] 3. Cash dashboard: cashflow.ts + tests, KPI band, in/out grouped
       bars, money-out stack.
-- [ ] 4. Forward view: forwardCollections/fundingGap, screen.
+- [x] 4. Forward view: forwardCollections/fundingGap, screen.
 - [ ] 5. Docs (CLAUDE.md contract row + money-exception paragraph,
       STATUS.md, TODO.md), probe grant matrix, founder sign-off,
       merge.

@@ -11,11 +11,14 @@ import {
   bucketMonthly,
   buildInOutModel,
   buildOutflowStackModel,
+  forwardCollections,
+  fundingGap,
   lastMonths,
   monthLabel,
   nextMonths,
   sumAmounts,
   type DatedAmount,
+  type ForwardMilestone,
 } from "./cashflow";
 
 const TODAY = "2026-08-13";
@@ -105,4 +108,74 @@ test("the outflow stack keeps streams in hand-in order with stable colours", () 
 test("month labels always carry the year", () => {
   assert.equal(monthLabel("2026-01"), "Jan 2026");
   assert.equal(monthLabel("2025-12"), "Dec 2025");
+});
+
+const rung = (over: Partial<ForwardMilestone>): ForwardMilestone => ({
+  engagementId: "e1",
+  sortOrder: 10,
+  dueAmount: 1000,
+  dueOn: "2026-09-01",
+  receivedAmount: 0,
+  ...over,
+});
+
+test("forward collections split into months, overdue and unscheduled", () => {
+  const result = forwardCollections(
+    [
+      rung({ sortOrder: 10, dueOn: "2026-05-01" }),
+      rung({ sortOrder: 20, dueOn: "2026-09-15", dueAmount: 2000 }),
+      rung({ sortOrder: 30, dueOn: null, dueAmount: 500 }),
+      rung({ sortOrder: 40, dueAmount: null, dueOn: null }),
+    ],
+    new Map(),
+    TODAY,
+  );
+  assert.equal(result.overdue, 1000);
+  assert.equal(result.byMonth.get("2026-09"), 2000);
+  assert.equal(result.unscheduled, 500);
+  assert.equal(result.toCome, 3500);
+});
+
+test("an unallocated receipt settles the oldest unpaid rung of its own engagement", () => {
+  const result = forwardCollections(
+    [
+      rung({ sortOrder: 10, dueOn: "2026-05-01" }),
+      rung({ sortOrder: 20, dueOn: "2026-09-15" }),
+      rung({ engagementId: "e2", sortOrder: 10, dueOn: "2026-05-01" }),
+    ],
+    new Map([["e1", 1200]]),
+    TODAY,
+  );
+  // e1's pool clears its overdue rung and takes 200 off September;
+  // e2's identical overdue rung is untouched — its own ledger.
+  assert.equal(result.overdue, 1000);
+  assert.equal(result.byMonth.get("2026-09"), 800);
+});
+
+test("a settled rung and a rung due later today's month both land where they should", () => {
+  const result = forwardCollections(
+    [
+      rung({ sortOrder: 10, dueOn: "2026-08-20" }),
+      rung({ sortOrder: 20, dueOn: "2026-08-01", receivedAmount: 1000 }),
+    ],
+    new Map(),
+    TODAY,
+  );
+  // Due later this month is coming, not overdue; the fully-received rung
+  // vanishes from every figure.
+  assert.equal(result.byMonth.get("2026-08"), 1000);
+  assert.equal(result.overdue, 0);
+  assert.equal(result.toCome, 1000);
+});
+
+test("the funding gap subtracts what is coming and what is undrawn", () => {
+  const gap = fundingGap({
+    remainingSpend: 10_000,
+    collectionsToCome: 6000,
+    undrawnSanctioned: 3000,
+  });
+  assert.equal(gap, 1000);
+  assert.ok(
+    fundingGap({ remainingSpend: 5000, collectionsToCome: 6000, undrawnSanctioned: 0 }) < 0,
+  );
 });

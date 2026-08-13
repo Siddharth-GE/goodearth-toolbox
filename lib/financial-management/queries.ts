@@ -4,7 +4,7 @@ import { requireTool } from "@/lib/auth/access";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { cache } from "react";
-import type { DatedAmount } from "./cashflow";
+import type { DatedAmount, ForwardMilestone } from "./cashflow";
 import { facilityPosition, todayInIndia, type FacilityPosition } from "./interest";
 import type { FacilityKind, MovementKind } from "./kinds";
 
@@ -258,6 +258,105 @@ export async function getCashPosition(): Promise<CashPosition> {
     drawdowns: byKind("drawdown"),
     repayments: byKind("repayment"),
     interestPaid: byKind("interest"),
+  };
+}
+
+export type TargetRow = {
+  id: string;
+  projectName: string;
+  planName: string;
+  revenue: number;
+  totalCost: number;
+  actualSpend: number;
+  actualCollections: number;
+};
+
+export type ForwardView = {
+  milestones: ForwardMilestone[];
+  /** engagement id → receipts not yet filed against a rung. */
+  unallocatedByEngagement: Map<string, number>;
+  targets: TargetRow[];
+  /** Sanctioned but undrawn across active facilities — headroom. */
+  undrawnSanctioned: number;
+};
+
+/**
+ * Everything the Forward screen reasons over: the payment schedules
+ * (crm_milestone_facts), the receipts not yet filed against a rung
+ * (crm_receipt_facts), the published plan targets, and the facilities'
+ * undrawn headroom. The spillover arithmetic lives in cashflow.ts.
+ */
+export async function getForwardView(): Promise<ForwardView> {
+  await requireTool("/financial-management");
+  const supabase = await createClient();
+
+  const [milestones, unallocated, targets, facilities] = await Promise.all([
+    fetchAll((from, to) =>
+      supabase
+        .from("crm_milestone_facts")
+        .select("id, engagement_id, sort_order, due_amount, due_on, received_amount")
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAll((from, to) =>
+      supabase
+        .from("crm_receipt_facts")
+        .select("id, engagement_id, amount")
+        .is("milestone_id", null)
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAll((from, to) =>
+      supabase
+        .from("business_plan_target_facts")
+        .select(
+          "id, project_name, plan_name, revenue, total_cost, actual_spend, actual_collections",
+        )
+        .order("id")
+        .range(from, to),
+    ),
+    listFacilities(),
+  ]);
+
+  const unallocatedByEngagement = new Map<string, number>();
+  for (const receipt of unallocated) {
+    if (receipt.engagement_id === null || receipt.amount === null) continue;
+    unallocatedByEngagement.set(
+      receipt.engagement_id,
+      (unallocatedByEngagement.get(receipt.engagement_id) ?? 0) + receipt.amount,
+    );
+  }
+
+  return {
+    milestones: milestones
+      .filter((row) => row.id !== null && row.engagement_id !== null)
+      .map((row) => ({
+        engagementId: row.engagement_id ?? "",
+        sortOrder: row.sort_order ?? 0,
+        dueAmount: row.due_amount,
+        dueOn: row.due_on,
+        receivedAmount: row.received_amount ?? 0,
+      })),
+    unallocatedByEngagement,
+    targets: targets
+      .filter((row) => row.id !== null)
+      .map((row) => ({
+        id: row.id ?? "",
+        projectName: row.project_name ?? "—",
+        planName: row.plan_name ?? "—",
+        revenue: row.revenue ?? 0,
+        totalCost: row.total_cost ?? 0,
+        actualSpend: row.actual_spend ?? 0,
+        actualCollections: row.actual_collections ?? 0,
+      })),
+    undrawnSanctioned: facilities.reduce(
+      (sum, facility) =>
+        sum +
+        (facility.isActive && facility.sanctionedAmount !== null
+          ? Math.max(0, facility.sanctionedAmount - facility.position.drawn)
+          : 0),
+      0,
+    ),
   };
 }
 

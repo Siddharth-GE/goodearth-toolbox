@@ -13,8 +13,11 @@
  *     into one — it is returned separately for the screen to state.
  */
 
-import { chartToken } from "@/lib/charts/palette";
+import { ACCENT_TOKEN, chartToken } from "@/lib/charts/palette";
 import type { CartesianModel, ChartPoint } from "@/lib/charts/series";
+
+/** Money either side of a rounding boundary counts as settled. */
+const EPSILON = 0.005;
 
 export type DatedAmount = {
   amount: number;
@@ -126,6 +129,117 @@ export function buildInOutModel(args: {
     ],
     money: true,
   };
+}
+
+/** One stream over the window in the brand accent — the single-series rule. */
+export function buildMonthlySeriesModel(args: {
+  id: string;
+  label: string;
+  byMonth: ReadonlyMap<string, number>;
+  months: readonly string[];
+}): CartesianModel {
+  return {
+    kind: "cartesian",
+    type: "bar",
+    categoryLabel: "Month",
+    points: args.months.map((key) => ({
+      category: monthLabel(key),
+      values: { [args.id]: args.byMonth.get(key) ?? 0 },
+    })),
+    series: [{ id: args.id, label: args.label, color: ACCENT_TOKEN }],
+    money: true,
+  };
+}
+
+export type ForwardMilestone = {
+  engagementId: string;
+  sortOrder: number;
+  /** Null until someone has decided the amount — not the same as zero. */
+  dueAmount: number | null;
+  dueOn: string | null;
+  /** Receipts allocated to this rung, from crm_milestone_facts. */
+  receivedAmount: number;
+};
+
+export type ForwardCollections = {
+  /** Outstanding rung money bucketed by due month (today's month onward). */
+  byMonth: Map<string, number>;
+  /** Outstanding on rungs whose due date has already passed. */
+  overdue: number;
+  /** Outstanding on priced rungs with no due date — never invented into a month. */
+  unscheduled: number;
+  /** Everything above, added up. */
+  toCome: number;
+};
+
+/**
+ * What the payment schedules say is still coming, and when.
+ *
+ * AN UNALLOCATED RECEIPT SETTLES THE OLDEST UNPAID RUNG FIRST, within
+ * its own engagement — client-relations' dues.ts rule, restated here
+ * (never imported: one tool never imports another tool's code) so this
+ * screen and the CRM Dues page cannot disagree about what is owed.
+ * Money often arrives before anyone files it against a rung; ignoring
+ * it would show money already in the bank as still to come.
+ */
+export function forwardCollections(
+  milestones: readonly ForwardMilestone[],
+  unallocatedByEngagement: ReadonlyMap<string, number>,
+  today: string,
+): ForwardCollections {
+  const byEngagement = new Map<string, ForwardMilestone[]>();
+  for (const milestone of milestones) {
+    const list = byEngagement.get(milestone.engagementId) ?? [];
+    list.push(milestone);
+    byEngagement.set(milestone.engagementId, list);
+  }
+
+  const byMonth = new Map<string, number>();
+  let overdue = 0;
+  let unscheduled = 0;
+
+  for (const [engagementId, rungs] of byEngagement) {
+    let pool = unallocatedByEngagement.get(engagementId) ?? 0;
+    const ordered = [...rungs].sort((a, b) => a.sortOrder - b.sortOrder);
+    for (const rung of ordered) {
+      // An unpriced rung is not zero — and absorbs nothing.
+      if (rung.dueAmount === null) continue;
+      let received = rung.receivedAmount;
+      if (pool > 0 && rung.dueAmount - received > EPSILON) {
+        const take = Math.min(pool, rung.dueAmount - received);
+        received += take;
+        pool -= take;
+      }
+      const outstanding = Math.max(0, rung.dueAmount - received);
+      if (outstanding <= EPSILON) continue;
+
+      if (rung.dueOn === null) {
+        unscheduled += outstanding;
+      } else if (rung.dueOn < today) {
+        overdue += outstanding;
+      } else {
+        const key = monthKey(rung.dueOn);
+        byMonth.set(key, (byMonth.get(key) ?? 0) + outstanding);
+      }
+    }
+  }
+
+  let scheduled = 0;
+  for (const value of byMonth.values()) scheduled += value;
+  return { byMonth, overdue, unscheduled, toCome: scheduled + overdue + unscheduled };
+}
+
+/**
+ * What still has to be found: remaining expected spend, less the
+ * collections still to come, less the sanctioned money not yet drawn.
+ * Positive = money to raise; negative = covered on paper.
+ */
+export function fundingGap(args: {
+  remainingSpend: number;
+  collectionsToCome: number;
+  undrawnSanctioned: number;
+}): number {
+  return args.remainingSpend - args.collectionsToCome - args.undrawnSanctioned;
 }
 
 /**
