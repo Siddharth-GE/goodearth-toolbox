@@ -108,6 +108,28 @@ const SPEND_VS_BUDGET = {
   },
 };
 
+// One dataset — milestones — never a join to receipts (the registry
+// explains the fan-out). received_amount is the view's own per-rung
+// aggregate, so due, received and balance all live on one row.
+const SALES_COLLECTIONS = {
+  dataset: "crm_milestones",
+  columns: ["project", "unit", "client", "stage", "due_amount", "received_amount", "balance_due", "due_on"], // prettier-ignore
+  filters: [],
+  groupBy: ["project"],
+  measures: [
+    { field: "due_amount", agg: "sum" },
+    { field: "received_amount", agg: "sum" },
+    { field: "balance_due", agg: "sum" },
+  ],
+  sort: [{ field: "balance_due", dir: "desc" }],
+  limit: 100,
+  chart: {
+    type: "bar",
+    category: "project",
+    measures: ["due_amount:sum", "received_amount:sum"],
+  },
+};
+
 export const STARTERS: Starter[] = [
   {
     id: "starter-site-procurement",
@@ -123,12 +145,20 @@ export const STARTERS: Starter[] = [
       "What each approved budget commits us to spend, project by project, beside the client value quoted on the same lines — and the margin between them.",
     spec: parseReportSpec(SPEND_VS_BUDGET),
   },
+  {
+    id: "starter-sales-collections",
+    name: "Sales & collections",
+    description:
+      "What clients owe against every payment milestone, what has come in, and the balance still to collect — project by project. Receipts not yet matched to a milestone are in the Client receipts data set.",
+    spec: parseReportSpec(SALES_COLLECTIONS),
+  },
 ];
 
 /** The raw specs, for the test that proves they parse without loss. */
 export const STARTER_SOURCES: Record<string, unknown> = {
   "starter-site-procurement": SITE_PROCUREMENT,
   "starter-spend-vs-budget": SPEND_VS_BUDGET,
+  "starter-sales-collections": SALES_COLLECTIONS,
 };
 
 /** A starter by id, or null. Never throws on an unknown id. */

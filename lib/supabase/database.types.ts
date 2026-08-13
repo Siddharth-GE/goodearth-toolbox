@@ -796,6 +796,13 @@ export type Database = {
             referencedColumns: ["id", "engagement_id"]
           },
           {
+            foreignKeyName: "client_receipts_milestone_fkey"
+            columns: ["milestone_id", "engagement_id"]
+            isOneToOne: false
+            referencedRelation: "crm_milestone_facts"
+            referencedColumns: ["id", "engagement_id"]
+          },
+          {
             foreignKeyName: "client_receipts_updated_by_fkey"
             columns: ["updated_by"]
             isOneToOne: false
@@ -4421,6 +4428,119 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_milestone_facts: {
+        Row: {
+          client_id: string | null
+          client_name: string | null
+          created_at: string | null
+          due_amount: number | null
+          due_on: string | null
+          engagement_id: string | null
+          id: string | null
+          invoice_no: string | null
+          invoiced_on: string | null
+          project_id: string | null
+          project_name: string | null
+          received_amount: number | null
+          sort_order: number | null
+          stage: string | null
+          unit_id: string | null
+          unit_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_engagements_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_engagements_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: true
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_payment_milestones_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "client_engagements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "units_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_receipt_facts: {
+        Row: {
+          amount: number | null
+          client_id: string | null
+          client_name: string | null
+          created_at: string | null
+          engagement_id: string | null
+          id: string | null
+          milestone_id: string | null
+          milestone_stage: string | null
+          mode: string | null
+          project_id: string | null
+          project_name: string | null
+          received_on: string | null
+          reference: string | null
+          unit_id: string | null
+          unit_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_engagements_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_engagements_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: true
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_receipts_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "client_engagements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_receipts_milestone_fkey"
+            columns: ["milestone_id", "engagement_id"]
+            isOneToOne: false
+            referencedRelation: "client_payment_milestones"
+            referencedColumns: ["id", "engagement_id"]
+          },
+          {
+            foreignKeyName: "client_receipts_milestone_fkey"
+            columns: ["milestone_id", "engagement_id"]
+            isOneToOne: false
+            referencedRelation: "crm_milestone_facts"
+            referencedColumns: ["id", "engagement_id"]
+          },
+          {
+            foreignKeyName: "units_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
         ]

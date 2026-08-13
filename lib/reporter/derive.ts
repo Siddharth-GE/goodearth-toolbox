@@ -65,4 +65,15 @@ export const DERIVED: Record<string, (row: Record<string, unknown>) => number | 
     if (cost === null || client === null) return null;
     return client - cost;
   },
+  /**
+   * What is still to collect on a milestone: due − received. Null when
+   * no due amount is set (an unpriced rung is not "fully collected");
+   * received defaults to 0 because the view coalesces it — a rung
+   * nobody has paid genuinely has received 0.
+   */
+  crm_balance_due: (row) => {
+    const due = num(row.due_amount);
+    if (due === null) return null;
+    return due - (num(row.received_amount) ?? 0);
+  },
 };
