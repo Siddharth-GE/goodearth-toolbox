@@ -22,7 +22,7 @@ import type { GroupRow, ReportResult, ReportValue } from "@/lib/reporter/aggrega
 import { DATASETS, type FieldType } from "@/lib/reporter/datasets";
 import { measureId, type ReportSpec } from "@/lib/reporter/spec";
 
-import { measureLabel } from "./labels";
+import { measureLabel } from "@/lib/reporter/labels";
 
 function formatValue(type: FieldType, value: ReportValue): string {
   if (value === null) return "—";

@@ -1,15 +1,17 @@
 # Reporter — build notes
 
-**Stages 1–4 are built and merged** (2026-08-12): the rename (`0052`), the
+**Stages 1–5 are built and merged** (2026-08-12): the rename (`0052`), the
 builder pipeline over one dataset (registry, `parseReportSpec`, the pure
 aggregation engine, the screens), charts (`recharts`, the `--chart-1…8`
 tokens, `components/ui/chart/*`, `lib/charts/{palette,series}.ts`, KPI band —
-a report is a composed page), and CSV (`lib/csv.ts` shared with Selections,
-`lib/reporter/csv-rows.ts`). Three decisions arrived during build and bind the
+a report is a composed page), CSV (`lib/csv.ts` shared with Selections,
+`lib/reporter/csv-rows.ts`), and saved reports (`0054`, `starters.ts`, the
+`[reportId]` screen). Three decisions arrived during build and bind the
 remaining stages: **every filter is a dropdown** (decision 8 below), **a
 meter carries two measures** — the value, then the limit — and **a distinct
-count counts things, not labels** (decision 9 below). Stages 5–10 are still to
-come. Read this before touching the tool.
+count counts things, not labels** (decision 9 below). Stages 6–10 are still to
+come, and **Stage 6 is the money — it ships alone.** Read this before
+touching the tool.
 
 Planned with the founder on 2026-08-11. Ten stages, each shippable on its own.
 
@@ -276,7 +278,8 @@ lib/reporter/datasets.ts    PURE — the registry, and the whitelist
 lib/reporter/spec.ts        PURE — parseReportSpec(): THE BOUNDARY
 lib/reporter/aggregate.ts   PURE — grouping, aggregation, subtotals, totals
 lib/reporter/derive.ts      PURE — line value, GST, margin arithmetic
-lib/reporter/starters.ts    PURE — the seven starting points, as constants
+lib/reporter/starters.ts    PURE — the starting points, as constants; one ships per stage
+lib/reporter/labels.ts      PURE — the plain-English words page, chart and CSV share
 lib/reporter/queries.ts     server-only — the ONLY file touching Supabase
 lib/reporter/actions.ts     server-only — save / rename / delete, ActionState
 lib/charts/{palette,series}.ts         PURE — see above
@@ -489,7 +492,7 @@ app/(dashboard)/reporter/PLAN.md
 + loading.tsx in every route segment (shared Spinner, house rule)
 ```
 
-`[reportId]` accepts a `reports.id` uuid **or** a `starter:*` id — one screen, one
+`[reportId]` accepts a `reports.id` uuid **or** a `starter-*` id — one screen, one
 code path, resolved by `getReport(id)`.
 
 Client components in `_components/`: `report-builder` (owns spec state, writes
@@ -512,10 +515,13 @@ surface gap between bars and stacked segments, tooltip on `surface-raised` with
 
 ## The seven starters are code constants, not seeded rows
 
-`lib/reporter/starters.ts`, ids `starter:project-scorecard`,
-`starter:sales-collections`, `starter:spend-vs-budget`,
-`starter:site-procurement`, `starter:stock-position`, `starter:plan-vs-actual`,
-`starter:design-delivery` — **each shipping with its chart already configured**,
+`lib/reporter/starters.ts`, ids `starter-project-scorecard`,
+`starter-sales-collections`, `starter-spend-vs-budget`,
+`starter-site-procurement`, `starter-stock-position`, `starter-plan-vs-actual`,
+`starter-design-delivery` — **each shipping with its chart already configured**.
+_(Hyphens, not the colons this plan first specified: a starter id is a URL path
+segment, and a colon read fine to Next's own routing but 404'd on the deployed
+preview. `starters.test.ts` now asserts an id survives a URL untouched.)_
 so a starting point opens as a designed page rather than a blank grid.
 
 Because: a seeded row cannot be corrected under additive-only migrations
@@ -541,18 +547,18 @@ sign-off. Migration applied before its code merges. Smoke-tested as the **probe
 account holding only the relevant grant** — an admin passes every check and never
 sees grant bugs.
 
-| #      | What ships                                                                                                                                                                                                                                                                                     | Browser check                                                                                                                                                                                                                                               |
-| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **1**  | **The rename, alone.** `0052`; `lib/tools.ts` → `{name:"Reporter", href:"/reporter", icon:"FileChartColumn"}`, `FileChartColumn` into `TOOL_ICONS`, `LayoutDashboard` out (an unused import fails lint, and CI stops at the first failure); folder `management-dashboard/` → `reporter/`; docs | Sidebar says Reporter with the new icon; Settings shows a Reporter checkbox; grant to the probe, probe sees it; remove it, probe doesn't                                                                                                                    |
-| **2**  | **One dataset, table on screen.** Registry (`indent_lines` only), `spec.ts`, `aggregate.ts`, `derive.ts`, `queries.ts`, builder screens, `built: true`. Chosen because `indents`/`indent_lines` are already readable by all authenticated — **zero RLS risk**, full pipeline exercised         | Pick columns, filter by project, group by item, sort, see subtotals and a grand total — as the probe holding only `/reporter`                                                                                                                               |
-| **3**  | **Charts.** Add `recharts`; `--chart-1…8` tokens light+dark; `lib/charts/{palette,series}.ts`; `components/ui/chart/*` themed wrappers; the chart card; KPI band via `FigureBand`; chart picker in the builder                                                                                 | Bar, line, stacked and meter all render; hover tooltips; switch a report between forms; check light **and** dark; check on a phone; confirm the Reporter route is the only bundle that grew                                                                 |
-| **4**  | **CSV.** ✅ `lib/csv.ts` + tests, Selections route refactored (byte-identical), `lib/reporter/csv-rows.ts` + tests, `run/csv` route (the `[reportId]` one lands with Stage 5). The download carries EVERY matched line — the row limit is a screen setting                                     | Download, open in Excel, no mangled characters, no formula rows; Selections' existing CSV unchanged                                                                                                                                                         |
-| **5**  | **Saved reports.** `0054`, `actions.ts`, list screen, the money-free starters (Site & procurement, Design & delivery)                                                                                                                                                                          | Save, reopen, rename, "Save a copy" of a starter, be refused deleting someone else's                                                                                                                                                                        |
-| **6**  | **The money — ships alone.** `0055`; register `po_lines`, `bills`, `budget_report_lines`; starter: Spend vs budget                                                                                                                                                                             | Probe with only `/reporter` sees rates, bill amounts **and margin**; probe with only `/indents` sees no rates anywhere; probe with only `/reporter` still cannot open `/purchase-orders`; then press one real write button on Purchase Orders on production |
-| **7**  | **Sales & collections.** `0056`, two CRM datasets, starter                                                                                                                                                                                                                                     | Totals reconcile against Client Relations' own screens for one villa — if they don't, the fan-out bug is present                                                                                                                                            |
-| **8**  | **The rest.** `goods_receipt_lines`, `stock`, `selection_lines`, `relay_chains`, `units`; starters: Project scorecard, Stock position                                                                                                                                                          | Open every one of the five new datasets by hand — a bad `select` is invisible to lint, types, tests and build                                                                                                                                               |
-| **9**  | **PDF.** `lib/pdf/chart.tsx` — `renderToStaticMarkup` → `sharp` → PNG → react-pdf `<Image>`; print palette (literal hexes) in `lib/pdf/theme.ts`; `report-document.tsx`; two routes                                                                                                            | The same report on screen and on paper, chart included, and they match; **check the rasterised axis/label typeface on a real PDF** — `sharp` will not have Geist                                                                                            |
-| **10** | **Plan vs actual.** `0057`, Business Planning gains the project field and publishes targets, Reporter reads the view, starter                                                                                                                                                                  | Set a plan's project, save, see planned vs real side by side                                                                                                                                                                                                |
+| #      | What ships                                                                                                                                                                                                                                                                                                                                               | Browser check                                                                                                                                                                                                                                               |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **1**  | **The rename, alone.** `0052`; `lib/tools.ts` → `{name:"Reporter", href:"/reporter", icon:"FileChartColumn"}`, `FileChartColumn` into `TOOL_ICONS`, `LayoutDashboard` out (an unused import fails lint, and CI stops at the first failure); folder `management-dashboard/` → `reporter/`; docs                                                           | Sidebar says Reporter with the new icon; Settings shows a Reporter checkbox; grant to the probe, probe sees it; remove it, probe doesn't                                                                                                                    |
+| **2**  | **One dataset, table on screen.** Registry (`indent_lines` only), `spec.ts`, `aggregate.ts`, `derive.ts`, `queries.ts`, builder screens, `built: true`. Chosen because `indents`/`indent_lines` are already readable by all authenticated — **zero RLS risk**, full pipeline exercised                                                                   | Pick columns, filter by project, group by item, sort, see subtotals and a grand total — as the probe holding only `/reporter`                                                                                                                               |
+| **3**  | **Charts.** Add `recharts`; `--chart-1…8` tokens light+dark; `lib/charts/{palette,series}.ts`; `components/ui/chart/*` themed wrappers; the chart card; KPI band via `FigureBand`; chart picker in the builder                                                                                                                                           | Bar, line, stacked and meter all render; hover tooltips; switch a report between forms; check light **and** dark; check on a phone; confirm the Reporter route is the only bundle that grew                                                                 |
+| **4**  | **CSV.** ✅ `lib/csv.ts` + tests, Selections route refactored (byte-identical), `lib/reporter/csv-rows.ts` + tests, `run/csv` route (the `[reportId]` one lands with Stage 5). The download carries EVERY matched line — the row limit is a screen setting                                                                                               | Download, open in Excel, no mangled characters, no formula rows; Selections' existing CSV unchanged                                                                                                                                                         |
+| **5**  | **Saved reports.** ✅ `0054`, `actions.ts`, `starters.ts`, the list screen, the `[reportId]` screen and its CSV route. **One starter, not two**: Design & delivery needs `selection_lines`, which arrives at Stage 8 — a starter over a dataset that does not exist fails its own test and would be a broken tile. Starters now ship WITH their data set | Save, reopen, rename, "Save a copy" of a starter, be refused deleting someone else's                                                                                                                                                                        |
+| **6**  | **The money — ships alone.** `0055`; register `po_lines`, `bills`, `budget_report_lines`; starter: Spend vs budget                                                                                                                                                                                                                                       | Probe with only `/reporter` sees rates, bill amounts **and margin**; probe with only `/indents` sees no rates anywhere; probe with only `/reporter` still cannot open `/purchase-orders`; then press one real write button on Purchase Orders on production |
+| **7**  | **Sales & collections.** `0056`, two CRM datasets, starter                                                                                                                                                                                                                                                                                               | Totals reconcile against Client Relations' own screens for one villa — if they don't, the fan-out bug is present                                                                                                                                            |
+| **8**  | **The rest.** `goods_receipt_lines`, `stock`, `selection_lines`, `relay_chains`, `units`; starters: Project scorecard, Stock position                                                                                                                                                                                                                    | Open every one of the five new datasets by hand — a bad `select` is invisible to lint, types, tests and build                                                                                                                                               |
+| **9**  | **PDF.** `lib/pdf/chart.tsx` — `renderToStaticMarkup` → `sharp` → PNG → react-pdf `<Image>`; print palette (literal hexes) in `lib/pdf/theme.ts`; `report-document.tsx`; two routes                                                                                                                                                                      | The same report on screen and on paper, chart included, and they match; **check the rasterised axis/label typeface on a real PDF** — `sharp` will not have Geist                                                                                            |
+| **10** | **Plan vs actual.** `0057`, Business Planning gains the project field and publishes targets, Reporter reads the view, starter                                                                                                                                                                                                                            | Set a plan's project, save, see planned vs real side by side                                                                                                                                                                                                |
 
 ---
 

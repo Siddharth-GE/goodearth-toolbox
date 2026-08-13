@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { requireTool } from "@/lib/auth/access";
 import { cleanSearch } from "@/lib/masters/paged";
 import { listProjects } from "@/lib/masters/projects";
@@ -10,7 +12,14 @@ import { formatCount } from "@/lib/format";
 
 import { extractRows, runReport, type ReportResult } from "./aggregate";
 import { DATASETS } from "./datasets";
-import { MAX_REPORT_ROWS, type ReportFilter, type ReportSpec } from "./spec";
+import { getStarter, isStarterId } from "./starters";
+import {
+  describeSpecLoss,
+  MAX_REPORT_ROWS,
+  parseReportSpec,
+  type ReportFilter,
+  type ReportSpec,
+} from "./spec";
 
 // The ONLY Reporter file that touches Supabase. Reads run under the
 // signed-in user's own RLS through the normal server client — Reporter
@@ -145,6 +154,162 @@ export async function runSpec(spec: ReportSpec): Promise<RunOutcome> {
  */
 export async function runSpecForCsv(spec: ReportSpec): Promise<RunOutcome> {
   return runSpec({ ...spec, limit: MAX_REPORT_ROWS });
+}
+
+// ---------------------------------------------------------------------
+// Saved reports
+// ---------------------------------------------------------------------
+// A saved report is a NAME and a SPEC — a question, not an answer. It
+// holds no figures: running it re-reads the live tables through the
+// reader's own RLS, so the same report shows each person exactly what
+// that person is allowed to see.
+
+export type ReportSummary = {
+  id: string;
+  name: string;
+  description: string | null;
+  /** The dataset's label, or its key if the dataset has since gone. */
+  datasetLabel: string;
+  /** False when the spec names a dataset that no longer exists. */
+  datasetExists: boolean;
+  updated_at: string;
+  updated_by_name: string | null;
+};
+
+export type LoadedReport = {
+  id: string;
+  name: string;
+  description: string | null;
+  spec: ReportSpec;
+  /** True for a `starter-*` id — read-only, "Save a copy" only. */
+  starter: boolean;
+  /** Whether THIS user may delete it: their own, or an admin. */
+  canDelete: boolean;
+  updated_at: string | null;
+  updated_by_name: string | null;
+};
+
+/**
+ * Every saved report, newest touch first. fetchAll rather than a plain
+ * select: this is the only way to reach a saved report, so a silent
+ * 1,000-row cap would one day hide one.
+ */
+export async function listReports(): Promise<ReportSummary[]> {
+  await requireTool("/reporter");
+  const supabase = await createClient();
+
+  const rows = await fetchAll((from, to) =>
+    supabase
+      .from("reports")
+      .select("id, name, description, dataset, updated_at, updated_by")
+      .order("updated_at", { ascending: false })
+      .order("id")
+      .range(from, to),
+  );
+
+  const names = await lookupNames(rows.map((row) => row.updated_by));
+
+  return rows.map((row) => {
+    const dataset = DATASETS[row.dataset];
+    return {
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      datasetLabel: dataset?.label ?? row.dataset,
+      datasetExists: Boolean(dataset),
+      updated_at: row.updated_at,
+      updated_by_name: row.updated_by ? (names.get(row.updated_by) ?? null) : null,
+    };
+  });
+}
+
+/**
+ * One report by id — a `reports.id` uuid OR a `starter-*` id. One
+ * screen, one code path, resolved here.
+ *
+ * Returns null for "no such report" AND for "not visible to you": RLS
+ * makes those indistinguishable, and both end at notFound(), which is
+ * the right answer to either.
+ */
+export const getReport = cache(async (reportId: string): Promise<LoadedReport | null> => {
+  const user = await requireTool("/reporter");
+
+  if (isStarterId(reportId)) {
+    const starter = getStarter(reportId);
+    if (!starter) return null;
+    return {
+      id: starter.id,
+      name: starter.name,
+      description: starter.description,
+      spec: starter.spec,
+      starter: true,
+      canDelete: false,
+      updated_at: null,
+      updated_by_name: null,
+    };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("reports")
+    .select("id, name, description, spec, created_by, updated_at, updated_by")
+    .eq("id", reportId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("getReport failed:", error);
+    return null;
+  }
+  if (!data) return null;
+
+  const names = await lookupNames([data.updated_by]);
+
+  return {
+    id: data.id,
+    name: data.name,
+    description: data.description,
+    // The stored spec is untrusted in exactly the way a URL is: it was
+    // written by an older version of this code. Unknown keys are
+    // dropped rather than thrown, so an old report still opens.
+    spec: parseReportSpec(data.spec),
+    starter: false,
+    // Mirrors the DELETE policy in 0054. The screen hides what the
+    // database would refuse, rather than offering a button that fails.
+    canDelete: user.profile?.role === "admin" || data.created_by === user.id,
+    updated_at: data.updated_at,
+    updated_by_name: data.updated_by ? (names.get(data.updated_by) ?? null) : null,
+  };
+});
+
+/** What `describeSpecLoss` would say about a stored report, for the screen. */
+export async function getReportSpecLoss(reportId: string): Promise<string[]> {
+  await requireTool("/reporter");
+  if (isStarterId(reportId)) return [];
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("reports")
+    .select("spec")
+    .eq("id", reportId)
+    .maybeSingle();
+  if (error || !data) return [];
+  return describeSpecLoss(data.spec);
+}
+
+/** Profile ids to display names, in one query, skipping the nulls. */
+async function lookupNames(ids: (string | null)[]): Promise<Map<string, string | null>> {
+  const unique = [...new Set(ids.filter((id): id is string => id != null))];
+  if (unique.length === 0) return new Map();
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("profiles").select("id, full_name").in("id", unique);
+  if (error) {
+    // A missing name is cosmetic — the report still opens, the byline
+    // just shows a dash. Not worth failing a page over.
+    console.error("lookupNames failed:", error);
+    return new Map();
+  }
+  return new Map((data ?? []).map((profile) => [profile.id, profile.full_name]));
 }
 
 export type ProjectOption = { id: string; name: string };

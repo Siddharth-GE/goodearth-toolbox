@@ -16,10 +16,11 @@
  * money does not tally.
  */
 
-import { csvRow, safeFilename } from "@/lib/csv";
+import { csvResponse, csvRow, safeFilename } from "@/lib/csv";
 
 import type { ReportResult, ReportValue } from "./aggregate";
 import type { DatasetDef, FieldType } from "./datasets";
+import { measureLabel } from "./labels";
 import { measureId, type ReportSpec } from "./spec";
 
 /**
@@ -111,4 +112,30 @@ export function reportCsvRows(
     ]),
   );
   return rows;
+}
+
+/**
+ * A finished report as a download — what both CSV routes return, so an
+ * unsaved report and a saved one cannot produce different files. The
+ * headings come from the one `measureLabel()` the table and the chart
+ * use, so the three can never disagree about what a column is called.
+ */
+export function reportCsvResponse(
+  dataset: DatasetDef,
+  spec: ReportSpec,
+  result: ReportResult,
+): Response {
+  const rows = reportCsvRows(
+    dataset,
+    spec,
+    result,
+    Object.fromEntries(
+      spec.measures.map((measure) => [
+        measureId(measure),
+        measureLabel(dataset.fields[measure.field].label, measure.agg),
+      ]),
+    ),
+  );
+  const today = new Date().toISOString().slice(0, 10);
+  return csvResponse(rows, reportCsvFilename(dataset, today));
 }
