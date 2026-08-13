@@ -65,9 +65,9 @@ TODO.md required.
 - [x] 3. Cash dashboard: cashflow.ts + tests, KPI band, in/out grouped
       bars, money-out stack.
 - [x] 4. Forward view: forwardCollections/fundingGap, screen.
-- [ ] 5. Docs (CLAUDE.md contract row + money-exception paragraph,
+- [x] 5. Docs (CLAUDE.md contract row + money-exception paragraph,
       STATUS.md, TODO.md), probe grant matrix, founder sign-off,
-      merge.
+      merge (PR #17, 2026-08-13).
 
 ## Open items (confirm with the founder as they come up)
 

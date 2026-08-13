@@ -94,17 +94,16 @@ Wanted later, not asked for yet: a dashboard composer (several charts on one
 page — the true multi-dataset Project scorecard waits on it), and a
 sparkline for a second tool.
 
-**Financial Management is built** (2026-08-13, the founder session happened
-and the plan is its `PLAN.md`) — on `feature/financial-management`, waiting
-on the founder's browser pass before merge. What it needs next:
+**Financial Management shipped** (2026-08-13, PR #17 merged after founder
+sign-off; the plan is its `PLAN.md`). What it still needs:
 
-- **Founder sign-off on the preview**: create one real facility with its
-  real rate, record the real drawdowns, and check the accrued-interest
-  column against the bank's own statement before trusting it (the month-end
+- **Enter the real facilities**: each bank loan and investor with its real
+  rate and drawdown history, then check the accrued-interest column against
+  the bank's own statement once before trusting it (the month-end
   simple-accrual convention is stated on the screen).
 - **Grant `/financial-management`** to whoever should see it — the amber
   warning says what the grant means: every client's dues, every bill amount,
-  every loan and its terms.
+  every loan and its terms. Until then only admins see it.
 - Open items parked in its `PLAN.md`: opening balance (a true bank balance
   needs one), dated spend forecasting, partial bill payments, a possible
   `dividend` movement kind for equity.
