@@ -109,7 +109,7 @@ export async function createPlan(_state: ActionState, formData: FormData): Promi
     return { error: "Could not create the plan. Try again." };
   }
 
-  revalidatePath("/business-planning");
+  revalidatePath("/business-planning", "layout");
   // redirect() throws its own control-flow signal, so it must be outside
   // any try/catch and after every write has been checked.
   redirect(`/business-planning/${data.id}`);
@@ -154,7 +154,7 @@ export async function renamePlan(
   // The name and the link both live on the published targets row.
   await syncPlanTargets(planId, user.id);
 
-  revalidatePath("/business-planning");
+  revalidatePath("/business-planning", "layout");
   revalidatePath(`/business-planning/${planId}`);
   return undefined;
 }
@@ -196,7 +196,7 @@ export async function savePlan(planId: string, inputs: PlanInputs): Promise<Acti
 
   // Only the list page: revalidating this plan's own route mid-edit
   // would re-render the editor underneath the person typing into it.
-  revalidatePath("/business-planning");
+  revalidatePath("/business-planning", "layout");
   return undefined;
 }
 
@@ -242,7 +242,7 @@ export async function duplicatePlan(planId: string): Promise<ActionState> {
     return { error: "Could not duplicate the plan. Try again." };
   }
 
-  revalidatePath("/business-planning");
+  revalidatePath("/business-planning", "layout");
   redirect(`/business-planning/${data.id}`);
 }
 
@@ -261,6 +261,6 @@ export async function deletePlan(planId: string): Promise<ActionState> {
     return { error: "Could not delete the plan. Try again." };
   }
 
-  revalidatePath("/business-planning");
+  revalidatePath("/business-planning", "layout");
   return undefined;
 }

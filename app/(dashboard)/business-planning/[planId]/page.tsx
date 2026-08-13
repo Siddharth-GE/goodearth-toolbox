@@ -21,7 +21,7 @@ export default async function PlanPage({ params }: { params: Promise<{ planId: s
       <PageTitle
         title={plan.name}
         description={plan.location ?? undefined}
-        backHref="/business-planning"
+        backHref="/business-planning/plans"
         backLabel="All plans"
         actions={
           <div className="flex items-center gap-3">
