@@ -1,10 +1,12 @@
-import { ComingSoon } from "../_components/coming-soon";
-import { TOOL_ICONS, TOOLS } from "@/lib/tools";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Wallet } from "lucide-react";
 
-const tool = TOOLS.find((t) => t.href === "/financial-management")!;
-
-export default function FinancialManagementPage() {
+export default function CashPage() {
   return (
-    <ComingSoon icon={TOOL_ICONS[tool.icon]} title={tool.name} description={tool.description} />
+    <EmptyState
+      icon={Wallet}
+      title="Cash position"
+      description="Money in against money out, month by month. Coming in the next step."
+    />
   );
 }

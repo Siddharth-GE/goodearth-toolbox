@@ -197,7 +197,11 @@ export const TOOLS: Tool[] = [
     href: "/financial-management",
     icon: "Landmark",
     group: "Management",
-    built: false,
+    built: true,
+    // The founder's decision (Financial Management PLAN.md; views
+    // restated by 0058) and the copy that decision requires.
+    grantWarning:
+      "Shows the company's full money picture: every client's dues and receipts, every bill's amount, and every loan and investor with its terms.",
   },
   {
     name: "Business Planning",

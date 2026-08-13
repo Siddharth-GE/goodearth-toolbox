@@ -1131,6 +1131,130 @@ export type Database = {
           },
         ]
       }
+      funding_facilities: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          interest_rate_pct: number | null
+          is_active: boolean
+          kind: string
+          party: string
+          sanctioned_amount: number | null
+          start_date: string | null
+          terms: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          interest_rate_pct?: number | null
+          is_active?: boolean
+          kind: string
+          party: string
+          sanctioned_amount?: number | null
+          start_date?: string | null
+          terms?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          interest_rate_pct?: number | null
+          is_active?: boolean
+          kind?: string
+          party?: string
+          sanctioned_amount?: number | null
+          start_date?: string | null
+          terms?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funding_facilities_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "funding_facilities_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      funding_movements: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          facility_id: string
+          happened_on: string
+          id: string
+          kind: string
+          note: string | null
+          reference: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          facility_id: string
+          happened_on: string
+          id?: string
+          kind: string
+          note?: string | null
+          reference?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          facility_id?: string
+          happened_on?: string
+          id?: string
+          kind?: string
+          note?: string | null
+          reference?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funding_movements_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "funding_movements_facility_id_fkey"
+            columns: ["facility_id"]
+            isOneToOne: false
+            referencedRelation: "funding_facilities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "funding_movements_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       goods_receipt_lines: {
         Row: {
           created_at: string
@@ -4407,6 +4531,57 @@ export type Database = {
             columns: ["po_id"]
             isOneToOne: false
             referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bill_money_facts: {
+        Row: {
+          approved_at: string | null
+          created_at: string | null
+          gst_amount: number | null
+          id: string | null
+          invoice_date: string | null
+          kind: string | null
+          paid_at: string | null
+          plot_id: string | null
+          project_id: string | null
+          project_name: string | null
+          scope_code: string | null
+          status: string | null
+          taxable_amount: number | null
+          total_amount: number | null
+          unit_id: string | null
+          vendor_id: string | null
+          vendor_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bills_plot_id_fkey"
+            columns: ["plot_id"]
+            isOneToOne: false
+            referencedRelation: "plots"
             referencedColumns: ["id"]
           },
           {
