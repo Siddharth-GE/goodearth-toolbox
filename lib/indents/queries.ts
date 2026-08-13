@@ -788,10 +788,19 @@ export async function getBudgetPull(
   // indent. line_key is stable across revisions, so a line pulled from
   // R1's budget must show as already asked when R2's budget is on
   // screen — scoping this to one budget_id was the double-buy bug.
-  const { data: siblingBudgets } = await supabase
+  const { data: siblingBudgets, error: siblingBudgetsError } = await supabase
     .from("approved_budgets")
     .select("id")
     .eq("unit_id", budget.unit_id);
+  // No sibling budgets reads as "nothing has ever been raised for this
+  // unit", so every line shows as still to order — which is the
+  // double-buy bug arriving by the other door. Throw instead.
+  if (siblingBudgetsError) {
+    console.error("indent pull sibling budgets read failed:", siblingBudgetsError);
+    throw new Error("Could not check what has already been requested for this unit.", {
+      cause: siblingBudgetsError,
+    });
+  }
   const siblingIds = (siblingBudgets ?? [])
     .map((row) => row.id)
     .filter((id): id is string => id != null);

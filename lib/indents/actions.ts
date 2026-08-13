@@ -347,10 +347,17 @@ export async function addBudgetPullLines(
   // A line pulled from ANY of this unit's budgets is the same line —
   // line_key is stable across revisions, so the dedupe must span them
   // all, not just the budget on screen (the double-buy bug).
-  const { data: siblingBudgets } = await supabase
+  const { data: siblingBudgets, error: siblingBudgetsError } = await supabase
     .from("approved_budgets")
     .select("id")
     .eq("unit_id", budget.unit_id);
+  // The dedupe below is only as wide as this list. A failed read narrows
+  // it to nothing, every line looks unrequested, and the same quantity
+  // gets ordered twice — so refuse the pull rather than write it.
+  if (siblingBudgetsError) {
+    console.error("addBudgetPullLines sibling budgets read failed:", siblingBudgetsError);
+    return { error: "Could not check what has already been requested. Try again." };
+  }
   const siblingIds = (siblingBudgets ?? [])
     .map((row) => row.id)
     .filter((id): id is string => id != null);
