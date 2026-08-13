@@ -131,7 +131,7 @@ export function IndentForm({ options }: { options: IndentFormOptions }) {
       <FormMessage error={error} />
 
       <div className="flex items-center justify-end gap-2">
-        <LinkButton href="/indents" variant="ghost">
+        <LinkButton href="/indents/list" variant="ghost">
           Cancel
         </LinkButton>
         <Button onClick={create} disabled={creating || !projectId || missingCode}>

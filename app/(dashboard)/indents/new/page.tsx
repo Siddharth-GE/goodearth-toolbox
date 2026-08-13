@@ -9,7 +9,7 @@ export default async function NewIndentPage() {
     <div className="space-y-4">
       <PageTitle
         title="New indent"
-        backHref="/indents"
+        backHref="/indents/list"
         backLabel="All indents"
         description="Say where the materials are needed. The number is minted on create — items are added on the indent itself."
       />

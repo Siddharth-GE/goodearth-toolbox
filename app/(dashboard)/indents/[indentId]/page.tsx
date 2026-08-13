@@ -29,7 +29,7 @@ export default async function IndentPage({ params }: { params: Promise<{ indentI
     <div className="space-y-4">
       <PageTitle
         title={indent.reference}
-        backHref="/indents"
+        backHref="/indents/list"
         backLabel="All indents"
         description={
           <>

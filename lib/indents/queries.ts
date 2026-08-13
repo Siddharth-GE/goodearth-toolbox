@@ -55,6 +55,35 @@ export type IndentListPage = {
   pageSize: number;
 };
 
+/** Headline counts for the tool's welcome screen. Indents carry no
+ * money by design, so these are plain status counts. */
+export async function getWelcomeCounts() {
+  await requireTool("/indents");
+  const supabase = await createClient();
+
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+  const since = startOfMonth.toISOString();
+
+  // Exact database counts, head-only — never rows.length.
+  const [submitted, drafts, approved] = await Promise.all([
+    supabase.from("indents").select("id", { count: "exact", head: true }).eq("status", "submitted"),
+    supabase.from("indents").select("id", { count: "exact", head: true }).eq("status", "draft"),
+    supabase
+      .from("indents")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "approved")
+      .gte("created_at", since),
+  ]);
+
+  return {
+    awaitingApproval: submitted.count ?? 0,
+    drafts: drafts.count ?? 0,
+    approvedThisMonth: approved.count ?? 0,
+  };
+}
+
 export async function listIndents({
   page = 1,
   status,

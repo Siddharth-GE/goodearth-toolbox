@@ -89,7 +89,7 @@ export async function createIndent(input: CreateIndentInput): Promise<ActionStat
   }
   if (!indentId) return { error: "Could not create the indent. Try again." };
 
-  revalidatePath("/indents");
+  revalidatePath("/indents", "layout");
   redirect(`/indents/${indentId}`);
 }
 
@@ -539,7 +539,7 @@ export async function submitIndent(indentId: string): Promise<ActionState> {
   }
 
   revalidatePath(`/indents/${indentId}`);
-  revalidatePath("/indents");
+  revalidatePath("/indents", "layout");
   return undefined;
 }
 
@@ -572,7 +572,7 @@ export async function approveIndent(indentId: string): Promise<ActionState> {
   }
 
   revalidatePath(`/indents/${indentId}`);
-  revalidatePath("/indents");
+  revalidatePath("/indents", "layout");
   return undefined;
 }
 
@@ -607,7 +607,7 @@ export async function rejectIndent(indentId: string, note: string): Promise<Acti
   }
 
   revalidatePath(`/indents/${indentId}`);
-  revalidatePath("/indents");
+  revalidatePath("/indents", "layout");
   return undefined;
 }
 
@@ -624,6 +624,6 @@ export async function deleteIndent(indentId: string): Promise<ActionState> {
     return { error: error.message.replace(/^.*?:\s*/, "") || "Could not delete this indent." };
   }
 
-  revalidatePath("/indents");
-  redirect("/indents");
+  revalidatePath("/indents", "layout");
+  redirect("/indents/list");
 }
