@@ -66,3 +66,7 @@ reintroduce:
 - The design document uses a placeholder letterhead and Helvetica until
   real assets and a Geist `.ttf` arrive.
 - Paste-from-Excel into the line grid — asked for, not built.
+
+## Welcome screen (2026-08-13)
+
+The tool opens on a welcome screen (founder request, all Operations and Management tools). The units list moved to `/selections/units`; the delete-draft redirect follows it. Counts from `getWelcomeCounts()` in `lib/selections/queries.ts`.

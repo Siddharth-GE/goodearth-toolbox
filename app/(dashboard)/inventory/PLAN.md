@@ -163,3 +163,7 @@ a store's and a plot's movement history open — i.e. the whole
   the guard when the form is real.
 - Bills (Phase 8) anchors on `purchase_order_lines.id` too; nothing in
   this tool needs to change for it.
+
+## Welcome screen (2026-08-13)
+
+The tool opens on a welcome screen (founder request, all Operations and Management tools). The Receive screen moved to `/inventory/receive` (its nav tab too); `revalidatePath` calls became the `"layout"` form. Counts from `getWelcomeCounts()` in `lib/inventory/receipts-queries.ts`.

@@ -187,3 +187,7 @@ it punishes exactly the people doing the long work. Use the **clean
 streak** instead: a day counts if you neither ended it holding an overdue
 baton nor let one go overdue. Reachable while on a long leg, breaks the
 moment you go cold, and derived from the same log with nothing stored.
+
+## Welcome screen (2026-08-13)
+
+The tool opens on a welcome screen (founder request, all Operations and Management tools). This supersedes the 2026-08-10 redirect-to-Projects: `/relay` now renders the welcome with `getRelayPulse()` counts, and Projects is its primary door.

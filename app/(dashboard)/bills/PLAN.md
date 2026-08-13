@@ -89,3 +89,7 @@ the workers, nothing when the muster roll is paid directly).
   "success" (the PO lesson).
 - `/bills` was already in the `user_apps_app_known` CHECK (0017
   pre-listed all planned tools) — no constraint change needed.
+
+## Welcome screen (2026-08-13)
+
+The tool opens on a welcome screen (founder request, all Operations and Management tools). The tabbed list moved to `/bills/list` — tabs, pager, the client-side filter push, the form cancel link and the delete redirect follow it; `revalidatePath` calls became the `"layout"` form. Counts from `getWelcomeCounts()` in `lib/bills/queries.ts` (counts only — no bill money on the welcome).

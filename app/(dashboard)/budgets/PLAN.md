@@ -127,3 +127,7 @@ Data layer: `lib/budgets/construction.ts` (reads) +
 `construction-actions.ts` (writes) — separate files from the Interiors
 queries/actions on purpose; nothing in them may touch `budget_lines` or
 `item_margins`.
+
+## Welcome screen (2026-08-13)
+
+The tool opens on a welcome screen (founder request, all Operations and Management tools). The Interiors pricing inbox moved to `/budgets/interiors` (its nav tab too). Welcome counts are derived from `listInbox()` — a complete fetchAll read — and show counts only, never a rupee.
