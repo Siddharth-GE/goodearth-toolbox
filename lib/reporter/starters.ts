@@ -130,6 +130,41 @@ const SALES_COLLECTIONS = {
   },
 };
 
+// Grouped by item and summed across locations — the same item at two
+// stores is one holding. hbar because item names are long and many.
+const STOCK_POSITION = {
+  dataset: "stock",
+  columns: ["item", "item_code", "location", "location_kind", "quantity"],
+  filters: [],
+  groupBy: ["item"],
+  measures: [{ field: "quantity", agg: "sum" }],
+  sort: [{ field: "quantity", dir: "desc" }],
+  limit: 100,
+  chart: {
+    type: "hbar",
+    category: "item",
+    measures: ["quantity:sum"],
+  },
+};
+
+// What stands where: units stacked by status, project by project. The
+// full multi-dataset scorecard the founder sketched is the dashboard
+// composer, deferred — this is the single-dataset version that exists.
+const PROJECT_SCORECARD = {
+  dataset: "units",
+  columns: ["project", "plot", "unit", "unit_type", "status"],
+  filters: [],
+  groupBy: ["project", "status"],
+  measures: [{ field: "unit", agg: "count_distinct" }],
+  sort: [{ field: "unit", dir: "desc" }],
+  limit: 100,
+  chart: {
+    type: "stacked",
+    category: "project",
+    measures: ["unit:count_distinct"],
+  },
+};
+
 export const STARTERS: Starter[] = [
   {
     id: "starter-site-procurement",
@@ -152,6 +187,20 @@ export const STARTERS: Starter[] = [
       "What clients owe against every payment milestone, what has come in, and the balance still to collect — project by project. Receipts not yet matched to a milestone are in the Client receipts data set.",
     spec: parseReportSpec(SALES_COLLECTIONS),
   },
+  {
+    id: "starter-stock-position",
+    name: "Stock & inventory position",
+    description:
+      "Every item's balance on hand, biggest holdings first — and where each sits, store by store, site by site.",
+    spec: parseReportSpec(STOCK_POSITION),
+  },
+  {
+    id: "starter-project-scorecard",
+    name: "Project scorecard",
+    description:
+      "What stands where: every project's units stacked by sale status, with the plot and type behind each.",
+    spec: parseReportSpec(PROJECT_SCORECARD),
+  },
 ];
 
 /** The raw specs, for the test that proves they parse without loss. */
@@ -159,6 +208,8 @@ export const STARTER_SOURCES: Record<string, unknown> = {
   "starter-site-procurement": SITE_PROCUREMENT,
   "starter-spend-vs-budget": SPEND_VS_BUDGET,
   "starter-sales-collections": SALES_COLLECTIONS,
+  "starter-stock-position": STOCK_POSITION,
+  "starter-project-scorecard": PROJECT_SCORECARD,
 };
 
 /** A starter by id, or null. Never throws on an unknown id. */

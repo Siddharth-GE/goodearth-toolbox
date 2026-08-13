@@ -70,6 +70,11 @@ export const KNOWN_SOURCES = [
   "budget_report_lines",
   "crm_milestone_facts",
   "crm_receipt_facts",
+  "goods_receipt_lines",
+  "stock_by_location",
+  "selection_lines",
+  "pusher_chain_state",
+  "units",
 ] as const;
 export type KnownSource = (typeof KNOWN_SOURCES)[number];
 
@@ -143,6 +148,21 @@ export type DatasetDef = {
   optionsSelect: string | null;
   /** Field key whose filter scopes the report to a project, if any. */
   projectField: string | null;
+  /**
+   * Columns fetchAll pages by, in order. Defaults to ["id"]; a dataset
+   * over a view WITHOUT an id column (stock_by_location) must name a
+   * combination stable enough to page on, or the first fetch 400s at
+   * runtime — which no local gate catches. datasets.test.ts asserts
+   * every named column is in the select.
+   */
+  pageOrder?: string[];
+  /**
+   * Names a post-fetch enrichment queries.ts performs on the extracted
+   * rows — the stock view carries bare ids, and its item and location
+   * names come from bounded masters lookups rather than embeds (a view
+   * declares no FKs, so PostgREST cannot embed through it).
+   */
+  enrich?: "stock_names";
   /** Field keys the user may range on — a report picks WHICH date. */
   dateFields: string[];
   /** True once a dataset carries rupees. Gated by its own RLS. */
@@ -1097,6 +1117,591 @@ const crmReceipts: DatasetDef = {
 };
 
 // ---------------------------------------------------------------------
+// goods_receipt_lines — every delivery line ever received
+// ---------------------------------------------------------------------
+// Money-free by design (0022's reasoning: a quantity and a status are
+// operational fact, not commercial secret), and readable by every
+// authenticated user, so zero RLS risk.
+
+const GOODS_RECEIPT_LINES_SELECT =
+  "id, item_id, quantity, uom, note, created_at, " +
+  "items!goods_receipt_lines_item_id_fkey!inner(name, code), " +
+  "goods_receipts!goods_receipt_lines_receipt_id_fkey!inner(reference, received_at, to_site, project_id, unit_id, store_id, " +
+  "projects!goods_receipts_project_id_fkey(name), units!goods_receipts_unit_id_fkey(name), " +
+  "stores!goods_receipts_store_id_fkey(name))";
+
+const GOODS_RECEIPT_LINES_OPTIONS_SELECT =
+  "uom, items!goods_receipt_lines_item_id_fkey!inner(name, code)";
+
+const goodsReceiptLines: DatasetDef = {
+  label: "Goods receipt lines",
+  description: "Every delivery line ever received, at a store or straight to site.",
+  source: "goods_receipt_lines",
+  select: GOODS_RECEIPT_LINES_SELECT,
+  optionsSelect: GOODS_RECEIPT_LINES_OPTIONS_SELECT,
+  projectField: "project",
+  dateFields: ["received_on"],
+  money: false,
+  defaultColumns: ["project", "grn", "item", "quantity", "uom", "store", "to_site", "received_on"],
+  defaultSort: [{ field: "received_on", dir: "desc" }],
+  fields: {
+    project: {
+      label: "Project",
+      type: "text",
+      path: "goods_receipts.projects.name",
+      identityPath: "goods_receipts.project_id",
+      filterColumn: "goods_receipts.project_id",
+      sortColumn: "goods_receipts.projects.name",
+      groupable: true,
+      aggregates: ["count_distinct"],
+      lookup: "projects",
+    },
+    unit: {
+      label: "Unit",
+      type: "text",
+      path: "goods_receipts.units.name",
+      identityPath: "goods_receipts.unit_id",
+      filterColumn: "goods_receipts.unit_id",
+      sortColumn: "goods_receipts.units.name",
+      groupable: true,
+      aggregates: ["count_distinct"],
+      lookup: "units",
+    },
+    grn: {
+      label: "GRN",
+      type: "text",
+      path: "goods_receipts.reference",
+      sortColumn: "goods_receipts.reference",
+      groupable: true,
+      aggregates: ["count_distinct"],
+    },
+    // Stores are few but have no lookup type and their name sits on a
+    // nested left embed (the filter-the-embed trap), so the store
+    // displays and groups but does not filter in v1.
+    store: {
+      label: "Store",
+      type: "text",
+      path: "goods_receipts.stores.name",
+      identityPath: "goods_receipts.store_id",
+      groupable: true,
+      aggregates: ["count_distinct"],
+    },
+    to_site: {
+      label: "Straight to site",
+      type: "bool",
+      path: "goods_receipts.to_site",
+      filterColumn: "goods_receipts.to_site",
+      groupable: true,
+      aggregates: [],
+    },
+    item: {
+      label: "Item",
+      type: "text",
+      path: "items.name",
+      identityPath: "item_id",
+      filterColumn: "items.name",
+      sortColumn: "items.name",
+      groupable: true,
+      aggregates: ["count_distinct"],
+      filterOptions: "distinct",
+    },
+    item_code: {
+      label: "Item code",
+      type: "text",
+      path: "items.code",
+      identityPath: "item_id",
+      filterColumn: "items.code",
+      sortColumn: "items.code",
+      groupable: true,
+      aggregates: ["count_distinct"],
+      filterOptions: "distinct",
+    },
+    quantity: {
+      label: "Quantity",
+      type: "number",
+      path: "quantity",
+      filterColumn: "quantity",
+      sortColumn: "quantity",
+      groupable: false,
+      aggregates: ["sum", "avg", "min", "max", "count"],
+    },
+    uom: {
+      label: "Unit of measure",
+      type: "text",
+      path: "uom",
+      filterColumn: "uom",
+      sortColumn: "uom",
+      groupable: true,
+      aggregates: [],
+      filterOptions: "distinct",
+    },
+    note: {
+      label: "Note",
+      type: "text",
+      path: "note",
+      groupable: false,
+      aggregates: [],
+    },
+    received_on: {
+      label: "Received on",
+      type: "date",
+      path: "goods_receipts.received_at",
+      filterColumn: "goods_receipts.received_at",
+      sortColumn: "goods_receipts.received_at",
+      groupable: false,
+      aggregates: [],
+    },
+  },
+};
+
+// ---------------------------------------------------------------------
+// stock — what is where, right now
+// ---------------------------------------------------------------------
+// stock_by_location has NO project_id and NO declared FKs, so it
+// registers unscoped (an honest note lives in the description) and its
+// names arrive by enrichment, not embed. It also has no id column —
+// pageOrder replaces the default. Quantities only, never cost.
+
+const stock: DatasetDef = {
+  label: "Stock on hand",
+  description:
+    "What is where right now — every item's balance at each store and site. Not scoped to a project: a store serves several.",
+  source: "stock_by_location",
+  select: "item_id, location_id, location_kind, quantity",
+  optionsSelect: "location_kind",
+  projectField: null,
+  pageOrder: ["item_id", "location_id"],
+  enrich: "stock_names",
+  dateFields: [],
+  money: false,
+  defaultColumns: ["item", "item_code", "location", "location_kind", "quantity"],
+  defaultSort: [],
+  fields: {
+    // Enriched from bounded lookups — display and grouping only. The
+    // founder's dropdown rule is satisfied by not being filterable.
+    item: {
+      label: "Item",
+      type: "text",
+      path: "item_name",
+      identityPath: "item_id",
+      groupable: true,
+      aggregates: ["count_distinct"],
+    },
+    item_code: {
+      label: "Item code",
+      type: "text",
+      path: "item_code",
+      identityPath: "item_id",
+      groupable: true,
+      aggregates: ["count_distinct"],
+    },
+    location: {
+      label: "Location",
+      type: "text",
+      path: "location_name",
+      identityPath: "location_id",
+      groupable: true,
+      aggregates: ["count_distinct"],
+    },
+    location_kind: {
+      label: "Location kind",
+      type: "text",
+      path: "location_kind",
+      filterColumn: "location_kind",
+      sortColumn: "location_kind",
+      groupable: true,
+      aggregates: [],
+      filterOptions: "distinct",
+    },
+    quantity: {
+      label: "Quantity",
+      type: "number",
+      path: "quantity",
+      filterColumn: "quantity",
+      sortColumn: "quantity",
+      groupable: false,
+      aggregates: ["sum", "avg", "min", "max", "count"],
+    },
+  },
+};
+
+// ---------------------------------------------------------------------
+// selection_lines — what design has specified
+// ---------------------------------------------------------------------
+// Money-free: indicative_rate_snapshot exists on the table and is
+// DELIBERATELY not a field here — this dataset is about what was
+// specified, not what it costs; budget_report_lines carries the money.
+// The selections embed names the COMPOSITE FK (selection_id, unit_id).
+
+const SELECTION_LINES_SELECT =
+  "id, item_id, quantity, uom, designer_note, created_at, " +
+  "items!selection_lines_item_id_fkey(name, code), " +
+  "selections!selection_lines_selection_id_unit_id_fkey!inner(revision_no, status, unit_id, " +
+  "units!selections_unit_id_fkey!inner(name, project_id, projects!units_project_id_fkey(name)))";
+
+const SELECTION_LINES_OPTIONS_SELECT =
+  "uom, items!selection_lines_item_id_fkey(name, code), " +
+  "selections!selection_lines_selection_id_unit_id_fkey!inner(status)";
+
+const selectionLines: DatasetDef = {
+  label: "Selection lines",
+  description: "Every line design has specified, unit by unit, revision by revision.",
+  source: "selection_lines",
+  select: SELECTION_LINES_SELECT,
+  optionsSelect: SELECTION_LINES_OPTIONS_SELECT,
+  projectField: "project",
+  dateFields: ["specified_on"],
+  money: false,
+  defaultColumns: ["project", "unit", "revision", "status", "item", "quantity", "uom"],
+  defaultSort: [{ field: "specified_on", dir: "desc" }],
+  fields: {
+    project: {
+      label: "Project",
+      type: "text",
+      path: "selections.units.projects.name",
+      identityPath: "selections.units.project_id",
+      filterColumn: "selections.units.project_id",
+      sortColumn: "selections.units.projects.name",
+      groupable: true,
+      aggregates: ["count_distinct"],
+      lookup: "projects",
+    },
+    unit: {
+      label: "Unit",
+      type: "text",
+      path: "selections.units.name",
+      identityPath: "selections.unit_id",
+      filterColumn: "selections.unit_id",
+      sortColumn: "selections.units.name",
+      groupable: true,
+      aggregates: ["count_distinct"],
+      lookup: "units",
+    },
+    revision: {
+      label: "Revision",
+      type: "number",
+      path: "selections.revision_no",
+      filterColumn: "selections.revision_no",
+      sortColumn: "selections.revision_no",
+      groupable: true,
+      aggregates: ["max"],
+    },
+    status: {
+      label: "Revision status",
+      type: "text",
+      path: "selections.status",
+      filterColumn: "selections.status",
+      sortColumn: "selections.status",
+      groupable: true,
+      aggregates: [],
+      filterOptions: "distinct",
+    },
+    item: {
+      label: "Item",
+      type: "text",
+      path: "items.name",
+      identityPath: "item_id",
+      filterColumn: "items.name",
+      sortColumn: "items.name",
+      groupable: true,
+      aggregates: ["count_distinct"],
+      filterOptions: "distinct",
+    },
+    item_code: {
+      label: "Item code",
+      type: "text",
+      path: "items.code",
+      identityPath: "item_id",
+      filterColumn: "items.code",
+      sortColumn: "items.code",
+      groupable: true,
+      aggregates: ["count_distinct"],
+      filterOptions: "distinct",
+    },
+    quantity: {
+      label: "Quantity",
+      type: "number",
+      path: "quantity",
+      filterColumn: "quantity",
+      sortColumn: "quantity",
+      groupable: false,
+      aggregates: ["sum", "avg", "min", "max", "count"],
+    },
+    uom: {
+      label: "Unit of measure",
+      type: "text",
+      path: "uom",
+      filterColumn: "uom",
+      sortColumn: "uom",
+      groupable: true,
+      aggregates: [],
+      filterOptions: "distinct",
+    },
+    designer_note: {
+      label: "Designer note",
+      type: "text",
+      path: "designer_note",
+      groupable: false,
+      aggregates: [],
+    },
+    specified_on: {
+      label: "Specified on",
+      type: "date",
+      path: "created_at",
+      filterColumn: "created_at",
+      sortColumn: "created_at",
+      groupable: false,
+      aggregates: [],
+    },
+  },
+};
+
+// ---------------------------------------------------------------------
+// relay_chains — every trail and where its baton is
+// ---------------------------------------------------------------------
+// Reads pusher_chain_state — Reporter is now that view's THIRD consumer
+// (Relay, Client Relations, Reporter); a sixth redefinition must check
+// here too (CLAUDE.md's warning). The view is flat and already carries
+// its names. department_names is an array, which extractRows cannot
+// flatten — it stays out until someone actually asks for it.
+
+const RELAY_CHAINS_SELECT =
+  "chain_id, title, project_id, project_name, unit_id, unit_name, trail_set_name, " +
+  "activity_name, current_leg, leg_count, days_in_leg, expected_days, " +
+  "is_stuck, is_queued, is_finished, started_at, entered_at";
+
+const RELAY_CHAINS_OPTIONS_SELECT = "trail_set_name, activity_name";
+
+const relayChains: DatasetDef = {
+  label: "Relay trails",
+  description: "Every trail and where its baton is — the current activity, and for how long.",
+  source: "pusher_chain_state",
+  select: RELAY_CHAINS_SELECT,
+  optionsSelect: RELAY_CHAINS_OPTIONS_SELECT,
+  projectField: "project",
+  pageOrder: ["chain_id"],
+  dateFields: ["started_on", "entered_on"],
+  money: false,
+  defaultColumns: ["project", "trail", "activity", "current_leg", "days_in_leg", "expected_days", "stuck"], // prettier-ignore
+  defaultSort: [{ field: "days_in_leg", dir: "desc" }],
+  fields: {
+    project: {
+      label: "Project",
+      type: "text",
+      path: "project_name",
+      identityPath: "project_id",
+      filterColumn: "project_id",
+      sortColumn: "project_name",
+      groupable: true,
+      aggregates: ["count_distinct"],
+      lookup: "projects",
+    },
+    unit: {
+      label: "Unit",
+      type: "text",
+      path: "unit_name",
+      identityPath: "unit_id",
+      filterColumn: "unit_id",
+      sortColumn: "unit_name",
+      groupable: true,
+      aggregates: ["count_distinct"],
+      lookup: "units",
+    },
+    trail: {
+      label: "Trail",
+      type: "text",
+      path: "title",
+      identityPath: "chain_id",
+      sortColumn: "title",
+      groupable: true,
+      aggregates: ["count_distinct"],
+    },
+    trail_set: {
+      label: "Trail type",
+      type: "text",
+      path: "trail_set_name",
+      filterColumn: "trail_set_name",
+      sortColumn: "trail_set_name",
+      groupable: true,
+      aggregates: [],
+      filterOptions: "distinct",
+    },
+    activity: {
+      label: "Current activity",
+      type: "text",
+      path: "activity_name",
+      filterColumn: "activity_name",
+      sortColumn: "activity_name",
+      groupable: true,
+      aggregates: [],
+      filterOptions: "distinct",
+    },
+    current_leg: {
+      label: "Leg",
+      type: "number",
+      path: "current_leg",
+      filterColumn: "current_leg",
+      sortColumn: "current_leg",
+      groupable: false,
+      aggregates: ["avg", "min", "max"],
+    },
+    leg_count: {
+      label: "Legs in trail",
+      type: "number",
+      path: "leg_count",
+      filterColumn: "leg_count",
+      sortColumn: "leg_count",
+      groupable: false,
+      aggregates: ["avg", "min", "max"],
+    },
+    days_in_leg: {
+      label: "Days on this leg",
+      type: "number",
+      path: "days_in_leg",
+      filterColumn: "days_in_leg",
+      sortColumn: "days_in_leg",
+      groupable: false,
+      aggregates: ["sum", "avg", "min", "max"],
+    },
+    expected_days: {
+      label: "Expected days",
+      type: "number",
+      path: "expected_days",
+      filterColumn: "expected_days",
+      sortColumn: "expected_days",
+      groupable: false,
+      aggregates: ["sum", "avg", "min", "max"],
+    },
+    stuck: {
+      label: "Stuck",
+      type: "bool",
+      path: "is_stuck",
+      filterColumn: "is_stuck",
+      groupable: true,
+      aggregates: [],
+    },
+    queued: {
+      label: "Waiting to start",
+      type: "bool",
+      path: "is_queued",
+      filterColumn: "is_queued",
+      groupable: true,
+      aggregates: [],
+    },
+    finished: {
+      label: "Finished",
+      type: "bool",
+      path: "is_finished",
+      filterColumn: "is_finished",
+      groupable: true,
+      aggregates: [],
+    },
+    started_on: {
+      label: "Started on",
+      type: "date",
+      path: "started_at",
+      filterColumn: "started_at",
+      sortColumn: "started_at",
+      groupable: false,
+      aggregates: [],
+    },
+    entered_on: {
+      label: "On this leg since",
+      type: "date",
+      path: "entered_at",
+      filterColumn: "entered_at",
+      sortColumn: "entered_at",
+      groupable: false,
+      aggregates: [],
+    },
+  },
+};
+
+// ---------------------------------------------------------------------
+// units — what stands where
+// ---------------------------------------------------------------------
+// The one dataset that touches plots, and it does so by the book:
+// plots!units_plot_id_fkey, never a bare embed — units has had two FK
+// paths to plots since 0029.
+
+const UNITS_SELECT =
+  "id, name, code, unit_type, status, project_id, plot_id, created_at, " +
+  "projects!units_project_id_fkey(name), plots!units_plot_id_fkey(name)";
+
+const UNITS_OPTIONS_SELECT = "unit_type, status";
+
+const units: DatasetDef = {
+  label: "Units",
+  description: "Every villa and plot-holding, with its type and sale status.",
+  source: "units",
+  select: UNITS_SELECT,
+  optionsSelect: UNITS_OPTIONS_SELECT,
+  projectField: "project",
+  dateFields: [],
+  money: false,
+  defaultColumns: ["project", "plot", "unit", "unit_type", "status"],
+  defaultSort: [{ field: "unit", dir: "asc" }],
+  fields: {
+    project: {
+      label: "Project",
+      type: "text",
+      path: "projects.name",
+      identityPath: "project_id",
+      filterColumn: "project_id",
+      sortColumn: "projects.name",
+      groupable: true,
+      aggregates: ["count_distinct"],
+      lookup: "projects",
+    },
+    plot: {
+      label: "Plot",
+      type: "text",
+      path: "plots.name",
+      identityPath: "plot_id",
+      groupable: true,
+      aggregates: ["count_distinct"],
+    },
+    unit: {
+      label: "Unit",
+      type: "text",
+      path: "name",
+      identityPath: "id",
+      sortColumn: "name",
+      groupable: true,
+      aggregates: ["count_distinct"],
+    },
+    code: {
+      label: "Code",
+      type: "text",
+      path: "code",
+      sortColumn: "code",
+      groupable: false,
+      aggregates: [],
+    },
+    unit_type: {
+      label: "Type",
+      type: "text",
+      path: "unit_type",
+      filterColumn: "unit_type",
+      sortColumn: "unit_type",
+      groupable: true,
+      aggregates: [],
+      filterOptions: "distinct",
+    },
+    status: {
+      label: "Status",
+      type: "text",
+      path: "status",
+      filterColumn: "status",
+      sortColumn: "status",
+      groupable: true,
+      aggregates: [],
+      filterOptions: "distinct",
+    },
+  },
+};
+
+// ---------------------------------------------------------------------
 // The registry
 // ---------------------------------------------------------------------
 
@@ -1107,6 +1712,11 @@ export const DATASETS: Record<string, DatasetDef> = {
   budget_report_lines: budgetReportLines,
   crm_milestones: crmMilestones,
   crm_receipts: crmReceipts,
+  goods_receipt_lines: goodsReceiptLines,
+  stock,
+  selection_lines: selectionLines,
+  relay_chains: relayChains,
+  units,
 };
 
 /** Where a blank or unrecognisable spec lands. */
