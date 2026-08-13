@@ -1,8 +1,8 @@
-import { Download } from "lucide-react";
+import { Download, FileText } from "lucide-react";
 
 import { LinkButton } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { buildChartModel, type ChartModel } from "@/lib/charts/series";
+import { chartModelFor } from "@/lib/reporter/chart-model";
 import { DATASETS } from "@/lib/reporter/datasets";
 import {
   listFilterOptions,
@@ -11,9 +11,8 @@ import {
   listVendorOptions,
   runSpec,
 } from "@/lib/reporter/queries";
-import { builderDataset, encodeSpec, measureId, type ReportSpec } from "@/lib/reporter/spec";
+import { builderDataset, encodeSpec, type ReportSpec } from "@/lib/reporter/spec";
 
-import { measureLabel } from "@/lib/reporter/labels";
 import { ReportBuilder } from "./report-builder";
 import { ReportChart } from "./report-chart";
 import { ReportSummary } from "./report-summary";
@@ -46,25 +45,9 @@ export async function ReportView({
   ]);
   const dataset = DATASETS[spec.dataset];
 
-  let chartModel: ChartModel | null = null;
-  if (outcome.ok && spec.chart) {
-    chartModel = buildChartModel({
-      spec,
-      result: outcome.result,
-      measureLabels: Object.fromEntries(
-        spec.measures.map((measure) => [
-          measureId(measure),
-          measureLabel(dataset.fields[measure.field].label, measure.agg),
-        ]),
-      ),
-      fieldLabels: Object.fromEntries(
-        Object.entries(dataset.fields).map(([key, field]) => [key, field.label]),
-      ),
-      moneyMeasures: spec.measures
-        .filter((measure) => dataset.fields[measure.field].type === "money")
-        .map((measure) => measureId(measure)),
-    });
-  }
+  // The same helper the PDF route uses, so paper and screen can never
+  // shape the same chart differently.
+  const chartModel = outcome.ok ? chartModelFor(dataset, spec, outcome.result) : null;
 
   return (
     <>
@@ -83,12 +66,21 @@ export async function ReportView({
           <ReportSummary spec={spec} result={outcome.result} />
           {chartModel && <ReportChart model={chartModel} />}
           {outcome.result.matched > 0 && (
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
               {/* The spec is re-encoded from what actually ran, so the
                   file matches the page even if the URL was hand-edited.
                   `plain` because next/link would prefetch the download
                   on hover and build the whole file for a passing
                   cursor. */}
+              <LinkButton
+                href={`${basePath}/pdf?spec=${encodeSpec(spec)}`}
+                variant="secondary"
+                size="sm"
+                plain
+              >
+                <FileText className="size-4" />
+                Download PDF
+              </LinkButton>
               <LinkButton
                 href={`${basePath}/csv?spec=${encodeSpec(spec)}`}
                 variant="secondary"

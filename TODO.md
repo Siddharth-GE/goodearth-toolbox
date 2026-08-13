@@ -73,31 +73,26 @@ waiting list (the write path `replaceFutureLegs` exists and is current, just
 unwired), and no "Open a trail" button on the Projects landing page (one click
 away already; not asked for).
 
-## 5. Reporter — next is Stage 9, PDF
+## 5. Reporter — ALL TEN STAGES BUILT; awaiting the founder's check on 9+10
 
-The Reporter is live through Stage 8: builder, dropdown filters, grouping,
-subtotals, charts, CSV, saved reports with copyable starting points, **the
-money** (`0055` + `0056` — the amber warning beside the Settings checkbox is
-the reminder of what the grant now means), and **all eleven datasets**:
-indents, PO lines, bills, budget lines, CRM milestones and receipts (two,
-never one join), goods receipts, stock, selection lines, relay trails and
-units. Five starting points. Before Stage 6 merged, only one non-admin held
-`/reporter` (the probe) — worth remembering when granting it next.
+Stages 9 and 10 sit on `feature/reporter-pdf-plan` (one preview, checked
+together at the founder's request while travelling — 2026-08-13). Everything
+else is merged. What the founder's browser pass should cover:
 
-No client receipts are recorded yet, so the receipts dataset shows an honest
-empty state until Client Relations records one.
-
-The full plan is **`app/(dashboard)/reporter/PLAN.md`**. Read it before
-touching anything below. Two stages remain:
-
-9. **PDF** — Recharts → `renderToStaticMarkup` → SVG → `sharp` → PNG →
-   react-pdf. The plan flags three known traps: literal print hexes (CSS
-   variables don't resolve in a detached SVG), fixed chart dimensions
-   (`ResponsiveContainer` is browser-only), and checking the rasterised
-   typeface on a real PDF — `sharp` will not have Geist.
-10. **Plan vs actual** — `0057`, Business Planning publishes targets. The
-    migration is declared by Business Planning so the coupling points the
-    right way (the `0045` precedent).
+- **PDF** — download a saved report and an unsaved one as PDF; the chart is
+  drawn in vector on the shared letterhead. _(The plan's Recharts→sharp
+  pipeline died on evidence — recharts@3 renders an empty div server-side —
+  so the PDF draws the same tested chart model with react-pdf primitives; the
+  plan's Stage-9 correction has the full story.)_
+- **Plan vs actual** — in Business Planning, open a plan → Rename → link a
+  Project → save. The plan's headline numbers publish as targets; the
+  Reporter's "Plan vs actual" starting point puts billed spend and
+  collections beside them. Clearing the link withdraws them.
+- No client receipts are recorded yet, so the receipts dataset and the
+  collections side of plan-vs-actual honestly read zero until Client
+  Relations records one.
+- Before Stage 6, only the probe held `/reporter` among non-admins — worth
+  remembering when granting it next.
 
 Three things the founder decided that are easy to lose:
 

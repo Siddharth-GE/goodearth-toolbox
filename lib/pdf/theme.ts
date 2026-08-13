@@ -44,6 +44,50 @@ export const pdf = {
 } as const;
 
 /**
+ * The chart palette for PAPER — literal hexes, deliberately.
+ *
+ * The screens' chart colours are CSS variables (`--chart-1…8`,
+ * app/globals.css) so light and dark swap in one file; but a chart
+ * headed for a PDF is rendered to a detached SVG string and rasterised
+ * by `sharp`, and neither can resolve a CSS variable. So the print
+ * palette repeats the LIGHT-mode hexes — the ones validated against
+ * white, which is what paper is — in the same measured order.
+ * DESIGN.md's "do not re-order this list by eye" applies here exactly
+ * as it does to the tokens; if globals.css changes, change this too.
+ */
+export const pdfChart = {
+  slots: [
+    "#1baf7a", // 1 aqua-green
+    "#eda100", // 2 yellow
+    "#e87ba4", // 3 magenta
+    "#008300", // 4 green
+    "#4a3aa7", // 5 violet
+    "#e34948", // 6 red
+    "#2a78d6", // 7 blue
+    "#eb6834", // 8 orange
+  ],
+  accent: "#1f7a5c",
+  /** What a de-emphasised series wears when one series is the point. */
+  rest: "#b9b7b2",
+  grid: "#d9d7d3",
+  axis: "#6b6b66",
+} as const;
+
+/**
+ * A screen colour token ("var(--chart-3)", "var(--accent)", …) to its
+ * print hex. The chart model is shaped once, by the same tested code
+ * the screen uses; only the colours are re-spoken for paper.
+ */
+export function printColor(token: string): string {
+  const slot = /^var\(--chart-(\d)\)$/.exec(token);
+  if (slot) return pdfChart.slots[Number(slot[1]) - 1] ?? pdfChart.accent;
+  if (token === "var(--accent)") return pdfChart.accent;
+  if (token === "var(--muted)") return pdfChart.rest;
+  // Already a literal (or unknown): pass through rather than guess.
+  return token.startsWith("var(") ? pdfChart.accent : token;
+}
+
+/**
  * Design views — the single source of truth for how uploaded renders are
  * sized, everywhere. The upload resizes to this, the editor previews at
  * this shape, and every document lays out at this shape. Change it here

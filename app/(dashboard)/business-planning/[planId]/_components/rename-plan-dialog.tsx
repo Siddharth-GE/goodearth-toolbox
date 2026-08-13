@@ -13,6 +13,7 @@ import {
 import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import { renamePlan } from "@/lib/business-planning/actions";
 import { Pencil } from "lucide-react";
 import { useActionState, useEffect, useRef, useState } from "react";
@@ -29,14 +30,21 @@ import { useActionState, useEffect, useRef, useState } from "react";
  * and because the editor holds the model in its own state and is not
  * remounted, nothing typed into the plan is lost by renaming it.
  */
+export type PlanProjectOption = { id: string; name: string };
+
 export function RenamePlanDialog({
   planId,
   name,
   location,
+  projectId,
+  projects,
 }: {
   planId: string;
   name: string;
   location: string | null;
+  /** The published-targets link (0057); null = targets withdrawn. */
+  projectId: string | null;
+  projects: PlanProjectOption[];
 }) {
   const [open, setOpen] = useState(false);
 
@@ -58,6 +66,8 @@ export function RenamePlanDialog({
           planId={planId}
           name={name}
           location={location}
+          projectId={projectId}
+          projects={projects}
           onSaved={() => setOpen(false)}
         />
       </DialogContent>
@@ -69,11 +79,15 @@ function RenameForm({
   planId,
   name,
   location,
+  projectId,
+  projects,
   onSaved,
 }: {
   planId: string;
   name: string;
   location: string | null;
+  projectId: string | null;
+  projects: PlanProjectOption[];
   onSaved: () => void;
 }) {
   const [state, formAction, pending] = useActionState(renamePlan.bind(null, planId), undefined);
@@ -109,6 +123,21 @@ function RenameForm({
             maxLength={120}
             placeholder="Vagamon, Idukki"
           />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="rename-project">Project</Label>
+          <Select id="rename-project" name="project_id" defaultValue={projectId ?? ""}>
+            <option value="">No project — keep this plan private to this tool</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.name}
+              </option>
+            ))}
+          </Select>
+          <p className="text-muted text-xs">
+            Linking a project publishes this plan&rsquo;s headline numbers — revenue, cost, profit,
+            funding — so the Reporter can put actuals beside them. Clearing it withdraws them.
+          </p>
         </div>
         <FormMessage error={state?.error} />
         <DialogFooter>

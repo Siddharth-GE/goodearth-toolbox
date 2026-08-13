@@ -15,10 +15,67 @@ import {
   defaultPlanInputs,
   parsePlanInputs,
   PLAN_SCHEMA_VERSION,
+  SCENARIOS,
   type PlanInputs,
 } from "./inputs";
+import { runScenario } from "./model";
 
 const NAME_LIMIT = 120;
+
+/**
+ * Publish (or withdraw) a plan's headline numbers as targets (0057).
+ *
+ * Called after every write that could change them — save, rename, a
+ * project link set or cleared. The engine runs HERE, in Business
+ * Planning's own action: Reporter reads the resulting plain numbers
+ * from business_plan_target_facts and never imports the model. A plan
+ * without a project has no targets row; clearing the link withdraws.
+ *
+ * Failures are logged, not surfaced: the plan itself saved fine, and
+ * "your plan is saved but the reporting copy lagged" is not worth
+ * blocking the editor over — the next save republishes.
+ */
+async function syncPlanTargets(planId: string, userId: string): Promise<void> {
+  const supabase = await createClient();
+  const { data: plan, error } = await supabase
+    .from("business_plans")
+    .select("id, name, project_id, inputs")
+    .eq("id", planId)
+    .maybeSingle();
+  if (error || !plan) {
+    console.error("syncPlanTargets read failed:", error);
+    return;
+  }
+
+  if (!plan.project_id) {
+    const { error: deleteError } = await supabase
+      .from("business_plan_targets")
+      .delete()
+      .eq("plan_id", planId);
+    if (deleteError) console.error("syncPlanTargets withdraw failed:", deleteError);
+    return;
+  }
+
+  const inputs = parsePlanInputs(plan.inputs);
+  const active = runScenario(inputs, inputs.activeScenario);
+
+  const { error: upsertError } = await supabase.from("business_plan_targets").upsert(
+    {
+      plan_id: planId,
+      project_id: plan.project_id,
+      plan_name: plan.name,
+      scenario_name: SCENARIOS[inputs.activeScenario],
+      revenue: active.revenue,
+      total_cost: active.totalCost,
+      pbt: active.pbt,
+      margin_pct: active.marginPct,
+      peak_funding: active.peakFunding,
+      updated_by: userId,
+    },
+    { onConflict: "plan_id" },
+  );
+  if (upsertError) console.error("syncPlanTargets publish failed:", upsertError);
+}
 
 /**
  * Create a plan, then open it. A new plan starts from
@@ -72,19 +129,30 @@ export async function renamePlan(
 
   const name = String(formData.get("name") ?? "").trim();
   const location = String(formData.get("location") ?? "").trim();
+  // "" = no project = targets withdrawn. The value is a projects.id from
+  // a bounded picker; the FK refuses anything else.
+  const projectId = String(formData.get("project_id") ?? "").trim();
   if (!name) return { error: "Give the plan a name." };
   if (name.length > NAME_LIMIT) return { error: `Keep the name under ${NAME_LIMIT} characters.` };
 
   const supabase = await createClient();
   const { error } = await supabase
     .from("business_plans")
-    .update({ name, location: location || null, updated_by: user.id })
+    .update({
+      name,
+      location: location || null,
+      project_id: projectId || null,
+      updated_by: user.id,
+    })
     .eq("id", planId);
 
   if (error) {
     console.error("renamePlan failed:", error);
     return { error: "Could not rename the plan. Try again." };
   }
+
+  // The name and the link both live on the published targets row.
+  await syncPlanTargets(planId, user.id);
 
   revalidatePath("/business-planning");
   revalidatePath(`/business-planning/${planId}`);
@@ -121,6 +189,10 @@ export async function savePlan(planId: string, inputs: PlanInputs): Promise<Acti
     console.error("savePlan failed:", error);
     return { error: "Could not save. Your changes are still on screen — try again." };
   }
+
+  // A linked plan's save republishes its targets, so Reporter's
+  // plan-vs-actual is never staler than the plan's last save.
+  await syncPlanTargets(planId, user.id);
 
   // Only the list page: revalidating this plan's own route mid-edit
   // would re-render the editor underneath the person typing into it.

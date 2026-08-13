@@ -19,12 +19,12 @@
  * page. So this list grows a row per stage:
  *
  *   Site & procurement activity   indent_lines        Stage 5  ✅
- *   Spend vs budget               budget_report_lines Stage 6
- *   Sales & collections           crm_*               Stage 7
- *   Project scorecard             several             Stage 8
- *   Stock & inventory position    stock               Stage 8
- *   Design & delivery progress    selection_lines     Stage 8
- *   Plan vs actual                plan_targets        Stage 10
+ *   Spend vs budget               budget_report_lines Stage 6  ✅
+ *   Sales & collections           crm_milestones      Stage 7  ✅
+ *   Stock & inventory position    stock               Stage 8  ✅
+ *   Project scorecard             units               Stage 8  ✅
+ *   Design & delivery progress    selection_lines     Stage 10 ✅
+ *   Plan vs actual                plan_targets        Stage 10 ✅
  *
  * PURE data. Nothing here touches Supabase.
  */
@@ -165,6 +165,51 @@ const PROJECT_SCORECARD = {
   },
 };
 
+// Grouped by revision status, not project×status: a stacked chart over
+// count_distinct would refuse (distinct counts do not merge across
+// segments — a unit under two revisions would double), so the chart is
+// a plain bar over one level and project is the filter.
+const DESIGN_DELIVERY = {
+  dataset: "selection_lines",
+  columns: ["project", "unit", "revision", "status", "item", "quantity", "uom"],
+  filters: [],
+  groupBy: ["status"],
+  measures: [
+    { field: "unit", agg: "count_distinct" },
+    { field: "item", agg: "count_distinct" },
+  ],
+  sort: [{ field: "unit", dir: "desc" }],
+  limit: 100,
+  chart: {
+    type: "bar",
+    category: "status",
+    measures: ["unit:count_distinct", "item:count_distinct"],
+  },
+};
+
+// One row per published plan; the actuals are the view's own aggregates
+// so nothing here can fan out. Planned revenue beside what has actually
+// come in; planned cost beside what has actually been billed.
+const PLAN_VS_ACTUAL = {
+  dataset: "plan_targets",
+  columns: ["project", "plan", "scenario", "revenue", "actual_collections", "total_cost", "actual_spend", "pbt"], // prettier-ignore
+  filters: [],
+  groupBy: ["project"],
+  measures: [
+    { field: "revenue", agg: "sum" },
+    { field: "actual_collections", agg: "sum" },
+    { field: "total_cost", agg: "sum" },
+    { field: "actual_spend", agg: "sum" },
+  ],
+  sort: [{ field: "revenue", dir: "desc" }],
+  limit: 100,
+  chart: {
+    type: "bar",
+    category: "project",
+    measures: ["revenue:sum", "actual_collections:sum", "total_cost:sum", "actual_spend:sum"],
+  },
+};
+
 export const STARTERS: Starter[] = [
   {
     id: "starter-site-procurement",
@@ -201,6 +246,20 @@ export const STARTERS: Starter[] = [
       "What stands where: every project's units stacked by sale status, with the plot and type behind each.",
     spec: parseReportSpec(PROJECT_SCORECARD),
   },
+  {
+    id: "starter-design-delivery",
+    name: "Design & delivery progress",
+    description:
+      "How much of the specified catalogue sits at each design stage — units and distinct items per revision status. Filter to a project to see one site's picture.",
+    spec: parseReportSpec(DESIGN_DELIVERY),
+  },
+  {
+    id: "starter-plan-vs-actual",
+    name: "Plan vs actual",
+    description:
+      "Every published business plan's revenue and cost, beside what the project has actually collected and billed so far. A plan publishes when Business Planning links it to a project.",
+    spec: parseReportSpec(PLAN_VS_ACTUAL),
+  },
 ];
 
 /** The raw specs, for the test that proves they parse without loss. */
@@ -210,6 +269,8 @@ export const STARTER_SOURCES: Record<string, unknown> = {
   "starter-sales-collections": SALES_COLLECTIONS,
   "starter-stock-position": STOCK_POSITION,
   "starter-project-scorecard": PROJECT_SCORECARD,
+  "starter-design-delivery": DESIGN_DELIVERY,
+  "starter-plan-vs-actual": PLAN_VS_ACTUAL,
 };
 
 /** A starter by id, or null. Never throws on an unknown id. */
