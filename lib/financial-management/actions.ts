@@ -100,7 +100,7 @@ export async function createFacility(
     return { error: "Could not save the facility. Try again." };
   }
 
-  revalidatePath("/financial-management/funding");
+  revalidatePath("/financial-management", "layout");
   // redirect() throws its own control-flow signal, so it must be outside
   // any try/catch and after every write has been checked.
   redirect(`/financial-management/funding/${data.id}`);
@@ -185,8 +185,7 @@ export async function deleteFacility(facilityId: string): Promise<ActionState> {
     return { error: "Could not delete the facility. Try again." };
   }
 
-  revalidatePath("/financial-management");
-  revalidatePath("/financial-management/funding");
+  revalidatePath("/financial-management", "layout");
   redirect("/financial-management/funding");
 }
 
@@ -258,7 +257,6 @@ export async function deleteMovement(movementId: string, facilityId: string): Pr
 
 /** A movement or facility change touches the Cash page's totals too. */
 function revalidateFunding(facilityId: string) {
-  revalidatePath("/financial-management");
-  revalidatePath("/financial-management/funding");
+  revalidatePath("/financial-management", "layout");
   revalidatePath(`/financial-management/funding/${facilityId}`);
 }

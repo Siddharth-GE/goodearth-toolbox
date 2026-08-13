@@ -1,108 +1,40 @@
-import { ChartBars } from "@/components/ui/chart/bar-chart";
-import { ChartCard } from "@/components/ui/chart/chart-card";
-import { ChartStacked } from "@/components/ui/chart/stacked-bar";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Figure, FigureBand, FigureBandCell } from "@/components/ui/figure";
-import {
-  buildInOutModel,
-  buildOutflowStackModel,
-  lastMonths,
-  sumAmounts,
-} from "@/lib/financial-management/cashflow";
-import { todayInIndia } from "@/lib/financial-management/interest";
-import { getCashPosition } from "@/lib/financial-management/queries";
-import { formatCount, formatCrore } from "@/lib/format";
-import { Wallet } from "lucide-react";
+import { getWelcomeCounts } from "@/lib/financial-management/queries";
 
-export default async function CashPage() {
-  const position = await getCashPosition();
+import { ToolWelcome } from "../_components/tool-welcome";
 
-  const inflows = [...position.collections, ...position.drawdowns];
-  const outflows = [...position.billsPaid, ...position.repayments, ...position.interestPaid];
-
-  if (inflows.length === 0 && outflows.length === 0) {
-    return (
-      <EmptyState
-        icon={Wallet}
-        title="Nothing to add up yet"
-        description="This screen draws from what the other tools record — client receipts in Client Relations, paid bills in Bills — plus the funding ledger here. As soon as any of those hold a rupee, it shows."
-      />
-    );
-  }
-
-  const inTotal = sumAmounts(inflows);
-  const outTotal = sumAmounts(outflows);
-  const net = inTotal - outTotal;
-
-  const today = todayInIndia();
-  const months = lastMonths(today, 12);
-  const inOut = buildInOutModel({ inflows, outflows, months });
-  const outStack = buildOutflowStackModel({
-    streams: [
-      { id: "bills", label: "Bills paid", entries: position.billsPaid },
-      { id: "repayments", label: "Loan repayments", entries: position.repayments },
-      { id: "interest", label: "Interest paid", entries: position.interestPaid },
-    ],
-    months,
-  });
+// The welcome screen (founder, 2026-08-13: every Operations and
+// Management tool opens on one). No PageTitle here — the layout renders
+// the title and nav. The Cash dashboard lives one click in at
+// /financial-management/cash. Counts only, never rupees: this tool's
+// screens are all money, so the welcome is the one place showing none.
+export default async function FinancialManagementPage() {
+  const counts = await getWelcomeCounts();
 
   return (
-    <div className="space-y-4">
-      <FigureBand>
-        <FigureBandCell>
-          <Figure
-            label="Money in to date"
-            value={formatCrore(inTotal)}
-            size="hero"
-            hint={`Collections ${formatCrore(sumAmounts(position.collections))} · funds drawn ${formatCrore(sumAmounts(position.drawdowns))}`}
-          />
-        </FigureBandCell>
-        <FigureBandCell>
-          <Figure
-            label="Money out to date"
-            value={formatCrore(outTotal)}
-            size="lg"
-            hint={
-              position.approvedUnpaidCount > 0
-                ? `Plus ${formatCrore(position.approvedUnpaidTotal)} across ${formatCount(position.approvedUnpaidCount)} approved bills waiting to be paid`
-                : "Every approved bill is paid"
-            }
-          />
-        </FigureBandCell>
-        <FigureBandCell>
-          <Figure
-            label="Net, as recorded"
-            value={formatCrore(net)}
-            size="lg"
-            tone={net < 0 ? "warn" : "good"}
-          />
-        </FigureBandCell>
-        <FigureBandCell>
-          <Figure
-            label="Interest paid to date"
-            value={formatCrore(sumAmounts(position.interestPaid))}
-            size="lg"
-          />
-        </FigureBandCell>
-      </FigureBand>
-
-      <ChartCard title="Money in vs money out, last 12 months" series={inOut.series}>
-        <ChartBars model={inOut} />
-      </ChartCard>
-
-      <ChartCard
-        title="What the money out was, by month"
-        series={outStack.series}
-        note="Bills are counted when they are marked paid, not when the invoice arrived."
-      >
-        <ChartStacked model={outStack} />
-      </ChartCard>
-
-      <p className="text-muted text-xs">
-        This is the net of what the toolbox has recorded — client receipts, paid bills and the
-        funding ledger. It is not a bank balance: salaries, overheads and anything paid outside
-        Bills are not in it.
-      </p>
-    </div>
+    <ToolWelcome
+      icon="Landmark"
+      intro={[
+        "The company's money picture in one place, drawn from what the other tools record — client receipts from Client Relations, paid bills from Bills — plus the funding ledger kept here: every loan and investor, its drawdowns, repayments and interest.",
+        "Cash adds up money in against money out, month by month. Forward looks ahead at expected collections against the plan. Funding is the ledger of what has been raised.",
+      ]}
+      stats={[
+        { label: "Funding facilities", value: counts.facilities, hint: "loans and investors" },
+        {
+          label: "Bills awaiting payment",
+          value: counts.approvedUnpaid,
+          hint: "approved, not yet paid",
+        },
+        {
+          label: "Receipts this month",
+          value: counts.receiptsThisMonth,
+          hint: "client payments in",
+        },
+      ]}
+      links={[
+        { label: "Cash", href: "/financial-management/cash", primary: true },
+        { label: "Forward", href: "/financial-management/forward" },
+        { label: "Funding", href: "/financial-management/funding" },
+      ]}
+    />
   );
 }
