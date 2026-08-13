@@ -73,43 +73,36 @@ waiting list (the write path `replaceFutureLegs` exists and is current, just
 unwired), and no "Open a trail" button on the Projects landing page (one click
 away already; not asked for).
 
-## 5. Reporter — COMPLETE (all ten stages merged, signed off 2026-08-13)
+## 5. Reporter — COMPLETE; three founder taps remain, then follow-ups
 
-Follow-ups that are decisions or small acts in the running app, not code:
+All ten stages merged and signed off 2026-08-13; the tool's history and
+binding decisions live in `app/(dashboard)/reporter/PLAN.md`. What is left
+is done in the running app, not in code:
 
-- **Grant `/reporter`** to whoever should see it. The amber warning beside
-  the checkbox says what the grant means; before Stage 6, only the probe
-  held it among non-admins.
 - **Press one real write button on Purchase Orders on production** — `0055`
-  rewrote the read policies its screens run under (house rule after any
+  rewrote the read policies its screens run under (the house rule after any
   deploy touching a tool's policies). Same spot-check for Bills and Budgets.
-- No client receipts are recorded yet, so the receipts dataset and the
-  collections side of plan-vs-actual honestly read zero until Client
-  Relations records one.
-- Wanted later, not asked for yet: a dashboard composer (several charts on
-  one page — the true multi-dataset Project scorecard and budget-vs-PO
-  spend comparison both wait on it), and a sparkline for a second tool.
+- **Grant `/reporter`** to whoever should see it. The amber warning beside
+  the checkbox says exactly what the grant now means — every vendor rate,
+  bill amount and margin; before Stage 6, only the probe held it among
+  non-admins.
+- **Reconcile Sales & collections against one villa** once Client Relations
+  records its first real receipt — the receipts dataset and the collections
+  side of plan-vs-actual honestly read zero until then.
 
-Three things the founder decided that are easy to lose:
+Wanted later, not asked for yet: a dashboard composer (several charts on one
+page — the true multi-dataset Project scorecard waits on it), and a
+sparkline for a second tool.
 
-- **Reporter shows full line-level money, including client rate and margin %.**
-  After Stages 6 and 7, granting `/reporter` shows every vendor rate, every bill
-  amount and the markup on every quoted line. One grant, grantable to anyone in
-  Settings — so the Settings copy beside the checkbox must say so. This is the
-  widest permission change the app has made.
-- **It is a builder, not a fixed shelf of reports.** Seven starting points ship
-  as code constants you can bend and "Save a copy" of.
-- **Charts are core, not a nice-to-have**, and a report is a composed page —
-  headline figures, chart, then the table with subtotals.
-
-**Financial Management is now the one Management stub with no plan**, and it gets
-its own session with the founder before any code. It has an obvious first
-question: Client Relations already holds every rupee coming in, and Bills holds
-every rupee going out. Whatever that tool becomes, it reads those two rather than
-re-recording either — and CRM's tables are grant-gated on SELECT, so it needs a
-money-free view with a hand-written column list, never a second policy. Note that
-Reporter's `0056` will already have built two such CRM fact views; check them
-before writing a third.
+**Financial Management is now the one Management stub with no plan**, and it
+gets its own session with the founder before any code. It has an obvious
+first question: Client Relations already holds every rupee coming in, and
+Bills holds every rupee going out. Whatever that tool becomes, it reads
+those two rather than re-recording either — and CRM's tables are
+grant-gated on SELECT, so it needs a money-free view with a hand-written
+column list, never a second policy. Reporter's `0056` has already built two
+such CRM fact views (`crm_milestone_facts`, `crm_receipt_facts`); check
+them before writing a third.
 
 Two follow-ups the founder asked to defer on Client Relations:
 
@@ -132,16 +125,16 @@ Neither blocking, both for when the founder next uses it in anger:
   month, not money to raise. The tool reports peak funding as zero and the
   trough separately.
 
-Wanted later, none asked for yet: a one-page PDF of a plan; itemised charge
-and running-cost lines on a HOLD line; a cash curve.
+One new since `0057`: linking a plan to a project in the Rename dialog
+publishes its headline numbers for Reporter's plan-vs-actual. **Nobody has
+linked a real plan yet** — the founder should link Vihara (or whichever plan
+is live) to its project when the projects exist in Masters, or the
+plan-vs-actual starter stays an empty page.
 
-**The cash curve's instruction has changed.** This line used to say "hand-rolled
-inline SVG per `DESIGN.md`, not a chart library". Reporter's Stage 3 adds
-`recharts` and the shared `components/ui/chart/*` wrappers, so once that lands
-the cash curve uses those like every other chart — a second, hand-rolled charting
-approach in the same app is exactly the drift the shared components exist to
-prevent. If Business Planning gets there first, build the wrappers as part of it
-and Reporter reuses them.
+Wanted later, none asked for yet: a one-page PDF of a plan (the Reporter's
+`lib/pdf/` chart pieces now exist to build on); itemised charge and
+running-cost lines on a HOLD line; a cash curve — which now simply uses the
+shared `components/ui/chart/*` wrappers Reporter built, per DESIGN.md.
 
 ## 7. From the audit — lower priority
 
