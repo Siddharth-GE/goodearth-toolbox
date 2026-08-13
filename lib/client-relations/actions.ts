@@ -22,11 +22,10 @@ import type { ActionState } from "@/lib/action-state";
 
 const GRANT = "/client-relations";
 
-/** Every CRM screen shows some slice of the same records. */
+/** Every CRM screen shows some slice of the same records. The layout
+ * form covers the whole tree — the moved clients list included. */
 function revalidateAll(): void {
-  revalidatePath("/client-relations");
-  revalidatePath("/client-relations/plots");
-  revalidatePath("/client-relations/dues");
+  revalidatePath("/client-relations", "layout");
 }
 
 /**
