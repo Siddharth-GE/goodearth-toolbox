@@ -77,3 +77,7 @@ TODO.md required.
 - Interest convention sanity-check against one real facility.
 - Equity: "repayment" doubles as return of capital; dividends may need
   their own movement kind later.
+
+## Welcome screen (2026-08-13)
+
+The tool opens on a welcome screen (founder request, all Operations and Management tools). The Cash dashboard moved to `/financial-management/cash` (its nav tab too; the nav lights no tab on the welcome); `revalidatePath` calls became the `"layout"` form. Welcome counts are deliberately rupee-free — facilities, approved-unpaid bills and receipts this month as plain counts via `getWelcomeCounts()`.

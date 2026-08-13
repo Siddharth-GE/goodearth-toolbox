@@ -131,7 +131,7 @@ export async function deleteDraft(selectionId: string): Promise<ActionState> {
   }
 
   revalidatePath("/selections", "layout");
-  redirect("/selections");
+  redirect("/selections/units");
 }
 
 // ---------------------------------------------------------------------

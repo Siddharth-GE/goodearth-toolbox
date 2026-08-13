@@ -9,8 +9,8 @@ export default async function NewBillPage() {
     <div className="space-y-4">
       <PageTitle
         title="Record a bill"
-        backHref="/bills"
-        backLabel="Bills"
+        backHref="/bills/list"
+        backLabel="All bills"
         description="The vendor's paper invoice, as printed — against one purchase order or one labour contract."
       />
       <BillForm options={options} />

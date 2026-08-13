@@ -51,7 +51,7 @@ export function RelayPanel({ engagement }: { engagement: EngagementDetail }) {
       <Section
         title="On site"
         aside={
-          <LinkButton href="/relay" variant="ghost">
+          <LinkButton href="/relay/projects" variant="ghost">
             Open Relay
           </LinkButton>
         }

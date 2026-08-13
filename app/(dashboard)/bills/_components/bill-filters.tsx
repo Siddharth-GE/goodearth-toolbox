@@ -31,7 +31,7 @@ export function BillFilters({
     if (vendor) params.set("vendor", vendor);
     if (project) params.set("project", project);
     const query = params.toString();
-    router.push(query ? `/bills?${query}` : "/bills");
+    router.push(query ? `/bills/list?${query}` : "/bills/list");
   };
 
   return (

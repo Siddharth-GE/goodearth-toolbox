@@ -195,6 +195,39 @@ export type CashPosition = {
   interestPaid: DatedAmount[];
 };
 
+/** Headline counts for the tool's welcome screen. Deliberately counts,
+ * never rupees — this tool's screens are all money, so the welcome is
+ * the one place that shows none of it. */
+export async function getWelcomeCounts() {
+  await requireTool("/financial-management");
+  const supabase = await createClient();
+
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+  // received_on is a date, not a timestamp.
+  const since = startOfMonth.toISOString().slice(0, 10);
+
+  // Exact database counts, head-only — never rows.length.
+  const [facilities, approvedUnpaid, receipts] = await Promise.all([
+    supabase.from("funding_facilities").select("id", { count: "exact", head: true }),
+    supabase
+      .from("bill_money_facts")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "approved"),
+    supabase
+      .from("crm_receipt_facts")
+      .select("id", { count: "exact", head: true })
+      .gte("received_on", since),
+  ]);
+
+  return {
+    facilities: facilities.count ?? 0,
+    approvedUnpaid: approvedUnpaid.count ?? 0,
+    receiptsThisMonth: receipts.count ?? 0,
+  };
+}
+
 /**
  * Everything the Cash screen adds up, raw — the bucketing and chart
  * shaping stay in the pure cashflow.ts where the tests are.

@@ -644,3 +644,7 @@ tests never touch a database.
    exactly where intended and nowhere else.
 6. After each deploy touching server actions, press one real write button on
    production.
+
+## Welcome screen (2026-08-13)
+
+The tool opens on a welcome screen (founder request, all Operations and Management tools). The starters grid and saved-reports table moved to `/reporter/saved`; back-links and the post-delete push follow it; `revalidatePath` calls became the `"layout"` form. Counts: saved reports (head count), starters and datasets (code constants).

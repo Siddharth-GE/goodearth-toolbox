@@ -27,7 +27,7 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
     <div className="space-y-4">
       <PageTitle
         title={bill.reference}
-        backHref="/bills"
+        backHref="/bills/list"
         backLabel="All bills"
         description={
           <>

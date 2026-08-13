@@ -5,7 +5,8 @@ A snapshot, not a changelog. Durable rules live in `CLAUDE.md`, next tasks in
 `PLAN.md`, and full history in git.
 
 _Last reviewed: 2026-08-13 — Financial Management shipped (`0058`, PR #17
-merged after founder sign-off), closing the last planned Management tool._
+merged after founder sign-off), closing the last planned Management tool;
+welcome screens added to every Operations and Management tool the same day._
 
 ## Platform
 
@@ -42,6 +43,19 @@ merged after founder sign-off), closing the last planned Management tool._
 
 The chain runs end to end: design → price → indent → PO → goods in / stock /
 goods out → bill → paid.
+
+**Every Operations and Management tool opens on a welcome screen**
+(2026-08-13, founder request): a plain-English card on what the tool is for,
+live counts (never rupees), and buttons into the real screens. The old first
+screens moved one click in — `/selections/units`, `/indents/list`,
+`/purchase-orders/list`, `/inventory/receive`, `/bills/list`,
+`/budgets/interiors`, `/reporter/saved`, `/client-relations/clients`,
+`/financial-management/cash`, `/business-planning/plans`; Relay's root
+redirect became its welcome. Shared component:
+`app/(dashboard)/_components/tool-welcome.tsx`; each tool's counts come from
+a `getWelcomeCounts()` in its own `lib/<tool>/` module. The moves changed
+every `revalidatePath("/<tool>")` to the `"layout"` form — an exact-path
+call would refresh only the welcome and leave the moved list stale.
 
 ## Notable facts worth not rediscovering
 

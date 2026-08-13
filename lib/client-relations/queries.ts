@@ -42,6 +42,27 @@ function fail(context: string, error: { message: string } | null): void {
   }
 }
 
+/** Headline counts for the tool's welcome screen. Counts only — dues,
+ * receipts and every other rupee stay behind the doors. */
+export async function getWelcomeCounts() {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+
+  // Exact database counts, head-only — never rows.length. No embeds
+  // here on purpose: a bad select string passes every CI gate.
+  const [clients, prospects, engaged] = await Promise.all([
+    supabase.from("clients").select("id", { count: "exact", head: true }).eq("stage", "client"),
+    supabase.from("clients").select("id", { count: "exact", head: true }).eq("stage", "prospect"),
+    supabase.from("client_engagements").select("id", { count: "exact", head: true }),
+  ]);
+
+  return {
+    clients: clients.count ?? 0,
+    prospects: prospects.count ?? 0,
+    engaged: engaged.count ?? 0,
+  };
+}
+
 // ---------------------------------------------------------------------
 // Shared lookups
 // ---------------------------------------------------------------------

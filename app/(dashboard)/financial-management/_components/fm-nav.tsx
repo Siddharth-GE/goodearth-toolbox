@@ -9,17 +9,16 @@ import { usePathname } from "next/navigation";
  * CrmNav reasoning).
  */
 const TABS = [
-  { key: "cash", href: "/financial-management", label: "Cash" },
+  { key: "cash", href: "/financial-management/cash", label: "Cash" },
   { key: "forward", href: "/financial-management/forward", label: "Forward" },
   { key: "funding", href: "/financial-management/funding", label: "Funding" },
 ] as const;
 
 export function FmNav() {
   const pathname = usePathname();
-  // Longest match first, because every href starts with the Cash one.
-  const active =
-    [...TABS]
-      .sort((a, b) => b.href.length - a.href.length)
-      .find((tab) => pathname.startsWith(tab.href))?.key ?? "cash";
+  // The tool root is the welcome screen, which carries its own doors —
+  // showing the tabs above them reads as two competing menus.
+  if (pathname === "/financial-management") return null;
+  const active = TABS.find((tab) => pathname.startsWith(tab.href))?.key ?? "cash";
   return <NavTabs tabs={[...TABS]} active={active} />;
 }

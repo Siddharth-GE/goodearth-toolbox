@@ -77,3 +77,7 @@ Budgets (cost/margin/client rate) appears on a PO, ever.**
   to lift every PDF at once.
 - `/purchase-orders` was already in the `user_apps_app_known` CHECK
   (0017 pre-listed all planned tools) — no constraint change needed.
+
+## Welcome screen (2026-08-13)
+
+The tool opens on a welcome screen (founder request, all Operations and Management tools). The tabbed list moved to `/purchase-orders/list` — tab and pager hrefs, the form cancel link and the delete redirect follow it; `revalidatePath` calls became the `"layout"` form. Counts from `getWelcomeCounts()` in `lib/purchase-orders/queries.ts`.

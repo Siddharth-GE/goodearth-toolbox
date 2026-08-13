@@ -68,7 +68,7 @@ export default async function SelectionEditorPage({
     <div className="space-y-4">
       <PageTitle
         title={`${selection.unit_name} · R${selection.revision_no}`}
-        backHref="/selections"
+        backHref="/selections/units"
         backLabel="All units"
         description={
           <>
@@ -246,7 +246,7 @@ export default async function SelectionEditorPage({
                   editable={isDraft}
                   emptyAction={
                     isDraft ? undefined : (
-                      <LinkButton href="/selections" variant="secondary">
+                      <LinkButton href="/selections/units" variant="secondary">
                         Back to units
                       </LinkButton>
                     )

@@ -158,7 +158,7 @@ export async function recordGoodsReceipt(input: RecordReceiptInput): Promise<Act
     });
     if (lineError) {
       console.error("recordGoodsReceipt line insert failed:", lineError);
-      revalidatePath("/inventory");
+      revalidatePath("/inventory", "layout");
       const friendly = guardError(lineError, "A line was refused.");
       return {
         error:
@@ -170,7 +170,7 @@ export async function recordGoodsReceipt(input: RecordReceiptInput): Promise<Act
     added++;
   }
 
-  revalidatePath("/inventory");
+  revalidatePath("/inventory", "layout");
   revalidatePath("/inventory/stock");
   revalidatePath(`/purchase-orders/${input.poId}`);
   redirect(`/inventory/receipts/${receiptId}`);

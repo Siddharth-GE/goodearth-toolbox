@@ -43,6 +43,35 @@ export type PoListPage = {
   pageSize: number;
 };
 
+/** Headline counts for the tool's welcome screen. Status counts only —
+ * no money leaves the PO tables through this. */
+export async function getWelcomeCounts() {
+  await requireTool("/purchase-orders");
+  const supabase = await createClient();
+
+  // Exact database counts, head-only — never rows.length.
+  const [drafts, issued, deletions] = await Promise.all([
+    supabase
+      .from("purchase_orders")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "draft"),
+    supabase
+      .from("purchase_orders")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "issued"),
+    supabase
+      .from("purchase_orders")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "deletion_requested"),
+  ]);
+
+  return {
+    drafts: drafts.count ?? 0,
+    issuedOpen: issued.count ?? 0,
+    deletionRequests: deletions.count ?? 0,
+  };
+}
+
 export async function listPurchaseOrders({
   page = 1,
   status,

@@ -33,8 +33,8 @@ export default async function RunReportPage({
       <PageTitle
         title={`${dataset.label} report`}
         description="Unsaved — the page link is the report. Share it, bookmark it, or save it by name."
-        backHref="/reporter"
-        backLabel="Reporter"
+        backHref="/reporter/saved"
+        backLabel="Reports"
         actions={<SaveReportDialog spec={spec} trigger="Save report" />}
       />
 

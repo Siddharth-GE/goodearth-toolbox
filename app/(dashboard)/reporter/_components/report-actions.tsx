@@ -88,7 +88,7 @@ export function ReportActions({
       return;
     }
     setConfirming(false);
-    router.push("/reporter");
+    router.push("/reporter/saved");
   }
 
   return (

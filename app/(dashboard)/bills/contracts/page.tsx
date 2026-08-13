@@ -32,8 +32,8 @@ export default async function LabourContractsPage() {
     <div className="space-y-4">
       <PageTitle
         title="Labour Contracts"
-        backHref="/bills"
-        backLabel="Bills"
+        backHref="/bills/list"
+        backLabel="All bills"
         description="A contractor's agreement — recorded here, approved by a bill approver, then billable."
         actions={
           <ContractFormDialog

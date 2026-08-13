@@ -51,8 +51,8 @@ export default async function ReportPage({
       <PageTitle
         title={report.name}
         description={description}
-        backHref="/reporter"
-        backLabel="Reporter"
+        backHref="/reporter/saved"
+        backLabel="Reports"
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {!report.starter && (

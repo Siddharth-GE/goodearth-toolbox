@@ -1,98 +1,38 @@
 import { PageTitle } from "@/components/ui/page-title";
-import { Badge } from "@/components/ui/badge";
-import { EmptyState } from "@/components/ui/empty-state";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeaderCell,
-  TableRow,
-} from "@/components/ui/table";
 import { listInbox } from "@/lib/budgets/queries";
-import { PiggyBank } from "lucide-react";
-import Link from "next/link";
-import { BudgetsNav } from "./_components/budgets-nav";
-import { StartPricingButton } from "./_components/start-pricing-button";
-import { formatDate } from "@/lib/format";
 
+import { ToolWelcome } from "../_components/tool-welcome";
+
+// The welcome screen (founder, 2026-08-13: every Operations and
+// Management tool opens on one). Counts only — the rupees stay on the
+// screens behind the doors below. The inbox is a complete fetchAll read,
+// so deriving counts from it is safe.
 export default async function BudgetsPage() {
-  const rows = await listInbox();
+  const inbox = await listInbox();
+  const waiting = inbox.filter((row) => !row.budget_id).length;
+  const pricing = inbox.filter((row) => row.budget_status === "pricing").length;
+  const approved = inbox.filter((row) => row.budget_status === "approved").length;
 
   return (
     <div className="space-y-4">
-      <PageTitle
-        title="Budgets"
-        description="Every design revision handed over for pricing. Costs and margins here are visible only to this team."
-        actions={
-          <Link href="/budgets/margins" className="text-accent text-sm font-medium hover:underline">
-            Product margins
-          </Link>
-        }
+      <PageTitle title="Budgets" description="Price an issued design revision, space by space." />
+      <ToolWelcome
+        icon="PiggyBank"
+        intro={[
+          "The moment the design team issues a revision, it lands here to be priced — every line, space by space, with the margins this team alone can see. An approved budget is what Indents draws against, so nothing is purchased that was never priced.",
+          "Interiors carries the priced revisions and client quotes; Construction carries the QS team's stage-wise quantity plans.",
+        ]}
+        stats={[
+          { label: "Waiting to price", value: waiting, hint: "issued, not started" },
+          { label: "Being priced", value: pricing, hint: "part-way through" },
+          { label: "Approved", value: approved, hint: "ready for indents" },
+        ]}
+        links={[
+          { label: "Pricing inbox", href: "/budgets/interiors", primary: true },
+          { label: "Construction", href: "/budgets/construction" },
+          { label: "Product margins", href: "/budgets/margins" },
+        ]}
       />
-
-      <BudgetsNav />
-
-      {rows.length === 0 ? (
-        <EmptyState
-          icon={PiggyBank}
-          title="Nothing to price yet"
-          description="A revision appears here the moment the design team issues it."
-        />
-      ) : (
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableHeaderCell>Project</TableHeaderCell>
-              <TableHeaderCell>Unit</TableHeaderCell>
-              <TableHeaderCell>Revision</TableHeaderCell>
-              <TableHeaderCell>Issued</TableHeaderCell>
-              <TableHeaderCell>Progress</TableHeaderCell>
-              <TableHeaderCell></TableHeaderCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {rows.map((row) => (
-              <TableRow key={row.selection_id}>
-                <TableCell>{row.project_name}</TableCell>
-                <TableCell className="text-foreground font-medium">{row.unit_name}</TableCell>
-                <TableCell>R{row.revision_no}</TableCell>
-                <TableCell className="text-muted">{formatDate(row.issued_at)}</TableCell>
-                <TableCell>
-                  {row.budget_status === "approved" ? (
-                    <Badge variant="success">Approved</Badge>
-                  ) : row.budget_status === "pricing" ? (
-                    <div className="flex items-center gap-2">
-                      <Badge variant="warning">Pricing</Badge>
-                      {/* The number that says whether this is nearly done or
-                          barely started, without having to open it. */}
-                      <span className="text-muted text-xs">
-                        {row.priced_count} of {row.line_count} priced
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="text-muted">
-                      {row.line_count} {row.line_count === 1 ? "line" : "lines"} waiting
-                    </span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  {row.budget_id ? (
-                    <Link
-                      href={`/budgets/${row.budget_id}`}
-                      className="text-accent text-sm font-medium hover:underline"
-                    >
-                      {row.budget_status === "approved" ? "View" : "Continue"}
-                    </Link>
-                  ) : (
-                    <StartPricingButton selectionId={row.selection_id} />
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
     </div>
   );
 }

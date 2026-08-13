@@ -12,15 +12,15 @@ export default async function ReceivePage({ params }: { params: Promise<{ poId: 
 
   // Goods only arrive against an issued order — the database refuses
   // anything else, so don't offer a form that cannot be submitted.
-  if (pool.status !== "issued") redirect("/inventory");
+  if (pool.status !== "issued") redirect("/inventory/receive");
 
   return (
     <div className="space-y-4">
       <PageTitle
         title={`Receive against ${pool.reference}`}
         description={`${pool.vendor_name} · ${pool.project_name}${pool.site_label ? ` · ${pool.site_label}` : ""}`}
-        backHref="/inventory"
-        backLabel="Inventory"
+        backHref="/inventory/receive"
+        backLabel="Receive"
       />
 
       {pool.lines.length === 0 ? (

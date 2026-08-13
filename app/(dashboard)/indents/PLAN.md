@@ -98,3 +98,7 @@ R1's budget and again from R2's, and bought twice. Now:
 - Approvers are a named list (`indent_approvers`), managed from
   Settings; admins always may. The approver tick doesn't grant the app —
   the Settings header hint covers it.
+
+## Welcome screen (2026-08-13)
+
+The tool opens on a welcome screen (founder request, all Operations and Management tools). The tabbed list moved to `/indents/list` — tab and pager hrefs, the form cancel link and the delete redirect follow it; `revalidatePath` calls became the `"layout"` form so the moved list never goes stale. Counts from `getWelcomeCounts()` in `lib/indents/queries.ts`.

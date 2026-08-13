@@ -10,7 +10,7 @@ import { usePathname } from "next/navigation";
  * keep their back-links instead.
  */
 const TABS = [
-  { key: "interiors", href: "/budgets", label: "Interiors" },
+  { key: "interiors", href: "/budgets/interiors", label: "Interiors" },
   { key: "construction", href: "/budgets/construction", label: "Construction" },
 ] as const;
 

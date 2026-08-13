@@ -141,3 +141,7 @@ column anywhere, and there must never be one.**
   exists as a standalone page — the register must open something on every row,
   and those five have no client page to land on. It renders the same
   `EngagementCard` as the client page so the two cannot drift.
+
+## Welcome screen (2026-08-13)
+
+The tool opens on a welcome screen (founder request, all Operations and Management tools). The clients list moved to `/client-relations/clients` — the GET filter form, Clear link, pager and nav tab follow it; the shared `revalidateAll()` became one `"layout"` call. The nav lights no tab on the welcome. Counts from `getWelcomeCounts()` in `lib/client-relations/queries.ts` (embed-free head counts; dues stay behind the doors).

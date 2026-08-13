@@ -90,7 +90,7 @@ export async function createPurchaseOrder(input: CreatePoInput): Promise<ActionS
   }
   if (!poId) return { error: "Could not create the purchase order. Try again." };
 
-  revalidatePath("/purchase-orders");
+  revalidatePath("/purchase-orders", "layout");
   redirect(`/purchase-orders/${poId}`);
 }
 
@@ -328,7 +328,7 @@ export async function issuePo(poId: string): Promise<ActionState> {
   }
 
   revalidatePath(`/purchase-orders/${poId}`);
-  revalidatePath("/purchase-orders");
+  revalidatePath("/purchase-orders", "layout");
   return undefined;
 }
 
@@ -361,7 +361,7 @@ export async function requestPoDeletion(poId: string, note: string): Promise<Act
   }
 
   revalidatePath(`/purchase-orders/${poId}`);
-  revalidatePath("/purchase-orders");
+  revalidatePath("/purchase-orders", "layout");
   return undefined;
 }
 
@@ -387,7 +387,7 @@ export async function withdrawPoDeletion(poId: string): Promise<ActionState> {
   }
 
   revalidatePath(`/purchase-orders/${poId}`);
-  revalidatePath("/purchase-orders");
+  revalidatePath("/purchase-orders", "layout");
   return undefined;
 }
 
@@ -415,7 +415,7 @@ export async function approvePoDeletion(poId: string): Promise<ActionState> {
   }
 
   revalidatePath(`/purchase-orders/${poId}`);
-  revalidatePath("/purchase-orders");
+  revalidatePath("/purchase-orders", "layout");
   return undefined;
 }
 
@@ -435,6 +435,6 @@ export async function deleteDraftPo(poId: string): Promise<ActionState> {
     };
   }
 
-  revalidatePath("/purchase-orders");
-  redirect("/purchase-orders");
+  revalidatePath("/purchase-orders", "layout");
+  redirect("/purchase-orders/list");
 }

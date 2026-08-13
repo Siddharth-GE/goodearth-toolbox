@@ -46,7 +46,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
     <div className="space-y-4">
       <PageTitle
         title={po.reference}
-        backHref="/purchase-orders"
+        backHref="/purchase-orders/list"
         backLabel="All purchase orders"
         description={
           <>

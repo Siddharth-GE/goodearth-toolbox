@@ -33,7 +33,7 @@ export default async function ClientDetailPage({
     <div className="space-y-4">
       <PageTitle
         title={client.name}
-        backHref="/client-relations"
+        backHref="/client-relations/clients"
         backLabel="Clients"
         description={client.stage === "lost" ? (client.lostReason ?? undefined) : undefined}
         actions={

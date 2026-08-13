@@ -23,6 +23,38 @@ import { remainingToReceive } from "./stock";
  * shape everything here are documented in ./queries.ts.
  */
 
+/** Headline counts for the tool's welcome screen. Inventory carries no
+ * money at all, so these are counts of movements, nothing else. */
+export async function getWelcomeCounts() {
+  await requireTool("/inventory");
+  const supabase = await createClient();
+
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+  // received_at and issued_at are dates, not timestamps.
+  const since = startOfMonth.toISOString().slice(0, 10);
+
+  // Exact database counts, head-only — never rows.length.
+  const [awaiting, received, issued] = await Promise.all([
+    supabase.from("po_facts").select("id", { count: "exact", head: true }).eq("status", "issued"),
+    supabase
+      .from("goods_receipts")
+      .select("id", { count: "exact", head: true })
+      .gte("received_at", since),
+    supabase
+      .from("stock_issues")
+      .select("id", { count: "exact", head: true })
+      .gte("issued_at", since),
+  ]);
+
+  return {
+    awaitingDelivery: awaiting.count ?? 0,
+    receivedThisMonth: received.count ?? 0,
+    issuedThisMonth: issued.count ?? 0,
+  };
+}
+
 /* ------------------------------------------------------------------ *
  * Receive — the purchase orders with goods still to come
  * ------------------------------------------------------------------ */

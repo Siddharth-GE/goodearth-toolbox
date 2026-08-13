@@ -205,7 +205,7 @@ export function PoForm({ options }: { options: PoFormOptions }) {
       <FormMessage error={error} />
 
       <div className="flex items-center justify-end gap-2">
-        <LinkButton href="/purchase-orders" variant="ghost">
+        <LinkButton href="/purchase-orders/list" variant="ghost">
           Cancel
         </LinkButton>
         <Button

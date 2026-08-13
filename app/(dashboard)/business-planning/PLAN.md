@@ -262,3 +262,7 @@ Note what this does and does not touch:
   _"completely independent"_ and it is: `0048` has no foreign key outside
   `profiles`, and nothing here appears in the cross-tool contract table
   in CLAUDE.md.
+
+## Welcome screen (2026-08-13)
+
+The tool opens on a welcome screen (founder request, all Operations and Management tools). The plans table moved to `/business-planning/plans` (the New-plan dialog with it); `revalidatePath` calls became the `"layout"` form. Welcome counts derive from `listPlans()` and show counts only, never a rupee.
