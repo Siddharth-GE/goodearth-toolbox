@@ -75,6 +75,25 @@ export type UnitSelectionPage = {
   pageSize: number;
 };
 
+/** Headline counts for the tool's welcome screen. Counts only, no money. */
+export async function getWelcomeCounts() {
+  await requireTool("/selections");
+  const supabase = await createClient();
+
+  // Exact database counts, head-only — never rows.length.
+  const [units, drafts, issued] = await Promise.all([
+    supabase.from("units").select("id", { count: "exact", head: true }),
+    supabase.from("selections").select("id", { count: "exact", head: true }).eq("status", "draft"),
+    supabase.from("selections").select("id", { count: "exact", head: true }).eq("status", "issued"),
+  ]);
+
+  return {
+    units: units.count ?? 0,
+    drafts: drafts.count ?? 0,
+    issued: issued.count ?? 0,
+  };
+}
+
 /**
  * Units a designer can work on, with whichever revision matters.
  *
