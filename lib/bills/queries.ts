@@ -41,6 +41,35 @@ export type BillListPage = {
   pageSize: number;
 };
 
+/** Headline counts for the tool's welcome screen. Counts only — bill
+ * money stays on the screens behind the doors. */
+export async function getWelcomeCounts() {
+  await requireTool("/bills");
+  const supabase = await createClient();
+
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+  const since = startOfMonth.toISOString();
+
+  // Exact database counts, head-only — never rows.length.
+  const [recorded, unpaid, paid] = await Promise.all([
+    supabase.from("bills").select("id", { count: "exact", head: true }).eq("status", "recorded"),
+    supabase.from("bills").select("id", { count: "exact", head: true }).neq("status", "paid"),
+    supabase
+      .from("bills")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "paid")
+      .gte("paid_at", since),
+  ]);
+
+  return {
+    awaitingApproval: recorded.count ?? 0,
+    unpaid: unpaid.count ?? 0,
+    paidThisMonth: paid.count ?? 0,
+  };
+}
+
 export async function listBills({
   page = 1,
   status,

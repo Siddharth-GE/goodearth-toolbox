@@ -101,7 +101,7 @@ export async function createBill(input: CreateBillInput): Promise<ActionState> {
   }
   if (!billId) return { error: "Could not record the bill. Try again." };
 
-  revalidatePath("/bills");
+  revalidatePath("/bills", "layout");
   redirect(`/bills/${billId}`);
 }
 
@@ -159,7 +159,7 @@ export async function createNmrBill(input: CreateNmrBillInput): Promise<ActionSt
   }
   if (!billId) return { error: "Could not record the bill. Try again." };
 
-  revalidatePath("/bills");
+  revalidatePath("/bills", "layout");
   redirect(`/bills/${billId}`);
 }
 
@@ -342,7 +342,7 @@ export async function updateBill(billId: string, input: UpdateBillInput): Promis
   }
 
   revalidatePath(`/bills/${billId}`);
-  revalidatePath("/bills");
+  revalidatePath("/bills", "layout");
   return undefined;
 }
 
@@ -372,7 +372,7 @@ export async function approveBill(billId: string): Promise<ActionState> {
   }
 
   revalidatePath(`/bills/${billId}`);
-  revalidatePath("/bills");
+  revalidatePath("/bills", "layout");
   return undefined;
 }
 
@@ -400,7 +400,7 @@ export async function sendBackBill(billId: string, note: string): Promise<Action
   }
 
   revalidatePath(`/bills/${billId}`);
-  revalidatePath("/bills");
+  revalidatePath("/bills", "layout");
   return undefined;
 }
 
@@ -429,7 +429,7 @@ export async function markBillPaid(billId: string, paymentRef: string): Promise<
   }
 
   revalidatePath(`/bills/${billId}`);
-  revalidatePath("/bills");
+  revalidatePath("/bills", "layout");
   return undefined;
 }
 
@@ -454,6 +454,6 @@ export async function deleteBill(billId: string): Promise<ActionState> {
     };
   }
 
-  revalidatePath("/bills");
-  redirect("/bills");
+  revalidatePath("/bills", "layout");
+  redirect("/bills/list");
 }

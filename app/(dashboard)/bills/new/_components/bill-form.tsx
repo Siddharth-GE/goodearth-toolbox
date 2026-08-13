@@ -403,7 +403,7 @@ export function BillForm({ options }: { options: BillFormOptions }) {
       <FormMessage error={error} />
 
       <div className="flex items-center justify-end gap-2">
-        <LinkButton href="/bills" variant="ghost">
+        <LinkButton href="/bills/list" variant="ghost">
           Cancel
         </LinkButton>
         <Button onClick={record} disabled={recording || !readyToRecord}>
