@@ -73,27 +73,29 @@ waiting list (the write path `replaceFutureLegs` exists and is current, just
 unwired), and no "Open a trail" button on the Projects landing page (one click
 away already; not asked for).
 
-## 5. Reporter — next is Stage 7, Sales & collections
+## 5. Reporter — next is Stage 8, the remaining datasets
 
-The Reporter is live through Stage 6: builder, dropdown filters, grouping,
-subtotals, charts, CSV, saved reports with copyable starting points — and
-**the money**. `0055` is applied (founder's go-ahead 2026-08-12): holding
-`/reporter` now reads PO rates, bill amounts, budget cost, client rate and
-margin, via widened quals, never a second policy. The Settings checkbox says
-so in amber. Before Stage 6 merged, only one non-admin held the grant (the
-probe) — worth remembering when granting it next.
+The Reporter is live through Stage 7: builder, dropdown filters, grouping,
+subtotals, charts, CSV, saved reports with copyable starting points, **the
+money** (`0055`: PO rates, bill amounts, budget cost/client rate/margin via
+widened quals; amber warning beside the Settings checkbox) and **sales &
+collections** (`0056`: `crm_milestone_facts` + `crm_receipt_facts`, owner
+views whose WHERE and column list are the gate — the prose columns never
+leave the CRM). Two datasets, never one join: a milestone with three
+receipts would triple a sum; the view's own `received_amount` aggregate is
+the one sanctioned crossing. Before Stage 6 merged, only one non-admin held
+`/reporter` (the probe) — worth remembering when granting it next.
 
-**Two starting points ship so far** (Site & procurement, Spend vs budget).
-The rest each need a dataset that does not exist yet; a starter ships with
-its data. Note Spend vs budget reads the budget side (cost vs client value vs
-margin) — true budget-vs-PO-actuals needs two datasets on one page, which is
-the deferred dashboard composer.
+**Three starting points ship so far** (Site & procurement, Spend vs budget,
+Sales & collections). The rest each need a dataset that does not exist yet; a
+starter ships with its data. No client receipts are recorded yet, so the
+receipts dataset shows an honest empty state until Client Relations records
+one.
 
 The full plan is **`app/(dashboard)/reporter/PLAN.md`**. Read it before
-touching anything below. Four stages remain, each shippable and
+touching anything below. Three stages remain, each shippable and
 browser-testable on its own:
 
-7. **Sales & collections** — `0056`, two CRM fact views.
 8. **The remaining datasets** and their starters.
 9. **PDF** — Recharts → `sharp` → PNG → react-pdf.
 10. **Plan vs actual** — `0057`, Business Planning publishes targets.
