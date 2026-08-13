@@ -1,131 +1,41 @@
-import { LinkButton } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
 import { PageTitle } from "@/components/ui/page-title";
-import { Pagination } from "@/components/ui/pagination";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeaderCell,
-  TableRow,
-} from "@/components/ui/table";
-import { NavTabs } from "@/components/ui/tabs";
-import { formatCount, formatDate } from "@/lib/format";
-import { listPurchaseOrders } from "@/lib/purchase-orders/queries";
-import type { PoStatus } from "@/lib/purchase-orders/workflow";
-import { ShoppingCart } from "lucide-react";
-import Link from "next/link";
-import { PoStatusBadge } from "./_components/status-badge";
+import { getWelcomeCounts } from "@/lib/purchase-orders/queries";
 
-const TABS: { key: string; label: string; status?: PoStatus }[] = [
-  { key: "all", label: "All" },
-  { key: "draft", label: "Draft", status: "draft" },
-  { key: "issued", label: "Issued", status: "issued" },
-  { key: "deletion_requested", label: "Deletion requested", status: "deletion_requested" },
-  { key: "cancelled", label: "Cancelled", status: "cancelled" },
-  { key: "completed", label: "Completed", status: "completed" },
-];
+import { ToolWelcome } from "../_components/tool-welcome";
 
-export default async function PurchaseOrdersPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ status?: string; page?: string }>;
-}) {
-  const { status: statusParam, page } = await searchParams;
-  const tab = TABS.find((t) => t.status === statusParam) ?? TABS[0];
-
-  const result = await listPurchaseOrders({ page: Number(page) || 1, status: tab.status });
-  const { orders, total, page: currentPage, pageCount, pageSize } = result;
-
-  const hrefForPage = (target: number) => {
-    const params = new URLSearchParams();
-    if (tab.status) params.set("status", tab.status);
-    if (target > 1) params.set("page", String(target));
-    const query = params.toString();
-    return query ? `/purchase-orders?${query}` : "/purchase-orders";
-  };
+// The welcome screen (founder, 2026-08-13: every Operations and
+// Management tool opens on one). The list lives one click in at
+// /purchase-orders/list. Counts only — PO money stays behind the doors.
+export default async function PurchaseOrdersPage() {
+  const counts = await getWelcomeCounts();
 
   return (
     <div className="space-y-4">
       <PageTitle
         title="Purchase Orders"
-        description="Orders to vendors, raised from approved indent lines — one vendor and one plot/unit per PO."
-        actions={<LinkButton href="/purchase-orders/new">New PO</LinkButton>}
+        description="Orders to vendors, raised from approved indent lines."
       />
-
-      <NavTabs
-        tabs={TABS.map((t) => ({
-          key: t.key,
-          href: t.status ? `/purchase-orders?status=${t.status}` : "/purchase-orders",
-          label: t.label,
-        }))}
-        active={tab.key}
+      <ToolWelcome
+        icon="ShoppingCart"
+        intro={[
+          "Every order the company places starts from an approved indent line — one vendor and one plot or unit per PO, priced here and issued to the vendor. An issued PO is what deliveries are received against and what bills are recorded against.",
+          "Deleting an issued PO is never quiet: it has to be requested, and someone else approves it.",
+        ]}
+        stats={[
+          { label: "Drafts", value: counts.drafts, hint: "being put together" },
+          { label: "Issued", value: counts.issuedOpen, hint: "with vendors now" },
+          {
+            label: "Deletion requests",
+            value: counts.deletionRequests,
+            hint: "waiting on a decision",
+          },
+        ]}
+        links={[
+          { label: "New PO", href: "/purchase-orders/new", primary: true },
+          { label: "All purchase orders", href: "/purchase-orders/list" },
+          { label: "Deletion requested", href: "/purchase-orders/list?status=deletion_requested" },
+        ]}
       />
-
-      {orders.length === 0 ? (
-        <EmptyState
-          icon={ShoppingCart}
-          title={
-            tab.status ? `No ${tab.label.toLowerCase()} purchase orders` : "No purchase orders yet"
-          }
-          description={
-            tab.status
-              ? undefined
-              : "Raise one from an approved indent — pick the vendor, price the lines, issue it."
-          }
-          action={
-            tab.status ? undefined : <LinkButton href="/purchase-orders/new">New PO</LinkButton>
-          }
-        />
-      ) : (
-        <>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableHeaderCell>Reference</TableHeaderCell>
-                <TableHeaderCell>Project</TableHeaderCell>
-                <TableHeaderCell>Vendor</TableHeaderCell>
-                <TableHeaderCell>Expected by</TableHeaderCell>
-                <TableHeaderCell>Lines</TableHeaderCell>
-                <TableHeaderCell>Status</TableHeaderCell>
-                <TableHeaderCell></TableHeaderCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {orders.map((po) => (
-                <TableRow key={po.id}>
-                  <TableCell className="text-foreground font-medium">{po.reference}</TableCell>
-                  <TableCell>{po.project_name}</TableCell>
-                  <TableCell>{po.vendor_name}</TableCell>
-                  <TableCell className="text-muted">{formatDate(po.expected_by)}</TableCell>
-                  <TableCell>{formatCount(po.line_count)}</TableCell>
-                  <TableCell>
-                    <PoStatusBadge status={po.status} />
-                  </TableCell>
-                  <TableCell>
-                    <Link
-                      href={`/purchase-orders/${po.id}`}
-                      className="text-accent text-sm font-medium hover:underline"
-                    >
-                      Open
-                    </Link>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-
-          <Pagination
-            page={currentPage}
-            pageCount={pageCount}
-            prevHref={currentPage > 1 ? hrefForPage(currentPage - 1) : null}
-            nextHref={currentPage < pageCount ? hrefForPage(currentPage + 1) : null}
-            total={total}
-            pageSize={pageSize}
-          />
-        </>
-      )}
     </div>
   );
 }
