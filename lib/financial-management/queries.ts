@@ -4,6 +4,7 @@ import { requireTool } from "@/lib/auth/access";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { cache } from "react";
+import type { DatedAmount } from "./cashflow";
 import { facilityPosition, todayInIndia, type FacilityPosition } from "./interest";
 import type { FacilityKind, MovementKind } from "./kinds";
 
@@ -179,6 +180,86 @@ export const getFacility = cache(async (facilityId: string): Promise<FacilityDet
     })),
   };
 });
+
+export type CashPosition = {
+  /** Client money received — every receipt, from crm_receipt_facts. */
+  collections: DatedAmount[];
+  /** Bills actually paid, dated by paid_at. */
+  billsPaid: DatedAmount[];
+  /** Approved and waiting to be paid — the near-term payables figure. */
+  approvedUnpaidTotal: number;
+  approvedUnpaidCount: number;
+  /** The tool's own ledger, split by kind. */
+  drawdowns: DatedAmount[];
+  repayments: DatedAmount[];
+  interestPaid: DatedAmount[];
+};
+
+/**
+ * Everything the Cash screen adds up, raw — the bucketing and chart
+ * shaping stay in the pure cashflow.ts where the tests are.
+ *
+ * The two cross-tool reads go through the 0058 views (`crm_receipt_facts`,
+ * `bill_money_facts`) whose WHERE admits this tool's grant — never the
+ * CRM or Bills tables. fetchAll throughout: a receipt dropped by the
+ * silent 1,000-row cap would quietly misstate the company's cash.
+ */
+export async function getCashPosition(): Promise<CashPosition> {
+  await requireTool("/financial-management");
+  const supabase = await createClient();
+
+  const [receipts, bills, movements] = await Promise.all([
+    fetchAll((from, to) =>
+      supabase
+        .from("crm_receipt_facts")
+        .select("id, amount, received_on")
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAll((from, to) =>
+      supabase
+        .from("bill_money_facts")
+        .select("id, total_amount, status, paid_at")
+        .in("status", ["approved", "paid"])
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAll((from, to) =>
+      supabase
+        .from("funding_movements")
+        .select("id, kind, amount, happened_on")
+        .order("id")
+        .range(from, to),
+    ),
+  ]);
+
+  const collections: DatedAmount[] = receipts
+    .filter((receipt) => receipt.amount !== null)
+    .map((receipt) => ({ amount: receipt.amount ?? 0, on: receipt.received_on }));
+
+  const billsPaid: DatedAmount[] = bills
+    .filter((bill) => bill.status === "paid" && bill.total_amount !== null)
+    // The bills_guard requires paid_at before a bill can be paid, but a
+    // missing date still lands in `undated` honestly rather than today.
+    .map((bill) => ({ amount: bill.total_amount ?? 0, on: bill.paid_at }));
+
+  const approvedUnpaid = bills.filter((bill) => bill.status === "approved");
+
+  const byKind = (kind: MovementKind): DatedAmount[] =>
+    movements
+      .filter((movement) => movement.kind === kind)
+      .map((movement) => ({ amount: movement.amount, on: movement.happened_on }));
+
+  return {
+    collections,
+    billsPaid,
+    approvedUnpaidTotal: approvedUnpaid.reduce((sum, bill) => sum + (bill.total_amount ?? 0), 0),
+    approvedUnpaidCount: approvedUnpaid.length,
+    drawdowns: byKind("drawdown"),
+    repayments: byKind("repayment"),
+    interestPaid: byKind("interest"),
+  };
+}
 
 /** Profile ids to display names, in one query, skipping the nulls. */
 async function lookupNames(ids: (string | null)[]): Promise<Map<string, string | null>> {
