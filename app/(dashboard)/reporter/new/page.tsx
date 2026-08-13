@@ -17,8 +17,8 @@ export default async function NewReportPage() {
       <PageTitle
         title="Start a report"
         description="Pick the data to report over."
-        backHref="/reporter"
-        backLabel="Reporter"
+        backHref="/reporter/saved"
+        backLabel="Reports"
       />
       <div className="grid gap-3 sm:grid-cols-2">
         {Object.entries(DATASETS).map(([key, dataset]) => (

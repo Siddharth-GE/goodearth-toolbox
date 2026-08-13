@@ -258,6 +258,18 @@ export type LoadedReport = {
   updated_by_name: string | null;
 };
 
+/** Headline count for the tool's welcome screen — saved reports only;
+ * starters and datasets are code constants counted where they live. */
+export async function getWelcomeCounts() {
+  await requireTool("/reporter");
+  const supabase = await createClient();
+
+  // Exact database count, head-only — never rows.length.
+  const saved = await supabase.from("reports").select("id", { count: "exact", head: true });
+
+  return { saved: saved.count ?? 0 };
+}
+
 /**
  * Every saved report, newest touch first. fetchAll rather than a plain
  * select: this is the only way to reach a saved report, so a silent

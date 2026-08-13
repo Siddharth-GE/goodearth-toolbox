@@ -81,7 +81,7 @@ export async function saveReport(_state: ActionState, formData: FormData): Promi
     return { error: "Could not save the report. Try again." };
   }
 
-  revalidatePath("/reporter");
+  revalidatePath("/reporter", "layout");
   // redirect() throws its own control-flow signal, so it must be outside
   // any try/catch and after every write has been checked.
   redirect(`/reporter/${data.id}`);
@@ -115,7 +115,7 @@ export async function updateReportSpec(reportId: string, specParam: string): Pro
     return { error: "Could not save the changes. They are still on screen — try again." };
   }
 
-  revalidatePath("/reporter");
+  revalidatePath("/reporter", "layout");
   revalidatePath(`/reporter/${reportId}`);
   return undefined;
 }
@@ -142,7 +142,7 @@ export async function renameReport(
     return { error: "Could not rename the report. Try again." };
   }
 
-  revalidatePath("/reporter");
+  revalidatePath("/reporter", "layout");
   revalidatePath(`/reporter/${reportId}`);
   return undefined;
 }
@@ -168,6 +168,6 @@ export async function deleteReport(reportId: string): Promise<ActionState> {
     return { error: "This report belongs to someone else. Only they or an admin can delete it." };
   }
 
-  revalidatePath("/reporter");
+  revalidatePath("/reporter", "layout");
   return undefined;
 }
