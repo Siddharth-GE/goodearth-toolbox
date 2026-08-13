@@ -36,7 +36,7 @@ export default async function BudgetPricingPage({
             )}
           </>
         }
-        backHref="/budgets"
+        backHref="/budgets/interiors"
         backLabel="All budgets"
         description={
           <>

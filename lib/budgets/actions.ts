@@ -107,7 +107,7 @@ export async function startPricing(selectionId: string): Promise<ActionState> {
     return { error: carryError };
   }
 
-  revalidatePath("/budgets");
+  revalidatePath("/budgets", "layout");
   redirect(`/budgets/${data.id}`);
 }
 

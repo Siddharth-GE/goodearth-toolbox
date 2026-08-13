@@ -15,7 +15,7 @@ export default async function MarginsPage() {
     <div className="space-y-4">
       <PageTitle
         title="Product margins"
-        backHref="/budgets"
+        backHref="/budgets/interiors"
         backLabel="All budgets"
         description="The default markup applied when a product is priced. Changing one here only affects pricing done from now on — budgets already priced keep their own figures."
       />
