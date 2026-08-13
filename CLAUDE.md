@@ -100,6 +100,21 @@ are owner views whose `WHERE has_app(...)` and column list are the gate,
 because the CRM tables' stronger secret is prose (`details`, notes,
 bottlenecks), which the views omit; `0056` asserts that omission.
 
+**A second named exception, by founder decision: `/financial-management`
+reads client money, bill money and plan targets** (`0058`). Done entirely
+through owner views, never a widened table qual: `0058` restates
+`crm_milestone_facts`, `crm_receipt_facts` and `business_plan_target_facts`
+with a **three-way** WHERE (`… or has_app('/financial-management')`) and adds
+one new money-bearing view, `bill_money_facts` (bills money without
+`payment_ref`/`rejection_note`/`note` — not to be confused with the
+money-free `bill_facts`). `0055`'s seven-widened-policies assertion is
+untouched. **Anyone redefining those three views must carry the three-way
+WHERE forward** — re-running `0056`/`0057` as-is would silently strip
+Financial Management's access; `0058` ends by asserting exactly four views
+admit it. Its grant carries an amber warning too. Funds raised
+(`funding_facilities`/`funding_movements`) are the tool's own tables, fully
+gated, SELECT included.
+
 **Never add a money column to a fact view; never add a second SELECT policy to
 a gated table.** These views deliberately bypass RLS — their `WHERE` clause and
 column list _are_ the boundary, so a careless column crosses it silently.
@@ -121,6 +136,7 @@ checking every tool in its row. Keep it current.
 | Overview         | `indents`, `indent_lines`, `po_facts`, `bill_facts`, `goods_receipts` (counts only)                                                                                                                                                                                                                                                                                                               |
 | Client Relations | `pusher_chain_state`, `selections`                                                                                                                                                                                                                                                                                                                                                                |
 | Reporter         | `indents`, `indent_lines`, `purchase_orders(_lines)`, `bills`, `budget_report_lines`, `crm_milestone_facts`, `crm_receipt_facts`, `goods_receipts(_lines)`, `stock_by_location`, `selections`, `selection_lines`, `pusher_chain_state`, `units`, `business_plan_target_facts` + masters lookups (`projects`, `units`, `plots`, `vendors`, `stores`, `items`; registry `lib/reporter/datasets.ts`) |
+| Financial Mgmt   | `crm_milestone_facts`, `crm_receipt_facts`, `bill_money_facts`, `business_plan_target_facts` + shared `profiles` (byline lookups)                                                                                                                                                                                                                                                                 |
 
 Relay reads only shared `projects`/`units`/`profiles`; Business Planning reads
 only shared `projects` (the optional `0057` targets link — a plan itself still
@@ -133,6 +149,9 @@ own `business_plan_targets` on save; Reporter reads only the
 `pusher_chain_state` has now been redefined five times (see `0042`'s warning)
 and has two consumers outside Relay. A sixth definition must check Client
 Relations **and Reporter** (the `relay_chains` dataset).
+`crm_milestone_facts`/`crm_receipt_facts` and `business_plan_target_facts`
+now have Financial Management as a consumer too — their current definition is
+`0058`'s three-way WHERE, not `0056`/`0057`'s.
 
 Everything above is a `SELECT`: **no tool's code writes another tool's table.**
 Three documented exceptions:
