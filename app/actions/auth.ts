@@ -198,6 +198,30 @@ export async function resendLoginCode(): Promise<VerifyState> {
   return undefined;
 }
 
+/**
+ * Starts the Google sign-in. Supabase links a verified Google email to
+ * its existing account automatically, and the project refuses signups —
+ * so only an email that already belongs to the team comes back from
+ * this with a session. /auth/callback finishes the trip.
+ */
+export async function signInWithGoogle() {
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: `${siteUrl()}/auth/callback`,
+      // Always show the account chooser — on a shared site phone, the
+      // previous person's Google account must not be silently reused.
+      queryParams: { prompt: "select_account" },
+    },
+  });
+  if (error || !data.url) {
+    console.error("signInWithGoogle failed:", error?.message);
+    redirect("/login?error=auth");
+  }
+  redirect(data.url);
+}
+
 export async function logout() {
   const supabase = await createClient();
   await supabase.auth.signOut();
