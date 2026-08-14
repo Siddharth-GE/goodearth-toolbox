@@ -1,82 +1,40 @@
-# Masters — build plan (Phase 1 of the full business-system rebuild)
+# Masters — the rules
 
-**Status: SHIPPED — merged to `master` 2026-07-31.** Gate 1 tested and
-approved by the founder in the browser. Phase 2 (Selections) is next.
+**Shipped 2026-07-31.** Migrations `0004`, `0005`; hardened in `0031`; construction stages added in `0053`.
 
-See the root `STATUS.md` for the full multi-phase roadmap this is the
-foundation of.
+The shared reference data every other tool reads: projects, plots, units, clients, vendors, stores, items, categories, brands, GST rates, construction stages, item requests. **Masters is a shared surface, not a peer tool** — when it degrades, everything degrades, and that is expected.
 
-## Steps
+_Trimmed 2026-08-14: the build checklist lives in git._
 
-- [x] 1. Migration (`supabase/migrations/0004_masters.sql`): projects,
-      plots, units, clients, vendors, stores, items, item_categories,
-      brands, space_types, spaces. RLS: read open to all authenticated
-      staff, write restricted to admins. Seeded space_types (11), a
-      few item_categories/brands, 5 sample items (3 catalogue, 2 material).
-- [x] 2. `lib/masters/*.ts` — two files per master (`<name>.ts` reads +
-      `<name>-actions.ts` writes — see CLAUDE.md's "Shared masters" for
-      why the split is required, not stylistic: a mixed single file
-      broke the production build even though `tsc` passed clean).
-      Read functions have no `requireApp` gate (any future tool can
-      call them); write functions are gated by
-      `requireApp(user, "/masters")`, following
-      `lib/settings/actions.ts`'s pattern.
-- [x] 3. Pickers in `components/masters/` — originally `project-picker`,
-      `unit-picker`, `item-picker`, `vendor-combobox`, all plain
-      `<Select>`-based. **Only `project-picker` survives.** The other
-      three were deleted in the 2026-08-01 hardening audit: they still
-      had zero importers a phase later (Selections built its own
-      catalogue picker instead), and the planned "upgrade to a real
-      searchable combobox" never happened because nothing needed it.
-      Build the third real use into a shared component, not the first.
-- [x] 4. Masters screens: `NavTabs` across Projects / Plots / Units /
-      Clients / Vendors / Stores / Items / Categories & Brands, each a
-      plain table + `Dialog`-based create/edit form (Categories & Brands
-      use lightweight inline add-row forms instead, since they're
-      simpler and grow continuously).
-- [x] **Gate 1** (founder tests in the browser): create a project, plots,
-      units, assign a client, add vendors, stores, and items of both
-      kinds. See the plan file's "Gate 1 verification" section for the
-      exact click-through.
+## The rules everything rests on
 
-## Judgment calls made during this phase (flagged for the founder)
+- **Reads are open to every authenticated user; writes need `/masters`.** Read functions carry no `requireApp` gate precisely so any future tool can call them.
+- **`lib/masters/` uses two files per entity** — `<name>.ts` reads, `<name>-actions.ts` writes. **This split is required, not stylistic**: a mixed single file broke the production build even though `tsc` passed clean. It is why Masters departs from the `queries.ts`/`actions.ts` convention every other tool follows.
+- **Editing an item code is always safe** — every downstream table references `items.id`, never the code.
+- **`plots` ↔ `units` is strictly 1:1** since `0029`, which also gave `units` a **second foreign key to `plots`**. Any embed reaching `plots` through `units` must name the key: `plots!units_plot_id_fkey`. A bare embed is HTTP 300 at runtime and compiles fine.
+- **Construction stages are picked, never typed** (`0053`), and a rename cascades to indents.
 
-- `projects.status`, `plots.status`/`units.status` value lists
-  (`planning`/`active`/`completed` and `available`/`reserved`/`sold`)
-  are my own defaults, not founder-specified — easy to extend later
-  (additive), but say so if they don't match how Goodearth actually
-  talks about status.
-- `spaces`/`space_types` ship with schema + RLS only, no screen yet —
-  deferred to whichever phase (likely Selections) actually consumes
-  per-unit room assignment.
-- `item_categories`/`brands` do get a screen (unlike `space_types`)
-  since Gate 1 itself needs a category to exist before an item can be
-  created, and both will keep growing as real items get catalogued.
-- `items.code` is deliberately **optional and hand-typed** in Phase 1.
-  It's unique, editable at master level (the item dialog), and shown +
-  searchable in the items list — but nothing generates it.
-  Auto-numbering stays deferred, and the real catalogue changed what it
-  should look like: Goodearth's actual codes are a **4-letter sub-type
-  prefix + 3-digit sequence** (`BENS001` bench, `SOFS…` sofa, `HANL…`
-  hanging light, `DINT…` dining table), which is _finer than category_ —
-  the single "Seating" category spans `BENS`/`CHAS`/`ARMS`/`SOFS`. So a
-  `code_prefix` column on `item_categories` would NOT reproduce this;
-  whenever auto-numbering is built it needs its own sub-type lookup, and
-  it must follow this existing convention rather than invent a competing
-  `GE-SOF-001` style. Editing a code is always safe — every downstream
-  table references `items.id`, never the code.
-- The **catalogue import was pulled forward** out of Phase 3, ahead of
-  Selections: building the picker against 2,631 real items beats
-  designing it around 5 samples and discovering the truth later. See
-  `scripts/import-catalogue.ts` (dry run by default, re-runnable, skips
-  codes already present) and `supabase/migrations/0005_remove_catalogue_seed_demo.sql`,
-  which clears the three fictional catalogue seeds whose categories
-  (`Sofas`/`Dining Tables`/`Lighting`) would otherwise sit beside the
-  real `Seating`/`Tables`/`Lighting & Electrical Fixtures`.
-- Only **900 of the 2,631 items carry an image URL**, all on other
-  companies' Shopify CDNs. Decided architecture: copy _thumbnails_ into
-  Supabase Storage (~14 MB, ours, can't rot) and leave full images
-  pointing at the source (~360 MB not worth storing for a rarely-opened
-  detail view); items with no image get a `lib/color-hash.ts` placeholder
-  tile rather than a broken-image icon. `thumb_url` is left null by the
-  import — a separate re-runnable pass fills it before the picker ships.
+## Cross-tool coupling declared elsewhere
+
+Two triggers fire on Masters writes but are declared by the tools that own the data, so the coupling points the right way:
+
+- **`projects_seed_schedule`** (`0045`, declared by Relay) — creating a project writes Relay's `project_stages` and `pusher_project_plans`. `security definer`, because the creator holds `/masters`, not `/relay`.
+- **`units_seed_engagement`** (`0050`, declared by Client Relations) — a unit created here gets its CRM record and nine-rung payment schedule.
+
+Client Relations also writes `clients` (extra INSERT/UPDATE policies — permissive policies OR together, so Masters keeps what it had) and `units.client_id`/`units.status` through two column-narrow `security definer` functions, because an UPDATE policy cannot be narrowed to two columns.
+
+## Judgement calls worth revisiting
+
+- **Status vocabularies were my defaults, not the founder's** — `planning`/`active`/`completed` for projects, `available`/`reserved`/`sold` for plots and units. Extending is additive. The Saarang sheet's "Blocked" plots were mapped to `reserved` because there is no blocked status; nobody has confirmed that reads right.
+- **`items.code` is optional and hand-typed.** Nothing generates it. Goodearth's real codes are a **4-letter sub-type prefix + 3-digit sequence** (`BENS001` bench, `SOFS…` sofa, `HANL…` hanging light) — which is **finer than category**: the single "Seating" category spans `BENS`/`CHAS`/`ARMS`/`SOFS`. So a `code_prefix` column on `item_categories` would NOT reproduce it. Auto-numbering, whenever it is built, needs its own sub-type lookup and must follow this convention rather than invent a competing `GE-SOF-001` style.
+- **`spaces`/`space_types` ship with schema and RLS only**, no screen — Selections consumes them.
+
+## The catalogue
+
+2,631 real items, imported by `scripts/import-catalogue.ts` (dry run by default, re-runnable, skips codes already present). It was pulled forward ahead of Selections deliberately: building the picker against real items beats designing it around five samples and discovering the truth later.
+
+Only ~900 items carry an image URL, all on other companies' Shopify CDNs. **Thumbnails are copied into Supabase Storage** (~14 MB, ours, can't rot); full images stay pointing at the source (~360 MB not worth storing for a rarely-opened detail view). Items with no image get a `lib/color-hash.ts` placeholder tile rather than a broken-image icon.
+
+## Shared pickers: build the third use, not the first
+
+`components/masters/` originally shipped four pickers. **Only `project-picker` survives.** The other three still had zero importers a phase later — Selections built its own catalogue picker instead — and the planned "upgrade to a real searchable combobox" never happened because nothing needed it. The same reasoning is in `DESIGN.md`.

@@ -1,83 +1,27 @@
-# Purchase Orders — build notes
+# Purchase Orders — the rules
 
-**Status: shipped** (Phase 6, merged 2026-08-03, branch deleted).
-Migrations `0020` (audit prerequisite) + `0021` (schema) + `0022`
-(money-free fact views). Every founder decision: root STATUS.md's
-"Decisions locked in" and the 2026-08-03 session log.
+**Shipped 2026-08-03.** Migrations `0020` (audit prerequisite) + `0021` (schema) + `0022` (money-free fact views).
 
-POs are raised from **approved indent lines only**, one vendor and one
-plot/unit (or "General") per PO — the scope is part of the number:
-`PO/<project>/<plot-or-unit>/NNN`, numbers running per scope. Money
-enters the system here: a line's rate is the vendor-agreed purchase
-price plus a GST % picked from the `gst_rates` master. **Nothing from
-Budgets (cost/margin/client rate) appears on a PO, ever.**
+POs are raised from **approved indent lines only**, one vendor and one plot/unit (or "General") per PO — the scope is part of the number: `PO/<project>/<plot-or-unit>/NNN`, numbers running per scope. **Money enters the system here**: a line's rate is the vendor-agreed purchase price plus a GST % picked from the `gst_rates` master. **Nothing from Budgets — cost, margin, client rate — appears on a PO, ever.**
+
+_Trimmed 2026-08-14: the milestone log lives in git._
 
 ## The rules everything rests on
 
-1. **The status machine lives in the database** (`purchase_orders_guard`
-   - `po_lines_draft_only`, 0021): draft → issued →
-     (deletion_requested → cancelled | back to issued); `completed` is
-     Phase 7's receipt trigger's alone. Lines and header editable only in
-     draft. `lib/purchase-orders/workflow.ts` mirrors it for buttons.
-2. **Over-ordering is impossible.** `unique (po_id, indent_line_id)` +
-   the `po_lines_qty_guard` trigger (advisory-lock serialised) refuse
-   the same indent line twice on a PO and any total beyond the approved
-   quantity across all non-cancelled POs.
-3. **Deleting an issued PO takes an admin's yes** — request with a note
-   → admin approves → cancelled (quantities return to the pool). Drafts:
-   creator-or-admin via `delete_draft_purchase_order()`.
-4. **Money is gated.** SELECT on PO tables requires `/purchase-orders`
-   (the Budgets precedent). Any future money-free exposure is a narrow
-   view, never a wider policy.
-5. **Amounts are computed, never stored** — `lib/purchase-orders/math.ts`
-   (null-is-not-zero, round-at-display), the only module that computes
-   PO money.
+1. **The status machine lives in the database** (`purchase_orders_guard` + `po_lines_draft_only`): draft → issued → (deletion_requested → cancelled | back to issued). `completed` belongs to Inventory's receipt trigger alone. Lines and header editable only in draft. `lib/purchase-orders/workflow.ts` mirrors it **for buttons only**.
+2. **Over-ordering is impossible.** `unique (po_id, indent_line_id)` plus the `po_lines_qty_guard` trigger — serialised on an **advisory lock**, not `select … for update`, because a row lock would need UPDATE rights under another tool's RLS that the acting user doesn't hold (`0021` §7) — refuse the same indent line twice on a PO, and any total beyond the approved quantity across all non-cancelled POs.
+3. **Deleting an issued PO takes an admin's yes** — request with a note → admin approves → cancelled, and the quantities return to the pool. Drafts go via `delete_draft_purchase_order()`, creator-or-admin.
+4. **Money is gated.** SELECT on the PO tables requires `/purchase-orders` (the Budgets precedent). **Any future money-free exposure is a narrow view, never a wider policy.** _(`0055` widened the qual to admit `/reporter`, by founder decision — a widened qual, still one policy.)_
+5. **Amounts are computed, never stored** — `lib/purchase-orders/math.ts` is the only module that computes PO money. Null is not zero; round at display.
 
-## Milestones
+## Things that will bite
 
-- [x] **M0 — schema + pure logic.** 0020 + 0021 written; reference/
-      math/workflow modules tested (15 tests).
-- [x] **M1 — groundwork.** Migrations applied in Studio + types
-      regenerated; plot/unit `code` fields in Masters; GST Rates tab;
-      stub flipped `built: true`; PO list renders empty.
-      _Gate passed 2026-08-03 (founder browser test)._
-- [x] **M2 — raise a PO.** New-PO flow (project → scope → vendor,
-      number previewed), the approved-indent-line pool with remaining
-      quantities, line grid with rate + GST dropdown + live totals,
-      draft save/delete.
-      _Gate passed 2026-08-03; qty-input visibility fixed on feedback._
-- [x] **M3 — issue, delete, fulfil.** Issue with the priced-at-click
-      check (the button deliberately does NOT gate on the server's
-      fullyPriced snapshot — rate saves don't revalidate, so that prop
-      goes stale and the button played dead, a founder-found bug);
-      request-deletion (note required) → admin approve/refuse, withdraw
-      by requester; status banners; indent detail's "ordered X of Y"
-      with PO references (via the money-free `po_line_facts` view,
-      migration `0022`); the `Attribution` component
-      (`components/ui/attribution.tsx`) on PO and Indent line grids and
-      banners; `updated_by` stamped by all indent/PO line actions.
-      _Gate passed 2026-08-03._
-- [x] **M4 — the document + Overview.** The PO PDF
-      (`lib/purchase-orders/po-document.tsx` on the shared shell —
-      vendor block with GSTIN, lines with GST, totals by slab, DRAFT
-      watermark, signature block on issued only); Overview pipeline
-      stage 02 real via money-free `po_facts`.
-      _Gate passed 2026-08-03; merged same day. Letterhead assets
-      still placeholder — swap tracked in root STATUS.md._
+- **The Issue button must not gate on the server's `fullyPriced` snapshot.** Rate saves don't revalidate, so that prop goes stale and the button plays dead. It checks priced-at-click instead. This was a founder-found bug and the obvious "fix" reintroduces it.
+- **Line pulls insert row-by-row, deliberately.** The qty guard raises per line with the item's remaining figure, and a batch insert would fail wholesale on the first refusal. Each reports partial success honestly.
+- **Reads go to indents and masters tables directly** — never another tool's gated queries module.
+- **Consumers read `po_facts` / `po_line_facts`**, which are money-free by column list and open to all authenticated. That is deliberate and documented in `0022`: what exists and how much was ordered is operational fact, not commercial secret. **Never add a money column to either.**
+- **`po_billing_totals` carries money** (ordered and billed) and is WHERE-gated to `/purchase-orders` OR `/bills`. It is not in the money-free family despite sitting beside it.
 
-## Notes
+## Open
 
-- Data layer: `lib/purchase-orders/queries.ts` (reads, `server-only`) +
-  `actions.ts` (writes, file-level `"use server"`, no type re-exports —
-  the outage rule), every function opening
-  `requireTool("/purchase-orders")`. Reads indents/masters tables
-  directly — never another tool's gated queries module.
-- Founder inputs still pending: real letterhead assets (logo, address,
-  GST no., terms; placeholder until then) and optionally a Geist `.ttf`
-  to lift every PDF at once.
-- `/purchase-orders` was already in the `user_apps_app_known` CHECK
-  (0017 pre-listed all planned tools) — no constraint change needed.
-
-## Welcome screen (2026-08-13)
-
-The tool opens on a welcome screen (founder request, all Operations and Management tools). The tabbed list moved to `/purchase-orders/list` — tab and pager hrefs, the form cancel link and the delete redirect follow it; `revalidatePath` calls became the `"layout"` form. Counts from `getWelcomeCounts()` in `lib/purchase-orders/queries.ts`.
+Real letterhead assets — logo, address, GST number, terms — are still placeholder in the PO PDF. Optionally a Geist `.ttf` to lift every PDF at once.

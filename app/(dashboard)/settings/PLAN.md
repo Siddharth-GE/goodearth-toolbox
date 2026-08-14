@@ -1,136 +1,59 @@
-# Settings — build notes
+# Settings — the rules
 
-**Status: shipped.** Migration `0003`, hardened in `0013`, people
-management added in `0032`.
+**Shipped.** Migration `0003`, hardened in `0013`/`0014`, people management in `0032`, role templates in `0034`.
 
-The admin console for who exists and what they can open. Three screens:
+Four screens: **People** (`/settings`), **a person** (`/settings/people/[id]`), **Roles** (`/settings/roles`), and **Overview** (`/settings/overview`) — the who-has-what grid, **read-only**. It used to be the editor, which made every one of sixteen columns a place to mis-click.
 
-- **People** (`/settings`) — everyone, searchable, with their role, app
-  count and approval rights. Invite from here.
-- **A person** (`/settings/people/[id]`) — name, account switches
-  (admin, active), their role, apps grouped by area, approval rights,
-  and the access history read from `audit_log`.
-- **Roles** (`/settings/roles`) — the bundles (see below).
-- **Overview** (`/settings/overview`) — the old who-has-what grid,
-  **read-only**. It used to be the editor, which made every one of
-  sixteen columns a place to mis-click.
-
-A person's display name is set here (`NameField`, save-on-blur →
-`setFullName`) — for accounts made before invites existed, which never
-asked for one; until it's set every attribution renders as a dash.
-`inviteUser` now passes the name as `user_metadata`, so new people
-never start out nameless.
+_Trimmed 2026-08-14._
 
 ## This is the permission system
 
-Not a sidebar filter. `user_apps` plus `requireApp()` (`lib/auth/access.ts`)
-**is** the access-control mechanism for the whole platform.
-`visibleTools()` decides what appears in the sidebar, but that's cosmetic
-— the real check is the one every tool's own queries and actions make.
+Not a sidebar filter. `user_apps` plus `requireApp()` **is** the access-control mechanism for the whole platform. `visibleTools()` decides what appears in the sidebar, and that is cosmetic. Two layers, and both matter:
 
-Two layers, and both matter:
-
-- **In the app**, `requireApp(user, "/budgets")` at the top of every
-  query and action. Redirects rather than erroring.
-- **In the database**, RLS policies calling `has_app('/budgets')`. This
-  is what holds when the app layer has a bug — and it has had one.
+- **In the app** — `requireApp(user, "/budgets")` at the top of every query and action. Redirects rather than erroring.
+- **In the database** — RLS policies calling `has_app('/budgets')`. This is what holds when the app layer has a bug, and it has had one.
 
 ## Roles
 
-Only two: `admin` and `staff`. Admins have every tool automatically and
-aren't shown checkboxes.
+Only two: `admin` and `staff`. Admins have every tool automatically and aren't shown checkboxes.
 
-**Admin is now changed in the app** (`setAdmin`, on a person's page) —
-reversing the earlier Studio-only stance, on the founder's call. Three
-things make it safe to hand over, all in the database: `profiles_guard()`
-lets only an admin change a role, it refuses to remove the **last active
-admin** (demotion _or_ deactivation), and `audit_profiles` records every
-change with who made it. Studio stays the break-glass path, because the
-guard only applies when `auth.uid()` is not null (`0014`'s reasoning).
+**Admin is changed in the app** (`setAdmin`, on a person's page), reversing the earlier Studio-only stance on the founder's call. Three things in the database make it safe to hand over: `profiles_guard()` lets only an admin change a role, it refuses to remove the **last active admin** (demotion _or_ deactivation), and `audit_profiles` records every change with who made it. Studio stays the break-glass path, because the guard only applies when `auth.uid()` is not null.
 
-**A staff user cannot change any role, including their own.** Until
-migration `0013` they could: `profiles` lets you edit your own row so you
-can change your name, and `role` is on that row, with the public anon key
-in every browser. One request bought every app grant, including
-`/budgets`. A trigger now refuses it; `0014` narrowed that to requests
-carrying a signed-in user, so Studio still works.
+**A staff user cannot change any role, including their own.** Until `0013` they could: `profiles` lets you edit your own row so you can change your name, `role` is on that row, and the anon key is in every browser. **One request bought every app grant, including `/budgets`.** A trigger now refuses it; `0014` narrowed that to requests carrying a signed-in user, so Studio still works.
 
-## Inviting and deactivating (`0032`)
+## Role templates
 
-`inviteUser` creates the account with a starting password the admin
-chooses and hands over themselves. Email-invite links were the other
-option and were declined: they need SMTP configured on the project, and
-a mail failure leaves a half-made account nobody can get into.
+A role names a job — Site Engineer, Purchase, Accounts — and bundles a set of apps plus approval rights.
 
-**The one sanctioned service-role call in the dashboard.** `auth.users`
-has no RLS path for the `authenticated` role at all, so creating a login
-cannot go through the scoped client. `inviteUser` alone calls
-`createAdminClient()`, only for `auth.admin.createUser`, never for a
-table write. Everywhere else in the dashboard uses the RLS-scoped
-client, always.
+**Effective access = the role's bundle ∪ the person's own grants, computed at read time, never copied.** Two deliberate consequences: editing a role takes effect immediately, because there is no stored copy to drift; and **a role only ever ADDS**. There is no way to give a role and take one app back, because a hole in a bundle is invisible on screen.
 
-Deactivation (`setActive`) is a flag, never a delete: the auth user, the
-grants and every "recorded by" line survive untouched, and reactivating
-restores them. `is_admin()` and `has_app()` both answer false for a
-deactivated person, so all ~80 RLS policies close at once; `dal.ts`
-returns null so every screen redirects; and login signs them straight
-back out with a plain message.
+**`has_app()` is the whole mechanism.** ~80 RLS policies already call it, so teaching that one function about bundles taught all of them with no policy edits. The definition is a strict superset for an active user, so every pre-existing `user_apps` row keeps working by construction. `lib/settings/access-model.ts` mirrors it in pure TS for the screens; **if the two disagree, the database is right.**
 
-**Accepted gap:** a deactivated person's already-issued JWT can still
-reach authenticated _reads_ (masters lists and other open selects) until
-it expires, ~1h. Writes and every gated screen are closed immediately.
+Approval rights ride along (`can_approve_indents`, `can_approve_bills`, `bill_approval_limit`), resolved personal ∪ role and taking the **more generous** — unlimited beats a number, otherwise the larger. Being named personally must never leave someone able to approve less than their role alone would have allowed.
 
-## Role templates (`0034`)
+Deleting a role someone holds is refused by the FK (`on delete restrict`) — silently stripping access was the alternative, and it isn't one.
 
-A role names a job — Site Engineer, Purchase, Accounts — and bundles a
-set of apps plus approval rights. Assign it and the person has the
-bundle; edit it and everyone holding it changes on their next page load.
+## Inviting and deactivating
 
-**Effective access = the role's bundle ∪ the person's own grants,
-computed at read time, never copied.** Two consequences, both deliberate:
+`inviteUser` creates the account with a starting password the admin chooses and hands over themselves. Email-invite links were declined: they need SMTP configured on the project, and a mail failure leaves a half-made account nobody can get into.
 
-- Editing a role takes effect immediately — there is no stored copy to
-  drift out of step.
-- **A role only ever ADDS.** There is no way to give a role and take one
-  app back, because a hole in a bundle is invisible on screen. Someone
-  whose job is "Purchase plus Inventory" gets the role and one extra
-  tick.
+**This is the one sanctioned service-role call in the dashboard.** `auth.users` has no RLS path for the `authenticated` role at all, so creating a login cannot go through the scoped client. `inviteUser` alone calls `createAdminClient()`, only for `auth.admin.createUser`, **never for a table write.**
 
-**`has_app()` is the whole mechanism.** ~80 RLS policies across every
-tool already call it, so teaching that one function about bundles taught
-all of them, with no policy edits. The definition is a strict superset
-for an active user — personal grants are still checked first and
-unchanged — so every pre-existing `user_apps` row keeps working by
-construction. `lib/settings/access-model.ts` mirrors it in pure TS for
-the screens; if the two ever disagree, the database is right.
+Deactivation (`setActive`) is a flag, never a delete: the auth user, the grants and every "recorded by" line survive, and reactivating restores them. `is_admin()` and `has_app()` both answer false for a deactivated person, so all ~80 RLS policies close at once.
 
-Approval rights ride along (`can_approve_indents`, `can_approve_bills`,
-`bill_approval_limit`), resolved personal ∪ role, taking the **more
-generous** — unlimited beats a number, otherwise the larger. Being named
-personally must never leave someone able to approve less than their role
-alone would have allowed.
-
-Deleting a role someone holds is refused by the FK (`on delete
-restrict`) — silently stripping access was the alternative, and it isn't
-one. `profiles.role` (admin/staff) is untouched by all this: that's the
-admin flag, a different question from what someone does here.
+> **Accepted gap:** a deactivated person's already-issued JWT can still reach authenticated _reads_ (masters lists and other open selects) until it expires, ~1h. Writes and every gated screen are closed immediately.
 
 ## Why Settings isn't grantable
 
-Granting access is itself a privileged action, so it can't be delegable
-through the same mechanism it manages. Settings checks `requireAdmin()`
-— role directly — rather than an app grant. `GRANTABLE_TOOLS` in
-`lib/tools.ts` excludes it for the same reason.
+Granting access is itself a privileged action, so it can't be delegable through the same mechanism it manages. Settings checks `requireAdmin()` — role directly — rather than an app grant, and `GRANTABLE_TOOLS` excludes it for the same reason.
+
+## Settings owns two other tools' tables
+
+`indent_approvers` (declared in `0019`) and `bill_approvers` (declared in `0025`) are written from `lib/settings/actions.ts`. This is a documented exception to "no tool's code writes another tool's table": both are `is_admin()`-gated, and deciding who approves things is Settings' job. `CLAUDE.md` records it.
 
 ## Known gaps
 
-- **Granting `/marathon` does nothing.** Marathon is a kiosk with its own
-  PIN auth and no `requireApp` call anywhere, so the checkbox is
-  cosmetic. Either wire it up or stop offering it.
-- **No object-level permissions.** Anyone with `/selections` can open any
-  unit's design; anyone with `/budgets` can open any budget. The app
-  boundary is the permission boundary — a real decision, not an
-  oversight, but worth stating to anyone who asks about per-project
-  confidentiality.
-- **A tool with no grants is invisible to everyone but admins.** After
-  shipping one, remember to grant it.
+- **Granting `/marathon` does nothing.** Marathon is a kiosk with its own PIN auth and no `requireApp` call anywhere, so the checkbox is cosmetic. Either wire it up or stop offering it.
+- **No object-level permissions.** Anyone with `/selections` can open any unit's design; anyone with `/budgets` can open any budget. The app boundary is the permission boundary — a real decision, not an oversight, but worth stating to anyone who asks about per-project confidentiality.
+- **A tool with no grants is invisible to everyone but admins.** After shipping one, remember to grant it.
+- **`bill_approval_cap(uid)` answers for any user id**, to any signed-in caller (`AUDIT.md` SEC-04). Scope it to `auth.uid()` unless the caller is an admin.

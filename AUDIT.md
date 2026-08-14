@@ -1,4 +1,4 @@
-# Toolbox audit — 13 August 2026
+# Toolbox audit — 14 August 2026
 
 A full re-read of the codebase, the 58 applied migrations, the live
 database and the production deployment, against the founding rule: **each
