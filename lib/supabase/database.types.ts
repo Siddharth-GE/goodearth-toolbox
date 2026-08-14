@@ -3929,6 +3929,144 @@ export type Database = {
           },
         ]
       }
+      staff_departments: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_departments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_departments_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staff_details: {
+        Row: {
+          blood_group: string | null
+          created_at: string
+          created_by: string | null
+          date_of_birth: string | null
+          department_id: string | null
+          designation: string | null
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
+          id: string
+          joined_on: string | null
+          phone: string | null
+          photo_path: string | null
+          reports_to_id: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          blood_group?: string | null
+          created_at?: string
+          created_by?: string | null
+          date_of_birth?: string | null
+          department_id?: string | null
+          designation?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          id: string
+          joined_on?: string | null
+          phone?: string | null
+          photo_path?: string | null
+          reports_to_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          blood_group?: string | null
+          created_at?: string
+          created_by?: string | null
+          date_of_birth?: string | null
+          department_id?: string | null
+          designation?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          id?: string
+          joined_on?: string | null
+          phone?: string | null
+          photo_path?: string | null
+          reports_to_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_details_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_details_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "staff_departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_details_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_details_reports_to_id_fkey"
+            columns: ["reports_to_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_details_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock_adjustments: {
         Row: {
           adjusted_at: string
@@ -5200,6 +5338,13 @@ export type Database = {
       delete_draft_selection: {
         Args: { p_selection_id: string }
         Returns: undefined
+      }
+      directory_emails: {
+        Args: never
+        Returns: {
+          email: string
+          id: string
+        }[]
       }
       discard_chain: { Args: { p_chain_id: string }; Returns: undefined }
       hand_baton: {
