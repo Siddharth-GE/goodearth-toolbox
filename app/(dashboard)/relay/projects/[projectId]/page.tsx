@@ -1,9 +1,11 @@
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Figure, FigureBand, FigureBandCell } from "@/components/ui/figure";
 import { PageTitle } from "@/components/ui/page-title";
 import { formatDate } from "@/lib/format";
 import { getProjectSchedule, listProjectHouses } from "@/lib/relay/queries";
 import { slipLabel } from "@/lib/relay/schedule";
+import { buildWave, waveAmpUnit, type WaveTrail } from "@/lib/relay/wave";
 import { cn } from "@/lib/utils";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -13,6 +15,7 @@ import { TimerDial } from "../../_components/timer-dial";
 import { ScheduleCard } from "./_components/schedule-card";
 import { ScheduleEditor } from "./_components/schedule-editor";
 import { StagePicker } from "./_components/stage-picker";
+import { VillaWaveCard, WaveStageHeader } from "./_components/villa-wave-card";
 
 export default async function ProjectSchedulePage({
   params,
@@ -29,13 +32,76 @@ export default async function ProjectSchedulePage({
   const { project, schedule, trails, stages } = data;
   const unfiled = trails.filter((t) => t.projectStageId === null);
 
+  // A villa's trails, keyed by house. Every house in the project gets an
+  // entry even with nothing filed against it — a villa missing from the
+  // page would read as "no such villa" rather than "nothing started".
+  const byUnit = new Map<string, WaveTrail[]>();
+  for (const house of houses) byUnit.set(house.unitId, []);
+  const wholeProject: WaveTrail[] = [];
+  for (const t of trails) {
+    const entry: WaveTrail = {
+      projectStageId: t.projectStageId,
+      isFinished: t.isFinished,
+      isStuck: t.isStuck,
+      isQueued: t.isQueued,
+    };
+    // Trails filed against the project itself rather than a house — fire
+    // NOCs, master approvals. They get their own row instead of vanishing.
+    if (t.unitId === null) {
+      wholeProject.push(entry);
+      continue;
+    }
+    const list = byUnit.get(t.unitId);
+    if (list) list.push(entry);
+    else byUnit.set(t.unitId, [entry]);
+  }
+
+  // One ceiling for the whole page, so a taller wave really does mean
+  // more open work than the villa above it.
+  const ampUnit = waveAmpUnit([...byUnit.values(), wholeProject]);
+  const waveOf = (rows: WaveTrail[]) =>
+    buildWave(schedule.stages, rows, { ampUnit, planPct: schedule.planPct });
+
+  // Trouble first, then work in flight, then what has landed. A project
+  // list sorted by villa number makes someone read all forty-three to
+  // find the two that need them, which is the opposite of one glance.
+  const RANK: Record<string, number> = {
+    stuck: 0,
+    withClient: 1,
+    moving: 2,
+    waiting: 3,
+    complete: 4,
+    quiet: 5,
+  };
+  const villaWaves = houses
+    .map((house) => ({ house, wave: waveOf(byUnit.get(house.unitId) ?? []) }))
+    .sort(
+      (a, b) =>
+        (RANK[a.wave?.status ?? "quiet"] ?? 5) - (RANK[b.wave?.status ?? "quiet"] ?? 5) ||
+        a.house.unitName.localeCompare(b.house.unitName, undefined, { numeric: true }),
+    );
+
+  // Villas with nothing filed at all are real, and there are usually far
+  // more of them than villas with work — Saarang has forty-three houses
+  // and four with anything on them. Drawing thirty-nine identical flat
+  // lines would bury the four that matter, so they are named together at
+  // the bottom instead of each taking a card.
+  const started = villaWaves.filter((v) => v.wave && v.wave.status !== "quiet");
+  const untouched = villaWaves.filter((v) => !v.wave || v.wave.status === "quiet");
+
+  const projectWave = wholeProject.length > 0 ? waveOf(wholeProject) : null;
+  const headerWave =
+    projectWave ?? started[0]?.wave ?? villaWaves.find((v) => v.wave)?.wave ?? null;
+
+  const live = trails.filter((t) => !t.isFinished && !t.isQueued);
+
   return (
     <div className="space-y-5">
       <PageTitle
         backHref="/relay/projects"
         backLabel="Projects"
         title={project.name}
-        description="Its schedule, and how far the work has actually got against it."
+        description="Every villa, one glance. Each lane is that villa's open work across the stages."
         actions={
           <Badge
             variant={
@@ -54,8 +120,96 @@ export default async function ProjectSchedulePage({
       />
       <RelayNav active="projects" />
 
-      {/* The picture, and the button that edits it. The editor used to
-          sit open below here on every visit. */}
+      {/* Counts, then the picture. No rupees anywhere in Relay — this
+          tool is about where work is standing, not what it cost. */}
+      <FigureBand>
+        <FigureBandCell>
+          <Figure label="Villas" value={houses.length} size="lg" />
+        </FigureBandCell>
+        <FigureBandCell>
+          <Figure label="Running" value={live.length} size="lg" hint="a baton with someone" />
+        </FigureBandCell>
+        <FigureBandCell>
+          <Figure
+            label="Cold"
+            value={live.filter((t) => t.isStuck).length}
+            size="lg"
+            tone={live.some((t) => t.isStuck) ? "bad" : undefined}
+            hint="past its expected days"
+          />
+        </FigureBandCell>
+        <FigureBandCell>
+          <Figure
+            label="Waiting"
+            value={trails.filter((t) => t.isQueued).length}
+            size="lg"
+            hint="written down, not started"
+          />
+        </FigureBandCell>
+      </FigureBand>
+
+      {/* The waves. Stage names once above the stack — every villa shares
+          one x-axis, so repeating them down the page is the same fact in
+          eight times the ink. */}
+      {headerWave ? (
+        <div className="space-y-2">
+          <WaveStageHeader wave={headerWave} />
+          <div className="space-y-3">
+            {projectWave && (
+              <VillaWaveCard
+                name="The project as a whole"
+                href={`/relay/trails?project=${projectId}`}
+                wave={projectWave}
+              />
+            )}
+            {started.map(({ house, wave }) =>
+              wave ? (
+                <VillaWaveCard
+                  key={house.unitId}
+                  name={house.unitName}
+                  href={`/relay/projects/${projectId}/houses/${house.unitId}`}
+                  wave={wave}
+                />
+              ) : null,
+            )}
+          </div>
+
+          {untouched.length > 0 && (
+            <Card className="p-4">
+              <h3 className="text-foreground text-sm font-semibold">
+                {untouched.length} villa{untouched.length === 1 ? "" : "s"} with nothing filed yet
+              </h3>
+              <p className="text-muted mt-0.5 text-sm">
+                No trails have been opened on {untouched.length === 1 ? "it" : "them"}. Open one to
+                give {untouched.length === 1 ? "it a wave" : "them waves"}.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1.5">
+                {untouched.map(({ house }) => (
+                  <Link
+                    key={house.unitId}
+                    href={`/relay/projects/${projectId}/houses/${house.unitId}`}
+                    className="text-muted hover:text-accent text-xs"
+                  >
+                    {house.unitName}
+                  </Link>
+                ))}
+              </div>
+            </Card>
+          )}
+        </div>
+      ) : (
+        <Card className="p-4">
+          <h2 className="text-foreground text-sm font-semibold">No stages set yet</h2>
+          <p className="text-muted mt-0.5 text-sm">
+            The waves need stages to run along. Set the start date and the stages below, and every
+            villa gets its own line.
+          </p>
+        </Card>
+      )}
+
+      {/* The plan, against which all of the above is running late or not.
+          Below the waves now: the wave is what someone opens this page
+          for, the schedule is what they check second. */}
       <ScheduleCard
         schedule={schedule}
         editor={
@@ -66,39 +220,6 @@ export default async function ProjectSchedulePage({
           />
         }
       />
-
-      {houses.length > 0 && (
-        <div className="space-y-2">
-          <h2 className="text-muted text-xs font-semibold tracking-widest uppercase">
-            Houses — {houses.length}
-          </h2>
-          <Card className="divide-border divide-y">
-            {houses.map((house) => (
-              <Link
-                key={house.unitId}
-                href={`/relay/projects/${projectId}/houses/${house.unitId}`}
-                className="flex items-center gap-3 p-3.5 transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.04]"
-              >
-                <p className="text-foreground min-w-0 flex-1 text-sm font-medium">
-                  {house.unitName}
-                </p>
-                {house.cold > 0 && <Badge variant="danger">{house.cold} cold</Badge>}
-                <span className="text-muted text-xs">
-                  {house.live + house.queued + house.finished === 0 ? (
-                    "nothing yet"
-                  ) : (
-                    <>
-                      {house.live} running
-                      {house.queued > 0 ? ` · ${house.queued} waiting` : ""}
-                      {house.finished > 0 ? ` · ${house.finished} done` : ""}
-                    </>
-                  )}
-                </span>
-              </Link>
-            ))}
-          </Card>
-        </div>
-      )}
 
       {schedule.stages.length > 0 && (
         <div className="space-y-3">
