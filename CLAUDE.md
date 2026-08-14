@@ -93,6 +93,7 @@ Numbered SQL files in `supabase/migrations/`, applied **from this machine** via 
 - **Charts are `recharts`**, imported ONLY by `components/ui/chart/*` — screens use those wrappers, never Recharts directly, so Next code-splits it to the routes that chart. Data shaping lives in `lib/charts/` (pure, tested); the PDF path rasterises the same charts through `sharp`, never a second implementation. Chart colours are the `--chart-1…8` tokens; `DESIGN.md` says why their order must not be touched.
 - **Site engineers and store-keepers use this on phones at site** — Indents, Inventory and site-facing flows must genuinely work on a phone. English-only UI is confirmed sufficient. Plain English in all copy and error messages.
 - Using the catalogue picker? Add the grant to the allow-list in `app/api/catalogue/route.ts` or it silently 403s.
+- **Uploading to Supabase Storage? Hand it a `Blob`, never a raw `Buffer`.** `supabase-js` only builds a multipart body for a Blob; anything else goes to `fetch` as a raw body, and Next's patched fetch text-decodes it — every non-UTF-8 byte becomes `EF BF BD`. Storage still reports `image/jpeg`, the row writes, nothing errors, and the only symptom is a broken image. **It does not reproduce locally**, only under the Next runtime (AUDIT.md BUG-01).
 
 ## Environment
 

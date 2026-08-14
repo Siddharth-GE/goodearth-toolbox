@@ -170,6 +170,37 @@ through the tools.
 
 ## 2. Security
 
+### BUG-01 · HIGH · **FIXED 2026-08-14** · Every binary upload was silently corrupted
+
+**Found by the Directory's first-ever photo upload**, which stored a JPEG
+whose every non-UTF-8 byte had become `EF BF BD` — the Unicode
+replacement character. A 40KB image arrived as 124KB of rubbish. Supabase
+still labelled it `image/jpeg`, the database row wrote fine, no error
+appeared anywhere, and the only symptom was a broken image.
+
+**Cause.** `supabase-js` builds a multipart body only when handed a
+`Blob`; anything else is passed to `fetch` as a raw body. Next patches
+global `fetch`, and a Node `Buffer` through that patched path is
+text-decoded. It does NOT reproduce locally with the plain
+`@supabase/supabase-js` client — only under the Next runtime, which is why
+nothing caught it.
+
+**Both call sites are fixed** by wrapping the buffer in a `Blob`:
+
+- `lib/directory/actions.ts` — `uploadMyPhoto`
+- `lib/selections/views-actions.ts` — `uploadSpaceView`, which had the
+  identical defect and **had never run in production**: the `design-views`
+  bucket was completely empty. The first render a designer uploaded would
+  have corrupted silently and gone into a client's quote PDF.
+
+`uploadMyPhoto` now also compares the stored object's size against what it
+sent and refuses the write if they differ, because this class of failure is
+permanent, invisible, and leaves nothing in any log.
+
+**The rule:** hand Supabase Storage a `Blob`, never a raw `Buffer`.
+
+---
+
 ### SEC-01 · CRITICAL · **FIXED 2026-08-14** · Three fact views were writable, and writing through them bypassed RLS
 
 > **Closed.** `0059_views_are_read_only.sql` was applied on 2026-08-14 and verified independently against the live database: zero INSERT/UPDATE/DELETE/TRUNCATE privileges remain on any of the fourteen views for `anon` or `authenticated`. The finding is kept in full below because the _rule_ it established — a view is a read surface, and every new one ships its revokes in the same migration — is the thing worth not relearning.

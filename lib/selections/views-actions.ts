@@ -74,9 +74,26 @@ export async function uploadSpaceView(
   // needs privileges an ordinary signed-in user doesn't have, so trying it
   // at upload time fails for everyone except the service role.
   const path = `spaces/${spaceId}/${crypto.randomUUID()}.${designView.extension}`;
+
+  // A BLOB, NOT THE RAW Buffer, AND THIS IS NOT STYLE.
+  //
+  // supabase-js only builds a multipart body when handed a Blob; anything
+  // else goes to fetch as a raw body. Next patches global fetch, and a
+  // Node Buffer through that path comes back TEXT-DECODED — every
+  // non-UTF-8 byte becomes EF BF BD, so a JPEG arrives as rubbish that
+  // storage still labels image/jpeg. Nothing errors; the only symptom is
+  // a broken image.
+  //
+  // Found on 2026-08-14 by the Directory's first-ever photo upload. This
+  // line had the same defect and had simply never run in production —
+  // there were no design-view objects in the bucket at all. Left as it
+  // was, the first render a designer uploaded would have corrupted
+  // silently and gone into a client's quote PDF.
+  const blob = new Blob([new Uint8Array(normalised)], { type: designView.contentType });
+
   const { error: uploadError } = await supabase.storage
     .from(BUCKET)
-    .upload(path, normalised, { contentType: designView.contentType });
+    .upload(path, blob, { contentType: designView.contentType });
   if (uploadError) {
     console.error("uploadSpaceView upload failed:", uploadError);
     // Storage refuses rather than explains, so name the most likely cause

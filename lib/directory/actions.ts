@@ -185,12 +185,48 @@ export async function uploadMyPhoto(formData: FormData): Promise<ActionState> {
   // The bucket and its policies come from 0061, not from here — creating
   // one needs privileges an ordinary signed-in user does not have.
   const path = staffPhotoPath(user.id, crypto.randomUUID());
+
+  // A BLOB, NOT THE RAW Buffer, AND THIS IS NOT STYLE.
+  //
+  // supabase-js only builds a multipart body when it is handed a Blob;
+  // anything else is passed to fetch as a raw body. Next patches global
+  // fetch, and a Node Buffer going through that patched path came back
+  // TEXT-DECODED: the first upload this app ever made stored a JPEG whose
+  // every non-UTF-8 byte had become EF BF BD, inflating 40KB to 124KB.
+  // Storage still reported it as image/jpeg, the row wrote fine, and the
+  // only symptom was a broken image — nothing errored anywhere.
+  //
+  // The Blob path is multipart, which every fetch implementation treats
+  // as binary. lib/selections/views-actions.ts still passes a raw Buffer
+  // and has the same latent bug (AUDIT.md) — it has simply never had an
+  // upload in production to prove it.
+  const blob = new Blob([new Uint8Array(normalised)], { type: staffPhoto.contentType });
+
   const { error: uploadError } = await supabase.storage
     .from(STAFF_PHOTOS_BUCKET)
-    .upload(path, normalised, { contentType: staffPhoto.contentType });
+    .upload(path, blob, { contentType: staffPhoto.contentType });
   if (uploadError) {
     console.error("uploadMyPhoto upload failed:", uploadError);
     return { error: "Could not save the photo. Try again." };
+  }
+
+  // Confirm what landed is what was sent. A silent binary corruption is
+  // permanent and invisible — it shows up as a broken image months later,
+  // with nothing in any log. Comparing sizes catches exactly that, for the
+  // cost of one small request on a rare action.
+  const folder = path.slice(0, path.lastIndexOf("/"));
+  const filename = path.slice(path.lastIndexOf("/") + 1);
+  const { data: stored } = await supabase.storage
+    .from(STAFF_PHOTOS_BUCKET)
+    .list(folder, { search: filename });
+  const storedSize = stored?.[0]?.metadata?.size as number | undefined;
+
+  if (storedSize !== undefined && storedSize !== normalised.length) {
+    await supabase.storage.from(STAFF_PHOTOS_BUCKET).remove([path]);
+    console.error(
+      `uploadMyPhoto stored ${storedSize} bytes but sent ${normalised.length} — binary was mangled in transit`,
+    );
+    return { error: "The photo did not save correctly. Try again." };
   }
 
   // Read the old path BEFORE overwriting it, so the previous object can
