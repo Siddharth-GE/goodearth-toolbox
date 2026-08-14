@@ -35,7 +35,7 @@ export function SchedulePath({ schedule }: { schedule: ScheduleSummary }) {
     <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" aria-hidden="true">
       {/* One block per stage, width proportional to its weeks, filled by
           how much of that stage's own work is done. */}
-      {schedule.stages.map((stage) => {
+      {schedule.stages.map((stage, i) => {
         const x = pxOf((stage.weekFrom / schedule.totalWeeks) * 100);
         const w = pxOf((stage.weeks / schedule.totalWeeks) * 100);
         const trackW = Math.max(2, w - 2);
@@ -81,10 +81,16 @@ export function SchedulePath({ schedule }: { schedule: ScheduleSummary }) {
                 fill="var(--foreground)"
               />
             )}
+            {/* The first and last names would run off the ends of the
+                viewBox and be clipped mid-word — "Handove" is what the
+                last stage read before this. They line up with the edge
+                instead of their own midpoint. Names also alternate onto
+                two rows, because stage lengths vary enough that a
+                four-week stage beside a sixteen-week one collides. */}
             <text
               x={x + w / 2}
-              y={TRACK_Y - 8}
-              textAnchor="middle"
+              y={TRACK_Y - (i % 2 === 0 ? 22 : 8)}
+              textAnchor={x + w / 2 < 60 ? "start" : x + w / 2 > W - 60 ? "end" : "middle"}
               fontSize="12"
               fontWeight={stage.id === schedule.currentStageId ? "700" : "500"}
               fill={stage.id === schedule.currentStageId ? "var(--warning)" : "var(--muted)"}

@@ -1,9 +1,8 @@
-import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Figure, FigureBand, FigureBandCell } from "@/components/ui/figure";
 import { LinkButton } from "@/components/ui/button";
 import { PageTitle } from "@/components/ui/page-title";
 import { requireUser } from "@/lib/auth/dal";
-import { cn } from "@/lib/utils";
 import {
   getLegsFor,
   getRelayPulse,
@@ -51,11 +50,22 @@ export default async function RelayCourtPage() {
 
         {/* One band, not three stretched cards: these are three small
             numbers that belong together, and read as a single glance. */}
-        <Card className="divide-border grid grid-cols-3 divide-x">
-          <Stat label="live" value={pulse.live} />
-          <Stat label="cold" value={pulse.cold} tone={pulse.cold > 0 ? "danger" : undefined} />
-          <Stat label="in your hand" value={pulse.mine} />
-        </Card>
+        <FigureBand className="lg:grid-cols-3">
+          <FigureBandCell>
+            <Figure label="Live" value={pulse.live} size="lg" />
+          </FigureBandCell>
+          <FigureBandCell>
+            <Figure
+              label="Cold"
+              value={pulse.cold}
+              size="lg"
+              tone={pulse.cold > 0 ? "bad" : undefined}
+            />
+          </FigureBandCell>
+          <FigureBandCell>
+            <Figure label="In your hand" value={pulse.mine} size="lg" />
+          </FigureBandCell>
+        </FigureBand>
 
         {isAdmin && stranded.length > 0 && <StrandedPanel rows={stranded} people={people} />}
 
@@ -95,6 +105,8 @@ export default async function RelayCourtPage() {
                         canBounce={(row.currentLeg ?? 1) > 1}
                         canFinish={row.currentLeg !== null && row.currentLeg === row.legCount}
                         canHand={false}
+                        canClientHold={row.currentLeg !== null && !row.isWithClient}
+                        canClientReturn={row.isWithClient}
                         target={{
                           chainId: row.chainId,
                           fromLeg: row.currentLeg ?? 1,
@@ -123,21 +135,5 @@ export default async function RelayCourtPage() {
         )}
       </div>
     </CelebrateProvider>
-  );
-}
-
-function Stat({ label, value, tone }: { label: string; value: number; tone?: "danger" }) {
-  return (
-    <div className="px-4 py-3.5">
-      <p
-        className={cn(
-          "text-3xl font-extrabold tracking-tight",
-          tone === "danger" ? "text-danger" : "text-foreground",
-        )}
-      >
-        {value}
-      </p>
-      <p className="text-muted mt-0.5 text-xs font-medium">{label}</p>
-    </div>
   );
 }

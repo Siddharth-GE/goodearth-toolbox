@@ -7,6 +7,8 @@ import {
   bounceTargets,
   bounceReasonLabel,
   canBounce,
+  canClientHold,
+  canClientReturn,
   canFinish,
   canHand,
   canPush,
@@ -19,6 +21,7 @@ import { notFound } from "next/navigation";
 
 import { CelebrateProvider } from "../../_components/celebrate";
 import { MoveBatonButtons } from "../../_components/move-baton";
+import { StagePicker } from "../../_components/stage-picker";
 import { TrailRoute } from "../../_components/trail-route";
 import { TrailDepartments } from "./_components/trail-departments";
 
@@ -68,20 +71,45 @@ export default async function TrailPage({ params }: { params: Promise<{ chainId:
           actions={
             state.status === "finished" ? (
               <Badge variant="success">Done</Badge>
-            ) : state.isStuck ? (
-              <Badge variant="danger">Cold · {state.overBy}d over</Badge>
             ) : (
-              <Badge variant="neutral">Warm</Badge>
+              // Cold and with-client are not alternatives. A trail can be
+              // both, and when it is, both are worth saying: the delay is
+              // real, and the client is where it is sitting.
+              <div className="flex flex-wrap items-center gap-2">
+                {state.isStuck && <Badge variant="danger">Cold · {state.overBy}d over</Badge>}
+                {state.isWithClient && (
+                  <Badge variant="warning">With client · {state.withClientDays}d</Badge>
+                )}
+                {!state.isStuck && !state.isWithClient && <Badge variant="neutral">Warm</Badge>}
+              </div>
             )
           }
         />
 
-        <TrailDepartments
-          chainId={chainId}
-          departments={departments}
-          selected={trail.departments}
-          editable={state.status === "running"}
-        />
+        {/* Tags and filing, one quiet row. The stage picker moved here
+            from the project page's trails-by-stage listing when that
+            section went — a trail is re-filed where the trail is. */}
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <TrailDepartments
+            chainId={chainId}
+            departments={departments}
+            selected={trail.departments}
+            editable={state.status === "running"}
+          />
+          {trail.stages.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-muted text-[10px] font-semibold tracking-widest uppercase">
+                Stage
+              </span>
+              <StagePicker
+                chainId={chainId}
+                stages={trail.stages}
+                current={trail.projectStageId}
+                disabled={state.status === "finished"}
+              />
+            </div>
+          )}
+        </div>
 
         {state.status === "running" && current && (
           <Card className={cn("p-4", state.isStuck && "border-danger/40")}>
@@ -102,6 +130,8 @@ export default async function TrailPage({ params }: { params: Promise<{ chainId:
                 canBounce={canBounce(last, actor)}
                 canFinish={canFinish(last, legCount, actor)}
                 canHand={canHand(last, actor)}
+                canClientHold={canClientHold(last, actor, state.isWithClient)}
+                canClientReturn={canClientReturn(last, actor, state.isWithClient)}
                 target={{
                   chainId,
                   fromLeg: state.currentLeg ?? 1,
@@ -174,10 +204,15 @@ export default async function TrailPage({ params }: { params: Promise<{ chainId:
                     e.kind === "pushed" && "text-success",
                     e.kind === "bounced" && "text-danger",
                     e.kind === "handed" && "text-warning",
+                    (e.kind === "client_held" || e.kind === "client_returned") && "text-warning",
                     (e.kind === "started" || e.kind === "completed") && "text-muted",
                   )}
                 >
-                  {e.kind}
+                  {e.kind === "client_held"
+                    ? "to client"
+                    : e.kind === "client_returned"
+                      ? "returned"
+                      : e.kind}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-foreground">
@@ -204,6 +239,17 @@ export default async function TrailPage({ params }: { params: Promise<{ chainId:
                       <>
                         <b className="font-semibold">{e.actorName}</b> handed the baton to{" "}
                         <b className="font-semibold">{e.toAssigneeName}</b>
+                      </>
+                    )}
+                    {e.kind === "client_held" && (
+                      <>
+                        <b className="font-semibold">{e.actorName}</b> gave it to the client — the
+                        clock kept running
+                      </>
+                    )}
+                    {e.kind === "client_returned" && (
+                      <>
+                        <b className="font-semibold">{e.actorName}</b> took it back from the client
                       </>
                     )}
                     {e.kind === "completed" && (

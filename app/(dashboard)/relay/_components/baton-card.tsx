@@ -60,6 +60,14 @@ export function BatonCard({
             </span>
           </>
         )}
+        {/* Still in your court while a client has it — you are the one
+            who chases them. */}
+        {row.isWithClient && (
+          <>
+            {" · "}
+            <span className="text-warning font-semibold">with client {row.withClientDays}d</span>
+          </>
+        )}
       </p>
 
       {actions}

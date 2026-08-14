@@ -104,45 +104,56 @@ export function HouseQueue({
           as one trail, staffed and ready — not counting a day until you start it.
         </p>
       ) : (
-        <div className="divide-border mt-3 divide-y">
+        // Tiles rather than rows: each waiting trail carries two buttons,
+        // and a row of them wraps into a pile of orphaned controls on the
+        // phone this screen is used from.
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
           {queued.map((trail) => (
-            <div key={trail.chainId} className="flex flex-wrap items-center gap-3 py-2.5">
-              <span
-                className="border-border size-2 shrink-0 rounded-full border"
-                aria-hidden="true"
-              />
-              <Link href={`/relay/trails/${trail.chainId}`} className="min-w-0 flex-1">
-                <p className="text-foreground hover:text-accent text-sm font-medium">
-                  {trail.activityName}
-                  {trail.title ? (
-                    <span className="text-muted font-normal"> · {trail.title}</span>
-                  ) : null}
-                </p>
-                <p className="text-muted mt-0.5 text-xs">
-                  {trail.legCount} activit{trail.legCount === 1 ? "y" : "ies"} · not started
-                </p>
-              </Link>
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={busy !== null}
-                onClick={() =>
-                  run(trail.chainId, () => startTrail(trail.chainId, projectId, unitId))
-                }
-              >
-                <Play className="size-4" />
-                {busy === trail.chainId ? "Starting…" : "Start"}
-              </Button>
-              <IconButton
-                tone="danger"
-                aria-label={`Remove ${trail.activityName}`}
-                disabled={busy !== null}
-                onClick={() =>
-                  run(`x-${trail.chainId}`, () => discardTrail(trail.chainId, projectId, unitId))
-                }
-              >
-                <X className="size-4" />
-              </IconButton>
+            <div
+              key={trail.chainId}
+              className="border-border bg-background flex flex-col gap-2 rounded-xl border p-3"
+            >
+              <div className="flex items-start gap-2">
+                <span
+                  className="border-border mt-1.5 size-2 shrink-0 rounded-full border"
+                  aria-hidden="true"
+                />
+                <Link href={`/relay/trails/${trail.chainId}`} className="min-w-0 flex-1">
+                  <p className="text-foreground hover:text-accent text-sm font-medium">
+                    {trail.activityName}
+                    {trail.title ? (
+                      <span className="text-muted font-normal"> · {trail.title}</span>
+                    ) : null}
+                  </p>
+                  <p className="text-muted mt-0.5 text-xs">
+                    {trail.legCount} activit{trail.legCount === 1 ? "y" : "ies"} · not started
+                  </p>
+                </Link>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={busy !== null}
+                  onClick={() =>
+                    run(trail.chainId, () => startTrail(trail.chainId, projectId, unitId))
+                  }
+                >
+                  <Play className="size-4" />
+                  {busy === trail.chainId ? "Starting…" : "Start"}
+                </Button>
+                <IconButton
+                  className="ml-auto"
+                  tone="danger"
+                  aria-label={`Remove ${trail.activityName}`}
+                  disabled={busy !== null}
+                  onClick={() =>
+                    run(`x-${trail.chainId}`, () => discardTrail(trail.chainId, projectId, unitId))
+                  }
+                >
+                  <X className="size-4" />
+                </IconButton>
+              </div>
             </div>
           ))}
         </div>

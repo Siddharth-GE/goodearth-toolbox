@@ -32,6 +32,7 @@ export type ChainRow = {
   chainId: string;
   projectId: string;
   projectName: string;
+  unitId: string | null;
   unitName: string | null;
   activityName: string;
   title: string | null;
@@ -45,6 +46,9 @@ export type ChainRow = {
   isFinished: boolean;
   /** Created but never started: no events, no clock, no holder. */
   isQueued: boolean;
+  /** Sitting with the client. Independent of isStuck — the clock runs on. */
+  isWithClient: boolean;
+  withClientDays: number;
   startedAt: string | null;
   departments: string[];
 };
@@ -53,6 +57,7 @@ type StateRow = {
   chain_id: string | null;
   project_id: string | null;
   project_name: string | null;
+  unit_id: string | null;
   unit_name: string | null;
   activity_name: string | null;
   title: string | null;
@@ -64,18 +69,21 @@ type StateRow = {
   is_stuck: boolean | null;
   is_finished: boolean | null;
   is_queued: boolean | null;
+  is_with_client: boolean | null;
+  with_client_days: number | null;
   started_at: string | null;
   department_names: string[] | null;
 };
 
 const STATE_COLUMNS =
-  "chain_id, project_id, project_name, unit_name, activity_name, title, leg_count, current_leg, holder_id, days_in_leg, expected_days, is_stuck, is_finished, is_queued, started_at, department_names";
+  "chain_id, project_id, project_name, unit_id, unit_name, activity_name, title, leg_count, current_leg, holder_id, days_in_leg, expected_days, is_stuck, is_finished, is_queued, is_with_client, with_client_days, started_at, department_names";
 
 function toRow(row: StateRow, names: Map<string, string>): ChainRow {
   return {
     chainId: row.chain_id ?? "",
     projectId: row.project_id ?? "",
     projectName: row.project_name ?? "—",
+    unitId: row.unit_id,
     unitName: row.unit_name,
     activityName: row.activity_name ?? "—",
     title: row.title,
@@ -88,6 +96,8 @@ function toRow(row: StateRow, names: Map<string, string>): ChainRow {
     isStuck: row.is_stuck ?? false,
     isFinished: row.is_finished ?? false,
     isQueued: row.is_queued ?? false,
+    isWithClient: row.is_with_client ?? false,
+    withClientDays: row.with_client_days ?? 0,
     startedAt: row.started_at,
     departments: row.department_names ?? [],
   };
@@ -283,6 +293,9 @@ export type TrailDetail = {
   departments: { id: string; name: string }[];
   title: string | null;
   note: string | null;
+  /** The stage this trail is filed under, and the project's stages to move it. */
+  projectStageId: string | null;
+  stages: ProjectStage[];
   legs: (Leg & { assigneeName: string })[];
   events: (ChainEvent & { actorName: string; toAssigneeName: string | null })[];
   state: ReturnType<typeof replayChain>;
@@ -301,7 +314,7 @@ export const getTrail = cache(async (chainId: string): Promise<TrailDetail | nul
   const { data: chain, error } = await supabase
     .from("pusher_chains")
     .select(
-      "id, project_id, activity_id, title, note, projects(name), units!pusher_chains_unit_id_fkey(name), pusher_activities(name), pusher_chain_departments(department_id, pusher_departments(id, name))",
+      "id, project_id, activity_id, project_stage_id, title, note, projects(name), units!pusher_chains_unit_id_fkey(name), pusher_activities(name), pusher_chain_departments(department_id, pusher_departments(id, name))",
     )
     .eq("id", chainId)
     .maybeSingle();
@@ -316,7 +329,7 @@ export const getTrail = cache(async (chainId: string): Promise<TrailDetail | nul
   // grow only as the baton moves), so these need no paging — but they do
   // need to be COMPLETE, because a missing event silently changes who the
   // holder is. fetchAll throws rather than answering with half a log.
-  const [legRows, eventRows, names] = await Promise.all([
+  const [legRows, stageRows, eventRows, names] = await Promise.all([
     fetchAll<{
       leg_no: number;
       activity_id: string;
@@ -329,6 +342,16 @@ export const getTrail = cache(async (chainId: string): Promise<TrailDetail | nul
         .select("leg_no, activity_id, label, assignee_id, expected_days")
         .eq("chain_id", chainId)
         .order("leg_no")
+        .range(from, to),
+    ),
+    // The project's stages, so the trail can be re-filed from its own
+    // page — the one place someone is already looking at it.
+    fetchAll<ProjectStage>((from, to) =>
+      supabase
+        .from("project_stages")
+        .select("id, name, weeks, sort_order")
+        .eq("project_id", chain.project_id)
+        .order("id")
         .range(from, to),
     ),
     fetchAll<Omit<ChainEvent, "kind"> & { kind: string }>((from, to) =>
@@ -369,6 +392,8 @@ export const getTrail = cache(async (chainId: string): Promise<TrailDetail | nul
       .sort((a, b) => a.name.localeCompare(b.name)),
     title: chain.title,
     note: chain.note,
+    projectStageId: chain.project_stage_id,
+    stages: orderStages(stageRows),
     legs: legs.map((l) => ({ ...l, assigneeName: names.get(l.assignee_id) ?? "Unnamed" })),
     events: events.map((e) => ({
       ...e,
@@ -570,10 +595,11 @@ export async function listProjectSchedules() {
       is_finished: boolean | null;
       is_stuck: boolean | null;
       is_queued: boolean | null;
+      is_with_client: boolean | null;
     }>((from, to) =>
       supabase
         .from("pusher_chain_state")
-        .select("project_id, project_stage_id, is_finished, is_stuck, is_queued")
+        .select("project_id, project_stage_id, is_finished, is_stuck, is_queued, is_with_client")
         .order("chain_id")
         .range(from, to),
     ),
@@ -591,6 +617,7 @@ export async function listProjectSchedules() {
         isFinished: t.is_finished ?? false,
         isStuck: t.is_stuck ?? false,
         isQueued: t.is_queued ?? false,
+        isWithClient: t.is_with_client ?? false,
       }));
 
     return {
@@ -603,6 +630,8 @@ export async function listProjectSchedules() {
       liveTrails: projectTrails.filter((t) => !t.isFinished && !t.isQueued).length,
       queuedTrails: projectTrails.filter((t) => t.isQueued).length,
       stuckTrails: projectTrails.filter((t) => !t.isFinished && t.isStuck).length,
+      /** The rows the project's wave is drawn from. */
+      trails: projectTrails,
       schedule: buildSchedule(
         stages.filter((s) => s.project_id === project.id),
         projectTrails,
@@ -685,7 +714,7 @@ export async function getRelayPulse(userId: string) {
     .eq("is_queued", false)
     .eq("is_finished", false);
 
-  const [live, cold, mine] = await Promise.all([
+  const [live, cold, mine, withClient] = await Promise.all([
     running,
     supabase
       .from("pusher_chain_state")
@@ -701,12 +730,21 @@ export async function getRelayPulse(userId: string) {
       .eq("is_queued", false)
       .eq("is_finished", false)
       .eq("holder_id", userId),
+    // Waiting on someone outside the company. Counted apart from cold
+    // because the fix is different: chasing a client, not a colleague.
+    supabase
+      .from("pusher_chain_state")
+      .select("chain_id", { count: "exact", head: true })
+      .eq("is_queued", false)
+      .eq("is_finished", false)
+      .eq("is_with_client", true),
   ]);
 
   return {
     live: live.count ?? 0,
     cold: cold.count ?? 0,
     mine: mine.count ?? 0,
+    withClient: withClient.count ?? 0,
   };
 }
 
@@ -856,14 +894,31 @@ export async function listProjectHouses(projectId: string): Promise<HouseRow[]> 
     .sort((a, b) => a.unitName.localeCompare(b.unitName, undefined, { numeric: true }));
 }
 
-/** One house: its trails split into what is running and what is waiting. */
+/**
+ * One house: its trails split into what is running and what is waiting,
+ * plus the project's stages and start date so the house can draw its own
+ * wave along the same axis its project page uses.
+ */
 export async function getHouse(projectId: string, unitId: string) {
   await requireTool("/relay");
   const supabase = await createClient();
 
-  const [unit, project, trails, names] = await Promise.all([
+  const [unit, project, stages, plan, trails, names] = await Promise.all([
     supabase.from("units").select("id, name").eq("id", unitId).maybeSingle(),
     supabase.from("projects").select("id, name").eq("id", projectId).maybeSingle(),
+    fetchAll<ProjectStage>((from, to) =>
+      supabase
+        .from("project_stages")
+        .select("id, name, weeks, sort_order")
+        .eq("project_id", projectId)
+        .order("id")
+        .range(from, to),
+    ),
+    supabase
+      .from("pusher_project_plans")
+      .select("start_date")
+      .eq("project_id", projectId)
+      .maybeSingle(),
     fetchAll<StateRow & { project_stage_id: string | null }>((from, to) =>
       supabase
         .from("pusher_chain_state")
@@ -883,6 +938,9 @@ export async function getHouse(projectId: string, unitId: string) {
   return {
     unit: unit.data,
     project: project.data,
+    stages: orderStages(stages),
+    startDate: (plan.data?.start_date as string | undefined) ?? null,
+    trails: rows,
     // Cold first among the running ones — the tool's standing order.
     running: rows
       .filter((r) => !r.isQueued && !r.isFinished)

@@ -324,3 +324,113 @@ test("a one-leg trail can be finished but never pushed", () => {
   const state = replayChain([opened], solo, at(1));
   assert.equal(state.remainingDays, 1);
 });
+
+test("handing work to a client does not touch the clock", () => {
+  seq = 0;
+  // Opened on the 1st with three days allowed, given to the client on
+  // the 3rd, still out on the 6th: five days in the leg, and cold.
+  const events = [
+    started(1),
+    ev({
+      kind: "client_held",
+      from_leg: 1,
+      to_leg: 1,
+      to_assignee_id: ANNA,
+      to_expected_days: 3,
+      occurred_at: at(3),
+    }),
+  ];
+  const state = replayChain(events, legs, at(6));
+
+  assert.equal(state.daysInLeg, 5, "the clock ran through the hold");
+  assert.equal(state.isStuck, true, "and it still went cold");
+  assert.equal(state.currentLeg, 1);
+  assert.equal(state.holderId, ANNA, "the holder is unchanged — they still chase it");
+  assert.equal(state.isWithClient, true);
+  assert.equal(state.withClientDays, 3, "three days sitting with the client");
+  assert.equal(state.withClientSince, at(3));
+  assert.equal(state.stints.length, 1, "a hold does not split the stint");
+});
+
+test("the client flag clears when the work comes back or moves on", () => {
+  seq = 0;
+  const held = ev({
+    kind: "client_held",
+    from_leg: 1,
+    to_leg: 1,
+    to_assignee_id: ANNA,
+    to_expected_days: 3,
+    occurred_at: at(2),
+  });
+
+  const returned = replayChain(
+    [
+      started(1),
+      held,
+      ev({
+        kind: "client_returned",
+        from_leg: 1,
+        to_leg: 1,
+        to_assignee_id: ANNA,
+        to_expected_days: 3,
+        occurred_at: at(4),
+      }),
+    ],
+    legs,
+    at(5),
+  );
+  assert.equal(returned.isWithClient, false);
+  assert.equal(returned.withClientDays, 0);
+  assert.equal(returned.daysInLeg, 4, "and the leg clock still never restarted");
+
+  const pushed = replayChain(
+    [
+      started(1),
+      held,
+      ev({
+        kind: "pushed",
+        from_leg: 1,
+        to_leg: 2,
+        to_assignee_id: RAVI,
+        to_expected_days: 5,
+        occurred_at: at(4),
+      }),
+    ],
+    legs,
+    at(5),
+  );
+  assert.equal(pushed.isWithClient, false, "a push clears it without a release");
+  assert.equal(pushed.daysInLeg, 1, "and it does restart the clock, because the baton moved");
+});
+
+test("an admin hand-off while the client holds the work keeps both facts", () => {
+  seq = 0;
+  const state = replayChain(
+    [
+      started(1),
+      ev({
+        kind: "client_held",
+        from_leg: 1,
+        to_leg: 1,
+        to_assignee_id: ANNA,
+        to_expected_days: 3,
+        occurred_at: at(2),
+      }),
+      ev({
+        kind: "handed",
+        from_leg: 1,
+        to_leg: 1,
+        to_assignee_id: RAVI,
+        to_expected_days: 3,
+        note: "Anna is away",
+        occurred_at: at(4),
+      }),
+    ],
+    legs,
+    at(5),
+  );
+
+  assert.equal(state.isWithClient, true, "the hand-off did not take it back from the client");
+  assert.equal(state.holderId, RAVI, "but it did move who chases it");
+  assert.equal(state.daysInLeg, 4, "and neither event reset the clock");
+});

@@ -6,8 +6,9 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 /**
- * Filing a trail under a stage, from the project page — the one place
- * where you can see what is filed where and fix it in the same glance.
+ * Filing a trail under a stage. Lives on the trail's own page, and on
+ * the project page's stragglers panel — since 0065 a trail files itself
+ * on creation, so this is the correction, not the routine.
  *
  * Disabled on a finished trail: it has already counted towards the
  * picture, and moving it after the fact rewrites what the schedule said

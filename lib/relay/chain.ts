@@ -20,7 +20,7 @@
  */
 
 import { addDays, istDayKey, istDaysBetween } from "./day";
-import { type ChainEvent, type Leg, isComplete, lastEvent } from "./events";
+import { type ChainEvent, type Leg, isComplete, isWithClient, lastEvent } from "./events";
 
 export type Stint = {
   legNo: number;
@@ -56,6 +56,14 @@ export type ChainState = {
   expectedDays: number;
   daysInLeg: number;
   isStuck: boolean;
+  /**
+   * The work is sitting with the client. Deliberately independent of
+   * isStuck: a trail can be both, and when it is, cold is the louder
+   * fact — the clock does not stop because the client has it.
+   */
+  isWithClient: boolean;
+  withClientSince: string | null;
+  withClientDays: number;
   overBy: number;
   bounceCount: number;
   startedAt: string | null;
@@ -184,6 +192,14 @@ export function replayChain(
   const daysInLeg = open?.days ?? 0;
   const expectedDays = open?.expectedDays ?? 0;
 
+  // Same answer as the view's `flow` lateral, from the same list of
+  // kinds. A hold that a later push, bounce or finish has overtaken is
+  // no longer a hold.
+  const withClient = !finished && isWithClient(ordered);
+  const heldAt = withClient
+    ? (ordered.filter((e) => e.kind === "client_held").at(-1)?.occurred_at ?? null)
+    : null;
+
   return {
     status: finished ? "finished" : "running",
     currentLeg,
@@ -192,6 +208,9 @@ export function replayChain(
     expectedDays,
     daysInLeg,
     isStuck: !finished && open !== null && daysInLeg > expectedDays,
+    isWithClient: withClient,
+    withClientSince: heldAt,
+    withClientDays: heldAt ? Math.max(0, istDaysBetween(heldAt, now)) : 0,
     overBy: open ? open.overBy : 0,
     bounceCount: ordered.filter((e) => e.kind === "bounced").length,
     startedAt,

@@ -26,6 +26,7 @@ export default async function RelayPage() {
           { label: "In flight", value: pulse.live, hint: "trails with a baton in hand" },
           { label: "Gone cold", value: pulse.cold, hint: "sitting longer than expected" },
           { label: "In your court", value: pulse.mine, hint: "waiting on you right now" },
+          { label: "With a client", value: pulse.withClient, hint: "waiting on someone outside" },
         ]}
         links={[
           { label: "Projects", href: "/relay/projects", primary: true },
