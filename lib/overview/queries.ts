@@ -163,6 +163,34 @@ export async function countBillsPipeline(): Promise<{
 }
 
 /**
+ * Headcount for the home page's People card.
+ *
+ * DELIBERATELY NOT `lib/directory/queries.ts`. Every function there opens
+ * with requireTool("/directory"), which `redirect("/")`s — and this runs
+ * on `/`. A person without the grant would be redirected from the home
+ * page to the home page, which renders this again: ERR_TOO_MANY_REDIRECTS,
+ * for everyone who has not been granted the Directory.
+ *
+ * So the counts are read here instead, from two tables whose SELECT
+ * policy is `using (true)` for any signed-in user — profiles (0001) and
+ * staff_departments (0060 §5). No grant needed, no cross-tool import, no
+ * loop. Counts only, like everything else in this module.
+ */
+export async function countPeople(): Promise<{ people: number; departments: number }> {
+  const supabase = await createClient();
+
+  const [people, departments] = await Promise.all([
+    supabase.from("profiles").select("id", { count: "exact", head: true }).eq("is_active", true),
+    supabase
+      .from("staff_departments")
+      .select("id", { count: "exact", head: true })
+      .eq("is_active", true),
+  ]);
+
+  return { people: people.count ?? 0, departments: departments.count ?? 0 };
+}
+
+/**
  * The four fields the home page's live card shows — the dashboard's
  * only window into Marathon. The service-role client stays confined to
  * lib/marathon; this adapter just narrows what leaves it.

@@ -319,7 +319,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
       (row): row is { id: string; selection_id: string; unit_id: string } =>
         row.id != null && row.selection_id != null && row.unit_id != null,
     );
-    const { data: anchorSelections } = budgets.length
+    const { data: anchorSelections, error: anchorSelectionsError } = budgets.length
       ? await supabase
           .from("selections")
           .select("id, status")
@@ -327,7 +327,17 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
             "id",
             budgets.map((row) => row.selection_id),
           )
-      : { data: [] };
+      : { data: [], error: null };
+    // Same rule as the read above. An empty answer here means "no anchor
+    // revision is still issued", which marks every budget superseded — so
+    // a failed read doesn't clear the flags, it invents them. Either way
+    // the screen is telling the site team something untrue.
+    if (anchorSelectionsError) {
+      console.error("indent drift read failed:", anchorSelectionsError);
+      throw new Error("Could not check this indent for design changes.", {
+        cause: anchorSelectionsError,
+      });
+    }
     const statusById = new Map((anchorSelections ?? []).map((row) => [row.id, row.status]));
     const superseded = budgets.filter((row) => statusById.get(row.selection_id) !== "issued");
 
@@ -340,11 +350,21 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
         anchoredKeysByBudget.set(line.budget_id, keys);
       }
 
-      const { data: issuedSelections } = await supabase
+      const { data: issuedSelections, error: issuedSelectionsError } = await supabase
         .from("selections")
         .select("id, unit_id")
         .in("unit_id", [...new Set(superseded.map((row) => row.unit_id))])
         .eq("status", "issued");
+      // This is the revision the drift is measured AGAINST. No rows reads
+      // as "there is nothing newer to compare with", so a failed read
+      // leaves every changed and removed line unflagged — the exact
+      // silence the throw above exists to prevent.
+      if (issuedSelectionsError) {
+        console.error("indent drift read failed:", issuedSelectionsError);
+        throw new Error("Could not check this indent for design changes.", {
+          cause: issuedSelectionsError,
+        });
+      }
       const issuedByUnit = new Map((issuedSelections ?? []).map((row) => [row.unit_id, row.id]));
 
       const selectionIds = [
@@ -768,10 +788,19 @@ export async function getBudgetPull(
   // indent. line_key is stable across revisions, so a line pulled from
   // R1's budget must show as already asked when R2's budget is on
   // screen — scoping this to one budget_id was the double-buy bug.
-  const { data: siblingBudgets } = await supabase
+  const { data: siblingBudgets, error: siblingBudgetsError } = await supabase
     .from("approved_budgets")
     .select("id")
     .eq("unit_id", budget.unit_id);
+  // No sibling budgets reads as "nothing has ever been raised for this
+  // unit", so every line shows as still to order — which is the
+  // double-buy bug arriving by the other door. Throw instead.
+  if (siblingBudgetsError) {
+    console.error("indent pull sibling budgets read failed:", siblingBudgetsError);
+    throw new Error("Could not check what has already been requested for this unit.", {
+      cause: siblingBudgetsError,
+    });
+  }
   const siblingIds = (siblingBudgets ?? [])
     .map((row) => row.id)
     .filter((id): id is string => id != null);

@@ -1,77 +1,30 @@
-# Inventory — build plan & status
+# Inventory — the rules
 
-Phase 7 of the rebuild. The store-keeper's tool: record what arrives
-against a purchase order, know what each store holds, record what goes
-out. Read `STATUS.md` and `CLAUDE.md` first; `DESIGN.md` before
-styling.
+The store-keeper's tool: record what arrives against a purchase order, know what each store holds, record what goes out. Shipped 2026-08-03. Migrations `0023`, `0024`.
 
-**Branch:** `feature/inventory` · **Migrations:** `0023_inventory.sql`,
-`0024_stock_by_location.sql`
+_Trimmed 2026-08-14: milestone log, screen inventory and the pre-merge smoke report live in git._
 
----
+## The shape of it
 
-## The shape of it, in one paragraph
+Three movements and one balance. **Goods receipts** (`GRN/<project>/NNN`) are always against an issued PO and land either in a store or straight at the PO's site. **Stock issues** (`ISS/<project>/NNN`) take material out of a store to a plot (used there) or across to another store (a transfer). **Adjustments** are signed corrections carrying a mandatory reason — opening stock is a positive adjustment. **Stock is computed from all three, never stored. No money exists anywhere in this tool.**
 
-Three movements and one balance. **Goods receipts** (`GRN/<project>/NNN`)
-are always against an issued PO and land either in a store or straight
-at the PO's site. **Stock issues** (`ISS/<project>/NNN`) take material
-out of a store to a plot (used there) or across to another store (a
-transfer). **Adjustments** are signed corrections carrying a mandatory
-reason — opening stock is a positive adjustment. **Stock** is computed
-from all three, never stored. No money exists anywhere in this tool.
+## Two stock views, deliberately
 
-**Two stock views, deliberately** (`0024`, after the founder asked for
-plots on the Stock screen):
-
-- `stock_on_hand` — a **store's live balance**. Goes up and down, can
-  be drawn down, and both negative-stock guards read it. A plot must
-  never enter this view: a plot has no balance to protect, and folding
-  one in would corrupt every guard that asks "how much is in that
-  store".
-- `stock_by_location` — **where material is**, across stores and
-  plots. For a store it is the balance above; for a plot it is a
-  running total of everything that has landed there (direct deliveries
-  — at the plot or its unit, the same place since 0029 — plus what was
-  carried out from a store). Those totals only grow, because nothing
-  leaves a site through this system — it is built into the house. This
-  is what the Stock screen reads.
+- **`stock_on_hand`** — a **store's live balance**. Goes up and down, can be drawn down, and both negative-stock guards read it. **A plot must never enter this view**: a plot has no balance to protect, and folding one in would corrupt every guard that asks "how much is in that store".
+- **`stock_by_location`** — **where material is**, across stores and plots. For a store it is the balance above; for a plot it is a running total of everything that has landed there. Those totals only grow, because nothing leaves a site through this system — it is built into the house. This is what the Stock screen reads.
 
 ## Settled decisions
 
-- **Quantities only, no money** — the reason reads are open to any
-  signed-in staff member (the Indents precedent). Writes need
-  `/inventory`.
-- **A location is a store or a plot.** There is no "manufacturing"
-  bucket (founder, kickoff); issue destinations are another store or a
-  plot. Units used to be their own location kind because
-  `units.plot_id` was nullable and rolling up would have stranded
-  deliveries to plot-less units; migration 0029 made plot ↔ unit
-  strictly 1:1 (founder decision, 2026-08-04), so a delivery at a unit
-  now shows under its plot and the 'unit' kind is gone.
-- **A general-scope PO cannot be delivered "to site"** — it has no plot
-  or unit, so there is nowhere for the goods to show. It must be
-  received into a store (refused in `create_goods_receipt`, and the
-  checkbox is disabled).
-- **Numbering:** `GRN/<project code>/NNN` and `ISS/<project code>/NNN`,
-  per-project counters, minted in the database (`create_goods_receipt`,
-  `create_stock_issue`). The TS mirrors are `lib/inventory/reference.ts`,
-  pinned by tests.
-- **Everything is append-only.** A receipt or issue records a physical
-  event, so there are no DELETE policies and their numbers, anchors and
-  destinations are permanent. A wrong quantity is corrected by a stock
-  adjustment, which keeps the reason visible instead of erasing it.
-- **A PO completes itself** once every line is fully received — an
-  AFTER trigger on `goods_receipt_lines`, `security definer` so the
-  store-keeper needs no `/purchase-orders` grant. The PO guard
-  re-checks that nothing is outstanding, so the transition is
-  self-validating from any direction.
-- **An issued PO whose goods have arrived can no longer be cancelled**
-  (the check 0021 §8 left a comment for).
-- **PO reads go through `po_facts` / `po_line_facts`** — a store-keeper
-  holds `/inventory` and usually not `/purchase-orders`. Never widen
-  the PO tables' policies for this.
+- **Quantities only, no money** — which is why reads are open to any signed-in staff member (the Indents precedent). Writes need `/inventory`.
+- **PO reads go through `po_facts` / `po_line_facts`** — a store-keeper holds `/inventory` and usually not `/purchase-orders`. **Never widen the PO tables' policies for this.**
+- **A location is a store or a plot.** No "manufacturing" bucket (founder, kickoff). Units used to be their own location kind because `units.plot_id` was nullable; `0029` made plot ↔ unit strictly 1:1, so a delivery at a unit now shows under its plot and the 'unit' kind is gone.
+- **A general-scope PO cannot be delivered "to site"** — it has no plot or unit, so there is nowhere for the goods to show. Refused in `create_goods_receipt`, and the checkbox is disabled.
+- **Numbering is minted in the database** (`create_goods_receipt`, `create_stock_issue`), per-project counters. The TS mirrors in `lib/inventory/reference.ts` are pinned by tests.
+- **Everything is append-only.** A receipt or issue records a physical event, so there are no DELETE policies and their numbers, anchors and destinations are permanent. A wrong quantity is corrected by a stock adjustment, which keeps the reason visible instead of erasing it.
+- **A PO completes itself** once every line is fully received — an AFTER trigger on `goods_receipt_lines`, `security definer` so the store-keeper needs no `/purchase-orders` grant. The PO guard re-checks that nothing is outstanding, so the transition is self-validating from any direction.
+- **An issued PO whose goods have arrived can no longer be cancelled.**
 
-## Guards (the boundary is the database, buttons are a courtesy)
+## Guards — the boundary is the database, buttons are a courtesy
 
 | Guard                         | Refuses                                                                    |
 | ----------------------------- | -------------------------------------------------------------------------- |
@@ -82,88 +35,12 @@ plots on the Stock screen):
 | `stock_issues_guard`          | changing an issue's store, destination or number                           |
 | `purchase_orders_guard`       | completing a PO with lines outstanding; cancelling one whose goods arrived |
 
-The two quantity guards serialise on an **advisory transaction lock**,
-not `select … for update` — a row lock would need UPDATE rights under
-another tool's RLS, which the acting user doesn't hold (the reasoning
-is written out at length in 0021 §7).
+The two quantity guards serialise on an **advisory transaction lock**, not `select … for update` — a row lock would need UPDATE rights under another tool's RLS, which the acting user doesn't hold. The reasoning is written out at length in `0021` §7.
 
-## Milestones
+## Things that will bite
 
-- [x] **M1 — receive.** Migration 0023, GRN against a PO with partial
-      deliveries, store-or-site destination, over-receipt refused, PO
-      auto-completion, receipts on the PO detail page.
-      _Gate: receive a real PO in two parts, watch it flip to Completed._
-- [x] **M2 — stock.** Stock on hand by store and item, per-item
-      movement history (receipts, issues, transfers, adjustments).
-      _Gate: check one item's count against reality._
-- [x] **M3 — out & adjust.** Issues to a plot or as a transfer,
-      negative-stock refusal, adjustments with a mandatory reason,
-      Overview pipeline stage 03.
-      _Gate: issue material to a plot, transfer between stores, adjust a
-      count with a reason._
-
-**Where it stands:** shipped. `0023`–`0024` applied, founder-tested in
-the browser, merged to `master` on 2026-08-03.
-
-### The pre-merge smoke, and what it caught
-
-Run as the probe user holding **`/inventory` and nothing else** — the
-store-keeper case the founder cannot test, since an admin holds every
-grant. 18/18 passed, read-only (receipts and issues are append-only, so
-a write would have left permanent test data; the write paths were
-already proven by the founder's four real GRNs and two self-completing
-POs).
-
-It caught one real bug: **`/api/catalogue` did not list `/inventory`**,
-so the Adjustments item picker returned 403 and sat empty for an actual
-store-keeper. Now in CLAUDE.md's new-tool checklist, because it will
-recur for any future tool that renders the shared picker.
-
-What the smoke proves and no unit test can: the sidebar and a direct
-URL both refuse `/purchase-orders`; every Inventory page renders under
-a single grant; no rupee figure appears anywhere in the tool; and both
-a store's and a plot's movement history open — i.e. the whole
-`po_facts` design holds for the user it was designed for.
-
-## Screens
-
-| Route                                           | What it does                                          |
-| ----------------------------------------------- | ----------------------------------------------------- |
-| `/inventory`                                    | Receive: POs awaiting delivery + recent deliveries    |
-| `/inventory/receive/[poId]`                     | The receive basket — ordered / received / arrived now |
-| `/inventory/receipts/[receiptId]`               | One delivery note                                     |
-| `/inventory/stock`                              | Where material is — store or plot                     |
-| `/inventory/stock/[kind]/[locationId]/[itemId]` | Why the number is what it is — every movement         |
-| `/inventory/issues`                             | What has gone out                                     |
-| `/inventory/issues/new`                         | Pick a store, then issue from what it actually holds  |
-| `/inventory/issues/[issueId]`                   | One issue note                                        |
-| `/inventory/adjustments`                        | The correction form + every adjustment ever made      |
-
-## Known gaps / next
-
-- **A mis-keyed receipt cannot be deleted**, only corrected by an
-  adjustment — and adjustments only apply to stores, so a wrong
-  site delivery cannot be corrected at all. Raise with the founder
-  after the M1 gate; if it bites, the fix is an admin-approved reversal
-  flow, not a DELETE policy. (Site adjustments would be the other half
-  of that fix.)
-- **Uom is not reconciled across movements.** Stock sums quantities
-  regardless of the unit each movement recorded; in practice an item's
-  unit doesn't change. If it ever does, the fix belongs in the
-  `stock_on_hand` view, not in the screens.
-- **`stores` has no `updated_at` or actor columns** (0004), so store
-  rows carry no attribution — unlike every table this tool adds.
-- **The receipt detail page is read-only** — a challan number or date
-  typo can't be corrected on screen. The database guard permits editing
-  exactly those fields (challan_no, received_at, note), so this is one
-  small form when someone actually needs it. The unused
-  `updateGoodsReceipt` action that anticipated it was deleted in the
-  post-merge cleanup (build the third copy, not the first — the same
-  reasoning as DESIGN.md's deleted components); recreate it from git or
-  the guard when the form is real.
-- Bills (Phase 8) anchors on `purchase_order_lines.id` too; nothing in
-  this tool needs to change for it.
-
-## Welcome screen (2026-08-13)
-
-The tool opens on a welcome screen (founder request, all Operations and Management tools). The Receive screen moved to `/inventory/receive` (its nav tab too); `revalidatePath` calls became the `"layout"` form. Counts from `getWelcomeCounts()` in `lib/inventory/receipts-queries.ts`.
+- **Any tool rendering the shared catalogue picker must be listed in `app/api/catalogue/route.ts`.** `/inventory` was missing, so the Adjustments item picker returned 403 and sat empty for an actual store-keeper. Found only by smoke-testing as the probe account holding one grant — an admin would never have seen it. This will recur for every future tool.
+- **A mis-keyed receipt cannot be deleted**, only corrected by an adjustment — and adjustments only apply to stores, so **a wrong site delivery cannot be corrected at all**. If it bites, the fix is an admin-approved reversal flow, not a DELETE policy.
+- **Uom is not reconciled across movements.** Stock sums quantities regardless of the unit each movement recorded. If an item's unit ever changes, the fix belongs in the `stock_on_hand` view, not in the screens.
+- **`stores` has no `updated_at` or actor columns** (`0004`), so store rows carry no attribution — unlike every table this tool adds.
+- **The receipt detail page is read-only.** The database guard permits editing exactly `challan_no`, `received_at` and `note`, so this is one small form when someone actually needs it. The unused `updateGoodsReceipt` action that anticipated it was deleted — build the third copy, not the first.

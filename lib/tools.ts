@@ -129,11 +129,11 @@ export const TOOLS: Tool[] = [
   },
   {
     name: "Directory",
-    description: "Staff and contractor directory.",
+    description: "Everyone who works here, and how to reach them.",
     href: "/directory",
     icon: "Users",
     group: "People",
-    built: false,
+    built: true,
   },
   {
     name: "Training",
