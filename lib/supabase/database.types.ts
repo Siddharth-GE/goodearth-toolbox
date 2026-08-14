@@ -5162,6 +5162,7 @@ export type Database = {
           is_finished: boolean | null
           is_queued: boolean | null
           is_stuck: boolean | null
+          is_with_client: boolean | null
           last_kind: string | null
           last_seq: number | null
           leg_count: number | null
@@ -5175,6 +5176,8 @@ export type Database = {
           trail_set_name: string | null
           unit_id: string | null
           unit_name: string | null
+          with_client_days: number | null
+          with_client_since: string | null
         }
         Relationships: [
           {
@@ -5466,6 +5469,7 @@ export type Database = {
         Args: { p_project_id: string }
         Returns: undefined
       }
+      session_is_verified: { Args: never; Returns: boolean }
       set_chain_departments: {
         Args: { p_chain_id: string; p_department_ids: string[] }
         Returns: undefined
