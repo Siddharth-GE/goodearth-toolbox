@@ -67,6 +67,11 @@ export function TrailCard({
               </>
             )}
           </p>
+          {row.isWithClient && !row.isFinished && (
+            <p className="text-warning mt-1 text-xs font-medium">
+              with client · {row.withClientDays}d
+            </p>
+          )}
           {row.departments.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1">
               {row.departments.map((d) => (

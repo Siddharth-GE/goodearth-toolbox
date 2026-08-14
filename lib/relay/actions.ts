@@ -172,6 +172,56 @@ export async function pushBaton(
   return undefined;
 }
 
+/**
+ * Say the work has gone to the client, or come back.
+ *
+ * Same leg, same holder, same clock — the only thing that changes is
+ * what the screen says is being waited on. The person holding the baton
+ * is still the person chasing it, which is why the trail stays in their
+ * court with an amber chip rather than disappearing from it.
+ */
+export async function holdForClient(
+  chainId: string,
+  fromLeg: number,
+  note: string | null,
+): Promise<ActionState> {
+  await requireTool("/relay");
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("pusher_chain_events").insert({
+    chain_id: chainId,
+    kind: "client_held",
+    from_leg: fromLeg,
+    to_leg: fromLeg,
+    note: note?.trim() || null,
+  });
+
+  if (error) return guardError(error, "Could not mark this trail as with the client.");
+  revalidate(chainId);
+  return undefined;
+}
+
+export async function clientReturned(
+  chainId: string,
+  fromLeg: number,
+  note: string | null,
+): Promise<ActionState> {
+  await requireTool("/relay");
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("pusher_chain_events").insert({
+    chain_id: chainId,
+    kind: "client_returned",
+    from_leg: fromLeg,
+    to_leg: fromLeg,
+    note: note?.trim() || null,
+  });
+
+  if (error) return guardError(error, "Could not take this trail back from the client.");
+  revalidate(chainId);
+  return undefined;
+}
+
 export async function finishTrail(
   chainId: string,
   fromLeg: number,

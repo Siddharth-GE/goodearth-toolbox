@@ -105,6 +105,8 @@ export default async function RelayCourtPage() {
                         canBounce={(row.currentLeg ?? 1) > 1}
                         canFinish={row.currentLeg !== null && row.currentLeg === row.legCount}
                         canHand={false}
+                        canClientHold={row.currentLeg !== null && !row.isWithClient}
+                        canClientReturn={row.isWithClient}
                         target={{
                           chainId: row.chainId,
                           fromLeg: row.currentLeg ?? 1,

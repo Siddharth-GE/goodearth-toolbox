@@ -7,6 +7,8 @@ import {
   bounceTargets,
   bounceReasonLabel,
   canBounce,
+  canClientHold,
+  canClientReturn,
   canFinish,
   canHand,
   canPush,
@@ -68,10 +70,17 @@ export default async function TrailPage({ params }: { params: Promise<{ chainId:
           actions={
             state.status === "finished" ? (
               <Badge variant="success">Done</Badge>
-            ) : state.isStuck ? (
-              <Badge variant="danger">Cold · {state.overBy}d over</Badge>
             ) : (
-              <Badge variant="neutral">Warm</Badge>
+              // Cold and with-client are not alternatives. A trail can be
+              // both, and when it is, both are worth saying: the delay is
+              // real, and the client is where it is sitting.
+              <div className="flex flex-wrap items-center gap-2">
+                {state.isStuck && <Badge variant="danger">Cold · {state.overBy}d over</Badge>}
+                {state.isWithClient && (
+                  <Badge variant="warning">With client · {state.withClientDays}d</Badge>
+                )}
+                {!state.isStuck && !state.isWithClient && <Badge variant="neutral">Warm</Badge>}
+              </div>
             )
           }
         />
@@ -102,6 +111,8 @@ export default async function TrailPage({ params }: { params: Promise<{ chainId:
                 canBounce={canBounce(last, actor)}
                 canFinish={canFinish(last, legCount, actor)}
                 canHand={canHand(last, actor)}
+                canClientHold={canClientHold(last, actor, state.isWithClient)}
+                canClientReturn={canClientReturn(last, actor, state.isWithClient)}
                 target={{
                   chainId,
                   fromLeg: state.currentLeg ?? 1,
@@ -174,10 +185,15 @@ export default async function TrailPage({ params }: { params: Promise<{ chainId:
                     e.kind === "pushed" && "text-success",
                     e.kind === "bounced" && "text-danger",
                     e.kind === "handed" && "text-warning",
+                    (e.kind === "client_held" || e.kind === "client_returned") && "text-warning",
                     (e.kind === "started" || e.kind === "completed") && "text-muted",
                   )}
                 >
-                  {e.kind}
+                  {e.kind === "client_held"
+                    ? "to client"
+                    : e.kind === "client_returned"
+                      ? "returned"
+                      : e.kind}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-foreground">
@@ -204,6 +220,17 @@ export default async function TrailPage({ params }: { params: Promise<{ chainId:
                       <>
                         <b className="font-semibold">{e.actorName}</b> handed the baton to{" "}
                         <b className="font-semibold">{e.toAssigneeName}</b>
+                      </>
+                    )}
+                    {e.kind === "client_held" && (
+                      <>
+                        <b className="font-semibold">{e.actorName}</b> gave it to the client — the
+                        clock kept running
+                      </>
+                    )}
+                    {e.kind === "client_returned" && (
+                      <>
+                        <b className="font-semibold">{e.actorName}</b> took it back from the client
                       </>
                     )}
                     {e.kind === "completed" && (

@@ -46,6 +46,9 @@ export type ChainRow = {
   isFinished: boolean;
   /** Created but never started: no events, no clock, no holder. */
   isQueued: boolean;
+  /** Sitting with the client. Independent of isStuck — the clock runs on. */
+  isWithClient: boolean;
+  withClientDays: number;
   startedAt: string | null;
   departments: string[];
 };
@@ -66,12 +69,14 @@ type StateRow = {
   is_stuck: boolean | null;
   is_finished: boolean | null;
   is_queued: boolean | null;
+  is_with_client: boolean | null;
+  with_client_days: number | null;
   started_at: string | null;
   department_names: string[] | null;
 };
 
 const STATE_COLUMNS =
-  "chain_id, project_id, project_name, unit_id, unit_name, activity_name, title, leg_count, current_leg, holder_id, days_in_leg, expected_days, is_stuck, is_finished, is_queued, started_at, department_names";
+  "chain_id, project_id, project_name, unit_id, unit_name, activity_name, title, leg_count, current_leg, holder_id, days_in_leg, expected_days, is_stuck, is_finished, is_queued, is_with_client, with_client_days, started_at, department_names";
 
 function toRow(row: StateRow, names: Map<string, string>): ChainRow {
   return {
@@ -91,6 +96,8 @@ function toRow(row: StateRow, names: Map<string, string>): ChainRow {
     isStuck: row.is_stuck ?? false,
     isFinished: row.is_finished ?? false,
     isQueued: row.is_queued ?? false,
+    isWithClient: row.is_with_client ?? false,
+    withClientDays: row.with_client_days ?? 0,
     startedAt: row.started_at,
     departments: row.department_names ?? [],
   };
@@ -688,7 +695,7 @@ export async function getRelayPulse(userId: string) {
     .eq("is_queued", false)
     .eq("is_finished", false);
 
-  const [live, cold, mine] = await Promise.all([
+  const [live, cold, mine, withClient] = await Promise.all([
     running,
     supabase
       .from("pusher_chain_state")
@@ -704,12 +711,21 @@ export async function getRelayPulse(userId: string) {
       .eq("is_queued", false)
       .eq("is_finished", false)
       .eq("holder_id", userId),
+    // Waiting on someone outside the company. Counted apart from cold
+    // because the fix is different: chasing a client, not a colleague.
+    supabase
+      .from("pusher_chain_state")
+      .select("chain_id", { count: "exact", head: true })
+      .eq("is_queued", false)
+      .eq("is_finished", false)
+      .eq("is_with_client", true),
   ]);
 
   return {
     live: live.count ?? 0,
     cold: cold.count ?? 0,
     mine: mine.count ?? 0,
+    withClient: withClient.count ?? 0,
   };
 }
 

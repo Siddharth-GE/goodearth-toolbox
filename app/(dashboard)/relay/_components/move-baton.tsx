@@ -13,7 +13,14 @@ import { FormMessage } from "@/components/ui/form-message";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { bounceBaton, finishTrail, handBaton, pushBaton } from "@/lib/relay/actions";
+import {
+  bounceBaton,
+  clientReturned,
+  finishTrail,
+  handBaton,
+  holdForClient,
+  pushBaton,
+} from "@/lib/relay/actions";
 import { BOUNCE_REASONS } from "@/lib/relay/events";
 import { POINTS, previewPoints } from "@/lib/relay/points";
 import { cn } from "@/lib/utils";
@@ -47,7 +54,7 @@ export type MoveTarget = {
   trailName: string;
 };
 
-type Mode = "push" | "bounce" | "finish" | "hand";
+type Mode = "push" | "bounce" | "finish" | "hand" | "client" | "clientBack";
 
 export function MoveBatonButtons({
   target,
@@ -56,6 +63,8 @@ export function MoveBatonButtons({
   canBounce,
   canFinish,
   canHand,
+  canClientHold = false,
+  canClientReturn = false,
   size = "md",
 }: {
   target: MoveTarget;
@@ -64,6 +73,8 @@ export function MoveBatonButtons({
   canBounce: boolean;
   canFinish: boolean;
   canHand: boolean;
+  canClientHold?: boolean;
+  canClientReturn?: boolean;
   size?: "sm" | "md";
 }) {
   const [mode, setMode] = useState<Mode | null>(null);
@@ -74,6 +85,16 @@ export function MoveBatonButtons({
         {canBounce && (
           <Button variant="secondary" size={size} onClick={() => setMode("bounce")}>
             Bounce
+          </Button>
+        )}
+        {canClientHold && (
+          <Button variant="ghost" size={size} onClick={() => setMode("client")}>
+            With client
+          </Button>
+        )}
+        {canClientReturn && (
+          <Button variant="secondary" size={size} onClick={() => setMode("clientBack")}>
+            Client returned it
           </Button>
         )}
         {canHand && (
@@ -146,6 +167,10 @@ function MoveDialog({
       } else if (mode === "bounce") {
         const back = Number(toLeg || target.bounceTargets.at(-1)?.legNo);
         result = await bounceBaton(target.chainId, target.fromLeg, back, reason, note);
+      } else if (mode === "client") {
+        result = await holdForClient(target.chainId, target.fromLeg, note);
+      } else if (mode === "clientBack") {
+        result = await clientReturned(target.chainId, target.fromLeg, note);
       } else {
         result = await handBaton(target.chainId, toUser, note);
       }
@@ -177,6 +202,13 @@ function MoveDialog({
       } else if (mode === "bounce") {
         celebrate.flow(`+${POINTS.bounce} FLOW · HONEST BOUNCE`);
         celebrate.toast("Sent back, with your reason.");
+      } else if (mode === "client") {
+        // No flow points either way: neither sending work to a client nor
+        // getting it back is an achievement, and scoring it would invite
+        // people to score it.
+        celebrate.toast("Marked as with the client.");
+      } else if (mode === "clientBack") {
+        celebrate.toast("Back with us.");
       } else {
         celebrate.toast("Baton handed over.");
       }
@@ -189,6 +221,8 @@ function MoveDialog({
     bounce: "Bounce back",
     finish: "Finish the trail",
     hand: "Hand the baton over",
+    client: "It is with the client",
+    clientBack: "The client sent it back",
   };
 
   return (
@@ -223,6 +257,10 @@ function MoveDialog({
               "Send the baton back down the trail. An honest bounce earns +5 flow — sitting on a problem earns nothing."}
             {mode === "hand" &&
               "Move this baton to someone else without moving the trail. The leg's clock keeps running."}
+            {mode === "client" &&
+              "The trail stays yours and the clock keeps running — everyone will just see that it is the client being waited on, not you."}
+            {mode === "clientBack" &&
+              "The work is back with us. The trail carries on from the same leg, and its clock never stopped."}
           </DialogDescription>
         </DialogHeader>
 
@@ -303,7 +341,11 @@ function MoveDialog({
                   ? "What needs to change before it comes back?"
                   : mode === "hand"
                     ? "Why is the baton changing hands?"
-                    : "Anything the next person should know?"
+                    : mode === "client"
+                      ? "What are we waiting for the client to do?"
+                      : mode === "clientBack"
+                        ? "What did they come back with?"
+                        : "Anything the next person should know?"
               }
             />
           </div>

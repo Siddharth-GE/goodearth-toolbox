@@ -31,6 +31,7 @@ export default async function HousePage({
   if (!house) notFound();
 
   const cold = house.running.filter((t) => t.isStuck).length;
+  const withClient = house.running.filter((t) => t.isWithClient).length;
 
   // This house's own wave, on the same axis as its project page — the
   // stages and the "today" marker come from the project's plan, so the
@@ -40,6 +41,7 @@ export default async function HousePage({
     isFinished: t.isFinished,
     isStuck: t.isStuck,
     isQueued: t.isQueued,
+    isWithClient: t.isWithClient,
   }));
   const schedule = buildSchedule(
     house.stages,
@@ -107,12 +109,20 @@ export default async function HousePage({
         </Card>
       )}
 
-      <FigureBand>
+      <FigureBand className="lg:grid-cols-5">
         <FigureBandCell>
           <Figure label="Running" value={house.running.length} size="lg" />
         </FigureBandCell>
         <FigureBandCell>
           <Figure label="Cold" value={cold} size="lg" tone={cold > 0 ? "bad" : undefined} />
+        </FigureBandCell>
+        <FigureBandCell>
+          <Figure
+            label="With client"
+            value={withClient}
+            size="lg"
+            tone={withClient > 0 ? "warn" : undefined}
+          />
         </FigureBandCell>
         <FigureBandCell>
           <Figure label="Waiting" value={house.queued.length} size="lg" />

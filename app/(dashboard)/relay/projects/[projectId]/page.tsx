@@ -44,6 +44,7 @@ export default async function ProjectSchedulePage({
       isFinished: t.isFinished,
       isStuck: t.isStuck,
       isQueued: t.isQueued,
+      isWithClient: t.isWithClient,
     };
     // Trails filed against the project itself rather than a house — fire
     // NOCs, master approvals. They get their own row instead of vanishing.
@@ -122,7 +123,7 @@ export default async function ProjectSchedulePage({
 
       {/* Counts, then the picture. No rupees anywhere in Relay — this
           tool is about where work is standing, not what it cost. */}
-      <FigureBand>
+      <FigureBand className="lg:grid-cols-5">
         <FigureBandCell>
           <Figure label="Villas" value={houses.length} size="lg" />
         </FigureBandCell>
@@ -136,6 +137,15 @@ export default async function ProjectSchedulePage({
             size="lg"
             tone={live.some((t) => t.isStuck) ? "bad" : undefined}
             hint="past its expected days"
+          />
+        </FigureBandCell>
+        <FigureBandCell>
+          <Figure
+            label="With client"
+            value={live.filter((t) => t.isWithClient).length}
+            size="lg"
+            tone={live.some((t) => t.isWithClient) ? "warn" : undefined}
+            hint="waiting on someone outside"
           />
         </FigureBandCell>
         <FigureBandCell>

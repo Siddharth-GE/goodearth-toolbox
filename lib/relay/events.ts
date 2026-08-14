@@ -16,7 +16,23 @@
  * deliberately not a replay. Pure: no I/O, no clock.
  */
 
-export type EventKind = "started" | "pushed" | "bounced" | "completed" | "handed";
+export type EventKind =
+  "started" | "pushed" | "bounced" | "completed" | "handed" | "client_held" | "client_returned";
+
+/**
+ * The kinds that say where the work is standing. A hand-off is not one of
+ * them: it changes who is accountable, not whether the client has it, so
+ * an admin reassigning a leg must not quietly take the work back from a
+ * client. The same list, in the same order, decides `flow` in the
+ * database view (0064 §3).
+ */
+const FLOW_KINDS: readonly EventKind[] = [
+  "started",
+  "pushed",
+  "bounced",
+  "client_held",
+  "client_returned",
+];
 
 export type BounceReason = "rework" | "missing_info" | "wrong_person" | "client_change" | "other";
 
@@ -122,6 +138,38 @@ export function bounceTargets(last: ChainEvent | null): number[] {
 /** Only an admin hands a baton over, and only while the trail is live. */
 export function canHand(last: ChainEvent | null, actor: Actor): boolean {
   return actor.isAdmin && !!last && !isComplete(last);
+}
+
+/**
+ * Is the work sitting with the client right now?
+ *
+ * Answered from the last event that MOVED the work, which is not always
+ * the last event — an admin hand-off can sit on top of a hold. Push,
+ * bounce and finish clear it implicitly: the baton moved, so the work is
+ * back with us and nobody has to remember to release it first.
+ *
+ * This is the mirror of the view's `flow` lateral. If the two ever
+ * disagree, the database wins.
+ */
+export function isWithClient(events: readonly ChainEvent[]): boolean {
+  const flow = events
+    .filter((e) => FLOW_KINDS.includes(e.kind))
+    .reduce<ChainEvent | null>((a, b) => (a === null || b.seq > a.seq ? b : a), null);
+  return flow?.kind === "client_held" && !isComplete(lastEvent(events));
+}
+
+/** Hand the work to the client: whoever could move the baton can say so. */
+export function canClientHold(last: ChainEvent | null, actor: Actor, withClient: boolean): boolean {
+  return mayMove(last, actor) && currentLeg(last) !== null && !withClient;
+}
+
+/** And take it back — only if the client has it. */
+export function canClientReturn(
+  last: ChainEvent | null,
+  actor: Actor,
+  withClient: boolean,
+): boolean {
+  return mayMove(last, actor) && currentLeg(last) !== null && withClient;
 }
 
 /**
