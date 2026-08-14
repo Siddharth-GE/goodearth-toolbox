@@ -21,6 +21,7 @@ import { notFound } from "next/navigation";
 
 import { CelebrateProvider } from "../../_components/celebrate";
 import { MoveBatonButtons } from "../../_components/move-baton";
+import { StagePicker } from "../../_components/stage-picker";
 import { TrailRoute } from "../../_components/trail-route";
 import { TrailDepartments } from "./_components/trail-departments";
 
@@ -85,12 +86,30 @@ export default async function TrailPage({ params }: { params: Promise<{ chainId:
           }
         />
 
-        <TrailDepartments
-          chainId={chainId}
-          departments={departments}
-          selected={trail.departments}
-          editable={state.status === "running"}
-        />
+        {/* Tags and filing, one quiet row. The stage picker moved here
+            from the project page's trails-by-stage listing when that
+            section went — a trail is re-filed where the trail is. */}
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <TrailDepartments
+            chainId={chainId}
+            departments={departments}
+            selected={trail.departments}
+            editable={state.status === "running"}
+          />
+          {trail.stages.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-muted text-[10px] font-semibold tracking-widest uppercase">
+                Stage
+              </span>
+              <StagePicker
+                chainId={chainId}
+                stages={trail.stages}
+                current={trail.projectStageId}
+                disabled={state.status === "finished"}
+              />
+            </div>
+          )}
+        </div>
 
         {state.status === "running" && current && (
           <Card className={cn("p-4", state.isStuck && "border-danger/40")}>

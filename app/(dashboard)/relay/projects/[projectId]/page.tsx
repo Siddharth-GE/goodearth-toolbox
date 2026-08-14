@@ -2,11 +2,9 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Figure, FigureBand, FigureBandCell } from "@/components/ui/figure";
 import { PageTitle } from "@/components/ui/page-title";
-import { formatDate } from "@/lib/format";
 import { getProjectSchedule, listProjectHouses } from "@/lib/relay/queries";
 import { slipLabel } from "@/lib/relay/schedule";
 import { buildWave, waveAmpUnit, type WaveTrail } from "@/lib/relay/wave";
-import { cn } from "@/lib/utils";
 import { ChevronRight } from "lucide-react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -15,9 +13,8 @@ import { RelayNav } from "../../_components/relay-nav";
 import { TimerDial } from "../../_components/timer-dial";
 import { ScheduleCard } from "./_components/schedule-card";
 import { ScheduleEditor } from "./_components/schedule-editor";
-import { StagePicker } from "./_components/stage-picker";
-import { WaveStageHeader } from "../../_components/wave-svg";
-import { VillaWaveCard } from "./_components/villa-wave-card";
+import { StagePicker } from "../../_components/stage-picker";
+import { VillaWaveBoard } from "./_components/villa-wave-board";
 
 export default async function ProjectSchedulePage({
   params,
@@ -160,33 +157,38 @@ export default async function ProjectSchedulePage({
         </FigureBandCell>
       </FigureBand>
 
-      {/* The waves. Stage names once above the stack — every villa shares
-          one x-axis, so repeating them down the page is the same fact in
-          eight times the ink. */}
+      {/* The waves: one board, the stage names written once across its
+          top, every villa a row beneath — names and curves share one
+          surface instead of the names floating in page-space. */}
       {headerWave ? (
-        <div className="space-y-2">
-          {/* Padded to line up with the villa cards below, whose waves
-              sit inside their p-4. */}
-          <WaveStageHeader wave={headerWave} className="px-4" />
-          <div className="space-y-3">
-            {projectWave && (
-              <VillaWaveCard
-                name="The project as a whole"
-                href={`/relay/trails?project=${projectId}`}
-                wave={projectWave}
-              />
-            )}
-            {started.map(({ house, wave }) =>
-              wave ? (
-                <VillaWaveCard
-                  key={house.unitId}
-                  name={house.unitName}
-                  href={`/relay/projects/${projectId}/houses/${house.unitId}`}
-                  wave={wave}
-                />
-              ) : null,
-            )}
-          </div>
+        <div className="space-y-3">
+          <VillaWaveBoard
+            headerWave={headerWave}
+            rows={[
+              ...(projectWave
+                ? [
+                    {
+                      key: "whole-project",
+                      name: "The project as a whole",
+                      href: `/relay/trails?project=${projectId}`,
+                      wave: projectWave,
+                    },
+                  ]
+                : []),
+              ...started.flatMap(({ house, wave }) =>
+                wave
+                  ? [
+                      {
+                        key: house.unitId,
+                        name: house.unitName,
+                        href: `/relay/projects/${projectId}/houses/${house.unitId}`,
+                        wave,
+                      },
+                    ]
+                  : [],
+              ),
+            ]}
+          />
 
           {/* One line, not thirty-nine links.
               These villas have no work on them, which is a fact about
@@ -204,12 +206,15 @@ export default async function ProjectSchedulePage({
                   {untouched.length === 1 ? "it" : "them"} yet
                 </span>
               </summary>
-              <div className="flex flex-wrap gap-x-4 gap-y-2 px-4 pb-4 pl-10">
+              {/* Tiles, not a wall of blue links: each villa is a small
+                  quiet button in an even grid, so the open drawer still
+                  looks designed rather than dumped. */}
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-2 px-4 pb-4">
                 {untouched.map(({ house }) => (
                   <Link
                     key={house.unitId}
                     href={`/relay/projects/${projectId}/houses/${house.unitId}`}
-                    className="text-muted hover:text-accent text-xs"
+                    className="border-border text-muted hover:border-accent/40 hover:text-foreground rounded-lg border px-2.5 py-2 text-center text-xs font-medium transition-colors"
                   >
                     {house.unitName}
                   </Link>
@@ -242,61 +247,12 @@ export default async function ProjectSchedulePage({
         }
       />
 
-      {schedule.stages.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-muted text-xs font-semibold tracking-widest uppercase">
-            Trails by stage
-          </h2>
-          {schedule.stages.map((stage) => {
-            const inStage = trails.filter((t) => t.projectStageId === stage.id);
-            return (
-              <Card key={stage.id} className="p-4">
-                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <span
-                    className={cn(
-                      "size-2 shrink-0 self-center rounded-full",
-                      stage.status === "done"
-                        ? "bg-foreground"
-                        : stage.status === "current"
-                          ? "bg-warning"
-                          : "bg-border",
-                    )}
-                  />
-                  <h3 className="text-foreground text-sm font-semibold">{stage.name}</h3>
-                  <span className="text-muted font-mono text-[11px]">
-                    {stage.weeks}w · {formatDate(stage.startDay)} → {formatDate(stage.endDay)}
-                  </span>
-                  <span className="ml-auto flex items-center gap-2">
-                    {stage.trailsStuck > 0 && (
-                      <Badge variant="danger">{stage.trailsStuck} cold</Badge>
-                    )}
-                    {/* Reads the same as the dashed block on the track:
-                        nothing filed is not the same as nothing done.
-                        Queued is called out separately because it is the
-                        reason a stage can look far behind and be fine —
-                        the work is written down, not started. */}
-                    <span className="text-muted text-xs">
-                      {stage.trailsTotal === 0
-                        ? "Nothing filed here yet"
-                        : `${stage.trailsFinished} of ${stage.trailsTotal} done`}
-                      {stage.trailsQueued > 0 ? ` · ${stage.trailsQueued} waiting` : ""}
-                    </span>
-                  </span>
-                </div>
-
-                {inStage.length > 0 && (
-                  <div className="divide-border mt-3 divide-y">
-                    {inStage.map((trail) => (
-                      <TrailLine key={trail.chainId} trail={trail} stages={stages} />
-                    ))}
-                  </div>
-                )}
-              </Card>
-            );
-          })}
-        </div>
-      )}
-
+      {/* "Trails by stage" used to be listed out here — every trail under
+          every stage, the founder's call to remove it: the waves already
+          say where the work is, a trail's own page is where it is acted
+          on, and since 0065 trails file themselves, so the workbench for
+          filing them had nothing left to do. Only the stragglers panel
+          below survives, because a straggler is a real, fixable fault. */}
       {unfiled.length > 0 && (
         <Card className="border-warning/40 p-4">
           <h3 className="text-foreground text-sm font-semibold">

@@ -20,7 +20,10 @@ import { cn } from "@/lib/utils";
  * label a wave now, and it is that component.
  *
  * The model does all the arithmetic (lib/relay/wave.ts). This file only
- * chooses colours and layers.
+ * chooses colours and layers. The choices lean quiet on purpose: the
+ * body is a gradient that fades to nothing rather than a flat tint, the
+ * stage rules are dotted hairlines, and the only saturated ink on the
+ * whole drawing is a marker that means trouble.
  */
 export function WaveSvg({ model, size = "sm" }: { model: WaveModel; size?: "sm" | "lg" }) {
   const W = 600;
@@ -35,54 +38,76 @@ export function WaveSvg({ model, size = "sm" }: { model: WaveModel; size?: "sm" 
   // dots — not the line — carry what is wrong. A line that changed colour
   // for every state would make five waves on a page into a rainbow, and
   // the eye would stop trusting any of them.
+  const quiet = model.status === "quiet" || model.status === "waiting";
   const stroke =
-    model.status === "complete"
-      ? "var(--success)"
-      : model.status === "quiet" || model.status === "waiting"
-        ? "var(--muted)"
-        : "var(--foreground)";
-  const fill =
-    model.status === "quiet" || model.status === "waiting" ? "var(--muted)" : "var(--accent)";
+    model.status === "complete" ? "var(--success)" : quiet ? "var(--muted)" : "var(--foreground)";
   const hasBody = model.points.some((p) => p.y > 0);
+
+  // The body fades out instead of sitting as a flat tint — the curve is
+  // the subject and the fill only gives it weight. Gradient ids repeat
+  // across instances on one page; that is fine because every instance of
+  // a variant defines the identical gradient.
+  const fillId = quiet ? "relay-wave-body-quiet" : "relay-wave-body";
+  const fillColour = quiet ? "var(--muted)" : "var(--accent)";
 
   const px = (x: number) => x * W;
   const py = (y: number) => baseline - Math.max(0, Math.min(1, y)) * (H - PAD * 2);
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" aria-hidden="true">
-      {/* Where one stage ends and the next begins — faint, because the
-          wave is the subject and these are only its ruled lines. */}
+      <defs>
+        <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={fillColour} stopOpacity="0.16" />
+          <stop offset="1" stopColor={fillColour} stopOpacity="0.02" />
+        </linearGradient>
+      </defs>
+
+      {/* Where one stage ends and the next begins — dotted hairlines,
+          because the wave is the subject and these are only its ruled
+          paper. */}
       {model.bands.slice(1).map((band) => (
         <line
           key={band.stageId}
           x1={px(band.x0)}
-          y1={PAD}
+          y1={PAD + 2}
           x2={px(band.x0)}
-          y2={baseline}
+          y2={baseline - 1}
           stroke="var(--border)"
           strokeWidth="1"
-          strokeDasharray="3 4"
+          strokeLinecap="round"
+          strokeDasharray="1 5"
         />
       ))}
 
       <line x1="0" y1={baseline} x2={W} y2={baseline} stroke="var(--border)" strokeWidth="1" />
 
-      {hasBody && <path d={area} fill={fill} fillOpacity="0.1" stroke="none" />}
+      {hasBody && <path d={area} fill={`url(#${fillId})`} stroke="none" />}
 
-      <path d={d} fill="none" stroke={stroke} strokeWidth="2.5" strokeLinecap="round" />
+      <path
+        d={d}
+        fill="none"
+        stroke={stroke}
+        strokeWidth="2.25"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
 
-      {/* Where the plan says today is — the same marker the schedule
-          picture uses, so the two pictures agree. */}
+      {/* Where the plan says today is — one thin amber line with a head,
+          the same signal the schedule picture uses, so the two pictures
+          agree. */}
       {model.planX !== null && (
-        <line
-          x1={px(model.planX)}
-          y1={PAD}
-          x2={px(model.planX)}
-          y2={baseline}
-          stroke="var(--warning)"
-          strokeWidth="1.5"
-          strokeDasharray="5 4"
-        />
+        <g>
+          <line
+            x1={px(model.planX)}
+            y1={PAD + 2}
+            x2={px(model.planX)}
+            y2={baseline}
+            stroke="var(--warning)"
+            strokeWidth="1.5"
+            strokeOpacity="0.75"
+          />
+          <circle cx={px(model.planX)} cy={PAD + 2} r="2.5" fill="var(--warning)" />
+        </g>
       )}
 
       {/* Trouble sits ON the curve, at the stage it belongs to. No
@@ -118,12 +143,7 @@ export function WaveSvg({ model, size = "sm" }: { model: WaveModel; size?: "sm" 
 }
 
 /**
- * The stage names, written once above the stack instead of on every wave.
- *
- * Every villa shares one x-axis, so repeating eight stage names down the
- * page would be eight times the ink for the same fact. Hidden on a phone,
- * where they would be unreadable and the big wave on the house page is
- * the place to read stages anyway.
+ * The stage names for a wave, or a stack of waves sharing one x-axis.
  *
  * The names sit on TWO staggered rows, and that is not decoration.
  * Stage lengths vary wildly — Saarang runs a four-week Design straight
@@ -131,6 +151,10 @@ export function WaveSvg({ model, size = "sm" }: { model: WaveModel; size?: "sm" 
  * the names or clips them to "De…" and "Co…". Staggering puts each
  * label's neighbours two stages away, which gives even a four-week stage
  * room for its full name over the exact point it labels.
+ *
+ * Always rendered INSIDE the surface that holds the wave, never floating
+ * on the page: a strip of names hanging in page-space above a card reads
+ * as debris, not as an axis.
  *
  * Carries no horizontal padding of its own: the labels are positioned as
  * percentages of THIS element's width, so it has to be the exact width
@@ -141,7 +165,7 @@ export function WaveStageHeader({ wave, className }: { wave: WaveModel; classNam
   return (
     <div
       className={cn(
-        "text-muted relative hidden h-8 text-[11px] font-semibold tracking-widest uppercase sm:block",
+        "text-muted relative hidden h-8 text-[10px] font-medium tracking-[0.12em] uppercase sm:block",
         className,
       )}
     >

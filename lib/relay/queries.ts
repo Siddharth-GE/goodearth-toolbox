@@ -293,6 +293,9 @@ export type TrailDetail = {
   departments: { id: string; name: string }[];
   title: string | null;
   note: string | null;
+  /** The stage this trail is filed under, and the project's stages to move it. */
+  projectStageId: string | null;
+  stages: ProjectStage[];
   legs: (Leg & { assigneeName: string })[];
   events: (ChainEvent & { actorName: string; toAssigneeName: string | null })[];
   state: ReturnType<typeof replayChain>;
@@ -311,7 +314,7 @@ export const getTrail = cache(async (chainId: string): Promise<TrailDetail | nul
   const { data: chain, error } = await supabase
     .from("pusher_chains")
     .select(
-      "id, project_id, activity_id, title, note, projects(name), units!pusher_chains_unit_id_fkey(name), pusher_activities(name), pusher_chain_departments(department_id, pusher_departments(id, name))",
+      "id, project_id, activity_id, project_stage_id, title, note, projects(name), units!pusher_chains_unit_id_fkey(name), pusher_activities(name), pusher_chain_departments(department_id, pusher_departments(id, name))",
     )
     .eq("id", chainId)
     .maybeSingle();
@@ -326,7 +329,7 @@ export const getTrail = cache(async (chainId: string): Promise<TrailDetail | nul
   // grow only as the baton moves), so these need no paging — but they do
   // need to be COMPLETE, because a missing event silently changes who the
   // holder is. fetchAll throws rather than answering with half a log.
-  const [legRows, eventRows, names] = await Promise.all([
+  const [legRows, stageRows, eventRows, names] = await Promise.all([
     fetchAll<{
       leg_no: number;
       activity_id: string;
@@ -339,6 +342,16 @@ export const getTrail = cache(async (chainId: string): Promise<TrailDetail | nul
         .select("leg_no, activity_id, label, assignee_id, expected_days")
         .eq("chain_id", chainId)
         .order("leg_no")
+        .range(from, to),
+    ),
+    // The project's stages, so the trail can be re-filed from its own
+    // page — the one place someone is already looking at it.
+    fetchAll<ProjectStage>((from, to) =>
+      supabase
+        .from("project_stages")
+        .select("id, name, weeks, sort_order")
+        .eq("project_id", chain.project_id)
+        .order("id")
         .range(from, to),
     ),
     fetchAll<Omit<ChainEvent, "kind"> & { kind: string }>((from, to) =>
@@ -379,6 +392,8 @@ export const getTrail = cache(async (chainId: string): Promise<TrailDetail | nul
       .sort((a, b) => a.name.localeCompare(b.name)),
     title: chain.title,
     note: chain.note,
+    projectStageId: chain.project_stage_id,
+    stages: orderStages(stageRows),
     legs: legs.map((l) => ({ ...l, assigneeName: names.get(l.assignee_id) ?? "Unnamed" })),
     events: events.map((e) => ({
       ...e,
