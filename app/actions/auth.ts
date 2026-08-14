@@ -19,6 +19,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import { createClient as createBareClient } from "@supabase/supabase-js";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 export type LoginState = { error?: string } | undefined;
@@ -32,7 +33,26 @@ const MIN_PASSWORD_LENGTH = 8;
 // "@", not adjudicate RFC 5322.
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function siteUrl() {
+/**
+ * The absolute URL this request arrived at — so reset links and the
+ * Google callback come back to the deployment that started them
+ * (production, a preview, localhost) instead of to a hardcoded address.
+ * A preview pointing its Google flow at production, where old code
+ * silently dropped it, is how this function earned its shape.
+ *
+ * Trusting the host header is safe HERE only because Supabase's
+ * redirect allow-list is the real gate: a forged host produces a
+ * redirect_to that isn't allow-listed, and GoTrue falls back to the
+ * configured Site URL. SITE_URL remains as the fallback when no header
+ * is present.
+ */
+async function requestOrigin() {
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  if (host) {
+    const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+    return `${proto}://${host}`;
+  }
   const value = process.env.SITE_URL;
   if (!value) throw new Error("SITE_URL is not set");
   return value.replace(/\/$/, "");
@@ -209,7 +229,7 @@ export async function signInWithGoogle() {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${siteUrl()}/auth/callback`,
+      redirectTo: `${await requestOrigin()}/auth/callback`,
       // Always show the account chooser — on a shared site phone, the
       // previous person's Google account must not be silently reused.
       queryParams: { prompt: "select_account" },
@@ -262,7 +282,7 @@ export async function sendPasswordReset(
 
   const supabase = await createClient();
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${siteUrl()}/auth/confirm`,
+    redirectTo: `${await requestOrigin()}/auth/confirm`,
   });
   // A failed send (rate limit, SMTP trouble) is logged for us but never
   // shown — the message must not vary by whether the account exists.
