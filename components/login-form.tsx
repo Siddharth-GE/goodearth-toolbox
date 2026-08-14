@@ -5,13 +5,20 @@ import { login } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useSearchParams } from "next/navigation";
 import { useActionState } from "react";
 
 export function LoginForm() {
   const [state, action, pending] = useActionState(login, undefined);
+  // Read client-side so the page itself stays prerendered static — an
+  // awaited searchParams prop would make /login dynamic (BUGCATCHER #6).
+  const resetDone = useSearchParams().get("reset") === "done";
 
   return (
     <form action={action} className="space-y-4">
+      {!state && resetDone && (
+        <FormMessage success="Password changed — sign in with the new one." />
+      )}
       <div className="space-y-1.5">
         <Label htmlFor="email">Email</Label>
         <Input id="email" name="email" type="email" autoComplete="email" required />

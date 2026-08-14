@@ -1,7 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login"];
+// Exact strings, matched with includes() below — never prefixes. Every
+// new unauthenticated route must be listed here or it 302s to /login
+// before it can run, an invisible loop during development.
+// /reset-password is deliberately absent: it needs the recovery session
+// the emailed link mints, so the default redirect is the right answer
+// for anyone arriving without one.
+const PUBLIC_PATHS = ["/login", "/forgot-password", "/auth/confirm"];
 
 /**
  * The request's headers with any client-supplied identity removed.
