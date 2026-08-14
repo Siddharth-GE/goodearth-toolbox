@@ -69,7 +69,7 @@ Two named exceptions, by founder decision. **`/reporter`** reads PO, bill, budge
 
 Everything in it is a `SELECT`: **no tool's code writes another tool's table.** Four documented exceptions — `indent_approvers`/`bill_approvers` are Settings-owned despite living in Indents'/Bills' migrations; the `projects_seed_schedule` trigger (`0045`) lets creating a project in Masters seed Relay's schedule, declared by _Relay's_ migration so the coupling points the right way; Client Relations writes Masters (`0050`, `0051`) through two column-narrow definer functions plus the `units_seed_engagement` trigger; and Directory's `profiles_seed_staff_details` trigger (`0060`) gives every new account a blank card, firing inside Settings' `inviteUser` — plus `updateMyName`, which writes `profiles.full_name` for the signed-in person's own row only. **A cross-tool trigger or definer function not listed there is what nobody finds until it misfires.**
 
-`pusher_chain_state` has been redefined five times (`0042`'s warning) and now has two consumers outside Relay: **a sixth definition must check Client Relations and Reporter.**
+`pusher_chain_state` has been redefined six times (`0042`'s warning, most recently `0064`) and has two consumers outside Relay: **a seventh definition must check Client Relations and Reporter**, must carry the `entry` lateral's clock-anchor exclusions forward, and must re-issue the revokes — `drop view` restores default write grants every time.
 
 ## Reads
 
