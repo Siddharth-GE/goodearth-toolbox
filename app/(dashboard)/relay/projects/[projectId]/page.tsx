@@ -7,6 +7,7 @@ import { getProjectSchedule, listProjectHouses } from "@/lib/relay/queries";
 import { slipLabel } from "@/lib/relay/schedule";
 import { buildWave, waveAmpUnit, type WaveTrail } from "@/lib/relay/wave";
 import { cn } from "@/lib/utils";
+import { ChevronRight } from "lucide-react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
@@ -187,16 +188,23 @@ export default async function ProjectSchedulePage({
             )}
           </div>
 
+          {/* One line, not thirty-nine links.
+              These villas have no work on them, which is a fact about
+              the project and not a list anyone came here to read — the
+              first version printed every name as a blue link and turned
+              the bottom of the page into a drawer of junk. It opens if
+              someone actually wants to reach one. */}
           {untouched.length > 0 && (
-            <Card className="p-4">
-              <h3 className="text-foreground text-sm font-semibold">
-                {untouched.length} villa{untouched.length === 1 ? "" : "s"} with nothing filed yet
-              </h3>
-              <p className="text-muted mt-0.5 text-sm">
-                No trails have been opened on {untouched.length === 1 ? "it" : "them"}. Open one to
-                give {untouched.length === 1 ? "it a wave" : "them waves"}.
-              </p>
-              <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1.5">
+            <details className="group border-border bg-surface rounded-2xl border shadow-sm">
+              <summary className="text-muted hover:text-foreground flex cursor-pointer list-none items-center gap-2 p-4 text-sm marker:content-none">
+                <ChevronRight className="size-4 shrink-0 transition-transform group-open:rotate-90" />
+                <span>
+                  <b className="text-foreground font-semibold">{untouched.length}</b> other villa
+                  {untouched.length === 1 ? " has" : "s have"} no work on{" "}
+                  {untouched.length === 1 ? "it" : "them"} yet
+                </span>
+              </summary>
+              <div className="flex flex-wrap gap-x-4 gap-y-2 px-4 pb-4 pl-10">
                 {untouched.map(({ house }) => (
                   <Link
                     key={house.unitId}
@@ -207,7 +215,7 @@ export default async function ProjectSchedulePage({
                   </Link>
                 ))}
               </div>
-            </Card>
+            </details>
           )}
         </div>
       ) : (

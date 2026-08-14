@@ -46,18 +46,21 @@ export function VillaWaveCard({
       <Link href={href} className="block p-4 hover:bg-black/[0.02] dark:hover:bg-white/[0.04]">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <h3 className="text-foreground min-w-0 flex-1 text-sm font-semibold">{name}</h3>
-          {/* Work that is not filed under any stage cannot appear on the
-              curve, so it is said out loud here. A wave that looks calm
-              because work is missing from it is the flattering number
-              this tool exists to remove. */}
-          {wave.unfiledOpen > 0 && (
-            <span className="text-warning text-xs">{wave.unfiledOpen} not on the wave</span>
-          )}
+          {/* One headline per villa. The unfiled note used to sit up
+              here beside it, so a card could read "2 not on the wave  2
+              stuck" — two warnings competing for the same glance, in two
+              colours, saying different things. It moved below the wave,
+              where it belongs: it is a footnote about the drawing. */}
           <span className={cn("text-xs font-medium", toneClass)}>{wave.label}</span>
         </div>
         <div className="mt-2">
           <WaveSvg model={wave} />
         </div>
+        {wave.unfiledOpen > 0 && (
+          <p className="text-muted mt-1 text-xs">
+            {wave.unfiledOpen} more not filed under a stage, so not drawn
+          </p>
+        )}
       </Link>
     </Card>
   );

@@ -11,7 +11,7 @@ import { notFound } from "next/navigation";
 
 import { RelayNav } from "../../../../_components/relay-nav";
 import { TrailCard } from "../../../../_components/trail-card";
-import { WaveSvg } from "../../../../_components/wave-svg";
+import { WaveStageHeader, WaveSvg } from "../../../../_components/wave-svg";
 import { HouseQueue } from "./_components/house-queue";
 
 /**
@@ -96,14 +96,15 @@ export default async function HousePage({
               {wave.label}
             </span>
           </div>
-          <div className="mt-2">
+          <div className="mt-3">
+            <WaveStageHeader wave={wave} />
             <WaveSvg model={wave} size="lg" />
           </div>
           {wave.unfiledOpen > 0 && (
-            <p className="text-warning mt-1 text-xs">
+            <p className="text-muted mt-1 text-xs">
               {wave.unfiledOpen} open trail{wave.unfiledOpen === 1 ? " is" : "s are"} not filed
-              under a stage, so {wave.unfiledOpen === 1 ? "it does" : "they do"} not appear on the
-              wave.
+              under a stage, so {wave.unfiledOpen === 1 ? "it is" : "they are"} not drawn here. Pick
+              a stage for {wave.unfiledOpen === 1 ? "it" : "them"} on the project page.
             </p>
           )}
         </Card>
