@@ -2,11 +2,20 @@
 
 import { revalidatePath } from "next/cache";
 
+import sharp from "sharp";
+
 import { requireAdmin } from "@/lib/auth/access";
 import { requireUser } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
 
 import { todayInIndia } from "./birthdays";
+import {
+  ACCEPTED_PHOTO_TYPES,
+  MAX_PHOTO_BYTES,
+  STAFF_PHOTOS_BUCKET,
+  staffPhoto,
+  staffPhotoPath,
+} from "./photo";
 import {
   normalisePhone,
   validateMyDetails,
@@ -131,6 +140,108 @@ export async function updateMyName(name: string): Promise<ActionState> {
     .eq("id", user.id);
 
   if (error) return friendly(error, "Could not save your name. Try again.");
+
+  revalidateAll();
+  return undefined;
+}
+
+/**
+ * The person's own photo.
+ *
+ * The browser already resized to 512×512 JPEG (~40KB) before this was
+ * called — that is not an optimisation, it is what makes upload work from
+ * a phone at all, since a camera photo is 3-8MB and the Server Action
+ * body cap is 4mb. This re-normalises anyway: an action is a public
+ * endpoint and nothing a browser sends can be trusted to already be the
+ * right shape.
+ */
+export async function uploadMyPhoto(formData: FormData): Promise<ActionState> {
+  const user = await requireUser();
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) return { error: "Choose a photo." };
+  if (file.size > MAX_PHOTO_BYTES) {
+    return { error: "That photo is too large. Take a smaller one and try again." };
+  }
+  if (!ACCEPTED_PHOTO_TYPES.includes(file.type)) {
+    return { error: "Upload a JPG, PNG, WebP or AVIF." };
+  }
+
+  let normalised: Buffer;
+  try {
+    normalised = await sharp(Buffer.from(await file.arrayBuffer()))
+      // `cover`, not `contain`. A face may lose its corners and that is
+      // fine; letterboxing a portrait onto white looks wrong on a card.
+      .resize(staffPhoto.size, staffPhoto.size, { fit: "cover" })
+      .jpeg({ quality: staffPhoto.quality })
+      .toBuffer();
+  } catch (error) {
+    console.error("uploadMyPhoto resize failed:", error);
+    return { error: "That file could not be read as a photo." };
+  }
+
+  const supabase = await createClient();
+
+  // The bucket and its policies come from 0061, not from here — creating
+  // one needs privileges an ordinary signed-in user does not have.
+  const path = staffPhotoPath(user.id, crypto.randomUUID());
+  const { error: uploadError } = await supabase.storage
+    .from(STAFF_PHOTOS_BUCKET)
+    .upload(path, normalised, { contentType: staffPhoto.contentType });
+  if (uploadError) {
+    console.error("uploadMyPhoto upload failed:", uploadError);
+    return { error: "Could not save the photo. Try again." };
+  }
+
+  // Read the old path BEFORE overwriting it, so the previous object can
+  // be cleaned up rather than orphaned.
+  const { data: existing } = await supabase
+    .from("staff_details")
+    .select("photo_path")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const { error } = await supabase
+    .from("staff_details")
+    .update({ photo_path: path, updated_by: user.id })
+    .eq("id", user.id);
+
+  if (error) {
+    // Object first, then row — so a failed row write leaves an invisible
+    // orphan rather than a card pointing at nothing.
+    await supabase.storage.from(STAFF_PHOTOS_BUCKET).remove([path]);
+    console.error("uploadMyPhoto row write failed:", error);
+    return { error: "Could not save the photo. Try again." };
+  }
+
+  if (existing?.photo_path && existing.photo_path !== path) {
+    await supabase.storage.from(STAFF_PHOTOS_BUCKET).remove([existing.photo_path]);
+  }
+
+  revalidateAll();
+  return undefined;
+}
+
+/** Row first, then the object — the reverse of upload, same reasoning. */
+export async function removeMyPhoto(): Promise<ActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data: existing, error: readError } = await supabase
+    .from("staff_details")
+    .select("photo_path")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (readError) return friendly(readError, "Could not remove the photo. Try again.");
+  if (!existing?.photo_path) return undefined;
+
+  const { error } = await supabase
+    .from("staff_details")
+    .update({ photo_path: null, updated_by: user.id })
+    .eq("id", user.id);
+  if (error) return friendly(error, "Could not remove the photo. Try again.");
+
+  await supabase.storage.from(STAFF_PHOTOS_BUCKET).remove([existing.photo_path]);
 
   revalidateAll();
   return undefined;

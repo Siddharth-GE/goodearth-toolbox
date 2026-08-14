@@ -22,7 +22,12 @@ export function PersonCard({ person }: { person: DirectoryPerson }) {
   return (
     <Card className="flex flex-col p-4">
       <div className="flex items-start gap-3">
-        <PersonPhoto name={person.name} photoPath={person.photoPath} size={44} />
+        <PersonPhoto
+          personId={person.id}
+          name={person.name}
+          photoPath={person.photoPath}
+          size={44}
+        />
         <div className="min-w-0 flex-1">
           <Link
             href={`/directory/people/${person.id}`}

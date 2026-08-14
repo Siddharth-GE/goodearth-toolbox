@@ -3,7 +3,7 @@ import { getMyDetails } from "@/lib/directory/queries";
 import { formatDate } from "@/lib/format";
 
 import { MyDetailsForm } from "../_components/my-details-form";
-import { PersonPhoto } from "../_components/person-photo";
+import { PhotoUpload } from "../_components/photo-upload";
 
 export default async function MyDetailsPage() {
   const me = await getMyDetails();
@@ -14,10 +14,8 @@ export default async function MyDetailsPage() {
         title="Yours to keep current"
         note="Everyone who can open the Directory can see these, including your blood group and emergency contact."
       >
-        <div className="flex items-start gap-4">
-          <div className="hidden sm:block">
-            <PersonPhoto name={me.name || "?"} photoPath={me.photoPath} size={56} />
-          </div>
+        <div className="flex flex-col items-start gap-4 sm:flex-row">
+          <PhotoUpload personId={me.id} name={me.name} photoPath={me.photoPath} />
           <div className="min-w-0 flex-1">
             <MyDetailsForm
               initial={{

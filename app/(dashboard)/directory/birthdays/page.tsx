@@ -47,7 +47,12 @@ export default async function BirthdaysPage() {
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {group.rows.map((person) => (
               <Card key={person.id} className="flex items-center gap-3 p-3">
-                <PersonPhoto name={person.name} photoPath={person.photoPath} size={36} />
+                <PersonPhoto
+                  personId={person.id}
+                  name={person.name}
+                  photoPath={person.photoPath}
+                  size={36}
+                />
                 <div className="min-w-0 flex-1">
                   <Link
                     href={`/directory/people/${person.id}`}

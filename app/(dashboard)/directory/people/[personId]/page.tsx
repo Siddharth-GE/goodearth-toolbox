@@ -62,7 +62,12 @@ export default async function PersonPage({ params }: { params: Promise<{ personI
     <div className="space-y-4">
       <Card className="p-5">
         <div className="flex flex-wrap items-start gap-4">
-          <PersonPhoto name={person.name} photoPath={person.photoPath} size={64} />
+          <PersonPhoto
+            personId={person.id}
+            name={person.name}
+            photoPath={person.photoPath}
+            size={64}
+          />
           <div className="min-w-0 flex-1">
             <h1 className="text-foreground text-lg font-semibold">{person.name}</h1>
             {person.designation && <p className="text-muted text-sm">{person.designation}</p>}
