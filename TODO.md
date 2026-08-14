@@ -8,17 +8,15 @@ Read `STATUS.md` first. Anything finished moves to `STATUS.md`, not struck throu
 
 **Still worth one browser check on production:** press a real write button in Purchase Orders and Bills. Nothing should have changed — nothing in the app has ever written through a view — but that is the claim being tested.
 
-## 2. Sign-in hardening — the go-live runbook
+## 2. Sign-in hardening — LIVE. Three loose ends
 
-Built 2026-08-14 on `feature/auth-hardening` (see `STATUS.md`): password → emailed 6-digit code with a 30-day trusted device, self-service password reset, Google sign-in for team emails only. `0062` is applied; public signups are already off. **In order:**
+Shipped end to end on 2026-08-14 (PR #20, `0062` + `0063` applied, browser pass done and trace-verified — see `STATUS.md` and `BUGCATCHER.md` #7). What remains:
 
-1. **Founder: a Resend account** (resend.com, free tier is plenty) — verify a sending domain, create SMTP credentials, hand them over. _Everything email waits on this._
-2. **Founder: Google OAuth credentials** — Google Cloud Console → OAuth client (web), authorised redirect URI `https://ipstebqawrvhkyntctrv.supabase.co/auth/v1/callback`; hand over client id + secret.
-3. **Vercel env vars**: `SITE_URL=https://goodearth-toolbox.vercel.app` and a fresh long random `AUTH_COOKIE_SECRET`. The preview build fails closed without them.
-4. Me, with 1–3 in hand: wire SMTP + Google into the project config, apply the email templates (blocked until custom SMTP exists — Supabase refuses template edits on the built-in sender), then the full `BUGCATCHER.md` browser pass on the preview: reset round-trip, wrong-code lockout, trusted-device skip, outside-Google-account refusal, dark mode on the three new screens. Needs a **real-inbox test account** — the probe's `@goodearth.test` can't receive email.
-5. Merge to `master`, watch `gh run list`, press one real write-button on production.
-6. **Same day, after a heads-up to staff**: apply `0063` — from that moment a session that hasn't been through the new flow reaches nothing gated, so everyone signs in once more. Then sign in as the probe (password + code) to confirm a single-grant account still works end to end.
-7. Delete the temporary test account.
+1. **Tell the staff**, if not already done: next visit signs them out; password + emailed code once, then their browser is trusted 30 days. Forgot-password and Google sign-in now exist.
+2. **Vercel: re-enable Deployment Protection** (Settings → Deployment Protection → Vercel Authentication on) — it was switched off for the private-window tests. And delete `vercel-env-values.txt` if it still exists.
+3. **Press one real write-button on production** while signed in through the new flow — `0063` rewrote `has_app()`/`is_admin()`, and a write is the claim being tested. Doubles as the §1 check below.
+
+Also worth knowing: the Preview environment's `SITE_URL` no longer steers auth (return URLs come from the request origin), so its value can be ignored or deleted.
 
 ## 3. Today — two Marathon agents may still be on the published PIN
 
