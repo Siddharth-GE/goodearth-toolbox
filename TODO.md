@@ -18,14 +18,12 @@ Shipped end to end on 2026-08-14 (PR #20, `0062` + `0063` applied, browser pass 
 
 Also worth knowing: the Preview environment's `SITE_URL` no longer steers auth (return URLs come from the request origin), so its value can be ignored or deleted.
 
-## 3. Relay waves — shipped to a branch, waiting on a browser pass
+## 3. Relay waves — LIVE. Two things to try on production
 
-`feature/relay-waves` (`0064` applied). Villa waves on the project and house screens, the lists turned into cards, and "with client" as a real trackable state. Before merging:
+Merged 2026-08-14 (PR #21, `0064` + `0065` applied). Villa waves on Projects, a project and a house; the lists turned into cards; "with client" as a real trackable state; trails file themselves under a stage on creation. What is worth doing once on the live app:
 
-1. **Open a project and a villa on the preview URL** and check the waves against what you know is true on site — that is the one thing no test here can do.
-2. **Press "With client" on a real trail**, then push it, and confirm the amber label appears and then clears.
-3. The wave needs a project to have **stages and a start date**. Every project is seeded with eight, but a project whose stages were deleted shows the "no stages set yet" card instead of a wave — worth seeing once.
-4. **Saarang has 43 villas and 4 with any trail on them**, so most of that page is the "nothing filed yet" list at the bottom. If that reads wrong to you, the fix is filing trails, not changing the page.
+1. **Press "With client" on a real trail**, then push it — the amber label should appear and then clear on its own. This is the one real write the release added, and CLAUDE.md's rule is to press one after any deploy touching server actions.
+2. **Open a trail whose stage the auto-filing guessed wrong** and move it with the Stage picker on the trail's own page. If it guesses wrong often, the fallback (the stage the plan says today is in) is the thing to revisit — possibly by giving each activity a home stage in Masters.
 
 ## 4. Today — two Marathon agents may still be on the published PIN
 
