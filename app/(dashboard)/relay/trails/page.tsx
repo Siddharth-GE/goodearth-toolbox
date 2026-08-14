@@ -1,15 +1,12 @@
-import { Badge } from "@/components/ui/badge";
 import { LinkButton } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageTitle } from "@/components/ui/page-title";
 import { Pagination } from "@/components/ui/pagination";
 import { listActivities, listDepartments, listPeople, listTrails } from "@/lib/relay/queries";
 import { Route } from "lucide-react";
-import Link from "next/link";
 
 import { RelayNav } from "../_components/relay-nav";
-import { TimerDial } from "../_components/timer-dial";
+import { TrailCard } from "../_components/trail-card";
 import { TrailFilters } from "../_components/trail-filters";
 
 export default async function AllTrailsPage({
@@ -76,51 +73,11 @@ export default async function AllTrailsPage({
           <p className="text-muted text-xs">
             Showing {result.rows.length} of {result.total}
           </p>
-          <Card className="divide-border divide-y">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {result.rows.map((row) => (
-              <Link
-                key={row.chainId}
-                href={`/relay/trails/${row.chainId}`}
-                className="flex items-center gap-3 p-4 transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.04]"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="text-foreground text-sm font-semibold">
-                    {row.activityName}
-                    {row.title ? (
-                      <span className="text-muted font-normal"> · {row.title}</span>
-                    ) : null}
-                  </p>
-                  <p className="text-muted mt-0.5 text-xs">
-                    {row.projectName}
-                    {row.unitName ? ` · ${row.unitName}` : ""}
-                    {row.isFinished ? (
-                      " · finished"
-                    ) : (
-                      <>
-                        {" · with "}
-                        <b className="text-foreground font-medium">{row.holderName ?? "nobody"}</b>
-                        {row.currentLeg ? ` · leg ${row.currentLeg} of ${row.legCount}` : ""}
-                      </>
-                    )}
-                  </p>
-                  {row.departments.length > 0 && (
-                    <div className="mt-1.5 flex flex-wrap gap-1">
-                      {row.departments.map((d) => (
-                        <Badge key={d} variant="info">
-                          {d}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                {row.isFinished ? (
-                  <Badge variant="success">Done</Badge>
-                ) : (
-                  <TimerDial days={row.daysInLeg} expectedDays={row.expectedDays} />
-                )}
-              </Link>
+              <TrailCard key={row.chainId} row={row} showProject />
             ))}
-          </Card>
+          </div>
           <Pagination
             page={result.page}
             pageCount={result.pageCount}

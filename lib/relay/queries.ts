@@ -859,14 +859,31 @@ export async function listProjectHouses(projectId: string): Promise<HouseRow[]> 
     .sort((a, b) => a.unitName.localeCompare(b.unitName, undefined, { numeric: true }));
 }
 
-/** One house: its trails split into what is running and what is waiting. */
+/**
+ * One house: its trails split into what is running and what is waiting,
+ * plus the project's stages and start date so the house can draw its own
+ * wave along the same axis its project page uses.
+ */
 export async function getHouse(projectId: string, unitId: string) {
   await requireTool("/relay");
   const supabase = await createClient();
 
-  const [unit, project, trails, names] = await Promise.all([
+  const [unit, project, stages, plan, trails, names] = await Promise.all([
     supabase.from("units").select("id, name").eq("id", unitId).maybeSingle(),
     supabase.from("projects").select("id, name").eq("id", projectId).maybeSingle(),
+    fetchAll<ProjectStage>((from, to) =>
+      supabase
+        .from("project_stages")
+        .select("id, name, weeks, sort_order")
+        .eq("project_id", projectId)
+        .order("id")
+        .range(from, to),
+    ),
+    supabase
+      .from("pusher_project_plans")
+      .select("start_date")
+      .eq("project_id", projectId)
+      .maybeSingle(),
     fetchAll<StateRow & { project_stage_id: string | null }>((from, to) =>
       supabase
         .from("pusher_chain_state")
@@ -886,6 +903,9 @@ export async function getHouse(projectId: string, unitId: string) {
   return {
     unit: unit.data,
     project: project.data,
+    stages: orderStages(stages),
+    startDate: (plan.data?.start_date as string | undefined) ?? null,
+    trails: rows,
     // Cold first among the running ones — the tool's standing order.
     running: rows
       .filter((r) => !r.isQueued && !r.isFinished)

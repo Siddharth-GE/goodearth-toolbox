@@ -1,13 +1,17 @@
 import { Badge } from "@/components/ui/badge";
 import { LinkButton } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Figure, FigureBand, FigureBandCell } from "@/components/ui/figure";
 import { PageTitle } from "@/components/ui/page-title";
 import { getHouse, listTrailSets } from "@/lib/relay/queries";
+import { buildSchedule } from "@/lib/relay/schedule";
+import { buildWave, waveAmpUnit, type WaveTrail } from "@/lib/relay/wave";
+import { cn } from "@/lib/utils";
 import { notFound } from "next/navigation";
-import Link from "next/link";
 
 import { RelayNav } from "../../../../_components/relay-nav";
-import { TimerDial } from "../../../../_components/timer-dial";
+import { TrailCard } from "../../../../_components/trail-card";
+import { WaveSvg } from "../../../../_components/wave-svg";
 import { HouseQueue } from "./_components/house-queue";
 
 /**
@@ -27,6 +31,26 @@ export default async function HousePage({
   if (!house) notFound();
 
   const cold = house.running.filter((t) => t.isStuck).length;
+
+  // This house's own wave, on the same axis as its project page — the
+  // stages and the "today" marker come from the project's plan, so the
+  // big wave here and the small one there agree.
+  const waveTrails: WaveTrail[] = house.trails.map((t) => ({
+    projectStageId: t.projectStageId,
+    isFinished: t.isFinished,
+    isStuck: t.isStuck,
+    isQueued: t.isQueued,
+  }));
+  const schedule = buildSchedule(
+    house.stages,
+    waveTrails,
+    house.startDate,
+    new Date().toISOString(),
+  );
+  const wave = buildWave(schedule.stages, waveTrails, {
+    ampUnit: waveAmpUnit([waveTrails]),
+    planPct: schedule.hasSchedule ? schedule.planPct : null,
+  });
 
   return (
     <div className="space-y-5">
@@ -48,12 +72,55 @@ export default async function HousePage({
       />
       <RelayNav active="projects" />
 
-      <Card className="divide-border grid grid-cols-4 divide-x">
-        <Stat label="running" value={house.running.length} />
-        <Stat label="cold" value={cold} tone={cold > 0 ? "danger" : undefined} />
-        <Stat label="waiting" value={house.queued.length} />
-        <Stat label="done" value={house.finished.length} />
-      </Card>
+      {/* The house's own wave, big enough to carry its stage names. */}
+      {wave && (
+        <Card className="p-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+            <h2 className="text-muted text-xs font-semibold tracking-widest uppercase">
+              Where the work is
+            </h2>
+            <span
+              className={cn(
+                "text-xs font-medium",
+                wave.status === "stuck"
+                  ? "text-danger"
+                  : wave.status === "withClient"
+                    ? "text-warning"
+                    : wave.status === "complete"
+                      ? "text-success"
+                      : "text-muted",
+              )}
+            >
+              {wave.label}
+            </span>
+          </div>
+          <div className="mt-2">
+            <WaveSvg model={wave} size="lg" />
+          </div>
+          {wave.unfiledOpen > 0 && (
+            <p className="text-warning mt-1 text-xs">
+              {wave.unfiledOpen} open trail{wave.unfiledOpen === 1 ? " is" : "s are"} not filed
+              under a stage, so {wave.unfiledOpen === 1 ? "it does" : "they do"} not appear on the
+              wave.
+            </p>
+          )}
+        </Card>
+      )}
+
+      <FigureBand>
+        <FigureBandCell>
+          <Figure label="Running" value={house.running.length} size="lg" />
+        </FigureBandCell>
+        <FigureBandCell>
+          <Figure label="Cold" value={cold} size="lg" tone={cold > 0 ? "bad" : undefined} />
+        </FigureBandCell>
+        <FigureBandCell>
+          <Figure label="Waiting" value={house.queued.length} size="lg" />
+        </FigureBandCell>
+        <FigureBandCell>
+          <Figure label="Done" value={house.finished.length} size="lg" />
+        </FigureBandCell>
+      </FigureBand>
 
       <div>
         <h2 className="text-muted mb-2 text-xs font-semibold tracking-widest uppercase">Running</h2>
@@ -64,30 +131,11 @@ export default async function HousePage({
             </p>
           </Card>
         ) : (
-          <Card className="divide-border divide-y">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {house.running.map((trail) => (
-              <Link
-                key={trail.chainId}
-                href={`/relay/trails/${trail.chainId}`}
-                className="flex items-center gap-3 p-4 transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.04]"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="text-foreground text-sm font-semibold">
-                    {trail.activityName}
-                    {trail.title ? (
-                      <span className="text-muted font-normal"> · {trail.title}</span>
-                    ) : null}
-                  </p>
-                  <p className="text-muted mt-0.5 text-xs">
-                    with{" "}
-                    <b className="text-foreground font-medium">{trail.holderName ?? "nobody"}</b>
-                    {trail.currentLeg ? ` · leg ${trail.currentLeg} of ${trail.legCount}` : ""}
-                  </p>
-                </div>
-                <TimerDial days={trail.daysInLeg} expectedDays={trail.expectedDays} />
-              </Link>
+              <TrailCard key={trail.chainId} row={trail} showUnit={false} />
             ))}
-          </Card>
+          </div>
         )}
       </div>
 
@@ -101,42 +149,13 @@ export default async function HousePage({
       {house.finished.length > 0 && (
         <div>
           <h2 className="text-muted mb-2 text-xs font-semibold tracking-widest uppercase">Done</h2>
-          <Card className="divide-border divide-y">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {house.finished.map((trail) => (
-              <Link
-                key={trail.chainId}
-                href={`/relay/trails/${trail.chainId}`}
-                className="flex items-center gap-3 p-4 transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.04]"
-              >
-                <p className="text-foreground min-w-0 flex-1 text-sm font-medium">
-                  {trail.activityName}
-                  {trail.title ? (
-                    <span className="text-muted font-normal"> · {trail.title}</span>
-                  ) : null}
-                </p>
-                <Badge variant="success">Done</Badge>
-              </Link>
+              <TrailCard key={trail.chainId} row={trail} showUnit={false} />
             ))}
-          </Card>
+          </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function Stat({ label, value, tone }: { label: string; value: number; tone?: "danger" }) {
-  return (
-    <div className="px-4 py-3.5">
-      <p
-        className={
-          tone === "danger"
-            ? "text-danger text-2xl font-extrabold tracking-tight"
-            : "text-foreground text-2xl font-extrabold tracking-tight"
-        }
-      >
-        {value}
-      </p>
-      <p className="text-muted mt-0.5 text-xs font-medium">{label}</p>
     </div>
   );
 }
