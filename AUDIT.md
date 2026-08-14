@@ -1,31 +1,37 @@
-# Toolbox audit — 11 August 2026
+# Toolbox audit — 13 August 2026
 
-A full read of the codebase, the 48 applied migrations, the live database
-and the production deployment, against the founding rule: **each tool is an
-independent instrument, connected only through the shell, the shared
-database, and shared UI.**
+A full re-read of the codebase, the 58 applied migrations, the live
+database and the production deployment, against the founding rule: **each
+tool is an independent instrument, connected only through the shell, the
+shared database, and shared UI.**
 
-**The headline is one live security hole, not an architecture problem.** The
-Marathon kiosk's admin PIN is still the seeded default `2026`, published in
-plaintext in a public GitHub repository. That needs ten minutes today. See
+This supersedes the audit of 11 August. Four tools have shipped since
+(Reporter, Client Relations, Business Planning, Financial Management) plus
+the welcome-screen pass, so most of this is new ground rather than a
+re-check.
+
+**The headline is one hole nobody has looked for before: three of the
+"money-free" database views can be written to and deleted from by any
+signed-in person, with no app grant at all.** It is not a code bug — it
+is a Postgres privilege default that the migrations never revoked. Fix is
+four lines of SQL and changes nothing about how the app behaves. See
 SEC-01.
 
-> **Update, evening of 2026-08-11:** the admin PIN has been rotated and
-> verified. Two agent accounts remain on the published test PIN `1234` —
-> SEC-01 carries the correction and `TODO.md` §1 the remaining steps.
+The architecture held again. Every server action and route handler gates
+first, all 71 tables have row-level security, no screen touches the
+database from the browser, the line chain is still anchored on real
+foreign keys, and the money boundary that `0055`–`0058` widened by hand is
+intact — exactly one SELECT policy per gated table, no doubles.
 
-The architecture itself held up better than expected. The line chain is
-anchored on real foreign keys at every hop, every table has row-level
-security, every server action and route handler checks permission, and no
-screen touches the database from the browser. Four of the things this audit
-was asked to look for turned out to have been solved already — those are
-listed at the end so the next audit doesn't go looking again.
+**How to use this file:** it is the standing record of open findings. When
+you ask for "an audit", this is the document that gets read first and
+rewritten at the end — CLAUDE.md says so.
 
 ---
 
 ## 1. Modularity & independence
 
-### MOD-01 · HIGH · Budgets imports Selections' code
+### MOD-01 · HIGH · Budgets imports Selections' code — still open
 
 `lib/budgets/quote.ts:3`
 
@@ -33,58 +39,80 @@ listed at the end so the next audit doesn't go looking again.
 import { downloadSpaceView, listSpaceViews } from "@/lib/selections/views";
 ```
 
-Used at `quote.ts:71` and `:91` to put the client-facing space photos on the
-quote PDF. This is the **only true cross-tool code import in the repo** and
-it breaks the rule directly: one tool never imports another tool's code.
-
-Two consequences, one architectural and one a permission smell:
+Used at `quote.ts:71` and `:91` to put the client-facing space photos on
+the quote PDF. Carried forward unchanged from the August 11 audit, where
+it was listed as item 3 for your decision. Two consequences:
 
 - Delete or break Selections and the Budgets quote PDF stops compiling.
-  Every other tool survives its neighbours; this pair does not.
-- `getQuote()` only ever checks `/budgets` (via `getBudget()`), and
-  `lib/selections/views.ts` has no gate of its own. So a person holding
-  `/budgets` and **not** `/selections` runs Selections' storage-download
-  code and reads its private bucket. Not a leak of anything they shouldn't
-  see — the photos belong on the quote by design — but the boundary is
-  being crossed by import rather than by a deliberate shared surface.
+- `getQuote()` only ever checks `/budgets`, and `lib/selections/views.ts`
+  has no gate of its own — so someone holding `/budgets` and not
+  `/selections` runs Selections' storage-download code. Nothing they
+  shouldn't see (the photos belong on the quote), but the boundary is
+  crossed by import rather than by a shared surface.
 
-Fix is small and there are two honest options; both are your call, not
-mine, because both move code between tools. See the roadmap.
+### MOD-02 · HIGH · NEW · Shared charting depends on Reporter
 
-### MOD-02 · LOW · Overview reads Marathon's query layer
+`lib/charts/series.ts:20-21`
 
-`lib/overview/queries.ts:3` imports `getMarathonHome` from
-`lib/marathon/queries`. I flag it only to close it off: **this is
-sanctioned**, and the file says so itself at `queries.ts:6-19` — Overview is
-the shell's home, not a tool, and is "the one module allowed to import other
-tools' queries (reads only)." It is also defensive about it: `getMarathonPulse`
-wraps the call in try/catch (`queries.ts:180-186`) specifically so a missing
-Marathon environment variable cannot take down the signed-in home page, which
-it once did.
+```ts
+import type { GroupRow, ReportResult } from "@/lib/reporter/aggregate";
+import { measureId, type ReportSpec } from "@/lib/reporter/spec";
+```
 
-The only gap is documentation — CLAUDE.md's cross-tool table lists Overview's
-table reads but not this one. Fixed in the rewritten CLAUDE.md.
+`measureId` is a **value** import, not a type, used at `series.ts:181`
+and `:215`.
 
-### MOD-03 · MEDIUM · Settings writes two other tools' tables
+CLAUDE.md lists `lib/charts/` among the shared utilities — the third
+thread. But the dependency points the wrong way: shared code now imports a
+tool. Everything downstream inherits it:
 
-`lib/settings/actions.ts:246, :255, :291, :314, :323` insert into and delete
-from `indent_approvers` (declared in Indents' migration 0019) and
-`bill_approvers` (declared in Bills' migration 0025).
+```
+lib/reporter/spec.ts, aggregate.ts
+        ↑
+lib/charts/series.ts        (shared)
+        ↑
+components/ui/chart/*       (shared UI — 5 components)
+        ↑
+Financial Management's Cash, Forward and Facility pages
+```
 
-CLAUDE.md states flatly: "no tool's CODE ever writes another tool's table."
-This is a real exception to that sentence. It is almost certainly the right
-design — deciding who may approve things is Settings' job, both tables are
-RLS-gated to `is_admin()` rather than to `/indents` or `/bills`, and both
-migrations describe them as "managed from Settings" — but an undocumented
-exception to a rule that strict is how the rule quietly stops being believed.
+So **delete `lib/reporter/` and Financial Management stops compiling**,
+along with every chart wrapper in the design system. That is a straight
+violation of "stays functional when a neighbour is down", and it is worse
+than MOD-01 because it runs through shared UI rather than between two
+tools.
 
-**Recommendation:** reclassify both tables as Settings-owned in the docs
-(like `profiles` and `user_apps`), rather than change any code. Done in the
-rewritten CLAUDE.md, flagged here so you know it was a judgement call.
+It is also easy to undo. `buildChartModel` — the only function in
+`series.ts` that touches Reporter's types — has exactly one real caller,
+`lib/reporter/chart-model.ts:1`. Moving that one function into
+`lib/reporter/` leaves `series.ts` holding only the chart model types,
+which is what the shared UI actually consumes. Roughly a 40-line move plus
+relocating `series.test.ts`. Listed for your decision because it moves
+code between modules; I did not do it unasked.
 
-### MOD-04 · PASS · The line chain is anchored in the database, not in code
+### MOD-03 · PASS · Overview reads Marathon's query layer
 
-Traced end to end. Every hand-off is a real constraint:
+`lib/overview/queries.ts:3` imports `getMarathonHome`. Sanctioned and
+documented — Overview is the shell's home, not a tool, and is the one
+module allowed to read other tools' queries. Still defensive:
+`getMarathonPulse` wraps the call in try/catch so a missing Marathon
+environment variable cannot take down the signed-in home page.
+
+### MOD-04 · PASS · Settings writes two other tools' tables
+
+`indent_approvers` and `bill_approvers` are written from
+`lib/settings/actions.ts`. Confirmed as Settings-owned in CLAUDE.md after
+the last audit; both are `is_admin()`-gated in the database. No change.
+
+### MOD-05 · PASS · No tool imports another tool's components
+
+Checked every `@/app/...` and every relative import that escapes a tool
+folder. All 26 hits stay inside their own tool. Marathon's are all
+`@/app/marathon/...`. Clean.
+
+### MOD-06 · PASS · The line chain is still anchored in the database
+
+Re-traced end to end against the live schema:
 
 | Hop                          | Anchor                                | Kind                     |
 | ---------------------------- | ------------------------------------- | ------------------------ |
@@ -94,410 +122,517 @@ Traced end to end. Every hand-off is a real constraint:
 | PO line → receipt line       | `goods_receipt_lines.po_line_id`      | FK, not null, `0023:151` |
 | PO → bill                    | `bills.po_id`                         | FK, header level only    |
 
-Not one of these is a bare string key, and the two files that decide what
-carries forward — `lib/budgets/carry-forward.ts` and
-`lib/indents/pull-rules.ts` — are pure functions that import **nothing at
-all**. The coupling really does live in the schema. This is the part of the
-codebase most likely to have rotted and it hasn't.
+Not one is a bare string key. `lib/budgets/carry-forward.ts` and
+`lib/indents/pull-rules.ts` still import nothing at all. The coupling
+lives in the schema, as designed.
 
-### MOD-05 · PASS · Delete-cascade: stronger than the rule asked for
+### MOD-07 · PASS · Deletion is refused, not cascaded
 
-The brief asked me to verify that deleting a design line _flags_ rather than
-silently breaks linked budget/indent/PO lines, and to test what actually
-happens. What actually happens is that **the delete is refused**:
+Re-verified. `selection_lines_draft_only` raises unless the parent
+selection is still `draft`, so an issued revision is immutable; the
+composite FKs carry no `ON DELETE` clause, so Postgres refuses to orphan a
+budget line even in draft. Drift is surfaced instead —
+`classifyDesignDrift` marks lines changed/removed and `getDownstreamImpact`
+shows which indents and POs already exist before a designer touches a
+line. Nothing can cascade, so nothing needs to.
 
-- `selection_lines_draft_only` (`0017:50-75`) raises unless the parent
-  selection is still `draft`. Once a revision is issued it is immutable —
-  you create a new revision instead.
-- The composite FKs above carry no `ON DELETE` clause, so they are
-  `RESTRICT`. Postgres refuses to orphan a budget line even in draft.
+Two of the reads feeding that drift display were trusting a failed query;
+fixed this session (QUAL-01).
 
-Drift is surfaced instead of destruction: `classifyDesignDrift`
-(`lib/indents/pull-rules.ts`) marks indent lines `changed`/`removed` against
-the latest issued revision, and `getDownstreamImpact`
-(`lib/selections/queries.ts:400-466`) shows a designer which indents and POs
-already exist for a line before they touch it. No cascade is needed because
-nothing can cascade.
-
-### MOD-06 · Failure-ripple test
+### MOD-08 · Failure-ripple test
 
 What breaks in **other** tools if one tool's tables empty, routes die, or
 code is deleted:
 
-| If this tool goes | What else notices                                                                                                     |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Marathon          | Home page live card only, and it is already caught in try/catch (MOD-02). Nothing else.                               |
-| Selections        | **Budgets quote PDF stops compiling** (MOD-01). Budgets/Indents lose their upstream data but degrade to empty states. |
-| Budgets           | Indents' interiors pull goes empty; nothing crashes.                                                                  |
-| Indents           | POs cannot be raised (by design — POs come from indents only). Selections' impact panel goes quiet.                   |
-| Purchase Orders   | Inventory has nothing to receive; Bills cannot anchor to a PO; both still load.                                       |
-| Inventory         | POs show no receipts. Nothing breaks.                                                                                 |
-| Bills             | Nothing reads Bills. Fully leaf.                                                                                      |
-| Relay             | Nothing. Reads only shared `projects`/`units`/`profiles`.                                                             |
-| Business Planning | Nothing. No FK to any other tool.                                                                                     |
-| Masters           | Everything degrades — but Masters is a shared surface, not a peer tool. Expected.                                     |
+| If this tool goes    | What else notices                                                                                |
+| -------------------- | ------------------------------------------------------------------------------------------------ |
+| Marathon             | Home page live card only, already caught in try/catch. Nothing else.                             |
+| Selections           | **Budgets quote PDF stops compiling** (MOD-01). Budgets/Indents degrade to empty states.         |
+| Budgets              | Indents' interiors pull goes empty. Reporter's budget dataset empties. Nothing crashes.          |
+| Indents              | POs cannot be raised (by design). Selections' impact panel goes quiet.                           |
+| Purchase Orders      | Inventory has nothing to receive; Bills cannot anchor to a PO; both still load.                  |
+| Inventory            | POs show no receipts. Reporter's stock dataset empties.                                          |
+| Bills                | Financial Management's spend side goes to zero. Nothing crashes.                                 |
+| Relay                | Reporter's `relay_chains` dataset empties. Nothing else.                                         |
+| **Reporter**         | **Financial Management stops compiling** (MOD-02), and so does every chart in the design system. |
+| Client Relations     | Financial Management's receivables go to zero; Reporter's CRM datasets empty. Both still load.   |
+| Business Planning    | Financial Management's Forward page loses its plan line; Reporter's plan-vs-actual empties.      |
+| Financial Management | Nothing. Fully leaf — no other tool reads it.                                                    |
+| Masters              | Everything degrades — but Masters is a shared surface, not a peer tool. Expected.                |
 
-**One violation of "stays functional when a neighbour is down": MOD-01.**
-Everything else is data-empty degradation, which is the design working.
+**Two violations of "stays functional when a neighbour is down": MOD-01
+and MOD-02.** Everything else is data-empty degradation, which is the
+design working. Note that all four tools built since the last audit
+degrade correctly — the new coupling came in through the chart helper, not
+through the tools.
 
 ---
 
 ## 2. Security
 
-### SEC-01 · CRITICAL · PARTLY RESOLVED 2026-08-11 · The Marathon PINs are published defaults
+### SEC-01 · CRITICAL · NEW · Three fact views are writable, and writing through them bypasses RLS
 
-> **Admin PIN: closed.** Rotated by the founder on the evening of
-> 2026-08-11 and verified against production — `2026` no longer matches
-> the stored hash, `marathon_config.updated_at` is 09:10 UTC that day.
->
-> **Agent PINs: still open**, and the table below was wrong about them.
-> The same verification found **Ravi and yema still on the published test
-> PIN `1234`**, and "Test Agent" still present (its own PIN since reset).
-> The audit recorded all four real agents as having rotated PINs; that was
-> not checked against the hashes at the time, only assumed. See `TODO.md`
-> §1. An agent reaches entry capture, not the admin panel, so the exposure
-> is narrower than what follows — but it is the same published default.
->
-> The rest of this finding is left as written, because the reasoning about
-> why rotation is the only remedy still stands.
+**Any signed-in person — including one with zero app grants — can update
+and delete production purchase orders, bills and budgets through the REST
+API.**
 
-`supabase/migrations/0002_marathon.sql:154-170`, in a **public** repository:
+Three of the fourteen views are simple enough for Postgres to treat as
+auto-updatable, which means a write to the view is a write to the table
+underneath:
+
+| View               | Base table        | `is_updatable` |
+| ------------------ | ----------------- | -------------- |
+| `po_facts`         | `purchase_orders` | YES            |
+| `bill_facts`       | `bills`           | YES            |
+| `approved_budgets` | `budgets`         | YES            |
+
+Two things combine:
+
+1. **The views bypass RLS by design.** They are owned by `postgres`, which
+   owns the base tables too, and none of those tables is `FORCE ROW LEVEL
+SECURITY`. That is deliberate and load-bearing for reads — it is how
+   `/indents` sees budget quantities without seeing budget costs. It
+   applies to writes just the same.
+2. **Supabase's default privileges grant `INSERT`, `UPDATE` and `DELETE`
+   on every new relation in `public` to `authenticated`.** The migrations
+   say `grant select on po_facts to authenticated` — but a `grant` adds;
+   it does not replace. `0022:42` revokes from `public` and `anon`, and
+   never from `authenticated`. So the write privileges the platform
+   handed out are still sitting there.
+
+Verified against production, read-only:
+
+- `information_schema.views` reports `is_updatable = YES` for all three.
+- `role_table_grants` shows `authenticated` holding `INSERT`, `UPDATE`,
+  `DELETE` on all fourteen views.
+- `pg_class` confirms `relowner = postgres` and `relforcerowsecurity =
+false` on `purchase_orders`, `bills` and `budgets`.
+- Running `select count(*) from po_facts` as a bare `authenticated` role
+  with no JWT and no grants returned **10 rows** — the RLS bypass,
+  demonstrated. The same ownership rule governs `DELETE`.
+
+I deliberately did **not** fire the destructive half of that test at
+production. The read result plus the privilege table is proof enough.
+
+**What it takes to exploit:** a valid session and one HTTP request. The
+guard triggers do not help — they are all `BEFORE UPDATE`, and none exists
+for `DELETE`. `audit_row` would record the damage after the fact.
+
+**The fix is four lines and changes no behaviour**, because nothing in the
+app has ever written through a view:
 
 ```sql
--- Shared admin PIN, defaults to 2026 (matches the approved mockup).
-insert into marathon_config (admin_pin_hash, admin_pin_salt) values (...);
-
--- One test agent (PIN 1234) ... Delete this row once real field agents
--- are added.
-insert into marathon_agents (name, pin_hash, pin_salt) values ('Test Agent', ...);
+revoke insert, update, delete, truncate on
+  po_facts, po_line_facts, bill_facts, bill_money_facts, po_billing_totals,
+  approved_budgets, approved_budget_lines, budget_report_lines,
+  crm_milestone_facts, crm_receipt_facts, business_plan_target_facts,
+  pusher_chain_state, stock_by_location, stock_on_hand
+from authenticated, anon;
 ```
 
-The PINs are scrypt-hashed, which is correct and irrelevant — the comments
-state the plaintext. No cracking required, just reading.
+Written as a migration but **not applied** — it is a production privilege
+change and the rules of engagement say those are yours. It is the first
+thing I would do today. Going forward, every new view needs the revoke in
+the same migration that creates it; CLAUDE.md now says so.
 
-**I checked production. Both are still live:**
+### SEC-02 · HIGH · NEW · A security-definer function with no permission check
 
-| Check                                                          | Result                                             |
-| -------------------------------------------------------------- | -------------------------------------------------- |
-| `marathon_config` admin PIN still the seeded hash **and** salt | ~~yes~~ **rotated 2026-08-11**                     |
-| "Test Agent" row still present with the seeded PIN `1234`      | row still there; its PIN reset                     |
-| Real agents added since (Mathew, Ravi, rega, yema)             | ~~4, all rotated~~ **Ravi and yema are on `1234`** |
+`create_client_engagement(p_unit_id uuid, p_owner_id uuid)` is `SECURITY
+DEFINER`, `EXECUTE` is granted to `authenticated`, and its body checks
+nothing. Declared in `0050`.
 
-So the migration's own instruction — "delete this row once real field agents
-are added" — was never carried out, and the admin PIN was never changed.
+CLAUDE.md states the rule flatly: "Each `security definer` function checks
+`has_app('/client-relations')` in its own body — that check is the entire
+permission boundary." Its two siblings, `crm_assign_unit` and
+`crm_release_unit`, do exactly that. This one does not.
 
-**Impact.** `/marathon` is deliberately outside Supabase Auth
-(`lib/supabase/proxy.ts:20-32`), so the PIN is the only thing in the way.
-Anyone on the internet who reads the repo can open `/marathon/admin` and
-reach the entry list — runner **name, mobile number, age, gender** — plus add
-or remove agents and reset their PINs. Rate limiting doesn't help: it stops
-guessing, and nobody needs to guess.
+**Effect:** any signed-in person — a store-keeper holding only
+`/inventory`, say — can call it over the REST API and create a CRM
+engagement plus a nine-rung payment schedule against any plot id, writing
+into a tool they have no grant for. It returns only an id, so it is a
+write hole rather than a read leak, but the rows then show up on Client
+Relations' screens as real records.
 
-**Do this today, in the running app — no deploy needed:**
+It is reached legitimately two ways: by the `units_seed_engagement` trigger
+(where the definer rights are the point) and from
+`lib/client-relations/actions.ts`, which already calls `requireTool`
+first. Adding `if not has_app('/client-relations') then raise ...` breaks
+neither — the trigger path runs as the definer, and the app path already
+holds the grant. **Recommended, not applied:** it changes a database
+function's behaviour for callers who should never have been calling it.
 
-1. `/marathon/admin`, sign in with `2026`, use **Change admin PIN**. Pick
-   something not in the repo.
-2. Delete the "Test Agent" member on the members screen.
-3. Assume anything in Marathon was readable and judge whether the runner
-   list needs telling.
+### SEC-03 · MEDIUM · NEW · Two definer functions are callable with the public anon key
 
-Note that rewriting the migration would fix nothing and break the
-additive-only rule: the PIN is in public git history permanently. Rotation
-is the only remedy. Going forward, seed a placeholder that cannot work and
-force a first-run change, rather than a real default.
+`revoke execute ... from public` does not remove `anon`. Supabase grants
+`anon` and `authenticated` explicitly through default privileges, so a
+revoke aimed at `PUBLIC` leaves both untouched. `0023:331` does exactly
+this for `stock_qty_on_hand` and believes it has locked the function down.
 
-### SEC-02 · MEDIUM · The fact views bypass RLS by design
+Two `SECURITY DEFINER` functions currently carry `anon=X` in `proacl`:
 
-`po_facts`, `po_line_facts` (`0022`), `approved_budgets`,
-`approved_budget_lines` (`0019:506-520`), `bill_facts`, `po_billing_totals`
-(`0025:477-511`), `pusher_chain_state` — none declare `security_invoker`.
-They are owned by `postgres`, so they read straight past the RLS on the
-tables underneath, and their security is entirely their own `WHERE` clause,
-their explicit column list, `security_barrier`, and a `revoke`/`grant` pair.
+| Function                               | What it does                                | Reachable by                    |
+| -------------------------------------- | ------------------------------------------- | ------------------------------- |
+| `stock_qty_on_hand(store, item)`       | Reads stock on hand, bypassing RLS          | Anyone with the public anon key |
+| `seed_default_project_stages(project)` | **Writes** eight rows into `project_stages` | Anyone with the public anon key |
 
-This is deliberate, heavily commented, and load-bearing — it is exactly how
-`/indents` sees budget quantities without seeing budget costs. It is not a
-bug and I am not proposing to change it.
+Real-world exploitability is low — both need a uuid that is not
+guessable, and `seed_default_project_stages` no-ops if the project already
+has stages (which every project does, from the `0045` trigger). But an
+anonymous caller should not be able to reach a definer function at all,
+and the anon key is public by design.
 
-The risk is procedural: **one carelessly added column silently crosses the
-money boundary**, with no policy and no linter to catch it. The comments say
-"NEVER add a money column" because a comment is currently the only guard.
-Supabase's own advisor flags every one of these as `security_definer_view`,
-which trains you to ignore that warning — worth knowing before you dismiss
-it wholesale.
+`profile_is_active(uid)` is in the same position and is genuinely
+harmless — it answers a boolean about a uuid you would already have to
+know.
 
-**Recommendation:** a CI check asserting the exact column list of the six
-money-adjacent views. Roughly thirty lines, turns tribal knowledge into a
-failing build. Listed in the roadmap, not done here — it needs a decision
-about where to draw the list.
+**Fix:** `revoke execute on function … from anon;` for all three, and use
+`revoke execute … from public, anon` as the pattern from here on. Not
+applied — same reason as SEC-01.
 
-### SEC-03 · PASS · Everything else in the security brief
+### SEC-04 · LOW · NEW · An approval limit is readable by anyone signed in
 
-I went looking for each item asked for and did not find it:
+`bill_approval_cap(uid)` is `SECURITY DEFINER`, granted to
+`authenticated`, and returns the rupee ceiling on a person's bill
+approvals for **any** user id. `profiles` is readable by every
+authenticated user, so the ids are trivially enumerable.
+
+It is one number per person and not a bill amount, so this is a boundary
+smell rather than a leak of the ledger. `can_approve_bills(uid)` and
+`can_approve_indents(uid)` are the same shape and return only booleans.
+The straightforward fix is to make each answer only for `auth.uid()`
+unless the caller is an admin. Listed, not applied.
+
+### SEC-05 · MEDIUM · CARRIED · Marathon agent PINs — could not re-verify
+
+The August 11 audit found two real agents (Ravi, yema) still on the
+published test PIN `1234`, and the "Test Agent" row still present. The
+admin PIN was rotated that evening and verified.
+
+**I could not re-check this today** — the PIN-hash comparison was blocked
+by this environment's command policy, so I have no fresh evidence either
+way. It stays open in TODO.md until you confirm it in the running app.
+Two minutes on `/marathon/admin`: reset both agents' PINs, delete "Test
+Agent".
+
+The mechanism around the PIN remains sound: scrypt with a per-row salt,
+`timingSafeEqual`, an HMAC-signed httpOnly cookie scoped to `/marathon`
+with an 8-hour expiry, and DB-backed rate limiting (10 failures → 10
+minute lockout) checked _before_ the PIN is examined. The kiosk sits
+outside Supabase Auth on purpose, so the PIN is the only thing in the way
+— which is why a published default matters more here than anywhere else.
+
+### SEC-06 · MEDIUM · CARRIED · The fact views' column lists have no automated guard
+
+Eleven views bypass RLS by ownership. Their security is entirely their own
+`WHERE` clause, their explicit column list, `security_barrier`, and a
+`revoke`/`grant` pair. This is deliberate and heavily commented — but one
+carelessly added column silently crosses the money boundary, with no
+policy and no linter to catch it. The comments say "NEVER add a money
+column" because a comment is currently the only guard.
+
+I re-checked every column list this session and all eleven are correct.
+`budget_report_lines` is still the one `security_invoker` view, so it
+inherits RLS rather than bypassing it — right, because it carries rupees.
+`bill_money_facts` correctly omits `payment_ref`, `rejection_note` and
+`note`.
+
+Still worth roughly thirty lines of CI that pins the exact column list of
+each money-adjacent view. Unchanged recommendation from the last audit.
+
+### SEC-07 · LOW · Catalogue search builds a PostgREST filter from user input
+
+`app/api/catalogue/route.ts:48` strips `,` `(` `)` from the search term
+before interpolating it into an `or(...)` string at `:88`. Stripping the
+comma is what stops a second clause being injected, so the sanitiser is
+doing real work — but it is the only thing standing there, and it is
+three characters wide. No SQL injection is possible (PostgREST
+parameterises underneath), and the worst case is a malformed filter.
+Worth knowing it exists; not worth changing today.
+
+### SEC-08 · PASS · Everything else in the brief
+
+Went looking for each and did not find it:
 
 - **Secrets in the repo.** None. `.env*` is gitignored except the blank
-  `.env.local.example`; a full-history scan across every commit for JWTs,
-  service-role keys and access tokens found nothing but variable names in
-  docs. SEC-01 is a published _default credential_, which is a different
-  thing and worse.
-- **Client-side database access.** None. All 108 `"use client"` files reach
-  the database only through server actions. The one browser client that
-  existed was unused — deleted this session.
-- **Anon-key exposure.** Confined to auth, as intended.
-- **RLS coverage.** Every table has it enabled. Sixteen get it through
-  `do $$ ... execute format(...)` loops (`0004:139-159`, `0023:924-948`),
-  which defeats a naive grep — worth knowing before someone "discovers"
-  they're unprotected.
-- **Auth on actions and routes.** Complete. Every exported server action
-  calls `requireTool`/`requireUser`/`requireAdmin` first; all seven route
-  handlers gate before touching data, including `app/api/catalogue` and the
-  private-bucket streamer at `selections/views/[viewId]`.
-- **Service-role usage.** Confined to Marathon (which has no other way in)
-  plus the single sanctioned `inviteUser` (`lib/settings/actions.ts:88`),
-  which touches only the auth-admin API, never a table.
-- **Marathon PIN mechanics.** Sound: scrypt with per-row salt,
-  `timingSafeEqual`, HMAC-signed httpOnly cookie scoped to `/marathon`,
-  8-hour expiry, and DB-backed rate limiting (10 failures → 10-minute
-  lockout) checked _before_ the PIN is examined. The mechanism is good; the
-  secret was left at its default.
-- **IDOR.** The model is role-based, not owner-based — any `/budgets` holder
-  may open any budget, deliberately. Where per-caller scoping is genuinely
-  required it exists, e.g. `getSavedEntry` (`lib/marathon/queries.ts:69-88`)
-  filters on `agent_id` with a comment explaining that without it any agent
-  could walk bib numbers.
-- **SQL injection.** No raw SQL string interpolation anywhere; everything
-  goes through PostgREST builders or parameterised RPCs.
-- **Input validation.** Manual rather than schema-based (no zod), but I
-  found no action writing a field it hadn't checked, and the database
-  carries matching `check` constraints as a second line.
+  `.env.local.example`. The repo is public; the two `NEXT_PUBLIC_*` vars
+  are meant to be.
+- **Client-side database access.** None. All 135 `"use client"` files
+  reach the database through server actions only. No browser Supabase
+  client exists.
+- **RLS coverage.** All 71 tables have it enabled. The seven `marathon_*`
+  tables have RLS on and **zero policies**, which is deny-all — correct,
+  since Marathon reaches them through the service-role key and has no
+  Supabase Auth session at all.
+- **Auth on actions.** Complete. Every exported server action across 22
+  action files calls `requireTool` / `requireAdmin` / `requireAgentSession`
+  first. The two that appear not to — `createClientForm` and
+  `updateClientForm` (`lib/client-relations/actions.ts:165,172`) — are
+  thin `FormData` wrappers that delegate to guarded functions.
+- **Auth on routes.** All 11 route handlers gate before touching data,
+  either directly (`app/api/catalogue`, the private-bucket streamer at
+  `selections/views/[viewId]`) or through a `requireTool`-gated query.
+- **Double SELECT policies.** None. Every one of the twelve money-gated
+  tables has exactly one, so `0055`'s widened-qual approach held through
+  three subsequent migrations.
+- **The three-way WHERE.** Intact. `crm_milestone_facts`,
+  `crm_receipt_facts` and `business_plan_target_facts` all still admit
+  `/financial-management`, and `bill_money_facts` exists as `0058` wrote
+  it. Nobody re-ran `0056`/`0057` over the top.
+- **IDOR.** The model is role-based, not owner-based — any `/budgets`
+  holder may open any budget, deliberately. Where per-caller scoping is
+  genuinely needed it exists, e.g. `getSavedEntry` filters on `agent_id`
+  so no agent can walk bib numbers.
+- **SQL injection.** No raw SQL interpolation anywhere; everything goes
+  through PostgREST builders or parameterised RPCs.
+- **Service-role usage.** Confined to Marathon plus the single sanctioned
+  `inviteUser`, which touches the auth-admin API and never a table.
+- **Storage.** Two buckets: `catalogue` public (thumbnails, by design) and
+  `design-views` private, streamed through a gated route handler.
 
 ---
 
 ## 3. Performance
 
-**The reported numbers are LCP ~5.5s, FCP 2.6s, TTFB 1.3s. I measured
-rather than guessed, and the answer is cold starts.** Most of what a
-performance audit normally finds is already correct here, so I want to be
-precise about what I ruled out and how.
+**Reported: LCP ~5.5s, FCP 2.6s, TTFB 1.3s.** Re-measured today; the
+answer is the same as August 11, and nothing shipped since has made it
+worse.
 
 ### PERF-01 · HIGH · Cold starts, and essentially nothing else
 
-Timed against production (`goodearth-toolbox.vercel.app`):
+Timed against `goodearth-toolbox.vercel.app` this session:
 
-| Path                                 | First hit (cold) | Warm       |
-| ------------------------------------ | ---------------- | ---------- |
-| `/login` (prerendered static)        | **1.14s**        | 0.16–0.41s |
-| `/_next/static/...` (proxy excluded) | 0.43s            | 0.14–0.18s |
-| `/` (proxy + redirect)               | —                | 0.16–0.18s |
+| Path                          | First hit (cold) | Warm          |
+| ----------------------------- | ---------------- | ------------- |
+| `/login` (prerendered static) | **1.01s**        | 0.20s / 0.22s |
+| `/` (proxy + redirect)        | 0.25s            | 0.17s         |
 
-Warm TTFB is ~0.16s and indistinguishable from a static asset — so the proxy
-costs nothing measurable, and neither do the queries. Cold TTFB is ~1.14s,
-a **7× difference**, and it lands almost exactly on the reported 1.3s. With
-~70 staff spread thinly across eleven tools all day, a large share of loads
-hit a cold function.
+Warm TTFB is ~0.2s and indistinguishable from a static asset — so the
+proxy costs nothing measurable, and neither do the queries. Cold TTFB is
+5× that and lands near the reported 1.3s. With ~70 staff spread thinly
+across sixteen tools all day, a large share of loads hit a cold function.
+
+**This is unchanged from the last audit, which means Fluid compute /
+keep-warm has not been turned on.** It remains the single biggest lever
+and it is a Vercel setting, not a code change.
 
 Two structural reasons it bites here:
 
-- Every `(dashboard)` route is dynamic (`ƒ` in the build output), because
+- Every route is dynamic (`ƒ` in the build output — 108 of 110), because
   `getCurrentUser` reads `headers()`. Correct for per-user grants, but it
-  means no route can ever be served from cache.
-- The dashboard `<h1>` — almost certainly the LCP element — sits outside any
-  Suspense boundary and renders only after `await requireUser()`, so it
-  inherits the whole cold-start cost.
+  means no route can be served from cache.
+- The dashboard `<h1>` — almost certainly the LCP element — renders only
+  after `await requireUser()`, so it inherits the whole cold-start cost.
 
-**The honest limit of this finding:** I can measure TTFB from here, but not
-real-user LCP on a phone in Kerala. That TTFB is cold-start-dominated is
-measured. That LCP follows it is inference — strong, because the remaining
-2.9s between FCP and LCP has no other candidate I could find, but inference.
-Confirm with Vercel Speed Insights filtered to cold vs warm before spending
-real money on it.
+**The honest limit:** TTFB being cold-start-dominated is measured. That
+LCP follows it is inference — strong, because the remaining time has no
+other candidate I could find, but inference. Confirm in Vercel Speed
+Insights (already wired into the root layout) filtered to cold vs warm
+before spending money on it.
 
-**What would actually help, in order:** Fluid compute / keeping a function
-warm (a platform setting, not a code change) is the single biggest lever.
-After that, moving the greeting `<h1>` above the auth await so the shell
-paints before the profile query resolves.
+### PERF-02 · PASS · The bundle is still fine, and Recharts is properly split
 
-### PERF-02 · MEDIUM · Five missing indexes — preventative, not the cause — **applied**
+Re-measured from the production build, because Recharts landed since the
+last audit:
 
-Migration `0049` went in on 2026-08-11 ahead of `0050`, all five indexes
-verified present. The finding below stands as written: it changed nothing
-measurable, which was always the point.
+| Thing                     | Size                                                       |
+| ------------------------- | ---------------------------------------------------------- |
+| Shared first-load JS      | 556 KB raw / **168 KB gzipped**                            |
+| Stylesheet                | 72 KB raw / 12 KB gzipped                                  |
+| All route chunks together | 2.7 MB raw                                                 |
+| Recharts                  | 360 KB + 83 KB, **two chunks, neither in `rootMainFiles`** |
 
-`indents.created_at`, `indent_lines.created_at`, `purchase_orders.issued_at`,
-`bills.created_at`, `bills.paid_at` are all filtered by the thirteen
-Overview counts on every visit to `/`, and none has an index.
+So Recharts is genuinely code-split to the routes that chart, exactly as
+CLAUDE.md claims. 168 KB gzipped shared is up from ~145 KB but still well
+inside reasonable. Fonts are `next/font/google` and self-hosted; images go
+through `next/image`. None of this is the LCP problem.
 
-**This is not why the site is slow.** I checked the live row counts:
+### PERF-03 · PASS · No waterfalls, and streaming is wired everywhere
 
-| Table           | Rows |
-| --------------- | ---- |
-| selection_lines | 79   |
-| budget_lines    | 49   |
-| indent_lines    | 28   |
-| indents         | 16   |
-| purchase_orders | 9    |
-| bills           | 4    |
+- **All 96 routes have a `loading.tsx`** in their own segment or an
+  ancestor. Checked programmatically, not by eye. The rule in CLAUDE.md
+  holds without exception.
+- **Every welcome screen's counts run in `Promise.all`** — I checked all
+  eight `getWelcomeCounts` implementations. The new tool-root screens
+  added a query to the most-visited pages in each tool and did it the
+  cheap way.
+- **The sequential awaits I flagged automatically were all false
+  positives** — every one turned out to be `await params` (which resolves
+  instantly) followed by a query, or already inside a `Promise.all`. The
+  home page's thirteen counts still run in batches.
 
-At this size Postgres will sequential-scan regardless, and adding indexes
-changes nothing today. Migration `0049` is written and committed **but not
-applied**, framed as a "before it matters" measure. Apply whenever suits.
+### PERF-04 · LOW · 106 foreign keys have no index — preventative, not the cause
 
-(`goods_receipts.received_at` is deliberately not in the list — it is already
-indexed from `0023`.)
+Most are `created_by`/`updated_by` audit columns that are never filtered,
+only resolved in bulk against the `profiles` primary key. About a dozen
+are genuinely filtered: `indents.plot_id`, `goods_receipts.plot_id`,
+`goods_receipts.unit_id`, `stock_issues.plot_id`,
+`labour_contracts.plot_id`, `business_plans.project_id`,
+`stock_adjustments.item_id`, `purchase_orders.deliver_store_id`,
+`item_requests.category_id`.
 
-### PERF-03 · LOW · Marathon per-run counts are N+1
+At today's row counts — tens of rows in most of these tables — Postgres
+sequential-scans regardless and an index changes nothing measurable. The
+same was true of the five indexes added in `0049`, which is why they
+changed nothing. Worth doing before the data grows, not worth doing this
+week.
 
-`lib/marathon/queries.ts:31-39` issues one count per run inside `.map`. It is
-parallelised, behind Suspense, and running against 11 rows, so the cost today
-is one extra round trip. The existing comment explains it replaced something
-worse.
+### PERF-05 · LOW · CARRIED · Marathon per-run counts are N+1
 
-Doing it properly needs a `GROUP BY` — which PostgREST can't express, so it
-needs a database function. **That is a schema change, so I did not do it**
-(the plan put schema out of scope). Left as a recommendation; it is not
-urgent.
-
-### PERF-04 · PASS · What I ruled out
-
-Each of these was a plausible cause and each is measurably fine:
-
-- **Client bundle.** 446 KB uncompressed for the shared shell (~145 KB
-  gzipped); 2.0 MB across _all_ routes. No charting library, no
-  framer-motion; Radix is three primitives. `@react-pdf/renderer` is
-  confined to route handlers and does not leak into any page bundle.
-- **Fonts.** `next/font/google`, self-hosted, exactly two files preloaded
-  (51 KB total). Mono is genuinely used in 83 places, so it earns its place.
-- **CSS.** One 56.6 KB stylesheet.
-- **Images.** `next/image` throughout; the two raw `<img>` tags are a
-  same-origin route handler and a PDF primitive.
-- **Region.** Vercel `bom1` and Supabase `ap-south-1` are both Mumbai. This
-  was my leading hypothesis for the 1.3s TTFB and it is wrong.
-- **Waterfalls.** The homepage has none — six of nine sections are static
-  arrays, the two that fetch are behind `<Suspense>`, and all thirteen counts
-  run in `Promise.all` batches.
-- **Whole-table reads.** Every `select("*")` is paired with `.range()` inside
-  `fetchAll` or is a single-row `.single()`.
+`lib/marathon/queries.ts` issues one count per run inside `.map`. It is
+parallelised, behind Suspense, and running against 11 rows. Doing it
+properly needs a `GROUP BY`, which PostgREST cannot express, so it needs a
+database function. Not urgent.
 
 ---
 
 ## 4. Code quality & consistency
 
-### QUAL-01 · HIGH · Two failed reads that looked like good news — **fixed**
+### QUAL-01 · HIGH · Four reads that treated failure as good news — **fixed**
 
-`lib/budgets/actions.ts:170` and `lib/indents/queries.ts:273` both
-destructured only `{ data }` and fell through to an empty list. In both, empty
-means the opposite of failure:
+The August audit fixed two of these. Four more of the same shape were
+still live, all in the indent path, all in code whose own comments explain
+why the empty case is dangerous:
 
-- Carry-forward read "no prior budget for this unit" and started a blank
-  sheet — silently discarding prices someone had already entered, which is
-  precisely the data loss `fetchAll` exists to prevent, arriving by another
-  door.
-- The indent drift check read "nothing has changed" and cleared every
-  design-changed flag, telling the site team an indent was safe to order
-  when the design under it had moved.
+| Where                        | What an empty result meant                                                    |
+| ---------------------------- | ----------------------------------------------------------------------------- |
+| `lib/indents/queries.ts:322` | Anchor revision lookup — failure marks **every** budget superseded            |
+| `lib/indents/queries.ts:343` | Latest issued revision — failure leaves every changed line **unflagged**      |
+| `lib/indents/queries.ts:771` | Sibling budgets — failure hides everything already ordered                    |
+| `lib/indents/actions.ts:350` | Sibling budgets, write path — failure lets the same quantity be ordered twice |
 
-Fixed this session, each matching what its layer already does: the action
-returns a message, the query throws to the error boundary.
+The last two are the documented "double-buy bug" reachable through a
+database blip instead of through the code path that was fixed. All four
+now speak up: the queries throw to the error boundary, the action returns
+a plain message. Nothing changes on the happy path.
 
-### QUAL-02 · LOW · Dead code and a duplicated filter — **fixed**
+### QUAL-02 · LOW · The one lint warning — **fixed**
 
-`listActiveGstRates()` (`lib/masters/gst-rates.ts:29`) was never called, while
-the PO detail page fetched every slab and filtered in JavaScript. Now one
-caller each.
+`DetailTable` in `lib/reporter/report-document.tsx` took the report spec
+and never read it. Removed. `npm run lint` is now silent, which matters
+more than it sounds: CI stops at the first failure, so noise in the lint
+step is noise in front of every gate after it.
 
-### QUAL-03 · MEDIUM · Line pulls are not atomic — deliberate, documented
+### QUAL-03 · MEDIUM · CARRIED · Line pulls are not atomic — deliberate
 
 `addDirectLines`, `addConstructionPullLines`, `addConstructionLines`,
-`addPoolLines`, and the receipt/issue loops all insert row-by-row in
-JavaScript with no transaction. A failure part-way leaves some lines added
-and some not.
+`addPoolLines` and the receipt/issue loops insert row-by-row with no
+transaction, so a failure part-way leaves some lines added and some not.
+Every site says why: the quantity guard raises per line with that item's
+remaining figure, and a batch insert would fail wholesale on the first
+refusal. Each reports partial success honestly.
 
-This is a **considered trade-off, not an oversight**, and every site says so
-— e.g. `lib/purchase-orders/actions.ts:158-160`: "One at a time, deliberately:
-the qty guard raises per line with the item's remaining figure, and a batch
-insert would fail wholesale on the first refusal." Each reports partial
-success honestly ("Added 3, then stopped: …").
-
-Worth knowing there is a way to have both: Marathon's bib numbering does the
-whole allocation inside one function (`marathon_create_entry`), atomic and
-one round trip. The same shape — a function that loops server-side and
-returns a per-row summary — would give the pulls atomicity _and_ keep the
-per-row messages. Not urgent; noting it because the brief asked whether the
-bib pattern was used everywhere it should be. It isn't, but the gap is
-reasoned.
+Marathon's bib numbering shows the shape that gives you both — one
+`marathon_create_entry` function that loops server-side and returns a
+per-row summary, atomic and one round trip. The brief asked whether that
+pattern is used everywhere it should be. It isn't, but the gap is reasoned
+rather than forgotten.
 
 ### QUAL-04 · LOW · Structural drift
 
-- `lib/masters/` uses one `<entity>.ts` / `<entity>-actions.ts` pair per
-  entity (18 files) instead of the `queries.ts` / `actions.ts` convention.
-  Sensible for nine entities; just not the stated pattern.
-- Every tool in `lib/tools.ts` has a matching route and vice versa,
-  including the five Coming Soon stubs. No orphans.
-- `replaceFutureLegs`, `editableFromLeg` and `scoreAll` in `lib/relay/` are
-  unused **on purpose** — tested write paths not yet wired to a screen.
-  Don't let a future cleanup delete them by accident.
+- **All sixteen tools follow the pattern.** Every entry in `lib/tools.ts`
+  has a matching route and vice versa, including the two Coming Soon
+  stubs. No orphans, no unregistered routes.
+- `lib/masters/` still uses one `<entity>.ts` / `<entity>-actions.ts` pair
+  per entity (18 files) rather than `queries.ts` / `actions.ts`. Sensible
+  for nine entities; just not the stated convention. Documented in
+  CLAUDE.md rather than changed.
+- `replaceFutureLegs`, `editableFromLeg` and `scoreAll` in `lib/relay/`
+  are unused **on purpose** — tested write paths not yet wired to a
+  screen. Don't let a cleanup delete them by accident.
 - ~35 further call sites destructure `{ data }` without checking `error`.
-  The two that mattered are fixed; the rest are display-only lookups (an
-  editor's name, a label) where an empty result is genuinely harmless. Worth
-  a slow tidy, not a project.
+  The six that mattered are now fixed; the rest are display-only lookups
+  (an editor's name, a label) where an empty result is genuinely harmless.
 
-### QUAL-05 · The access model is already what you decided
+### QUAL-05 · PASS · The access model is already what you decided
 
-The brief asks to "note the access model inconsistency: profiles currently
-store one team string, but the decided model is per-user per-app grants" and
-to assess migration effort.
+The brief asks about "profiles storing one team string" versus per-user
+per-app grants, and to assess the migration effort.
 
-**There is nothing to migrate — it shipped.** `user_apps` (migration 0003)
-plus role bundles `role_apps` (0034) are live, unioned per request in
-`lib/auth/dal.ts`, and enforced _in the database_ by `has_app()`, not merely
-in the app. `profiles.team` is a vestigial free-text column that `0038:12-13`
-already describes as null on every row.
+**There is nothing to migrate — it shipped.** `user_apps` (`0003`) plus
+role bundles `role_apps` (`0034`) are live, unioned per request in
+`lib/auth/dal.ts`, and enforced _in the database_ by `has_app()`.
+`profiles.team` is a vestigial free-text column, null on every row.
+Effort is a dead-column cleanup, not a migration, and even that is
+optional under the additive-only rule.
 
-Effort is a dead-column cleanup, not a migration, and even that is optional
-under the additive-only rule. Removed from TODO.md.
+### QUAL-06 · CI is green
+
+`prettier → lint → typecheck → test → build → check:actions`, all
+passing. 392 tests, 0 failures. 145 action export lists clean.
+
+---
+
+## 5. Documentation
+
+Reduced to three living documents at root plus this one:
+
+| File          | What it is                                                            |
+| ------------- | --------------------------------------------------------------------- |
+| **CLAUDE.md** | The rulebook. Rules only, no history, no tasks. Rewritten, 148 lines. |
+| **STATUS.md** | What exists and works, per tool, plus platform facts. A snapshot.     |
+| **TODO.md**   | Next tasks in priority order. Anything done moves to STATUS.md.       |
+| **AUDIT.md**  | This file — the standing record of open findings.                     |
+
+**Kept, against the brief's letter:** `DESIGN.md` (Warm Minimalism) and
+`PRODUCT.md`. Both are read by the `impeccable` design skill, and
+CLAUDE.md is required to _reference_ the design language rather than
+contain it — a 312-line design system does not fit in a 150-line rulebook.
+Deleting them would break tooling, so I did not. Say the word if you want
+them gone anyway.
+
+**Per-tool `PLAN.md` files: kept in place and trimmed** (your call this
+session). They were 2,437 lines across 14 files; the stage-by-stage
+delivery logs and dated session notes are gone, the rules and the "things
+that will bite" sections stay. Eight applied migrations cite these files
+by name and migrations can never be edited, so deleting them would have
+left permanent dangling references.
 
 ---
 
 ## Fixed in this session
 
-Five commits, each verified:
+| #   | Commit    | What                                                                           |
+| --- | --------- | ------------------------------------------------------------------------------ |
+| 1   | `d9d9279` | Two drift reads throw instead of silently clearing design-change flags         |
+| 2   | `07ea8d1` | Both sides of the budget pull refuse a failed dedupe read (double-buy)         |
+| 3   | `fbd2f26` | Report PDF's detail table drops the prop it never read — lint now silent       |
+| 4   | —         | Documentation: this file, CLAUDE.md, STATUS.md, TODO.md, PLAN.md files trimmed |
 
-| #   | Commit    | What                                                                                                          |
-| --- | --------- | ------------------------------------------------------------------------------------------------------------- |
-| 1   | `51e0154` | Deleted the unused browser Supabase client — the one easy way client-side DB access could return              |
-| 2   | `b612415` | Error checks on the two reads whose silent failure looked like good news (QUAL-01)                            |
-| 3   | `d105596` | PO screen filters GST rates in the database; dead export retired (QUAL-02)                                    |
-| 4   | `f5fda05` | Migration `0049` — five Overview indexes, written here and applied 2026-08-11 (PERF-02)                       |
-| 5   | —         | Documentation consolidated: CLAUDE.md, STATUS.md, TODO.md rewritten; README.md, PRODUCT.md, AGENTS.md removed |
-
-Nothing above changes behaviour, except that two previously-silent failures
-now speak up.
+Nothing above changes behaviour, except that four previously-silent
+failures now speak up.
 
 ## Needs your decision
 
-Ranked by what I'd do first.
+Ranked by what I would do first.
 
-| #   | Item                                                                                                                                                                                                                | Why it's yours                                                                                         |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| 1   | ~~SEC-01 admin PIN~~ **done 2026-08-11.** What is left: **reset Ravi's and yema's PINs (both `1234`) and delete "Test Agent".**                                                                                     | Live production credentials. Minutes in the running app; I can't and shouldn't do it for you.          |
-| 2   | **PERF-01 — cold starts.** Enable Fluid compute / keep-warm on Vercel, then re-measure.                                                                                                                             | A billing and platform decision. Biggest single lever on the slow first load.                          |
-| 3   | **MOD-01 — untangle the Budgets → Selections import.** Either move `listSpaceViews`/`downloadSpaceView` into a shared surface (`lib/masters/` or a new `lib/space-views/`), or have Budgets read the bucket itself. | Moves code between tools; the brief says not to without asking. First option is cleaner and ~20 lines. |
-| 4   | **SEC-02 — CI check pinning the money-free views' column lists.**                                                                                                                                                   | Needs a decision on where the authoritative list lives.                                                |
-| 5   | **MOD-03 — confirm `indent_approvers`/`bill_approvers` are Settings-owned.**                                                                                                                                        | I documented it that way. Say if you disagree and it should move instead.                              |
-| 6   | **PERF-03 — Marathon per-run counts via a database function.**                                                                                                                                                      | Schema change, low value at 11 rows.                                                                   |
-| 7   | **QUAL-03 — line pulls atomic via server-side loop functions.**                                                                                                                                                     | Real design change to a working, reasoned trade-off.                                                   |
+| #   | Item                                                                                                                                 | Why it's yours                                                                                    |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| 1   | **SEC-01 — revoke write privileges on all 14 views.** Four lines of SQL, no behaviour change.                                        | A production privilege change. Say go and it is applied in a minute.                              |
+| 2   | **SEC-05 — Marathon agent PINs.** Reset Ravi's and yema's, delete "Test Agent".                                                      | Live credentials in the running app. I could not verify them this session and cannot change them. |
+| 3   | **SEC-02 — add the `has_app` check to `create_client_engagement`.**                                                                  | Changes a database function's behaviour for callers who should never have reached it.             |
+| 4   | **PERF-01 — cold starts.** Enable Fluid compute / keep-warm on Vercel, then re-measure.                                              | A billing and platform decision. Biggest single lever on the slow first load, still untouched.    |
+| 5   | **SEC-03 — revoke `execute` from `anon` on the three definer functions.**                                                            | Same category as #1; smaller blast radius, so it can ride along.                                  |
+| 6   | **MOD-02 — move `buildChartModel` into `lib/reporter/`,** leaving `lib/charts/series.ts` holding only types.                         | Moves code between modules. ~40 lines, and it un-breaks the design system's independence.         |
+| 7   | **MOD-01 — untangle the Budgets → Selections import.** Move the space-view helpers to a shared surface, or read the bucket directly. | Same class as #6, carried from August. First option is cleaner and ~20 lines.                     |
+| 8   | **SEC-06 — CI check pinning the money-free views' column lists.**                                                                    | Needs a decision on where the authoritative list lives.                                           |
+| 9   | **SEC-04 — scope `bill_approval_cap` to the caller unless admin.**                                                                   | Small, but it is a behaviour change to a shared helper.                                           |
+| 10  | **PERF-04 — index the dozen genuinely-filtered foreign keys.**                                                                       | Preventative. Changes nothing measurable today.                                                   |
+| 11  | **QUAL-03 — line pulls atomic via server-side loop functions.**                                                                      | A real design change to a working, reasoned trade-off.                                            |
 
 ## Already true — things this audit was asked to find and didn't
 
 Recorded so the next pass doesn't re-litigate them:
 
-1. **Per-user per-app grants are live** (0003 + 0034), enforced in the
-   database. No migration pending. (QUAL-05)
-2. **No client component can reach the database.** Not one.
-3. **Every table has RLS enabled** — sixteen via `do $$` loops that a grep
-   will miss.
-4. **Deleting a linked design line is impossible, not cascading.** Issued
-   revisions are immutable and the FKs are RESTRICT; drift is flagged
-   instead. (MOD-05)
-5. **Vercel and Supabase are in the same region.** Not a TTFB cause.
-6. **The client bundle, fonts, CSS and images are all already correct.**
+1. **Per-user per-app grants are live** and enforced in the database. No
+   migration pending. (QUAL-05)
+2. **No client component can reach the database.** Not one, across 135.
+3. **Every table has RLS enabled** — all 71, including the seven Marathon
+   tables where zero policies is the correct answer.
+4. **Deleting a linked design line is impossible, not cascading.** (MOD-07)
+5. **Every server action and route handler gates first.** (SEC-08)
+6. **Vercel `bom1` and Supabase `ap-south-1` are both Mumbai.** Not a TTFB
+   cause.
+7. **The bundle, fonts, CSS, images, `loading.tsx` coverage and query
+   parallelism are all already correct.** (PERF-02, PERF-03)
+8. **The money boundary widened by hand in `0055`–`0058` is intact** — one
+   SELECT policy per gated table, three-way WHERE preserved. (SEC-08)
