@@ -51,8 +51,13 @@ Two small known gaps: no inline editor for a queued trail's activities in the wa
 
 Every tool below is built and gated; until someone is granted it, only admins see it.
 
-- **Run `npx tsx scripts/import-staff.ts --commit`** — 47 people, 45 new logins. The dry run is clean and reviewed. It writes every starting password to a git-ignored `data/staff-passwords-<date>.csv`; **hand those over and delete that file.** Then set a department for the eight the sheet left blank (Admin, Designer, Jitha TA, Kavin kumar Senthil, Saurav, Siddharth, Team, Varghese George).
-- **Grant the other tools.** The import grants `/directory` only — everybody lands on a directory and nothing else. Deciding who gets Selections, Indents, Budgets and the rest is the founder's, one role template at a time.
+**The staff import ran on 2026-08-14** — 47 people, 45 new logins, everyone granted `/directory` and nothing else. `scripts/import-staff.ts` is re-runnable and a re-run is a no-op, so it is the way to add the next joiner.
+
+- **Delete `data/staff-passwords-2026-08-14.csv` once the passwords are handed over.** 45 plaintext starting passwords sitting on the founder's machine. Git-ignored, never pushed — but it should not outlive its purpose. **This is the oldest open item on this page.**
+- **Sign in as one imported person, in a private window.** The check nobody has done: an admin passes every permission test in the app and never sees a grant bug. Confirm they land on the Directory, can edit their own phone, and cannot reach anything else.
+- **Set a department for the eight the sheet left blank** — Admin, Designer, Jitha TA, Kavin kumar Senthil, Saurav, Siddharth, Team, Varghese George. On each person's page in the Directory, five minutes.
+- **Decide the role templates.** Everybody currently holds `/directory` and nothing more, so the whole company can see a phone list and do no work. `/settings/roles` is built and empty; naming the jobs — Site Engineer, Purchase, Accounts — turns granting somebody their tools into one click instead of sixteen. **This is the next real piece of work and it needs the founder, not code.**
+- **`admin@`, `designer@` and `team@` are people now**, by decision. If that turns out wrong, deactivating them in Settings is the undo — nothing they have done will name a person.
 
 - **`/reporter`** — the amber warning beside the checkbox says what it means: every vendor rate, bill amount and margin.
 - **`/financial-management`** — every client's dues, every bill amount, every loan and its terms.
