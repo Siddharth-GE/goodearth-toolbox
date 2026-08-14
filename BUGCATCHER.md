@@ -12,14 +12,15 @@ Read this before merging anything that touches a database read, a file upload, a
 
 Six checks, each earned by a bug below.
 
-| Check                                                             | Because                                                                                                                          |
-| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| **Open the page in a browser.** Not the build output — the page.  | A bad PostgREST `select` compiles, type-checks and builds, then answers HTTP 300 at runtime. Four dead screens shipped this way. |
-| **Sign in as a real single-grant user**, not as yourself.         | An admin passes every permission check in the app and will never once see a grant bug.                                           |
-| **Press the button that writes.** Upload the file, save the form. | Binary uploads were silently corrupting for as long as the feature existed. Nothing errored.                                     |
-| **Look at what landed**, not at what the code sent.               | Storage reported `image/jpeg` for a file that was not an image. The row wrote fine.                                              |
-| **`gh run list`** — a successful push is not a green build.       | CI stops at the first failure. A trivial formatting error silently skips every check that matters after it.                      |
-| **Look at the page in dark mode.**                                | An entire class of browser-drawn furniture ignored the palette for months.                                                       |
+| Check                                                                         | Because                                                                                                                          |
+| ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| **Open the page in a browser.** Not the build output — the page.              | A bad PostgREST `select` compiles, type-checks and builds, then answers HTTP 300 at runtime. Four dead screens shipped this way. |
+| **Sign in as a real single-grant user**, not as yourself.                     | An admin passes every permission check in the app and will never once see a grant bug.                                           |
+| **Press the button that writes.** Upload the file, save the form.             | Binary uploads were silently corrupting for as long as the feature existed. Nothing errored.                                     |
+| **Look at what landed**, not at what the code sent.                           | Storage reported `image/jpeg` for a file that was not an image. The row wrote fine.                                              |
+| **`gh run list`** — a successful push is not a green build.                   | CI stops at the first failure. A trivial formatting error silently skips every check that matters after it.                      |
+| **Look at the page in dark mode.**                                            | An entire class of browser-drawn furniture ignored the palette for months.                                                       |
+| **After a smoke test, read the traces.** The database says what actually ran. | A Google sign-in "worked" that never minted a session, and two tests reported done had left zero rows. Eyes lie; rows don't.     |
 
 ---
 
@@ -100,6 +101,20 @@ Note the nuance: `export type Foo = {…}` as a _declaration_ is fine. The re-ex
 **Why nothing caught it.** Everything still worked. It was only slower, and only sometimes.
 
 **The check.** Inspect `.next/prerender-manifest.json` before and after, the same way it was measured the first time. Do this before adding any `cookies()` or `headers()` call to a root layout.
+
+---
+
+### 7. A smoke test can pass in front of your eyes without ever running
+
+_Found 2026-08-14, testing the sign-in hardening on its preview._
+
+**What happened.** "Continue with Google" was declared working: click, account chooser, dashboard. The database said otherwise — the sign-in code was issued but **never exchanged**, `last_sign_in_at` hadn't moved in eleven days, and no session existed. The "dashboard" was an older session already in that browser. The cause: the OAuth return leg was built from a hardcoded `SITE_URL`, which on the preview pointed at **production** — where the old code had no `/auth/callback` route and bounced the returning sign-in to `/login` without a word. Separately, two tests reported as done (the lockout, the reset round-trip) had left **zero rows** — they had simply not been run.
+
+**Why nothing caught it.** Every gate was green and every screen rendered. The failure lived in which _deployment_ a third party redirected back to, and in the gap between "I saw a dashboard" and "a session was minted". No local check sees either.
+
+**The rule.** Auth flows must return to the address the request arrived at (`requestOrigin()` in `app/actions/auth.ts` — the Supabase redirect allow-list stays the gate), never to a hardcoded URL that previews falsify. And a browser pass of an auth flow is a claim, not evidence.
+
+**The check.** Auth leaves receipts; read them. After any sign-in smoke test: `auth_verified_sessions` has the row with the right `method`, `auth.sessions` has a live session, `auth.users.last_sign_in_at` moved, and for the unhappy paths `login_attempts` shows the failures and the lock. On the return from any OAuth hop, glance at the address bar — you must still be on the deployment you started from.
 
 ---
 
