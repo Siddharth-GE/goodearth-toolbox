@@ -172,32 +172,9 @@ through the tools.
 
 ### BUG-01 · HIGH · **FIXED 2026-08-14** · Every binary upload was silently corrupted
 
-**Found by the Directory's first-ever photo upload**, which stored a JPEG
-whose every non-UTF-8 byte had become `EF BF BD` — the Unicode
-replacement character. A 40KB image arrived as 124KB of rubbish. Supabase
-still labelled it `image/jpeg`, the database row wrote fine, no error
-appeared anywhere, and the only symptom was a broken image.
+A raw `Buffer` handed to Supabase Storage was text-decoded under Next's patched fetch, so a 40KB JPEG stored as 124KB of rubbish that storage still reported as `image/jpeg`. Nothing errored. Found by the Directory's first-ever photo upload; the identical defect was sitting unexercised in `lib/selections/views-actions.ts`, where the `design-views` bucket was completely empty. Both fixed by passing a `Blob`; `uploadMyPhoto` also verifies the stored size against what it sent.
 
-**Cause.** `supabase-js` builds a multipart body only when handed a
-`Blob`; anything else is passed to `fetch` as a raw body. Next patches
-global `fetch`, and a Node `Buffer` through that patched path is
-text-decoded. It does NOT reproduce locally with the plain
-`@supabase/supabase-js` client — only under the Next runtime, which is why
-nothing caught it.
-
-**Both call sites are fixed** by wrapping the buffer in a `Blob`:
-
-- `lib/directory/actions.ts` — `uploadMyPhoto`
-- `lib/selections/views-actions.ts` — `uploadSpaceView`, which had the
-  identical defect and **had never run in production**: the `design-views`
-  bucket was completely empty. The first render a designer uploaded would
-  have corrupted silently and gone into a client's quote PDF.
-
-`uploadMyPhoto` now also compares the stored object's size against what it
-sent and refuses the write if they differ, because this class of failure is
-permanent, invisible, and leaves nothing in any log.
-
-**The rule:** hand Supabase Storage a `Blob`, never a raw `Buffer`.
+**The full write-up, the rule and the check now live in `BUGCATCHER.md` — that is its permanent home.** It is repeated here only because this is where the finding was raised.
 
 ---
 

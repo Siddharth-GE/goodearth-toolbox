@@ -67,6 +67,8 @@ Masters, `profiles` and `items` are shared surfaces, not another tool's property
 
 ## Notable facts worth not rediscovering
 
+**Anything a green build cannot catch lives in `BUGCATCHER.md`** — the bad PostgREST select, the corrupted binary upload, the view privileges, the white date pickers. This section is the rest.
+
 - **Migrations are applied from this machine** via the management API's `/database/query` endpoint (`SUPABASE_ACCESS_TOKEN` in git-ignored `.env.local`) — not by hand in Studio. Verify, then `npm run db:types`. Use Node for the request; PowerShell's `Invoke-RestMethod` mangles large JSON bodies.
 - **Preview deployments sit behind Vercel's SSO wall** — a preview URL 302s unless that browser is signed into Vercel. So the two-browser probe smoke uses the private window for **production**, and your Vercel-authenticated browser for the preview.
 - **The probe account holds `/inventory` only.** Its password is never stored — set a throwaway one via the auth admin API each time. Its `@goodearth.test` domain isn't real, so recovery emails can never arrive. The reset did work on 2026-08-10; try it before assuming a browser pass is impossible.
@@ -74,14 +76,9 @@ Masters, `profiles` and `items` are shared surfaces, not another tool's property
 - **Line pulls are deliberately non-atomic** — row-by-row so the quantity guard can refuse one line with a useful message rather than failing the whole basket. Each reports partial success honestly.
 - **Full CI browser smoke was costed and declined** (2026-08-03); `check:actions` covers the known outage class.
 - **Dark mode is a switch, not a stored preference.** `data-theme` on `<html>`, remembered in a cookie and applied by a blocking inline script before first paint. Untouched, it follows the device. Nothing is stored on anyone's account. Rules in `DESIGN.md`, logic in `lib/theme.ts`.
-- **Reading the theme cookie in the root layout costs static rendering.** Tried it: `cookies()` there turned `/login`, `/_not-found` and `/_global-error` from prerendered into server-rendered-on-demand. Hence the inline script. Re-measure the same way (`.next/prerender-manifest.json`) before adding any `cookies()` or `headers()` call to a root layout.
-- **`color-scheme` is why date pickers were white.** The app carried a full dark palette from the start but never declared `color-scheme`, so the browser drew its own furniture in light colours on a dark page, across ~30 forms. One line fixed all of them, and nothing in CI could ever have seen it.
 - **`/directory` is granted to everyone, so `has_app('/directory')` is not a boundary.** With every account holding it, that check is `true` with extra steps. Everything genuinely restricted inside the Directory says `is_admin()` instead. The grant does protect exactly one thing — `directory_emails()`, against an account that has _not_ been granted the tool. Don't hide anything sensitive behind it believing it is narrow.
 - **`profiles_seed_staff_details` is a trigger on the shared `profiles` table**, declared by Directory's `0060` and firing inside Settings' `inviteUser` path — the fourth documented cross-tool trigger. The misfire to watch for: give `staff_details` a `not null` column with no default and **`inviteUser` starts failing**, surfacing as "Could not create the account", nowhere near the cause.
 - **Two definer functions now read `auth.users`** — `admin_list_users()` (gated `is_admin()`) and `directory_emails()` (gated `has_app('/directory')`). Neither may grow a column without deciding who that column is for.
-- **A raw `Buffer` handed to Supabase Storage is silently text-decoded** under Next's patched fetch, so the stored file is corrupt while everything reports success. Pass a `Blob`. Found 2026-08-14 by the first photo upload the app had ever made; the same defect was sitting unexercised in Selections' design-view upload (AUDIT.md BUG-01).
-- **A broken PostgREST `select` passes every gate.** Client Relations shipped four dead screens behind a fully green CI: an ambiguous embed answers HTTP 300 at runtime and is invisible to lint, types, tests and build. **Open the page, or run the query.** The specific trap: a table with two FKs to the same target needs the key named (`plots!units_plot_id_fkey`).
-- **Supabase's default privileges grant more than the migrations ask for.** `grant select on <view> to authenticated` adds; it does not replace. The platform had already granted INSERT/UPDATE/DELETE, and `revoke … from public` never removes `anon` or `authenticated`. Found by the 2026-08-14 audit; `0059` closes it.
 
 ## Settled decisions
 

@@ -4,7 +4,7 @@ Internal tools for Goodearth, a design-led real estate company in Kerala (~70 st
 
 **This Next.js is not the one you know.** v16 has breaking changes to APIs and file structure. Read `node_modules/next/dist/docs/` first. Note `proxy.ts`, not `middleware.ts`.
 
-`STATUS.md` = what exists, including the cross-tool read contract. `TODO.md` = what's next. `AUDIT.md` = open findings. `DESIGN.md` before styling. A tool's own `PLAN.md` before touching that tool. **"Do an audit" means: read `AUDIT.md`, re-verify its open findings, then rewrite it** — it is the standing record, not a one-off.
+`STATUS.md` = what exists, including the cross-tool read contract. `TODO.md` = what's next. `AUDIT.md` = open findings. `BUGCATCHER.md` = **what a green build does not prove** — read it before merging anything touching a database read, a file upload, a permission or a colour. `DESIGN.md` before styling. A tool's own `PLAN.md` before touching that tool. **"Do an audit" means: read `AUDIT.md`, re-verify its open findings, then rewrite it** — it is the standing record, not a one-off.
 
 ## The one principle
 
@@ -93,7 +93,6 @@ Numbered SQL files in `supabase/migrations/`, applied **from this machine** via 
 - **Charts are `recharts`**, imported ONLY by `components/ui/chart/*` — screens use those wrappers, never Recharts directly, so Next code-splits it to the routes that chart. Data shaping lives in `lib/charts/` (pure, tested); the PDF path rasterises the same charts through `sharp`, never a second implementation. Chart colours are the `--chart-1…8` tokens; `DESIGN.md` says why their order must not be touched.
 - **Site engineers and store-keepers use this on phones at site** — Indents, Inventory and site-facing flows must genuinely work on a phone. English-only UI is confirmed sufficient. Plain English in all copy and error messages.
 - Using the catalogue picker? Add the grant to the allow-list in `app/api/catalogue/route.ts` or it silently 403s.
-- **Uploading to Supabase Storage? Hand it a `Blob`, never a raw `Buffer`.** `supabase-js` only builds a multipart body for a Blob; anything else goes to `fetch` as a raw body, and Next's patched fetch text-decodes it — every non-UTF-8 byte becomes `EF BF BD`. Storage still reports `image/jpeg`, the row writes, nothing errors, and the only symptom is a broken image. **It does not reproduce locally**, only under the Next runtime (AUDIT.md BUG-01).
 
 ## Environment
 
@@ -106,6 +105,7 @@ Data-load scripts in `scripts/` are **dry run by default, `--commit` to write**.
 - Pure logic only (`npm test`) — no database, no browser; extract pure modules to test them. CI is the gate; no hooks. It runs **prettier → lint → typecheck → test → build → check:actions, stopping at the first failure**, so a trivial lint error silently skips every check that matters. Confirm with `gh run list` — a successful push is not a green build.
 - **Never `export type` from a `"use server"` file** — it caused a production outage; `npm run check:actions` enforces it.
 - **Smoke-test as a real single-grant user** (the probe account) before merging; an admin passes every check and never sees grant bugs. After any deploy changing server actions or policies, press one real write-button on production.
+- **A green build is not a working feature.** Six bugs have now passed all six CI steps — a dead screen, a corrupted upload, a live privilege hole. `BUGCATCHER.md` is the catalogue and the pre-merge checklist it earned; **when something breaks that CI said was fine, add it there.** Uploading to Supabase Storage is the newest: hand it a `Blob`, never a raw `Buffer`, or Next's patched fetch text-decodes the binary and stores rubbish that reports success.
 - `master` is production and auto-deploys on every push. Tools and sizeable changes get a `feature/<tool>` branch — each push gets a preview URL. Merge to `master` only after browser testing and sign-off, then delete the branch. Small fixes to live tools may go straight to `master`. **Commit each working piece and push it; never leave work uncommitted.**
 
 ## Working with the founder
