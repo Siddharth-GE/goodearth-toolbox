@@ -32,6 +32,7 @@ export type ChainRow = {
   chainId: string;
   projectId: string;
   projectName: string;
+  unitId: string | null;
   unitName: string | null;
   activityName: string;
   title: string | null;
@@ -53,6 +54,7 @@ type StateRow = {
   chain_id: string | null;
   project_id: string | null;
   project_name: string | null;
+  unit_id: string | null;
   unit_name: string | null;
   activity_name: string | null;
   title: string | null;
@@ -69,13 +71,14 @@ type StateRow = {
 };
 
 const STATE_COLUMNS =
-  "chain_id, project_id, project_name, unit_name, activity_name, title, leg_count, current_leg, holder_id, days_in_leg, expected_days, is_stuck, is_finished, is_queued, started_at, department_names";
+  "chain_id, project_id, project_name, unit_id, unit_name, activity_name, title, leg_count, current_leg, holder_id, days_in_leg, expected_days, is_stuck, is_finished, is_queued, started_at, department_names";
 
 function toRow(row: StateRow, names: Map<string, string>): ChainRow {
   return {
     chainId: row.chain_id ?? "",
     projectId: row.project_id ?? "",
     projectName: row.project_name ?? "—",
+    unitId: row.unit_id,
     unitName: row.unit_name,
     activityName: row.activity_name ?? "—",
     title: row.title,
