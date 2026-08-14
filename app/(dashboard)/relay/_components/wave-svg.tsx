@@ -24,14 +24,22 @@ import { cn } from "@/lib/utils";
  * body is a gradient that fades to nothing rather than a flat tint, the
  * stage rules are dotted hairlines, and the only saturated ink on the
  * whole drawing is a marker that means trouble.
+ *
+ * THE INK GOES WHERE THE WORK IS. A villa with one trail used to be
+ * drawn as a heavy line across the whole row — ninety percent of the
+ * stroke saying "nothing here" at the same weight as the one hump that
+ * mattered. The curve is now stroked only across the stages that hold
+ * work (rising off the baseline and settling back beside them); the rest
+ * of the row is just the ruled hairline. Two deliberate exceptions:
+ * "complete" keeps its full-width green line, because the whole trail
+ * having landed IS a statement about the whole row, and "nothing yet"
+ * draws no curve at all — an absence should look absent.
  */
 export function WaveSvg({ model, size = "sm" }: { model: WaveModel; size?: "sm" | "lg" }) {
-  const W = 600;
-  const H = size === "lg" ? 128 : 72;
+  const W = 720;
+  const H = size === "lg" ? 132 : 64;
   const PAD = size === "lg" ? 14 : 8;
   const baseline = H - PAD;
-  const d = wavePath(model.points, W, H, PAD);
-  const area = `${d} L ${W} ${baseline} L 0 ${baseline} Z`;
 
   // Complete is the only state that earns green: the work has landed.
   // Everything with open work is drawn in the reading colour, and the
@@ -42,6 +50,30 @@ export function WaveSvg({ model, size = "sm" }: { model: WaveModel; size?: "sm" 
   const stroke =
     model.status === "complete" ? "var(--success)" : quiet ? "var(--muted)" : "var(--foreground)";
   const hasBody = model.points.some((p) => p.y > 0);
+
+  // The living region: from the first stage holding work to the last.
+  // The curve is built from only the points inside it, entering and
+  // leaving on the baseline at its edges, so the stroke exists exactly
+  // where the work does. The edges reach a little beyond the stages
+  // themselves — a four-week stage is 4% of a three-year timeline, and
+  // rising and falling inside that alone drew a needle, not a wave.
+  const RAMP = 0.055;
+  const active = model.bands.filter((b) => b.amp > 0);
+  const lead = active.length > 0 ? Math.max(0, active[0].x0 - RAMP) : 0;
+  const tail = active.length > 0 ? Math.min(1, active[active.length - 1].x1 + RAMP) : 1;
+  const strokePoints =
+    model.status === "complete" || active.length === 0
+      ? model.points
+      : [
+          { x: lead, y: 0 },
+          ...model.points.filter((p) => p.x > lead && p.x < tail),
+          { x: tail, y: 0 },
+        ];
+
+  // The curve starts and ends on the baseline, so Z closes it flat.
+  const d = wavePath(strokePoints, W, H, PAD);
+  const area = `${d} Z`;
+  const drawCurve = model.status !== "quiet";
 
   // The body fades out instead of sitting as a flat tint — the curve is
   // the subject and the fill only gives it weight. Gradient ids repeat
@@ -81,20 +113,23 @@ export function WaveSvg({ model, size = "sm" }: { model: WaveModel; size?: "sm" 
 
       <line x1="0" y1={baseline} x2={W} y2={baseline} stroke="var(--border)" strokeWidth="1" />
 
-      {hasBody && <path d={area} fill={`url(#${fillId})`} stroke="none" />}
+      {drawCurve && hasBody && <path d={area} fill={`url(#${fillId})`} stroke="none" />}
 
-      <path
-        d={d}
-        fill="none"
-        stroke={stroke}
-        strokeWidth="2.25"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      {drawCurve && (
+        <path
+          d={d}
+          fill="none"
+          stroke={stroke}
+          strokeWidth="2.25"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      )}
 
-      {/* Where the plan says today is — one thin amber line with a head,
-          the same signal the schedule picture uses, so the two pictures
-          agree. */}
+      {/* Where the plan says today is — one thin amber line, the same
+          signal the schedule picture uses, so the two pictures agree.
+          The head dot only on the big wave: on a card row it read as a
+          stray orange lollipop, louder than the work itself. */}
       {model.planX !== null && (
         <g>
           <line
@@ -104,9 +139,11 @@ export function WaveSvg({ model, size = "sm" }: { model: WaveModel; size?: "sm" 
             y2={baseline}
             stroke="var(--warning)"
             strokeWidth="1.5"
-            strokeOpacity="0.75"
+            strokeOpacity={size === "lg" ? 0.75 : 0.5}
           />
-          <circle cx={px(model.planX)} cy={PAD + 2} r="2.5" fill="var(--warning)" />
+          {size === "lg" && (
+            <circle cx={px(model.planX)} cy={PAD + 2} r="2.5" fill="var(--warning)" />
+          )}
         </g>
       )}
 
