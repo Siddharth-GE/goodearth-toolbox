@@ -10,7 +10,7 @@ Read this before merging anything that touches a database read, a file upload, a
 
 ## Before you merge
 
-Seven checks, each earned by a bug below.
+Eight checks, each earned by a bug below.
 
 | Check                                                                         | Because                                                                                                                          |
 | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
@@ -21,6 +21,7 @@ Seven checks, each earned by a bug below.
 | **`gh run list`** — a successful push is not a green build.                   | CI stops at the first failure. A trivial formatting error silently skips every check that matters after it.                      |
 | **Look at the page in dark mode.**                                            | An entire class of browser-drawn furniture ignored the palette for months.                                                       |
 | **After a smoke test, read the traces.** The database says what actually ran. | A Google sign-in "worked" that never minted a session, and two tests reported done had left zero rows. Eyes lie; rows don't.     |
+| **Render any new drawing from real data and look at it.**                     | A wave with 22 passing tests still overlapped its own labels, and was designed for 7 villas where production has 43.             |
 
 ---
 
@@ -115,6 +116,20 @@ _Found 2026-08-14, testing the sign-in hardening on its preview._
 **The rule.** Auth flows must return to the address the request arrived at (`requestOrigin()` in `app/actions/auth.ts` — the Supabase redirect allow-list stays the gate), never to a hardcoded URL that previews falsify. And a browser pass of an auth flow is a claim, not evidence.
 
 **The check.** Auth leaves receipts; read them. After any sign-in smoke test: `auth_verified_sessions` has the row with the right `method`, `auth.sessions` has a live session, `auth.users.last_sign_in_at` moved, and for the unhappy paths `login_attempts` shows the failures and the lock. On the return from any OAuth hop, glance at the address bar — you must still be on the deployment you started from.
+
+---
+
+### 8. A drawing can be provably correct and still unreadable
+
+_Found 2026-08-14, building Relay's villa waves — caught before merge, by looking._
+
+**What happened.** The wave model had twenty-two passing tests: stage positions, hump heights, marker placement, degenerate shapes, path geometry. Every one passed. The page those numbers produced had two faults no assertion could see. The stage names along the top **printed on top of each other** — Saarang runs a four-week Design straight into a sixteen-week Technical Drawings, and centred labels collide the moment two stages differ that much in width. And the real project has **43 villas with work on 4 of them**, so the page was going to be thirty-nine identical flat lines with the four that mattered buried among them. The design had been drawn against a mock with seven busy villas.
+
+**Why nothing caught it.** Tests assert the model, not the picture. `buildWave` was right; the SVG was right; the arithmetic was right. Overlap is a fact about rendered text width, and "the interesting rows are outnumbered ten to one" is a fact about production data. Neither exists anywhere in the repo.
+
+**The rule.** A visualisation is not finished when its model is tested. It is finished when you have **looked at it, drawn from real data, at the sizes it will really be seen at** — including the empty and the overwhelming cases. Mock data flatters a design because it is chosen to.
+
+**The check.** Before merging any new drawing: pull the real rows for the busiest real project, render it, and look. No browser needed if none is available — `sharp` rasterises an SVG to PNG in three lines, and the pure model can be imported straight into a script (`npx tsx`). Then ask the two questions the mock never will: what does this look like when there is nothing, and what does it look like when there are forty of them?
 
 ---
 
