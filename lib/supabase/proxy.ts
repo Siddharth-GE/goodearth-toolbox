@@ -7,7 +7,7 @@ import { NextResponse, type NextRequest } from "next/server";
 // /reset-password is deliberately absent: it needs the recovery session
 // the emailed link mints, so the default redirect is the right answer
 // for anyone arriving without one.
-const PUBLIC_PATHS = ["/login", "/forgot-password", "/auth/confirm"];
+const PUBLIC_PATHS = ["/login", "/login/verify", "/forgot-password", "/auth/confirm"];
 
 /**
  * The request's headers with any client-supplied identity removed.

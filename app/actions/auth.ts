@@ -5,8 +5,20 @@
 // Tool-specific actions belong in lib/<tool>/actions.ts instead,
 // alongside that tool's queries.ts (see lib/marathon/actions.ts).
 
-import { checkLockout, clearFailures, recordFailure } from "@/lib/auth/rate-limit";
+import { checkLockout, clearFailures, lockoutMessage, recordFailure } from "@/lib/auth/rate-limit";
+import {
+  clearChallenge,
+  clearVerified,
+  getChallenge,
+  isTrustedDevice,
+  markSessionVerified,
+  setChallenge,
+  setTrustedDevice,
+  setVerified,
+} from "@/lib/auth/verified-session";
 import { createClient } from "@/lib/supabase/server";
+import type { Database } from "@/lib/supabase/database.types";
+import { createClient as createBareClient } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 
 export type LoginState = { error?: string } | undefined;
@@ -26,6 +38,18 @@ function siteUrl() {
   return value.replace(/\/$/, "");
 }
 
+/**
+ * Step one of signing in: the password.
+ *
+ * The password is checked on a throwaway in-memory client, NOT the
+ * cookie-backed one — so no session ever reaches the browser before the
+ * code step is passed. The discarded session is harmless: it holds no
+ * verified-sessions row, so after 0063 it can reach nothing gated, and
+ * it expires on its own.
+ *
+ * A trusted device (this browser finished a code inside 30 days) signs
+ * in directly; anything else is owed a code screen.
+ */
 export async function login(_state: LoginState, formData: FormData): Promise<LoginState> {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
@@ -34,34 +58,154 @@ export async function login(_state: LoginState, formData: FormData): Promise<Log
     return { error: "Enter your email and password." };
   }
 
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  // Locked out? Say only that — not whether the password would have been
+  // right. checkLockout before the guess is examined, like the kiosk.
+  const locked = await checkLockout(email, "password");
+  if (locked) return { error: lockoutMessage(locked.lockedUntil) };
 
-  if (error) {
+  const bare = createBareClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } },
+  );
+  const { data, error } = await bare.auth.signInWithPassword({ email, password });
+
+  if (error || !data.user) {
+    const nowLocked = await recordFailure(email, "password");
+    if (nowLocked) return { error: lockoutMessage(nowLocked.lockedUntil) };
     return { error: "Incorrect email or password." };
   }
+  await clearFailures(email, "password");
 
   // The credentials are right, but the account may have been switched
-  // off. Signing them straight back out is clearer than letting them in
-  // to a dashboard where every screen redirects (0032).
-  if (data.user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("is_active")
-      .eq("id", data.user.id)
-      .maybeSingle();
-    if (profile && !profile.is_active) {
-      await supabase.auth.signOut();
-      return { error: "This account has been deactivated. Ask an admin to switch it back on." };
-    }
+  // off. Refusing here is clearer than letting them in to a dashboard
+  // where every screen redirects (0032). The bare client still holds
+  // the throwaway session in memory, so RLS lets it read the row.
+  const { data: profile } = await bare
+    .from("profiles")
+    .select("is_active")
+    .eq("id", data.user.id)
+    .maybeSingle();
+  if (profile && !profile.is_active) {
+    return { error: "This account has been deactivated. Ask an admin to switch it back on." };
   }
 
+  // A remembered device skips the code, never the password. This is the
+  // one place the real (cookie-backed) session is minted without a code.
+  if (await isTrustedDevice(data.user.id)) {
+    const supabase = await createClient();
+    const { error: sessionError } = await supabase.auth.signInWithPassword({ email, password });
+    if (sessionError) return { error: "Could not sign you in. Try again." };
+    await markSessionVerified("trusted");
+    await setVerified(data.user.id);
+    redirect("/");
+  }
+
+  // Everyone else gets a code. Supabase generates, hashes and emails it;
+  // this code never passes through our hands.
+  const supabase = await createClient();
+  const { error: otpError } = await supabase.auth.signInWithOtp({
+    email,
+    options: { shouldCreateUser: false },
+  });
+  if (otpError) {
+    console.error("login: could not send the code:", otpError.message);
+    return { error: "Couldn't send the code email. Wait a minute and try again." };
+  }
+
+  await setChallenge(email);
+  redirect("/login/verify");
+}
+
+export type VerifyState = { error?: string } | undefined;
+
+/**
+ * Step two: the emailed 6-digit code.
+ *
+ * Only reachable behind a challenge cookie, which only the login action
+ * sets, and only after a correct password — so a right code from
+ * someone who never proved the password gets nothing here. verifyOtp
+ * mints the real session; the verified-sessions row minted right after
+ * is what the database trusts (0063), not the cookie.
+ */
+export async function verifyLoginCode(
+  _state: VerifyState,
+  formData: FormData,
+): Promise<VerifyState> {
+  const code = String(formData.get("code") ?? "").trim();
+
+  const challenge = await getChallenge();
+  if (!challenge) redirect("/login");
+  const email = challenge.subject;
+
+  if (!/^\d{6}$/.test(code)) {
+    return { error: "Enter the 6-digit code from the email." };
+  }
+
+  const locked = await checkLockout(email, "otp");
+  if (locked) return { error: lockoutMessage(locked.lockedUntil) };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.verifyOtp({ email, token: code, type: "email" });
+
+  if (error || !data.user) {
+    const nowLocked = await recordFailure(email, "otp");
+    if (nowLocked) return { error: lockoutMessage(nowLocked.lockedUntil) };
+    return { error: "That code isn't right — check the latest email." };
+  }
+  await clearFailures(email, "otp");
+
+  // Re-checked with the real session: the account could have been
+  // switched off between the password step and now.
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("is_active")
+    .eq("id", data.user.id)
+    .maybeSingle();
+  if (profileError || !profile || !profile.is_active) {
+    await supabase.auth.signOut();
+    await clearChallenge();
+    return { error: "This account has been deactivated. Ask an admin to switch it back on." };
+  }
+
+  await markSessionVerified("otp");
+  await setVerified(data.user.id);
+  await setTrustedDevice(data.user.id);
+  await clearChallenge();
   redirect("/");
+}
+
+/** Another code, for the same proven password — 60s between sends. */
+export async function resendLoginCode(): Promise<VerifyState> {
+  const challenge = await getChallenge();
+  if (!challenge) redirect("/login");
+
+  if (challenge.sentAt && Date.now() - challenge.sentAt < 60_000) {
+    return { error: "Just sent one — give it a minute, and check spam." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithOtp({
+    email: challenge.subject,
+    options: { shouldCreateUser: false },
+  });
+  if (error) {
+    console.error("resendLoginCode failed:", error.message);
+    return { error: "Couldn't send the code email. Wait a minute and try again." };
+  }
+
+  await setChallenge(challenge.subject);
+  return undefined;
 }
 
 export async function logout() {
   const supabase = await createClient();
   await supabase.auth.signOut();
+  // The verified marker and any half-finished challenge go with the
+  // session. The trusted-device cookie deliberately stays — it only
+  // skips the code, never the password.
+  await clearVerified();
+  await clearChallenge();
   redirect("/login");
 }
 

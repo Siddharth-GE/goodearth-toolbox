@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import { isVerified } from "@/lib/auth/verified-session";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { cache } from "react";
@@ -119,5 +120,14 @@ export const getCurrentUser = cache(async () => {
 export async function requireUser() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+
+  // A session that never finished the code step (or one from before 2FA
+  // launched) is routed to the code screen rather than rendered a
+  // dashboard the database will answer emptily — after 0063, has_app()
+  // refuses any session without its auth_verified_sessions row. This
+  // cookie check is the polite half; the row is the enforcing half.
+  // /login/verify sends anyone without a live challenge back to /login.
+  if (!(await isVerified(user.id))) redirect("/login/verify");
+
   return user;
 }
