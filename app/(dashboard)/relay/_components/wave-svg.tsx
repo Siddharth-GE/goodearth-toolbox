@@ -1,5 +1,6 @@
 import type { WaveModel } from "@/lib/relay/wave";
 import { wavePath } from "@/lib/relay/wave";
+import { cn } from "@/lib/utils";
 
 /**
  * A house's open work, drawn as one wave along the project's stages.
@@ -127,5 +128,56 @@ export function WaveSvg({ model, size = "sm" }: { model: WaveModel; size?: "sm" 
           </text>
         ))}
     </svg>
+  );
+}
+
+/**
+ * The stage names, written once above the stack instead of on every wave.
+ *
+ * Every villa shares one x-axis, so repeating eight stage names down the
+ * page would be eight times the ink for the same fact. Hidden on a phone,
+ * where they would be unreadable and the big wave on the house page is
+ * the place to read stages anyway.
+ *
+ * The names sit on TWO staggered rows, and that is not decoration.
+ * Stage lengths vary wildly — Saarang runs a four-week Design straight
+ * into a sixteen-week Technical Drawings — so one row either overlaps
+ * the names or clips them to "De…" and "Co…". Staggering puts each
+ * label's neighbours two stages away, which gives even a four-week stage
+ * room for its full name over the exact point it labels.
+ *
+ * Carries no horizontal padding of its own: the labels are positioned as
+ * percentages of THIS element's width, so it has to be the exact width
+ * of the wave it names. Padding it to match one caller's card would put
+ * every label a few pixels off the stage it points at in the other.
+ */
+export function WaveStageHeader({ wave, className }: { wave: WaveModel; className?: string }) {
+  return (
+    <div
+      className={cn(
+        "text-muted relative hidden h-8 text-[11px] font-semibold tracking-widest uppercase sm:block",
+        className,
+      )}
+    >
+      {wave.bands.map((band, i) => {
+        const mid = ((band.x0 + band.x1) / 2) * 100;
+        // The first and last names would hang off the ends, so they line
+        // up with the edge instead of their midpoint.
+        const align = mid < 8 ? "0" : mid > 92 ? "-100%" : "-50%";
+        return (
+          <span
+            key={band.stageId}
+            className="absolute whitespace-nowrap"
+            style={{
+              left: `${mid}%`,
+              top: i % 2 === 0 ? 0 : "1rem",
+              transform: `translateX(${align})`,
+            }}
+          >
+            {band.name}
+          </span>
+        );
+      })}
+    </div>
   );
 }

@@ -15,7 +15,8 @@ import { TimerDial } from "../../_components/timer-dial";
 import { ScheduleCard } from "./_components/schedule-card";
 import { ScheduleEditor } from "./_components/schedule-editor";
 import { StagePicker } from "./_components/stage-picker";
-import { VillaWaveCard, WaveStageHeader } from "./_components/villa-wave-card";
+import { WaveStageHeader } from "../../_components/wave-svg";
+import { VillaWaveCard } from "./_components/villa-wave-card";
 
 export default async function ProjectSchedulePage({
   params,
@@ -163,7 +164,9 @@ export default async function ProjectSchedulePage({
           eight times the ink. */}
       {headerWave ? (
         <div className="space-y-2">
-          <WaveStageHeader wave={headerWave} />
+          {/* Padded to line up with the villa cards below, whose waves
+              sit inside their p-4. */}
+          <WaveStageHeader wave={headerWave} className="px-4" />
           <div className="space-y-3">
             {projectWave && (
               <VillaWaveCard

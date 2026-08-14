@@ -580,10 +580,11 @@ export async function listProjectSchedules() {
       is_finished: boolean | null;
       is_stuck: boolean | null;
       is_queued: boolean | null;
+      is_with_client: boolean | null;
     }>((from, to) =>
       supabase
         .from("pusher_chain_state")
-        .select("project_id, project_stage_id, is_finished, is_stuck, is_queued")
+        .select("project_id, project_stage_id, is_finished, is_stuck, is_queued, is_with_client")
         .order("chain_id")
         .range(from, to),
     ),
@@ -601,6 +602,7 @@ export async function listProjectSchedules() {
         isFinished: t.is_finished ?? false,
         isStuck: t.is_stuck ?? false,
         isQueued: t.is_queued ?? false,
+        isWithClient: t.is_with_client ?? false,
       }));
 
     return {
@@ -613,6 +615,8 @@ export async function listProjectSchedules() {
       liveTrails: projectTrails.filter((t) => !t.isFinished && !t.isQueued).length,
       queuedTrails: projectTrails.filter((t) => t.isQueued).length,
       stuckTrails: projectTrails.filter((t) => !t.isFinished && t.isStuck).length,
+      /** The rows the project's wave is drawn from. */
+      trails: projectTrails,
       schedule: buildSchedule(
         stages.filter((s) => s.project_id === project.id),
         projectTrails,
