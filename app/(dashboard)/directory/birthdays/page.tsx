@@ -34,9 +34,7 @@ export default async function BirthdaysPage() {
 
   const groups = GROUPS.map((group) => ({
     title: group.title,
-    rows: people.filter(
-      (person) => person.daysAway >= group.from && person.daysAway <= group.to,
-    ),
+    rows: people.filter((person) => person.daysAway >= group.from && person.daysAway <= group.to),
   })).filter((group) => group.rows.length > 0);
 
   return (

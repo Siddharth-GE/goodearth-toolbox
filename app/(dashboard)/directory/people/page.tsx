@@ -74,9 +74,7 @@ export default async function DirectoryPeoplePage({
       {people.length === 0 ? (
         <EmptyState
           icon={Users}
-          title={
-            departmentName ? `Nobody in ${departmentName} yet` : "Nobody matches that search"
-          }
+          title={departmentName ? `Nobody in ${departmentName} yet` : "Nobody matches that search"}
           description={
             departmentName
               ? "An admin sets each person's department on their card."

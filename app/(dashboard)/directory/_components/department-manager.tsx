@@ -5,11 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
-import {
-  createDepartment,
-  renameDepartment,
-  setDepartmentActive,
-} from "@/lib/directory/actions";
+import { createDepartment, renameDepartment, setDepartmentActive } from "@/lib/directory/actions";
 import type { DepartmentRow } from "@/lib/directory/queries";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState } from "react";

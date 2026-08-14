@@ -129,7 +129,11 @@ export function MyDetailsForm({ initial }: { initial: Details }) {
           </Select>
         </Field>
 
-        <Field label="Emergency contact" hint="Who to call, and what they are to you." saved={saved("ecName")}>
+        <Field
+          label="Emergency contact"
+          hint="Who to call, and what they are to you."
+          saved={saved("ecName")}
+        >
           <Input
             defaultValue={values.emergencyContactName ?? ""}
             placeholder="e.g. Reena (wife)"
