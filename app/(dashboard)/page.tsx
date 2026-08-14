@@ -74,7 +74,18 @@ export default async function DashboardHome() {
             >
               <MarathonLiveCard />
             </Suspense>
-            <PeopleOverview />
+            {/* Fetches its own counts now that Directory is real, so it
+                gets its own boundary — the shell must not wait on, or
+                fall over with, a tool. */}
+            <Suspense
+              fallback={
+                <div className="bg-surface flex h-[158px] items-center justify-center rounded-2xl">
+                  <Spinner />
+                </div>
+              }
+            >
+              <PeopleOverview />
+            </Suspense>
             <ActivityFeed />
           </div>
         </div>
