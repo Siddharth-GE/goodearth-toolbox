@@ -2,13 +2,11 @@
 
 Read `STATUS.md` first. Anything finished moves to `STATUS.md`, not struck through here. Audit findings are in `AUDIT.md` with full reasoning.
 
-## 1. Today — one line of SQL closes a live hole
+## 1. Done — the live hole is closed
 
-**`AUDIT.md` SEC-01.** Any signed-in person, including one with no app grants at all, can currently update and delete production purchase orders, bills and budgets through the REST API. Three of the fourteen database views are auto-updatable, they bypass row-level security by design, and Supabase's default privileges handed out write access that the migrations never took back.
+**`AUDIT.md` SEC-01 is fixed.** `0059_views_are_read_only.sql` was applied on 2026-08-14 and verified independently: zero INSERT/UPDATE/DELETE/TRUNCATE privileges remain on any of the fourteen views, for `anon` or `authenticated`.
 
-`supabase/migrations/0059_views_are_read_only.sql` is **written and waiting**. It revokes write privileges on all fourteen views and asserts none survive. Nothing in the app has ever written through a view, so it changes no behaviour.
-
-**Say go and it is applied in a minute.** I did not apply it unasked — it is a production privilege change.
+**Still worth one browser check on production:** press a real write button in Purchase Orders and Bills. Nothing should have changed — nothing in the app has ever written through a view — but that is the claim being tested.
 
 ## 2. Today — two Marathon agents may still be on the published PIN
 
@@ -53,6 +51,9 @@ Two small known gaps: no inline editor for a queued trail's activities in the wa
 
 Every tool below is built and gated; until someone is granted it, only admins see it.
 
+- **Run `npx tsx scripts/import-staff.ts --commit`** — 47 people, 45 new logins. The dry run is clean and reviewed. It writes every starting password to a git-ignored `data/staff-passwords-<date>.csv`; **hand those over and delete that file.** Then set a department for the eight the sheet left blank (Admin, Designer, Jitha TA, Kavin kumar Senthil, Saurav, Siddharth, Team, Varghese George).
+- **Grant the other tools.** The import grants `/directory` only — everybody lands on a directory and nothing else. Deciding who gets Selections, Indents, Budgets and the rest is the founder's, one role template at a time.
+
 - **`/reporter`** — the amber warning beside the checkbox says what it means: every vendor rate, bill amount and margin.
 - **`/financial-management`** — every client's dues, every bill amount, every loan and its terms.
 - **`/client-relations`** — to Anu, Sayooj and Sebastina (deferred by the founder).
@@ -68,6 +69,7 @@ Every tool below is built and gated; until someone is granted it, only admins se
 - **Index the dozen genuinely-filtered foreign keys** (`AUDIT.md` PERF-04) — `indents.plot_id`, `goods_receipts.plot_id`/`unit_id`, `stock_issues.plot_id`, `business_plans.project_id` and friends. Preventative; changes nothing measurable at today's row counts.
 - **Marathon per-run counts are N+1** (`AUDIT.md` PERF-05). Needs a database function to fix properly. Trivial at 11 rows.
 - **Line pulls could be atomic** (`AUDIT.md` QUAL-03) using the pattern Marathon's bib numbering already uses — a server-side loop in one function, keeping the per-row refusal messages. A real design change to a working, reasoned trade-off.
+- **`todayInIndia()` now exists three times** — `lib/client-relations/dues.ts`, `lib/financial-management/interest.ts` and `lib/directory/birthdays.ts`. Each is a verbatim copy because one tool never imports another's code, and three is the point at which it earns a shared `lib/date.ts`. ~10 lines plus moving three imports.
 - **~35 remaining `{ data }` destructures with no `error` check** (`AUDIT.md` QUAL-04). The six that mattered are fixed; the rest are display-only lookups. A slow tidy, not a project.
 - **PO-anchor picker in the Bills record form** — move to server-side search (the `/api/catalogue` pattern) once the PO list makes the form payload noticeable.
 

@@ -170,7 +170,9 @@ through the tools.
 
 ## 2. Security
 
-### SEC-01 · CRITICAL · NEW · Three fact views are writable, and writing through them bypasses RLS
+### SEC-01 · CRITICAL · **FIXED 2026-08-14** · Three fact views were writable, and writing through them bypassed RLS
+
+> **Closed.** `0059_views_are_read_only.sql` was applied on 2026-08-14 and verified independently against the live database: zero INSERT/UPDATE/DELETE/TRUNCATE privileges remain on any of the fourteen views for `anon` or `authenticated`. The finding is kept in full below because the _rule_ it established — a view is a read surface, and every new one ships its revokes in the same migration — is the thing worth not relearning.
 
 **Any signed-in person — including one with zero app grants — can update
 and delete production purchase orders, bills and budgets through the REST
@@ -607,7 +609,7 @@ Ranked by what I would do first.
 
 | #   | Item                                                                                                                                 | Why it's yours                                                                                    |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
-| 1   | **SEC-01 — revoke write privileges on all 14 views.** Four lines of SQL, no behaviour change.                                        | A production privilege change. Say go and it is applied in a minute.                              |
+| 1   | ~~**SEC-01 — revoke write privileges on all 14 views.**~~ **Done 2026-08-14.**                                                       | Applied and verified: zero write privileges left on any view.                                     |
 | 2   | **SEC-05 — Marathon agent PINs.** Reset Ravi's and yema's, delete "Test Agent".                                                      | Live credentials in the running app. I could not verify them this session and cannot change them. |
 | 3   | **SEC-02 — add the `has_app` check to `create_client_engagement`.**                                                                  | Changes a database function's behaviour for callers who should never have reached it.             |
 | 4   | **PERF-01 — cold starts.** Enable Fluid compute / keep-warm on Vercel, then re-measure.                                              | A billing and platform decision. Biggest single lever on the slow first load, still untouched.    |
