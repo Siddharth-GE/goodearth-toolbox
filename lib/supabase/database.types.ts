@@ -47,6 +47,27 @@ export type Database = {
         }
         Relationships: []
       }
+      auth_verified_sessions: {
+        Row: {
+          created_at: string
+          method: string
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          method: string
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          method?: string
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       bill_approvers: {
         Row: {
           approval_limit: number | null
@@ -2192,6 +2213,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      login_attempts: {
+        Row: {
+          failed_count: number
+          kind: string
+          locked_until: string | null
+          target: string
+          window_started_at: string
+        }
+        Insert: {
+          failed_count?: number
+          kind: string
+          locked_until?: string | null
+          target: string
+          window_started_at?: string
+        }
+        Update: {
+          failed_count?: number
+          kind?: string
+          locked_until?: string | null
+          target?: string
+          window_started_at?: string
+        }
+        Relationships: []
       }
       marathon_agents: {
         Row: {
