@@ -10,7 +10,7 @@ Read this before merging anything that touches a database read, a file upload, a
 
 ## Before you merge
 
-Six checks, each earned by a bug below.
+Seven checks, each earned by a bug below.
 
 | Check                                                                         | Because                                                                                                                          |
 | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
