@@ -191,7 +191,14 @@ function capBounces(scored: ScoredEvent[]): ScoredEvent[] {
   });
 }
 
-/** Score many chains at once. The key is the chain id. */
+/**
+ * Score many chains at once. The key is the chain id.
+ *
+ * NOT WIRED TO A SCREEN YET, AND NOT DEAD CODE. The leaderboard and
+ * podium are still to be built; the scoring they will read is written and
+ * tested first, because points people can see must not change meaning
+ * later. Don't let a cleanup delete it.
+ */
 export function scoreAll(eventsByChain: ReadonlyMap<string, readonly ChainEvent[]>): ScoredEvent[] {
   return [...eventsByChain].flatMap(([chainId, events]) => scoreChain(chainId, events));
 }

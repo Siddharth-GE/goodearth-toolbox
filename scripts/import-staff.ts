@@ -41,7 +41,8 @@
  *     in Settings.
  *
  * PASSWORDS. There is no shared starting password, not even for one run —
- * CLAUDE.md and AUDIT.md SEC-05 forbid seeding a real default credential.
+ * CLAUDE.md forbids seeding a real default credential, and a seeded PIN
+ * that reached the live database is why.
  * Each new account gets its own twelve random characters, and the list is
  * written to /data (git-ignored) for the founder to hand over and then
  * delete.

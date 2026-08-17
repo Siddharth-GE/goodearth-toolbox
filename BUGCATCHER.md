@@ -30,7 +30,7 @@ Nine checks, each earned by a bug below.
 
 ### 1. A raw `Buffer` handed to Supabase Storage is silently text-decoded
 
-_Found 2026-08-14, by the first photo the app had ever uploaded. `AUDIT.md` BUG-01._
+_Found 2026-08-14, by the first photo the app had ever uploaded._
 
 **What happened.** A 40KB JPEG stored as 124KB of rubbish — every byte that was not valid UTF-8 replaced with `EF BF BD`. Supabase still reported the file as `image/jpeg`. The database row wrote fine. No error appeared anywhere. The only symptom was a broken image.
 
@@ -62,7 +62,7 @@ _Client Relations shipped four dead screens behind a fully green CI._
 
 ### 3. Supabase's default privileges grant more than the migrations ask for
 
-_`AUDIT.md` SEC-01, found 2026-08-14, closed by `0059`._
+_Found 2026-08-14 by an audit of Postgres privileges, and closed the same day by `0059`. It had been true since the first fact view shipped._
 
 **What happened.** Any signed-in person — including one with no app grants at all — could update and delete production purchase orders, bills and budgets through the REST API. Three views were auto-updatable, and views bypass RLS by design.
 
@@ -98,7 +98,7 @@ Note the nuance: `export type Foo = {…}` as a _declaration_ is fine. The re-ex
 
 ### 6. Reading the theme cookie in the root layout costs static rendering
 
-**What happened.** Calling `cookies()` in the root layout turned `/login`, `/_not-found` and `/_global-error` from prerendered into server-rendered-on-demand. Cold starts are already the app's known performance problem (`AUDIT.md` PERF-01).
+**What happened.** Calling `cookies()` in the root layout turned `/login`, `/_not-found` and `/_global-error` from prerendered into server-rendered-on-demand. Cold starts are already the app's one measured performance problem — warm time-to-first-byte is ~0.2s and a cold one is ~1.0s, so turning a prerendered page into a rendered one puts every first visitor behind a function boot.
 
 **Why nothing caught it.** Everything still worked. It was only slower, and only sometimes.
 
@@ -138,7 +138,7 @@ _Found 2026-08-14, building Relay's villa waves — caught before merge, by look
 
 _Found 2026-08-17, tracing error screens the founder hit across the Operations tools the evening before._
 
-**What happened.** For one evening, Selections, Budgets and Indents threw repeated "Something went wrong" screens — worst when submitting, gone by morning, never reproduced. Nothing in the code had changed for three days. The reads in this app were deliberately made to **throw** rather than hand back half an answer (`fetchAll`, and the four indent drift reads in `AUDIT.md` QUAL-04) — the right call, and it had already prevented real data loss. But **nothing anywhere in the codebase retried anything.** So a single dropped connection, one cold start, one moment of back-pressure, went straight to a blank page with a "Try again" button that reran the whole render.
+**What happened.** For one evening, Selections, Budgets and Indents threw repeated "Something went wrong" screens — worst when submitting, gone by morning, never reproduced. Nothing in the code had changed for three days. The reads in this app were deliberately made to **throw** rather than hand back half an answer — `fetchAll`, and the reads in the Indents pull path that had been turning a failed query into "that budget belongs to a superseded revision" or a bare "page not found". That was the right call, and it had already prevented real data loss. But **nothing anywhere in the codebase retried anything.** So a single dropped connection, one cold start, one moment of back-pressure, went straight to a blank page with a "Try again" button that reran the whole render.
 
 **Why nothing caught it.** There was no defect to catch. Every gate was green because every line was correct; the failure only exists when the network misbehaves, which no test, type or build reproduces. It is also invisible after the fact: Supabase keeps about an hour of edge logs and Vercel's age out, so by the time anyone looks the evidence is gone. Diagnosing it needed a live forensic dig through production, and even that only surfaced one confirmed failure — a refused `DELETE` — because the app recorded nothing about its own errors.
 
@@ -166,7 +166,7 @@ _Found 2026-08-17, minutes after production was switched to the fresh database �
 
 _Caught 2026-08-17 while writing `0071`, before it was applied — the audit's own suggested fix would have broken adding a plot for everyone in Masters._
 
-**What nearly happened.** `create_client_engagement` is `SECURITY DEFINER` with no permission check, so any signed-in person could write Client Relations records against any plot (AUDIT.md SEC-02). The obvious fix, and the one the audit wrote down, is `if not has_app('/client-relations') then raise`. That would have closed the hole **and stopped Masters from being able to create a unit at all** — because the function's real caller is the `units_seed_engagement` trigger, which fires for a person holding `/masters`.
+**What nearly happened.** `create_client_engagement` is `SECURITY DEFINER` with no permission check, so any signed-in person could write Client Relations records against any plot. The obvious fix, and the one first written down, is `if not has_app('/client-relations') then raise`. That would have closed the hole **and stopped Masters from being able to create a unit at all** — because the function's real caller is the `units_seed_engagement` trigger, which fires for a person holding `/masters`.
 
 **Why the reasoning was wrong.** `SECURITY DEFINER` changes the Postgres **role** the body runs as. It does **not** change `auth.uid()`, which comes from the request's JWT and stays the signed-in person however deep the nesting goes. `has_app()` is built on `auth.uid()`. So "the trigger path runs as the definer, so the check passes" is false: the check is evaluated against whoever made the request, in every path. That is the exact invisible failure `0050` made the function `SECURITY DEFINER` to avoid, reintroduced by the fix for a different problem.
 
@@ -180,7 +180,7 @@ _Caught 2026-08-17 while writing `0071`, before it was applied — the audit's o
 
 ## Adding to this file
 
-When something breaks that a green build said was fine, it belongs here — not in `STATUS.md`, which is what exists, and not only in `AUDIT.md`, which is findings open at a point in time.
+When something breaks that a green build said was fine, it belongs here — not in `STATUS.md`, which is what exists, and not in `TODO.md`, which is what to do next. **This file is the only standing record of the failures CI cannot see, so an entry has to explain itself in full rather than cite a finding somewhere else.** Anyone reading it in a year should not need a second document, and there is no longer one to reach for.
 
 Write four things: **what happened**, **why every gate missed it**, **the rule**, and **the one check that would have caught it**. The check is the part that matters; a war story without one is just a war story.
 

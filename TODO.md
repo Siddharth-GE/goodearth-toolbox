@@ -1,6 +1,8 @@
 # TODO — next tasks, in priority order
 
-Read `STATUS.md` first. Anything finished moves to `STATUS.md`, not struck through here. Audit findings are in `AUDIT.md` with full reasoning — it holds the eight still open, plus one line each on the closed ones that code comments cite by name.
+Read `STATUS.md` first. Anything finished moves to `STATUS.md`, not struck through here.
+
+**There is no separate findings document.** The August 2026 audits are fully worked through: everything they found is fixed, enforced by a check that runs on every pull request, or written down as a decision in the `PLAN.md` of the tool it concerns. What is left of them is on this page, stated on its own terms rather than as a reference — and the failures a green build cannot see live in `BUGCATCHER.md`.
 
 ## 0. Backups — the biggest open risk, and it is now bigger
 
@@ -24,7 +26,7 @@ Cut over on 2026-08-17, checked in the browser, staging wired up and its emails 
 
 ## 1. Done — the live hole is closed
 
-**`AUDIT.md` SEC-01 is fixed.** `0059_views_are_read_only.sql` was applied on 2026-08-14 and verified independently: zero INSERT/UPDATE/DELETE/TRUNCATE privileges remain on any of the fourteen views, for `anon` or `authenticated`.
+**The writable fact views are fixed.** Three of them were writable by any signed-in person — a Postgres privilege default the migrations never revoked, and a view bypasses row-level security, so it was an RLS bypass with a `DELETE` on the end. `0059_views_are_read_only.sql` was applied on 2026-08-14 and verified independently: zero INSERT/UPDATE/DELETE/TRUNCATE privileges remain on any of the fourteen views, for `anon` or `authenticated`. Since 2026-08-17 `npm run db:check-views` re-checks it on every pull request, because `drop view` hands those grants straight back.
 
 **Still worth one browser check on production:** press a real write button in Purchase Orders and Bills. Nothing should have changed — nothing in the app has ever written through a view — but that is the claim being tested.
 
@@ -45,39 +47,37 @@ Merged 2026-08-14 (PR #21, `0064` + `0065` applied). Villa waves on Projects, a 
 1. **Press "With client" on a real trail**, then push it — the amber label should appear and then clear on its own. This is the one real write the release added, and CLAUDE.md's rule is to press one after any deploy touching server actions.
 2. **Open a trail whose stage the auto-filing guessed wrong** and move it with the Stage picker on the trail's own page. If it guesses wrong often, the fallback (the stage the plan says today is in) is the thing to revisit — possibly by giving each activity a home stage in Masters.
 
-## 4. Marathon PINs — confirmed, and confined to staging
+## 4. Marathon PINs — closed
 
-**Re-checked properly on 2026-08-17** by recomputing scrypt against each agent's own salt, which is what the previous two audits could not do. No longer speculation:
+**Done 2026-08-17.** Ravi and yema were both on the seeded PIN `1234`, which is in plaintext in this public repo. Both now have fresh random PINs, handed over in the session that set them; change either in `/marathon/admin` → Members → **Reset PIN** whenever you like. The Marathon admin PIN was always fine, and no Marathon agent exists on production at all.
 
-1. **Ravi and yema are on PIN `1234`.** Confirmed. `/marathon/admin` → Members → **Reset PIN** on both.
-2. **"Test Agent" on staging has had its PIN rotated** — it is not on the published value. Deleting the row is still tidy but is no longer a security item.
-3. The Marathon **admin** PIN is fine on both databases.
+`npm run rotate-marathon-pins -- --project <ref>` reports any agent sitting on a PIN that has ever appeared in the repo, by recomputing scrypt against that agent's own salt — which is the only way to find them, and the reason a migration could not. `0070` deletes anything still matching the published hash.
 
-**What changed the urgency:** none of these agents exist on the new production database — no Marathon rows were carried across — and staging sits behind Vercel's login wall. So this is now a staging-hygiene item, not a live hole. It becomes live again the moment Marathon is used for a real event and these agents are recreated.
+## 5. The audit's security findings — all closed
 
-`0070` removes any agent still on the published hash, and caught one: replaying the migrations onto the fresh database **recreated** `0002`'s Test Agent, PIN and all. The general lesson is in `CLAUDE.md` — a seed is a fixture in development and a credential in production.
+**`0071`, applied 2026-08-17.** `create_client_engagement` was a `SECURITY DEFINER` function any signed-in person could call to write Client Relations records against any plot; three more definer functions were reachable with the public browser key, because `revoke … from public` never touched `anon`; and the bill-approval helpers answered about anybody's user id rather than the caller's. Verified against staging: both trigger paths still seed what they should, and a direct call is refused. The trap that fix nearly fell into is `BUGCATCHER.md` #11 — `security definer` changes the role, not `auth.uid()`.
 
-## 4. The rest of the audit's security findings — three closed, one open
+**The fourteen views are now guarded.** They bypass row-level security by design, so each one's column list and `WHERE` clause _are_ its permission boundary, and a comment saying "never add a money column" was the only thing standing there. `scripts/view-manifest.ts` pins every view's exact columns, its `has_app` guards, its barrier and invoker flags, and the absence of write grants; `npm run db:check-views` runs on every pull request. It caught a real mistake within a minute of being written.
 
-**Closed 2026-08-17 by `0071`:** SEC-02 (`create_client_engagement` had no permission check and was executable by anyone signed in), SEC-03 (three definer functions reachable with the public anon key) and SEC-04 (`bill_approval_cap` answered about any user id). Verified against staging: the two trigger paths still seed what they should, and a direct call is refused. The trap the fix walked into is `BUGCATCHER.md` #11 — `security definer` changes the role, not `auth.uid()`.
+**Catalogue search no longer strips characters out of what you typed.** The term used to have `,` `(` `)` removed before being spliced into a PostgREST `or` filter, and removing the comma was the only thing stopping a typed clause of its own. It is quoted now, so searching for "basin, wall" searches for that.
 
-Still open:
+## 6. The slow first load — **this one needs you**
 
-- **CI check pinning the money-free views' column lists** (`AUDIT.md` SEC-06). Those views bypass RLS by design; their column list _is_ the boundary and a comment is currently the only guard. ~30 lines. Needs a decision on where the authoritative list lives — and note CI has no database, so a real check either parses the migrations or runs from a machine with the management token.
+The only thing left from the audits, and it is not a code change.
 
-## 5. The slow first load is cold starts
+Measured 2026-08-14 and unchanged across three audits: warm time-to-first-byte is ~0.20s, a cold one is ~1.01s. That 5× gap is the whole of the reported slowness. It is not the queries, not the region (both Mumbai), not the bundle, not waterfalls, not a missing `loading.tsx` — every one of those was checked and is fine. With ~70 staff spread thinly across sixteen tools all day, a large share of page loads land on a function that has gone cold.
 
-**`AUDIT.md` PERF-01.** Re-measured 2026-08-14: warm TTFB ~0.20s, cold ~1.01s — a 5× gap landing on the reported 1.3s. Not queries, not the region (both Mumbai), not the bundle, not waterfalls, not missing `loading.tsx` — all re-verified fine.
+**What to do: turn on Fluid compute / keep-warm in the Vercel project settings, then re-measure.** It is a billing decision, which is why it has sat here. Two things make it bite harder than usual: every route is dynamic (108 of 110) because per-user grants are read from the request, so nothing can be served from cache; and the dashboard heading renders only after the user is resolved, so it inherits the whole cold start.
 
-Enable Fluid compute / keep-warm on Vercel and re-measure. This is a billing decision, so it needs the founder. **Unchanged since the August 11 audit, which means it hasn't been turned on.** If it doesn't move the number, the next step is Speed Insights split by cold vs warm — not more code changes.
+If turning it on doesn't move the number, the next step is Vercel Speed Insights split by cold versus warm — already wired into the root layout — not more code changes.
 
-## 6. The two cross-tool imports — done
+## 7. The two cross-tool imports — done
 
 **Both closed 2026-08-17.** `buildChartModel` moved out of shared `lib/charts/series.ts` into `lib/reporter/chart-model.ts`, leaving the shared file holding only the chart shapes; and the design-view reads moved out of Selections into shared `lib/design-views/queries.ts`, which Budgets and Selections both use. **No tool imports another tool's code and no shared module imports a tool's** — `CLAUDE.md` now says so without exceptions.
 
 One bug fell out of MOD-01: `listSpaceViews` treated a failed read as "no photographs", so a client quotation could print with every picture missing and report success. It throws now, and both PDF routes answer in plain English.
 
-## 7. Relay — what is left, in order
+## 8. Relay — what is left, in order
 
 The relay, departments, project schedule, trail types and house screen are built; see `app/(dashboard)/relay/PLAN.md`.
 
@@ -87,7 +87,7 @@ The relay, departments, project schedule, trail types and house screen are built
 
 Two small known gaps: no inline editor for a queued trail's activities in the waiting list (the write path `replaceFutureLegs` exists, just unwired), and no "Open a trail" button on the Projects landing page.
 
-## 8. Grants and real data — done in the running app, not in code
+## 9. Grants and real data — done in the running app, not in code
 
 Every tool below is built and gated; until someone is granted it, only admins see it.
 
@@ -109,16 +109,13 @@ Every tool below is built and gated; until someone is granted it, only admins se
 - **Press one real write-button on Purchase Orders, Bills and Budgets on production** — `0055` rewrote the read policies their screens run under, and `0059` will touch view privileges.
 - **The Saarang sheet's "Blocked" plots (34, 35, 43) are `reserved`** — the schema has no blocked status and `import-saarang.ts` mapped them across. Nobody has confirmed that reads right on screen.
 
-## 9. Lower priority, from the audit
+## 10. Lower priority
 
-- **Index the dozen genuinely-filtered foreign keys** (`AUDIT.md` PERF-04) — `indents.plot_id`, `goods_receipts.plot_id`/`unit_id`, `stock_issues.plot_id`, `business_plans.project_id` and friends. Preventative; changes nothing measurable at today's row counts.
-- **Marathon per-run counts are N+1** (`AUDIT.md` PERF-05). Needs a database function to fix properly. Trivial at 11 rows.
-- **Line pulls could be atomic** (`AUDIT.md` QUAL-03) using the pattern Marathon's bib numbering already uses — a server-side loop in one function, keeping the per-row refusal messages. A real design change to a working, reasoned trade-off.
 - **`todayInIndia()` now exists three times** — `lib/client-relations/dues.ts`, `lib/financial-management/interest.ts` and `lib/directory/birthdays.ts`. Each is a verbatim copy because one tool never imports another's code, and three is the point at which it earns a shared `lib/date.ts`. ~10 lines plus moving three imports.
-- **~35 remaining `{ data }` destructures with no `error` check** (`AUDIT.md` QUAL-04). The six that mattered are fixed; the rest are display-only lookups. A slow tidy, not a project.
+- **~35 remaining `{ data }` destructures with no `error` check.** Every one that mattered has been fixed — eleven of them, across the budget pricing path, the design-drift warnings and the Indents pull screens, where a swallowed error was not hiding a label but stating something untrue. The rest are display-only lookups (an editor's name, a label) where an empty result and a failed read look the same to the person reading the page. A slow tidy, not a project. **The rule for anything new is unchanged: check `error`, not just `data`.**
 - **PO-anchor picker in the Bills record form** — move to server-side search (the `/api/catalogue` pattern) once the PO list makes the form payload noticeable.
 
-## 10. Not yet planned
+## 11. Not yet planned
 
 - **Phase 9** — Overview fully real, plus one real project run end to end.
 - **Downtime mode.**

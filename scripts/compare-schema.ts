@@ -22,7 +22,8 @@
  *   policies     - compares the qual and with_check text, not just the
  *                  name. 0055's whole point was widening a qual; a policy
  *                  with the right name and the wrong qual is a hole.
- *   privileges   - AUDIT.md SEC-01 was writable views, caused by grants
+ *   privileges   - three fact views were writable by any signed-in
+ *                  person for months, caused by grants
  *                  nobody looked at. Grants are compared for anon,
  *                  authenticated, public and service_role by name,
  *                  because `revoke ... from public` does not touch the

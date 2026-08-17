@@ -18,7 +18,7 @@ export async function GET(
 
   // getQuote reads the design photographs, and that read THROWS on
   // failure rather than quietly producing a quotation with none of them
-  // (AUDIT.md MOD-01). A quote is a document a client sees, so refusing
+  // A quote is a document a client sees, so refusing
   // to build it beats building a wrong one — but say why in English
   // instead of a bare 500 on a download the browser cannot explain.
   let quote;

@@ -177,6 +177,11 @@ export function canClientReturn(
  * excluded on purpose — holder and expected days come from the event
  * snapshot, so editing it would change nothing anyone can see, and the
  * guard refuses it rather than doing nothing silently.
+ *
+ * NOT WIRED TO A SCREEN YET, AND NOT DEAD CODE. It is the read half of
+ * the waiting list's inline leg editor; `replaceFutureLegs` in
+ * ./actions.ts is the write half. Both are tested and both are waiting on
+ * the screen. Don't let a cleanup delete them.
  */
 export function editableFromLeg(last: ChainEvent | null): number | null {
   const leg = currentLeg(last);

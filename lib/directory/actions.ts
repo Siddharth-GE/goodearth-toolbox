@@ -198,7 +198,7 @@ export async function uploadMyPhoto(formData: FormData): Promise<ActionState> {
   //
   // The Blob path is multipart, which every fetch implementation treats
   // as binary. lib/selections/views-actions.ts still passes a raw Buffer
-  // and has the same latent bug (AUDIT.md) — it has simply never had an
+  // and has the same latent bug — it has simply never had an
   // upload in production to prove it.
   const blob = new Blob([new Uint8Array(normalised)], { type: staffPhoto.contentType });
 

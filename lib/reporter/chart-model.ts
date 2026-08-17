@@ -11,7 +11,7 @@
  * WHY IT LIVES IN REPORTER. It used to be lib/charts/series.ts, which is
  * shared code, and it reached into lib/reporter/spec and /aggregate to do
  * its job — so the shared chart wrappers, and through them Financial
- * Management, all inherited a dependency on this tool (AUDIT.md MOD-02).
+ * Management, all inherited a dependency on this tool.
  * Moved on 2026-08-17. The dependency now points the way the rulebook
  * says: a tool imports shared code (lib/charts/palette, and the model
  * types in lib/charts/series), never the other way about.

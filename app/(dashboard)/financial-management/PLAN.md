@@ -25,7 +25,7 @@ _Trimmed 2026-08-14: the build-stage log lives in git._
 ## Things that will bite
 
 - **This tool is fully leaf — nothing reads it** — but it depends on four other tools' data. Each dependency degrades to zero rather than breaking: no CRM receipts means no collections, no published plan means no forward spend.
-- **It charts through `components/ui/chart/*`**, which used to depend transitively on `lib/reporter/*` — so deleting Reporter would have stopped this tool compiling (`AUDIT.md` MOD-02, closed 2026-08-17). The wrappers now take only the chart shapes from `lib/charts/series.ts`. Nothing here imports Reporter, and nothing may; `lib/financial-management/cashflow.ts` builds its own models against those shared types.
+- **It charts through `components/ui/chart/*`**, which used to depend transitively on `lib/reporter/*` — so deleting Reporter would have stopped this tool compiling. Untangled on 2026-08-17. The wrappers now take only the chart shapes from `lib/charts/series.ts`. Nothing here imports Reporter, and nothing may; `lib/financial-management/cashflow.ts` builds its own models against those shared types.
 - **Welcome counts are deliberately rupee-free** — facilities, approved-unpaid bills and receipts this month, as plain counts. A welcome screen must not leak what the money views gate.
 
 ## Open items — confirm with the founder as they come up

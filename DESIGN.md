@@ -51,7 +51,7 @@ in a theme they cannot read cannot find the switch either.
 costs the app static rendering: calling `cookies()` there turns `/login`,
 `/_not-found` and `/_global-error` from prerendered into
 server-rendered-on-demand — measured, not guessed — and cold starts are
-the app's known performance problem (`AUDIT.md` PERF-01).
+the app's one measured performance problem: warm time-to-first-byte is ~0.2s and a cold start is ~1.0s.
 
 Two things deliberately do **not** follow the theme: PDFs
 (`lib/pdf/theme.ts` is a separate print palette) and the logo

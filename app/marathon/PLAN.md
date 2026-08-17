@@ -8,11 +8,11 @@ _Trimmed 2026-08-14: the nine-step build checklist and the dated session logs li
 
 **Marathon is the one kiosk pattern, and it is not to be copied.** It sits outside Supabase Auth entirely — `/marathon` is exempted in `lib/supabase/proxy.ts`, there is no session, and every query runs through the **service-role client**, which bypasses RLS. The PIN is therefore the only thing in the way. Its tables (`marathon_*`) have RLS enabled with **zero policies**, which is deny-all to `anon` and `authenticated` — correct, and not a gap.
 
-**The bib-numbering pattern is worth stealing even though the kiosk isn't.** `marathon_create_entry` does the whole allocation inside one database function: atomic, one round trip, and it returns a per-row result. Everywhere else in the toolbox that loops row-by-row in JavaScript (the line pulls) could have both atomicity and per-row messages this way — see `AUDIT.md` QUAL-03.
+**The bib-numbering pattern is worth stealing even though the kiosk isn't.** `marathon_create_entry` does the whole allocation inside one database function: atomic, one round trip, and it returns a per-row result. Everywhere else in the toolbox that loops row-by-row in JavaScript (the line pulls in Indents and Inventory) could have both atomicity and per-row messages this way. Reviewed on 2026-08-17 and left as it is — the reasoning is in `app/(dashboard)/indents/PLAN.md` — but this is the shape to copy if it is ever worth building.
 
 ## Pending before a real race day
 
-- **Reset any agent still on the published test PIN `1234`, and delete "Test Agent".** The seeded PINs are in plaintext in a public repo, so rotation is the only remedy — rewriting the migration fixes nothing. Admin → Members has a form; no SQL needed. (`TODO.md` §2, `AUDIT.md` SEC-05.)
+- **No agent may sit on a published PIN.** `0002` seeded one with `1234`, and that PIN, its hash and its salt are all in this public repo; two more agents were then given the same PIN by hand, where no migration could find them because every row is salted separately. Rotation is the only remedy — rewriting the migration fixes nothing. All of them were rotated on 2026-08-17, and `npm run rotate-marathon-pins -- --project <ref>` finds any that come back, by recomputing scrypt against each agent's own salt. Admin → Members has a form for doing it by hand; no SQL needed.
 - The duplicate-mobile warning ("already registered, save anyway?") is English-only; flagged during the design pass as wanting a native-speaker Malayalam translation, never done.
 - One final walkthrough on the actual devices agents will use on the day.
 

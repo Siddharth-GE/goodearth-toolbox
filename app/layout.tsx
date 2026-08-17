@@ -45,7 +45,7 @@ export const viewport: Viewport = {
  * cookies() here opts the whole app out of static rendering — measured:
  * it turned /login, /_not-found and /_global-error from prerendered into
  * server-rendered-on-demand, and cold starts are already this app's known
- * performance problem (AUDIT.md PERF-01). Nine lines of script is the
+ * performance problem — warm TTFB ~0.2s, cold ~1.0s. Nine lines of script is the
  * cheaper trade.
  *
  * No cookie leaves the attribute off entirely, which is what makes

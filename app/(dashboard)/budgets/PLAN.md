@@ -21,7 +21,7 @@ The budget team picks up an **issued** selection revision, sets a **quantity** (
 
 **C, the client quotation** (`/budgets/[id]/quote`) renders from `QuoteData` in `lib/budgets/quote.ts`, **a type with no cost or margin field at all**. That is stronger than a template that merely omits two columns: a mistaken edit becomes a compile error rather than a leaked margin. **Keep it that way.**
 
-> The space photos come from **shared `lib/design-views/queries.ts`**, which Selections uses too. Until 2026-08-17 `quote.ts` imported them out of `lib/selections/` — the toolbox's oldest cross-tool code import (`AUDIT.md` MOD-01, now closed). If Budgets ever needs another of another tool's reads, the answer is a shared module, not an import.
+> The space photos come from **shared `lib/design-views/queries.ts`**, which Selections uses too. Until 2026-08-17 `quote.ts` imported them out of `lib/selections/` — the toolbox's oldest cross-tool code import, closed on 2026-08-17. If Budgets ever needs another of another tool's reads, the answer is a shared module, not an import.
 >
 > That read **throws** if the database refuses it, and the quote route answers 503 rather than building the document. Deliberate: a quotation that silently prints without its photographs is worse than one that fails to print.
 

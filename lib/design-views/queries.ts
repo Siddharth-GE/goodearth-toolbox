@@ -9,7 +9,7 @@ import "server-only";
  * the revision screen and prints them on the sheet set, and Budgets
  * prints them on the client quote. Until 2026-08-17 these functions sat
  * in lib/selections/views.ts and Budgets imported them from there, which
- * was the toolbox's oldest cross-tool code import (AUDIT.md MOD-01) and
+ * was the toolbox's oldest cross-tool code import, and
  * meant breaking Selections stopped the quote PDF compiling.
  *
  * SELECTIONS STILL OWNS THE WRITES. Uploading, captioning, reordering and

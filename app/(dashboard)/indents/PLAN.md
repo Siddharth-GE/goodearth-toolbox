@@ -24,7 +24,7 @@ A unit's design is revised over time and every issued revision gets its own appr
 The fix has four parts, and all four matter:
 
 - The pull chooser offers only each unit's **issued** revision's budget (`classifyBudgetChooser` in `pull-rules.ts` — pure and tested). A unit whose new revision awaits budget approval shows a greyed pending row.
-- **"Already asked" and the add-action dedupe span _all_ of the unit's budgets by `line_key`**, not just the one on screen. Both sides read `approved_budgets` for the sibling list — and **that read must be error-checked**, because an empty result reads as "nothing has ever been ordered" and reopens the bug through a database blip (`AUDIT.md` QUAL-01, fixed 2026-08-14).
+- **"Already asked" and the add-action dedupe span _all_ of the unit's budgets by `line_key`**, not just the one on screen. Both sides read `approved_budgets` for the sibling list — and **that read must be error-checked**, because an empty result reads as "nothing has ever been ordered" and reopens the double-buy bug through a single database blip. It was doing exactly that until 2026-08-14; it throws now.
 - `getBudgetPull` and `addBudgetPullLines` refuse superseded-revision budgets and cross-unit pulls; the `indent_lines_budget_current` trigger (`0028`, security definer) is the boundary that holds against stale tabs and pasted URLs.
 - Lines anchored to a revision superseded AFTER they were pulled get a warning badge via `classifyDesignDrift`. Selections' diff page shows the mirror warning with the affected IND/PO references.
 
@@ -32,6 +32,11 @@ The fix has four parts, and all four matter:
 
 - **The drift reads must throw, not fall through.** Every lookup feeding `classifyDesignDrift` has the property that an empty result looks like good news — "nothing changed", "nothing superseded", "nothing already ordered". A failed read that returns `[]` tells the site team an indent is safe to order when the design under it has moved. All of them now throw to the error boundary; keep it that way if you add another.
 - **Reads cross-tool tables directly — never another tool's gated queries module.** `lib/indents/queries.ts` reads `approved_budgets`, `selections`, `selection_lines`, `po_line_facts` itself.
-- **Line pulls insert row-by-row, deliberately.** The quantity guard raises per line with that item's remaining figure, and a batch insert would fail wholesale on the first refusal. Each pull reports partial success honestly ("Added 3, then stopped: …"). Not atomic; see `AUDIT.md` QUAL-03 for the shape that would give both.
+- **Line pulls insert row-by-row, deliberately — and this is a settled decision, not an open one.** `addDirectLines`, `addConstructionPullLines`, `addConstructionLines` and `addPoolLines` (plus the receipt and issue loops in Inventory) insert one line at a time with no transaction, so a failure part-way leaves some lines added and some not.
+
+  Why it is that way: the quantity guard raises **per line**, with that item's own remaining figure in the message, and a batch insert would fail wholesale on the first refusal — one over-ordered line would silently discard nine good ones and say nothing useful about which. Each pull therefore reports partial success honestly ("Added 3, then stopped: …") and the person fixes the one line and pulls again.
+
+  What the atomic version would look like, if it is ever worth building: one database function that loops server-side and returns a per-row summary — atomic, one round trip, and still able to say which line was refused and why. Marathon's `marathon_create_entry` is that shape already. **Reviewed and accepted as-is on 2026-08-17**: the trade is a real one, every site says so in its own comment, and rewriting four money-adjacent write paths to buy atomicity nobody has yet been hurt by is not a good use of a day. Revisit it if a partial pull ever confuses somebody in practice.
+
 - **Approvers are a named list** (`indent_approvers`), managed from **Settings**, not here; admins always may. The approver tick doesn't grant the app.
 - `lib/indents/reference.ts` mirrors the SQL mint (`lpad` vs `padStart`, pinned by test). If one changes, both change.

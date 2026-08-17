@@ -23,7 +23,7 @@ export async function GET(
   // bytes are downloaded here and handed to the document directly.
   //
   // listSpaceViews THROWS on a failed read rather than answering with no
-  // photographs (AUDIT.md MOD-01), so say so in English instead of
+  // photographs, so say so in English instead of
   // letting the browser show a failed download with no reason.
   let viewRows;
   try {

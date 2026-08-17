@@ -28,7 +28,7 @@ The picker was rebuilt once after it felt slow. Both causes are easy to reintrod
 ## Things that will bite
 
 - **`getDownstreamImpact` reads indents and POs directly** — open reads of `indent_lines`/`indents` plus the money-free `po_line_facts`. **No Indents code is imported**, and none may be.
-- **The design-view READS are shared, in `lib/design-views/queries.ts`** — Selections shows and prints them, Budgets prints them on the client quote. They moved out of `lib/selections/views.ts` on 2026-08-17, which was the toolbox's one long-standing cross-tool code import (`AUDIT.md` MOD-01). **Selections still owns the writes** (`views-actions.ts`, gated on `/selections`), and only reading is shared. That shared file has **no grant of its own** by design, following the `lib/masters/*` convention — so anything added to it is reachable by a holder of `/budgets` who has no `/selections`. Keep it narrowly about photographs.
+- **The design-view READS are shared, in `lib/design-views/queries.ts`** — Selections shows and prints them, Budgets prints them on the client quote. They moved out of `lib/selections/views.ts` on 2026-08-17, which was the toolbox's one long-standing cross-tool code import. **Selections still owns the writes** (`views-actions.ts`, gated on `/selections`), and only reading is shared. That shared file has **no grant of its own** by design, following the `lib/masters/*` convention — so anything added to it is reachable by a holder of `/budgets` who has no `/selections`. Keep it narrowly about photographs.
 - **`/selections/views/[viewId]` streams from a private bucket** and gates on `/selections` OR `/budgets` itself, in the route handler. It is not covered by any RLS policy.
 
 ## Open

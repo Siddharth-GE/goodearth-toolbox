@@ -5,7 +5,7 @@
  * not import a tool — the shared UI in components/ui/chart/* consumes
  * these types, and until 2026-08-17 it inherited a dependency on
  * /reporter through them, which meant deleting one tool would have
- * stopped the whole chart design system compiling (AUDIT.md MOD-02).
+ * stopped the whole chart design system compiling.
  *
  * The building of a model from a report lives in the tool that has a
  * report to build it from: lib/reporter/chart-model.ts. Anything else

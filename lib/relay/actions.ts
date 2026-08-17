@@ -299,7 +299,18 @@ export async function handBaton(
   return undefined;
 }
 
-/** Rewrites the legs still ahead of the baton. Everything behind it is history. */
+/**
+ * Rewrites the legs still ahead of the baton. Everything behind it is
+ * history.
+ *
+ * NOT WIRED TO A SCREEN YET, AND NOT DEAD CODE — leave it alone. The
+ * waiting list has no inline editor for a queued trail's activities; this
+ * is the write path that editor will call, written and tested first
+ * because getting the "everything ahead of the baton" boundary wrong
+ * would rewrite history. `editableFromLeg` in ./events.ts is its other
+ * half, unwired for the same reason. A cleanup that removes unused
+ * exports will find both and should be told no.
+ */
 export async function replaceFutureLegs(chainId: string, legs: LegInput[]): Promise<ActionState> {
   await requireTool("/relay");
 

@@ -2,7 +2,8 @@
  * Grouping, aggregation, subtotals and totals — in pure TypeScript, not
  * SQL. PostgREST cannot do arbitrary GROUP BY; the SQL alternatives are
  * a `security definer` runner (reads past every policy) or a pile of
- * RLS-bypassing views (the AUDIT.md SEC-02 hazard, multiplied).
+ * RLS-bypassing views — the same hazard as a definer function with no
+ * permission check in its body, multiplied by every dataset.
  * TypeScript also puts the arithmetic behind a leadership report where
  * `npm test` can cover it — the same reasoning that put runScenario in
  * lib/business-planning/model.ts rather than in SQL.
