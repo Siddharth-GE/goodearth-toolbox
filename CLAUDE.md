@@ -112,13 +112,47 @@ Numbered SQL files in `supabase/migrations/`, applied **from this machine** via 
 
 Data-load scripts in `scripts/` are **dry run by default, `--commit` to write**. Match on a natural key and update in place so a re-run is a no-op; never delete to re-insert, because live rows carry selections, budgets and indents.
 
+## The staging protocol
+
+Two databases and three places code runs. **Nothing but `master` may ever touch production.**
+
+| Where you are                 | Deploys from | Reads          | Who sees it                       |
+| ----------------------------- | ------------ | -------------- | --------------------------------- |
+| `npm run dev`                 | your machine | **staging**    | you                               |
+| `feature/<tool>`              | any push     | **staging**    | you, on a preview URL             |
+| `staging.goodearthkannur.org` | `staging`    | **staging**    | the founder, for days of real use |
+| `toolbox.goodearthkannur.org` | `master`     | **production** | seventy people doing their jobs   |
+
+**The whole point: three of those four rows cannot damage real work.** Before 2026-08-17 every one of them wrote to the live database.
+
+### Building anything
+
+1. Branch `feature/<tool>` off `staging`. Push early — the preview URL is free and it reads staging.
+2. **If it needs a migration**, apply it to staging **first**: `npm run db:apply -- --project ipstebqawrvhkyntctrv --commit`, then `npm run db:types:staging`, and commit the types with the migration. The code that needs a column must never reach a database without it.
+3. Build. Test on the preview. **Open the page** — a green build proves nothing about a `select` string (`BUGCATCHER.md`).
+4. Merge to `staging`. Leave it on `staging.goodearthkannur.org` for a few days of real use — that is what the environment is _for_, and rushing past it wastes the whole arrangement.
+5. **Then** apply the same migration to production: `npm run db:apply -- --project pajfrgnkapicdgangjey --commit`, and `npm run db:types`.
+6. `npm run db:compare -- --project pajfrgnkapicdgangjey --against ipstebqawrvhkyntctrv` — **must be empty.** It checks the schema _and_ all 237 auth settings.
+7. Merge `staging` → `master` only after browser testing and sign-off. Press one real write button on production afterwards.
+
+Small fixes to live tools may still go straight to `master`. **Commit each working piece and push it; never leave work uncommitted.**
+
+### The rules that make it hold
+
+- **`--project` is required everywhere and never defaults.** Not to production, not to `.env.local`. Twenty characters of typing against the obvious disaster.
+- **Staging is a snapshot, not a mirror.** It froze on 2026-08-17 with every practice row still in it, and diverges further every day. It is the right place to prove a screen works and the wrong place to prove a number is correct.
+- **Staging cannot email anyone.** Every address there is `@staging.invalid` except the founder's and the probe's. So you cannot sign in as a colleague to reproduce their problem — reproduce it with the probe account and a grant instead.
+- **Production has no backups** (free tier). Until that changes, treat every production migration as unrepeatable: run it on staging first, and mean it.
+- **Anything the platform holds outside the database is configuration too** — auth settings, email templates, redirect lists. `db:compare` covers them because BUGCATCHER #10 is what happened when it didn't: the 2FA code silently became a magic link.
+- **`applied_migrations` (`0067`) is the source of truth for what a database has had.** Never apply SQL by hand; the ledger stops being true the moment you do.
+
 ## Tests, CI and git
 
 - Pure logic only (`npm test`) — no database, no browser; extract pure modules to test them. CI is the gate; no hooks. It runs **prettier → lint → typecheck → test → build → check:actions, stopping at the first failure**, so a trivial lint error silently skips every check that matters. Confirm with `gh run list` — a successful push is not a green build.
 - **Never `export type` from a `"use server"` file** — it caused a production outage; `npm run check:actions` enforces it.
 - **Smoke-test as a real single-grant user** (the probe account) before merging; an admin passes every check and never sees grant bugs. After any deploy changing server actions or policies, press one real write-button on production.
 - **A green build is not a working feature.** Six bugs have now passed all six CI steps — a dead screen, a corrupted upload, a live privilege hole. `BUGCATCHER.md` is the catalogue and the pre-merge checklist it earned; **when something breaks that CI said was fine, add it there.** Uploading to Supabase Storage is the newest: hand it a `Blob`, never a raw `Buffer`, or Next's patched fetch text-decodes the binary and stores rubbish that reports success.
-- **`feature/<tool>` → `staging` → `master`.** A feature branch gets a preview URL; `staging` is `staging.goodearthkannur.org` and is where something sits for a few days of real use; `master` is production and auto-deploys. Every preview and staging URL reads the **staging** database, so building a feature can no longer touch the work seventy people depend on. Merge to `master` only after browser testing and sign-off. Small fixes to live tools may still go straight to `master`. **Commit each working piece and push it; never leave work uncommitted.**
+- **`feature/<tool>` → `staging` → `master`** — the full protocol, including where each migration goes, is its own section above.
 
 ## Working with the founder
 
