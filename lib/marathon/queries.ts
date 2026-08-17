@@ -5,15 +5,29 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export async function getMarathonHome() {
   const supabase = createAdminClient();
 
+  // Every run's entry count comes from marathon_run_counts() (0072) —
+  // Postgres does the GROUP BY, in one query, and the run's name comes
+  // back with it, so there is no separate marathon_runs read any more.
+  //
+  // This used to be one exact count per run inside a .map, and that was
+  // already the careful version: the one before it fetched every entry row
+  // and called .length, which on race day would have frozen the per-run
+  // breakdown at PostgREST's 1,000-row ceiling while the total beside it
+  // kept climbing — two numbers on the same screen contradicting each
+  // other, on the only day this screen matters. PostgREST cannot express a
+  // GROUP BY, so doing it properly needed a database function.
+  //
+  // A run with no entries still comes back, at zero: the kiosk lists the
+  // runs, and a missing row would read as a missing run, not an empty one.
   const [
     { data: config },
-    { data: runs },
+    { data: counts, error: countsError },
     { count: groupCount },
     { data: agents },
     { count: totalEntries },
   ] = await Promise.all([
     supabase.from("marathon_config").select("event_name").single(),
-    supabase.from("marathon_runs").select("id, name").order("sort_order"),
+    supabase.rpc("marathon_run_counts"),
     // A head-count, not the rows. Fetching every group just to read
     // .length would silently stop at PostgREST's 1000-row ceiling.
     supabase.from("marathon_groups").select("id", { count: "exact", head: true }),
@@ -21,22 +35,17 @@ export async function getMarathonHome() {
     supabase.from("marathon_entries").select("id", { count: "exact", head: true }),
   ]);
 
-  // One exact count per run rather than tallying every entry row in JS.
-  // The old version fetched one row per entry, so on race day — the only
-  // day this screen matters — the per-run breakdown would have frozen at
-  // 1000 while the hero total beside it kept climbing, and the two
-  // numbers on the same screen would have contradicted each other.
-  // There are a handful of runs, so these go in parallel and the cost is
-  // one round trip, not one per thousand entries.
-  const runCounts = await Promise.all(
-    (runs ?? []).map(async (run) => {
-      const { count } = await supabase
-        .from("marathon_entries")
-        .select("id", { count: "exact", head: true })
-        .eq("run_id", run.id);
-      return { runId: run.id as string, name: run.name as string, count: count ?? 0 };
-    }),
-  );
+  // Checked, not shrugged at. A failed read here would otherwise render
+  // every run at zero entries, which on race day is a lie that looks
+  // exactly like a quiet morning.
+  if (countsError) {
+    throw new Error(`Could not count the entries per run: ${countsError.message}`);
+  }
+  const runCounts = (counts ?? []).map((row) => ({
+    runId: row.run_id,
+    name: row.run_name,
+    count: Number(row.entry_count),
+  }));
 
   return {
     eventName: config?.event_name ?? "Marathon",

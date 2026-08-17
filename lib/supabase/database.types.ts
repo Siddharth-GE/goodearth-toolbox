@@ -5479,6 +5479,14 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      marathon_run_counts: {
+        Args: never
+        Returns: {
+          entry_count: number
+          run_id: string
+          run_name: string
+        }[]
+      }
       open_chain:
         | {
             Args: {
