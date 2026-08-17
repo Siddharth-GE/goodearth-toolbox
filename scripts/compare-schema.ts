@@ -49,7 +49,23 @@
  * endings are normalised is COUNTED AND REPORTED SEPARATELY, and does not
  * fail the run.
  */
-import { requireProjectRef, sql } from "./supabase-management";
+import { managementToken, requireProjectRef, sql } from "./supabase-management";
+
+/**
+ * Auth settings that are SUPPOSED to differ between two projects, and are
+ * therefore not compared. Everything else is.
+ *
+ * Keep this list short and justified. Every name added here is a setting
+ * that can drift between production and staging without anyone noticing —
+ * which is the exact failure this section exists to prevent.
+ */
+const SETTINGS_EXPECTED_TO_DIFFER = new Set([
+  "site_url", // each environment has its own address
+  "uri_allow_list", // and its own redirect list
+  "smtp_pass", // returned as a hash, not the value
+  "external_google_secret", // same
+  "smtp_sender_name", // staging says "(staging)" on purpose, if set
+]);
 
 type Aspect = { name: string; query: string };
 
@@ -152,6 +168,15 @@ const ASPECTS: Aspect[] = [
   },
 ];
 
+/** The project's auth settings, which live on the platform rather than in the database. */
+async function authConfig(ref: string): Promise<Record<string, unknown>> {
+  const response = await fetch(`https://api.supabase.com/v1/projects/${ref}/config/auth`, {
+    headers: { Authorization: `Bearer ${managementToken()}` },
+  });
+  if (!response.ok) throw new Error(`${ref}: could not read auth config (HTTP ${response.status})`);
+  return (await response.json()) as Record<string, unknown>;
+}
+
 async function readAspect(ref: string, aspect: Aspect): Promise<Map<string, string>> {
   const rows = await sql<{ key: string; value: string }>(ref, aspect.query);
   return new Map(rows.map((row) => [row.key, row.value]));
@@ -225,6 +250,32 @@ async function main() {
       console.log(`    differs     ${key}`);
       console.log(`                A: ${short(inA.get(key)!)}`);
       console.log(`                B: ${short(inB.get(key)!)}`);
+    }
+    console.log("");
+  }
+
+  // ---- the settings the platform holds, not the database ----------------
+  // BUGCATCHER #10: everything above can be an empty diff while two-factor
+  // authentication has quietly become a magic link, because the setting
+  // that decides it is an email template living in project config.
+  const [settingsA, settingsB] = await Promise.all([authConfig(a), authConfig(b)]);
+  const settingKeys = [...new Set([...Object.keys(settingsA), ...Object.keys(settingsB)])]
+    .filter((key) => !SETTINGS_EXPECTED_TO_DIFFER.has(key))
+    .sort();
+
+  const settingDiffs = settingKeys.filter(
+    (key) => JSON.stringify(settingsA[key]) !== JSON.stringify(settingsB[key]),
+  );
+
+  if (settingDiffs.length === 0) {
+    console.log(`  auth settings: ${settingKeys.length} checked, identical`);
+  } else {
+    differences += settingDiffs.length;
+    console.log(`\n  AUTH SETTINGS — ${settingDiffs.length} difference(s)`);
+    for (const key of settingDiffs) {
+      console.log(`    differs     ${key}`);
+      console.log(`                A: ${short(JSON.stringify(settingsA[key]) ?? "absent")}`);
+      console.log(`                B: ${short(JSON.stringify(settingsB[key]) ?? "absent")}`);
     }
     console.log("");
   }
