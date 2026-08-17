@@ -50,9 +50,11 @@ mid-way.
 1. **Your Resend API key.** Resend is what sends the sign-in code emails.
    Log in at resend.com → API Keys. It starts with `re_`.
    _If you cannot find it, create a new one — old ones keep working._
+
 2. **Your Google sign-in client ID and secret.** These are in the **old**
    Supabase project: open it → Authentication → Sign In / Providers →
    Google. Copy both values somewhere.
+
 3. **Access to Google Cloud Console** (console.cloud.google.com), signed
    in as whoever set up Google sign-in.
 
@@ -214,26 +216,70 @@ The old database has not been touched. Nothing anywhere has been deleted.
 proven, the old one is your safety net — and a safety net nobody can log
 into is not a safety net.
 
-**Step 20.** In Vercel → **Settings** → **Domains**, add
-`staging.goodearthkannur.org` and point it at a branch called `staging`.
-(This needs one DNS record adding wherever goodearthkannur.org is
-managed.)
+> **You do not need a Custom Environment.** Leave that section empty.
+> Vercel's built-in **Preview** environment already has everything the
+> practice site needs, and the practice site is just a fixed web address
+> pointing at one branch's preview. Fewer moving parts, same result.
 
-**Step 21.** Give that staging environment its own settings: the **old**
-database's URL and two keys, `SITE_URL` set to
-`https://staging.goodearthkannur.org`, and **brand new random values**
-for `AUTH_COOKIE_SECRET` and `MARATHON_SESSION_SECRET` — different from
-the live ones, so changing one never disturbs the other.
+**Step 20 — check the Preview settings point at the old database.**
 
-**Step 22.** Same Environment Variables page, this time the **Preview**
-ones: point those three at the **old** database too.
+Vercel → **Settings** → **Environment Variables**. Find each of these and
+look at the value marked **Preview** (not Production):
 
-> **This is the step that fixes the original problem.** From here on,
-> every test link I send you reads the practice database, so building
-> something new can never write into real work.
+| Name                            | Should be                                  |
+| ------------------------------- | ------------------------------------------ |
+| `NEXT_PUBLIC_SUPABASE_URL`      | `https://ipstebqawrvhkyntctrv.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | the **old** project's anon key             |
+| `SUPABASE_SERVICE_ROLE_KEY`     | the **old** project's service_role key     |
 
-**Step 23.** In the **old** Supabase project (`goodearth-toolbox-staging`)
-→ Authentication → URL Configuration: set the Site URL to
+**These are probably already right and need no change.** They pointed at
+the old project before any of this started, and the old project is now
+the practice one — the swap did this step for free. You are confirming,
+not editing.
+
+> **This is what fixes the original problem.** Every test link I send you
+> reads the practice database, so building something new can never write
+> into real work.
+
+If any of them still shows `pajfrgnkapicdgangjey` (the new one) under
+Preview, change it to the old one.
+
+**Step 21 — give the practice site its address.**
+
+Vercel → **Settings** → **Domains** → **Add Domain** →
+`staging.goodearthkannur.org`.
+
+After adding it, Vercel shows options for that domain. Choose to attach
+it to a **git branch**, and type `staging` in the branch box. It is a
+free-text field — Vercel does not offer a dropdown of branches, which is
+why you couldn't find one. The branch exists; I pushed it earlier.
+
+Vercel will then show you a **DNS record** to add (a CNAME) wherever
+goodearthkannur.org is managed. Add it, and wait a few minutes for the
+tick.
+
+_There is nothing else to configure. The `staging` branch deploys as a
+preview, so it already uses the Preview variables you just checked._
+
+**Step 22 — give the practice site its own cookie key.**
+
+Environment Variables again. Look at **`AUTH_COOKIE_SECRET`**: if the
+**Preview** value is the same as the **Production** value, replace the
+Preview one with any long random string.
+
+> **Why it matters:** that key signs the "trust this browser for 30 days"
+> cookie. If both sites sign with the same key, a browser trusted on the
+> practice site is also trusted on the real one — meaning the emailed
+> code could be skipped on production. Only you and the test account can
+> sign in to the practice site, so the exposure is small, but the fix
+> costs nothing.
+
+Do the same for `MARATHON_SESSION_SECRET` if Preview shares Production's.
+
+**Step 23 — tell the old database its new address.**
+
+In the **old** Supabase project (`goodearth-toolbox-staging`) →
+Authentication → URL Configuration: set the Site URL to
 `https://staging.goodearthkannur.org`, and add these two to the redirect
 list:
 
