@@ -195,14 +195,19 @@ Vercel had built the commit — but only as the **staging Preview**. There was n
 
 **The rule.** **A merge is not a deployment.** After merging to `master`, confirm a **Production** deployment exists for that exact commit before telling anyone the release is out. And prefer the documented order — land on `master`, then fast-forward `staging` back to it — so master's push is the first the platform sees of that SHA.
 
-**The check.** One command, no dashboard:
+**The check — and the false one, which is the second lesson.** Look at **Vercel's own Deployments list**, filtered to Production, and confirm the newest row's commit equals `git rev-parse --short origin/master`. That dashboard is the source of truth.
+
+The tempting shortcut does not work:
 
 ```
+# UNRELIABLE — do not trust this to prove a deployment exists
 gh api repos/<owner>/<repo>/deployments \
   -q '.[] | select(.environment=="Production") | "\(.created_at) \(.sha[0:7])"' | head -1
 ```
 
-The SHA it prints must equal `git rev-parse --short origin/master`. If it does not, nothing you merged is live.
+It was written as the check for this entry and **failed on its first real use**. GitHub's Deployments API is a mirror Vercel posts into, and it is not complete: a preview build visible in the Vercel dashboard was entirely absent from it, and later pushes produced no rows at all. A check that reports "no deployment" when one exists is worse than no check, because the next person spends an hour debugging a deployment that already happened.
+
+Automating this properly needs a **Vercel** API token, which this machine deliberately does not have — only Supabase ones. Until that exists, the dashboard is the answer, and "I merged it" is never the same sentence as "it is live".
 
 ---
 
