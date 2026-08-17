@@ -145,6 +145,8 @@ Small fixes to live tools may still go straight to `master`. **Commit each worki
 - **Production has no backups** (free tier). Until that changes, treat every production migration as unrepeatable: run it on staging first, and mean it.
 - **Anything the platform holds outside the database is configuration too** — auth settings, email templates, redirect lists. `db:compare` covers them because BUGCATCHER #10 is what happened when it didn't: the 2FA code silently became a magic link.
 - **`applied_migrations` (`0067`) is the source of truth for what a database has had.** Never apply SQL by hand; the ledger stops being true the moment you do.
+- **`staging.goodearthkannur.org` follows the `staging` branch and nothing else.** A `feature/…` branch gets Vercel's generated address instead (`goodearth-toolbox-git-<branch>-….vercel.app`). Both read the staging database and both show the practice banner; only the fixed address is worth giving to other people. **A new feature is not visible on the staging URL until it is merged into `staging`.**
+- **Supabase's redirect allow-list is the gate for every sign-in return** (BUGCATCHER #7), so it must cover the generated preview addresses: `https://goodearth-toolbox-*.vercel.app/**`. Two asterisks — one `/` matches only the home page — and the wildcard goes _after_ the project name, because that is where Vercel puts the branch.
 
 ## Tests, CI and git
 

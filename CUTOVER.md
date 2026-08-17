@@ -330,11 +330,20 @@ list:
 
 ```
 https://staging.goodearthkannur.org/**
-https://*-goodearth-toolbox*.vercel.app/**
+https://goodearth-toolbox-*.vercel.app/**
 ```
 
-_(That second line has never been right — it's why test links sometimes
-misbehaved on sign-in.)_
+> **Both lines must end in two asterisks**, not one and not none. A single
+> `/` at the end matches only the home page, so sign-in redirects fail —
+> which is exactly what happened the first time these were pasted in: the
+> `**` was lost and even `staging.goodearthkannur.org` itself was not on
+> its own allow-list.
+>
+> The second line is also a correction. It used to read
+> `*-goodearth-toolbox*`, which cannot match anything: Vercel's branch
+> addresses **begin** with the project name
+> (`goodearth-toolbox-git-my-branch-….vercel.app`), so a wildcard
+> demanding something in front of it never fires.
 
 **Step 24.** Tell me when steps 20–23 are done, and I'll run one command
 that scrambles the staff email addresses on the practice database.
