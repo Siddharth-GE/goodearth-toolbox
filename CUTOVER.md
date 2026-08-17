@@ -151,6 +151,12 @@ Development are **not**:
 `AUTH_COOKIE_SECRET` or `MARATHON_SESSION_SECRET` — leaving those as they
 are means the marathon kiosk keeps working.
 
+> **Note what these three say underneath their names.** If the label
+> reads **"Production and Preview"**, one value is serving both, and
+> changing it here also points every test link at the real database.
+> That is fixed in step 20 — but it means that between now and then,
+> preview links are not safe to use.
+
 **Step 12.** Go to the **Deployments** tab → the top one (the live one) →
 the **…** menu → **Redeploy**.
 
@@ -221,28 +227,50 @@ into is not a safety net.
 > practice site needs, and the practice site is just a fixed web address
 > pointing at one branch's preview. Fewer moving parts, same result.
 
-**Step 20 — check the Preview settings point at the old database.**
+**Step 20 — split the three database settings apart.**
 
-Vercel → **Settings** → **Environment Variables**. Find each of these and
-look at the value marked **Preview** (not Production):
+Vercel → **Settings** → **Environment Variables**. Look at the label
+under each name. The three database ones say **"Production and Preview"**,
+which means _one value shared by both_ — so when you changed them in step
+11, the practice site was pointed at the real database along with the
+live site.
 
-| Name                            | Should be                                  |
-| ------------------------------- | ------------------------------------------ |
-| `NEXT_PUBLIC_SUPABASE_URL`      | `https://ipstebqawrvhkyntctrv.supabase.co` |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | the **old** project's anon key             |
-| `SUPABASE_SERVICE_ROLE_KEY`     | the **old** project's service_role key     |
+**This is the most important step on the page.** Until it is done, every
+test link reads and writes real work, which is the exact thing this whole
+exercise exists to prevent.
 
-**These are probably already right and need no change.** They pointed at
-the old project before any of this started, and the old project is now
-the practice one — the swap did this step for free. You are confirming,
-not editing.
+For **each** of these three:
 
-> **This is what fixes the original problem.** Every test link I send you
-> reads the practice database, so building something new can never write
-> into real work.
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
 
-If any of them still shows `pajfrgnkapicdgangjey` (the new one) under
-Preview, change it to the old one.
+do two things:
+
+**(a) Make the existing one Production-only.** Click the **…** at the
+right → **Edit**. Untick **Preview**, leaving only **Production** ticked.
+Save. The value stays as it is — the new database. _Don't touch it._
+
+**(b) Add a second entry with the same name, for Preview.** Click **Add
+Another** / **Add New**, and enter:
+
+| Name                            | Value                                      | Environment      |
+| ------------------------------- | ------------------------------------------ | ---------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`      | `https://ipstebqawrvhkyntctrv.supabase.co` | **Preview** only |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | the **old** project's anon key             | **Preview** only |
+| `SUPABASE_SERVICE_ROLE_KEY`     | the **old** project's service_role key     | **Preview** only |
+
+The old project's keys: Supabase → `goodearth-toolbox-staging` → Project
+Settings → API Keys.
+
+Vercel allows the same name twice as long as the environments don't
+overlap. When you are done, each of the three names appears **twice** —
+once saying "Production", once saying "Preview" — the way `SITE_URL` and
+`AUTH_COOKIE_SECRET` already do in your list.
+
+> **Nothing needs redeploying for this.** Production's value hasn't
+> changed. The Preview value gets picked up the next time a branch
+> builds.
 
 **Step 21 — give the practice site its address.**
 
@@ -261,20 +289,22 @@ tick.
 _There is nothing else to configure. The `staging` branch deploys as a
 preview, so it already uses the Preview variables you just checked._
 
-**Step 22 — give the practice site its own cookie key.**
+**Step 22 — the cookie keys.**
 
-Environment Variables again. Look at **`AUTH_COOKIE_SECRET`**: if the
-**Preview** value is the same as the **Production** value, replace the
-Preview one with any long random string.
+`SITE_URL` and `AUTH_COOKIE_SECRET` **already have separate Production
+and Preview entries** — nothing to do. Set `SITE_URL`'s Preview value to
+`https://staging.goodearthkannur.org` if it isn't already, though it no
+longer steers sign-in (BUGCATCHER #7 moved that to the request address).
 
-> **Why it matters:** that key signs the "trust this browser for 30 days"
-> cookie. If both sites sign with the same key, a browser trusted on the
-> practice site is also trusted on the real one — meaning the emailed
-> code could be skipped on production. Only you and the test account can
-> sign in to the practice site, so the exposure is small, but the fix
-> costs nothing.
+The one left over is **`MARATHON_SESSION_SECRET`**, which still says
+"Production and Preview". Split it the same way as step 20: make the
+existing one Production-only, and add a Preview one with any long random
+string.
 
-Do the same for `MARATHON_SESSION_SECRET` if Preview shares Production's.
+> **Why:** it signs the marathon kiosk's PIN cookie. Shared, a kiosk
+> session opened on the practice site is also valid on the real one.
+> Small — the kiosk has no agents on production at all — but it is the
+> same class of mistake as the one above and takes a minute.
 
 **Step 23 — tell the old database its new address.**
 
