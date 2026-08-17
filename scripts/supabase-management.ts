@@ -81,10 +81,7 @@ type QueryRow = Record<string, unknown>;
  * PostgREST reads, and it is worse here: it would report a migration
  * applied that in fact errored.
  */
-export async function sql<T extends QueryRow = QueryRow>(
-  ref: string,
-  query: string,
-): Promise<T[]> {
+export async function sql<T extends QueryRow = QueryRow>(ref: string, query: string): Promise<T[]> {
   // Retries cover the network dropping and the API answering 5xx — both
   // seen repeatedly while migrating two databases. They deliberately do
   // NOT cover a SQL error, which is deterministic: retrying a syntax
@@ -161,20 +158,14 @@ export async function scalar<T>(ref: string, query: string): Promise<T | undefin
   return Object.values(first)[0] as T;
 }
 
-/** Quotes a value for inlining into SQL. Used for building INSERTs from copied rows. */
-export function quote(value: unknown): string {
-  if (value === null || value === undefined) return "null";
-  if (typeof value === "number") return Number.isFinite(value) ? String(value) : "null";
-  if (typeof value === "boolean") return value ? "true" : "false";
-  if (typeof value === "object") {
-    // json / jsonb / arrays come back parsed; send them back as a quoted
-    // literal and let Postgres cast on the way in.
-    return `${literal(JSON.stringify(value))}`;
-  }
-  return literal(String(value));
-}
-
-/** Postgres string literal, doubling single quotes. */
+/**
+ * Postgres string literal, doubling single quotes.
+ *
+ * There is deliberately no general "quote any value" helper here. Row
+ * data is moved with jsonb_populate_recordset (see clone-data.ts), which
+ * lets Postgres do every type conversion — hand-rolled quoting is how a
+ * copy gets one column of one table subtly wrong.
+ */
 export function literal(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
 }

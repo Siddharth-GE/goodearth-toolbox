@@ -137,7 +137,9 @@ async function main() {
   const ledger = await readLedger(ref);
 
   console.log(`Database : ${ref}`);
-  console.log(`Folder   : ${migrations.length} migration file${migrations.length === 1 ? "" : "s"}${only ? ` (--only ${only})` : ""}`);
+  console.log(
+    `Folder   : ${migrations.length} migration file${migrations.length === 1 ? "" : "s"}${only ? ` (--only ${only})` : ""}`,
+  );
   console.log(`Ledger   : ${ledger.size} already recorded`);
   console.log(`Mode     : ${commit ? (recordOnly ? "RECORD ONLY" : "COMMIT") : "dry run"}\n`);
 
