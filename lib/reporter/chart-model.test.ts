@@ -7,12 +7,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { DATASETS } from "@/lib/reporter/datasets";
-import { parseReportSpec } from "@/lib/reporter/spec";
-import { runReport, type ReportRow } from "@/lib/reporter/aggregate";
+import { ACCENT_TOKEN } from "@/lib/charts/palette";
+import type { CartesianModel, MeterModel, SplitModel } from "@/lib/charts/series";
 
-import { ACCENT_TOKEN } from "./palette";
-import { buildChartModel, type CartesianModel, type MeterModel, type SplitModel } from "./series";
+import { runReport, type ReportRow } from "./aggregate";
+import { buildChartModel } from "./chart-model";
+import { DATASETS } from "./datasets";
+import { parseReportSpec } from "./spec";
 
 const dataset = DATASETS.indent_lines;
 
