@@ -137,6 +137,22 @@ Two databases and three places code runs. **Nothing but `master` may ever touch 
 
 Small fixes to live tools may still go straight to `master`. **Commit each working piece and push it; never leave work uncommitted.**
 
+### Two permanent branches, and keeping them level
+
+`master` and `staging` are both **permanent**. Only `feature/…` branches are temporary, and they are deleted once merged. `staging` is never deleted, never force-pushed, never reset — a preview URL, a domain and the team's bookmarks all point at it.
+
+**They must be kept identical whenever nothing is in flight**, and there is exactly one habit that achieves it:
+
+> **Anything that lands on `master`, merge straight back into `staging`.**
+>
+> ```
+> git checkout staging && git merge master --ff-only && git push
+> ```
+
+The drift comes from the escape hatch, not the main road. A small fix taken straight to `master` — which is allowed — leaves `staging` behind, and the next `staging` → `master` merge then carries an older base and starts producing conflicts over code nobody touched. Merging back immediately keeps both branches on the same commit, so every merge in either direction stays a fast-forward.
+
+`git log --oneline origin/staging..origin/master` should print nothing. If it prints something, that is the backlog to merge back before starting anything new.
+
 ### The rules that make it hold
 
 - **`--project` is required everywhere and never defaults.** Not to production, not to `.env.local`. Twenty characters of typing against the obvious disaster.
