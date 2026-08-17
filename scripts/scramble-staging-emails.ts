@@ -92,9 +92,10 @@ async function main() {
       .map((entry) => entry.trim().toLowerCase())
       .filter(Boolean);
     const source = requireProjectRef(argv, "--from");
+    const everyone = wanted.length === 1 && wanted[0] === "all";
 
     if (wanted.length === 0) {
-      console.log("--restore needs at least one address. Nothing done.");
+      console.log("--restore needs at least one address, or the word 'all'. Nothing done.");
       return;
     }
 
@@ -104,17 +105,20 @@ async function main() {
     // be guessing at a domain.
     const real = await sql<{ id: string; email: string }>(
       source,
-      `select id, email from auth.users
-       where lower(email) in (${wanted.map(literal).join(", ")})`,
+      everyone
+        ? `select id, email from auth.users where email is not null`
+        : `select id, email from auth.users
+           where lower(email) in (${wanted.map(literal).join(", ")})`,
     );
 
-    const missing = wanted.filter(
-      (address) => !real.some((row) => row.email.toLowerCase() === address),
-    );
+    const missing = everyone
+      ? []
+      : wanted.filter((address) => !real.some((row) => row.email.toLowerCase() === address));
     for (const address of missing) console.log(`  ! no account on ${source} for ${address}`);
 
     console.log(`\n  restoring ${real.length} address(es) on ${ref}:`);
-    for (const row of real) console.log(`    ${row.email}`);
+    for (const row of real.slice(0, 8)) console.log(`    ${row.email}`);
+    if (real.length > 8) console.log(`    … and ${real.length - 8} more`);
 
     if (!commit) {
       console.log("\nDry run. Nothing was written. Re-run with --commit to restore.");

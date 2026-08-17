@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { PracticeBanner } from "@/components/ui/practice-banner";
 import { THEME_COOKIE } from "@/lib/theme";
 import "./globals.css";
 
@@ -67,6 +68,11 @@ export default function RootLayout({
     >
       <body className="flex min-h-full flex-col" suppressHydrationWarning>
         <script dangerouslySetInnerHTML={{ __html: APPLY_SAVED_THEME }} />
+        {/* In the root layout so it covers the sign-in pages and the
+            marathon kiosk too, not just the dashboard — you should know
+            which site you are on before you type a password into it.
+            Renders nothing on production. */}
+        <PracticeBanner />
         {children}
         {/* Real-user page-load timings, reported to Vercel. Sits in the root
             layout so it covers the kiosk routes (app/marathon) too, not just
