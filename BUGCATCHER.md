@@ -133,6 +133,20 @@ _Found 2026-08-14, building Relay's villa waves — caught before merge, by look
 
 ---
 
+### 9. Throwing loudly on a failed read has no retry behind it
+
+_Found 2026-08-17, tracing error screens the founder hit across the Operations tools the evening before._
+
+**What happened.** For one evening, Selections, Budgets and Indents threw repeated "Something went wrong" screens — worst when submitting, gone by morning, never reproduced. Nothing in the code had changed for three days. The reads in this app were deliberately made to **throw** rather than hand back half an answer (`fetchAll`, and the four indent drift reads in `AUDIT.md` QUAL-04) — the right call, and it had already prevented real data loss. But **nothing anywhere in the codebase retried anything.** So a single dropped connection, one cold start, one moment of back-pressure, went straight to a blank page with a "Try again" button that reran the whole render.
+
+**Why nothing caught it.** There was no defect to catch. Every gate was green because every line was correct; the failure only exists when the network misbehaves, which no test, type or build reproduces. It is also invisible after the fact: Supabase keeps about an hour of edge logs and Vercel's age out, so by the time anyone looks the evidence is gone. Diagnosing it needed a live forensic dig through production, and even that only surfaced one confirmed failure — a refused `DELETE` — because the app recorded nothing about its own errors.
+
+**The rule.** "Throw rather than show a wrong answer" and "give up on the first failure" are two different decisions, and only the first one was ever argued for. A read that must be complete should still **retry a connection-level failure** before it throws — and must **never** retry a refusal, a constraint or a bad filter, which fail identically every time and only get slower. `isTransient` (`lib/supabase/transient.ts`) is where that line is drawn; it is pure and unit-tested precisely so the list can be argued with.
+
+**The check.** Two, and they are cheap. Ask of any new failure path: _would this survive one dropped packet, and if it doesn't, what will the user see?_ And when a production error is reported, look for the record first — `app_errors` (0066) keeps the digest, the path and the route, which is the same "Reference:" code printed on the error screen. If a class of failure leaves no durable trace, that is the first bug to fix, before the one being reported.
+
+---
+
 ## Adding to this file
 
 When something breaks that a green build said was fine, it belongs here — not in `STATUS.md`, which is what exists, and not only in `AUDIT.md`, which is findings open at a point in time.

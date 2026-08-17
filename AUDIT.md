@@ -552,6 +552,14 @@ rather than forgotten.
 - ~35 further call sites destructure `{ data }` without checking `error`.
   The six that mattered are now fixed; the rest are display-only lookups
   (an editor's name, a label) where an empty result is genuinely harmless.
+- **2026-08-17:** five more found and fixed in the Indents pull path,
+  where the swallowed error did not merely hide a label but stated
+  something untrue. `addBudgetPullLines` reported "that budget belongs to
+  a superseded design revision" for any failed read of `selections`;
+  `getBudgetPull` (the budget, spaces and selection reads),
+  `getConstructionPull` and `getIndentHeader` each turned a failed read
+  into `notFound()` — a "page not found" for a plan that exists. All now
+  throw, matching the four drift reads beside them.
 
 ### QUAL-05 · PASS · The access model is already what you decided
 

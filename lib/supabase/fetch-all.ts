@@ -1,5 +1,7 @@
 import "server-only";
 
+import { withRetry } from "./transient";
+
 /**
  * Reads a query to completion, page by page.
  *
@@ -16,7 +18,10 @@ import "server-only";
  * something with a unique tiebreaker (`.order("id")` at minimum) —
  * without a total order, rows can repeat or vanish between pages.
  *
- * THROWS if a page fails, and hands back the rows directly.
+ * THROWS if a page fails, and hands back the rows directly. A page that
+ * fails for a connection-level reason is retried first (withRetry, in
+ * transient.ts) — the throw is for a database that really won't answer,
+ * not for one dropped socket. A refusal or a constraint is not retried.
  *
  * It used to return `{ data, error }` with whatever had been read so
  * far. Of roughly seventy call sites, four checked the error; the rest
@@ -38,7 +43,7 @@ export async function fetchAll<Row>(
   const rows: Row[] = [];
 
   for (let from = 0; ; from += PAGE_SIZE) {
-    const { data, error } = await page(from, from + PAGE_SIZE - 1);
+    const { data, error } = await withRetry(() => page(from, from + PAGE_SIZE - 1));
     if (error) {
       console.error("fetchAll page failed:", error);
       throw new Error(`A read that must be complete failed: ${error.message}`, { cause: error });

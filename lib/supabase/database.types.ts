@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_errors: {
+        Row: {
+          actor: string | null
+          at: string
+          digest: string | null
+          id: number
+          message: string | null
+          path: string | null
+        }
+        Insert: {
+          actor?: string | null
+          at?: string
+          digest?: string | null
+          id?: never
+          message?: string | null
+          path?: string | null
+        }
+        Update: {
+          actor?: string | null
+          at?: string
+          digest?: string | null
+          id?: never
+          message?: string | null
+          path?: string | null
+        }
+        Relationships: []
+      }
       audit_log: {
         Row: {
           action: string
@@ -5460,6 +5487,7 @@ export type Database = {
             Returns: string
           }
       profile_is_active: { Args: { uid: string }; Returns: boolean }
+      pusher_current_stage: { Args: { p_project_id: string }; Returns: string }
       reopen_budget: { Args: { p_budget_id: string }; Returns: undefined }
       replace_future_legs: {
         Args: { p_chain_id: string; p_legs: Json }
