@@ -41,6 +41,24 @@ export type Database = {
         }
         Relationships: []
       }
+      applied_migrations: {
+        Row: {
+          applied_at: string
+          checksum: string
+          filename: string
+        }
+        Insert: {
+          applied_at?: string
+          checksum: string
+          filename: string
+        }
+        Update: {
+          applied_at?: string
+          checksum?: string
+          filename?: string
+        }
+        Relationships: []
+      }
       audit_log: {
         Row: {
           action: string
