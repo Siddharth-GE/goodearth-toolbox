@@ -1,5 +1,5 @@
 import { hasApp } from "@/lib/auth/access";
-import { CATALOGUE_PAGE_SIZE } from "@/lib/masters/catalogue";
+import { CATALOGUE_PAGE_SIZE, catalogueSearchFilter } from "@/lib/masters/catalogue";
 import { getCurrentUser } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
 
@@ -45,7 +45,11 @@ export async function GET(request: Request) {
   if (!allowed) return new Response("Forbidden", { status: 403 });
 
   const { searchParams } = new URL(request.url);
-  const search = (searchParams.get("q") ?? "").replace(/[,()]/g, " ").trim();
+  // Passed through whole. The term used to have `,` `(` `)` stripped out
+  // of it, because it was spliced unquoted into PostgREST's `or` filter
+  // below; catalogueSearchFilter quotes it instead, so the search now
+  // means what was typed. See lib/masters/catalogue.ts.
+  const search = (searchParams.get("q") ?? "").trim();
   const categoryId = searchParams.get("category") ?? "";
   const brandId = searchParams.get("brand") ?? "";
   const placement = searchParams.get("placement") ?? "";
@@ -86,11 +90,7 @@ export async function GET(request: Request) {
   if (categoryId) query = query.eq("category_id", categoryId);
   if (brandId) query = query.eq("brand_id", brandId);
   if (placement) query = query.eq("placement", placement);
-  if (search) {
-    const clauses = [`name.ilike.%${search}%`, `code.ilike.%${search}%`];
-    if (brandMatchIds.length > 0) clauses.push(`brand_id.in.(${brandMatchIds.join(",")})`);
-    query = query.or(clauses.join(","));
-  }
+  if (search) query = query.or(catalogueSearchFilter(search, brandMatchIds));
 
   const { data, count, error } = await query;
   if (error) {

@@ -69,6 +69,30 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
+      # The fourteen views in `public` are owned by postgres, so they
+      # BYPASS row-level security: each one's WHERE clause, column list and
+      # grants are its entire permission boundary, with no policy behind it
+      # to refuse a careless change. Before this step the only guard was a
+      # comment saying "NEVER add a money column".
+      #
+      # It pins all five things that go wrong in silence: a column added to
+      # a money-free fact view, a has_app check lost from a WHERE clause,
+      # security_invoker lost from the one view carrying margins, write
+      # privileges handed back by `drop view`, and a new view that nobody
+      # pinned. See scripts/view-manifest.ts, which says why each view is
+      # the shape it is.
+      - name: The views are still the shape they claim (PRs into master)
+        if: github.base_ref == 'master'
+        run: npm run db:check-views -- --project pajfrgnkapicdgangjey
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: The views are still the shape they claim (PRs into staging)
+        if: github.base_ref == 'staging'
+        run: npm run db:check-views -- --project ipstebqawrvhkyntctrv
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
       - name: Formatting
         run: npm run format:check
 

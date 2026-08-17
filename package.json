@@ -16,6 +16,7 @@
     "db:types:staging": "supabase gen types typescript --project-id ipstebqawrvhkyntctrv --schema public > lib/supabase/database.types.ts",
     "db:apply": "tsx scripts/apply-migrations.ts",
     "db:check": "tsx scripts/check-migrations.ts",
+    "db:check-views": "tsx scripts/check-view-columns.ts",
     "db:compare": "tsx scripts/compare-schema.ts"
   },
   "dependencies": {
