@@ -85,14 +85,45 @@ export async function sql<T extends QueryRow = QueryRow>(
   ref: string,
   query: string,
 ): Promise<T[]> {
-  const response = await fetch(`${API}/v1/projects/${ref}/database/query`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${managementToken()}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ query }),
-  });
+  // Retries cover the network dropping and the API answering 5xx — both
+  // seen repeatedly while migrating two databases. They deliberately do
+  // NOT cover a SQL error, which is deterministic: retrying a syntax
+  // error just prints it four times.
+  //
+  // Retrying a write is safe here because every caller sends either a
+  // transaction (all of it happened or none of it did) or an idempotent
+  // statement. A half-applied file cannot be silently retried into a
+  // worse state.
+  let response: Response | undefined;
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 500 * 2 ** attempt));
+    try {
+      response = await fetch(`${API}/v1/projects/${ref}/database/query`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${managementToken()}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ query }),
+      });
+    } catch (error) {
+      lastError = error;
+      continue;
+    }
+    if (response.status < 500) break;
+    lastError = new Error(`HTTP ${response.status}`);
+    response = undefined;
+  }
+
+  if (!response) {
+    throw new Error(
+      `${ref}: could not reach the management API after 4 attempts — ${
+        lastError instanceof Error ? lastError.message : String(lastError)
+      }`,
+    );
+  }
 
   const text = await response.text();
   let body: unknown;
