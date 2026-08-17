@@ -17,10 +17,11 @@ Created 2026-08-17 by the reverse of the obvious move: the database the toolbox 
 
 Three things carried across as masters and turned out to be practice — the **business plans** ("Kaadal", "Phase 3") and the single **funding facility** (party "fed", terms "d", ₹10,00,000). All removed the same day and dropped from the clone list. The distinction that was missed, worth applying to anything similar: a plan or a loan is something someone _builds in_ the tool, not a fact about the company that exists whether or not the toolbox does. Those belong with the transactions.
 
-**Not live yet.** The new database is built, filled and verified, but `toolbox.goodearthkannur.org` still reads the old one until the Vercel variables are switched. The remaining steps all need a browser and are listed in order in **`CUTOVER.md`**.
+**Live since 2026-08-17.** Cut over, checked in the browser, and both sides verified: `npm run db:compare` reports no differences across 4,304 schema objects **and** all 237 auth settings.
 
 - **The tooling is in `scripts/`**, all dry-run by default and all requiring `--project`/`--from`/`--to` explicitly: `apply-migrations.ts`, `compare-schema.ts`, `clone-data.ts`, `copy-storage.ts`, `scramble-staging-emails.ts`.
-- **Staging's staff emails get rewritten to `@staging.invalid`** (`CUTOVER.md` §5d, _after_ the cutover is proven — until then the old database is still the fallback, and a database nobody can sign in to is not one). Afterwards staging can never email a real colleague a sign-in code, and you can no longer sign in as a specific colleague there to reproduce their problem. That was the accepted trade.
+- **Staging's staff emails are `@staging.invalid`** — 47 of the 49 rewritten, so staging cannot email a real colleague a sign-in code. Only `siddharth@goodearthkannur.org` and the `+probe` account can sign in there. **So you cannot sign in as a specific colleague on staging to reproduce their problem** — use the probe account and a grant. Kavin's and Saurav's staging logins went with the rest; one command restores any of them.
+- **Vercel holds the three Supabase variables twice** — a Production entry (new database) and a Preview entry (staging). They were a single "Production and Preview" entry until cutover day, which meant switching production also switched every preview. If a preview ever shows real data again, that is the first thing to check.
 - **Backups: none at all.** Free tier, by decision on 2026-08-17. `TODO.md` §0.
 
 ## Platform

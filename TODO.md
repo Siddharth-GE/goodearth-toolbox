@@ -13,9 +13,15 @@ Two ways out, either is fine:
 
 This sits above everything else on this page because everything else is recoverable and this is the thing that makes that true.
 
-## 0b. Finish the cutover — see `CUTOVER.md`
+## 0b. The cutover is done — what it left behind
 
-The databases were split on 2026-08-17 and the fresh production database is built, filled and verified. **It is not live yet.** Four things need the founder, and they are in order in `CUTOVER.md`: the Resend key and Google secret on the new project, the Vercel variables, the staging URL, and the checks afterwards. Until those are done, `toolbox.goodearthkannur.org` still reads the old database.
+Cut over on 2026-08-17, checked in the browser, staging wired up and its emails scrambled. `CUTOVER.md` is kept as the record of how it was done, not as an outstanding task. What remains from its Part 6:
+
+- **Delete `data/staff-passwords-2026-08-14.csv`** — 45 plaintext starting passwords on the founder's machine. Every account signed in on the new database with its existing password, so the file's purpose is served. **Oldest open item on this page.**
+- **Delete `vercel-env-values.txt`** if it still exists.
+- **Enter one real vendor and one real store** in Masters. Neither was carried across, and Purchase Orders and Inventory each need one before first use.
+- **Document counters** — only where a real series already runs on paper. `po_counters`, `bill_counters`, `indent_counters`, `grn_counters`, `iss_counters` are `(project_id, scope, last_no)` rows. Tell the assistant the last number used and it is one update each. **Before the first real document, not after.**
+- **Deployment Protection** back on in Vercel if it is still off.
 
 ## 1. Done — the live hole is closed
 
