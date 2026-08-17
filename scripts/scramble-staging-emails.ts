@@ -7,6 +7,12 @@
  *
  *   npx tsx scripts/scramble-staging-emails.ts --project <ref> --keep a@b --commit
  *
+ *   npx tsx scripts/scramble-staging-emails.ts --project <ref> \
+ *       --restore a@b,c@d --from <production-ref> [--commit]
+ *       # puts real addresses BACK for named people, so they can sign in
+ *       # to staging and test. Reads each real address from production by
+ *       # account id rather than guessing at spellings.
+ *
  * WHY THIS EXISTS. When the databases swapped roles on 17 Aug 2026, the
  * old one kept a full copy of everything, including 49 real accounts with
  * 49 real company email addresses — and a working Resend SMTP
@@ -54,7 +60,7 @@ async function main() {
       .filter(Boolean),
   );
 
-  if (keep.size === 0) {
+  if (keep.size === 0 && !argv.includes("--restore")) {
     console.log(
       "--keep is required, and needs at least one address.\n" +
         "A staging database nobody at all can sign in to is not useful — keep your own\n" +
@@ -75,6 +81,72 @@ async function main() {
         "script ever being aimed at production.",
     );
     process.exitCode = 1;
+    return;
+  }
+
+  // ---- putting addresses back -----------------------------------------
+  const restoreAt = argv.indexOf("--restore");
+  if (restoreAt !== -1) {
+    const wanted = (argv[restoreAt + 1] ?? "")
+      .split(",")
+      .map((entry) => entry.trim().toLowerCase())
+      .filter(Boolean);
+    const source = requireProjectRef(argv, "--from");
+
+    if (wanted.length === 0) {
+      console.log("--restore needs at least one address. Nothing done.");
+      return;
+    }
+
+    // The real addresses come from production, matched on account id —
+    // the ids are identical on both databases because the copy preserved
+    // them. Reconstructing an address from the scrambled local part would
+    // be guessing at a domain.
+    const real = await sql<{ id: string; email: string }>(
+      source,
+      `select id, email from auth.users
+       where lower(email) in (${wanted.map(literal).join(", ")})`,
+    );
+
+    const missing = wanted.filter(
+      (address) => !real.some((row) => row.email.toLowerCase() === address),
+    );
+    for (const address of missing) console.log(`  ! no account on ${source} for ${address}`);
+
+    console.log(`\n  restoring ${real.length} address(es) on ${ref}:`);
+    for (const row of real) console.log(`    ${row.email}`);
+
+    if (!commit) {
+      console.log("\nDry run. Nothing was written. Re-run with --commit to restore.");
+      return;
+    }
+
+    for (const row of real) {
+      await sql(
+        ref,
+        `update auth.users
+           set email = ${literal(row.email)},
+               raw_user_meta_data = case
+                 when raw_user_meta_data ? 'email'
+                 then jsonb_set(raw_user_meta_data, '{email}', ${literal(`"${row.email}"`)}::jsonb)
+                 else raw_user_meta_data end
+         where id = ${literal(row.id)};
+
+         update auth.identities
+           set identity_data = case
+                 when identity_data ? 'email'
+                 then jsonb_set(identity_data, '{email}', ${literal(`"${row.email}"`)}::jsonb)
+                 else identity_data end
+         where user_id = ${literal(row.id)};`,
+      );
+    }
+
+    const live = await sql<{ n: string }>(
+      ref,
+      `select count(*)::text as n from auth.users
+       where email is not null and email not like ${literal(`%@${DOMAIN}`)}`,
+    );
+    console.log(`\nDone. ${live[0]?.n ?? 0} addresses on ${ref} can now receive email.`);
     return;
   }
 
