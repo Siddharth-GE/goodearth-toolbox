@@ -2,6 +2,21 @@
 
 Read `STATUS.md` first. Anything finished moves to `STATUS.md`, not struck through here. Audit findings are in `AUDIT.md` with full reasoning.
 
+## 0. Backups — the biggest open risk, and it is now bigger
+
+**Production is a free-tier Supabase project, which has no backups of any kind.** Not daily, not point-in-time, none. Chosen deliberately on 2026-08-17 ("free for now, decide later"), which is a fair call to make — but from the day staff enter real indents and bills, a bad delete or a bad migration has **no undo**.
+
+Two ways out, either is fine:
+
+1. **Supabase Pro** (~$25/month) — daily backups and point-in-time recovery, nothing to build or remember.
+2. **A nightly export script** — cheaper, more moving parts, and only as good as the last time it ran.
+
+This sits above everything else on this page because everything else is recoverable and this is the thing that makes that true.
+
+## 0b. Finish the cutover — see `CUTOVER.md`
+
+The databases were split on 2026-08-17 and the fresh production database is built, filled and verified. **It is not live yet.** Four things need the founder, and they are in order in `CUTOVER.md`: the Resend key and Google secret on the new project, the Vercel variables, the staging URL, and the checks afterwards. Until those are done, `toolbox.goodearthkannur.org` still reads the old database.
+
 ## 1. Done — the live hole is closed
 
 **`AUDIT.md` SEC-01 is fixed.** `0059_views_are_read_only.sql` was applied on 2026-08-14 and verified independently: zero INSERT/UPDATE/DELETE/TRUNCATE privileges remain on any of the fourteen views, for `anon` or `authenticated`.
@@ -25,14 +40,17 @@ Merged 2026-08-14 (PR #21, `0064` + `0065` applied). Villa waves on Projects, a 
 1. **Press "With client" on a real trail**, then push it — the amber label should appear and then clear on its own. This is the one real write the release added, and CLAUDE.md's rule is to press one after any deploy touching server actions.
 2. **Open a trail whose stage the auto-filing guessed wrong** and move it with the Stage picker on the trail's own page. If it guesses wrong often, the fallback (the stage the plan says today is in) is the thing to revisit — possibly by giving each activity a home stage in Masters.
 
-## 4. Today — two Marathon agents may still be on the published PIN
+## 4. Marathon PINs — now confirmed, and confined to staging
 
-The admin PIN was rotated and verified on 2026-08-11. What the same check turned up and nobody has closed:
+**Re-checked properly on 2026-08-17** by recomputing scrypt against each agent's own salt, which is what the previous two audits could not do. No longer speculation:
 
-1. **Ravi and yema were on PIN `1234`** — the seeded test PIN, in plaintext in a **public** repo. `/marathon/admin` → Members → **Reset PIN** on both.
-2. **"Test Agent" is still on the list.** Its PIN has been reset, but the migration's own instruction was to delete the row once real agents existed.
+1. **Ravi and yema are on PIN `1234`.** Confirmed. `/marathon/admin` → Members → **Reset PIN** on both.
+2. **"Test Agent" on staging has had its PIN rotated** — it is not on the published value. Deleting the row is still tidy but is no longer a security item.
+3. The Marathon **admin** PIN is fine on both databases.
 
-**Not re-verified in the 2026-08-14 audit** — the PIN-hash check was blocked by the environment, so there is no fresh evidence either way. Two minutes in the running app settles it. Rewriting the migration would fix nothing: the PIN is in public git history permanently, so rotation is the only remedy.
+**What changed the urgency:** none of these agents exist on the new production database — no Marathon rows were carried across — and staging sits behind Vercel's login wall. So this is now a staging-hygiene item, not a live hole. It becomes live again the moment Marathon is used for a real event and these agents are recreated.
+
+`0070` removes any agent still on the published hash, and caught one: replaying the migrations onto the fresh database **recreated** `0002`'s Test Agent, PIN and all. The general lesson is in `CLAUDE.md` — a seed is a fixture in development and a credential in production.
 
 ## 4. The rest of the audit's security findings
 
@@ -98,8 +116,7 @@ Every tool below is built and gated; until someone is granted it, only admins se
 ## 10. Not yet planned
 
 - **Phase 9** — Overview fully real, plus one real project run end to end.
-- **Backups.** Supabase managed backups only, with no independent export.
-- **Staging environment.** Preview URLs cover most of it today.
 - **Downtime mode.**
+- **Opening state, per tool, as each one goes live** (established 2026-08-17 by reading the schema, not built). Already possible with no code: client dues (`client_receipts` exists, milestones carry `invoice_no`/`invoiced_on`), bills received before go-live (`bills.po_id` is nullable), POs already open (entered as indent → PO, since `indent_lines.budget_id` is nullable), and funding drawdown history. **The one real gap is opening stock** — `goods_receipt_lines.po_line_id` is `NOT NULL`, so there is no way to record that 40 bags of cement are already in the store without inventing a PO. A migration making it nullable for an opening-balance receipt plus a small entry screen, ~half a day, **due the week Inventory goes live**. Indents needs none of this, which is why it goes first.
 - **A dashboard composer** — several charts on one page; the true multi-dataset project scorecard waits on it.
 - **Business Planning follow-ups**: a one-page PDF of a plan, itemised charge and running-cost lines on a HOLD line, a cash curve. Also carry the peak-funding finding into how plans are discussed — the workbook's "peak funding ₹5.91 Cr" is headroom at the worst month, not money to raise.

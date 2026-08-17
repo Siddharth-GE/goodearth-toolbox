@@ -147,6 +147,20 @@ _Found 2026-08-17, tracing error screens the founder hit across the Operations t
 
 ---
 
+### 10. Copying a project's settings does not copy the settings that are content
+
+_Found 2026-08-17, minutes after production was switched to the fresh database — by the founder trying to sign in._
+
+**What happened.** The 2FA email arrived as a **magic sign-in link** instead of the 6-digit code. The whole second factor had quietly turned into "click this link", which is a different, weaker thing — anyone with the inbox is in, no password needed. The cause: Supabase decides which of the two to send by **looking at the email template**. If the magic-link template contains `{{ .Token }}` it sends a code; if it doesn't, it sends a link. Building the new project copied its auth _configuration_ — allow-list, expiry, sign-ups off, all fifteen fields — but the templates are also config, and they were left at Supabase's defaults. The default template has a link in it. `mailer_otp_length` was also still at the default **8**, so even with the right template the code would not have fitted the six-box sign-in screen.
+
+**Why nothing caught it.** Nothing was wrong with the code, and nothing was wrong with the database. The schema comparison — 4,304 objects, columns, policies, grants, functions, triggers, storage — was an empty diff, because none of this lives in the database. It is project settings held by the platform, and the only two that were checked by eye were the ones with obvious names (`site_url`, `disable_signup`). The setting that decided whether two-factor authentication still existed was a **paragraph of HTML** three screens down a settings page.
+
+**The rule.** When a platform holds configuration outside your database, **diff it the same way you diff the schema** — field by field, both projects, no eyeballing. And treat template text as configuration with behaviour, not decoration: here, one `{{ .Token }}` was the difference between a second factor and a magic link.
+
+**The check.** `GET /v1/projects/{ref}/config/auth` on both projects and compare **every key**, not the ones you thought of. Then the behavioural one, which takes thirty seconds and is the only real proof: **request a code and read the email**. It must contain digits, and the right number of them. A sign-in flow that "sent an email" is not a sign-in flow that works.
+
+---
+
 ## Adding to this file
 
 When something breaks that a green build said was fine, it belongs here — not in `STATUS.md`, which is what exists, and not only in `AUDIT.md`, which is findings open at a point in time.
