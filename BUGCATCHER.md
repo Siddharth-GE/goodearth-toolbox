@@ -10,18 +10,19 @@ Read this before merging anything that touches a database read, a file upload, a
 
 ## Before you merge
 
-Eight checks, each earned by a bug below.
+Nine checks, each earned by a bug below.
 
-| Check                                                                         | Because                                                                                                                          |
-| ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| **Open the page in a browser.** Not the build output — the page.              | A bad PostgREST `select` compiles, type-checks and builds, then answers HTTP 300 at runtime. Four dead screens shipped this way. |
-| **Sign in as a real single-grant user**, not as yourself.                     | An admin passes every permission check in the app and will never once see a grant bug.                                           |
-| **Press the button that writes.** Upload the file, save the form.             | Binary uploads were silently corrupting for as long as the feature existed. Nothing errored.                                     |
-| **Look at what landed**, not at what the code sent.                           | Storage reported `image/jpeg` for a file that was not an image. The row wrote fine.                                              |
-| **`gh run list`** — a successful push is not a green build.                   | CI stops at the first failure. A trivial formatting error silently skips every check that matters after it.                      |
-| **Look at the page in dark mode.**                                            | An entire class of browser-drawn furniture ignored the palette for months.                                                       |
-| **After a smoke test, read the traces.** The database says what actually ran. | A Google sign-in "worked" that never minted a session, and two tests reported done had left zero rows. Eyes lie; rows don't.     |
-| **Render any new drawing from real data and look at it.**                     | A wave with 22 passing tests still overlapped its own labels, and was designed for 7 villas where production has 43.             |
+| Check                                                                         | Because                                                                                                                                                   |
+| ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Open the page in a browser.** Not the build output — the page.              | A bad PostgREST `select` compiles, type-checks and builds, then answers HTTP 300 at runtime. Four dead screens shipped this way.                          |
+| **Sign in as a real single-grant user**, not as yourself.                     | An admin passes every permission check in the app and will never once see a grant bug.                                                                    |
+| **Press the button that writes.** Upload the file, save the form.             | Binary uploads were silently corrupting for as long as the feature existed. Nothing errored.                                                              |
+| **Look at what landed**, not at what the code sent.                           | Storage reported `image/jpeg` for a file that was not an image. The row wrote fine.                                                                       |
+| **`gh run list`** — a successful push is not a green build.                   | CI stops at the first failure. A trivial formatting error silently skips every check that matters after it.                                               |
+| **Look at the page in dark mode.**                                            | An entire class of browser-drawn furniture ignored the palette for months.                                                                                |
+| **After a smoke test, read the traces.** The database says what actually ran. | A Google sign-in "worked" that never minted a session, and two tests reported done had left zero rows. Eyes lie; rows don't.                              |
+| **Render any new drawing from real data and look at it.**                     | A wave with 22 passing tests still overlapped its own labels, and was designed for 7 villas where production has 43.                                      |
+| **Fire the trigger, in a transaction you roll back.**                         | A permission check added to a definer function would have blocked the trigger it exists for — and the migration's own assertions would still have passed. |
 
 ---
 
@@ -158,6 +159,22 @@ _Found 2026-08-17, minutes after production was switched to the fresh database �
 **The rule.** When a platform holds configuration outside your database, **diff it the same way you diff the schema** — field by field, both projects, no eyeballing. And treat template text as configuration with behaviour, not decoration: here, one `{{ .Token }}` was the difference between a second factor and a magic link.
 
 **The check.** `GET /v1/projects/{ref}/config/auth` on both projects and compare **every key**, not the ones you thought of. Then the behavioural one, which takes thirty seconds and is the only real proof: **request a code and read the email**. It must contain digits, and the right number of them. A sign-in flow that "sent an email" is not a sign-in flow that works.
+
+---
+
+### 11. `security definer` changes the role, not `auth.uid()`
+
+_Caught 2026-08-17 while writing `0071`, before it was applied — the audit's own suggested fix would have broken adding a plot for everyone in Masters._
+
+**What nearly happened.** `create_client_engagement` is `SECURITY DEFINER` with no permission check, so any signed-in person could write Client Relations records against any plot (AUDIT.md SEC-02). The obvious fix, and the one the audit wrote down, is `if not has_app('/client-relations') then raise`. That would have closed the hole **and stopped Masters from being able to create a unit at all** — because the function's real caller is the `units_seed_engagement` trigger, which fires for a person holding `/masters`.
+
+**Why the reasoning was wrong.** `SECURITY DEFINER` changes the Postgres **role** the body runs as. It does **not** change `auth.uid()`, which comes from the request's JWT and stays the signed-in person however deep the nesting goes. `has_app()` is built on `auth.uid()`. So "the trigger path runs as the definer, so the check passes" is false: the check is evaluated against whoever made the request, in every path. That is the exact invisible failure `0050` made the function `SECURITY DEFINER` to avoid, reintroduced by the fix for a different problem.
+
+**Why nothing would have caught it.** No test here touches a database, `next build` compiles SQL not at all, and the migration's own assertions would have passed — the function body would have contained precisely what it was asked to contain. It would have failed the first time somebody added a plot, days later, in production, and looked like a Masters bug.
+
+**The rule.** A permission check inside a definer function reached from a **cross-tool trigger** must say which caller it means. `pg_trigger_depth() = 0` distinguishes a direct REST call from a trigger, so a grant-holder and the trigger both pass and nobody else does. And when the function has no legitimate direct caller at all, revoke `execute` from `anon` and `authenticated` — the grant is then the boundary, which is stronger than any body check.
+
+**The check.** Run the trigger, in a transaction you roll back. Insert the row that fires it against the staging database and count what the trigger was supposed to create; end the block with a deliberate `raise` so the counts come back and nothing persists. Reading the function body proves nothing about who can reach it.
 
 ---
 

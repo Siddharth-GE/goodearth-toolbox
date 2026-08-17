@@ -2,92 +2,15 @@
 
 The standing record of what is **still wrong**. When you ask for "an audit", this is the document read first and rewritten at the end (CLAUDE.md says so).
 
-_Findings from the full audit of 14 August 2026 — a re-read of the codebase, the migrations, the live database and the deployment against the founding rule that each tool is an independent instrument. Trimmed on 17 August to the thirteen still open; the resolved ones are listed at the foot with one line each, because code comments cite them by name. Their full reasoning is in git._
+_Findings from the full audit of 14 August 2026 — a re-read of the codebase, the migrations, the live database and the deployment against the founding rule that each tool is an independent instrument. Trimmed on 17 August to the thirteen still open, then to the eight below when SEC-02/03/04 and MOD-01/02 were fixed the same day. The resolved ones are listed at the foot with one line each, because code comments cite them by name. Their full reasoning is in git._
 
-**Nothing here is a regression.** The architecture has held through every audit: every server action and route handler gates first, every table has row-level security, no screen touches the database from the browser, the line chain is anchored on real foreign keys, and the money boundary widened by hand in `0055`–`0058` is intact.
+**Nothing here is a regression.** The architecture has held through every audit: every server action and route handler gates first, every table has row-level security, no screen touches the database from the browser, the line chain is anchored on real foreign keys, and the money boundary widened by hand in `0055`–`0058` is intact. **As of 17 August no tool imports another tool's code, and no shared module imports a tool's** — the two long-standing violations are gone.
 
-**The one to fix first is SEC-02** — a `SECURITY DEFINER` function any signed-in person can call to write CRM records for any plot. One `if` in the function body. It has been open since 14 August and now sits on a database holding real client money.
-
----
-
-## 1. Modularity & independence
-
-### MOD-01 · HIGH · Budgets imports Selections' code
-
-`lib/budgets/quote.ts:3`
-
-```ts
-import { downloadSpaceView, listSpaceViews } from "@/lib/selections/views";
-```
-
-Used at `quote.ts:71` and `:91` to put the client-facing space photos on the quote PDF. Carried unchanged since the 11 August audit. Two consequences:
-
-- Delete or break Selections and the Budgets quote PDF stops compiling.
-- `getQuote()` only ever checks `/budgets`, and `lib/selections/views.ts` has no gate of its own — so someone holding `/budgets` and not `/selections` runs Selections' storage-download code. Nothing they shouldn't see (the photos belong on the quote), but the boundary is crossed by import rather than by a shared surface.
-
-### MOD-02 · HIGH · Shared charting depends on Reporter
-
-`lib/charts/series.ts:20-21`
-
-```ts
-import type { GroupRow, ReportResult } from "@/lib/reporter/aggregate";
-import { measureId, type ReportSpec } from "@/lib/reporter/spec";
-```
-
-`measureId` is a **value** import, not a type, used at `series.ts:181` and `:215`.
-
-CLAUDE.md lists `lib/charts/` among the shared utilities — the third thread. But the dependency points the wrong way: shared code imports a tool, and everything downstream inherits it.
-
-```
-lib/reporter/spec.ts, aggregate.ts
-        ↑
-lib/charts/series.ts        (shared)
-        ↑
-components/ui/chart/*       (shared UI — 5 components)
-        ↑
-Financial Management's Cash, Forward and Facility pages
-```
-
-So **delete `lib/reporter/` and Financial Management stops compiling**, along with every chart wrapper in the design system. Worse than MOD-01 because it runs through shared UI rather than between two tools.
-
-Easy to undo: `buildChartModel` — the only function in `series.ts` touching Reporter's types — has exactly one real caller, `lib/reporter/chart-model.ts:1`. Move it into `lib/reporter/` and `series.ts` is left holding the chart model types, which is what the shared UI actually consumes. ~40 lines plus relocating `series.test.ts`.
+**The one to fix first is now PERF-01**, and it is not a code change: cold starts are the whole of the toolbox's slowness, and Fluid compute / keep-warm is a Vercel setting nobody has turned on across three audits. Everything still open below is either deliberate, preventative, or waiting on a decision.
 
 ---
 
-## 2. Security
-
-### SEC-02 · HIGH · A security-definer function with no permission check
-
-`create_client_engagement(p_unit_id uuid, p_owner_id uuid)` is `SECURITY DEFINER`, `EXECUTE` is granted to `authenticated`, and its body checks nothing. Declared in `0050`.
-
-CLAUDE.md states the rule flatly: every `security definer` function checks `has_app(...)` in its own body — that check is its entire permission boundary. Its two siblings, `crm_assign_unit` and `crm_release_unit`, do exactly that. This one does not.
-
-**Effect:** any signed-in person — a store-keeper holding only `/inventory`, say — can call it over the REST API and create a CRM engagement plus a nine-rung payment schedule against any plot id, writing into a tool they have no grant for. It returns only an id, so it is a write hole rather than a read leak, but the rows then appear on Client Relations' screens as real records.
-
-It is reached legitimately two ways: by the `units_seed_engagement` trigger (where the definer rights are the point) and from `lib/client-relations/actions.ts`, which already calls `requireTool` first. Adding `if not has_app('/client-relations') then raise ...` breaks neither — the trigger path runs as the definer, and the app path already holds the grant.
-
-### SEC-03 · MEDIUM · Two definer functions are callable with the public anon key
-
-`revoke execute ... from public` does not remove `anon`. Supabase grants `anon` and `authenticated` explicitly through default privileges, so a revoke aimed at `PUBLIC` leaves both untouched. `0023:331` does exactly this for `stock_qty_on_hand` and believes it has locked the function down.
-
-Two `SECURITY DEFINER` functions currently carry `anon=X` in `proacl`:
-
-| Function                               | What it does                                | Reachable by                    |
-| -------------------------------------- | ------------------------------------------- | ------------------------------- |
-| `stock_qty_on_hand(store, item)`       | Reads stock on hand, bypassing RLS          | Anyone with the public anon key |
-| `seed_default_project_stages(project)` | **Writes** eight rows into `project_stages` | Anyone with the public anon key |
-
-Exploitability is low — both need a uuid that is not guessable, and `seed_default_project_stages` no-ops if the project already has stages (which every project does, from the `0045` trigger). But an anonymous caller should not reach a definer function at all, and the anon key is public by design.
-
-`profile_is_active(uid)` is in the same position and is genuinely harmless — it answers a boolean about a uuid you would already have to know.
-
-**Fix:** `revoke execute on function … from anon;` for all three, and use `revoke execute … from public, anon` as the pattern from here on.
-
-### SEC-04 · LOW · An approval limit is readable by anyone signed in
-
-`bill_approval_cap(uid)` is `SECURITY DEFINER`, granted to `authenticated`, and returns the rupee ceiling on a person's bill approvals for **any** user id. `profiles` is readable by every authenticated user, so the ids are trivially enumerable.
-
-It is one number per person and not a bill amount, so this is a boundary smell rather than a leak of the ledger. `can_approve_bills(uid)` and `can_approve_indents(uid)` are the same shape and return only booleans. The straightforward fix is to make each answer only for `auth.uid()` unless the caller is an admin.
+## 1. Security
 
 ### SEC-05 · MEDIUM · Marathon agent PINs — confirmed, and now confined to staging
 
@@ -117,7 +40,7 @@ Still worth roughly thirty lines of CI pinning the exact column list of each mon
 
 ---
 
-## 3. Performance
+## 2. Performance
 
 ### PERF-01 · HIGH · Cold starts, and essentially nothing else
 
@@ -151,7 +74,7 @@ At today's row counts Postgres sequential-scans regardless and an index changes 
 
 ---
 
-## 4. Code quality & consistency
+## 3. Code quality & consistency
 
 ### QUAL-03 · MEDIUM · Line pulls are not atomic — deliberate
 
@@ -173,20 +96,25 @@ Marathon's bib numbering shows the shape that gives you both — one `marathon_c
 
 Kept as one-liners because code comments and tool plans cite them by name. Full reasoning is in git history.
 
-| ID          | Verdict                                                                                                                                                                                                                                        |
-| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **BUG-01**  | HIGH · **fixed 2026-08-14.** Every binary upload was silently corrupted — Storage was handed a `Buffer`, which Next's patched fetch text-decodes. Hand it a `Blob`. BUGCATCHER #6.                                                             |
-| **SEC-01**  | CRITICAL · **fixed 2026-08-14** by `0059`. Three money-free fact views were writable by any signed-in person — a Postgres privilege default the migrations never revoked. Verified: zero write privileges remain on any of the fourteen views. |
-| **QUAL-01** | HIGH · **fixed.** Four reads treated a failed query as an empty result — silently destroying priced budget lines and clearing drift warnings. They throw now.                                                                                  |
-| **QUAL-02** | LOW · **fixed.** The one lint warning.                                                                                                                                                                                                         |
-| **MOD-03**  | PASS · Overview reads Marathon's query layer — sanctioned; it is the shell, not a tool.                                                                                                                                                        |
-| **MOD-04**  | PASS · Settings writes two other tools' tables — one of the four documented exceptions.                                                                                                                                                        |
-| **MOD-05**  | PASS · No tool imports another tool's components.                                                                                                                                                                                              |
-| **MOD-06**  | PASS · The line chain is still anchored in the database, on real foreign keys.                                                                                                                                                                 |
-| **MOD-07**  | PASS · Deletion is refused, not cascaded.                                                                                                                                                                                                      |
-| **MOD-08**  | PASS · Failure-ripple test — one tool failing does not take the others down.                                                                                                                                                                   |
-| **SEC-08**  | PASS · Everything else in the security brief.                                                                                                                                                                                                  |
-| **PERF-02** | PASS · The bundle is fine and Recharts is properly code-split.                                                                                                                                                                                 |
-| **PERF-03** | PASS · No waterfalls; streaming is wired everywhere.                                                                                                                                                                                           |
-| **QUAL-05** | PASS · The access model is what you decided.                                                                                                                                                                                                   |
-| **QUAL-06** | PASS · CI is green.                                                                                                                                                                                                                            |
+| ID          | Verdict                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **BUG-01**  | HIGH · **fixed 2026-08-14.** Every binary upload was silently corrupted — Storage was handed a `Buffer`, which Next's patched fetch text-decodes. Hand it a `Blob`. BUGCATCHER #6.                                                                                                                                                                                                                                                                                                                                                                       |
+| **MOD-01**  | HIGH · **fixed 2026-08-17.** Budgets imported `lib/selections/views` for the quote photos. The reads moved to shared `lib/design-views/queries.ts`; Selections kept the writes. `listSpaceViews` now throws — it was printing quotes with every photo silently missing.                                                                                                                                                                                                                                                                                  |
+| **MOD-02**  | HIGH · **fixed 2026-08-17.** `lib/charts/series.ts` imported Reporter's spec and aggregate, so the whole chart design system and Financial Management inherited a dependency on one tool. `buildChartModel` moved to `lib/reporter/chart-model.ts`; `series.ts` is types only.                                                                                                                                                                                                                                                                           |
+| **SEC-01**  | CRITICAL · **fixed 2026-08-14** by `0059`. Three money-free fact views were writable by any signed-in person — a Postgres privilege default the migrations never revoked. Verified: zero write privileges remain on any of the fourteen views.                                                                                                                                                                                                                                                                                                           |
+| **SEC-02**  | HIGH · **fixed 2026-08-17** by `0071`. `create_client_engagement` was `SECURITY DEFINER`, executable by `authenticated`, and checked nothing — any signed-in person could write CRM records against any plot. Now revoked from every client role _and_ carrying a body check. **Note the trap:** the fix this file originally proposed was wrong — `SECURITY DEFINER` changes the role, not `auth.uid()`, so a bare `has_app` check would have broken the Masters trigger. `pg_trigger_depth() = 0` is what tells the two callers apart. BUGCATCHER #11. |
+| **SEC-03**  | MEDIUM · **fixed 2026-08-17** by `0071`. `stock_qty_on_hand`, `profile_is_active` and `seed_default_project_stages` were reachable with the public anon key, because `revoke … from public` never touched `anon`. All three revoked; `seed_default_project_stages` closed to `authenticated` too, being trigger-only.                                                                                                                                                                                                                                    |
+| **SEC-04**  | LOW · **fixed 2026-08-17** by `0071`. `bill_approval_cap`, `can_approve_bills` and `can_approve_indents` answered about any user id. Now self-or-admin — the cap **raises** rather than returning null, because in that function null means _unlimited_.                                                                                                                                                                                                                                                                                                 |
+| **QUAL-01** | HIGH · **fixed.** Four reads treated a failed query as an empty result — silently destroying priced budget lines and clearing drift warnings. They throw now.                                                                                                                                                                                                                                                                                                                                                                                            |
+| **QUAL-02** | LOW · **fixed.** The one lint warning.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| **MOD-03**  | PASS · Overview reads Marathon's query layer — sanctioned; it is the shell, not a tool.                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **MOD-04**  | PASS · Settings writes two other tools' tables — one of the four documented exceptions.                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **MOD-05**  | PASS · No tool imports another tool's components.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| **MOD-06**  | PASS · The line chain is still anchored in the database, on real foreign keys.                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| **MOD-07**  | PASS · Deletion is refused, not cascaded.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| **MOD-08**  | PASS · Failure-ripple test — one tool failing does not take the others down.                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| **SEC-08**  | PASS · Everything else in the security brief.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| **PERF-02** | PASS · The bundle is fine and Recharts is properly code-split.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| **PERF-03** | PASS · No waterfalls; streaming is wired everywhere.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| **QUAL-05** | PASS · The access model is what you decided.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| **QUAL-06** | PASS · CI is green.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |

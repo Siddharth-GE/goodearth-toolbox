@@ -12,9 +12,9 @@ Internal tools for Goodearth, a design-led real estate company in Kerala (~70 st
 
 1. **The shell** — auth, `lib/tools.ts`, per-user grants.
 2. **The shared database** — including the line chain.
-3. **Shared UI/utilities** — `components/ui/*`, `components/masters/*`, `lib/masters/`, `lib/hooks/`, `lib/format.ts`, `lib/pdf/`, `lib/charts/`.
+3. **Shared UI/utilities** — `components/ui/*`, `components/masters/*`, `lib/masters/`, `lib/hooks/`, `lib/format.ts`, `lib/pdf/`, `lib/charts/`, `lib/design-views/`.
 
-**One tool never imports another tool's code, and shared code never imports a tool's.** _(Two known violations: `lib/budgets/quote.ts` → `lib/selections/views`, and `lib/charts/series.ts` → `lib/reporter/*`. Don't copy either — AUDIT.md MOD-01, MOD-02.)_
+**One tool never imports another tool's code, and shared code never imports a tool's.** _(True with no exceptions since 2026-08-17. The two that stood for months are worth knowing as shapes: Budgets imported `lib/selections/views` for the quote photos — the reads became shared `lib/design-views/`; and `lib/charts/series.ts` imported Reporter, so the whole chart design system inherited a dependency on one tool — the shaping moved into `lib/reporter/chart-model.ts` and the shared file kept only types. AUDIT.md MOD-01, MOD-02. When two tools want the same read, the answer is a shared module, not an import.)_
 
 ## Structure
 
@@ -34,7 +34,7 @@ Internal tools for Goodearth, a design-led real estate company in Kerala (~70 st
 - Tools use the RLS-scoped client (`lib/supabase/server.ts`), never the admin client. Sanctioned exceptions, all in the shell, none in a tool: `inviteUser` (auth-admin API), the sign-in flow's `lib/auth/rate-limit.ts` and `markSessionVerified` (both write deny-all tables no signed-in role may touch), and the OAuth callback's delete of a signup-leak account. Marathon uses service-role throughout — it has no Supabase Auth session at all.
 - **RLS on for every table, always.** A new table without policies is a bug.
 - **A view is a READ surface.** Views are owned by `postgres` and bypass RLS, so a writable view is an RLS bypass with a `DELETE` on the end. Supabase's default privileges grant writes on every new relation, and `revoke … from public` does **not** remove `anon` or `authenticated` — name them. Every new view ships with `revoke insert, update, delete, truncate … from anon, authenticated`, and every new function with `revoke execute … from public, anon`, in the same migration. (AUDIT.md SEC-01/SEC-03 is what happens when it doesn't.)
-- Every `security definer` function checks `has_app(...)` or `is_admin()` in its own body — that check is its entire permission boundary.
+- Every `security definer` function checks `has_app(...)` or `is_admin()` in its own body — that check is its entire permission boundary. A function no client role may execute (revoked from `anon` **and** `authenticated`, reached only by a definer trigger) is boundaried by its grant instead; `create_client_engagement` and `seed_default_project_stages` are the two, and `0071` gave the first one both. **`security definer` changes the ROLE, not `auth.uid()`** — so a bare `has_app` check inside a function reached from a cross-tool trigger refuses the very person the trigger exists for. `pg_trigger_depth() = 0` is how `0071` tells a direct call from a trigger. BUGCATCHER #11.
 - Actions return `ActionState` (`lib/action-state.ts`), never throw. Queries may throw — a failed read has no partial answer worth showing.
 - **Never seed a real default credential** (AUDIT.md SEC-05).
 
@@ -102,7 +102,7 @@ Numbered SQL files in `supabase/migrations/`, applied **from this machine** via 
 ## UI
 
 - Every screen from `components/ui/*` (+ `components/masters/*`) — no one-off styles, no raw colour classes. Formatting through `lib/format.ts`. Every route gets a `loading.tsx` with the shared `Spinner`. Read `DESIGN.md` (Warm Minimalism) before styling.
-- **Charts are `recharts`**, imported ONLY by `components/ui/chart/*` — screens use those wrappers, never Recharts directly, so Next code-splits it to the routes that chart. Data shaping lives in `lib/charts/` (pure, tested); the PDF path rasterises the same charts through `sharp`, never a second implementation. Chart colours are the `--chart-1…8` tokens; `DESIGN.md` says why their order must not be touched.
+- **Charts are `recharts`**, imported ONLY by `components/ui/chart/*` — screens use those wrappers, never Recharts directly, so Next code-splits it to the routes that chart. The chart shapes themselves live in `lib/charts/series.ts` — **types only**, so shared code stays free of any tool — and building one from a tool's data is that tool's job (`lib/reporter/chart-model.ts`, pure and tested). `lib/charts/palette.ts` is the shared colour arithmetic. The PDF path rasterises the same charts through `sharp`, never a second implementation. Chart colours are the `--chart-1…8` tokens; `DESIGN.md` says why their order must not be touched.
 - **Site engineers and store-keepers use this on phones at site** — Indents, Inventory and site-facing flows must genuinely work on a phone. English-only UI is confirmed sufficient. Plain English in all copy and error messages.
 - Using the catalogue picker? Add the grant to the allow-list in `app/api/catalogue/route.ts` or it silently 403s.
 

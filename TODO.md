@@ -1,6 +1,6 @@
 # TODO — next tasks, in priority order
 
-Read `STATUS.md` first. Anything finished moves to `STATUS.md`, not struck through here. Audit findings are in `AUDIT.md` with full reasoning — it holds the thirteen still open, plus one line each on the closed ones that code comments cite by name.
+Read `STATUS.md` first. Anything finished moves to `STATUS.md`, not struck through here. Audit findings are in `AUDIT.md` with full reasoning — it holds the eight still open, plus one line each on the closed ones that code comments cite by name.
 
 ## 0. Backups — the biggest open risk, and it is now bigger
 
@@ -57,12 +57,13 @@ Merged 2026-08-14 (PR #21, `0064` + `0065` applied). Villa waves on Projects, a 
 
 `0070` removes any agent still on the published hash, and caught one: replaying the migrations onto the fresh database **recreated** `0002`'s Test Agent, PIN and all. The general lesson is in `CLAUDE.md` — a seed is a fixture in development and a credential in production.
 
-## 4. The rest of the audit's security findings
+## 4. The rest of the audit's security findings — three closed, one open
 
-- **`create_client_engagement` has no permission check** (`AUDIT.md` SEC-02). It is `SECURITY DEFINER`, executable by any signed-in user, and writes CRM engagement records plus a nine-rung payment schedule for any plot. Its two siblings check `has_app('/client-relations')`; this one doesn't. One `if` in the function body.
-- **Two definer functions are callable with the public anon key** (`AUDIT.md` SEC-03) — `stock_qty_on_hand` reads stock, `seed_default_project_stages` **writes** eight rows. `revoke execute … from anon` on both, plus `profile_is_active`. Can ride along with `0059`.
-- **`bill_approval_cap(uid)` returns anyone's approval ceiling to any signed-in user** (`AUDIT.md` SEC-04). Scope it to `auth.uid()` unless the caller is an admin.
-- **CI check pinning the money-free views' column lists** (`AUDIT.md` SEC-06). Those views bypass RLS by design; their column list _is_ the boundary and a comment is currently the only guard. ~30 lines. Needs a decision on where the authoritative list lives.
+**Closed 2026-08-17 by `0071`:** SEC-02 (`create_client_engagement` had no permission check and was executable by anyone signed in), SEC-03 (three definer functions reachable with the public anon key) and SEC-04 (`bill_approval_cap` answered about any user id). Verified against staging: the two trigger paths still seed what they should, and a direct call is refused. The trap the fix walked into is `BUGCATCHER.md` #11 — `security definer` changes the role, not `auth.uid()`.
+
+Still open:
+
+- **CI check pinning the money-free views' column lists** (`AUDIT.md` SEC-06). Those views bypass RLS by design; their column list _is_ the boundary and a comment is currently the only guard. ~30 lines. Needs a decision on where the authoritative list lives — and note CI has no database, so a real check either parses the migrations or runs from a machine with the management token.
 
 ## 5. The slow first load is cold starts
 
@@ -70,12 +71,11 @@ Merged 2026-08-14 (PR #21, `0064` + `0065` applied). Villa waves on Projects, a 
 
 Enable Fluid compute / keep-warm on Vercel and re-measure. This is a billing decision, so it needs the founder. **Unchanged since the August 11 audit, which means it hasn't been turned on.** If it doesn't move the number, the next step is Speed Insights split by cold vs warm — not more code changes.
 
-## 6. Untangle the two cross-tool imports
+## 6. The two cross-tool imports — done
 
-Both break the toolbox principle in the same way, and neither is more than an hour.
+**Both closed 2026-08-17.** `buildChartModel` moved out of shared `lib/charts/series.ts` into `lib/reporter/chart-model.ts`, leaving the shared file holding only the chart shapes; and the design-view reads moved out of Selections into shared `lib/design-views/queries.ts`, which Budgets and Selections both use. **No tool imports another tool's code and no shared module imports a tool's** — `CLAUDE.md` now says so without exceptions.
 
-- **`lib/charts/series.ts` → `lib/reporter/*`** (`AUDIT.md` MOD-02). Shared code importing a tool, so deleting Reporter would stop Financial Management _and the whole chart design system_ compiling. `buildChartModel` is the only function involved and has one real caller. Move it into `lib/reporter/`, leave `series.ts` holding the model types. ~40 lines plus its test.
-- **`lib/budgets/quote.ts` → `lib/selections/views`** (`AUDIT.md` MOD-01, carried from August). Either move the space-view helpers to a shared surface or have Budgets read the bucket itself. ~20 lines.
+One bug fell out of MOD-01: `listSpaceViews` treated a failed read as "no photographs", so a client quotation could print with every picture missing and report success. It throws now, and both PDF routes answer in plain English.
 
 ## 7. Relay — what is left, in order
 
