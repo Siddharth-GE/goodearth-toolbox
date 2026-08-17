@@ -8,6 +8,13 @@
 #
 # It runs exactly the checks that were already being run manually. No new
 # tools, no coverage thresholds, nothing to argue with.
+#
+# ONE SECRET LIVES HERE: SUPABASE_ACCESS_TOKEN, the management API key,
+# used by the migration check below and nothing else. It is account-level
+# — Supabase has no way to narrow it — so it reaches both databases with
+# full rights. That is a real cost, accepted on 2026-08-17 because the
+# alternative was a rule nobody can enforce. If it is ever rotated,
+# rotate it here too or every pull request goes red.
 
 name: CI
 
@@ -32,6 +39,35 @@ jobs:
       # lockfile says, so CI can't pass on a different set of packages
       # than a developer has.
       - run: npm ci
+
+      # FIRST, and the only step that talks to a real database.
+      #
+      # "Apply the migration, THEN merge the code that needs it" was a rule
+      # kept by remembering it. This is the rule with a gate under it: a
+      # pull request cannot go green while the database it merges towards
+      # is missing a migration in its own branch. One HTTP call, so putting
+      # it before the fast checks costs nothing — and it is the failure
+      # that is most expensive to discover afterwards, because by then the
+      # code is live against a database that has no column for it.
+      #
+      # Each PR is checked against the database its base branch deploys to.
+      # `github.base_ref` is set only for pull_request events, so both
+      # steps skip on a push to master — where it would be too late anyway.
+      #
+      # It is READ-ONLY and cannot apply anything. A check that fixed what
+      # it found would be applying an unreviewed migration to production
+      # from CI, on a database with no backups.
+      - name: Production has every migration (PRs into master)
+        if: github.base_ref == 'master'
+        run: npm run db:check -- --project pajfrgnkapicdgangjey
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Staging has every migration (PRs into staging)
+        if: github.base_ref == 'staging'
+        run: npm run db:check -- --project ipstebqawrvhkyntctrv
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
       - name: Formatting
         run: npm run format:check

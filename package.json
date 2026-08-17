@@ -15,6 +15,7 @@
     "db:types": "supabase gen types typescript --project-id pajfrgnkapicdgangjey --schema public > lib/supabase/database.types.ts",
     "db:types:staging": "supabase gen types typescript --project-id ipstebqawrvhkyntctrv --schema public > lib/supabase/database.types.ts",
     "db:apply": "tsx scripts/apply-migrations.ts",
+    "db:check": "tsx scripts/check-migrations.ts",
     "db:compare": "tsx scripts/compare-schema.ts"
   },
   "dependencies": {

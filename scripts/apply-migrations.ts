@@ -50,46 +50,8 @@
  * SAFE TO RUN TWICE. Anything already in the ledger is skipped, so a
  * second run against the same database does nothing at all.
  */
-import { createHash } from "node:crypto";
-import { readdirSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { compareToLedger, readLedger, readMigrations, type Migration } from "./migration-ledger";
 import { isCommit, requireProjectRef, sql } from "./supabase-management";
-
-const MIGRATIONS_DIR = resolve(import.meta.dirname, "..", "supabase", "migrations");
-
-type Migration = { filename: string; body: string; checksum: string };
-
-function readMigrations(): Migration[] {
-  return readdirSync(MIGRATIONS_DIR)
-    .filter((name) => name.endsWith(".sql"))
-    .sort()
-    .map((filename) => {
-      const body = readFileSync(resolve(MIGRATIONS_DIR, filename), "utf8");
-      return {
-        filename,
-        body,
-        checksum: createHash("sha256").update(body).digest("hex"),
-      };
-    });
-}
-
-/**
- * The ledger, or an empty map when the table does not exist yet — which
- * is the normal state of a database that has never been migrated.
- */
-async function readLedger(ref: string): Promise<Map<string, string>> {
-  const exists = await sql<{ present: boolean }>(
-    ref,
-    "select to_regclass('public.applied_migrations') is not null as present",
-  );
-  if (!exists[0]?.present) return new Map();
-
-  const rows = await sql<{ filename: string; checksum: string }>(
-    ref,
-    "select filename, checksum from applied_migrations",
-  );
-  return new Map(rows.map((row) => [row.filename, row.checksum]));
-}
 
 /**
  * Records a file as applied, but only once there is a table to record it
@@ -143,17 +105,7 @@ async function main() {
   console.log(`Ledger   : ${ledger.size} already recorded`);
   console.log(`Mode     : ${commit ? (recordOnly ? "RECORD ONLY" : "COMMIT") : "dry run"}\n`);
 
-  const mismatched: string[] = [];
-  const pending: Migration[] = [];
-
-  for (const migration of migrations) {
-    const recorded = ledger.get(migration.filename);
-    if (recorded === undefined) {
-      pending.push(migration);
-    } else if (recorded !== migration.checksum) {
-      mismatched.push(migration.filename);
-    }
-  }
+  const { pending, mismatched } = compareToLedger(migrations, ledger);
 
   if (mismatched.length > 0) {
     console.error("CHANGED SINCE IT WAS APPLIED — an applied migration must never be edited:");
