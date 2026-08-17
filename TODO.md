@@ -1,6 +1,6 @@
 # TODO — next tasks, in priority order
 
-Read `STATUS.md` first. Anything finished moves to `STATUS.md`, not struck through here. Audit findings are in `AUDIT.md` with full reasoning.
+Read `STATUS.md` first. Anything finished moves to `STATUS.md`, not struck through here. Audit findings are in `AUDIT.md` with full reasoning — it holds the thirteen still open, plus one line each on the closed ones that code comments cite by name.
 
 ## 0. Backups — the biggest open risk, and it is now bigger
 
@@ -15,10 +15,9 @@ This sits above everything else on this page because everything else is recovera
 
 ## 0b. The cutover is done — what it left behind
 
-Cut over on 2026-08-17, checked in the browser, staging wired up and its emails scrambled. `CUTOVER.md` is kept as the record of how it was done, not as an outstanding task. What remains from its Part 6:
+Cut over on 2026-08-17, checked in the browser, staging wired up and its emails scrambled. The step-by-step guide has served its purpose and is deleted; how the two environments work now lives in `CLAUDE.md`'s staging protocol and `STATUS.md`'s Environments section. What remains:
 
-- **Delete `data/staff-passwords-2026-08-14.csv`** — 45 plaintext starting passwords on the founder's machine. Every account signed in on the new database with its existing password, so the file's purpose is served. **Oldest open item on this page.**
-- **Delete `vercel-env-values.txt`** if it still exists.
+- **~~Delete `data/staff-passwords-2026-08-14.csv`~~** and **~~`vercel-env-values.txt`~~** — both confirmed gone on 2026-08-17. The oldest item on this page for a week, now closed.
 - **Enter one real vendor and one real store** in Masters. Neither was carried across, and Purchase Orders and Inventory each need one before first use.
 - **Document counters** — only where a real series already runs on paper. `po_counters`, `bill_counters`, `indent_counters`, `grn_counters`, `iss_counters` are `(project_id, scope, last_no)` rows. Tell the assistant the last number used and it is one update each. **Before the first real document, not after.**
 - **Deployment Protection** back on in Vercel if it is still off.
@@ -46,7 +45,7 @@ Merged 2026-08-14 (PR #21, `0064` + `0065` applied). Villa waves on Projects, a 
 1. **Press "With client" on a real trail**, then push it — the amber label should appear and then clear on its own. This is the one real write the release added, and CLAUDE.md's rule is to press one after any deploy touching server actions.
 2. **Open a trail whose stage the auto-filing guessed wrong** and move it with the Stage picker on the trail's own page. If it guesses wrong often, the fallback (the stage the plan says today is in) is the thing to revisit — possibly by giving each activity a home stage in Masters.
 
-## 4. Marathon PINs — now confirmed, and confined to staging
+## 4. Marathon PINs — confirmed, and confined to staging
 
 **Re-checked properly on 2026-08-17** by recomputing scrypt against each agent's own salt, which is what the previous two audits could not do. No longer speculation:
 
