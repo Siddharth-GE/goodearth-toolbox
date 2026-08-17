@@ -10,7 +10,7 @@ Read this before merging anything that touches a database read, a file upload, a
 
 ## Before you merge
 
-Nine checks, each earned by a bug below.
+Ten checks, each earned by a bug below.
 
 | Check                                                                         | Because                                                                                                                                                   |
 | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -23,6 +23,7 @@ Nine checks, each earned by a bug below.
 | **After a smoke test, read the traces.** The database says what actually ran. | A Google sign-in "worked" that never minted a session, and two tests reported done had left zero rows. Eyes lie; rows don't.                              |
 | **Render any new drawing from real data and look at it.**                     | A wave with 22 passing tests still overlapped its own labels, and was designed for 7 villas where production has 43.                                      |
 | **Fire the trigger, in a transaction you roll back.**                         | A permission check added to a definer function would have blocked the trigger it exists for — and the migration's own assertions would still have passed. |
+| **Confirm a Production deployment exists for the merged commit.**             | A merge, a green CI and an applied migration all say "done" while the site serves the commit from three hours ago.                                        |
 
 ---
 
@@ -175,6 +176,33 @@ _Caught 2026-08-17 while writing `0071`, before it was applied — the audit's o
 **The rule.** A permission check inside a definer function reached from a **cross-tool trigger** must say which caller it means. `pg_trigger_depth() = 0` distinguishes a direct REST call from a trigger, so a grant-holder and the trigger both pass and nobody else does. And when the function has no legitimate direct caller at all, revoke `execute` from `anon` and `authenticated` — the grant is then the boundary, which is stronger than any body check.
 
 **The check.** Run the trigger, in a transaction you roll back. Insert the row that fires it against the staging database and count what the trigger was supposed to create; end the block with a deliberate `raise` so the counts come back and nothing persists. Reading the function body proves nothing about who can reach it.
+
+---
+
+### 12. A merge to `master` that never became a deployment
+
+_Found 2026-08-17 by the founder, looking at the Vercel dashboard after being told the release was live. It was not._
+
+**What happened.** Nine commits were merged to `master` as a fast-forward and pushed. GitHub had them, CI went green on `master`, both migrations were applied to production, `db:compare` was empty. Everything said done. **Production was still serving the commit from three hours earlier**, and would have gone on serving it indefinitely.
+
+Vercel had built the commit — but only as the **staging Preview**. There was no Production deployment for it at all. The dashboard showed one row where every other commit that day had two.
+
+**Why.** The order the branches were pushed in. The normal habit here is master first, then merge back into `staging`; that day the work was merged to `staging` first and sat there for testing, and `master` was then fast-forwarded to the **identical commit**. Vercel had already built that SHA for the preview and did not raise a second deployment for it. (That is the mechanism the evidence points to — same SHA, second push, no build — rather than something proven from Vercel's internals. The rule below holds either way.)
+
+**Why nothing caught it.** Nothing in this repo watches deployments. CI proves the code compiles and the tests pass; the migration gate proves the database is ready; `db:compare` proves the two databases match. **Not one of them looks at what is actually being served.** Every signal was green and every signal was about something else. The GitHub Deployments API is where the absence is visible, and nobody reads it.
+
+**And a trap in the fix.** The obvious repair is Vercel's **Promote to Production** on that preview row. Do not: promoting rolls out that exact _build_, and a preview build has the **staging** Supabase URL and anon key inlined at build time by Next. It would put the production domain in front of the practice database — the one accident the whole staging arrangement exists to prevent. The repair is a fresh commit on `master`, which builds with production environment variables.
+
+**The rule.** **A merge is not a deployment.** After merging to `master`, confirm a **Production** deployment exists for that exact commit before telling anyone the release is out. And prefer the documented order — land on `master`, then fast-forward `staging` back to it — so master's push is the first the platform sees of that SHA.
+
+**The check.** One command, no dashboard:
+
+```
+gh api repos/<owner>/<repo>/deployments \
+  -q '.[] | select(.environment=="Production") | "\(.created_at) \(.sha[0:7])"' | head -1
+```
+
+The SHA it prints must equal `git rev-parse --short origin/master`. If it does not, nothing you merged is live.
 
 ---
 
