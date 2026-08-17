@@ -79,13 +79,23 @@ Everything in it is a `SELECT`: **no tool's code writes another tool's table.** 
 
 ## Database
 
-Numbered SQL files in `supabase/migrations/`, applied **from this machine** via the management API's `/database/query` endpoint (`SUPABASE_ACCESS_TOKEN` in `.env.local`) — not by hand in Studio. The same endpoint reads production when you need to check what is actually there. No CLI, no local Postgres, no rollback tooling. Use Node for the request; PowerShell's `Invoke-RestMethod` mangles large JSON bodies.
+**There are two, and confusing them is the expensive mistake:**
 
-- **Apply the migration first, then merge the code needing it.**
+|                             | ref                    | what it is                                                                                                |
+| --------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------------- |
+| `goodearth-toolbox`         | `pajfrgnkapicdgangjey` | **Production.** Real work, real staff, real client money.                                                 |
+| `goodearth-toolbox-staging` | `ipstebqawrvhkyntctrv` | **Staging.** Everything the toolbox was built with. Local `npm run dev` and every preview URL point here. |
+
+Numbered SQL files in `supabase/migrations/`, applied **from this machine** via the management API's `/database/query` endpoint (`SUPABASE_ACCESS_TOKEN` in `.env.local`, account-level so it reaches both) — not by hand in Studio. The same endpoint reads either database when you need to check what is actually there. No CLI, no local Postgres, no rollback tooling. Use Node for the request; PowerShell's `Invoke-RestMethod` mangles large JSON bodies.
+
+- **Never apply a migration by hand.** `npm run db:apply -- --project <ref> --commit` applies what is pending and records it in `applied_migrations` (`0067`), so a re-run is a no-op and the two databases cannot drift unnoticed. **`--project` is required and never defaults** — no script here guesses which database it is pointed at.
+- **Staging first, then production, then merge.** Apply to staging → `npm run db:types:staging` → build and test → apply to production → merge. The old rule (_apply the migration first, then merge the code needing it_) is unchanged, just doubled.
+- **`npm run db:compare -- --project <a> --against <b>` must come back empty** whenever the two are supposed to be level. It compares columns, RLS, policies, grants, functions, views, triggers, indexes, constraints and storage. It is not ceremony: on its first run it found two objects that existed on the original database and in **no migration** — the `ensure_rls` event trigger (`0068`) and the `catalogue` storage bucket (`0069`). Neither would have failed anything; the fresh database would simply have stopped enforcing "RLS on for every table" and lost every thumbnail upload.
+- **A seed is a fixture in development and a credential in production.** Replaying the migrations recreated `0002`'s "Test Agent" — PIN, hash and salt all in this public repo — on the database holding the real work (`0070` removes it). Before adding a seed row, ask what it becomes on a database that is replayed.
 - **Additive only** — never rename or drop something in use.
-- **Never edit an applied migration**; a correction is a new, later file (`0014` fixing `0013`).
+- **Never edit an applied migration**; a correction is a new, later file (`0014` fixing `0013`). The ledger stores a checksum, so an edited file is now detected rather than invisible.
 - **Write every one to be run twice** (`if not exists`, `drop … if exists`, `create or replace`) and end it asserting what it claimed to do.
-- After applying: `npm run db:types`, commit the types with the migration.
+- After applying: `npm run db:types` (production) or `npm run db:types:staging`, and commit the types with the migration.
 - New tool → extend **both** `user_apps_app_known` and `role_apps_app_known` CHECKs in the same migration, or granting fails at the database.
 - Making an admin has a UI — the toggle in Settings (`setAdmin`, guarded by `profiles_guard()`, which refuses to remove the last active admin). The raw `update profiles set role = 'admin'` is the fallback for when nobody can get in at all.
 
@@ -108,7 +118,7 @@ Data-load scripts in `scripts/` are **dry run by default, `--commit` to write**.
 - **Never `export type` from a `"use server"` file** — it caused a production outage; `npm run check:actions` enforces it.
 - **Smoke-test as a real single-grant user** (the probe account) before merging; an admin passes every check and never sees grant bugs. After any deploy changing server actions or policies, press one real write-button on production.
 - **A green build is not a working feature.** Six bugs have now passed all six CI steps — a dead screen, a corrupted upload, a live privilege hole. `BUGCATCHER.md` is the catalogue and the pre-merge checklist it earned; **when something breaks that CI said was fine, add it there.** Uploading to Supabase Storage is the newest: hand it a `Blob`, never a raw `Buffer`, or Next's patched fetch text-decodes the binary and stores rubbish that reports success.
-- `master` is production and auto-deploys on every push. Tools and sizeable changes get a `feature/<tool>` branch — each push gets a preview URL. Merge to `master` only after browser testing and sign-off, then delete the branch. Small fixes to live tools may go straight to `master`. **Commit each working piece and push it; never leave work uncommitted.**
+- **`feature/<tool>` → `staging` → `master`.** A feature branch gets a preview URL; `staging` is `staging.goodearthkannur.org` and is where something sits for a few days of real use; `master` is production and auto-deploys. Every preview and staging URL reads the **staging** database, so building a feature can no longer touch the work seventy people depend on. Merge to `master` only after browser testing and sign-off. Small fixes to live tools may still go straight to `master`. **Commit each working piece and push it; never leave work uncommitted.**
 
 ## Working with the founder
 
