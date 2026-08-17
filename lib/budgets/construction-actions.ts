@@ -165,13 +165,60 @@ export async function updateConstructionLine(
   return undefined;
 }
 
+/**
+ * Removes a line from the plan — unless the site team has already
+ * requested it.
+ *
+ * indent_lines.construction_line_id is ON DELETE SET NULL, so deleting a
+ * plan line makes Postgres UPDATE every indent line pulled from it, which
+ * fires indent_lines_draft_only and raises once any of those indents has
+ * left draft. The delete then comes back as an opaque 400 and the screen
+ * said "Try again" — advice that could never work, which is exactly what
+ * the founder hit (twice, seconds apart) on 16 Aug 2026.
+ *
+ * So the refusal is looked up and stated properly. Note the check names
+ * the indent: "already requested on IND/SAA/016" is actionable, "could
+ * not remove that line" is not.
+ */
 export async function removeConstructionLine(planId: string, lineId: string): Promise<ActionState> {
   await requireTool("/budgets");
 
   const supabase = await createClient();
+
+  const { data: raised, error: raisedError } = await supabase
+    .from("indent_lines")
+    .select("id, indents(reference, status)")
+    .eq("construction_line_id", lineId);
+  if (raisedError) {
+    console.error("removeConstructionLine indent check failed:", raisedError);
+    return { error: "Could not check whether this item has been requested. Try again." };
+  }
+
+  const blocking = (raised ?? [])
+    .map((row) => row.indents as { reference: string; status: string } | null)
+    .filter((indent): indent is { reference: string; status: string } => {
+      return indent != null && indent.status !== "draft";
+    });
+  if (blocking.length > 0) {
+    const names = [...new Set(blocking.map((indent) => indent.reference))];
+    const list =
+      names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+    return {
+      error: `This item has already been requested on ${list}, so it can't be removed from the plan. It stays here as the record of what was planned.`,
+    };
+  }
+
   const { error } = await supabase.from("construction_budget_lines").delete().eq("id", lineId);
   if (error) {
     console.error("removeConstructionLine failed:", error);
+    // The check above races with an indent being submitted; the database
+    // is the backstop, and its refusal is worth repeating plainly.
+    if (error.message.includes("lines can only be changed while it is a draft")) {
+      return {
+        error:
+          "This item has just been requested on an indent, so it can't be removed from the plan any more.",
+      };
+    }
     return { error: "Could not remove that line. Try again." };
   }
 

@@ -1,8 +1,10 @@
 "use client";
 
+import { recordAppError } from "@/app/actions/record-error";
 import { Button, LinkButton } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TriangleAlert } from "lucide-react";
+import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 
 /**
@@ -23,11 +25,25 @@ export default function DashboardError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const pathname = usePathname();
+
   useEffect(() => {
-    // Vercel's function logs are the only place this is visible today.
-    // The digest is what ties this screen to the server-side stack trace.
     console.error("dashboard error:", error);
-  }, [error]);
+    // Filed to app_errors (0066) so this screen is still answerable
+    // tomorrow — Vercel's logs and Supabase's age out within the day,
+    // which is what made the 16 Aug 2026 failures so hard to trace. Not
+    // awaited, and it swallows its own failures: recording an error must
+    // never get in the way of showing one.
+    // The .catch() is not decoration: the action swallows its own
+    // failures, but the CALL can still reject if the network is what
+    // broke — and an unhandled rejection thrown from the error screen is
+    // the one place it must never happen.
+    recordAppError({
+      digest: error.digest,
+      path: pathname,
+      message: error.message,
+    }).catch(() => {});
+  }, [error, pathname]);
 
   return (
     <EmptyState

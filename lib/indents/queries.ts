@@ -9,6 +9,7 @@ import { listActiveStageNames } from "@/lib/masters/stages";
 import { listUnits } from "@/lib/masters/units";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
+import { withRetry } from "@/lib/supabase/transient";
 
 import {
   classifyBudgetChooser,
@@ -203,12 +204,20 @@ export type IndentHeader = {
 export const getIndentHeader = cache(async (indentId: string): Promise<IndentHeader | null> => {
   await requireTool("/indents");
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("indents")
-    .select("id, reference, status, project_id, unit_id, projects(name)")
-    .eq("id", indentId)
-    .maybeSingle();
-  if (error) console.error("listIndents failed:", error);
+  const { data, error } = await withRetry(() =>
+    supabase
+      .from("indents")
+      .select("id, reference, status, project_id, unit_id, projects(name)")
+      .eq("id", indentId)
+      .maybeSingle(),
+  );
+  // Both pull screens call notFound() on a null header, so a swallowed
+  // error here told the user the indent doesn't exist. Throw instead —
+  // it is the same rule as the drift reads below.
+  if (error) {
+    console.error("getIndentHeader failed:", error);
+    throw new Error("Could not open that indent.", { cause: error });
+  }
   if (!data) return null;
   return {
     id: data.id,
@@ -300,10 +309,12 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
     ...new Set(lines.map((line) => line.budget_id).filter((id): id is string => id != null)),
   ];
   if (anchoredBudgetIds.length > 0) {
-    const { data: anchorBudgets, error: anchorBudgetsError } = await supabase
-      .from("approved_budgets")
-      .select("id, selection_id, unit_id")
-      .in("id", anchoredBudgetIds);
+    const { data: anchorBudgets, error: anchorBudgetsError } = await withRetry(() =>
+      supabase
+        .from("approved_budgets")
+        .select("id, selection_id, unit_id")
+        .in("id", anchoredBudgetIds),
+    );
     // Throw rather than fall through to an empty list: no rows here reads
     // as "nothing drifted", so a failed read would clear every drift flag
     // on the screen and tell the site team an indent is safe to order
@@ -320,13 +331,15 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
         row.id != null && row.selection_id != null && row.unit_id != null,
     );
     const { data: anchorSelections, error: anchorSelectionsError } = budgets.length
-      ? await supabase
-          .from("selections")
-          .select("id, status")
-          .in(
-            "id",
-            budgets.map((row) => row.selection_id),
-          )
+      ? await withRetry(() =>
+          supabase
+            .from("selections")
+            .select("id, status")
+            .in(
+              "id",
+              budgets.map((row) => row.selection_id),
+            ),
+        )
       : { data: [], error: null };
     // Same rule as the read above. An empty answer here means "no anchor
     // revision is still issued", which marks every budget superseded — so
@@ -350,11 +363,13 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
         anchoredKeysByBudget.set(line.budget_id, keys);
       }
 
-      const { data: issuedSelections, error: issuedSelectionsError } = await supabase
-        .from("selections")
-        .select("id, unit_id")
-        .in("unit_id", [...new Set(superseded.map((row) => row.unit_id))])
-        .eq("status", "issued");
+      const { data: issuedSelections, error: issuedSelectionsError } = await withRetry(() =>
+        supabase
+          .from("selections")
+          .select("id, unit_id")
+          .in("unit_id", [...new Set(superseded.map((row) => row.unit_id))])
+          .eq("status", "issued"),
+      );
       // This is the revision the drift is measured AGAINST. No rows reads
       // as "there is nothing newer to compare with", so a failed read
       // leaves every changed and removed line unflagged — the exact
@@ -514,11 +529,18 @@ export async function getConstructionPull(
   await requireTool("/indents");
   const supabase = await createClient();
 
-  const { data: plan } = await supabase
-    .from("construction_budgets")
-    .select("id, units(name)")
-    .eq("unit_id", unitId)
-    .maybeSingle();
+  const { data: plan, error: planError } = await withRetry(() =>
+    supabase.from("construction_budgets").select("id, units(name)").eq("unit_id", unitId).single(),
+  );
+  // "No plan for this unit" and "the read failed" both arrive as a null
+  // plan, and returning null here lands the caller on a 404 — which tells
+  // the site team the plan doesn't exist. Throw on a genuine failure so
+  // they get the retryable error screen instead. PGRST116 is the real
+  // "no rows" answer, and keeps the 404.
+  if (planError && planError.code !== "PGRST116") {
+    console.error("construction pull plan read failed:", planError);
+    throw new Error("Could not open the construction plan.", { cause: planError });
+  }
   if (!plan) return null;
 
   const lines = await fetchAll((from, to) =>
@@ -737,12 +759,24 @@ export async function getBudgetPull(
   await requireTool("/indents");
   const supabase = await createClient();
 
-  const { data: budget } = await supabase
-    .from("approved_budgets")
-    .select("id, selection_id, unit_id, version")
-    .eq("id", budgetId)
-    .maybeSingle();
+  const { data: budget, error: budgetError } = await withRetry(() =>
+    supabase
+      .from("approved_budgets")
+      .select("id, selection_id, unit_id, version")
+      .eq("id", budgetId)
+      .maybeSingle(),
+  );
+  // Same rule as getConstructionPull: a failed read must not become a
+  // 404 that says this budget isn't there.
+  if (budgetError) {
+    console.error("indent budget pull read failed:", budgetError);
+    throw new Error("Could not open that budget.", { cause: budgetError });
+  }
   if (!budget || !budget.selection_id || !budget.unit_id) return null;
+  // Captured as locals: TypeScript drops property narrowing inside the
+  // retry callbacks below, and these are non-null from here on.
+  const budgetUnitId: string = budget.unit_id;
+  const budgetSelectionId: string = budget.selection_id;
 
   // An indent tagged to a unit pulls from that unit alone — the chooser
   // never offers another unit's budget, so arriving here with one is a
@@ -751,7 +785,12 @@ export async function getBudgetPull(
   if (!indent) return null;
   if (indent.unit_id && indent.unit_id !== budget.unit_id) return null;
 
-  const [budgetLines, selectionLines, { data: spaces }, { data: selection }] = await Promise.all([
+  const [
+    budgetLines,
+    selectionLines,
+    { data: spaces, error: spacesError },
+    { data: selection, error: selectionError },
+  ] = await Promise.all([
     fetchAll((from, to) =>
       supabase
         .from("approved_budget_lines")
@@ -766,18 +805,26 @@ export async function getBudgetPull(
         .select(
           "line_key, item_id, uom, unit_space_id, sort_order, items(name, code, thumb_url, brands(name))",
         )
-        .eq("selection_id", budget.selection_id as string)
+        .eq("selection_id", budgetSelectionId)
         .order("sort_order")
         .order("id")
         .range(from, to),
     ),
-    supabase.from("spaces").select("id, label, sort_order").eq("unit_id", budget.unit_id),
+    supabase.from("spaces").select("id, label, sort_order").eq("unit_id", budgetUnitId),
     supabase
       .from("selections")
       .select("revision_no, status, units(name)")
-      .eq("id", budget.selection_id as string)
+      .eq("id", budgetSelectionId)
       .maybeSingle(),
   ]);
+
+  // A failed spaces read would silently label every line "Unassigned";
+  // a failed selection read would look exactly like a superseded
+  // revision and 404. Neither is worth showing.
+  if (spacesError || selectionError) {
+    console.error("indent budget pull read failed:", spacesError ?? selectionError);
+    throw new Error("Could not open that budget.", { cause: spacesError ?? selectionError });
+  }
 
   // Only the current design revision may be requested against. The
   // chooser already filters; this holds against a stale tab or a pasted
@@ -788,10 +835,9 @@ export async function getBudgetPull(
   // indent. line_key is stable across revisions, so a line pulled from
   // R1's budget must show as already asked when R2's budget is on
   // screen — scoping this to one budget_id was the double-buy bug.
-  const { data: siblingBudgets, error: siblingBudgetsError } = await supabase
-    .from("approved_budgets")
-    .select("id")
-    .eq("unit_id", budget.unit_id);
+  const { data: siblingBudgets, error: siblingBudgetsError } = await withRetry(() =>
+    supabase.from("approved_budgets").select("id").eq("unit_id", budgetUnitId),
+  );
   // No sibling budgets reads as "nothing has ever been raised for this
   // unit", so every line shows as still to order — which is the
   // double-buy bug arriving by the other door. Throw instead.

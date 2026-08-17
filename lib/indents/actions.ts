@@ -330,10 +330,19 @@ export async function addBudgetPullLines(
   // Only the current design revision may be requested against — a stale
   // tab or pasted URL lands here after the screens have filtered, and
   // the 0028 trigger backstops the insert itself.
-  const [{ data: revision }, { data: indent }] = await Promise.all([
-    supabase.from("selections").select("status").eq("id", budget.selection_id).maybeSingle(),
-    supabase.from("indents").select("unit_id").eq("id", indentId).maybeSingle(),
-  ]);
+  const [{ data: revision, error: revisionError }, { data: indent, error: indentReadError }] =
+    await Promise.all([
+      supabase.from("selections").select("status").eq("id", budget.selection_id).maybeSingle(),
+      supabase.from("indents").select("unit_id").eq("id", indentId).maybeSingle(),
+    ]);
+  // Checked separately from the test below, because a failed read and a
+  // superseded revision both leave `revision` null — and saying "that
+  // budget belongs to a superseded design revision" when the read simply
+  // failed sends the team off to re-issue a revision that was fine.
+  if (revisionError || indentReadError) {
+    console.error("addBudgetPullLines revision check failed:", revisionError ?? indentReadError);
+    return { error: "Could not check that budget just now. Try again." };
+  }
   if (revision?.status !== "issued") {
     return {
       error:
