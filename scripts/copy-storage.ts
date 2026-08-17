@@ -139,10 +139,16 @@ async function main() {
   for (const problem of failed) console.error(`  FAILED ${problem}`);
 
   // ---- point the URLs at their new home --------------------------------
+  //
+  // Under replica mode, so the audit trigger stays quiet. Without it this
+  // one statement files 897 "items UPDATE" rows, and a brand-new
+  // database's audit log opens with 897 entries about its own setup
+  // rather than about anything anyone did.
   console.log("\nRewriting items.thumb_url...");
   await sql(
     to,
-    `update items
+    `set session_replication_role = replica;
+     update items
      set thumb_url = replace(thumb_url, ${literal(from)}, ${literal(to)})
      where thumb_url like ${literal(`%${from}%`)}`,
   );

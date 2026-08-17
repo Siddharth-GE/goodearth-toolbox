@@ -15,7 +15,7 @@ Two databases. Confusing them is the expensive mistake.
 
 Created 2026-08-17 by the reverse of the obvious move: the database the toolbox was **built** in kept everything — 21 practice selections, 11 budgets, 12 POs, 1,670 audit rows — and became staging, which is exactly what a staging database should look like. A fresh project took only the real master data (49 people with their existing passwords, 3 projects, 43 plots and units, 35 clients, the 2,634-item catalogue and its 897 thumbnails, Relay's templates). No counters came across, so **the first real purchase order is PO-0001**.
 
-Two things carried across as masters and turned out to be practice: the **business plans** ("Kaadal", "Phase 3" — removed the same day, and dropped from the clone list), and the single **funding facility** (party "fed", terms "d" — still there, awaiting a decision). The lesson for anything similar: a plan is something someone _builds in the tool_, not a fact about the company, so it belongs with the transactions.
+Three things carried across as masters and turned out to be practice — the **business plans** ("Kaadal", "Phase 3") and the single **funding facility** (party "fed", terms "d", ₹10,00,000). All removed the same day and dropped from the clone list. The distinction that was missed, worth applying to anything similar: a plan or a loan is something someone _builds in_ the tool, not a fact about the company that exists whether or not the toolbox does. Those belong with the transactions.
 
 **Not live yet.** The new database is built, filled and verified, but `toolbox.goodearthkannur.org` still reads the old one until the Vercel variables are switched. The remaining steps all need a browser and are listed in order in **`CUTOVER.md`**.
 

@@ -65,13 +65,18 @@ import { isCommit, literal, requireProjectRef, sql } from "./supabase-management
  *   vendors / stores  - one test row each. Real ones get entered in
  *                       Masters before Purchase Orders and Inventory are
  *                       first used.
- *   business_plans / business_plan_targets
- *                     - "Kaadal" and "Phase 3" looked like master data
- *                       and were carried across on 17 Aug; the founder
- *                       identified them as practice and they were
- *                       removed the same day. A plan is something someone
- *                       builds in the tool, not a fact about the company,
- *                       so it belongs with the transactions.
+ *   business_plans / business_plan_targets, funding_facilities
+ *                     - all three looked like master data and were
+ *                       carried across on 17 Aug; the founder identified
+ *                       them as practice ("Kaadal", "Phase 3", and a
+ *                       ₹10,00,000 loan from a party called "fed" with
+ *                       terms "d") and they were removed the same day.
+ *                       The distinction that was missed: a plan or a loan
+ *                       is something someone BUILDS IN the tool, not a
+ *                       fact about the company that exists whether or not
+ *                       the toolbox does. Those belong with the
+ *                       transactions. Real facilities get entered once,
+ *                       against the bank's own statement (TODO.md).
  *   audit_log / app_errors / login_attempts / auth_verified_sessions
  *     - records of the old database's own life.
  *   *_counters        - so numbering starts at 1.
@@ -97,7 +102,6 @@ const TABLES = [
   "brands",
   "gst_rates",
   "items",
-  "funding_facilities",
   "pusher_departments",
   "pusher_activities",
   "pusher_trail_sets",
