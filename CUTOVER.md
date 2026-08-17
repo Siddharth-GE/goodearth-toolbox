@@ -286,8 +286,23 @@ Vercel will then show you a **DNS record** to add (a CNAME) wherever
 goodearthkannur.org is managed. Add it, and wait a few minutes for the
 tick.
 
-_There is nothing else to configure. The `staging` branch deploys as a
-preview, so it already uses the Preview variables you just checked._
+> **Expect a "No Deployment" warning**, saying your domain is configured
+> but there is no production deployment and you should push to master.
+> **Ignore the advice** — it is Vercel's generic message and pushing to
+> master is the one thing you must not do here. The domain is fine; the
+> `staging` branch simply has not been built yet. Any push to that branch
+> triggers it, and I can do that from my side.
+
+**Then check which database it is actually reading.** Open
+`staging.goodearthkannur.org` and go to **Purchase Orders**:
+
+| What you see                   | What it means                                             |
+| ------------------------------ | --------------------------------------------------------- |
+| **12 practice POs**, next 0013 | Correct. It is on the practice database.                  |
+| **Empty**, next 0001           | **Step 20 is not finished** — it is reading the real one. |
+
+This is step 14's test in reverse, and it is the only way to be sure the
+split actually took.
 
 **Step 22 — the cookie keys.**
 
