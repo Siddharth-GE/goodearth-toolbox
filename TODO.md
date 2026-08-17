@@ -61,15 +61,13 @@ Merged 2026-08-14 (PR #21, `0064` + `0065` applied). Villa waves on Projects, a 
 
 **Catalogue search no longer strips characters out of what you typed.** The term used to have `,` `(` `)` removed before being spliced into a PostgREST `or` filter, and removing the comma was the only thing stopping a typed clause of its own. It is quoted now, so searching for "basin, wall" searches for that.
 
-## 6. The slow first load — **this one needs you**
+## 6. The slow first load — Fluid compute is on
 
-The only thing left from the audits, and it is not a code change.
+**Done 2026-08-17.** Fluid compute / keep-warm was turned on in the Vercel project, and production was redeployed after it, so the setting is live on the build people are using.
 
-Measured 2026-08-14 and unchanged across three audits: warm time-to-first-byte is ~0.20s, a cold one is ~1.01s. That 5× gap is the whole of the reported slowness. It is not the queries, not the region (both Mumbai), not the bundle, not waterfalls, not a missing `loading.tsx` — every one of those was checked and is fine. With ~70 staff spread thinly across sixteen tools all day, a large share of page loads land on a function that has gone cold.
+That was the last thing the August audits left open, and it was never a code change. The finding, for the record: warm time-to-first-byte is ~0.20s and a cold one ~1.01s, and that 5× gap was the whole of the reported slowness. Not the queries, not the region (both Mumbai), not the bundle, not waterfalls, not a missing `loading.tsx` — each was checked and is fine. Two things made it bite harder here: every route is dynamic (108 of 110) because per-user grants are read from the request, so nothing can be served from cache; and the dashboard heading renders only after the user is resolved, so it inherits the whole cold start.
 
-**What to do: turn on Fluid compute / keep-warm in the Vercel project settings, then re-measure.** It is a billing decision, which is why it has sat here. Two things make it bite harder than usual: every route is dynamic (108 of 110) because per-user grants are read from the request, so nothing can be served from cache; and the dashboard heading renders only after the user is resolved, so it inherits the whole cold start.
-
-If turning it on doesn't move the number, the next step is Vercel Speed Insights split by cold versus warm — already wired into the root layout — not more code changes.
+**Whether it helped is a judgement to make by using the app**, not by timing it from one machine — a single measurement catches an edge-cached page or a stale build and proves nothing. If a real number is ever wanted, Vercel Speed Insights is already wired into the root layout and splits cold from warm across all ~70 people.
 
 ## 7. The two cross-tool imports — done
 
