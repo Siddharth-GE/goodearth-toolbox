@@ -13,7 +13,7 @@ import {
 } from "@/lib/selections/views-actions";
 import { designView } from "@/lib/pdf/theme";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
-import type { SpaceViewRow } from "@/lib/selections/views";
+import type { SpaceViewRow } from "@/lib/design-views/queries";
 import { ChevronLeft, ChevronRight, ImagePlus, Trash2 } from "lucide-react";
 import { useRef, useState, useTransition } from "react";
 

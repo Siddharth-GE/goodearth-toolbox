@@ -21,7 +21,7 @@ import { IssueDialog } from "../_components/issue-dialog";
 import { LineGrid } from "../_components/line-grid";
 import { NextRevisionButton } from "../_components/next-revision-button";
 import { SpaceViews } from "../_components/space-views";
-import { listSpaceViews } from "@/lib/selections/views";
+import { listSpaceViews } from "@/lib/design-views/queries";
 import { listItemCategories } from "@/lib/masters/item-categories";
 import { listBrands } from "@/lib/masters/brands";
 import { formatDate } from "@/lib/format";

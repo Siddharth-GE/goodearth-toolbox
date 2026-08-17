@@ -1,6 +1,6 @@
 import { hasApp } from "@/lib/auth/access";
 import { getCurrentUser } from "@/lib/auth/dal";
-import { DESIGN_VIEWS_BUCKET } from "@/lib/selections/views";
+import { DESIGN_VIEWS_BUCKET } from "@/lib/design-views/queries";
 import { createClient } from "@/lib/supabase/server";
 
 /**

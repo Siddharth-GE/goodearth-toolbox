@@ -7,9 +7,11 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import sharp from "sharp";
 
-// Re-declared rather than imported from views.ts, which is "server-only":
-// importing a value from it into this file-level "use server" module drags
-// the server-only chain into the client bundle (see CLAUDE.md).
+// Re-declared rather than imported from lib/design-views/queries.ts, which
+// is "server-only": importing a value from it into this file-level
+// "use server" module drags the server-only chain into the client bundle
+// (see CLAUDE.md). The one string is duplicated on purpose; both copies
+// carry this comment so neither looks like an oversight.
 const BUCKET = "design-views";
 
 // Server Actions cap the request body at 1MB by default (raised to 4mb in

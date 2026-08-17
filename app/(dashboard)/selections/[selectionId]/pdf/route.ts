@@ -1,7 +1,7 @@
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import { getBudgetHandoff } from "@/lib/selections/queries";
 import { SelectionDocument, type ViewImage } from "@/lib/selections/selection-document";
-import { downloadSpaceView, listSpaceViews } from "@/lib/selections/views";
+import { downloadSpaceView, listSpaceViews } from "@/lib/design-views/queries";
 import { createElement, type ReactElement } from "react";
 
 /**
@@ -21,7 +21,17 @@ export async function GET(
 
   // The views bucket is private, so react-pdf can't fetch by URL — the
   // bytes are downloaded here and handed to the document directly.
-  const viewRows = await listSpaceViews(handoff.spaces.map((group) => group.space.id));
+  //
+  // listSpaceViews THROWS on a failed read rather than answering with no
+  // photographs (AUDIT.md MOD-01), so say so in English instead of
+  // letting the browser show a failed download with no reason.
+  let viewRows;
+  try {
+    viewRows = await listSpaceViews(handoff.spaces.map((group) => group.space.id));
+  } catch (error) {
+    console.error("Selections PDF: could not read the design views:", error);
+    return new Response("Could not read the design views. Try again in a moment.", { status: 503 });
+  }
   const viewsBySpace = new Map<string, ViewImage[]>();
   // All spaces' downloads at once — they were one sequential batch per
   // space, which is what made a many-space document slow to generate.

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { downloadSpaceView, listSpaceViews } from "@/lib/selections/views";
+import { downloadSpaceView, listSpaceViews } from "@/lib/design-views/queries";
 
 import { getBudget } from "./queries";
 import { lineAmount } from "./math";
