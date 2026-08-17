@@ -40,59 +40,6 @@ jobs:
       # than a developer has.
       - run: npm ci
 
-      # FIRST, and the only step that talks to a real database.
-      #
-      # "Apply the migration, THEN merge the code that needs it" was a rule
-      # kept by remembering it. This is the rule with a gate under it: a
-      # pull request cannot go green while the database it merges towards
-      # is missing a migration in its own branch. One HTTP call, so putting
-      # it before the fast checks costs nothing — and it is the failure
-      # that is most expensive to discover afterwards, because by then the
-      # code is live against a database that has no column for it.
-      #
-      # Each PR is checked against the database its base branch deploys to.
-      # `github.base_ref` is set only for pull_request events, so both
-      # steps skip on a push to master — where it would be too late anyway.
-      #
-      # It is READ-ONLY and cannot apply anything. A check that fixed what
-      # it found would be applying an unreviewed migration to production
-      # from CI, on a database with no backups.
-      - name: Production has every migration (PRs into master)
-        if: github.base_ref == 'master'
-        run: npm run db:check -- --project pajfrgnkapicdgangjey
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-
-      - name: Staging has every migration (PRs into staging)
-        if: github.base_ref == 'staging'
-        run: npm run db:check -- --project ipstebqawrvhkyntctrv
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-
-      # The fourteen views in `public` are owned by postgres, so they
-      # BYPASS row-level security: each one's WHERE clause, column list and
-      # grants are its entire permission boundary, with no policy behind it
-      # to refuse a careless change. Before this step the only guard was a
-      # comment saying "NEVER add a money column".
-      #
-      # It pins all five things that go wrong in silence: a column added to
-      # a money-free fact view, a has_app check lost from a WHERE clause,
-      # security_invoker lost from the one view carrying margins, write
-      # privileges handed back by `drop view`, and a new view that nobody
-      # pinned. See scripts/view-manifest.ts, which says why each view is
-      # the shape it is.
-      - name: The views are still the shape they claim (PRs into master)
-        if: github.base_ref == 'master'
-        run: npm run db:check-views -- --project pajfrgnkapicdgangjey
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-
-      - name: The views are still the shape they claim (PRs into staging)
-        if: github.base_ref == 'staging'
-        run: npm run db:check-views -- --project ipstebqawrvhkyntctrv
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-
       - name: Formatting
         run: npm run format:check
 
@@ -128,3 +75,68 @@ jobs:
       # live database on every push. See PLAN.md for that decision.
       - name: Server actions
         run: npm run check:actions
+
+      # ---------------------------------------------------------------
+      # LAST: the two steps that talk to a real database.
+      # ---------------------------------------------------------------
+      # Everything above is about the code in this branch and is decided
+      # on this machine. These two are about the world the branch is
+      # merging into, and they are the final gate before the merge button.
+      #
+      # THEY RUN LAST FOR A REASON, learnt by running them first. CI stops
+      # at the first failure, and a pull request into master is SUPPOSED to
+      # sit red for a while — from the moment the migration is written
+      # until it is applied to production. With these steps at the front,
+      # that expected red hid lint, types, tests and the build for the
+      # whole of that window, which is the same trap as a trivial
+      # formatting error skipping every check that matters, just pointing
+      # the other way. Last means a pending migration still tells you
+      # whether the code is sound.
+      #
+      # 1. HAS THIS DATABASE HAD EVERY MIGRATION IN THIS BRANCH?
+      #    "Apply the migration, THEN merge the code that needs it" was a
+      #    rule kept by remembering it. This is the rule with a gate under
+      #    it. Each PR is checked against the database its base branch
+      #    deploys to; `github.base_ref` is set only for pull_request
+      #    events, so these skip on a push to master, where it would be too
+      #    late anyway.
+      #
+      # 2. ARE THE VIEWS STILL THE SHAPE THEY CLAIM?
+      #    The fourteen views in `public` are owned by postgres, so they
+      #    BYPASS row-level security: each one's column list, WHERE clause
+      #    and grants are its entire permission boundary, with no policy
+      #    behind it to refuse a careless change. Until this existed the
+      #    only guard was a comment saying "NEVER add a money column". It
+      #    pins the five things that go wrong in silence — a column added
+      #    to a money-free fact view, a has_app check lost from a WHERE,
+      #    security_invoker lost from the one view carrying margins, write
+      #    privileges handed back by `drop view`, and a new view nobody
+      #    pinned. See scripts/view-manifest.ts for why each view is the
+      #    shape it is.
+      #
+      # Both are READ-ONLY and neither can change anything. A check that
+      # fixed what it found would be applying an unreviewed migration to
+      # production from CI, on a database with no backups.
+      - name: Production has every migration (PRs into master)
+        if: github.base_ref == 'master'
+        run: npm run db:check -- --project pajfrgnkapicdgangjey
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Staging has every migration (PRs into staging)
+        if: github.base_ref == 'staging'
+        run: npm run db:check -- --project ipstebqawrvhkyntctrv
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: The views are still the shape they claim (PRs into master)
+        if: github.base_ref == 'master'
+        run: npm run db:check-views -- --project pajfrgnkapicdgangjey
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: The views are still the shape they claim (PRs into staging)
+        if: github.base_ref == 'staging'
+        run: npm run db:check-views -- --project ipstebqawrvhkyntctrv
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
