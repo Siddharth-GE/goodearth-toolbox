@@ -74,6 +74,17 @@ export default async function WorksPage() {
           {tree.map(({ category, directItems, groups: categoryGroups }) => {
             const itemCount =
               directItems.length + categoryGroups.reduce((n, g) => n + g.items.length, 0);
+            // Direct items and group blocks interleave in code order, the
+            // way the site team's sheet reads — PF.30 (no group) follows
+            // the PF.19 group's items rather than jumping to the top.
+            const entries = [
+              ...directItems.map((item) => ({ sort: item.sort_order, code: item.code, item })),
+              ...categoryGroups.map((g) => ({
+                sort: g.group.sort_order,
+                code: g.group.code,
+                group: g,
+              })),
+            ].sort((a, b) => a.sort - b.sort || a.code.localeCompare(b.code));
             return (
               <Card
                 key={category.id}
@@ -135,23 +146,24 @@ export default async function WorksPage() {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {directItems.map((item) => (
-                        <WorkItemTableRow
-                          key={item.id}
-                          item={item}
-                          categories={categories}
-                          groups={groups}
-                        />
-                      ))}
-                      {categoryGroups.map(({ group, items }) => (
-                        <GroupRows
-                          key={group.id}
-                          group={group}
-                          items={items}
-                          categories={categories}
-                          groups={groups}
-                        />
-                      ))}
+                      {entries.map((entry) =>
+                        "item" in entry ? (
+                          <WorkItemTableRow
+                            key={entry.item.id}
+                            item={entry.item}
+                            categories={categories}
+                            groups={groups}
+                          />
+                        ) : (
+                          <GroupRows
+                            key={entry.group.group.id}
+                            group={entry.group.group}
+                            items={entry.group.items}
+                            categories={categories}
+                            groups={groups}
+                          />
+                        ),
+                      )}
                     </TableBody>
                   </Table>
                 )}
