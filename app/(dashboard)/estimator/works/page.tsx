@@ -27,7 +27,11 @@ export default async function WorksPage({
   const withRecipe = setUp.filter((work) => work.componentCount > 0);
 
   const shown =
-    show === "todo" ? active.filter((work) => work.uom === null) : show === "set-up" ? setUp : active;
+    show === "todo"
+      ? active.filter((work) => work.uom === null)
+      : show === "set-up"
+        ? setUp
+        : active;
 
   // Grouped by category, in the works vocabulary's own order.
   const byCategory = new Map<string, WorkStatusRow[]>();
@@ -47,7 +51,7 @@ export default async function WorksPage({
         </p>
       </div>
 
-      <FigureBand>
+      <FigureBand className="sm:grid-cols-3 lg:grid-cols-3">
         <FigureBandCell>
           <Figure label="Works" value={String(active.length)} hint="active in Masters" size="lg" />
         </FigureBandCell>
@@ -117,9 +121,7 @@ export default async function WorksPage({
                         <span className="text-muted block text-xs">{work.groupName}</span>
                       )}
                     </TableCell>
-                    <TableCell>
-                      {work.uom ?? <Badge variant="neutral">Not set up</Badge>}
-                    </TableCell>
+                    <TableCell>{work.uom ?? <Badge variant="neutral">Not set up</Badge>}</TableCell>
                     <TableCell>
                       {work.uom === null ? (
                         "—"

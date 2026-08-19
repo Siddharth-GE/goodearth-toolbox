@@ -88,7 +88,7 @@ export default async function EstimatePage({
         <p className="text-muted text-sm">Copied from {estimate.sourceName}.</p>
       )}
 
-      <FigureBand>
+      <FigureBand className="sm:grid-cols-3 lg:grid-cols-3">
         <FigureBandCell>
           <Figure
             label="Labour"
@@ -149,8 +149,9 @@ export default async function EstimatePage({
         <div>
           <p className="text-muted text-xs font-semibold tracking-widest uppercase">Works</p>
           <p className="text-muted mt-1 text-sm">
-            What this {estimate.isTemplate ? "standard villa" : "villa"} needs, and what each work
-            costs at today&apos;s rates.
+            {estimate.isTemplate
+              ? "What this standard villa needs, and what each work costs at today's rates."
+              : "What this villa needs, and what each work costs at today's rates."}
           </p>
         </div>
 
