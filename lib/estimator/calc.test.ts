@@ -4,6 +4,9 @@ import {
   computeEstimateTotals,
   computeLine,
   computeTakeoff,
+  computeWorkTakeoff,
+  frozenLineCosts,
+  aggregateFrozenTakeoff,
   expandRecipe,
   groupLineCosts,
   type MaterialDef,
@@ -346,4 +349,129 @@ test("a line whose work has no category lands in Uncategorised, last", () => {
   );
   assert.equal(groups[1].name, "Uncategorised");
   assert.equal(groups[1].totals.notSetUpCount, 1);
+});
+
+test("computeWorkTakeoff keeps quantities per work, and sums to computeTakeoff", () => {
+  const recipes = new Map<string, WorkRecipe>([
+    ["w1", { workItemId: "w1", uom: "cum", labourRate: 900, components: [mix("m20", 1)] }],
+    ["w2", { workItemId: "w2", uom: "sqm", labourRate: 50, components: [direct("cement", 0.5)] }],
+  ]);
+  const lines = [
+    { workItemId: "w1", qty: 10 },
+    { workItemId: "w2", qty: 100 },
+  ];
+
+  const perWork = computeWorkTakeoff(lines, recipes, mixes);
+  const w1Cement = perWork.find((r) => r.workItemId === "w1" && r.materialId === "cement");
+  const w2Cement = perWork.find((r) => r.workItemId === "w2" && r.materialId === "cement");
+  assert.equal(w1Cement?.quantity, 80);
+  assert.equal(w2Cement?.quantity, 50);
+
+  // The per-work rows must sum to exactly what the aggregate takeoff
+  // says — the snapshot (0077) stores the former, the screens print the
+  // latter, and they can never disagree.
+  const summed = new Map<string, number>();
+  for (const row of perWork) {
+    summed.set(row.materialId, (summed.get(row.materialId) ?? 0) + row.quantity);
+  }
+  for (const row of computeTakeoff(lines, recipes, mixes, materials)) {
+    assert.equal(summed.get(row.materialId), row.quantity);
+  }
+});
+
+test("computeWorkTakeoff skips works with no setup, like the aggregate does", () => {
+  const rows = computeWorkTakeoff([{ workItemId: "w9", qty: 5 }], new Map(), mixes);
+  assert.deepEqual(rows, []);
+});
+
+test("frozenLineCosts rebuilds LineCost from the snapshot, deriving what it can", () => {
+  const rebuilt = frozenLineCosts(
+    [
+      {
+        workItemId: "w1",
+        qty: 10,
+        uom: "cum",
+        labourCost: 9000,
+        materialCost: 52000,
+        totalCost: 61000,
+      },
+      {
+        workItemId: "w2",
+        qty: 100,
+        uom: "sqm",
+        labourCost: 5000,
+        materialCost: null,
+        totalCost: null,
+      },
+      {
+        workItemId: "w9",
+        qty: 5,
+        uom: null,
+        labourCost: null,
+        materialCost: null,
+        totalCost: null,
+      },
+    ],
+    [
+      {
+        workItemId: "w1",
+        materialId: "cement",
+        materialName: "Cement",
+        uom: "bag",
+        quantity: 80,
+        rate: 400,
+      },
+      {
+        workItemId: "w2",
+        materialId: "steel",
+        materialName: "Steel",
+        uom: "kg",
+        quantity: 160,
+        rate: null,
+      },
+    ],
+  );
+
+  assert.equal(rebuilt[0].isSetUp, true);
+  assert.equal(rebuilt[0].hasRecipe, true);
+  assert.deepEqual(rebuilt[0].missingRateMaterialIds, []);
+  assert.deepEqual(rebuilt[1].missingRateMaterialIds, ["steel"]);
+  assert.equal(rebuilt[2].isSetUp, false);
+  assert.equal(rebuilt[2].hasRecipe, false);
+});
+
+test("aggregateFrozenTakeoff sums a material across works and keeps null honest", () => {
+  const rows = aggregateFrozenTakeoff([
+    {
+      workItemId: "w1",
+      materialId: "cement",
+      materialName: "Cement",
+      uom: "bag",
+      quantity: 80,
+      rate: 400,
+    },
+    {
+      workItemId: "w2",
+      materialId: "cement",
+      materialName: "Cement",
+      uom: "bag",
+      quantity: 50,
+      rate: 400,
+    },
+    {
+      workItemId: "w2",
+      materialId: "steel",
+      materialName: "Steel",
+      uom: "kg",
+      quantity: 160,
+      rate: null,
+    },
+  ]);
+
+  const cement = rows.find((row) => row.materialId === "cement");
+  assert.equal(cement?.quantity, 130);
+  assert.equal(cement?.cost, 52000);
+  const steel = rows.find((row) => row.materialId === "steel");
+  assert.equal(steel?.cost, null);
+  assert.equal(steel?.missingRate, true);
 });
