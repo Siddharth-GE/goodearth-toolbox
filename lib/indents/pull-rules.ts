@@ -117,3 +117,46 @@ export function classifyDesignDrift(
   }
   return drift;
 }
+
+// ---------------------------------------------------------------------
+// Pull path 3 — the villa's official estimate (0078)
+// ---------------------------------------------------------------------
+
+export type EstimatePullCandidate = {
+  /** The estimate's quantity for this material, in the MATERIAL's uom. */
+  quantity: number;
+  material_uom: string;
+  /** The catalogue item the material is bought as; null = not linked. */
+  item_id: string | null;
+  item_default_uom: string | null;
+  /** One material_uom = factor × item_default_uom; null = none entered. */
+  item_uom_factor: number | null;
+};
+
+export type EstimatePullState =
+  { state: "unlinked" } | { state: "needs_qty" } | { state: "ready"; prefillQty: number };
+
+/**
+ * What the pull screen may do with one material of the takeoff.
+ *
+ * The conversion rule is lib/estimator/link.ts's, restated here because
+ * pure modules import nothing (the todayInIndia() arrangement): a
+ * person-entered factor converts; matching unit labels (case-insensitive,
+ * with procurement's 'each' and the estimator's 'nos' being one unit)
+ * convert 1:1; anything else asks a person for the quantity rather than
+ * guessing — a guessed conversion is a wrong number on an indent.
+ */
+export function classifyEstimatePull(row: EstimatePullCandidate): EstimatePullState {
+  if (!row.item_id || !row.item_default_uom) return { state: "unlinked" };
+  if (row.item_uom_factor !== null && row.item_uom_factor > 0) {
+    return { state: "ready", prefillQty: row.quantity * row.item_uom_factor };
+  }
+  const canon = (u: string) => {
+    const t = u.trim().toLowerCase();
+    return t === "nos" ? "each" : t;
+  };
+  if (canon(row.material_uom) === canon(row.item_default_uom)) {
+    return { state: "ready", prefillQty: row.quantity };
+  }
+  return { state: "needs_qty" };
+}

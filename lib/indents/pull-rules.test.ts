@@ -10,6 +10,7 @@ import { test } from "node:test";
 import {
   classifyBudgetChooser,
   classifyDesignDrift,
+  classifyEstimatePull,
   type BudgetCandidate,
   type DriftLine,
   type IssuedRevision,
@@ -112,4 +113,66 @@ test("drift: only the asked-about keys are classified", () => {
     [line("mine", "sofa", 1, "living"), line("new", "lamp", 2, "bed1")],
   );
   assert.equal(drift.size, 0);
+});
+
+test("estimate pull: an unlinked material cannot be pulled", () => {
+  assert.deepEqual(
+    classifyEstimatePull({
+      quantity: 50,
+      material_uom: "bag",
+      item_id: null,
+      item_default_uom: null,
+      item_uom_factor: null,
+    }),
+    { state: "unlinked" },
+  );
+});
+
+test("estimate pull: matching units prefill as-is; nos and each are one unit", () => {
+  assert.deepEqual(
+    classifyEstimatePull({
+      quantity: 50,
+      material_uom: "Bag",
+      item_id: "i1",
+      item_default_uom: "bag",
+      item_uom_factor: null,
+    }),
+    { state: "ready", prefillQty: 50 },
+  );
+  assert.deepEqual(
+    classifyEstimatePull({
+      quantity: 12,
+      material_uom: "nos",
+      item_id: "i1",
+      item_default_uom: "each",
+      item_uom_factor: null,
+    }),
+    { state: "ready", prefillQty: 12 },
+  );
+});
+
+test("estimate pull: a factor converts into the item's unit", () => {
+  assert.deepEqual(
+    classifyEstimatePull({
+      quantity: 2,
+      material_uom: "cum",
+      item_id: "i1",
+      item_default_uom: "cft",
+      item_uom_factor: 35.31,
+    }),
+    { state: "ready", prefillQty: 70.62 },
+  );
+});
+
+test("estimate pull: differing units with no factor ask a person instead of guessing", () => {
+  assert.deepEqual(
+    classifyEstimatePull({
+      quantity: 100,
+      material_uom: "sqm",
+      item_id: "i1",
+      item_default_uom: "sqft",
+      item_uom_factor: null,
+    }),
+    { state: "needs_qty" },
+  );
 });

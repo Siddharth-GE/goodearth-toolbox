@@ -497,7 +497,12 @@ export async function removeLine(indentId: string, lineId: string): Promise<Acti
  * revalidate for the same reason as updateLine. */
 export async function updateIndentHeader(
   indentId: string,
-  input: { stage: string | null; requiredBy: string | null; note: string | null },
+  input: {
+    stage: string | null;
+    workItemId: string | null;
+    requiredBy: string | null;
+    note: string | null;
+  },
 ): Promise<ActionState> {
   const user = await requireTool("/indents");
 
@@ -506,6 +511,7 @@ export async function updateIndentHeader(
     .from("indents")
     .update({
       stage: input.stage?.trim() || null,
+      work_item_id: input.workItemId || null,
       required_by: input.requiredBy || null,
       note: input.note?.trim() || null,
       updated_by: user.id,
@@ -642,4 +648,126 @@ export async function deleteIndent(indentId: string): Promise<ActionState> {
 
   revalidatePath("/indents", "layout");
   redirect("/indents/list");
+}
+
+export type EstimatePullInput = {
+  /** estimator material id — the stable row of the takeoff. */
+  materialId: string;
+  /** Typed (or prefilled) by the operator, in the ITEM's unit. */
+  quantity: number;
+};
+
+/**
+ * Pulls materials from the villa's official estimate — pull path 3.
+ *
+ * Only which materials and how much comes from the client; the item and
+ * its unit are re-read server-side from estimate_takeoff_facts and the
+ * catalogue. An unlinked material is refused by name — the fix lives on
+ * the Estimator's materials screen, and the message says so. Materials
+ * already on this indent are skipped rather than merged, the same rule
+ * as the other two pull paths (the unique (indent, estimate, item)
+ * anchor backstops it).
+ */
+export async function addEstimatePullLines(
+  indentId: string,
+  estimateId: string,
+  lines: EstimatePullInput[],
+): Promise<ActionState> {
+  const user = await requireTool("/indents");
+
+  if (lines.length === 0) return { error: "Pick at least one material." };
+  if (lines.some((line) => !Number.isFinite(line.quantity) || line.quantity <= 0)) {
+    return { error: "Quantities must be more than 0." };
+  }
+
+  const supabase = await createClient();
+  const materialIds = [...new Set(lines.map((line) => line.materialId))];
+
+  const [{ data: facts, error: factsError }, { data: existing, error: existingError }] =
+    await Promise.all([
+      supabase
+        .from("estimate_takeoff_facts")
+        .select("material_id, material_name, item_id")
+        .eq("estimate_id", estimateId)
+        .in("material_id", materialIds),
+      supabase
+        .from("indent_lines")
+        .select("item_id")
+        .eq("indent_id", indentId)
+        .eq("estimate_id", estimateId),
+    ]);
+  if (factsError || existingError) {
+    console.error("addEstimatePullLines lookup failed:", factsError ?? existingError);
+    return { error: "Could not add those materials. Try again." };
+  }
+  if (!facts || facts.length === 0) {
+    return { error: "That estimate is no longer the official one — reload and look again." };
+  }
+
+  const itemByMaterial = new Map<string, string | null>();
+  const nameByMaterial = new Map<string, string>();
+  for (const fact of facts) {
+    if (!fact.material_id) continue;
+    itemByMaterial.set(fact.material_id, fact.item_id);
+    if (fact.material_name) nameByMaterial.set(fact.material_id, fact.material_name);
+  }
+
+  const unlinked = materialIds.filter(
+    (id) => itemByMaterial.has(id) && itemByMaterial.get(id) === null,
+  );
+  if (unlinked.length > 0) {
+    const name = nameByMaterial.get(unlinked[0]) ?? "that material";
+    return {
+      error: `Link ${name} to a catalogue item in the Estimator first — a request line has to name what the store buys.`,
+    };
+  }
+
+  const itemIds = [
+    ...new Set(
+      materialIds
+        .map((id) => itemByMaterial.get(id))
+        .filter((id): id is string => typeof id === "string"),
+    ),
+  ];
+  const { data: items, error: itemsError } = await supabase
+    .from("items")
+    .select("id, default_uom")
+    .in("id", itemIds);
+  if (itemsError) {
+    console.error("addEstimatePullLines items failed:", itemsError);
+    return { error: "Could not add those materials. Try again." };
+  }
+  const uomByItem = new Map((items ?? []).map((item) => [item.id, item.default_uom]));
+  const already = new Set((existing ?? []).map((line) => line.item_id));
+
+  const inserts = [];
+  for (const line of lines) {
+    const itemId = itemByMaterial.get(line.materialId);
+    if (!itemId || already.has(itemId)) continue;
+    const uom = uomByItem.get(itemId);
+    if (!uom) continue;
+    inserts.push({
+      indent_id: indentId,
+      item_id: itemId,
+      quantity: line.quantity,
+      uom,
+      estimate_id: estimateId,
+      created_by: user.id,
+      updated_by: user.id,
+    });
+    already.add(itemId);
+  }
+
+  if (inserts.length === 0) {
+    return { error: "Every one of those materials is already on this indent." };
+  }
+
+  const { error } = await supabase.from("indent_lines").insert(inserts);
+  if (error) {
+    console.error("addEstimatePullLines insert failed:", error);
+    return guardError(error, "Could not add those materials. Try again.");
+  }
+
+  revalidatePath("/indents", "layout");
+  return undefined;
 }
