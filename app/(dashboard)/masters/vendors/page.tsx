@@ -21,10 +21,10 @@ import { VendorFormDialog } from "./_components/vendor-form-dialog";
 export default async function VendorsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; type?: string; page?: string }>;
 }) {
-  const { q, status, page } = await searchParams;
-  const result = await listVendorsPage({ search: q, status, page: Number(page) || 1 });
+  const { q, status, type, page } = await searchParams;
+  const result = await listVendorsPage({ search: q, status, type, page: Number(page) || 1 });
   const { rows: vendors, total, page: currentPage, pageSize, pageCount } = result;
 
   // Carries the active filters onto the pager links, so paging never
@@ -33,6 +33,7 @@ export default async function VendorsPage({
     const params = new URLSearchParams();
     if (q) params.set("q", q);
     if (status) params.set("status", status);
+    if (type) params.set("type", type);
     if (target > 1) params.set("page", String(target));
     const query = params.toString();
     return query ? `/masters/vendors?${query}` : "/masters/vendors";
@@ -62,10 +63,18 @@ export default async function VendorsPage({
               <option value="inactive">Inactive</option>
             </Select>
           </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="type">Type</Label>
+            <Select id="type" name="type" defaultValue={type ?? ""}>
+              <option value="">All</option>
+              <option value="contractor">Contractors</option>
+              <option value="supplier">Suppliers</option>
+            </Select>
+          </div>
           <Button type="submit" variant="secondary">
             Filter
           </Button>
-          {(q || status) && (
+          {(q || status || type) && (
             <LinkButton href="/masters/vendors" variant="ghost">
               Clear
             </LinkButton>
@@ -77,8 +86,8 @@ export default async function VendorsPage({
       {vendors.length === 0 ? (
         <EmptyState
           icon={ShoppingCart}
-          title={q || status ? "No vendors found" : "No vendors yet"}
-          description={q || status ? "Try a different search." : "Add the first vendor."}
+          title={q || status || type ? "No vendors found" : "No vendors yet"}
+          description={q || status || type ? "Try a different search." : "Add the first vendor."}
         />
       ) : (
         <>
@@ -97,9 +106,12 @@ export default async function VendorsPage({
               {vendors.map((vendor) => (
                 <TableRow key={vendor.id}>
                   <TableCell className="text-foreground font-medium">
-                    <Link href={`/masters/vendors/${vendor.id}`} className="hover:underline">
-                      {vendor.name}
-                    </Link>
+                    <span className="flex items-center gap-2">
+                      <Link href={`/masters/vendors/${vendor.id}`} className="hover:underline">
+                        {vendor.name}
+                      </Link>
+                      {vendor.is_contractor && <Badge variant="neutral">Contractor</Badge>}
+                    </span>
                   </TableCell>
                   <TableCell>{vendor.contact_name || "—"}</TableCell>
                   <TableCell>{vendor.mobile || "—"}</TableCell>

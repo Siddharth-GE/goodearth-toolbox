@@ -4550,6 +4550,7 @@ export type Database = {
           gst_no: string | null
           id: string
           is_active: boolean
+          is_contractor: boolean
           mobile: string | null
           name: string
           updated_at: string | null
@@ -4562,6 +4563,7 @@ export type Database = {
           gst_no?: string | null
           id?: string
           is_active?: boolean
+          is_contractor?: boolean
           mobile?: string | null
           name: string
           updated_at?: string | null
@@ -4574,6 +4576,7 @@ export type Database = {
           gst_no?: string | null
           id?: string
           is_active?: boolean
+          is_contractor?: boolean
           mobile?: string | null
           name?: string
           updated_at?: string | null
@@ -4582,6 +4585,189 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "vendors_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_categories: {
+        Row: {
+          code: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_categories_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_categories_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_groups: {
+        Row: {
+          category_id: string
+          code: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          category_id: string
+          code: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          category_id?: string
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_groups_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "work_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_groups_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_groups_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_items: {
+        Row: {
+          category_id: string
+          code: string
+          created_at: string
+          created_by: string | null
+          group_id: string | null
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          category_id: string
+          code: string
+          created_at?: string
+          created_by?: string | null
+          group_id?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          category_id?: string
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          group_id?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_items_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "work_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_items_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_items_group_in_category_fkey"
+            columns: ["category_id", "group_id"]
+            isOneToOne: false
+            referencedRelation: "work_groups"
+            referencedColumns: ["category_id", "id"]
+          },
+          {
+            foreignKeyName: "work_items_updated_by_fkey"
             columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "profiles"

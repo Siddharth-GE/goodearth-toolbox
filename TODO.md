@@ -115,6 +115,7 @@ Every tool below is built and gated; until someone is granted it, only admins se
 
 ## 11. Not yet planned
 
+- **The Estimator tool** (Operations) — construction estimation and progress tracking, replacing the site team's Excel workbook. Its masters shipped first (`0073`: works vocabulary in Masters, contractor flag on vendors, loaded 2026-08-19 by `scripts/import-works.ts` and `import-contractors.ts`). The tool itself still needs: a new `/estimator` slug (both grant CHECKs + `lib/tools.ts` + welcome screen), rates and quantities against `work_items`, per-plot schedules (the workbook's "Shedule & Progress track" sheet), and — later — the materials linkage.
 - **Phase 9** — Overview fully real, plus one real project run end to end.
 - **Downtime mode.**
 - **Opening state, per tool, as each one goes live** (established 2026-08-17 by reading the schema, not built). Already possible with no code: client dues (`client_receipts` exists, milestones carry `invoice_no`/`invoiced_on`), bills received before go-live (`bills.po_id` is nullable), POs already open (entered as indent → PO, since `indent_lines.budget_id` is nullable), and funding drawdown history. **The one real gap is opening stock** — `goods_receipt_lines.po_line_id` is `NOT NULL`, so there is no way to record that 40 bags of cement are already in the store without inventing a PO. A migration making it nullable for an opening-balance receipt plus a small entry screen, ~half a day, **due the week Inventory goes live**. Indents needs none of this, which is why it goes first.

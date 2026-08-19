@@ -1,8 +1,8 @@
 # Masters — the rules
 
-**Shipped 2026-07-31.** Migrations `0004`, `0005`; hardened in `0031`; construction stages added in `0053`.
+**Shipped 2026-07-31.** Migrations `0004`, `0005`; hardened in `0031`; construction stages added in `0053`; the works vocabulary in `0073`.
 
-The shared reference data every other tool reads: projects, plots, units, clients, vendors, stores, items, categories, brands, GST rates, construction stages, item requests. **Masters is a shared surface, not a peer tool** — when it degrades, everything degrades, and that is expected.
+The shared reference data every other tool reads: projects, plots, units, clients, vendors, stores, items, categories, brands, GST rates, construction stages, works, item requests. **Masters is a shared surface, not a peer tool** — when it degrades, everything degrades, and that is expected.
 
 _Trimmed 2026-08-14: the build checklist lives in git._
 
@@ -13,6 +13,10 @@ _Trimmed 2026-08-14: the build checklist lives in git._
 - **Editing an item code is always safe** — every downstream table references `items.id`, never the code.
 - **`plots` ↔ `units` is strictly 1:1** since `0029`, which also gave `units` a **second foreign key to `plots`**. Any embed reaching `plots` through `units` must name the key: `plots!units_plot_id_fkey`. A bare embed is HTTP 300 at runtime and compiles fine.
 - **Construction stages are picked, never typed** (`0053`), and a rename cascades to indents.
+- **Works (`0073`) and construction stages are two vocabularies on purpose.** Stages (Foundation, Plinth, … Handover) are what indents and construction budgets pick from; works are the site team's estimation list for the coming Estimator tool — three levels, `work_categories` (FD — Foundation) → optional `work_groups` (FD.3 — Dry rubble footing) → `work_items` (FD.4 — Excavation for rubble foundation), loaded from their workbook by `scripts/import-works.ts`. Nothing maps between the two lists, and nothing should until the Estimator gives a reason.
+- **A category's groups and works share one numbering space** (FD.3 is a group, FD.4 a work) across two tables, so the DB's per-table UNIQUEs can't see a cross-table clash — the actions and the import script check it instead. The workbook numbered F.20 twice ("Joinery shutter works" and the "External Finishes" header); decided 2026-08-19: the item kept F.20, the header became F.21, and everything after shifted up one. The app's list is the numbering now.
+- **Works codes (`FD.15`) are a second sanctioned code style**, the site team's own, alongside `items.code`'s `BENS001` convention below. They are different systems for different things — don't harmonise them.
+- **Contractors are vendors** (`0025`'s one-counterparty-list rule, unchanged). `vendors.is_contractor` (`0073`) only lets a screen filter the one list; `scripts/import-contractors.ts` loaded the site team's ~85 names and prints likely-duplicate spellings for review rather than ever merging.
 
 ## Cross-tool coupling declared elsewhere
 

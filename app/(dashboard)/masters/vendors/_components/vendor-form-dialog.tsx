@@ -47,6 +47,10 @@ export function VendorFormDialog({ vendor }: { vendor?: VendorRow }) {
         />
       </div>
       <label className="text-foreground flex items-center gap-2 text-sm">
+        <Checkbox name="is_contractor" value="1" defaultChecked={vendor?.is_contractor ?? false} />
+        Contractor (does labour work at site)
+      </label>
+      <label className="text-foreground flex items-center gap-2 text-sm">
         <Checkbox name="is_active" value="1" defaultChecked={vendor?.is_active ?? true} />
         Active
       </label>
