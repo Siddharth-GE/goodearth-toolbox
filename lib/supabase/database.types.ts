@@ -1197,6 +1197,116 @@ export type Database = {
           },
         ]
       }
+      est_counters: {
+        Row: {
+          last_no: number
+          project_id: string
+        }
+        Insert: {
+          last_no?: number
+          project_id: string
+        }
+        Update: {
+          last_no?: number
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "est_counters_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      estimator_estimate_line_costs: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          estimate_id: string
+          id: string
+          labour_cost: number | null
+          labour_rate: number | null
+          line_id: string
+          material_cost: number | null
+          qty: number
+          total_cost: number | null
+          uom: string | null
+          updated_at: string
+          updated_by: string | null
+          work_item_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          estimate_id: string
+          id?: string
+          labour_cost?: number | null
+          labour_rate?: number | null
+          line_id: string
+          material_cost?: number | null
+          qty: number
+          total_cost?: number | null
+          uom?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          work_item_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          estimate_id?: string
+          id?: string
+          labour_cost?: number | null
+          labour_rate?: number | null
+          line_id?: string
+          material_cost?: number | null
+          qty?: number
+          total_cost?: number | null
+          uom?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          work_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estimator_estimate_line_costs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimator_estimate_line_costs_estimate_id_fkey"
+            columns: ["estimate_id"]
+            isOneToOne: false
+            referencedRelation: "estimator_estimates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimator_estimate_line_costs_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: true
+            referencedRelation: "estimator_estimate_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimator_estimate_line_costs_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimator_estimate_line_costs_work_item_id_fkey"
+            columns: ["work_item_id"]
+            isOneToOne: false
+            referencedRelation: "work_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       estimator_estimate_lines: {
         Row: {
           created_at: string
@@ -1262,16 +1372,103 @@ export type Database = {
           },
         ]
       }
+      estimator_estimate_takeoff: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          estimate_id: string
+          id: string
+          material_id: string
+          material_name: string
+          quantity: number
+          rate: number | null
+          uom: string
+          updated_at: string
+          updated_by: string | null
+          work_item_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          estimate_id: string
+          id?: string
+          material_id: string
+          material_name: string
+          quantity: number
+          rate?: number | null
+          uom: string
+          updated_at?: string
+          updated_by?: string | null
+          work_item_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          estimate_id?: string
+          id?: string
+          material_id?: string
+          material_name?: string
+          quantity?: number
+          rate?: number | null
+          uom?: string
+          updated_at?: string
+          updated_by?: string | null
+          work_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estimator_estimate_takeoff_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimator_estimate_takeoff_estimate_id_fkey"
+            columns: ["estimate_id"]
+            isOneToOne: false
+            referencedRelation: "estimator_estimates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimator_estimate_takeoff_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "estimator_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimator_estimate_takeoff_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimator_estimate_takeoff_work_item_id_fkey"
+            columns: ["work_item_id"]
+            isOneToOne: false
+            referencedRelation: "work_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       estimator_estimates: {
         Row: {
           created_at: string
           created_by: string | null
+          est_no: number | null
           id: string
           is_template: boolean
           name: string
           note: string | null
           project_id: string
+          reference: string | null
           source_estimate_id: string | null
+          status: string
+          submitted_at: string | null
+          submitted_by: string | null
+          superseded_at: string | null
           unit_id: string | null
           updated_at: string
           updated_by: string | null
@@ -1279,12 +1476,18 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by?: string | null
+          est_no?: number | null
           id?: string
           is_template?: boolean
           name: string
           note?: string | null
           project_id: string
+          reference?: string | null
           source_estimate_id?: string | null
+          status?: string
+          submitted_at?: string | null
+          submitted_by?: string | null
+          superseded_at?: string | null
           unit_id?: string | null
           updated_at?: string
           updated_by?: string | null
@@ -1292,12 +1495,18 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string | null
+          est_no?: number | null
           id?: string
           is_template?: boolean
           name?: string
           note?: string | null
           project_id?: string
+          reference?: string | null
           source_estimate_id?: string | null
+          status?: string
+          submitted_at?: string | null
+          submitted_by?: string | null
+          superseded_at?: string | null
           unit_id?: string | null
           updated_at?: string
           updated_by?: string | null
@@ -1322,6 +1531,13 @@ export type Database = {
             columns: ["source_estimate_id"]
             isOneToOne: false
             referencedRelation: "estimator_estimates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimator_estimates_submitted_by_fkey"
+            columns: ["submitted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -6216,6 +6432,7 @@ export type Database = {
         Args: { p_item_id: string; p_store_id: string }
         Returns: number
       }
+      submit_estimate: { Args: { p_estimate_id: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never
