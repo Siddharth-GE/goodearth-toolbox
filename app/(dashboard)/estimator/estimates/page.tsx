@@ -90,7 +90,14 @@ export default async function EstimatesPage() {
                       <TableCell>{template.projectName}</TableCell>
                       <TableCell>{template.lineCount}</TableCell>
                       <TableCell>
-                        <div className="flex justify-end">
+                        <div className="flex items-center justify-end gap-1">
+                          <LinkButton
+                            href={`/estimator/estimates/${template.id}`}
+                            variant="ghost"
+                            size="sm"
+                          >
+                            Open
+                          </LinkButton>
                           <CopyTemplateDialog template={template} units={units} />
                         </div>
                       </TableCell>

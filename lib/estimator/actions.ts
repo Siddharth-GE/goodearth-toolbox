@@ -41,6 +41,47 @@ function deleteError(error: { code?: string }, what: string, instead: string): s
 }
 
 // ---------------------------------------------------------------------
+// Units of measure (0075)
+// ---------------------------------------------------------------------
+// The master exists so units are PICKED, not typed — the founder's call
+// after the first staging session produced cft, Sqft and cum by hand.
+// The uom columns stay text, so renaming or deleting a unit here never
+// touches saved rows; it only changes what the pickers offer next time.
+
+export async function createUom(_state: ActionState, formData: FormData): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+  const name = text(formData, "name");
+  if (!name) return { error: "Give the unit a name, like cft or bag." };
+  if (name.length > UOM_LIMIT) return { error: `Keep the unit under ${UOM_LIMIT} characters.` };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("estimator_uoms")
+    .insert({ name, created_by: user.id, updated_by: user.id });
+  if (error) {
+    if (error.code === "23505") return { error: "That unit is already in the list." };
+    console.error("createUom failed:", error);
+    return { error: "Could not add the unit. Try again." };
+  }
+
+  revalidatePath("/estimator", "layout");
+  return undefined;
+}
+
+export async function deleteUom(id: string): Promise<ActionState> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+  const { error } = await supabase.from("estimator_uoms").delete().eq("id", id);
+  if (error) {
+    console.error("deleteUom failed:", error);
+    return { error: "Could not remove the unit. Try again." };
+  }
+
+  revalidatePath("/estimator", "layout");
+  return undefined;
+}
+
+// ---------------------------------------------------------------------
 // Materials
 // ---------------------------------------------------------------------
 

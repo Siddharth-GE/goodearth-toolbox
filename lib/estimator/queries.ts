@@ -118,26 +118,72 @@ export async function listMaterials(): Promise<MaterialRow[]> {
   }));
 }
 
-/** The units already in use, for the form's datalist — keeps spelling from drifting. */
-export async function listUsedUoms(): Promise<string[]> {
+// ---------------------------------------------------------------------
+// Units of measure (0075) — the master behind every uom picker
+// ---------------------------------------------------------------------
+
+export type UomRow = {
+  id: string;
+  name: string;
+  isActive: boolean;
+  /** Rows across materials, mixes and work setups spelling this unit. */
+  useCount: number;
+};
+
+/** Every unit, for the management list on the Materials screen. */
+export async function listUoms(): Promise<UomRow[]> {
   await requireTool(GRANT);
   const supabase = await createClient();
 
-  const [materials, mixes, works] = await Promise.all([
-    fetchAll<{ uom: string }>((from, to) =>
-      supabase.from("estimator_materials").select("uom").order("uom").range(from, to),
+  const [uoms, materials, mixes, works] = await Promise.all([
+    fetchAll<{ id: string; name: string; is_active: boolean }>((from, to) =>
+      supabase
+        .from("estimator_uoms")
+        .select("id, name, is_active")
+        .order("sort_order")
+        .order("name")
+        .range(from, to),
     ),
     fetchAll<{ uom: string }>((from, to) =>
-      supabase.from("estimator_mixes").select("uom").order("uom").range(from, to),
+      supabase.from("estimator_materials").select("uom").order("id").range(from, to),
     ),
     fetchAll<{ uom: string }>((from, to) =>
-      supabase.from("estimator_work_info").select("uom").order("uom").range(from, to),
+      supabase.from("estimator_mixes").select("uom").order("id").range(from, to),
+    ),
+    fetchAll<{ uom: string }>((from, to) =>
+      supabase.from("estimator_work_info").select("uom").order("id").range(from, to),
     ),
   ]);
 
-  const seen = new Set<string>();
-  for (const row of [...materials, ...mixes, ...works]) seen.add(row.uom);
-  return [...seen].sort((a, b) => a.localeCompare(b));
+  const uses = new Map<string, number>();
+  for (const row of [...materials, ...mixes, ...works]) {
+    const key = row.uom.toLowerCase();
+    uses.set(key, (uses.get(key) ?? 0) + 1);
+  }
+
+  return uoms.map((uom) => ({
+    id: uom.id,
+    name: uom.name,
+    isActive: uom.is_active,
+    useCount: uses.get(uom.name.toLowerCase()) ?? 0,
+  }));
+}
+
+/** Active unit names in picker order, for every uom select in the tool. */
+export async function listUomNames(): Promise<string[]> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+
+  const rows = await fetchAll<{ name: string }>((from, to) =>
+    supabase
+      .from("estimator_uoms")
+      .select("name")
+      .eq("is_active", true)
+      .order("sort_order")
+      .order("name")
+      .range(from, to),
+  );
+  return rows.map((row) => row.name);
 }
 
 // ---------------------------------------------------------------------
