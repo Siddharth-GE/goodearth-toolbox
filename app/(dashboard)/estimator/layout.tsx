@@ -9,10 +9,7 @@ export default async function EstimatorLayout({ children }: { children: React.Re
 
   return (
     <div className="space-y-4">
-      <PageTitle
-        title="Estimator"
-        description="What a villa costs to build, work by work."
-      />
+      <PageTitle title="Estimator" description="What a villa costs to build, work by work." />
       <EstimatorNav />
       {children}
     </div>

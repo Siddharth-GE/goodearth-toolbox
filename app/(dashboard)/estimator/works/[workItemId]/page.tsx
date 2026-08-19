@@ -54,9 +54,7 @@ export default async function WorkSetupPage({
         description={[work.categoryName, work.groupName].filter(Boolean).join(" · ")}
         backHref="/estimator/works"
         backLabel="Works"
-        actions={
-          work.uom === null ? <Badge variant="neutral">Not set up</Badge> : undefined
-        }
+        actions={work.uom === null ? <Badge variant="neutral">Not set up</Badge> : undefined}
       />
 
       <Card className="space-y-3 p-4">
@@ -150,11 +148,7 @@ export default async function WorkSetupPage({
                       </div>
                     </TableCell>
                     <TableCell>
-                      <RemoveComponentButton
-                        id={component.id}
-                        kind="work"
-                        label={component.name}
-                      />
+                      <RemoveComponentButton id={component.id} kind="work" label={component.name} />
                     </TableCell>
                   </TableRow>
                 ))}
