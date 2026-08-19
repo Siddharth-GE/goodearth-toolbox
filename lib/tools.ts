@@ -1,5 +1,6 @@
 import {
   Boxes,
+  Calculator,
   ClipboardList,
   FileChartColumn,
   Footprints,
@@ -25,6 +26,7 @@ import {
 // actually rendered.
 export const TOOL_ICONS = {
   Boxes,
+  Calculator,
   ClipboardList,
   FileChartColumn,
   Footprints,
@@ -108,6 +110,14 @@ export const TOOLS: Tool[] = [
     description: "Recording against POs and labour contracts.",
     href: "/bills",
     icon: "Receipt",
+    group: "Operations",
+    built: true,
+  },
+  {
+    name: "Estimator",
+    description: "Cost a villa from its works: materials, mixes and labour.",
+    href: "/estimator",
+    icon: "Calculator",
     group: "Operations",
     built: true,
   },
