@@ -42,8 +42,9 @@ export default async function MaterialsPage() {
         <Card className="space-y-3 p-4">
           {unpriced > 0 && (
             <p className="text-muted text-sm">
-              {unpriced} of {materials.length}{" "}
-              {unpriced === 1 ? "material has" : "materials have"} no rate yet.
+              {materials.length === 1
+                ? "This material has no rate yet."
+                : `${unpriced} of ${materials.length} materials ${unpriced === 1 ? "has" : "have"} no rate yet.`}
             </p>
           )}
           <Table>

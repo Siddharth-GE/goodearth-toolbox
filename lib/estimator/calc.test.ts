@@ -215,6 +215,56 @@ test("totals add up what is known and refuse to call it complete", () => {
   assert.equal(totals.notSetUpCount, 1);
 });
 
+test("a column with nothing known in it is null, not zero", () => {
+  // The bug this exists to stop: one line, its only material unpriced.
+  // The materials column knows NOTHING, and a screen printing ₹0 there
+  // would be saying the materials are free. Caught on staging before
+  // the tool shipped.
+  const unpricedRecipe: WorkRecipe = {
+    workItemId: "w3",
+    uom: "cum",
+    labourRate: 900,
+    components: [direct("steel", 80)],
+  };
+  const totals = computeEstimateTotals([
+    computeLine({ workItemId: "w3", qty: 10 }, unpricedRecipe, mixes, materials),
+  ]);
+
+  assert.equal(totals.material, null);
+  assert.equal(totals.labour, 9000);
+  // The grand total is still the honest floor: labour is genuinely known.
+  assert.equal(totals.grand, 9000);
+  assert.equal(totals.isComplete, false);
+});
+
+test("nothing known anywhere leaves every column null", () => {
+  const totals = computeEstimateTotals([
+    computeLine({ workItemId: "w9", qty: 1 }, undefined, mixes, materials),
+  ]);
+  assert.equal(totals.labour, null);
+  assert.equal(totals.material, null);
+  assert.equal(totals.grand, null);
+  assert.equal(totals.notSetUpCount, 1);
+});
+
+test("a genuinely free column is zero, not null", () => {
+  // Labour-only work: the materials really do cost nothing, and that is
+  // a different statement from "nobody has priced them".
+  const labourOnly: WorkRecipe = {
+    workItemId: "w2",
+    uom: "sqm",
+    labourRate: 55,
+    components: [],
+  };
+  const totals = computeEstimateTotals([
+    computeLine({ workItemId: "w2", qty: 100 }, labourOnly, mixes, materials),
+  ]);
+  assert.equal(totals.material, 0);
+  assert.equal(totals.labour, 5500);
+  assert.equal(totals.grand, 5500);
+  assert.equal(totals.isComplete, true);
+});
+
 test("a fully priced estimate reports itself complete", () => {
   const recipe: WorkRecipe = {
     workItemId: "w1",

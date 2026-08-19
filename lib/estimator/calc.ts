@@ -181,11 +181,20 @@ export function computeTakeoff(
 }
 
 export type EstimateTotals = {
-  /** Sums of what IS known. Read them beside isComplete, never alone. */
-  labour: number;
-  material: number;
-  grand: number;
-  /** false = something is unpriced, so these totals are a floor. */
+  /**
+   * Sums of what IS known — a floor, not an answer, whenever
+   * `isComplete` is false.
+   *
+   * `null` means nothing in that column is known at all. It is NOT the
+   * same as 0, and the difference is the whole point: a screen that
+   * printed `₹0` for "every material here is unpriced" would be saying
+   * the materials are free. Zero is reserved for a column that really
+   * does cost nothing, like a labour-only estimate's materials.
+   */
+  labour: number | null;
+  material: number | null;
+  grand: number | null;
+  /** false = something is unpriced, so the totals above are a floor. */
   isComplete: boolean;
   missingLabourCount: number;
   missingMaterialRateCount: number;
@@ -211,10 +220,20 @@ export function computeEstimateTotals(lineCosts: LineCost[]): EstimateTotals {
     else material += line.materialCost;
   }
 
+  // A column with nothing known in it hands back null rather than 0 —
+  // otherwise "every material is unpriced" and "the materials are free"
+  // print identically. A line with no setup at all counts as unknown on
+  // BOTH sides, which is why it can't be judged by the two missing-rate
+  // counters alone (they only see lines that got as far as being set up).
+  const nothingUnknown =
+    missingLabourCount === 0 && missingMaterialRateCount === 0 && notSetUpCount === 0;
+  const labourKnown = nothingUnknown || labour > 0;
+  const materialKnown = nothingUnknown || material > 0;
+
   return {
-    labour,
-    material,
-    grand: labour + material,
+    labour: labourKnown ? labour : null,
+    material: materialKnown ? material : null,
+    grand: labourKnown || materialKnown ? labour + material : null,
     isComplete: missingLabourCount === 0 && missingMaterialRateCount === 0 && notSetUpCount === 0,
     missingLabourCount,
     missingMaterialRateCount,

@@ -117,12 +117,14 @@ export default async function EstimatePage({
         </FigureBandCell>
         <FigureBandCell>
           <Figure
-            label={totals.isComplete ? "Total" : "Total so far"}
+            label={totals.isComplete ? "Total" : totals.grand === null ? "Total" : "Total so far"}
             value={formatMoney(totals.grand)}
             hint={
               totals.isComplete
                 ? "at today's rates"
-                : "some rates are missing — this is a floor, not the answer"
+                : totals.grand === null
+                  ? "nothing on this estimate is priced yet"
+                  : "some rates are missing — this is a floor, not the answer"
             }
             tone={totals.isComplete ? undefined : "warn"}
             size="hero"
