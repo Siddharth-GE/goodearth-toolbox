@@ -12,6 +12,8 @@ export type VendorRow = {
   gst_no: string | null;
   address: string | null;
   is_active: boolean;
+  /** 0073: contractors are vendors (0025's one-counterparty-list rule); the flag only filters. */
+  is_contractor: boolean;
   created_at: string;
   updated_at: string | null;
   updated_by: string | null;
@@ -36,6 +38,8 @@ export type VendorFilters = {
   search?: string;
   /** "active" | "inactive" | undefined (all) */
   status?: string;
+  /** "contractor" | "supplier" | undefined (all) */
+  type?: string;
   page?: number;
 };
 
@@ -56,6 +60,8 @@ export async function listVendorsPage(
         .range((page - 1) * VENDORS_PAGE_SIZE, page * VENDORS_PAGE_SIZE - 1);
       if (filters.status === "active") query = query.eq("is_active", true);
       if (filters.status === "inactive") query = query.eq("is_active", false);
+      if (filters.type === "contractor") query = query.eq("is_contractor", true);
+      if (filters.type === "supplier") query = query.eq("is_contractor", false);
       if (search) {
         query = query.or(
           `name.ilike.%${search}%,contact_name.ilike.%${search}%,gst_no.ilike.%${search}%`,
