@@ -240,3 +240,43 @@ export function computeEstimateTotals(lineCosts: LineCost[]): EstimateTotals {
     notSetUpCount,
   };
 }
+
+export type BoqCategory = {
+  code: string;
+  name: string;
+  lineCosts: LineCost[];
+  /** The category's own honest subtotal — same null rules as the estimate's. */
+  totals: EstimateTotals;
+};
+
+/**
+ * The BOQ shape: lines gathered under their work category, in the
+ * category order the site team reads (ENC, SM, FD, …), each group with
+ * its own computeEstimateTotals subtotal. The estimate screen renders
+ * this, and a future PDF export renders THIS SAME STRUCTURE — that is
+ * the point of it living here rather than in the page: the paper and
+ * the screen can never group or add differently.
+ */
+export function groupLineCosts(
+  lineCosts: LineCost[],
+  categoryByWork: Map<string, { code: string; name: string }>,
+  /** Category codes in display order, from the works vocabulary. */
+  categoryOrder: string[],
+): BoqCategory[] {
+  const groups = new Map<string, { code: string; name: string; lineCosts: LineCost[] }>();
+  for (const line of lineCosts) {
+    const category = categoryByWork.get(line.workItemId) ?? { code: "", name: "Uncategorised" };
+    const group = groups.get(category.code) ?? { ...category, lineCosts: [] };
+    group.lineCosts.push(line);
+    groups.set(category.code, group);
+  }
+
+  const order = new Map(categoryOrder.map((code, index) => [code, index]));
+  return [...groups.values()]
+    .sort(
+      (a, b) =>
+        (order.get(a.code) ?? Number.MAX_SAFE_INTEGER) -
+          (order.get(b.code) ?? Number.MAX_SAFE_INTEGER) || a.code.localeCompare(b.code),
+    )
+    .map((group) => ({ ...group, totals: computeEstimateTotals(group.lineCosts) }));
+}
