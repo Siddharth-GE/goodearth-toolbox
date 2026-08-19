@@ -53,7 +53,10 @@ function readWorksForm(formData: FormData) {
     name: String(formData.get("name") ?? "").trim(),
     category_id: String(formData.get("category_id") ?? "").trim(),
     group_id: String(formData.get("group_id") ?? "").trim() || null,
-    is_active: formData.get("is_active") !== "0",
+    // Checkbox convention (vendors): checked posts "1", unchecked posts
+    // nothing — only the edit dialogs carry the checkbox, and only the
+    // update actions read this field.
+    is_active: formData.get("is_active") === "1",
   };
 }
 
@@ -125,7 +128,10 @@ export async function updateWorkCategory(
   return undefined;
 }
 
-export async function setWorkCategoryActive(id: string, isActive: boolean): Promise<WorksFormState> {
+export async function setWorkCategoryActive(
+  id: string,
+  isActive: boolean,
+): Promise<WorksFormState> {
   const user = await requireTool("/masters");
 
   const supabase = await createClient();
@@ -203,7 +209,13 @@ export async function updateWorkGroup(
 
   const { error } = await supabase
     .from("work_groups")
-    .update({ code, name, is_active, sort_order: sortOrderFromCode(code, 9990), updated_by: user.id })
+    .update({
+      code,
+      name,
+      is_active,
+      sort_order: sortOrderFromCode(code, 9990),
+      updated_by: user.id,
+    })
     .eq("id", id);
   if (error) {
     if (error.code === "23505") return { error: `${code} is already used.` };
