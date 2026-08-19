@@ -15,6 +15,7 @@ function readVendorForm(formData: FormData) {
     gst_no: String(formData.get("gst_no") ?? "").trim() || null,
     address: String(formData.get("address") ?? "").trim() || null,
     is_active: formData.get("is_active") === "1",
+    is_contractor: formData.get("is_contractor") === "1",
   };
 }
 
@@ -24,13 +25,14 @@ export async function createVendor(
 ): Promise<VendorFormState> {
   await requireTool("/masters");
 
-  const { name, contact_name, mobile, gst_no, address, is_active } = readVendorForm(formData);
+  const { name, contact_name, mobile, gst_no, address, is_active, is_contractor } =
+    readVendorForm(formData);
   if (!name) return { error: "Enter the vendor's name." };
 
   const supabase = await createClient();
   const { error } = await supabase
     .from("vendors")
-    .insert({ name, contact_name, mobile, gst_no, address, is_active });
+    .insert({ name, contact_name, mobile, gst_no, address, is_active, is_contractor });
   if (error) {
     console.error("createVendor failed:", error);
     return { error: "Could not create vendor. Try again." };
@@ -47,13 +49,23 @@ export async function updateVendor(
 ): Promise<VendorFormState> {
   const user = await requireTool("/masters");
 
-  const { name, contact_name, mobile, gst_no, address, is_active } = readVendorForm(formData);
+  const { name, contact_name, mobile, gst_no, address, is_active, is_contractor } =
+    readVendorForm(formData);
   if (!name) return { error: "Enter the vendor's name." };
 
   const supabase = await createClient();
   const { error } = await supabase
     .from("vendors")
-    .update({ name, contact_name, mobile, gst_no, address, is_active, updated_by: user.id })
+    .update({
+      name,
+      contact_name,
+      mobile,
+      gst_no,
+      address,
+      is_active,
+      is_contractor,
+      updated_by: user.id,
+    })
     .eq("id", id);
   if (error) {
     console.error("updateVendor failed:", error);
