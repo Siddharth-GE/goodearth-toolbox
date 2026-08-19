@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.15"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -1346,6 +1346,8 @@ export type Database = {
           created_by: string | null
           id: string
           is_active: boolean
+          item_id: string | null
+          item_uom_factor: number | null
           name: string
           rate: number | null
           uom: string
@@ -1357,6 +1359,8 @@ export type Database = {
           created_by?: string | null
           id?: string
           is_active?: boolean
+          item_id?: string | null
+          item_uom_factor?: number | null
           name: string
           rate?: number | null
           uom: string
@@ -1368,6 +1372,8 @@ export type Database = {
           created_by?: string | null
           id?: string
           is_active?: boolean
+          item_id?: string | null
+          item_uom_factor?: number | null
           name?: string
           rate?: number | null
           uom?: string
@@ -1380,6 +1386,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimator_materials_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
             referencedColumns: ["id"]
           },
           {
