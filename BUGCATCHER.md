@@ -10,7 +10,7 @@ Read this before merging anything that touches a database read, a file upload, a
 
 ## Before you merge
 
-Ten checks, each earned by a bug below.
+Eleven checks, each earned by a bug below.
 
 | Check                                                                         | Because                                                                                                                                                   |
 | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -24,6 +24,7 @@ Ten checks, each earned by a bug below.
 | **Render any new drawing from real data and look at it.**                     | A wave with 22 passing tests still overlapped its own labels, and was designed for 7 villas where production has 43.                                      |
 | **Fire the trigger, in a transaction you roll back.**                         | A permission check added to a definer function would have blocked the trigger it exists for — and the migration's own assertions would still have passed. |
 | **Confirm a Production deployment exists for the merged commit.**             | A merge, a green CI and an applied migration all say "done" while the site serves the commit from three hours ago.                                        |
+| **Read the number the screen prints for the empty and unknown cases.**        | A total whose model correctly said "nothing here is priced" still printed a confident ₹0 on the page.                                                     |
 
 ---
 
@@ -208,6 +209,24 @@ gh api repos/<owner>/<repo>/deployments \
 It was written as the check for this entry and **failed on its first real use**. GitHub's Deployments API is a mirror Vercel posts into, and it is not complete: a preview build visible in the Vercel dashboard was entirely absent from it, and later pushes produced no rows at all. A check that reports "no deployment" when one exists is worse than no check, because the next person spends an hour debugging a deployment that already happened.
 
 Automating this properly needs a **Vercel** API token, which this machine deliberately does not have — only Supabase ones. Until that exists, the dashboard is the answer, and "I merged it" is never the same sentence as "it is live".
+
+---
+
+### 13. An honest model and a lying screen
+
+_Caught 2026-08-19 on staging, building the Estimator — before it shipped, by reading the figure the page printed._
+
+**What happened.** An estimate whose only material was unpriced showed **MATERIALS ₹0**. Every part of that was built to prevent exactly this: `formatMoney(null)` prints "—", the calculator returns `null` for any cost it cannot know, the per-line cells and the material takeoff both correctly showed "Not priced" and a dash. The one number that got it wrong was the column total, and it was the biggest number on the screen.
+
+**Why.** `computeEstimateTotals` summed _what was known_ and reported `material: 0` alongside `missingMaterialRateCount: 1`. That pair is honest — 0 known rupees, 1 line we cannot price — and the function's own comment said to read them together. **The screen read only the first half.** Thirty passing tests all asserted the pair, so the model was proved right about a screen that was wrong.
+
+**Why nothing caught it.** There was no defect to find. Types were satisfied (`number` is a fine type for a sum), tests passed because they tested the model, and the build has no opinion about what a figure means. "Zero" and "unknown" are the same bits; only the rendering distinguishes them, and only a person can see the rendering.
+
+**The rule.** **A total that cannot be known must be `null`, not `0`, in the type that reaches the screen** — never a number plus a flag the caller is trusted to check, because a caller that forgets produces a confident lie rather than a visible gap. Reserve `0` for a column that genuinely costs nothing; the Estimator's labour-only estimate really does have ₹0 of materials, and that is a different sentence from "nobody has priced them".
+
+**The check.** Put a screen in its unknown state and **read the numbers on it out loud**: an estimate with nothing priced, a report with no rows, a total whose inputs are missing. If a figure says ₹0, ask whether the app knows it is zero or merely does not know. Model tests cannot answer that question, because the model is usually right.
+
+**It happened again the same day.** The founder's first real session found the second instance one screen over: a mix with nothing in it yet said **"Cost per cum: ₹0 — from today's material rates"**. The mix page computed its figure locally instead of going through the calculator's null rules, and `reduce` over an empty list is 0. Same disease, same fix (`null` + "nothing in it yet"), and proof the check above has to walk **every** screen that prints money, not the one where the bug was first found.
 
 ---
 

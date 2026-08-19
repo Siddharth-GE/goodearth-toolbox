@@ -1,5 +1,6 @@
 import {
   Boxes,
+  Calculator,
   ClipboardList,
   FileChartColumn,
   Footprints,
@@ -25,6 +26,7 @@ import {
 // actually rendered.
 export const TOOL_ICONS = {
   Boxes,
+  Calculator,
   ClipboardList,
   FileChartColumn,
   Footprints,
@@ -72,10 +74,26 @@ export type Tool = {
 // lib/auth/access.ts.
 export const TOOLS: Tool[] = [
   {
+    name: "Estimator",
+    description: "Cost a villa from its works: materials, mixes and labour.",
+    href: "/estimator",
+    icon: "Calculator",
+    group: "Operations",
+    built: true,
+  },
+  {
     name: "Selections",
     description: "Specify what goes into every space of a unit.",
     href: "/selections",
     icon: "Palette",
+    group: "Operations",
+    built: true,
+  },
+  {
+    name: "Budgets",
+    description: "Price an issued design revision, space by space.",
+    href: "/budgets",
+    icon: "PiggyBank",
     group: "Operations",
     built: true,
   },
@@ -108,14 +126,6 @@ export const TOOLS: Tool[] = [
     description: "Recording against POs and labour contracts.",
     href: "/bills",
     icon: "Receipt",
-    group: "Operations",
-    built: true,
-  },
-  {
-    name: "Budgets",
-    description: "Price an issued design revision, space by space.",
-    href: "/budgets",
-    icon: "PiggyBank",
     group: "Operations",
     built: true,
   },
