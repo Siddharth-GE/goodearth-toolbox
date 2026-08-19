@@ -19,11 +19,13 @@ import type { MaterialDef, MixDef, WorkRecipe } from "./calc";
  * Masters (`lib/masters/works.ts`) — a shared surface, money-free, and
  * ungated by design. Nothing here reads another tool's tables.
  *
- * No embeds anywhere: the estimates list needs villa names, and
- * `units` has had two foreign keys to `plots` since 0029, so a bare
- * embed answers HTTP 300 at runtime while compiling perfectly
- * (BUGCATCHER #2). Names are merged through a Map instead — the
- * Directory pattern.
+ * Almost no embeds: the estimates list needs villa names, and `units`
+ * has had two foreign keys to `plots` since 0029, so a bare embed
+ * answers HTTP 300 at runtime while compiling perfectly (BUGCATCHER
+ * #2). Names are merged through a Map instead — the Directory pattern.
+ * The one embed is listMaterials' `items(...)`: estimator_materials has
+ * exactly one path to items (0076), so it cannot go ambiguous, and it
+ * was exercised against staging PostgREST before shipping.
  */
 
 const GRANT = "/estimator";
@@ -73,6 +75,14 @@ export type MaterialRow = {
   isActive: boolean;
   /** How many mixes and recipes use it — a material in use can't be deleted. */
   useCount: number;
+  /** The catalogue item this material is bought and issued as (0076). */
+  itemId: string | null;
+  /** One <uom> of the material = factor × <default_uom> of the item. */
+  itemUomFactor: number | null;
+  /** Display fields of the linked item; null when unlinked. */
+  itemName: string | null;
+  itemCode: string | null;
+  itemDefaultUom: string | null;
 };
 
 export async function listMaterials(): Promise<MaterialRow[]> {
@@ -80,14 +90,24 @@ export async function listMaterials(): Promise<MaterialRow[]> {
   const supabase = await createClient();
 
   const [materials, mixUses, workUses] = await Promise.all([
-    fetchAll<{ id: string; name: string; uom: string; rate: number | null; is_active: boolean }>(
-      (from, to) =>
-        supabase
-          .from("estimator_materials")
-          .select("id, name, uom, rate, is_active")
-          .order("name")
-          .order("id")
-          .range(from, to),
+    fetchAll<{
+      id: string;
+      name: string;
+      uom: string;
+      rate: number | null;
+      is_active: boolean;
+      item_id: string | null;
+      item_uom_factor: number | null;
+      items: { name: string; code: string | null; default_uom: string } | null;
+    }>((from, to) =>
+      supabase
+        .from("estimator_materials")
+        .select(
+          "id, name, uom, rate, is_active, item_id, item_uom_factor, items(name, code, default_uom)",
+        )
+        .order("name")
+        .order("id")
+        .range(from, to),
     ),
     fetchAll<{ material_id: string }>((from, to) =>
       supabase.from("estimator_mix_components").select("material_id").order("id").range(from, to),
@@ -115,6 +135,11 @@ export async function listMaterials(): Promise<MaterialRow[]> {
     rate: material.rate,
     isActive: material.is_active,
     useCount: uses.get(material.id) ?? 0,
+    itemId: material.item_id,
+    itemUomFactor: material.item_uom_factor,
+    itemName: material.items?.name ?? null,
+    itemCode: material.items?.code ?? null,
+    itemDefaultUom: material.items?.default_uom ?? null,
   }));
 }
 

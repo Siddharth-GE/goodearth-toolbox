@@ -21,10 +21,11 @@ import { createClient } from "@/lib/supabase/server";
 export async function GET(request: Request) {
   const user = await getCurrentUser();
   if (!user) return new Response("Unauthorized", { status: 401 });
-  // Five tools browse the catalogue: designers picking items, Masters
+  // Six tools browse the catalogue: designers picking items, Masters
   // checking a request against what already exists, Budgets setting a
-  // product's default margin, Indents adding direct request lines, and
-  // Inventory choosing the item a stock adjustment applies to. Every
+  // product's default margin, Indents adding direct request lines,
+  // Inventory choosing the item a stock adjustment applies to, and the
+  // Estimator linking a material to the item it is bought as. Every
   // tool that renders components/masters/catalogue-picker.tsx must be
   // listed here — a missing grant fails as an unparseable fetch
   // response inside the dialog, not as a friendly refusal (found by the
@@ -41,7 +42,8 @@ export async function GET(request: Request) {
     (await hasApp(user, "/masters")) ||
     (await hasApp(user, "/budgets")) ||
     (await hasApp(user, "/indents")) ||
-    (await hasApp(user, "/inventory"));
+    (await hasApp(user, "/inventory")) ||
+    (await hasApp(user, "/estimator"));
   if (!allowed) return new Response("Forbidden", { status: 403 });
 
   const { searchParams } = new URL(request.url);

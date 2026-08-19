@@ -85,12 +85,21 @@ export async function deleteUom(id: string): Promise<ActionState> {
 // Materials
 // ---------------------------------------------------------------------
 
-type MaterialFields = { name: string; uom: string; rate: number | null; is_active: boolean };
+type MaterialFields = {
+  name: string;
+  uom: string;
+  rate: number | null;
+  is_active: boolean;
+  item_id: string | null;
+  item_uom_factor: number | null;
+};
 
 function readMaterialFields(formData: FormData): MaterialFields | { error: string } {
   const name = text(formData, "name");
   const uom = text(formData, "uom");
   const rate = parseNumber(formData.get("rate"));
+  const itemId = text(formData, "item_id") || null;
+  const factor = parseNumber(formData.get("item_uom_factor"));
 
   if (!name) return { error: "Give the material a name." };
   if (name.length > NAME_LIMIT) return { error: `Keep the name under ${NAME_LIMIT} characters.` };
@@ -99,8 +108,30 @@ function readMaterialFields(formData: FormData): MaterialFields | { error: strin
   if (rate !== null && (Number.isNaN(rate) || rate < 0)) {
     return { error: "The rate must be a number, or left blank if it isn't priced yet." };
   }
+  if (factor !== null && (Number.isNaN(factor) || factor <= 0)) {
+    return { error: "The conversion must be a number above zero, or left blank." };
+  }
+  if (factor !== null && !itemId) {
+    return { error: "A conversion only means something with a catalogue item picked." };
+  }
 
-  return { name, uom, rate, is_active: formData.get("is_active") === "1" };
+  return {
+    name,
+    uom,
+    rate,
+    is_active: formData.get("is_active") === "1",
+    item_id: itemId,
+    item_uom_factor: factor,
+  };
+}
+
+/** Two unique rules can answer 23505 here: one name per material, and
+ * one material per catalogue item (0076 — a shared item would
+ * double-count every issued-vs-estimated comparison). */
+function duplicateMaterialMessage(message: string): string {
+  return message.includes("estimator_materials_item_key")
+    ? "That catalogue item is already linked to another material."
+    : "A material with that name already exists.";
 }
 
 export async function createMaterial(
@@ -116,7 +147,7 @@ export async function createMaterial(
     .from("estimator_materials")
     .insert({ ...fields, created_by: user.id, updated_by: user.id });
   if (error) {
-    if (error.code === "23505") return { error: "A material with that name already exists." };
+    if (error.code === "23505") return { error: duplicateMaterialMessage(error.message) };
     console.error("createMaterial failed:", error);
     return { error: "Could not add the material. Try again." };
   }
@@ -140,7 +171,7 @@ export async function updateMaterial(
     .update({ ...fields, updated_by: user.id })
     .eq("id", id);
   if (error) {
-    if (error.code === "23505") return { error: "Another material already has that name." };
+    if (error.code === "23505") return { error: duplicateMaterialMessage(error.message) };
     console.error("updateMaterial failed:", error);
     return { error: "Could not update the material. Try again." };
   }
