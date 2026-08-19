@@ -1,6 +1,7 @@
 "use client";
 
 import { RecordFormDialog } from "@/components/masters/record-form-dialog";
+import { UomSelect } from "../../_components/uom-select";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FormMessage } from "@/components/ui/form-message";
@@ -51,21 +52,14 @@ export function MixFormDialog({
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="uom">One unit of this mix is</Label>
-        <Input
+        <UomSelect
           id="uom"
           name="uom"
-          defaultValue={mix?.uom}
+          uoms={uoms}
+          current={mix?.uom}
+          defaultValue={mix?.uom ?? ""}
           required
-          autoComplete="off"
-          list="estimator-mix-uoms"
-          placeholder="e.g. cum"
-          maxLength={20}
         />
-        <datalist id="estimator-mix-uoms">
-          {uoms.map((uom) => (
-            <option key={uom} value={uom} />
-          ))}
-        </datalist>
         <p className="text-muted text-xs">
           Its materials are given per one of these — so for concrete, per cubic metre.
         </p>

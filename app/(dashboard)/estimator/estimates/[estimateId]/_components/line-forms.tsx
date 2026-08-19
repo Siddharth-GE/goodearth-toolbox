@@ -1,5 +1,6 @@
 "use client";
 
+import { RecordFormDialog } from "@/components/masters/record-form-dialog";
 import { Button } from "@/components/ui/button";
 import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
@@ -11,14 +12,16 @@ import {
   updateEstimateLineQty,
 } from "@/lib/estimator/actions";
 import type { WorkStatusRow } from "@/lib/estimator/queries";
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 
 /**
- * Add a work to the estimate. The picker is a native select with an
- * optgroup per category — it gets the phone's own wheel picker, and the
- * works vocabulary is already ordered the way the site team reads it.
+ * Add a work to the estimate — behind a button, not squatting in the
+ * middle of the BOQ (the founder's "isnt simple"). The picker is a
+ * native select with an optgroup per category: it gets the phone's own
+ * wheel picker, and the works vocabulary is already ordered the way the
+ * site team reads it.
  */
-export function AddLineForm({
+export function AddLineDialog({
   estimateId,
   works,
 }: {
@@ -26,22 +29,7 @@ export function AddLineForm({
   /** Only works that are set up: a work with no unit has nothing to measure. */
   works: WorkStatusRow[];
 }) {
-  const [state, formAction, pending] = useActionState(
-    addEstimateLine.bind(null, estimateId),
-    undefined,
-  );
-  const formRef = useRef<HTMLFormElement>(null);
-  const wasPending = useRef(false);
   const [workItemId, setWorkItemId] = useState("");
-
-  useEffect(() => {
-    if (wasPending.current && !pending && !state?.error) {
-      formRef.current?.reset();
-      setWorkItemId("");
-    }
-    wasPending.current = pending;
-  }, [pending, state]);
-
   const categories = [...new Set(works.map((work) => work.categoryCode))];
   const chosen = works.find((work) => work.workItemId === workItemId);
 
@@ -54,62 +42,62 @@ export function AddLineForm({
   }
 
   return (
-    <form ref={formRef} action={formAction} className="space-y-2">
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="min-w-64 flex-1 space-y-1.5">
-          <Label htmlFor="work_item_id">Work</Label>
-          <Select
-            id="work_item_id"
-            name="work_item_id"
-            value={workItemId}
-            onChange={(event) => setWorkItemId(event.target.value)}
-            required
-          >
-            <option value="" disabled>
-              Choose a work
-            </option>
-            {categories.map((code) => (
-              <optgroup
-                key={code}
-                label={`${code} — ${works.find((w) => w.categoryCode === code)?.categoryName ?? ""}`}
-              >
-                {works
-                  .filter((work) => work.categoryCode === code)
-                  .map((work) => (
-                    <option key={work.workItemId} value={work.workItemId}>
-                      {work.code} — {work.name} ({work.uom})
-                    </option>
-                  ))}
-              </optgroup>
-            ))}
-          </Select>
-        </div>
-        <div className="w-40 space-y-1.5">
-          <Label htmlFor="qty">Quantity</Label>
-          <Input
-            id="qty"
-            name="qty"
-            required
-            autoComplete="off"
-            inputMode="decimal"
-            placeholder={chosen ? `in ${chosen.uom}` : "e.g. 40"}
-          />
-        </div>
-        <div className="w-48 space-y-1.5">
-          <Label htmlFor="note">Note (optional)</Label>
-          <Input id="note" name="note" autoComplete="off" />
-        </div>
-        <Button type="submit" disabled={pending}>
-          {pending ? "Adding…" : "Add"}
-        </Button>
+    <RecordFormDialog
+      label="Work"
+      isEdit={false}
+      action={addEstimateLine.bind(null, estimateId)}
+      trigger={<Button>Add work</Button>}
+      onOpen={() => setWorkItemId("")}
+    >
+      <div className="space-y-1.5">
+        <Label htmlFor="work_item_id">Work</Label>
+        <Select
+          id="work_item_id"
+          name="work_item_id"
+          value={workItemId}
+          onChange={(event) => setWorkItemId(event.target.value)}
+          required
+        >
+          <option value="" disabled>
+            Choose a work
+          </option>
+          {categories.map((code) => (
+            <optgroup
+              key={code}
+              label={`${code} — ${works.find((w) => w.categoryCode === code)?.categoryName ?? ""}`}
+            >
+              {works
+                .filter((work) => work.categoryCode === code)
+                .map((work) => (
+                  <option key={work.workItemId} value={work.workItemId}>
+                    {work.code} — {work.name} ({work.uom})
+                  </option>
+                ))}
+            </optgroup>
+          ))}
+        </Select>
       </div>
-      {chosen && (
-        <p className="text-muted text-xs">
-          How many {chosen.uom} of {chosen.name} this villa needs.
-        </p>
-      )}
-      <FormMessage error={state?.error} />
-    </form>
+      <div className="space-y-1.5">
+        <Label htmlFor="qty">Quantity{chosen ? ` (${chosen.uom})` : ""}</Label>
+        <Input
+          id="qty"
+          name="qty"
+          required
+          autoComplete="off"
+          inputMode="decimal"
+          placeholder={chosen ? `in ${chosen.uom}` : "e.g. 40"}
+        />
+        {chosen && (
+          <p className="text-muted text-xs">
+            How many {chosen.uom} of {chosen.name} this villa needs.
+          </p>
+        )}
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="note">Note (optional)</Label>
+        <Input id="note" name="note" autoComplete="off" />
+      </div>
+    </RecordFormDialog>
   );
 }
 

@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { LinkButton } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -9,13 +10,13 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/components/ui/table";
-import { listMixes, listUsedUoms } from "@/lib/estimator/queries";
+import { listMixes, listUomNames } from "@/lib/estimator/queries";
 import { Blend } from "lucide-react";
 import Link from "next/link";
 import { MixFormDialog } from "./_components/mix-forms";
 
 export default async function MixesPage() {
-  const [mixes, uoms] = await Promise.all([listMixes(), listUsedUoms()]);
+  const [mixes, uoms] = await Promise.all([listMixes(), listUomNames()]);
 
   return (
     <div className="space-y-4">
@@ -47,6 +48,7 @@ export default async function MixesPage() {
                 <TableHeaderCell>Materials</TableHeaderCell>
                 <TableHeaderCell>Used by</TableHeaderCell>
                 <TableHeaderCell>Status</TableHeaderCell>
+                <TableHeaderCell></TableHeaderCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -77,6 +79,15 @@ export default async function MixesPage() {
                     <Badge variant={mix.isActive ? "success" : "neutral"}>
                       {mix.isActive ? "Active" : "Inactive"}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {/* The visible door in. The name link alone was missed by
+                        the first real user — "cant edit a mix" meant this. */}
+                    <div className="flex justify-end">
+                      <LinkButton href={`/estimator/mixes/${mix.id}`} variant="ghost" size="sm">
+                        Edit
+                      </LinkButton>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

@@ -15,7 +15,7 @@ import {
   getWorkSetup,
   listMaterials,
   listMixes,
-  listUsedUoms,
+  listUomNames,
 } from "@/lib/estimator/queries";
 import { formatMoney, formatQuantity } from "@/lib/format";
 import { notFound } from "next/navigation";
@@ -32,7 +32,7 @@ export default async function WorkSetupPage({
     getWorkSetup(workItemId),
     listMaterials(),
     listMixes(),
-    listUsedUoms(),
+    listUomNames(),
     getRecipeBook(),
   ]);
   if (!work) notFound();

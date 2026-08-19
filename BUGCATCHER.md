@@ -226,6 +226,8 @@ _Caught 2026-08-19 on staging, building the Estimator — before it shipped, by 
 
 **The check.** Put a screen in its unknown state and **read the numbers on it out loud**: an estimate with nothing priced, a report with no rows, a total whose inputs are missing. If a figure says ₹0, ask whether the app knows it is zero or merely does not know. Model tests cannot answer that question, because the model is usually right.
 
+**It happened again the same day.** The founder's first real session found the second instance one screen over: a mix with nothing in it yet said **"Cost per cum: ₹0 — from today's material rates"**. The mix page computed its figure locally instead of going through the calculator's null rules, and `reduce` over an empty list is 0. Same disease, same fix (`null` + "nothing in it yet"), and proof the check above has to walk **every** screen that prints money, not the one where the bug was first found.
+
 ---
 
 ## Adding to this file

@@ -10,7 +10,7 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/components/ui/table";
-import { getMix, listMaterials, listUsedUoms } from "@/lib/estimator/queries";
+import { getMix, listMaterials, listUomNames } from "@/lib/estimator/queries";
 import { formatMoney } from "@/lib/format";
 import { notFound } from "next/navigation";
 import {
@@ -26,15 +26,17 @@ export default async function MixPage({ params }: { params: Promise<{ mixId: str
   const [mix, materials, uoms] = await Promise.all([
     getMix(mixId),
     listMaterials(),
-    listUsedUoms(),
+    listUomNames(),
   ]);
   if (!mix) notFound();
 
   // What one unit of the mix costs, if everything in it is priced. An
-  // unpriced material makes the whole figure unknown rather than low.
+  // unpriced material makes the whole figure unknown rather than low —
+  // and so does an empty mix: "₹0 from today's rates" on a mix with
+  // nothing in it yet is the same lying zero as BUGCATCHER #13.
   const unpriced = mix.components.filter((component) => component.materialRate === null);
   const costPerUnit =
-    unpriced.length > 0
+    unpriced.length > 0 || mix.components.length === 0
       ? null
       : mix.components.reduce(
           (total, component) => total + (component.materialRate ?? 0) * component.qtyPerUnit,
@@ -63,12 +65,14 @@ export default async function MixPage({ params }: { params: Promise<{ mixId: str
             label={`Cost per ${mix.uom}`}
             value={formatMoney(costPerUnit)}
             hint={
-              unpriced.length > 0
-                ? `${unpriced.length} of its materials ${unpriced.length === 1 ? "has" : "have"} no rate`
-                : "from today's material rates"
+              mix.components.length === 0
+                ? "nothing in it yet"
+                : unpriced.length > 0
+                  ? `${unpriced.length} of its materials ${unpriced.length === 1 ? "has" : "have"} no rate`
+                  : "from today's material rates"
             }
             size="lg"
-            tone={unpriced.length > 0 ? "warn" : undefined}
+            tone={costPerUnit === null ? "warn" : undefined}
           />
         </FigureBandCell>
         <FigureBandCell>

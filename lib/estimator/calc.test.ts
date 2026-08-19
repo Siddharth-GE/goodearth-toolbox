@@ -5,6 +5,7 @@ import {
   computeLine,
   computeTakeoff,
   expandRecipe,
+  groupLineCosts,
   type MaterialDef,
   type MixDef,
   type WorkRecipe,
@@ -283,4 +284,66 @@ test("an empty estimate totals zero and is not called incomplete", () => {
   const totals = computeEstimateTotals([]);
   assert.equal(totals.grand, 0);
   assert.equal(totals.isComplete, true);
+});
+
+test("groupLineCosts gathers lines under categories in vocabulary order", () => {
+  const priced: WorkRecipe = {
+    workItemId: "w1",
+    uom: "cum",
+    labourRate: 900,
+    components: [mix("m20", 1)],
+  };
+  const labourOnly: WorkRecipe = { workItemId: "w2", uom: "sqm", labourRate: 55, components: [] };
+  const lineCosts = [
+    computeLine({ workItemId: "w2", qty: 100 }, labourOnly, mixes, materials),
+    computeLine({ workItemId: "w1", qty: 10 }, priced, mixes, materials),
+  ];
+  const categories = new Map([
+    ["w1", { code: "FD", name: "Foundation" }],
+    ["w2", { code: "F", name: "Finishes" }],
+  ]);
+
+  const groups = groupLineCosts(lineCosts, categories, ["FD", "F"]);
+  // FD first even though the F line came first — the vocabulary decides.
+  assert.deepEqual(
+    groups.map((g) => g.code),
+    ["FD", "F"],
+  );
+  assert.equal(groups[0].totals.grand, 63500);
+  assert.equal(groups[1].totals.grand, 5500);
+});
+
+test("a category's subtotal keeps the null-never-zero rule", () => {
+  const unpricedRecipe: WorkRecipe = {
+    workItemId: "w3",
+    uom: "cum",
+    labourRate: 900,
+    components: [direct("steel", 80)],
+  };
+  const groups = groupLineCosts(
+    [computeLine({ workItemId: "w3", qty: 2 }, unpricedRecipe, mixes, materials)],
+    new Map([["w3", { code: "SS", name: "Super-structure" }]]),
+    ["SS"],
+  );
+  assert.equal(groups[0].totals.material, null);
+  assert.equal(groups[0].totals.labour, 1800);
+  assert.equal(groups[0].totals.isComplete, false);
+});
+
+test("a line whose work has no category lands in Uncategorised, last", () => {
+  const labourOnly: WorkRecipe = { workItemId: "w2", uom: "sqm", labourRate: 55, components: [] };
+  const groups = groupLineCosts(
+    [
+      computeLine({ workItemId: "w9", qty: 1 }, undefined, mixes, materials),
+      computeLine({ workItemId: "w2", qty: 100 }, labourOnly, mixes, materials),
+    ],
+    new Map([["w2", { code: "F", name: "Finishes" }]]),
+    ["F"],
+  );
+  assert.deepEqual(
+    groups.map((g) => g.code),
+    ["F", ""],
+  );
+  assert.equal(groups[1].name, "Uncategorised");
+  assert.equal(groups[1].totals.notSetUpCount, 1);
 });

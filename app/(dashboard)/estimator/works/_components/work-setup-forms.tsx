@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { addWorkComponent, saveWorkInfo } from "@/lib/estimator/actions";
+import { UomSelect } from "../../_components/uom-select";
 import type { MaterialRow, MixRow, WorkSetup } from "@/lib/estimator/queries";
 import { useActionState, useEffect, useRef, useState } from "react";
 
@@ -31,22 +32,15 @@ export function WorkInfoForm({ work, uoms }: { work: WorkSetup; uoms: string[] }
       <div className="flex flex-wrap items-end gap-2">
         <div className="w-44 space-y-1.5">
           <Label htmlFor="uom">Measured in</Label>
-          <Input
+          <UomSelect
             id="uom"
             name="uom"
+            uoms={uoms}
+            current={work.uom}
             value={uom}
             onChange={(event) => setUom(event.target.value)}
             required
-            autoComplete="off"
-            list="estimator-work-uoms"
-            placeholder="e.g. cum"
-            maxLength={20}
           />
-          <datalist id="estimator-work-uoms">
-            {uoms.map((option) => (
-              <option key={option} value={option} />
-            ))}
-          </datalist>
         </div>
         <div className="w-44 space-y-1.5">
           <Label htmlFor="labour_rate">Labour rate</Label>

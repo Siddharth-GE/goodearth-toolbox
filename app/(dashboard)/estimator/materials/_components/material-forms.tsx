@@ -1,6 +1,7 @@
 "use client";
 
 import { RecordFormDialog } from "@/components/masters/record-form-dialog";
+import { UomSelect } from "../../_components/uom-select";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FormMessage } from "@/components/ui/form-message";
@@ -42,21 +43,14 @@ export function MaterialFormDialog({
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="uom">Measured in</Label>
-        <Input
+        <UomSelect
           id="uom"
           name="uom"
-          defaultValue={material?.uom}
+          uoms={uoms}
+          current={material?.uom}
+          defaultValue={material?.uom ?? ""}
           required
-          autoComplete="off"
-          list="estimator-uoms"
-          placeholder="e.g. bag"
-          maxLength={20}
         />
-        <datalist id="estimator-uoms">
-          {uoms.map((uom) => (
-            <option key={uom} value={uom} />
-          ))}
-        </datalist>
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="rate">Rate per unit</Label>

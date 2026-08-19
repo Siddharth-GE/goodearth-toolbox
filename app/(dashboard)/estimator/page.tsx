@@ -13,8 +13,8 @@ export default async function EstimatorPage() {
     <ToolWelcome
       icon="Calculator"
       intro={[
-        "What a villa costs to build. Each work in the Masters list is set up once — what it is measured in, what labour costs, and what it consumes: materials directly, or a named mix like M20 concrete that several works share.",
-        "An estimate is a villa and a list of works with quantities. From that the tool works out every material needed and what the whole thing costs. Estimates use today's rates, so changing a rate updates every estimate that uses it.",
+        "Set up once, in this order: add your materials and their rates, build the mixes (M20 concrete — so many bags of cement, so much sand and jelly per cum), then give each work its unit, labour rate and recipe on the Works tab.",
+        "After that, estimating a villa is picking works and typing quantities. The tool prices it at today's rates, groups it the way a BOQ reads, and lists every material needed. Change a rate and every estimate follows.",
       ]}
       stats={[
         { label: "Estimates", value: counts.estimates, hint: "villas costed" },
@@ -22,10 +22,10 @@ export default async function EstimatorPage() {
         { label: "Materials", value: counts.materials, hint: "in the price list" },
       ]}
       links={[
-        { label: "Estimates", href: "/estimator/estimates", primary: true },
-        { label: "Works", href: "/estimator/works" },
-        { label: "Mixes", href: "/estimator/mixes" },
-        { label: "Materials", href: "/estimator/materials" },
+        { label: "1 · Materials", href: "/estimator/materials" },
+        { label: "2 · Mixes", href: "/estimator/mixes" },
+        { label: "3 · Works", href: "/estimator/works" },
+        { label: "4 · Estimates", href: "/estimator/estimates", primary: true },
       ]}
     />
   );

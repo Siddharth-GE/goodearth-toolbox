@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Figure, FigureBand, FigureBandCell } from "@/components/ui/figure";
+import { Figure } from "@/components/ui/figure";
 import { PageTitle } from "@/components/ui/page-title";
 import {
   Table,
@@ -14,6 +14,7 @@ import {
   computeEstimateTotals,
   computeLine,
   computeTakeoff,
+  groupLineCosts,
   type MaterialDef,
   type MixDef,
   type WorkRecipe,
@@ -21,11 +22,17 @@ import {
 import { getEstimate, getRecipeBook, listWorkStatus } from "@/lib/estimator/queries";
 import { formatMoney, formatQuantity } from "@/lib/format";
 import { notFound } from "next/navigation";
+import { Fragment } from "react";
 import { EstimateFormDialog, DeleteEstimateButton } from "../_components/estimate-forms";
-import { AddLineForm, LineQtyField, RemoveLineButton } from "./_components/line-forms";
+import { AddLineDialog, LineQtyField, RemoveLineButton } from "./_components/line-forms";
 import { listProjects } from "@/lib/masters/projects";
 import { listUnits } from "@/lib/masters/units";
 
+// The estimate reads as a BOQ, because that is the document an
+// estimator already knows: works gathered under their categories, one
+// amount per line, a subtotal per category, the grand total on top. A
+// future PDF export prints groupLineCosts' output — the same structure
+// this page renders, never a second grouping.
 export default async function EstimatePage({
   params,
 }: {
@@ -41,9 +48,9 @@ export default async function EstimatePage({
   ]);
   if (!estimate) notFound();
 
-  // One calculator for the whole tool: the per-line costs, the totals and
-  // the takeoff all come out of lib/estimator/calc.ts, so they can never
-  // disagree with each other or with the per-work figure on the Works tab.
+  // One calculator for the whole tool: per-line costs, per-unit rates,
+  // category subtotals, estimate totals and the takeoff all come out of
+  // lib/estimator/calc.ts, so they can never disagree with each other.
   const materialsById = new Map<string, MaterialDef>(book.materials.map((m) => [m.id, m]));
   const mixesById = new Map<string, MixDef>(book.mixes.map((m) => [m.id, m]));
   const recipesByWork = new Map<string, WorkRecipe>(book.recipes.map((r) => [r.workItemId, r]));
@@ -55,14 +62,45 @@ export default async function EstimatePage({
   const lineCosts = lineInputs.map((line) =>
     computeLine(line, recipesByWork.get(line.workItemId), mixesById, materialsById),
   );
-  const costByWork = new Map(lineCosts.map((cost) => [cost.workItemId, cost]));
   const totals = computeEstimateTotals(lineCosts);
   const takeoff = computeTakeoff(lineInputs, recipesByWork, mixesById, materialsById)
     .map((row) => ({ ...row, material: materialsById.get(row.materialId) }))
     .sort((a, b) => (a.material?.name ?? "").localeCompare(b.material?.name ?? ""));
 
+  // The BOQ grouping: category vocabulary and order come from Masters.
+  const categoryByWork = new Map(
+    works.map((work) => [work.workItemId, { code: work.categoryCode, name: work.categoryName }]),
+  );
+  const categoryOrder = [...new Set(works.map((work) => work.categoryCode))];
+  const boq = groupLineCosts(lineCosts, categoryByWork, categoryOrder);
+  const lineByWork = new Map(estimate.lines.map((line) => [line.workItemId, line]));
   const uomByWork = new Map(works.map((work) => [work.workItemId, work.uom]));
   const setUpWorks = works.filter((work) => work.uom !== null && work.isActive);
+
+  // A work's rate per one unit, from the same calculator as everything
+  // else — the Amount column is always rate × quantity, visibly.
+  const unitRateByWork = new Map(
+    estimate.lines.map((line) => [
+      line.workItemId,
+      computeLine(
+        { workItemId: line.workItemId, qty: 1 },
+        recipesByWork.get(line.workItemId),
+        mixesById,
+        materialsById,
+      ).totalCost,
+    ]),
+  );
+
+  const part = (label: string, value: number | null) =>
+    `${label} ${value === null ? "not priced yet" : formatMoney(value)}`;
+  const missingBits = [
+    totals.notSetUpCount > 0 &&
+      `${totals.notSetUpCount} ${totals.notSetUpCount === 1 ? "work has" : "works have"} no setup`,
+    totals.missingLabourCount > 0 &&
+      `${totals.missingLabourCount} ${totals.missingLabourCount === 1 ? "work has" : "works have"} no labour rate`,
+    totals.missingMaterialRateCount > 0 &&
+      `${totals.missingMaterialRateCount} ${totals.missingMaterialRateCount === 1 ? "work uses a material" : "works use materials"} with no rate`,
+  ].filter(Boolean);
 
   return (
     <div className="space-y-4">
@@ -88,130 +126,106 @@ export default async function EstimatePage({
         <p className="text-muted text-sm">Copied from {estimate.sourceName}.</p>
       )}
 
-      <FigureBand className="sm:grid-cols-3 lg:grid-cols-3">
-        <FigureBandCell>
-          <Figure
-            label="Labour"
-            value={formatMoney(totals.labour)}
-            hint={
-              totals.missingLabourCount > 0
-                ? `${totals.missingLabourCount} work${totals.missingLabourCount === 1 ? "" : "s"} unpriced`
-                : undefined
-            }
-            tone={totals.missingLabourCount > 0 ? "warn" : undefined}
-            size="lg"
-          />
-        </FigureBandCell>
-        <FigureBandCell>
-          <Figure
-            label="Materials"
-            value={formatMoney(totals.material)}
-            hint={
-              totals.missingMaterialRateCount > 0
-                ? `${totals.missingMaterialRateCount} line${totals.missingMaterialRateCount === 1 ? "" : "s"} unpriced`
-                : undefined
-            }
-            tone={totals.missingMaterialRateCount > 0 ? "warn" : undefined}
-            size="lg"
-          />
-        </FigureBandCell>
-        <FigureBandCell>
-          <Figure
-            label={totals.isComplete ? "Total" : totals.grand === null ? "Total" : "Total so far"}
-            value={formatMoney(totals.grand)}
-            hint={
-              totals.isComplete
-                ? "at today's rates"
-                : totals.grand === null
-                  ? "nothing on this estimate is priced yet"
-                  : "some rates are missing — this is a floor, not the answer"
-            }
-            tone={totals.isComplete ? undefined : "warn"}
-            size="hero"
-          />
-        </FigureBandCell>
-      </FigureBand>
-
-      {!totals.isComplete && (
-        <Card className="p-4">
+      <Card className="space-y-2 p-5">
+        <Figure
+          label={
+            estimate.lines.length === 0
+              ? "Total"
+              : totals.isComplete
+                ? "Total at today's rates"
+                : "Total so far"
+          }
+          value={estimate.lines.length === 0 ? formatMoney(null) : formatMoney(totals.grand)}
+          hint={
+            estimate.lines.length === 0
+              ? "nothing on it yet"
+              : `${part("Labour", totals.labour)} · ${part("Materials", totals.material)}`
+          }
+          tone={estimate.lines.length > 0 && !totals.isComplete ? "warn" : undefined}
+          size="hero"
+        />
+        {missingBits.length > 0 && (
           <p className="text-warning text-sm">
-            This estimate is not fully priced.
-            {totals.notSetUpCount > 0 &&
-              ` ${totals.notSetUpCount} ${totals.notSetUpCount === 1 ? "work has" : "works have"} no setup at all.`}
-            {totals.missingLabourCount > 0 &&
-              ` ${totals.missingLabourCount} ${totals.missingLabourCount === 1 ? "work has" : "works have"} no labour rate.`}
-            {totals.missingMaterialRateCount > 0 &&
-              ` ${totals.missingMaterialRateCount} ${totals.missingMaterialRateCount === 1 ? "work uses a material" : "works use materials"} with no rate.`}{" "}
-            The totals above count only what is priced.
+            {missingBits.join(", ")} — the total counts only what is priced.
           </p>
-        </Card>
-      )}
+        )}
+      </Card>
 
       <Card className="space-y-4 p-4">
-        <div>
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-muted text-xs font-semibold tracking-widest uppercase">Works</p>
-          <p className="text-muted mt-1 text-sm">
-            {estimate.isTemplate
-              ? "What this standard villa needs, and what each work costs at today's rates."
-              : "What this villa needs, and what each work costs at today's rates."}
-          </p>
+          <AddLineDialog estimateId={estimate.id} works={setUpWorks} />
         </div>
 
-        <AddLineForm estimateId={estimate.id} works={setUpWorks} />
-
         {estimate.lines.length === 0 ? (
-          <p className="text-muted text-sm">Nothing on it yet — add the first work above.</p>
+          <p className="text-muted text-sm">Nothing on it yet — add the first work.</p>
         ) : (
           <Table>
             <TableHead>
               <TableRow>
-                <TableHeaderCell className="w-24">Code</TableHeaderCell>
                 <TableHeaderCell>Work</TableHeaderCell>
                 <TableHeaderCell>Quantity</TableHeaderCell>
-                <TableHeaderCell>Labour</TableHeaderCell>
-                <TableHeaderCell>Materials</TableHeaderCell>
-                <TableHeaderCell>Total</TableHeaderCell>
+                <TableHeaderCell className="text-right">Rate</TableHeaderCell>
+                <TableHeaderCell className="text-right">Amount</TableHeaderCell>
                 <TableHeaderCell></TableHeaderCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {estimate.lines.map((line) => {
-                const cost = costByWork.get(line.workItemId);
-                const uom = uomByWork.get(line.workItemId) ?? null;
-                return (
-                  <TableRow key={line.id}>
-                    <TableCell className="text-muted text-sm">{line.code}</TableCell>
-                    <TableCell className="text-foreground text-sm">
-                      {line.name}
-                      {line.note && <span className="text-muted block text-xs">{line.note}</span>}
-                      {cost && !cost.isSetUp && (
-                        <Badge variant="warning" className="mt-1">
-                          Not set up
-                        </Badge>
-                      )}
-                      {cost?.isSetUp && !cost.hasRecipe && (
-                        <Badge variant="neutral" className="mt-1">
-                          Labour only
-                        </Badge>
-                      )}
+              {boq.map((group) => (
+                <Fragment key={group.code || "uncategorised"}>
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-foreground pt-4 text-sm font-semibold">
+                      {group.code ? `${group.code} — ${group.name}` : group.name}
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <LineQtyField id={line.id} qty={line.qty} label={line.name} />
-                        <span className="text-muted text-sm">{uom ?? ""}</span>
-                      </div>
+                    <TableCell className="text-foreground pt-4 text-right text-sm font-semibold">
+                      {formatMoney(group.totals.grand)}
                     </TableCell>
-                    <TableCell>{formatMoney(cost?.labourCost ?? null)}</TableCell>
-                    <TableCell>{formatMoney(cost?.materialCost ?? null)}</TableCell>
-                    <TableCell className="text-foreground font-medium">
-                      {formatMoney(cost?.totalCost ?? null)}
-                    </TableCell>
-                    <TableCell>
-                      <RemoveLineButton id={line.id} label={line.name} />
-                    </TableCell>
+                    <TableCell></TableCell>
                   </TableRow>
-                );
-              })}
+                  {group.lineCosts.map((cost) => {
+                    const line = lineByWork.get(cost.workItemId);
+                    if (!line) return null;
+                    const uom = uomByWork.get(line.workItemId) ?? null;
+                    return (
+                      <TableRow key={line.id}>
+                        <TableCell className="text-foreground text-sm">
+                          {line.name}
+                          <span className="text-muted ml-2 text-xs">{line.code}</span>
+                          {line.note && (
+                            <span className="text-muted block text-xs">{line.note}</span>
+                          )}
+                          {!cost.isSetUp && (
+                            <Badge variant="warning" className="mt-1">
+                              Not set up
+                            </Badge>
+                          )}
+                          {cost.isSetUp && !cost.hasRecipe && (
+                            <Badge variant="neutral" className="mt-1">
+                              Labour only
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <LineQtyField id={line.id} qty={line.qty} label={line.name} />
+                            <span className="text-muted text-sm">{uom ?? ""}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatMoney(unitRateByWork.get(line.workItemId) ?? null)}
+                          {uom && <span className="text-muted text-xs"> / {uom}</span>}
+                        </TableCell>
+                        <TableCell className="text-foreground text-right font-medium">
+                          {formatMoney(cost.totalCost)}
+                        </TableCell>
+                        <TableCell>
+                          <RemoveLineButton id={line.id} label={line.name} />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </Fragment>
+              ))}
             </TableBody>
           </Table>
         )}
@@ -223,18 +237,15 @@ export default async function EstimatePage({
             <p className="text-muted text-xs font-semibold tracking-widest uppercase">
               Materials needed
             </p>
-            <p className="text-muted mt-1 text-sm">
-              Everything the works above consume, added up — mixes expanded into what they are made
-              of.
-            </p>
+            <p className="text-muted mt-1 text-sm">Everything the works above consume, added up.</p>
           </div>
           <Table>
             <TableHead>
               <TableRow>
                 <TableHeaderCell>Material</TableHeaderCell>
                 <TableHeaderCell>Quantity</TableHeaderCell>
-                <TableHeaderCell>Rate</TableHeaderCell>
-                <TableHeaderCell>Cost</TableHeaderCell>
+                <TableHeaderCell className="text-right">Rate</TableHeaderCell>
+                <TableHeaderCell className="text-right">Cost</TableHeaderCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -246,14 +257,16 @@ export default async function EstimatePage({
                   <TableCell>
                     {formatQuantity(row.quantity)} {row.material?.uom ?? ""}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-right">
                     {row.missingRate ? (
                       <Badge variant="warning">Not priced</Badge>
                     ) : (
                       formatMoney(row.material?.rate ?? null)
                     )}
                   </TableCell>
-                  <TableCell className="text-foreground">{formatMoney(row.cost)}</TableCell>
+                  <TableCell className="text-foreground text-right">
+                    {formatMoney(row.cost)}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
