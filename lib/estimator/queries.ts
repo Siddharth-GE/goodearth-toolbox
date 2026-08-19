@@ -4,7 +4,7 @@ import { requireTool } from "@/lib/auth/access";
 import { listWorkCategories, listWorkGroups, listWorkItems } from "@/lib/masters/works";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
-import type { MaterialDef, MixDef, WorkRecipe } from "./calc";
+import type { FrozenLineRow, FrozenTakeoffRow, MaterialDef, MixDef, WorkRecipe } from "./calc";
 
 /**
  * Reads for the Estimator.
@@ -41,23 +41,29 @@ function fail(context: string, error: { message: string }): never {
 
 export async function getWelcomeCounts(): Promise<{
   estimates: number;
+  official: number;
   worksSetUp: number;
   materials: number;
 }> {
   await requireTool(GRANT);
   const supabase = await createClient();
 
-  const [estimates, worksSetUp, materials] = await Promise.all([
+  const [estimates, official, worksSetUp, materials] = await Promise.all([
     supabase
       .from("estimator_estimates")
       .select("id", { count: "exact", head: true })
       .eq("is_template", false),
+    supabase
+      .from("estimator_estimates")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "submitted"),
     supabase.from("estimator_work_info").select("id", { count: "exact", head: true }),
     supabase.from("estimator_materials").select("id", { count: "exact", head: true }),
   ]);
 
   return {
     estimates: estimates.count ?? 0,
+    official: official.count ?? 0,
     worksSetUp: worksSetUp.count ?? 0,
     materials: materials.count ?? 0,
   };
@@ -629,6 +635,9 @@ export type EstimateRow = {
   unitName: string | null;
   lineCount: number;
   createdAt: string;
+  status: "draft" | "submitted" | "superseded";
+  /** EST/<code>/NNN once submitted; null while a working draft. */
+  reference: string | null;
 };
 
 /**
@@ -648,10 +657,12 @@ export async function listEstimates(): Promise<EstimateRow[]> {
       project_id: string;
       unit_id: string | null;
       created_at: string;
+      status: string;
+      reference: string | null;
     }>((from, to) =>
       supabase
         .from("estimator_estimates")
-        .select("id, name, note, is_template, project_id, unit_id, created_at")
+        .select("id, name, note, is_template, project_id, unit_id, created_at, status, reference")
         .order("created_at", { ascending: false })
         .order("id")
         .range(from, to),
@@ -685,6 +696,8 @@ export async function listEstimates(): Promise<EstimateRow[]> {
     unitName: estimate.unit_id ? (unitById.get(estimate.unit_id) ?? null) : null,
     lineCount: lineCounts.get(estimate.id) ?? 0,
     createdAt: estimate.created_at,
+    status: estimate.status as EstimateRow["status"],
+    reference: estimate.reference,
   }));
 }
 
@@ -709,6 +722,22 @@ export type EstimateDetail = {
   unitName: string | null;
   sourceName: string | null;
   lines: EstimateLineRow[];
+  status: "draft" | "submitted" | "superseded";
+  reference: string | null;
+  submittedByName: string | null;
+  submittedAt: string | null;
+  supersededAt: string | null;
+  /** The revision that replaced (or is replacing) this one, if any. */
+  successor: { id: string; name: string; status: string } | null;
+  /**
+   * The 0077 snapshot, present whenever the estimate is no longer a
+   * draft. The screen renders THIS — costs frozen on the day of submit
+   * — through the same calc.ts grouping as a live draft.
+   */
+  frozen: {
+    lineCosts: FrozenLineRow[];
+    takeoff: FrozenTakeoffRow[];
+  } | null;
 };
 
 export async function getEstimate(estimateId: string): Promise<EstimateDetail | null> {
@@ -717,7 +746,9 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
 
   const { data: estimate, error } = await supabase
     .from("estimator_estimates")
-    .select("id, name, note, is_template, project_id, unit_id, source_estimate_id")
+    .select(
+      "id, name, note, is_template, project_id, unit_id, source_estimate_id, status, reference, submitted_by, submitted_at, superseded_at",
+    )
     .eq("id", estimateId)
     .maybeSingle();
   if (error) fail("the estimate", error);
@@ -753,6 +784,57 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
   const itemById = new Map(items.map((item) => [item.id, item]));
   const categoryById = new Map(categories.map((c) => [c.id, c]));
 
+  // The lifecycle extras: who submitted, what replaced this, and the
+  // frozen snapshot for anything past draft. Fetched after the header
+  // because all three hang off its fields.
+  const [submitter, successor, frozenCosts, frozenTakeoff] = await Promise.all([
+    estimate.submitted_by
+      ? supabase.from("profiles").select("full_name").eq("id", estimate.submitted_by).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    supabase
+      .from("estimator_estimates")
+      .select("id, name, status")
+      .eq("source_estimate_id", estimate.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    estimate.status !== "draft"
+      ? fetchAll<{
+          work_item_id: string;
+          qty: number;
+          uom: string | null;
+          labour_cost: number | null;
+          material_cost: number | null;
+          total_cost: number | null;
+        }>((from, to) =>
+          supabase
+            .from("estimator_estimate_line_costs")
+            .select("work_item_id, qty, uom, labour_cost, material_cost, total_cost")
+            .eq("estimate_id", estimateId)
+            .order("id")
+            .range(from, to),
+        )
+      : Promise.resolve([]),
+    estimate.status !== "draft"
+      ? fetchAll<{
+          work_item_id: string;
+          material_id: string;
+          material_name: string;
+          uom: string;
+          quantity: number;
+          rate: number | null;
+        }>((from, to) =>
+          supabase
+            .from("estimator_estimate_takeoff")
+            .select("work_item_id, material_id, material_name, uom, quantity, rate")
+            .eq("estimate_id", estimateId)
+            .order("id")
+            .range(from, to),
+        )
+      : Promise.resolve([]),
+  ]);
+  if (successor.error) fail("the estimate's revision", successor.error);
+
   return {
     id: estimate.id,
     name: estimate.name,
@@ -763,6 +845,33 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
     unitId: estimate.unit_id,
     unitName: unit.data?.name ?? null,
     sourceName: source.data?.name ?? null,
+    status: estimate.status as EstimateDetail["status"],
+    reference: estimate.reference,
+    submittedByName: submitter.data?.full_name ?? null,
+    submittedAt: estimate.submitted_at,
+    supersededAt: estimate.superseded_at,
+    successor: successor.data ?? null,
+    frozen:
+      estimate.status === "draft"
+        ? null
+        : {
+            lineCosts: frozenCosts.map((row) => ({
+              workItemId: row.work_item_id,
+              qty: row.qty,
+              uom: row.uom,
+              labourCost: row.labour_cost,
+              materialCost: row.material_cost,
+              totalCost: row.total_cost,
+            })),
+            takeoff: frozenTakeoff.map((row) => ({
+              workItemId: row.work_item_id,
+              materialId: row.material_id,
+              materialName: row.material_name,
+              uom: row.uom,
+              quantity: row.quantity,
+              rate: row.rate,
+            })),
+          },
     lines: lines
       .map((line) => {
         const item = itemById.get(line.work_item_id);
