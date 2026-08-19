@@ -137,11 +137,11 @@ export default async function EstimatePage({
           <p className="text-warning text-sm">
             This estimate is not fully priced.
             {totals.notSetUpCount > 0 &&
-              ` ${totals.notSetUpCount} work${totals.notSetUpCount === 1 ? " has" : "s have"} no setup at all.`}
+              ` ${totals.notSetUpCount} ${totals.notSetUpCount === 1 ? "work has" : "works have"} no setup at all.`}
             {totals.missingLabourCount > 0 &&
-              ` ${totals.missingLabourCount} ${totals.missingLabourCount === 1 ? "has" : "have"} no labour rate.`}
+              ` ${totals.missingLabourCount} ${totals.missingLabourCount === 1 ? "work has" : "works have"} no labour rate.`}
             {totals.missingMaterialRateCount > 0 &&
-              ` ${totals.missingMaterialRateCount} ${totals.missingMaterialRateCount === 1 ? "uses a material" : "use materials"} with no rate.`}{" "}
+              ` ${totals.missingMaterialRateCount} ${totals.missingMaterialRateCount === 1 ? "work uses a material" : "works use materials"} with no rate.`}{" "}
             The totals above count only what is priced.
           </p>
         </Card>
