@@ -24,7 +24,7 @@ Quirks found and handled below: one duplicated code (`PLD/836` names two differe
 
 ## Steps
 
-### 1. `[Sonnet]` Convert the workbook to CSVs in `data/` (gitignored — bank details never enter the public repo)
+### 1. ✅ `[Fable]` Convert the workbook to CSVs in `data/` (gitignored — bank details never enter the public repo)
 
 Python + openpyxl (already installed) one-off, producing:
 
@@ -34,7 +34,7 @@ Python + openpyxl (already installed) one-off, producing:
 
 Confirm `git check-ignore data/vendors.csv` passes before anything else. Scripts must fail with a plain message if a CSV is missing (import-catalogue precedent).
 
-### 2. `[Sonnet]` Migration `supabase/migrations/0089_vendor_details.sql`
+### 2. ✅ `[Fable]` Migration `supabase/migrations/0089_vendor_details.sql`
 
 Additive only, re-runnable, house style (`0082` is the template — audit + `set_updated_at` triggers, drop-if-exists policies, verification DO block):
 
@@ -46,12 +46,12 @@ Additive only, re-runnable, house style (`0082` is the template — audit + `set
   - Verification block: table exists with RLS on, exactly 4 policies, the 4 new vendors columns present.
 - No new views, no function changes, no money columns — bank details are payment _instructions_, gated by the estimator-rate precedent (sensitive data never sits on an ungated masters read).
 
-### 3. `[Fable]` Review 0089, then apply to **staging**
+### 3. ✅ `[Fable]` Review 0089, then apply to **staging**
 
 MODELS.md hard rule: an RLS-touching migration reaches `db:apply` only after Fable review.
 `npm run db:apply -- --project ipstebqawrvhkyntctrv --commit`, then `npm run db:types:staging`… **no** — types must keep coming from wherever the team currently generates them; run `npm run db:types:staging` during the build, and regenerate from production after the production apply (the 7de62cd precedent).
 
-### 4. `[Sonnet]` `scripts/import-material-master.ts`
+### 4. ✅ `[Fable]` `scripts/import-material-master.ts`
 
 Follows `import-contractors.ts` exactly: `requireProjectRef`/`isCommit`/`sql`/`literal` from `scripts/supabase-management.ts`, dry run by default, `--project <ref> --commit` to write, idempotent (a re-run prints all `=` and writes nothing). Row data moves via `jsonb_populate_recordset` (the `clone-data.ts` rule — no hand-rolled quoting of 2,050 rows).
 
@@ -71,7 +71,7 @@ UoM mapping (case-insensitive; targets are `uoms.name` values):
 
 Idempotency keys: coded rows match existing items on `lower(trim(code))`; code-less rows on `lower(trim(name))` within `kind='material'`. Existing rows are skipped, never updated (the 2 seed materials and staging's test "cement" stay untouched). Commit run wraps everything in one transaction and prints per-category counts afterwards.
 
-### 5. `[Sonnet]` `scripts/import-vendors.ts`
+### 5. ✅ `[Fable]` `scripts/import-vendors.ts`
 
 Same skeleton. Reads `data/vendors.csv` (83 rows):
 
@@ -80,7 +80,7 @@ Same skeleton. Reads `data/vendors.csv` (83 rows):
 - Near-duplicate report (the token heuristic from `import-contractors.ts`) over sheet + DB names, printed for the founder, never auto-merged.
 - "Creator Name" ignored.
 
-### 6. `[Sonnet]` UI: the new vendor fields become visible and editable
+### 6. ✅ `[Fable]` UI: the new vendor fields become visible and editable
 
 - [lib/masters/vendors.ts](lib/masters/vendors.ts): extend `VendorRow` with `email`, `contact_designation`, `gst_state`, `payment_term_days`.
 - [lib/masters/vendors-actions.ts](lib/masters/vendors-actions.ts): extend `readVendorForm` + both actions with the four fields.
@@ -89,7 +89,7 @@ Same skeleton. Reads `data/vendors.csv` (83 rows):
 - Vendor detail page `app/(dashboard)/masters/vendors/[vendorId]/`: a "Payment details" card (bank name, account number, holder, IFSC, payment term) with edit via `record-form-dialog` pattern; `revalidatePath` in the existing `"/masters/vendors"` form the file already uses.
 - Items/Masters screens need **nothing** — the items UI already handles `kind='material'`, and its pickers read the `uoms` and `item_categories` masters.
 
-### 7. `[Opus]` Staging run + checks
+### 7. 🔄 `[Fable]` Staging run + checks (imports done; CI + founder vet pending)
 
 1. CI green on the feature branch (`gh run list` — a successful push is not a green build).
 2. Dry-run both scripts against staging; eyeball the reports (new categories, new uoms, flagged rows, near-dup vendor pairs). Then `--commit`, then re-run dry: everything prints `=`.
@@ -105,6 +105,8 @@ Only after the founder's explicit go-ahead:
 - Both import scripts: dry-run against production, review, `--commit`, re-run prints `=`.
 - Merge `staging` → `master` after the Fable diff review; confirm the Vercel Production deployment; press one real write button on production (TODO item 1 rides along).
 - TODO.md: tick item 3; note item 4 (works recipes) is now unblocked.
+
+> **Build note (Fable, 2026-08-20):** the whole build ran in the planning session itself — single autonomous session, so the Opus/Sonnet handoff did not apply; every commit is signed Fable. 0090 was added mid-build: audit_row() requires an `id` column on every audited table, which 0089's vendor_id-keyed table lacked; the first vendor insert caught it and rolled back cleanly.
 
 ## Branch
 

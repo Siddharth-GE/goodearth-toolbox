@@ -18,6 +18,7 @@ import { FileText, ShoppingCart } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { VendorFormDialog } from "../_components/vendor-form-dialog";
+import { VendorPaymentDialog } from "../_components/vendor-payment-dialog";
 
 // Everything here is money-free (po_facts / bill_facts): what exists
 // and where it stands, never what it costs — see lib/masters/vendor-detail.ts.
@@ -29,12 +30,18 @@ export default async function VendorDetailPage({
   const [user, { vendorId }] = await Promise.all([requireUser(), params]);
   const detail = await getVendorDetail(vendorId);
   if (!detail) notFound();
-  const { vendor, updatedByName, pos, poTotal, bills, billTotal, projectNames } = detail;
+  const { vendor, updatedByName, paymentDetails, pos, poTotal, bills, billTotal, projectNames } =
+    detail;
 
-  const [canSeePos, canSeeBills] = await Promise.all([
+  const [canSeePos, canSeeBills, canEditMasters] = await Promise.all([
     hasApp(user, "/purchase-orders"),
     hasApp(user, "/bills"),
+    hasApp(user, "/masters"),
   ]);
+  // RLS gates the vendor_payment_details read to exactly these grants —
+  // the card is rendered from the same test so "not allowed" never
+  // dresses up as "no details entered".
+  const canSeeBank = canEditMasters || canSeePos || canSeeBills;
   const projectName = (id: string) => projectNames.get(id) ?? "—";
 
   return (
@@ -61,19 +68,35 @@ export default async function VendorDetailPage({
         <dl className="grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
           <div>
             <dt className="text-muted">Contact person</dt>
-            <dd className="text-foreground">{vendor.contact_name || "—"}</dd>
+            <dd className="text-foreground">
+              {vendor.contact_name || "—"}
+              {vendor.contact_designation ? ` (${vendor.contact_designation})` : ""}
+            </dd>
           </div>
           <div>
             <dt className="text-muted">Mobile</dt>
             <dd className="text-foreground">{vendor.mobile || "—"}</dd>
           </div>
           <div>
+            <dt className="text-muted">Email</dt>
+            <dd className="text-foreground">{vendor.email || "—"}</dd>
+          </div>
+          <div>
             <dt className="text-muted">GST number</dt>
-            <dd className="text-foreground">{vendor.gst_no || "—"}</dd>
+            <dd className="text-foreground">
+              {vendor.gst_no || "—"}
+              {vendor.gst_state ? ` · ${vendor.gst_state}` : ""}
+            </dd>
           </div>
           <div>
             <dt className="text-muted">Address</dt>
             <dd className="text-foreground">{vendor.address || "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-muted">Payment terms</dt>
+            <dd className="text-foreground">
+              {vendor.payment_term_days !== null ? `${vendor.payment_term_days} days credit` : "—"}
+            </dd>
           </div>
         </dl>
         <p className="text-muted text-xs">
@@ -87,6 +110,41 @@ export default async function VendorDetailPage({
           )}
         </p>
       </Card>
+
+      {canSeeBank && (
+        <Card className="space-y-2 p-4">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-muted text-xs font-semibold tracking-widest uppercase">
+              Bank details
+            </p>
+            {canEditMasters && (
+              <VendorPaymentDialog vendorId={vendor.id} details={paymentDetails} />
+            )}
+          </div>
+          {paymentDetails ? (
+            <dl className="grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
+              <div>
+                <dt className="text-muted">Bank</dt>
+                <dd className="text-foreground">{paymentDetails.bank_name || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-muted">Account number</dt>
+                <dd className="text-foreground">{paymentDetails.account_number || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-muted">Account holder</dt>
+                <dd className="text-foreground">{paymentDetails.account_holder_name || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-muted">IFSC</dt>
+                <dd className="text-foreground">{paymentDetails.ifsc || "—"}</dd>
+              </div>
+            </dl>
+          ) : (
+            <p className="text-muted text-sm">No bank details entered for this vendor.</p>
+          )}
+        </Card>
+      )}
 
       <Card className="space-y-3 p-4">
         <p className="text-muted text-xs font-semibold tracking-widest uppercase">
