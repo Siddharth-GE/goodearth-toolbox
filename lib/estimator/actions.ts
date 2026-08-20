@@ -48,126 +48,6 @@ function deleteError(error: { code?: string }, what: string, instead: string): s
 // reads it, and this tool's pickers read the shared list.
 
 // ---------------------------------------------------------------------
-// Materials
-// ---------------------------------------------------------------------
-
-type MaterialFields = {
-  name: string;
-  uom: string;
-  rate: number | null;
-  is_active: boolean;
-  item_id: string | null;
-  item_uom_factor: number | null;
-};
-
-function readMaterialFields(formData: FormData): MaterialFields | { error: string } {
-  const name = text(formData, "name");
-  const uom = text(formData, "uom");
-  const rate = parseNumber(formData.get("rate"));
-  const itemId = text(formData, "item_id") || null;
-  const factor = parseNumber(formData.get("item_uom_factor"));
-
-  if (!name) return { error: "Give the material a name." };
-  if (name.length > NAME_LIMIT) return { error: `Keep the name under ${NAME_LIMIT} characters.` };
-  if (!uom) return { error: "Say what it is measured in, like bag, cum or kg." };
-  if (uom.length > UOM_LIMIT) return { error: `Keep the unit under ${UOM_LIMIT} characters.` };
-  if (rate !== null && (Number.isNaN(rate) || rate < 0)) {
-    return { error: "The rate must be a number, or left blank if it isn't priced yet." };
-  }
-  if (factor !== null && (Number.isNaN(factor) || factor <= 0)) {
-    return { error: "The conversion must be a number above zero, or left blank." };
-  }
-  if (factor !== null && !itemId) {
-    return { error: "A conversion only means something with a catalogue item picked." };
-  }
-
-  return {
-    name,
-    uom,
-    rate,
-    is_active: formData.get("is_active") === "1",
-    item_id: itemId,
-    item_uom_factor: factor,
-  };
-}
-
-/** Two unique rules can answer 23505 here: one name per material, and
- * one material per catalogue item (0076 — a shared item would
- * double-count every issued-vs-estimated comparison). */
-function duplicateMaterialMessage(message: string): string {
-  return message.includes("estimator_materials_item_key")
-    ? "That catalogue item is already linked to another material."
-    : "A material with that name already exists.";
-}
-
-export async function createMaterial(
-  _state: ActionState,
-  formData: FormData,
-): Promise<ActionState> {
-  const user = await requireTool(GRANT);
-  const fields = readMaterialFields(formData);
-  if ("error" in fields) return fields;
-  // 0085, founder: the master is the one material list. A material is a
-  // picked item plus the estimator's rate and unit — never a free name.
-  if (!fields.item_id) {
-    return { error: "Pick the material from Masters — the catalogue is the one material list." };
-  }
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("estimator_materials")
-    .insert({ ...fields, created_by: user.id, updated_by: user.id });
-  if (error) {
-    if (error.code === "23505") return { error: duplicateMaterialMessage(error.message) };
-    console.error("createMaterial failed:", error);
-    return { error: "Could not add the material. Try again." };
-  }
-
-  revalidatePath("/estimator", "layout");
-  return undefined;
-}
-
-export async function updateMaterial(
-  id: string,
-  _state: ActionState,
-  formData: FormData,
-): Promise<ActionState> {
-  const user = await requireTool(GRANT);
-  const fields = readMaterialFields(formData);
-  if ("error" in fields) return fields;
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("estimator_materials")
-    .update({ ...fields, updated_by: user.id })
-    .eq("id", id);
-  if (error) {
-    if (error.code === "23505") return { error: duplicateMaterialMessage(error.message) };
-    // P0001 = the 0085 master-first trigger; its message is written for
-    // the person who clicked (unlinking a linked material is refused).
-    if (error.code === "P0001") return { error: error.message };
-    console.error("updateMaterial failed:", error);
-    return { error: "Could not update the material. Try again." };
-  }
-
-  revalidatePath("/estimator", "layout");
-  return undefined;
-}
-
-export async function deleteMaterial(id: string): Promise<ActionState> {
-  await requireTool(GRANT);
-  const supabase = await createClient();
-  const { error } = await supabase.from("estimator_materials").delete().eq("id", id);
-  if (error) {
-    console.error("deleteMaterial failed:", error);
-    return { error: deleteError(error, "material", "Switch it off instead.") };
-  }
-
-  revalidatePath("/estimator", "layout");
-  return undefined;
-}
-
-// ---------------------------------------------------------------------
 // Mixes
 // ---------------------------------------------------------------------
 
@@ -266,10 +146,12 @@ export async function addMixComponent(
   formData: FormData,
 ): Promise<ActionState> {
   const user = await requireTool(GRANT);
-  const materialId = text(formData, "material_id");
+  // Since 0086 a mix is a combination of master ITEMS (founder: the
+  // items master is the one material list) — material_id is legacy.
+  const itemId = text(formData, "item_id");
   const qty = parseNumber(formData.get("qty_per_unit"));
 
-  if (!materialId) return { error: "Pick a material." };
+  if (!itemId) return { error: "Pick a material from Masters." };
   if (qty === null || Number.isNaN(qty) || qty <= 0) {
     return { error: "Enter how much of it one unit of the mix needs." };
   }
@@ -277,7 +159,7 @@ export async function addMixComponent(
   const supabase = await createClient();
   const { error } = await supabase.from("estimator_mix_components").insert({
     mix_id: mixId,
-    material_id: materialId,
+    item_id: itemId,
     qty_per_unit: qty,
     created_by: user.id,
     updated_by: user.id,
@@ -391,9 +273,10 @@ export async function addWorkComponent(
   }
 
   const supabase = await createClient();
+  // "material" in the form means a master ITEM since 0086.
   const { error } = await supabase.from("estimator_work_components").insert({
     work_item_id: workItemId,
-    material_id: kind === "material" ? refId : null,
+    item_id: kind === "material" ? refId : null,
     mix_id: kind === "mix" ? refId : null,
     qty_per_unit: qty,
     created_by: user.id,
@@ -842,13 +725,18 @@ export async function submitEstimate(estimateId: string): Promise<ActionState> {
   }
 
   if (takeoff.length > 0) {
+    // A takeoff id is a master item since 0086, a legacy material
+    // before — the snapshot anchors on whichever column it really is.
+    const itemIds = new Set(book.itemIds);
     const { error: takeoffError } = await supabase.from("estimator_estimate_takeoff").insert(
       takeoff.map((row) => {
         const material = materialsById.get(row.materialId);
+        const isItem = itemIds.has(row.materialId);
         return {
           estimate_id: estimateId,
           work_item_id: row.workItemId,
-          material_id: row.materialId,
+          material_id: isItem ? null : row.materialId,
+          item_id: isItem ? row.materialId : null,
           material_name: material?.name ?? "Unknown material",
           uom: material?.uom ?? "",
           quantity: row.quantity,

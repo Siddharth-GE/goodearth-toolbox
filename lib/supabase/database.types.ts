@@ -1399,7 +1399,8 @@ export type Database = {
           created_by: string | null
           estimate_id: string
           id: string
-          material_id: string
+          item_id: string | null
+          material_id: string | null
           material_name: string
           quantity: number
           rate: number | null
@@ -1413,7 +1414,8 @@ export type Database = {
           created_by?: string | null
           estimate_id: string
           id?: string
-          material_id: string
+          item_id?: string | null
+          material_id?: string | null
           material_name: string
           quantity: number
           rate?: number | null
@@ -1427,7 +1429,8 @@ export type Database = {
           created_by?: string | null
           estimate_id?: string
           id?: string
-          material_id?: string
+          item_id?: string | null
+          material_id?: string | null
           material_name?: string
           quantity?: number
           rate?: number | null
@@ -1456,6 +1459,13 @@ export type Database = {
             columns: ["estimate_id"]
             isOneToOne: false
             referencedRelation: "estimator_estimates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimator_estimate_takeoff_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
             referencedColumns: ["id"]
           },
           {
@@ -1667,7 +1677,8 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
-          material_id: string
+          item_id: string | null
+          material_id: string | null
           mix_id: string
           qty_per_unit: number
           updated_at: string
@@ -1677,7 +1688,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
-          material_id: string
+          item_id?: string | null
+          material_id?: string | null
           mix_id: string
           qty_per_unit: number
           updated_at?: string
@@ -1687,7 +1699,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
-          material_id?: string
+          item_id?: string | null
+          material_id?: string | null
           mix_id?: string
           qty_per_unit?: number
           updated_at?: string
@@ -1699,6 +1712,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimator_mix_components_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
             referencedColumns: ["id"]
           },
           {
@@ -1914,6 +1934,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          item_id: string | null
           material_id: string | null
           mix_id: string | null
           qty_per_unit: number
@@ -1925,6 +1946,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          item_id?: string | null
           material_id?: string | null
           mix_id?: string | null
           qty_per_unit: number
@@ -1936,6 +1958,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          item_id?: string | null
           material_id?: string | null
           mix_id?: string | null
           qty_per_unit?: number
@@ -1949,6 +1972,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimator_work_components_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
             referencedColumns: ["id"]
           },
           {
@@ -6463,13 +6493,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "units"
             referencedColumns: ["project_id", "id"]
-          },
-          {
-            foreignKeyName: "estimator_materials_item_id_fkey"
-            columns: ["item_id"]
-            isOneToOne: false
-            referencedRelation: "items"
-            referencedColumns: ["id"]
           },
         ]
       }

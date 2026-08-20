@@ -21,13 +21,16 @@ import { compareIssuesToEstimate } from "./compare";
  * Masters (`lib/masters/works.ts`) — a shared surface, money-free, and
  * ungated by design. Nothing here reads another tool's tables.
  *
- * Almost no embeds: the estimates list needs villa names, and `units`
- * has had two foreign keys to `plots` since 0029, so a bare embed
- * answers HTTP 300 at runtime while compiling perfectly (BUGCATCHER
- * #2). Names are merged through a Map instead — the Directory pattern.
- * The one embed is listMaterials' `items(...)`: estimator_materials has
- * exactly one path to items (0076), so it cannot go ambiguous, and it
- * was exercised against staging PostgREST before shipping.
+ * No embeds: the estimates list needs villa names, and `units` has had
+ * two foreign keys to `plots` since 0029, so a bare embed answers HTTP
+ * 300 at runtime while compiling perfectly (BUGCATCHER #2). Names are
+ * merged through a Map instead — the Directory pattern.
+ *
+ * Since 0086 the material vocabulary IS the items master (founder:
+ * "materials are exactly the same as in the items master") — the rate
+ * is `items.indicative_price`, the unit is `items.default_uom`, and
+ * `estimator_materials` survives only to resolve components and frozen
+ * takeoff rows from before that day.
  */
 
 const GRANT = "/estimator";
@@ -60,7 +63,12 @@ export async function getWelcomeCounts(): Promise<{
       .select("id", { count: "exact", head: true })
       .eq("status", "submitted"),
     supabase.from("estimator_work_info").select("id", { count: "exact", head: true }),
-    supabase.from("estimator_materials").select("id", { count: "exact", head: true }),
+    // Since 0086 the material list IS the items master's material band.
+    supabase
+      .from("items")
+      .select("id", { count: "exact", head: true })
+      .eq("kind", "material")
+      .eq("is_active", true),
   ]);
 
   return {
@@ -75,80 +83,66 @@ export async function getWelcomeCounts(): Promise<{
 // Materials
 // ---------------------------------------------------------------------
 
-export type MaterialRow = {
+/** A master item wearing its material hat: the rate is Masters'
+ * indicative price, the unit is how stock moves. Since 0086 (founder:
+ * "materials are exactly the same as in the items master") this is the
+ * whole material vocabulary — there is no separate list to maintain. */
+export type MaterialItemRow = {
   id: string;
   name: string;
   uom: string;
+  /** items.indicative_price — null = nobody has priced it in Masters. */
   rate: number | null;
   isActive: boolean;
-  /** How many mixes and recipes use it — a material in use can't be deleted. */
-  useCount: number;
-  /** The catalogue item this material is bought and issued as (0076). */
-  itemId: string | null;
-  /** One <uom> of the material = factor × <default_uom> of the item. */
-  itemUomFactor: number | null;
-  /** Display fields of the linked item; null when unlinked. */
-  itemName: string | null;
-  itemCode: string | null;
-  itemDefaultUom: string | null;
 };
 
-export async function listMaterials(): Promise<MaterialRow[]> {
+export async function listMaterialItems(): Promise<MaterialItemRow[]> {
   await requireTool(GRANT);
   const supabase = await createClient();
 
-  const [materials, mixUses, workUses] = await Promise.all([
-    fetchAll<{
-      id: string;
-      name: string;
-      uom: string;
-      rate: number | null;
-      is_active: boolean;
-      item_id: string | null;
-      item_uom_factor: number | null;
-      items: { name: string; code: string | null; default_uom: string } | null;
-    }>((from, to) =>
-      supabase
-        .from("estimator_materials")
-        .select(
-          "id, name, uom, rate, is_active, item_id, item_uom_factor, items(name, code, default_uom)",
-        )
-        .order("name")
-        .order("id")
-        .range(from, to),
-    ),
-    fetchAll<{ material_id: string }>((from, to) =>
-      supabase.from("estimator_mix_components").select("material_id").order("id").range(from, to),
-    ),
-    fetchAll<{ material_id: string | null }>((from, to) =>
-      supabase
-        .from("estimator_work_components")
-        .select("material_id")
-        .not("material_id", "is", null)
-        .order("id")
-        .range(from, to),
-    ),
-  ]);
+  const rows = await fetchAll<{
+    id: string;
+    name: string;
+    default_uom: string;
+    indicative_price: number | null;
+    is_active: boolean;
+  }>((from, to) =>
+    supabase
+      .from("items")
+      .select("id, name, default_uom, indicative_price, is_active")
+      .eq("kind", "material")
+      .order("name")
+      .order("id")
+      .range(from, to),
+  );
 
-  const uses = new Map<string, number>();
-  for (const row of mixUses) uses.set(row.material_id, (uses.get(row.material_id) ?? 0) + 1);
-  for (const row of workUses) {
-    if (row.material_id) uses.set(row.material_id, (uses.get(row.material_id) ?? 0) + 1);
-  }
-
-  return materials.map((material) => ({
-    id: material.id,
-    name: material.name,
-    uom: material.uom,
-    rate: material.rate,
-    isActive: material.is_active,
-    useCount: uses.get(material.id) ?? 0,
-    itemId: material.item_id,
-    itemUomFactor: material.item_uom_factor,
-    itemName: material.items?.name ?? null,
-    itemCode: material.items?.code ?? null,
-    itemDefaultUom: material.items?.default_uom ?? null,
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    uom: row.default_uom,
+    rate: row.indicative_price,
+    isActive: row.is_active,
   }));
+}
+
+/** MaterialDefs for exactly the referenced items — the recipe book and
+ * the mix/work screens resolve components through this. */
+async function itemDefsByIds(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  ids: string[],
+): Promise<Map<string, MaterialDef>> {
+  if (ids.length === 0) return new Map();
+  const { data, error } = await supabase
+    .from("items")
+    .select("id, name, default_uom, indicative_price")
+    .in("id", ids);
+  if (error) fail("the materials", error);
+  return new Map(
+    (data ?? []).map((row) => [
+      row.id,
+      { id: row.id, name: row.name, uom: row.default_uom, rate: row.indicative_price },
+    ]),
+  );
 }
 
 // ---------------------------------------------------------------------
@@ -230,11 +224,14 @@ export async function listMixes(): Promise<MixRow[]> {
 
 export type MixComponentRow = {
   id: string;
+  /** The item id since 0086; a legacy estimator_materials id before. */
   materialId: string;
   materialName: string;
   materialUom: string;
   materialRate: number | null;
   qtyPerUnit: number;
+  /** true = a pre-0086 row still priced off the retired materials list. */
+  legacy: boolean;
 };
 
 export type MixDetail = {
@@ -258,19 +255,26 @@ export async function getMix(mixId: string): Promise<MixDetail | null> {
   if (error) fail("the mix", error);
   if (!mix) return null;
 
-  const [components, materials] = await Promise.all([
-    fetchAll<{ id: string; material_id: string; qty_per_unit: number }>((from, to) =>
+  const [components, legacyMaterials] = await Promise.all([
+    fetchAll<{
+      id: string;
+      material_id: string | null;
+      item_id: string | null;
+      qty_per_unit: number;
+    }>((from, to) =>
       supabase
         .from("estimator_mix_components")
-        .select("id, material_id, qty_per_unit")
+        .select("id, material_id, item_id, qty_per_unit")
         .eq("mix_id", mixId)
         .order("id")
         .range(from, to),
     ),
     listMaterialsRaw(supabase),
   ]);
-
-  const materialsById = new Map(materials.map((m) => [m.id, m]));
+  const itemDefs = await itemDefsByIds(supabase, [
+    ...new Set(components.flatMap((c) => (c.item_id ? [c.item_id] : []))),
+  ]);
+  const legacyById = new Map(legacyMaterials.map((m) => [m.id, m]));
 
   return {
     id: mix.id,
@@ -280,14 +284,17 @@ export async function getMix(mixId: string): Promise<MixDetail | null> {
     isActive: mix.is_active,
     components: components
       .map((component) => {
-        const material = materialsById.get(component.material_id);
+        const def = component.item_id
+          ? itemDefs.get(component.item_id)
+          : legacyById.get(component.material_id ?? "");
         return {
           id: component.id,
-          materialId: component.material_id,
-          materialName: material?.name ?? "Unknown material",
-          materialUom: material?.uom ?? "",
-          materialRate: material?.rate ?? null,
+          materialId: component.item_id ?? component.material_id ?? "",
+          materialName: def?.name ?? "Unknown material",
+          materialUom: def?.uom ?? "",
+          materialRate: def?.rate ?? null,
           qtyPerUnit: component.qty_per_unit,
+          legacy: component.item_id === null,
         };
       })
       .sort((a, b) => a.materialName.localeCompare(b.materialName)),
@@ -422,12 +429,13 @@ export async function getWorkSetup(workItemId: string): Promise<WorkSetup | null
     fetchAll<{
       id: string;
       material_id: string | null;
+      item_id: string | null;
       mix_id: string | null;
       qty_per_unit: number;
     }>((from, to) =>
       supabase
         .from("estimator_work_components")
-        .select("id, material_id, mix_id, qty_per_unit")
+        .select("id, material_id, item_id, mix_id, qty_per_unit")
         .eq("work_item_id", workItemId)
         .order("id")
         .range(from, to),
@@ -444,6 +452,9 @@ export async function getWorkSetup(workItemId: string): Promise<WorkSetup | null
 
   const materialsById = new Map(materials.map((m) => [m.id, m]));
   const mixesById = new Map(mixes.map((m) => [m.id, m]));
+  const itemDefs = await itemDefsByIds(supabase, [
+    ...new Set(components.flatMap((c) => (c.item_id ? [c.item_id] : []))),
+  ]);
 
   return {
     workItemId: item.id,
@@ -455,14 +466,17 @@ export async function getWorkSetup(workItemId: string): Promise<WorkSetup | null
     labourRate: info.data?.labour_rate ?? null,
     lineCount: lines.count ?? 0,
     components: components.map((component) => {
-      if (component.material_id) {
-        const material = materialsById.get(component.material_id);
+      if (component.item_id || component.material_id) {
+        // An item since 0086; a legacy material row before it.
+        const def = component.item_id
+          ? itemDefs.get(component.item_id)
+          : materialsById.get(component.material_id ?? "");
         return {
           id: component.id,
           kind: "material" as const,
-          refId: component.material_id,
-          name: material?.name ?? "Unknown material",
-          uom: material?.uom ?? "",
+          refId: component.item_id ?? component.material_id ?? "",
+          name: def?.name ?? "Unknown material",
+          uom: def?.uom ?? "",
           qtyPerUnit: component.qty_per_unit,
           mixComponentCount: null,
         };
@@ -489,21 +503,29 @@ export type RecipeBook = {
   materials: MaterialDef[];
   mixes: MixDef[];
   recipes: WorkRecipe[];
+  /** Which MaterialDef ids are master ITEMS (0086) — the snapshot
+   * writer needs to know which column a takeoff row anchors on. */
+  itemIds: string[];
 };
 
 export async function getRecipeBook(): Promise<RecipeBook> {
   await requireTool(GRANT);
   const supabase = await createClient();
 
-  const [materials, mixes, mixComponents, info, workComponents] = await Promise.all([
+  const [legacyMaterials, mixes, mixComponents, info, workComponents] = await Promise.all([
     listMaterialsRaw(supabase),
     fetchAll<{ id: string; name: string; uom: string }>((from, to) =>
       supabase.from("estimator_mixes").select("id, name, uom").order("id").range(from, to),
     ),
-    fetchAll<{ mix_id: string; material_id: string; qty_per_unit: number }>((from, to) =>
+    fetchAll<{
+      mix_id: string;
+      material_id: string | null;
+      item_id: string | null;
+      qty_per_unit: number;
+    }>((from, to) =>
       supabase
         .from("estimator_mix_components")
-        .select("mix_id, material_id, qty_per_unit")
+        .select("mix_id, material_id, item_id, qty_per_unit")
         .order("id")
         .range(from, to),
     ),
@@ -517,21 +539,33 @@ export async function getRecipeBook(): Promise<RecipeBook> {
     fetchAll<{
       work_item_id: string;
       material_id: string | null;
+      item_id: string | null;
       mix_id: string | null;
       qty_per_unit: number;
     }>((from, to) =>
       supabase
         .from("estimator_work_components")
-        .select("work_item_id, material_id, mix_id, qty_per_unit")
+        .select("work_item_id, material_id, item_id, mix_id, qty_per_unit")
         .order("id")
         .range(from, to),
     ),
   ]);
 
+  // Since 0086 a component's material IS a master item; rows from
+  // before that resolve through the retired estimator_materials list.
+  // calc.ts never knows the difference — a MaterialDef is a MaterialDef.
+  const itemDefs = await itemDefsByIds(supabase, [
+    ...new Set(
+      [...mixComponents, ...workComponents].flatMap((row) => (row.item_id ? [row.item_id] : [])),
+    ),
+  ]);
+
   const componentsByMix = new Map<string, { materialId: string; qtyPerUnit: number }[]>();
   for (const row of mixComponents) {
+    const sourceId = row.item_id ?? row.material_id;
+    if (!sourceId) continue;
     const list = componentsByMix.get(row.mix_id) ?? [];
-    list.push({ materialId: row.material_id, qtyPerUnit: row.qty_per_unit });
+    list.push({ materialId: sourceId, qtyPerUnit: row.qty_per_unit });
     componentsByMix.set(row.mix_id, list);
   }
 
@@ -542,7 +576,7 @@ export async function getRecipeBook(): Promise<RecipeBook> {
   for (const row of workComponents) {
     const list = componentsByWork.get(row.work_item_id) ?? [];
     list.push({
-      materialId: row.material_id,
+      materialId: row.item_id ?? row.material_id,
       mixId: row.mix_id,
       qtyPerUnit: row.qty_per_unit,
     });
@@ -550,7 +584,10 @@ export async function getRecipeBook(): Promise<RecipeBook> {
   }
 
   return {
-    materials: materials.map((m) => ({ id: m.id, name: m.name, uom: m.uom, rate: m.rate })),
+    materials: [
+      ...itemDefs.values(),
+      ...legacyMaterials.map((m) => ({ id: m.id, name: m.name, uom: m.uom, rate: m.rate })),
+    ],
     mixes: mixes.map((mix) => ({
       id: mix.id,
       name: mix.name,
@@ -563,6 +600,7 @@ export async function getRecipeBook(): Promise<RecipeBook> {
       labourRate: row.labour_rate,
       components: componentsByWork.get(row.work_item_id) ?? [],
     })),
+    itemIds: [...itemDefs.keys()],
   };
 }
 
@@ -764,7 +802,8 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
     estimate.status !== "draft"
       ? fetchAll<{
           work_item_id: string;
-          material_id: string;
+          material_id: string | null;
+          item_id: string | null;
           material_name: string;
           uom: string;
           quantity: number;
@@ -772,7 +811,7 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
         }>((from, to) =>
           supabase
             .from("estimator_estimate_takeoff")
-            .select("work_item_id, material_id, material_name, uom, quantity, rate")
+            .select("work_item_id, material_id, item_id, material_name, uom, quantity, rate")
             .eq("estimate_id", estimateId)
             .order("id")
             .range(from, to),
@@ -811,7 +850,8 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
             })),
             takeoff: frozenTakeoff.map((row) => ({
               workItemId: row.work_item_id,
-              materialId: row.material_id,
+              materialId: row.item_id ?? row.material_id ?? "",
+              itemId: row.item_id,
               materialName: row.material_name,
               uom: row.uom,
               quantity: row.quantity,
@@ -1078,14 +1118,15 @@ export async function countVillasOverEstimate(): Promise<number> {
     fetchAll<{
       estimate_id: string;
       work_item_id: string;
-      material_id: string;
+      material_id: string | null;
+      item_id: string | null;
       material_name: string;
       uom: string;
       quantity: number;
     }>((from, to) =>
       supabase
         .from("estimator_estimate_takeoff")
-        .select("estimate_id, work_item_id, material_id, material_name, uom, quantity")
+        .select("estimate_id, work_item_id, material_id, item_id, material_name, uom, quantity")
         .in(
           "estimate_id",
           officials.map((estimate) => estimate.id),
@@ -1095,6 +1136,24 @@ export async function countVillasOverEstimate(): Promise<number> {
     ),
     materialLinks(supabase),
   ]);
+  // An item-keyed row (0086) is its own link: the frozen quantity is
+  // already in the item's unit, so the identity link converts 1:1.
+  const identityLinks = [
+    ...new Map(
+      takeoff
+        .filter((row) => row.item_id !== null)
+        .map((row) => [
+          row.item_id as string,
+          {
+            materialId: row.item_id as string,
+            itemId: row.item_id as string,
+            itemUom: row.uom,
+            factor: null,
+          },
+        ]),
+    ).values(),
+  ];
+  const allLinks = [...links, ...identityLinks];
   if (unitsResult.error) fail("the villas", unitsResult.error);
   const plotByUnit = new Map(
     (unitsResult.data ?? []).map((unit) => [unit.id, unit.plot_id as string]),
@@ -1208,12 +1267,12 @@ export async function countVillasOverEstimate(): Promise<number> {
       .filter((row) => row.estimate_id === estimate.id)
       .map((row) => ({
         workItemId: row.work_item_id,
-        materialId: row.material_id,
+        materialId: row.item_id ?? row.material_id ?? "",
         materialName: row.material_name,
         uom: row.uom,
         quantity: row.quantity,
       }));
-    const comparison = compareIssuesToEstimate(rows, links, issued);
+    const comparison = compareIssuesToEstimate(rows, allLinks, issued);
     if (comparison.rows.some((row) => row.over)) over++;
   }
   return over;

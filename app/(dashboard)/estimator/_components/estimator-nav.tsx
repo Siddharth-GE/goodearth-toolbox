@@ -12,7 +12,6 @@ const TABS = [
   { key: "estimates", href: "/estimator/estimates", label: "Estimates" },
   { key: "works", href: "/estimator/works", label: "Works" },
   { key: "mixes", href: "/estimator/mixes", label: "Mixes" },
-  { key: "materials", href: "/estimator/materials", label: "Materials" },
 ] as const;
 
 export function EstimatorNav() {

@@ -2,7 +2,7 @@
 
 Approved by the founder 2026-08-20 (labour logs record per-trade counts; every supervisor sees every villa through a picker; overrun flags are derived, never stored). Phase 1 — the estimator-as-backbone rewiring, 0076–0083 — is live on production and recorded in STATUS.md; its plan is in git history.
 
-**All built, all on staging, 2026-08-20** — Step G (PR #41) and then G2 + H + I in one closing PR, per the founder's "correct this and finish the rest". Awaiting the founder's staging vet; production then applies `0084` + `0085` in order, `db:compare` must come back empty, then `staging → master`.
+**All built, all on staging, 2026-08-20** — Step G (PR #41), then G2 + H + I (PR #42), then **G3** (`0086`): the founder pulled the thread all the way — "we don't even need a materials tab, all materials are exactly the same as in the items master" — so mixes and work recipes hold master items directly, the rate is `items.indicative_price`, quantities speak each item's own unit, and the Materials tab is gone (see the Estimator's PLAN.md for the full shape; both databases were surveyed first — production had zero estimator rows). Awaiting the founder's staging vet; production then applies `0084`–`0086` in order, `db:compare` must come back empty, then `staging → master`.
 
 ## What Phase 2 delivers
 
