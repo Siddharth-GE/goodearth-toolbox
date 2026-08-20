@@ -9,19 +9,17 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/components/ui/table";
-import { listMaterials, listUomNames, listUoms } from "@/lib/estimator/queries";
+import { listMaterials, listUomNames } from "@/lib/estimator/queries";
 import { formatMoney, formatQuantity } from "@/lib/format";
 import { listBrands } from "@/lib/masters/brands";
 import { listItemCategories } from "@/lib/masters/item-categories";
 import { Package } from "lucide-react";
 import { DeleteMaterialButton, MaterialFormDialog } from "./_components/material-forms";
-import { UomManager } from "./_components/uom-manager";
 
 export default async function MaterialsPage() {
-  const [materials, uoms, uomRows, categories, brands] = await Promise.all([
+  const [materials, uoms, categories, brands] = await Promise.all([
     listMaterials(),
     listUomNames(),
-    listUoms(),
     // The picker's category filter offers the material band — that is
     // where construction raw materials live — but search still reaches
     // the whole catalogue.
@@ -135,16 +133,9 @@ export default async function MaterialsPage() {
         </Card>
       )}
 
-      <Card className="space-y-3 p-4">
-        <div>
-          <p className="text-muted text-xs font-semibold tracking-widest uppercase">Units</p>
-          <p className="text-muted mt-1 text-sm">
-            What the pickers offer wherever a unit is chosen — materials, mixes and works. A unit
-            with a number beside it is in use and stays; one with a ✕ can be removed.
-          </p>
-        </div>
-        <UomManager uoms={uomRows} />
-      </Card>
+      <p className="text-muted text-sm">
+        Units of measure are managed in Masters → Units — one list for the whole toolbox.
+      </p>
     </div>
   );
 }

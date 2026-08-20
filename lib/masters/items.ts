@@ -5,8 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 // The value lists live in ./constants (import-free, so actions files can
 // use them as values); the types are re-exported here because this module
 // is where readers of item data already look for them.
-export type { ItemKind, Placement, Uom } from "./constants";
-import type { ItemKind, Placement, Uom } from "./constants";
+export type { ItemKind, Placement } from "./constants";
+import type { ItemKind, Placement } from "./constants";
 
 export type ItemRow = {
   id: string;
@@ -17,7 +17,7 @@ export type ItemRow = {
   category_id: string;
   brand_id: string | null;
   placement: Placement | null;
-  default_uom: Uom;
+  default_uom: string;
   indicative_price: number | null;
   image_url: string | null;
   thumb_url: string | null;
