@@ -2,11 +2,12 @@
 
 Only the next build lives here (founder, 2026-08-20: this page holds Phase 2 and nothing else). What exists is `STATUS.md`, the rules are `CLAUDE.md`, history is git.
 
-## Phase 2 — Supervisors and over-issue warnings
+## Phase 2 — built, waiting on the staging vet
 
-Founder go-ahead given 2026-08-20. Sketches are in `plan.md` (Phase 2 section); a short plan gets the founder's approval before building starts, and everything lands on staging for the founder's vet before production.
+Everything approved on 2026-08-20 is on staging (`plan.md` holds the build record): the Supervisors app, the store-keeper's request queue, the over-issue warnings, and the founder's mid-build correction — the items master is the one material list (`0085`).
 
-**Prerequisite data task (Masters):** enter the construction raw materials as `kind='material'` items and link each estimator material to its item on the Estimator's Materials screen — unlinked materials cannot feed requests or comparisons.
+1. **Founder vets on staging.goodearthkannur.org** — the hard gate. The browser checklist is in the session summary; nothing below happens first.
+2. **Production promotion, after the vet**: `npm run db:apply -- --project pajfrgnkapicdgangjey --commit` (applies `0084`, `0085` in order) → `npm run db:types` → `npm run db:compare` must report no differences → merge `staging → master` → press one real write button on production (record a labour log).
+3. **Grants nobody has issued yet**: `/supervisors` to the actual site supervisors, once the founder says who.
 
-- **Supervisors app** (`/supervisors`, phone-first): labour logs per plot + work + contractor (`vendors.is_contractor`), a per-work view of the materials issued to the plot, and a "Request an issue" button (plot, work, item, qty → requested / fulfilled / declined) feeding the store-keeper's queue and pre-filling the issue form. Needs: a new grant in both `*_apps_app_known` CHECKs, `lib/tools.ts` registration, the slug added to `estimate_takeoff_facts`' WHERE and its manifest row, and a catalogue-route entry if it picks items.
-- **Over-issue warnings**: flag, never refuse. `recordStockIssue` completes the write and answers success-with-a-warning when cumulative issues for a plot + work pass the official takeoff (the arithmetic is `lib/estimator/compare.ts`, already on screen), and the flag is surfaced to the estimate's submitter on the Estimator welcome and the comparison card.
+**Data task (Masters + Estimator, not code):** enter the construction raw materials as `kind='material'` items, and link the Estimator's pre-`0085` unlinked materials to them on the Materials screen (each shows a link-me chip). New materials are forced to start from the master; comparisons, requests and warnings only bite for linked ones.

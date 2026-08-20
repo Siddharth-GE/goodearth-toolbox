@@ -2,6 +2,8 @@
 
 Approved by the founder 2026-08-20 (labour logs record per-trade counts; every supervisor sees every villa through a picker; overrun flags are derived, never stored). Phase 1 — the estimator-as-backbone rewiring, 0076–0083 — is live on production and recorded in STATUS.md; its plan is in git history.
 
+**All built, all on staging, 2026-08-20** — Step G (PR #41) and then G2 + H + I in one closing PR, per the founder's "correct this and finish the rest". Awaiting the founder's staging vet; production then applies `0084` + `0085` in order, `db:compare` must come back empty, then `staging → master`.
+
 ## What Phase 2 delivers
 
 A phone-first Supervisors app: log the day's labour per villa + work + contractor, see what material each work has drawn, request store issues. Plus a warning — flag, never refuse — when an issue takes a work past its official estimate.
@@ -18,7 +20,8 @@ A phone-first Supervisors app: log the day's labour per villa + work + contracto
 - **D2 `issue_requests` is Supervisors-owned; Inventory's fulfil/decline is the fifth documented cross-tool write exception** (STATUS.md list). RLS admits both apps; a guard trigger holds the fine grain: identity fields permanent, content edits only while `requested` and only by `/supervisors`, transitions `requested → fulfilled` (needs `fulfilled_issue_id`) or `requested → declined` (needs a reason) only by `/inventory`, resolved rows immutable.
 - **D3 No money anywhere in `/supervisors`.** Labour logs are headcounts, not wages; requests are quantities; `estimate_takeoff_facts` (which gains `/supervisors` in its WHERE) carries no rate column, ever.
 - **D4 Reads that already exist stay open reads**: `stock_issues(_lines)` and `goods_receipts(_lines)` SELECT is `using (true)` since 0023 — quantities only — so the per-work materials view needs no policy changes, only a contract row in STATUS.md.
-- **D5 Warnings ride the existing ActionState** as an optional `warning` field — `undefined` still means success; `{ warning }` is success the form shows in amber. `recordStockIssue` completes the write first, then compares; the check failing never blocks the save.
+- **D5 (revised in build): the warning lives on the issue note, not in the action's return.** `recordStockIssue` redirects to the note on success, so a returned warning would never render; instead the note derives the over-state fresh every render (`getOverIssueRows` + pure `lib/inventory/over-issue.ts`) — the keeper sees it the moment the redirect lands, later readers see the same truth, and ActionState stays untouched.
+- **D6 (added in build, founder): the items master is the one material list.** `estimator_materials` survives only as the rate card the open master cannot carry (rate = gated money; estimating unit + factor); since `0085` a new material starts from a picked item and a linked one can never unlink. Pre-0085 unlinked rows stay editable until linked.
 
 ## Step G — the Supervisors app (0084)
 
