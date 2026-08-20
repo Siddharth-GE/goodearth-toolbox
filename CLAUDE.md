@@ -4,7 +4,17 @@ Internal tools for Goodearth, a design-led real estate company in Kerala (~70 st
 
 **This Next.js is not the one you know.** v16 has breaking changes to APIs and file structure. Read `node_modules/next/dist/docs/` first. Note `proxy.ts`, not `middleware.ts`.
 
-`STATUS.md` = what exists, including the cross-tool read contract. `TODO.md` = what's next. `BUGCATCHER.md` = **what a green build does not prove** — read it before merging anything touching a database read, a file upload, a permission or a colour. `DESIGN.md` before styling. A tool's own `PLAN.md` before touching that tool.
+## The reading flow
+
+Every conversation starts the same way: the founder says **"read CLAUDE.md"**, and this file hands you the rest — they should never have to name another document.
+
+1. **This file** — the rules, and the flow you are now in.
+2. **`STATUS.md`** — what exists and works, including the cross-tool read contract.
+3. **`TODO.md`** — what is next, and nothing else. Kept deliberately empty of everything but the next build (founder, 2026-08-20): finished work moves to `STATUS.md`, settled trade-offs to the owning tool's `PLAN.md`, and nothing is struck through or left as a diary.
+4. **Before touching a tool** — that tool's `PLAN.md`. **Before styling** — `DESIGN.md`. **Before merging** anything touching a database read, a file upload, a permission or a colour — `BUGCATCHER.md`, what a green build does not prove.
+5. **`plan.md`** at the repo root is the currently approved build plan, when one is running.
+
+And the gate no document can hold, because it broke once (2026-08-20, BUGCATCHER #14): **nothing reaches production until the founder has vetted it on staging.goodearthkannur.org.** An instruction to ship covers only what the founder had seen when they gave it — anything built in the current conversation stops at staging until they say they have tried it there.
 
 **"Do an audit" means: re-derive the findings from the code, the migrations and the live databases — not read a list.** There is deliberately no standing findings file. Between 11 and 17 August 2026 there was one, and every finding it ever held is now either fixed, enforced by a check, or written down as a decision in the file it concerns; keeping the document after that point would have meant maintaining a second copy of the truth. So an audit produces a fresh account each time, and **anything it finds that a green build would have missed goes into `BUGCATCHER.md`, anything still to do goes into `TODO.md`, and anything that is a settled trade-off goes into the `PLAN.md` of the tool that lives with it.** Three places, each already read for other reasons.
 
@@ -134,7 +144,7 @@ Two databases and three places code runs. **Nothing but `master` may ever touch 
 1. Branch `feature/<tool>` off `staging`. Push early — the preview URL is free and it reads staging.
 2. **If it needs a migration**, apply it to staging **first**: `npm run db:apply -- --project ipstebqawrvhkyntctrv --commit`, then `npm run db:types:staging`, and commit the types with the migration. The code that needs a column must never reach a database without it.
 3. Build. Test on the preview. **Open the page** — a green build proves nothing about a `select` string (`BUGCATCHER.md`).
-4. Merge to `staging`. Leave it on `staging.goodearthkannur.org` for a few days of real use — that is what the environment is _for_, and rushing past it wastes the whole arrangement.
+4. Merge to `staging`. Leave it on `staging.goodearthkannur.org` for the founder's real use — that is what the environment is _for_, and rushing past it wastes the whole arrangement. **This step is a hard gate, not a courtesy** (2026-08-20, BUGCATCHER #14: a mid-soak correction went keyboard-to-production in one session on the strength of an earlier "merge to master"): a ship instruction covers only what the founder had seen when they gave it, so anything built since their last look waits here for their vet — one sentence from them, per feature, before step 5.
 5. **Then** apply the same migration to production: `npm run db:apply -- --project pajfrgnkapicdgangjey --commit`, and `npm run db:types`.
 6. `npm run db:compare -- --project pajfrgnkapicdgangjey --against ipstebqawrvhkyntctrv` — **must be empty.** It checks the schema _and_ all 237 auth settings.
 7. Merge `staging` → `master` only after browser testing and sign-off. Then **confirm a Production deployment exists for that exact commit, in Vercel's own Deployments list** — its newest Production row must be `git rev-parse --short origin/master`. **A merge is not a deployment**, and on 2026-08-17 nine commits sat merged, green and undeployed for hours because the identical SHA had already been built as a staging preview. Don't use GitHub's deployments API for this; it is an incomplete mirror and gave a confidently wrong answer the first time it was tried (`BUGCATCHER.md` #12). Press one real write button on production afterwards.
@@ -182,4 +192,4 @@ The drift comes from the escape hatch, not the main road. A small fix taken stra
 
 ## Working with the founder
 
-They direct the product, are not a developer, and judge the running app rather than the code. Every session, unprompted: **before** a task, 3–5 plain-language bullets on what and why (wait for a go-ahead if it touches more than a couple of files); **after**, a 2-sentence plain summary plus an "open this page, try this" browser checklist. Small steps, one at a time, a plain-English commit message each. If something breaks: one plain sentence on the cause, then offer a rollback before patching chaos on chaos. Handle the unhappy paths. Build fully what was approved; ask before adding what wasn't.
+They direct the product, are not a developer, and judge the running app rather than the code. Every session, unprompted: **before** a task, 3–5 plain-language bullets on what and why (wait for a go-ahead if it touches more than a couple of files); **after**, a 2-sentence plain summary plus an "open this page, try this" browser checklist. Small steps, one at a time, a plain-English commit message each. If something breaks: one plain sentence on the cause, then offer a rollback before patching chaos on chaos. Handle the unhappy paths. Build fully what was approved; ask before adding what wasn't. **The founder vets on staging before production, every time** — when they say "merge to master" in the same message as a new request, the new work still stops at staging for their eyes; the instruction covers what they had already seen, never what it prompted.

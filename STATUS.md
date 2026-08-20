@@ -1,6 +1,6 @@
 # Status — what exists and works
 
-A snapshot, not a changelog. Durable rules live in `CLAUDE.md`, next tasks in `TODO.md`, the failures a green build cannot see in `BUGCATCHER.md`, per-tool detail in each tool's `PLAN.md`, and full history in git.
+A snapshot, not a changelog. Second stop in the reading flow (`CLAUDE.md` first — it holds the rules and the flow itself): next tasks in `TODO.md`, the failures a green build cannot see in `BUGCATCHER.md`, per-tool detail in each tool's `PLAN.md`, full history in git.
 
 _Last reviewed: 2026-08-17 — the databases split in two (below), ahead of onboarding staff._
 

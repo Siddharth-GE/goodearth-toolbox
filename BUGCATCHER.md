@@ -230,6 +230,20 @@ _Caught 2026-08-19 on staging, building the Estimator — before it shipped, by 
 
 ---
 
+### 14. Production shipped work the founder had never seen
+
+_Caught 2026-08-20 by the founder, reading the release summary of features they were hearing about for the first time._
+
+**What happened.** Mid-soak, the founder sent one message carrying a correction (the reconciliation flag, `0083`) and the words "go for the last step and merge to master". The correction was built, merged to staging and carried straight on to production in the same session: green PRs, migrations applied in order, `db:compare` empty, the Vercel Production row confirmed against the exact SHA. Every mechanical check in this file passed, because every one of them was pointed at the code and the databases. **The founder had never opened the reconciliation screen.** "Merge to master" was read as sign-off — but it was spoken before the work it ended up covering existed.
+
+**Why every gate missed it.** Every gate here is mechanical, and the gate that failed is human. CI proves the code compiles; the ledger proves the databases are ready; the deployment row proves the site serves the commit. **None of them can know what the founder has looked at.** The staging protocol's step 4 — leave it on `staging.goodearthkannur.org` for real use — was the check, and it was skipped on the strength of an instruction that predated the feature.
+
+**The rule.** **An instruction to ship covers only what the founder had seen when they gave it.** Anything built in the current conversation stops at staging — production waits until the founder says they have tried that feature on `staging.goodearthkannur.org`. "Merge to master", "go ahead", "finish it" never roll forward onto work that did not exist when the words were typed.
+
+**The check.** Before `staging → master`, ask one question of the diff: **has the founder seen every feature in this on the staging site?** If any part of it was built since their last look, the answer is no, and the merge waits for one sentence from them.
+
+---
+
 ## Adding to this file
 
 When something breaks that a green build said was fine, it belongs here — not in `STATUS.md`, which is what exists, and not in `TODO.md`, which is what to do next. **This file is the only standing record of the failures CI cannot see, so an entry has to explain itself in full rather than cite a finding somewhere else.** Anyone reading it in a year should not need a second document, and there is no longer one to reach for.
