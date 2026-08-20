@@ -19,7 +19,7 @@ see what material each work has drawn, request store issues.
   never wages — nothing in this tool prices labour.
 - **Requests for issue** — plot, work, item, quantity in the item's
   unit (how stock moves, the 0076 D5 rule), status `requested →
-  fulfilled / declined`. The supervisor may edit or withdraw an OPEN
+fulfilled / declined`. The supervisor may edit or withdraw an OPEN
   request; the store-keeper (Inventory, Step H) resolves it, and a
   resolved request is immutable history. The request form quick-picks
   from the official estimate's materials for the chosen work, with the
