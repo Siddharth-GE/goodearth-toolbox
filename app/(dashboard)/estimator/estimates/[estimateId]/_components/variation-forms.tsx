@@ -20,6 +20,8 @@ import {
   customiseEstimateLine,
   removeLineComponent,
   resetEstimateLine,
+  setEstimateItemRate,
+  updateEstimateLineLabourRate,
   updateLineComponentQty,
 } from "@/lib/estimator/actions";
 import { formatQuantity } from "@/lib/format";
@@ -55,6 +57,8 @@ export function LineVariationDialog({
   customised,
   rows,
   options,
+  labourRate,
+  standardLabourRate,
 }: {
   lineId: string;
   workName: string;
@@ -62,6 +66,9 @@ export function LineVariationDialog({
   customised: boolean;
   rows: VariationRowView[];
   options: VariationOptions;
+  /** This villa's labour rate (0088); null = the work's standard. */
+  labourRate: number | null;
+  standardLabourRate: number | null;
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string>();
@@ -95,6 +102,15 @@ export function LineVariationDialog({
             {workName} — {customised ? "this villa's version" : "standard recipe"}
           </DialogTitle>
         </DialogHeader>
+
+        <LabourRateField
+          lineId={lineId}
+          rate={labourRate}
+          standardRate={standardLabourRate}
+          workUom={workUom}
+        />
+
+        <p className="text-muted text-xs font-semibold tracking-widest uppercase">Materials</p>
 
         {rows.length === 0 ? (
           <p className="text-muted text-sm">
@@ -190,6 +206,75 @@ export function LineVariationDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * This villa's labour rate for the work (0088) — blank means the
+ * work's standard rate from the Works tab, and the placeholder shows
+ * what that is. Independent of the recipe variation: a plot can pay
+ * differently for exactly the standard work.
+ */
+function LabourRateField({
+  lineId,
+  rate,
+  standardRate,
+  workUom,
+}: {
+  lineId: string;
+  rate: number | null;
+  standardRate: number | null;
+  workUom: string | null;
+}) {
+  const [value, setValue] = useState(rate === null ? "" : String(rate));
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string>();
+
+  const save = () => {
+    const cleaned = value.replace(/[,\s₹]/g, "");
+    // Blank clears the override; 0 is a real rate, not "unpriced".
+    const next = cleaned === "" ? null : Number(cleaned);
+    if (next !== null && (!Number.isFinite(next) || next < 0)) {
+      setValue(rate === null ? "" : String(rate));
+      setError("The labour rate must be a number, or blank for the standard.");
+      return;
+    }
+    if (next === rate) return;
+    startTransition(async () => {
+      const result = await updateEstimateLineLabourRate(lineId, next);
+      if (result?.error) {
+        setError(result.error);
+        setValue(rate === null ? "" : String(rate));
+      } else setError(undefined);
+    });
+  };
+
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={`labour-${lineId}`}>Labour rate for this villa</Label>
+      <div className="flex items-center gap-2">
+        <Input
+          id={`labour-${lineId}`}
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          onBlur={save}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") (event.target as HTMLInputElement).blur();
+          }}
+          disabled={pending}
+          inputMode="decimal"
+          placeholder={standardRate === null ? "Not priced" : `Standard: ${standardRate}`}
+          className="max-w-40"
+        />
+        <span className="text-muted text-xs">{workUom ? `per ${workUom}` : ""}</span>
+        {rate !== null && <Badge variant="info">Varied</Badge>}
+      </div>
+      <p className="text-muted text-xs">
+        Leave blank to use the standard rate from the Works tab. This villa&apos;s rate applies to
+        this work here only.
+      </p>
+      <FormMessage error={error} />
+    </div>
   );
 }
 
@@ -345,5 +430,70 @@ function AddComponentForm({
       )}
       <FormMessage error={state?.error} />
     </form>
+  );
+}
+
+/**
+ * This villa's price for one material (0088) — blank uses the price
+ * from Masters, shown as the placeholder. Saved per ESTIMATE, not per
+ * work: cement costing more at a far plot costs more everywhere in the
+ * house, and one price per material means two works can never
+ * disagree.
+ */
+export function ItemRateField({
+  estimateId,
+  itemId,
+  materialId,
+  rate,
+  standardRate,
+  label,
+}: {
+  estimateId: string;
+  itemId: string | null;
+  materialId: string | null;
+  rate: number | null;
+  standardRate: number | null;
+  label: string;
+}) {
+  const [value, setValue] = useState(rate === null ? "" : String(rate));
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string>();
+
+  const save = () => {
+    const cleaned = value.replace(/[,s₹]/g, "");
+    const next = cleaned === "" ? null : Number(cleaned);
+    if (next !== null && (!Number.isFinite(next) || next < 0)) {
+      setValue(rate === null ? "" : String(rate));
+      setError("The price must be a number, or blank for the Masters price.");
+      return;
+    }
+    if (next === rate) return;
+    startTransition(async () => {
+      const result = await setEstimateItemRate(estimateId, { itemId, materialId }, next);
+      if (result?.error) {
+        setError(result.error);
+        setValue(rate === null ? "" : String(rate));
+      } else setError(undefined);
+    });
+  };
+
+  return (
+    <span className="inline-flex items-center justify-end gap-1.5">
+      <FormMessage error={error} />
+      <Input
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
+        onBlur={save}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") (event.target as HTMLInputElement).blur();
+        }}
+        disabled={pending}
+        inputMode="decimal"
+        aria-label={`This villa's price for ${label}`}
+        placeholder={standardRate === null ? "Not priced" : String(standardRate)}
+        className="h-9 w-24 text-right"
+      />
+      {rate !== null && <Badge variant="info">Varied</Badge>}
+    </span>
   );
 }

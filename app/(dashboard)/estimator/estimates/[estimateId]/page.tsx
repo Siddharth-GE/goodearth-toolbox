@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/table";
 import {
   aggregateFrozenTakeoff,
+  applyEstimateOverrides,
+  applyRateOverrides,
   computeEstimateTotals,
   computeLine,
   computeTakeoff,
@@ -24,7 +26,6 @@ import {
 } from "@/lib/estimator/calc";
 import { compareIssuesToEstimate } from "@/lib/estimator/compare";
 import {
-  applyVariations,
   getEstimate,
   getEstimateVariations,
   getIssuedAgainstEstimate,
@@ -40,7 +41,11 @@ import { notFound } from "next/navigation";
 import { Fragment } from "react";
 import { EstimateFormDialog, DeleteEstimateButton } from "../_components/estimate-forms";
 import { AddLineDialog, LineQtyField, RemoveLineButton } from "./_components/line-forms";
-import { LineVariationDialog, type VariationRowView } from "./_components/variation-forms";
+import {
+  ItemRateField,
+  LineVariationDialog,
+  type VariationRowView,
+} from "./_components/variation-forms";
 import { ApproveReconciliationButton } from "./_components/reconciliation-forms";
 import { ReviseEstimateButton, SubmitEstimateButton } from "./_components/submit-forms";
 import { listProjects } from "@/lib/masters/projects";
@@ -123,12 +128,20 @@ export default async function EstimatePage({
   // category subtotals, estimate totals and the takeoff all come out of
   // lib/estimator/calc.ts, so they can never disagree with each other.
   // The frozen branch feeds the SAME grouping from the snapshot.
+  // This villa's variations, laid over the master before any
+  // arithmetic runs: its own recipe per customised line (0087), its own
+  // labour rates and material prices (0088).
   const materialsById = new Map<string, MaterialDef>(
-    [...book.materials, ...variations.extraMaterials].map((m) => [m.id, m]),
+    applyRateOverrides(
+      [...book.materials, ...variations.extraMaterials],
+      variations.rateByMaterialId,
+    ).map((m) => [m.id, m]),
   );
   const mixesById = new Map<string, MixDef>(book.mixes.map((m) => [m.id, m]));
   const recipesByWork = new Map<string, WorkRecipe>(
-    applyVariations(book.recipes, variations.byWork).map((r) => [r.workItemId, r]),
+    applyEstimateOverrides(book.recipes, variations.byWork, variations.labourRateByWork).map(
+      (recipe) => [recipe.workItemId, recipe],
+    ),
   );
 
   const lineInputs = estimate.lines.map((line) => ({
@@ -199,6 +212,12 @@ export default async function EstimatePage({
   const categoryOrder = [...new Set(works.map((work) => work.categoryCode))];
   const boq = groupLineCosts(lineCosts, categoryByWork, categoryOrder);
   const lineByWork = new Map(estimate.lines.map((line) => [line.workItemId, line]));
+
+  // What Masters says, before this villa's price overrides — the
+  // placeholder in each price box, so "blank means standard" is visible.
+  const standardRateById = new Map(
+    [...book.materials, ...variations.extraMaterials].map((m) => [m.id, m.rate]),
+  );
 
   // Per-villa variations (0087): what each line's dialog shows — the
   // line's own list when customised, the standard read-only otherwise.
@@ -463,6 +482,11 @@ export default async function EstimatePage({
                                   customised={variations.byLine.has(line.id)}
                                   rows={variationRowsForLine(line.id, line.workItemId)}
                                   options={variationOptions}
+                                  labourRate={line.labourRate}
+                                  standardLabourRate={
+                                    book.recipes.find((r) => r.workItemId === line.workItemId)
+                                      ?.labourRate ?? null
+                                  }
                                 />
                               )}
                               <RemoveLineButton id={line.id} label={line.name} />
@@ -508,7 +532,16 @@ export default async function EstimatePage({
                     {formatQuantity(row.quantity)} {row.uom}
                   </TableCell>
                   <TableCell className="text-right">
-                    {row.missingRate ? (
+                    {isDraft ? (
+                      <ItemRateField
+                        estimateId={estimate.id}
+                        itemId={book.itemIds.includes(row.materialId) ? row.materialId : null}
+                        materialId={book.itemIds.includes(row.materialId) ? null : row.materialId}
+                        rate={variations.rateByMaterialId.get(row.materialId) ?? null}
+                        standardRate={standardRateById.get(row.materialId) ?? null}
+                        label={row.name}
+                      />
+                    ) : row.missingRate ? (
                       <Badge variant="warning">Not priced</Badge>
                     ) : row.quantity > 0 ? (
                       formatMoney(row.cost === null ? null : row.cost / row.quantity)

@@ -624,26 +624,72 @@ export type EstimateVariations = {
   byLine: Map<string, LineVariationRow[]>;
   /** work_item_id → calc-ready components, for merging into recipes. */
   byWork: Map<string, WorkRecipe["components"]>;
+  /** work_item_id → this villa's labour rate (0088). Absent = standard. */
+  labourRateByWork: Map<string, number>;
+  /** material/item id → this villa's price (0088). Absent = Masters'. */
+  rateByMaterialId: Map<string, number>;
+  /** The price overrides as rows, for the screen to render and clear. */
+  itemRates: { id: string; itemId: string | null; materialId: string | null; rate: number }[];
   /** Defs for variation items the global book may not know. */
   extraMaterials: MaterialDef[];
   /** Which of those defs are master items (snapshot anchoring). */
   extraItemIds: string[];
 };
 
+const NO_VARIATIONS: EstimateVariations = {
+  byLine: new Map(),
+  byWork: new Map(),
+  labourRateByWork: new Map(),
+  rateByMaterialId: new Map(),
+  itemRates: [],
+  extraMaterials: [],
+  extraItemIds: [],
+};
+
 export async function getEstimateVariations(estimateId: string): Promise<EstimateVariations> {
   await requireTool(GRANT);
   const supabase = await createClient();
 
-  const lines = await fetchAll<{ id: string; work_item_id: string }>((from, to) =>
-    supabase
-      .from("estimator_estimate_lines")
-      .select("id, work_item_id")
-      .eq("estimate_id", estimateId)
-      .order("id")
-      .range(from, to),
-  );
+  const [lines, itemRates] = await Promise.all([
+    fetchAll<{ id: string; work_item_id: string; labour_rate: number | null }>((from, to) =>
+      supabase
+        .from("estimator_estimate_lines")
+        .select("id, work_item_id, labour_rate")
+        .eq("estimate_id", estimateId)
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAll<{ id: string; item_id: string | null; material_id: string | null; rate: number }>(
+      (from, to) =>
+        supabase
+          .from("estimator_estimate_item_rates")
+          .select("id, item_id, material_id, rate")
+          .eq("estimate_id", estimateId)
+          .order("id")
+          .range(from, to),
+    ),
+  ]);
+
+  // Prices are per (estimate, material) — no line needed, so they stand
+  // even on an estimate whose works carry no recipe variation.
+  const rateByMaterialId = new Map<string, number>();
+  for (const row of itemRates) {
+    const id = row.item_id ?? row.material_id;
+    if (id) rateByMaterialId.set(id, row.rate);
+  }
+  const shapedRates = itemRates.map((row) => ({
+    id: row.id,
+    itemId: row.item_id,
+    materialId: row.material_id,
+    rate: row.rate,
+  }));
+  const labourRateByWork = new Map<string, number>();
+  for (const line of lines) {
+    if (line.labour_rate !== null) labourRateByWork.set(line.work_item_id, line.labour_rate);
+  }
+
   if (lines.length === 0) {
-    return { byLine: new Map(), byWork: new Map(), extraMaterials: [], extraItemIds: [] };
+    return { ...NO_VARIATIONS, rateByMaterialId, itemRates: shapedRates };
   }
 
   const components = await fetchAll<{
@@ -700,21 +746,12 @@ export async function getEstimateVariations(estimateId: string): Promise<Estimat
   return {
     byLine,
     byWork,
+    labourRateByWork,
+    rateByMaterialId,
+    itemRates: shapedRates,
     extraMaterials: [...itemDefs.values()],
     extraItemIds: [...itemDefs.keys()],
   };
-}
-
-/** The estimate's own recipes: standard everywhere, replaced whole
- * wherever a line carries a variation. */
-export function applyVariations(
-  recipes: WorkRecipe[],
-  byWork: Map<string, WorkRecipe["components"]>,
-): WorkRecipe[] {
-  return recipes.map((recipe) => {
-    const components = byWork.get(recipe.workItemId);
-    return components ? { ...recipe, components } : recipe;
-  });
 }
 
 // ---------------------------------------------------------------------
@@ -806,6 +843,8 @@ export type EstimateLineRow = {
   categoryCode: string;
   qty: number;
   note: string | null;
+  /** This villa's labour rate (0088); null = the work's standard. */
+  labourRate: number | null;
 };
 
 export type EstimateDetail = {
@@ -852,10 +891,16 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
   if (!estimate) return null;
 
   const [lines, items, categories, project, unit, source] = await Promise.all([
-    fetchAll<{ id: string; work_item_id: string; qty: number; note: string | null }>((from, to) =>
+    fetchAll<{
+      id: string;
+      work_item_id: string;
+      qty: number;
+      note: string | null;
+      labour_rate: number | null;
+    }>((from, to) =>
       supabase
         .from("estimator_estimate_lines")
-        .select("id, work_item_id, qty, note")
+        .select("id, work_item_id, qty, note, labour_rate")
         .eq("estimate_id", estimateId)
         .order("id")
         .range(from, to),
@@ -981,6 +1026,7 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
           name: item?.name ?? "Unknown work",
           categoryCode: item ? (categoryById.get(item.category_id)?.code ?? "") : "",
           qty: line.qty,
+          labourRate: line.labour_rate,
           note: line.note,
         };
       })
