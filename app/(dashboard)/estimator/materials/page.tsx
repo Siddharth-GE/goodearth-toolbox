@@ -9,19 +9,27 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/components/ui/table";
-import { listMaterials, listUomNames, listUoms } from "@/lib/estimator/queries";
-import { formatMoney } from "@/lib/format";
+import { listMaterials, listUomNames } from "@/lib/estimator/queries";
+import { formatMoney, formatQuantity } from "@/lib/format";
+import { listBrands } from "@/lib/masters/brands";
+import { listItemCategories } from "@/lib/masters/item-categories";
 import { Package } from "lucide-react";
 import { DeleteMaterialButton, MaterialFormDialog } from "./_components/material-forms";
-import { UomManager } from "./_components/uom-manager";
 
 export default async function MaterialsPage() {
-  const [materials, uoms, uomRows] = await Promise.all([
+  const [materials, uoms, categories, brands] = await Promise.all([
     listMaterials(),
     listUomNames(),
-    listUoms(),
+    // The picker's category filter offers the material band — that is
+    // where construction raw materials live — but search still reaches
+    // the whole catalogue.
+    listItemCategories("material"),
+    listBrands(),
   ]);
   const unpriced = materials.filter((material) => material.rate === null).length;
+  const unlinked = materials.filter((material) => material.itemId === null).length;
+  const pickerCategories = categories.map(({ id, name }) => ({ id, name }));
+  const pickerBrands = brands.map(({ id, name }) => ({ id, name }));
 
   return (
     <div className="space-y-4">
@@ -34,7 +42,7 @@ export default async function MaterialsPage() {
             free.
           </p>
         </div>
-        <MaterialFormDialog uoms={uoms} />
+        <MaterialFormDialog uoms={uoms} categories={pickerCategories} brands={pickerBrands} />
       </div>
 
       {materials.length === 0 ? (
@@ -45,11 +53,14 @@ export default async function MaterialsPage() {
         />
       ) : (
         <Card className="space-y-3 p-4">
-          {unpriced > 0 && (
+          {(unpriced > 0 || unlinked > 0) && (
             <p className="text-muted text-sm">
-              {materials.length === 1
-                ? "This material has no rate yet."
-                : `${unpriced} of ${materials.length} materials ${unpriced === 1 ? "has" : "have"} no rate yet.`}
+              {unpriced > 0 &&
+                (materials.length === 1
+                  ? "This material has no rate yet. "
+                  : `${unpriced} of ${materials.length} materials ${unpriced === 1 ? "has" : "have"} no rate yet. `)}
+              {unlinked > 0 &&
+                `${unlinked} ${unlinked === 1 ? "is" : "are"} not linked to a catalogue item — those can't feed material requests yet.`}
             </p>
           )}
           <Table>
@@ -58,6 +69,7 @@ export default async function MaterialsPage() {
                 <TableHeaderCell>Material</TableHeaderCell>
                 <TableHeaderCell>Measured in</TableHeaderCell>
                 <TableHeaderCell>Rate</TableHeaderCell>
+                <TableHeaderCell>Bought as</TableHeaderCell>
                 <TableHeaderCell>Used in</TableHeaderCell>
                 <TableHeaderCell>Status</TableHeaderCell>
                 <TableHeaderCell></TableHeaderCell>
@@ -78,6 +90,22 @@ export default async function MaterialsPage() {
                     )}
                   </TableCell>
                   <TableCell>
+                    {material.itemName ? (
+                      <span>
+                        {material.itemName}
+                        {material.itemUomFactor !== null && material.itemDefaultUom && (
+                          <span className="text-muted">
+                            {" "}
+                            · 1 {material.uom} = {formatQuantity(material.itemUomFactor)}{" "}
+                            {material.itemDefaultUom}
+                          </span>
+                        )}
+                      </span>
+                    ) : (
+                      <Badge variant="neutral">Not linked</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
                     {material.useCount === 0
                       ? "—"
                       : `${material.useCount} ${material.useCount === 1 ? "recipe" : "recipes"}`}
@@ -89,7 +117,12 @@ export default async function MaterialsPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">
-                      <MaterialFormDialog material={material} uoms={uoms} />
+                      <MaterialFormDialog
+                        material={material}
+                        uoms={uoms}
+                        categories={pickerCategories}
+                        brands={pickerBrands}
+                      />
                       {material.useCount === 0 && <DeleteMaterialButton material={material} />}
                     </div>
                   </TableCell>
@@ -100,16 +133,9 @@ export default async function MaterialsPage() {
         </Card>
       )}
 
-      <Card className="space-y-3 p-4">
-        <div>
-          <p className="text-muted text-xs font-semibold tracking-widest uppercase">Units</p>
-          <p className="text-muted mt-1 text-sm">
-            What the pickers offer wherever a unit is chosen — materials, mixes and works. A unit
-            with a number beside it is in use and stays; one with a ✕ can be removed.
-          </p>
-        </div>
-        <UomManager uoms={uomRows} />
-      </Card>
+      <p className="text-muted text-sm">
+        Units of measure are managed in Masters → Units — one list for the whole toolbox.
+      </p>
     </div>
   );
 }

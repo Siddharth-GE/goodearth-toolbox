@@ -123,6 +123,7 @@ export default async function EstimatesPage() {
                     <TableRow>
                       <TableHeaderCell>Estimate</TableHeaderCell>
                       <TableHeaderCell>Villa</TableHeaderCell>
+                      <TableHeaderCell>Status</TableHeaderCell>
                       <TableHeaderCell>Works</TableHeaderCell>
                       <TableHeaderCell>Started</TableHeaderCell>
                       <TableHeaderCell></TableHeaderCell>
@@ -144,6 +145,18 @@ export default async function EstimatesPage() {
                         </TableCell>
                         <TableCell>
                           {estimate.unitName ?? <Badge variant="warning">No villa</Badge>}
+                        </TableCell>
+                        <TableCell>
+                          {estimate.status === "submitted" ? (
+                            <span className="flex items-center gap-1.5">
+                              <Badge variant="success">Official</Badge>
+                              <span className="text-muted text-xs">{estimate.reference}</span>
+                            </span>
+                          ) : estimate.status === "superseded" ? (
+                            <Badge variant="neutral">Superseded</Badge>
+                          ) : (
+                            <Badge variant="warning">Draft</Badge>
+                          )}
                         </TableCell>
                         <TableCell>{estimate.lineCount}</TableCell>
                         <TableCell className="text-muted">

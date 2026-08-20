@@ -84,6 +84,27 @@ export const VIEW_MANIFEST: Record<string, ViewExpectation> = {
     money: false,
     why: "The quantity to order and who was expected to supply it. No unit_cost, no margin_pct, no client_rate — those three names must never appear here.",
   },
+  estimate_takeoff_facts: {
+    columns: [
+      "estimate_id",
+      "project_id",
+      "unit_id",
+      "reference",
+      "submitted_at",
+      "work_item_id",
+      "material_id",
+      "material_name",
+      "uom",
+      "quantity",
+      "item_id",
+      "item_uom_factor",
+    ],
+    guards: ["/estimator", "/indents", "/inventory"],
+    barrier: true,
+    invoker: false,
+    money: false,
+    why: "The official estimate's frozen material takeoff — what Indents pulls from and issues are compared against. Quantities and the catalogue link only: the snapshot's rate column stays behind /estimator, because adding it here would put construction pricing in front of every site engineer.",
+  },
   po_facts: {
     columns: [
       "id",

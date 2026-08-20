@@ -22,8 +22,7 @@ import { formatCount, formatQuantity } from "@/lib/format";
 import { addDirectLines, removeLine, updateLine } from "@/lib/indents/actions";
 import type { IndentLineRow, IndentLineSource } from "@/lib/indents/queries";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
-import { UOMS } from "@/lib/masters/constants";
-import { HardHat, PackageOpen, Palette, Trash2 } from "lucide-react";
+import { Calculator, PackageOpen, Palette, Trash2 } from "lucide-react";
 import { useState, useTransition } from "react";
 
 type Option = { id: string; name: string };
@@ -34,6 +33,7 @@ const SOURCE_LABELS: Record<IndentLineSource, string | null> = {
   direct: null,
   construction: "from the construction plan",
   interiors: "from the interiors budget",
+  estimate: "from the official estimate",
 };
 
 export function LineGrid({
@@ -45,6 +45,7 @@ export function LineGrid({
   showOrdered,
   categories,
   brands,
+  uoms,
 }: {
   indentId: string;
   reference: string;
@@ -57,6 +58,8 @@ export function LineGrid({
   showOrdered: boolean;
   categories: Option[];
   brands: Option[];
+  /** Active unit names from the one master (0082). */
+  uoms: string[];
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -71,11 +74,17 @@ export function LineGrid({
           {editable && (
             <>
               {/* The three sources a line can come from, in the order a
-                  site team reaches for them. */}
+                  site team reaches for them. Construction requests come
+                  from the official estimate since 2026-08-20; the old
+                  plan pull is retired. */}
               {hasUnit && (
-                <LinkButton href={`/indents/${indentId}/pull`} size="sm" variant="secondary">
-                  <HardHat className="size-4" />
-                  From construction plan
+                <LinkButton
+                  href={`/indents/${indentId}/pull-estimate`}
+                  size="sm"
+                  variant="secondary"
+                >
+                  <Calculator className="size-4" />
+                  From the estimate
                 </LinkButton>
               )}
               <LinkButton
@@ -131,6 +140,7 @@ export function LineGrid({
                 line={line}
                 editable={editable}
                 showOrdered={showOrdered}
+                uoms={uoms}
               />
             ))}
           </TableBody>
@@ -162,11 +172,13 @@ function LineRow({
   line,
   editable,
   showOrdered,
+  uoms,
 }: {
   indentId: string;
   line: IndentLineRow;
   editable: boolean;
   showOrdered: boolean;
+  uoms: string[];
 }) {
   const [quantity, setQuantity] = useState(String(line.quantity));
   const [uom, setUom] = useState(line.uom);
@@ -256,7 +268,10 @@ function LineRow({
               className="h-9"
               aria-label={`Unit for ${line.item_name}`}
             >
-              {UOMS.map((unit) => (
+              {/* A saved unit that has since left the master stays
+                  choosable, so an old line can be reopened and saved. */}
+              {uom && !uoms.includes(uom) && <option value={uom}>{uom}</option>}
+              {uoms.map((unit) => (
                 <option key={unit} value={unit}>
                   {unit}
                 </option>

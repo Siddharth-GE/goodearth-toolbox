@@ -11,20 +11,33 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  aggregateFrozenTakeoff,
   computeEstimateTotals,
   computeLine,
   computeTakeoff,
+  frozenLineCosts,
   groupLineCosts,
+  type LineCost,
   type MaterialDef,
   type MixDef,
   type WorkRecipe,
 } from "@/lib/estimator/calc";
-import { getEstimate, getRecipeBook, listWorkStatus } from "@/lib/estimator/queries";
-import { formatMoney, formatQuantity } from "@/lib/format";
+import { compareIssuesToEstimate } from "@/lib/estimator/compare";
+import {
+  getEstimate,
+  getIssuedAgainstEstimate,
+  getReconciliationApprovals,
+  getRecipeBook,
+  listWorkStatus,
+} from "@/lib/estimator/queries";
+import { formatDate, formatMoney, formatQuantity } from "@/lib/format";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Fragment } from "react";
 import { EstimateFormDialog, DeleteEstimateButton } from "../_components/estimate-forms";
 import { AddLineDialog, LineQtyField, RemoveLineButton } from "./_components/line-forms";
+import { ApproveReconciliationButton } from "./_components/reconciliation-forms";
+import { ReviseEstimateButton, SubmitEstimateButton } from "./_components/submit-forms";
 import { listProjects } from "@/lib/masters/projects";
 import { listUnits } from "@/lib/masters/units";
 
@@ -33,6 +46,11 @@ import { listUnits } from "@/lib/masters/units";
 // amount per line, a subtotal per category, the grand total on top. A
 // future PDF export prints groupLineCosts' output — the same structure
 // this page renders, never a second grouping.
+//
+// Since 0077 the page has two lives. A DRAFT is the calculator: costs
+// computed live from today's rates. A SUBMITTED (or superseded)
+// estimate renders from its frozen snapshot instead — same grouping,
+// same totals arithmetic, numbers that no longer move.
 export default async function EstimatePage({
   params,
 }: {
@@ -48,9 +66,36 @@ export default async function EstimatePage({
   ]);
   if (!estimate) notFound();
 
+  const isDraft = estimate.status === "draft";
+
+  // Issued-vs-estimated, for the villa's OFFICIAL estimate only: what
+  // the store has issued to its plot, per work, lined up against the
+  // frozen takeoff. Inventory's reads are open (no money there), so
+  // this crosses no gate — see getIssuedAgainstEstimate.
+  const issuedData =
+    estimate.status === "submitted" && estimate.unitId
+      ? await getIssuedAgainstEstimate(estimate.unitId)
+      : null;
+  const comparison =
+    issuedData && estimate.frozen
+      ? compareIssuesToEstimate(estimate.frozen.takeoff, issuedData.links, issuedData.lines)
+      : null;
+
+  // Reconciliation (0083): every unmatched arrival is an entry the
+  // estimator must approve, and the flag never clears — approved rows
+  // keep their badge with who looked and when.
+  const approvals =
+    comparison && comparison.unmatched.length > 0
+      ? await getReconciliationApprovals(estimateId)
+      : [];
+  const approvalByKey = new Map(
+    approvals.map((approval) => [`${approval.workItemId ?? ""} ${approval.itemId}`, approval]),
+  );
+
   // One calculator for the whole tool: per-line costs, per-unit rates,
   // category subtotals, estimate totals and the takeoff all come out of
   // lib/estimator/calc.ts, so they can never disagree with each other.
+  // The frozen branch feeds the SAME grouping from the snapshot.
   const materialsById = new Map<string, MaterialDef>(book.materials.map((m) => [m.id, m]));
   const mixesById = new Map<string, MixDef>(book.mixes.map((m) => [m.id, m]));
   const recipesByWork = new Map<string, WorkRecipe>(book.recipes.map((r) => [r.workItemId, r]));
@@ -59,13 +104,62 @@ export default async function EstimatePage({
     workItemId: line.workItemId,
     qty: line.qty,
   }));
-  const lineCosts = lineInputs.map((line) =>
-    computeLine(line, recipesByWork.get(line.workItemId), mixesById, materialsById),
-  );
+
+  let lineCosts: LineCost[];
+  let takeoffRows: {
+    materialId: string;
+    name: string;
+    uom: string;
+    quantity: number;
+    cost: number | null;
+    missingRate: boolean;
+  }[];
+  const uomByWork = new Map<string, string | null>();
+  const unitRateByWork = new Map<string, number | null>();
+
+  if (isDraft || !estimate.frozen) {
+    lineCosts = lineInputs.map((line) =>
+      computeLine(line, recipesByWork.get(line.workItemId), mixesById, materialsById),
+    );
+    takeoffRows = computeTakeoff(lineInputs, recipesByWork, mixesById, materialsById).map((row) => {
+      const material = materialsById.get(row.materialId);
+      return {
+        materialId: row.materialId,
+        name: material?.name ?? "Unknown material",
+        uom: material?.uom ?? "",
+        quantity: row.quantity,
+        cost: row.cost,
+        missingRate: row.missingRate,
+      };
+    });
+    for (const work of works) uomByWork.set(work.workItemId, work.uom);
+    for (const line of estimate.lines) {
+      unitRateByWork.set(
+        line.workItemId,
+        computeLine(
+          { workItemId: line.workItemId, qty: 1 },
+          recipesByWork.get(line.workItemId),
+          mixesById,
+          materialsById,
+        ).totalCost,
+      );
+    }
+  } else {
+    lineCosts = frozenLineCosts(estimate.frozen.lineCosts, estimate.frozen.takeoff);
+    takeoffRows = aggregateFrozenTakeoff(estimate.frozen.takeoff);
+    for (const row of estimate.frozen.lineCosts) {
+      uomByWork.set(row.workItemId, row.uom);
+      // The frozen per-unit rate is derived, not stored: the arithmetic
+      // is linear, so total ÷ quantity is exactly what it was.
+      unitRateByWork.set(
+        row.workItemId,
+        row.totalCost === null || row.qty === 0 ? null : row.totalCost / row.qty,
+      );
+    }
+  }
+  takeoffRows.sort((a, b) => a.name.localeCompare(b.name));
+
   const totals = computeEstimateTotals(lineCosts);
-  const takeoff = computeTakeoff(lineInputs, recipesByWork, mixesById, materialsById)
-    .map((row) => ({ ...row, material: materialsById.get(row.materialId) }))
-    .sort((a, b) => (a.material?.name ?? "").localeCompare(b.material?.name ?? ""));
 
   // The BOQ grouping: category vocabulary and order come from Masters.
   const categoryByWork = new Map(
@@ -74,22 +168,7 @@ export default async function EstimatePage({
   const categoryOrder = [...new Set(works.map((work) => work.categoryCode))];
   const boq = groupLineCosts(lineCosts, categoryByWork, categoryOrder);
   const lineByWork = new Map(estimate.lines.map((line) => [line.workItemId, line]));
-  const uomByWork = new Map(works.map((work) => [work.workItemId, work.uom]));
   const setUpWorks = works.filter((work) => work.uom !== null && work.isActive);
-
-  // A work's rate per one unit, from the same calculator as everything
-  // else — the Amount column is always rate × quantity, visibly.
-  const unitRateByWork = new Map(
-    estimate.lines.map((line) => [
-      line.workItemId,
-      computeLine(
-        { workItemId: line.workItemId, qty: 1 },
-        recipesByWork.get(line.workItemId),
-        mixesById,
-        materialsById,
-      ).totalCost,
-    ]),
-  );
 
   const part = (label: string, value: number | null) =>
     `${label} ${value === null ? "not priced yet" : formatMoney(value)}`;
@@ -105,7 +184,7 @@ export default async function EstimatePage({
   return (
     <div className="space-y-4">
       <PageTitle
-        title={estimate.name}
+        title={estimate.reference ? `${estimate.name} · ${estimate.reference}` : estimate.name}
         description={
           estimate.isTemplate
             ? `Template · ${estimate.projectName}`
@@ -116,11 +195,63 @@ export default async function EstimatePage({
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {estimate.isTemplate && <Badge variant="info">Template</Badge>}
-            <EstimateFormDialog projects={projects} units={units} estimate={estimate} />
-            <DeleteEstimateButton estimateId={estimate.id} />
+            {estimate.status === "submitted" && <Badge variant="success">Official</Badge>}
+            {estimate.status === "superseded" && <Badge variant="neutral">Superseded</Badge>}
+            {isDraft && !estimate.isTemplate && <Badge variant="warning">Draft</Badge>}
+            {isDraft && (
+              <>
+                <EstimateFormDialog projects={projects} units={units} estimate={estimate} />
+                <DeleteEstimateButton estimateId={estimate.id} />
+                {estimate.unitId && (
+                  <SubmitEstimateButton
+                    estimateId={estimate.id}
+                    villaName={estimate.unitName ?? "this villa"}
+                    hasLines={estimate.lines.length > 0}
+                  />
+                )}
+              </>
+            )}
+            {estimate.status === "submitted" && <ReviseEstimateButton estimateId={estimate.id} />}
           </div>
         }
       />
+
+      {estimate.status === "submitted" && (
+        <p className="text-muted text-sm">
+          The official estimate for {estimate.unitName} — submitted
+          {estimate.submittedByName ? ` by ${estimate.submittedByName}` : ""} on{" "}
+          {formatDate(estimate.submittedAt)}. Its numbers are frozen at that day&apos;s rates.
+        </p>
+      )}
+      {estimate.status === "superseded" && (
+        <p className="text-warning text-sm">
+          Superseded on {formatDate(estimate.supersededAt)} — kept as history.
+          {estimate.successor && (
+            <>
+              {" "}
+              <Link
+                className="underline underline-offset-2"
+                href={`/estimator/estimates/${estimate.successor.id}`}
+              >
+                See what replaced it
+              </Link>
+              .
+            </>
+          )}
+        </p>
+      )}
+      {isDraft && estimate.successor && (
+        <p className="text-warning text-sm">
+          A newer draft already revises this estimate —{" "}
+          <Link
+            className="underline underline-offset-2"
+            href={`/estimator/estimates/${estimate.successor.id}`}
+          >
+            open it
+          </Link>
+          .
+        </p>
+      )}
 
       {estimate.sourceName && (
         <p className="text-muted text-sm">Copied from {estimate.sourceName}.</p>
@@ -131,9 +262,11 @@ export default async function EstimatePage({
           label={
             estimate.lines.length === 0
               ? "Total"
-              : totals.isComplete
-                ? "Total at today's rates"
-                : "Total so far"
+              : !isDraft
+                ? `Total, frozen ${formatDate(estimate.submittedAt)}`
+                : totals.isComplete
+                  ? "Total at today's rates"
+                  : "Total so far"
           }
           value={estimate.lines.length === 0 ? formatMoney(null) : formatMoney(totals.grand)}
           hint={
@@ -146,7 +279,10 @@ export default async function EstimatePage({
         />
         {missingBits.length > 0 && (
           <p className="text-warning text-sm">
-            {missingBits.join(", ")} — the total counts only what is priced.
+            {missingBits.join(", ")}
+            {isDraft
+              ? " — the total counts only what is priced."
+              : " — those were unpriced on the day of submit, so the frozen total counts only what was priced."}
           </p>
         )}
       </Card>
@@ -154,7 +290,7 @@ export default async function EstimatePage({
       <Card className="space-y-4 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-muted text-xs font-semibold tracking-widest uppercase">Works</p>
-          <AddLineDialog estimateId={estimate.id} works={setUpWorks} />
+          {isDraft && <AddLineDialog estimateId={estimate.id} works={setUpWorks} />}
         </div>
 
         {estimate.lines.length === 0 ? (
@@ -167,7 +303,7 @@ export default async function EstimatePage({
                 <TableHeaderCell>Quantity</TableHeaderCell>
                 <TableHeaderCell className="text-right">Rate</TableHeaderCell>
                 <TableHeaderCell className="text-right">Amount</TableHeaderCell>
-                <TableHeaderCell></TableHeaderCell>
+                {isDraft && <TableHeaderCell></TableHeaderCell>}
               </TableRow>
             </TableHead>
             <TableBody>
@@ -180,7 +316,7 @@ export default async function EstimatePage({
                     <TableCell className="text-foreground pt-4 text-right text-sm font-semibold">
                       {formatMoney(group.totals.grand)}
                     </TableCell>
-                    <TableCell></TableCell>
+                    {isDraft && <TableCell></TableCell>}
                   </TableRow>
                   {group.lineCosts.map((cost) => {
                     const line = lineByWork.get(cost.workItemId);
@@ -206,10 +342,17 @@ export default async function EstimatePage({
                           )}
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-2">
-                            <LineQtyField id={line.id} qty={line.qty} label={line.name} />
-                            <span className="text-muted text-sm">{uom ?? ""}</span>
-                          </div>
+                          {isDraft ? (
+                            <div className="flex items-center gap-2">
+                              <LineQtyField id={line.id} qty={line.qty} label={line.name} />
+                              <span className="text-muted text-sm">{uom ?? ""}</span>
+                            </div>
+                          ) : (
+                            <span className="text-foreground text-sm">
+                              {formatQuantity(cost.qty)}{" "}
+                              <span className="text-muted">{uom ?? ""}</span>
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell className="text-right">
                           {formatMoney(unitRateByWork.get(line.workItemId) ?? null)}
@@ -218,9 +361,11 @@ export default async function EstimatePage({
                         <TableCell className="text-foreground text-right font-medium">
                           {formatMoney(cost.totalCost)}
                         </TableCell>
-                        <TableCell>
-                          <RemoveLineButton id={line.id} label={line.name} />
-                        </TableCell>
+                        {isDraft && (
+                          <TableCell>
+                            <RemoveLineButton id={line.id} label={line.name} />
+                          </TableCell>
+                        )}
                       </TableRow>
                     );
                   })}
@@ -231,13 +376,17 @@ export default async function EstimatePage({
         )}
       </Card>
 
-      {takeoff.length > 0 && (
+      {takeoffRows.length > 0 && (
         <Card className="space-y-3 p-4">
           <div>
             <p className="text-muted text-xs font-semibold tracking-widest uppercase">
               Materials needed
             </p>
-            <p className="text-muted mt-1 text-sm">Everything the works above consume, added up.</p>
+            <p className="text-muted mt-1 text-sm">
+              {isDraft
+                ? "Everything the works above consume, added up."
+                : "Everything the works above consume, added up — quantities and rates as frozen on submit."}
+            </p>
           </div>
           <Table>
             <TableHead>
@@ -249,19 +398,19 @@ export default async function EstimatePage({
               </TableRow>
             </TableHead>
             <TableBody>
-              {takeoff.map((row) => (
+              {takeoffRows.map((row) => (
                 <TableRow key={row.materialId}>
-                  <TableCell className="text-foreground font-medium">
-                    {row.material?.name ?? "Unknown material"}
-                  </TableCell>
+                  <TableCell className="text-foreground font-medium">{row.name}</TableCell>
                   <TableCell>
-                    {formatQuantity(row.quantity)} {row.material?.uom ?? ""}
+                    {formatQuantity(row.quantity)} {row.uom}
                   </TableCell>
                   <TableCell className="text-right">
                     {row.missingRate ? (
                       <Badge variant="warning">Not priced</Badge>
+                    ) : row.quantity > 0 ? (
+                      formatMoney(row.cost === null ? null : row.cost / row.quantity)
                     ) : (
-                      formatMoney(row.material?.rate ?? null)
+                      formatMoney(null)
                     )}
                   </TableCell>
                   <TableCell className="text-foreground text-right">
@@ -271,6 +420,131 @@ export default async function EstimatePage({
               ))}
             </TableBody>
           </Table>
+        </Card>
+      )}
+
+      {comparison && (
+        <Card className="space-y-3 p-4">
+          <div>
+            <p className="text-muted text-xs font-semibold tracking-widest uppercase">
+              Reached the site
+            </p>
+            <p className="text-muted mt-1 text-sm">
+              What has actually reached this villa — store issues and direct-to-site deliveries —
+              per work, against what the estimate froze. Both name their work when they are
+              recorded; that is what lines these up.
+            </p>
+          </div>
+          {comparison.rows.every((row) => row.issued === 0) && comparison.unmatched.length === 0 ? (
+            <p className="text-muted text-sm">Nothing issued to this villa yet.</p>
+          ) : (
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableHeaderCell>Work</TableHeaderCell>
+                  <TableHeaderCell>Material</TableHeaderCell>
+                  <TableHeaderCell className="text-right">Estimated</TableHeaderCell>
+                  <TableHeaderCell className="text-right">Issued</TableHeaderCell>
+                  <TableHeaderCell></TableHeaderCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {comparison.rows
+                  .filter((row) => row.issued !== 0 || row.over)
+                  .map((row) => {
+                    const work = works.find((w) => w.workItemId === row.workItemId);
+                    return (
+                      <TableRow key={`${row.workItemId}-${row.materialId}`}>
+                        <TableCell className="text-sm">
+                          {work ? `${work.code} — ${work.name}` : "—"}
+                        </TableCell>
+                        <TableCell className="text-foreground text-sm">
+                          {row.materialName}
+                        </TableCell>
+                        <TableCell className="text-right text-sm whitespace-nowrap">
+                          {formatQuantity(row.estimated)} {row.uom}
+                        </TableCell>
+                        <TableCell className="text-right text-sm whitespace-nowrap">
+                          {row.issued !== null
+                            ? `${formatQuantity(row.issued)} ${row.uom}`
+                            : row.issuedRaw
+                              ? `${formatQuantity(row.issuedRaw.quantity)} ${row.issuedRaw.uom} (no conversion set)`
+                              : "—"}
+                        </TableCell>
+                        <TableCell>
+                          {row.over && <Badge variant="warning">Past the estimate</Badge>}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+              </TableBody>
+            </Table>
+          )}
+          {comparison.unmatched.length > 0 && issuedData && (
+            <div className="border-border space-y-2 border-t pt-3">
+              <p className="text-muted text-xs font-semibold tracking-widest uppercase">
+                Outside the estimate
+              </p>
+              <p className="text-muted text-sm">
+                This material reached the villa but the official estimate never planned it — a
+                direct purchase, or an issue for a work the estimate does not pair it with. Each
+                entry needs an estimator&apos;s approval, and it stays here with its flag
+                permanently either way.
+              </p>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableHeaderCell>Work</TableHeaderCell>
+                    <TableHeaderCell>Item</TableHeaderCell>
+                    <TableHeaderCell className="text-right">Reached the site</TableHeaderCell>
+                    <TableHeaderCell></TableHeaderCell>
+                    <TableHeaderCell></TableHeaderCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {comparison.unmatched.map((row) => {
+                    const work = row.workItemId
+                      ? works.find((w) => w.workItemId === row.workItemId)
+                      : null;
+                    const workName = work ? `${work.code} — ${work.name}` : null;
+                    const itemName = issuedData.itemNamesById.get(row.itemId) ?? "An item";
+                    const approval = approvalByKey.get(`${row.workItemId ?? ""} ${row.itemId}`);
+                    return (
+                      <TableRow key={`${row.workItemId ?? "untagged"}-${row.itemId}`}>
+                        <TableCell className="text-sm">
+                          {workName ?? "Not tagged to a work"}
+                        </TableCell>
+                        <TableCell className="text-foreground text-sm">{itemName}</TableCell>
+                        <TableCell className="text-right text-sm whitespace-nowrap">
+                          {formatQuantity(row.quantity)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="warning">Outside the estimate</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {approval ? (
+                            <span className="text-muted text-xs">
+                              Approved by {approval.approvedByName} on{" "}
+                              {formatDate(approval.approvedAt)}
+                              {approval.note ? ` — ${approval.note}` : ""}
+                            </span>
+                          ) : (
+                            <ApproveReconciliationButton
+                              estimateId={estimateId}
+                              itemId={row.itemId}
+                              workItemId={row.workItemId}
+                              itemName={itemName}
+                              workName={workName}
+                            />
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </Card>
       )}
     </div>

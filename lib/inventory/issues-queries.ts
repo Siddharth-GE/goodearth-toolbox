@@ -25,6 +25,8 @@ export type IssueSummary = {
   reference: string;
   store_name: string;
   destination: string;
+  /** The work a plot issue served (0080); null for transfers and history. */
+  work_name: string | null;
   issued_at: string;
   line_count: number;
   issued_by_name: string | null;
@@ -48,7 +50,7 @@ export async function listStockIssues({ page = 1 }: { page?: number } = {}): Pro
   const { data, count, error } = await supabase
     .from("stock_issues")
     .select(
-      "id, reference, store_id, to_store_id, plot_id, issued_at, created_by, stock_issue_lines(count)",
+      "id, reference, store_id, to_store_id, plot_id, work_item_id, issued_at, created_by, stock_issue_lines(count), work_items(name)",
       { count: "exact" },
     )
     .order("issued_at", { ascending: false })
@@ -86,6 +88,7 @@ export async function listStockIssues({ page = 1 }: { page?: number } = {}): Pro
       destination: row.to_store_id
         ? `${stores.get(row.to_store_id) ?? "another store"} (transfer)`
         : (plots.get(row.plot_id ?? "") ?? "—"),
+      work_name: (row.work_items as { name: string } | null)?.name ?? null,
       issued_at: row.issued_at,
       line_count: (row.stock_issue_lines as { count: number }[] | null)?.[0]?.count ?? 0,
       issued_by_name: nameOf(row.created_by),
@@ -103,6 +106,10 @@ export type IssueDetail = {
   store_name: string;
   destination: string;
   is_transfer: boolean;
+  /** The work a plot issue served (0080), with its category as the stage. */
+  work_item_id: string | null;
+  work_name: string | null;
+  work_category: string | null;
   issued_at: string;
   note: string | null;
   issued_by_name: string | null;
@@ -125,7 +132,9 @@ export const getStockIssue = cache(async (issueId: string): Promise<IssueDetail 
 
   const { data: issue } = await supabase
     .from("stock_issues")
-    .select("id, reference, store_id, to_store_id, plot_id, issued_at, note, created_by")
+    .select(
+      "id, reference, store_id, to_store_id, plot_id, work_item_id, issued_at, note, created_by, work_items(name, work_categories(name))",
+    )
     .eq("id", issueId)
     .maybeSingle();
   if (!issue) return null;
@@ -161,6 +170,13 @@ export const getStockIssue = cache(async (issueId: string): Promise<IssueDetail 
       ? (stores.get(issue.to_store_id) ?? "another store")
       : (plots.get(issue.plot_id ?? "") ?? "—"),
     is_transfer: issue.to_store_id != null,
+    work_item_id: issue.work_item_id,
+    work_name:
+      (issue.work_items as { name: string; work_categories: { name: string } | null } | null)
+        ?.name ?? null,
+    work_category:
+      (issue.work_items as { name: string; work_categories: { name: string } | null } | null)
+        ?.work_categories?.name ?? null,
     issued_at: issue.issued_at,
     note: issue.note,
     issued_by_name: nameOf(issue.created_by),

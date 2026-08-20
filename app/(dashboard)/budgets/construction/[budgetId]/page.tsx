@@ -26,7 +26,7 @@ export default async function ConstructionPlanPage({
         title={`${plan.unit_name} — construction plan`}
         backHref="/budgets/construction"
         backLabel="All plans"
-        description={`${plan.project_name} · materials and quantities only, stage by stage — site indents pull from this.`}
+        description={`${plan.project_name} · materials and quantities only, stage by stage. This plan no longer feeds Indents — construction requests pull from the villa's official estimate.`}
       />
 
       <StageGrid

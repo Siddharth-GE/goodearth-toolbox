@@ -10,8 +10,6 @@ import { Select } from "@/components/ui/select";
 import { requestItem } from "@/lib/selections/actions";
 import { useState, useTransition } from "react";
 
-const UOMS = ["each", "rft", "sqft", "lumpsum", "bag", "kg", "litre", "cft"];
-
 /**
  * "It's not in the catalogue."
  *
@@ -22,11 +20,14 @@ const UOMS = ["each", "rft", "sqft", "lumpsum", "bag", "kg", "litre", "cft"];
 export function RequestItemDialog({
   categories,
   brands,
+  uoms,
   prefillName,
   onCreated,
 }: {
   categories: { id: string; name: string }[];
   brands: { id: string; name: string }[];
+  /** Active unit names from the one master (0082). */
+  uoms: string[];
   prefillName?: string;
   onCreated: (itemId: string, name: string) => void;
 }) {
@@ -126,7 +127,7 @@ export function RequestItemDialog({
             <div className="space-y-1.5">
               <Label htmlFor="req-uom">Unit</Label>
               <Select id="req-uom" value={uom} onChange={(event) => setUom(event.target.value)}>
-                {UOMS.map((value) => (
+                {uoms.map((value) => (
                   <option key={value} value={value}>
                     {value}
                   </option>

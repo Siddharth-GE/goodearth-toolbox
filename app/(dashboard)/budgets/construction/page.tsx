@@ -22,7 +22,7 @@ export default async function ConstructionPlansPage() {
     <div className="space-y-4">
       <PageTitle
         title="Budgets"
-        description="Stage-wise construction plans by unit — materials and quantities, no pricing. Site indents pull from these."
+        description="Stage-wise construction plans by unit — materials and quantities, no pricing. This plan no longer feeds Indents: since 2026-08-20 construction requests pull from the villa's official estimate in the Estimator."
         actions={<StartPlanDialog units={startable} />}
       />
 

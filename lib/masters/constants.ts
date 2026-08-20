@@ -14,17 +14,14 @@
  * "server-only".
  */
 
-export const UOMS = ["each", "rft", "sqft", "lumpsum", "bag", "kg", "litre", "cft"] as const;
-export type Uom = (typeof UOMS)[number];
+// Units of measure left this file on 2026-08-20: they are a managed
+// Masters list now (`uoms`, 0082) — pickers read listActiveUomNames()
+// and actions validate with isActiveUom() from lib/masters/uoms.ts.
 
 export const ITEM_KINDS = ["catalogue", "material"] as const;
 export type ItemKind = (typeof ITEM_KINDS)[number];
 
 export type Placement = "fixed" | "loose" | "soft_furnishing";
-
-export function isUom(value: string): value is Uom {
-  return (UOMS as readonly string[]).includes(value);
-}
 
 export function isItemKind(value: string): value is ItemKind {
   return (ITEM_KINDS as readonly string[]).includes(value);

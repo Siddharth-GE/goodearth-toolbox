@@ -16,6 +16,7 @@ import {
 import { listBrands } from "@/lib/masters/brands";
 import { listItemCategories } from "@/lib/masters/item-categories";
 import { listItems, type ItemKind } from "@/lib/masters/items";
+import { listActiveUomNames } from "@/lib/masters/uoms";
 import { Package } from "lucide-react";
 import { ItemFormDialog } from "./_components/item-form-dialog";
 import { formatMoney } from "@/lib/format";
@@ -27,7 +28,7 @@ export default async function ItemsPage({
   searchParams: Promise<{ q?: string; kind?: string; category?: string; page?: string }>;
 }) {
   const { q, kind, category, page } = await searchParams;
-  const [result, categories, brands] = await Promise.all([
+  const [result, categories, brands, uoms] = await Promise.all([
     listItems({
       search: q,
       kind: kind as ItemKind | undefined,
@@ -36,6 +37,7 @@ export default async function ItemsPage({
     }),
     listItemCategories(),
     listBrands(),
+    listActiveUomNames(),
   ]);
   const { items, total, page: currentPage, pageSize, pageCount } = result;
 
@@ -99,7 +101,7 @@ export default async function ItemsPage({
             </LinkButton>
           )}
         </form>
-        <ItemFormDialog categories={categories} brands={brands} />
+        <ItemFormDialog categories={categories} brands={brands} uoms={uoms} />
       </div>
 
       {items.length === 0 ? (
@@ -141,7 +143,12 @@ export default async function ItemsPage({
                     {item.indicative_price != null ? formatMoney(item.indicative_price) : "—"}
                   </TableCell>
                   <TableCell>
-                    <ItemFormDialog categories={categories} brands={brands} item={item} />
+                    <ItemFormDialog
+                      categories={categories}
+                      brands={brands}
+                      uoms={uoms}
+                      item={item}
+                    />
                   </TableCell>
                 </TableRow>
               ))}

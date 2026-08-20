@@ -1,7 +1,7 @@
 "use server";
 
 import { requireTool } from "@/lib/auth/access";
-import { isUom } from "@/lib/masters/constants";
+import { isActiveUom } from "@/lib/masters/uoms";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -42,13 +42,13 @@ export type CreateIndentInput = {
   projectId: string;
   plotId: string | null;
   unitId: string | null;
-  stage: string | null;
+  workItemId: string | null;
   requiredBy: string | null;
   note: string | null;
 };
 
 export async function createIndent(input: CreateIndentInput): Promise<ActionState> {
-  await requireTool("/indents");
+  const user = await requireTool("/indents");
 
   if (!input.projectId) return { error: "Pick a project first." };
 
@@ -79,7 +79,10 @@ export async function createIndent(input: CreateIndentInput): Promise<ActionStat
     p_project_id: input.projectId,
     p_plot_id: (input.plotId || null) as unknown as string,
     p_unit_id: (input.unitId || null) as unknown as string,
-    p_stage: (input.stage?.trim() || null) as unknown as string,
+    // The one vocabulary: the work, not the retired stage picker. The
+    // create RPC's p_stage stays for the legacy column; new indents
+    // leave it null and carry the work instead.
+    p_stage: null as unknown as string,
     p_required_by: (input.requiredBy || null) as unknown as string,
     p_note: (input.note?.trim() || null) as unknown as string,
   });
@@ -88,6 +91,18 @@ export async function createIndent(input: CreateIndentInput): Promise<ActionStat
     return guardError(error, "Could not create the indent. Try again.");
   }
   if (!indentId) return { error: "Could not create the indent. Try again." };
+
+  // The work rides in a second write: create_indent()'s signature
+  // predates the works vocabulary and additive-only keeps it as is. A
+  // failure here leaves a draft without its work — visible on the
+  // header, fixable in place, never silent.
+  if (input.workItemId) {
+    const { error: workError } = await supabase
+      .from("indents")
+      .update({ work_item_id: input.workItemId, updated_by: user.id })
+      .eq("id", indentId);
+    if (workError) console.error("createIndent work update failed:", workError);
+  }
 
   revalidatePath("/indents", "layout");
   redirect(`/indents/${indentId}`);
@@ -181,117 +196,6 @@ export type PullLineInput = {
   sourceId: string;
   quantity: number;
 };
-
-/**
- * Pulls lines from a construction plan stage — the site path.
- *
- * Everything except which lines and how many is re-read server-side:
- * the item, the uom and the stage name all come from the plan, never
- * from the client. Lines already on this indent are skipped rather than
- * merged (the unique (indent_id, construction_line_id) pair means one
- * row per plan line, and silently doubling a quantity is how a site
- * ends up with twice the cement).
- */
-export async function addConstructionPullLines(
-  indentId: string,
-  lines: PullLineInput[],
-): Promise<ActionState> {
-  const user = await requireTool("/indents");
-
-  if (lines.length === 0) return { error: "Pick at least one line." };
-  if (lines.some((line) => !Number.isFinite(line.quantity) || line.quantity <= 0)) {
-    return { error: "Quantities must be more than 0." };
-  }
-
-  const supabase = await createClient();
-  const sourceIds = lines.map((line) => line.sourceId);
-
-  const [{ data: sources, error: sourcesError }, { data: existing, error: existingError }] =
-    await Promise.all([
-      supabase
-        .from("construction_budget_lines")
-        .select("id, stage, item_id, uom")
-        .in("id", sourceIds),
-      supabase
-        .from("indent_lines")
-        .select("construction_line_id")
-        .eq("indent_id", indentId)
-        .in("construction_line_id", sourceIds),
-    ]);
-  if (sourcesError || existingError) {
-    console.error("addConstructionPullLines lookup failed:", sourcesError ?? existingError);
-    return { error: "Could not add those lines. Try again." };
-  }
-
-  const byId = new Map((sources ?? []).map((source) => [source.id, source]));
-  const already = new Set(
-    (existing ?? [])
-      .map((line) => line.construction_line_id)
-      .filter((id): id is string => id != null),
-  );
-
-  const inserts = [];
-  for (const line of lines) {
-    const source = byId.get(line.sourceId);
-    if (!source || already.has(line.sourceId)) continue;
-    inserts.push({
-      indent_id: indentId,
-      item_id: source.item_id,
-      quantity: line.quantity,
-      uom: source.uom,
-      construction_line_id: source.id,
-      created_by: user.id,
-      updated_by: user.id,
-    });
-  }
-
-  const skipped = lines.length - inserts.length;
-  if (inserts.length === 0) {
-    return { error: "Every one of those lines is already on this indent." };
-  }
-
-  const { error } = await supabase.from("indent_lines").insert(inserts);
-  if (error) {
-    console.error("addConstructionPullLines insert failed:", error);
-    return guardError(error, "Could not add those lines. Try again.");
-  }
-
-  // The indent takes the stage it was raised against, so a site request
-  // says which part of the build it belongs to. Only stamped when the
-  // pull is from a single stage and the indent doesn't already say.
-  const stages = new Set(inserts.map((row) => byId.get(row.construction_line_id)?.stage));
-  if (stages.size === 1) {
-    const [stage] = [...stages];
-    if (stage) {
-      const { data: indent } = await supabase
-        .from("indents")
-        .select("stage, status")
-        .eq("id", indentId)
-        .maybeSingle();
-      if (indent?.status === "draft" && !indent.stage) {
-        const { error: stampError } = await supabase
-          .from("indents")
-          .update({ stage })
-          .eq("id", indentId);
-        // A failed stamp is cosmetic — the lines are in, and the stage
-        // is editable on the indent. Logged, not surfaced.
-        if (stampError) console.error("addConstructionPullLines stage stamp failed:", stampError);
-      }
-    }
-  }
-
-  revalidatePath(`/indents/${indentId}`);
-  revalidatePath(`/indents/${indentId}/pull`);
-  if (skipped > 0) {
-    // Only reachable if the indent changed underneath (another tab, a
-    // colleague): the screen disables lines it already holds. Said out
-    // loud rather than silently adding fewer lines than were ticked.
-    return {
-      error: `Added ${inserts.length}. ${skipped} ${skipped === 1 ? "line was" : "lines were"} already on this indent and ${skipped === 1 ? "was" : "were"} not added again.`,
-    };
-  }
-  return undefined;
-}
 
 /**
  * Pulls lines from an approved interiors budget.
@@ -460,7 +364,7 @@ export async function updateLine(
   if (!Number.isFinite(input.quantity) || input.quantity <= 0) {
     return { error: "Quantity must be more than 0" };
   }
-  if (!isUom(input.uom)) return { error: "Pick a unit from the list" };
+  if (!(await isActiveUom(input.uom))) return { error: "Pick a unit from the list" };
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -497,15 +401,22 @@ export async function removeLine(indentId: string, lineId: string): Promise<Acti
  * revalidate for the same reason as updateLine. */
 export async function updateIndentHeader(
   indentId: string,
-  input: { stage: string | null; requiredBy: string | null; note: string | null },
+  input: {
+    workItemId: string | null;
+    requiredBy: string | null;
+    note: string | null;
+  },
 ): Promise<ActionState> {
   const user = await requireTool("/indents");
 
   const supabase = await createClient();
+  // `stage` is deliberately absent: the picker is gone (founder,
+  // 2026-08-20 — one vocabulary, the works masters) and a legacy stage
+  // on an old indent stays exactly as history left it.
   const { error } = await supabase
     .from("indents")
     .update({
-      stage: input.stage?.trim() || null,
+      work_item_id: input.workItemId || null,
       required_by: input.requiredBy || null,
       note: input.note?.trim() || null,
       updated_by: user.id,
@@ -642,4 +553,126 @@ export async function deleteIndent(indentId: string): Promise<ActionState> {
 
   revalidatePath("/indents", "layout");
   redirect("/indents/list");
+}
+
+export type EstimatePullInput = {
+  /** estimator material id — the stable row of the takeoff. */
+  materialId: string;
+  /** Typed (or prefilled) by the operator, in the ITEM's unit. */
+  quantity: number;
+};
+
+/**
+ * Pulls materials from the villa's official estimate — pull path 3.
+ *
+ * Only which materials and how much comes from the client; the item and
+ * its unit are re-read server-side from estimate_takeoff_facts and the
+ * catalogue. An unlinked material is refused by name — the fix lives on
+ * the Estimator's materials screen, and the message says so. Materials
+ * already on this indent are skipped rather than merged, the same rule
+ * as the other two pull paths (the unique (indent, estimate, item)
+ * anchor backstops it).
+ */
+export async function addEstimatePullLines(
+  indentId: string,
+  estimateId: string,
+  lines: EstimatePullInput[],
+): Promise<ActionState> {
+  const user = await requireTool("/indents");
+
+  if (lines.length === 0) return { error: "Pick at least one material." };
+  if (lines.some((line) => !Number.isFinite(line.quantity) || line.quantity <= 0)) {
+    return { error: "Quantities must be more than 0." };
+  }
+
+  const supabase = await createClient();
+  const materialIds = [...new Set(lines.map((line) => line.materialId))];
+
+  const [{ data: facts, error: factsError }, { data: existing, error: existingError }] =
+    await Promise.all([
+      supabase
+        .from("estimate_takeoff_facts")
+        .select("material_id, material_name, item_id")
+        .eq("estimate_id", estimateId)
+        .in("material_id", materialIds),
+      supabase
+        .from("indent_lines")
+        .select("item_id")
+        .eq("indent_id", indentId)
+        .eq("estimate_id", estimateId),
+    ]);
+  if (factsError || existingError) {
+    console.error("addEstimatePullLines lookup failed:", factsError ?? existingError);
+    return { error: "Could not add those materials. Try again." };
+  }
+  if (!facts || facts.length === 0) {
+    return { error: "That estimate is no longer the official one — reload and look again." };
+  }
+
+  const itemByMaterial = new Map<string, string | null>();
+  const nameByMaterial = new Map<string, string>();
+  for (const fact of facts) {
+    if (!fact.material_id) continue;
+    itemByMaterial.set(fact.material_id, fact.item_id);
+    if (fact.material_name) nameByMaterial.set(fact.material_id, fact.material_name);
+  }
+
+  const unlinked = materialIds.filter(
+    (id) => itemByMaterial.has(id) && itemByMaterial.get(id) === null,
+  );
+  if (unlinked.length > 0) {
+    const name = nameByMaterial.get(unlinked[0]) ?? "that material";
+    return {
+      error: `Link ${name} to a catalogue item in the Estimator first — a request line has to name what the store buys.`,
+    };
+  }
+
+  const itemIds = [
+    ...new Set(
+      materialIds
+        .map((id) => itemByMaterial.get(id))
+        .filter((id): id is string => typeof id === "string"),
+    ),
+  ];
+  const { data: items, error: itemsError } = await supabase
+    .from("items")
+    .select("id, default_uom")
+    .in("id", itemIds);
+  if (itemsError) {
+    console.error("addEstimatePullLines items failed:", itemsError);
+    return { error: "Could not add those materials. Try again." };
+  }
+  const uomByItem = new Map((items ?? []).map((item) => [item.id, item.default_uom]));
+  const already = new Set((existing ?? []).map((line) => line.item_id));
+
+  const inserts = [];
+  for (const line of lines) {
+    const itemId = itemByMaterial.get(line.materialId);
+    if (!itemId || already.has(itemId)) continue;
+    const uom = uomByItem.get(itemId);
+    if (!uom) continue;
+    inserts.push({
+      indent_id: indentId,
+      item_id: itemId,
+      quantity: line.quantity,
+      uom,
+      estimate_id: estimateId,
+      created_by: user.id,
+      updated_by: user.id,
+    });
+    already.add(itemId);
+  }
+
+  if (inserts.length === 0) {
+    return { error: "Every one of those materials is already on this indent." };
+  }
+
+  const { error } = await supabase.from("indent_lines").insert(inserts);
+  if (error) {
+    console.error("addEstimatePullLines insert failed:", error);
+    return guardError(error, "Could not add those materials. Try again.");
+  }
+
+  revalidatePath("/indents", "layout");
+  return undefined;
 }

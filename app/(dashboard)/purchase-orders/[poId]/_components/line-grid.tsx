@@ -1,8 +1,9 @@
 "use client";
 
+import { CataloguePickerDialog } from "@/components/masters/catalogue-picker";
 import { ItemThumb } from "@/components/masters/item-thumb";
 import { Attribution } from "@/components/ui/attribution";
-import { LinkButton } from "@/components/ui/button";
+import { Button, LinkButton } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FormMessage } from "@/components/ui/form-message";
 import { IconButton } from "@/components/ui/icon-button";
@@ -17,7 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCount, formatMoney, formatPercent, formatQuantity } from "@/lib/format";
-import { removePoLine, updatePoLine } from "@/lib/purchase-orders/actions";
+import { addDirectPoLines, removePoLine, updatePoLine } from "@/lib/purchase-orders/actions";
 import { lineTotal, rollUpPo, type PoLineMoney } from "@/lib/purchase-orders/math";
 import type { PoLineRow } from "@/lib/purchase-orders/queries";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
@@ -31,18 +32,25 @@ import { useState, useTransition } from "react";
  * react as rates are typed (each row reports its money up), so the
  * figure at the bottom is always the figure being agreed to.
  */
+type Option = { id: string; name: string };
+
 export function LineGrid({
   poId,
   lines,
   editable,
   gstRates,
+  categories,
+  brands,
 }: {
   poId: string;
   lines: PoLineRow[];
   editable: boolean;
   /** Active gst_rates from Masters, plus any inactive rate a line holds. */
   gstRates: number[];
+  categories: Option[];
+  brands: Option[];
 }) {
+  const [pickerOpen, setPickerOpen] = useState(false);
   // Live money per line, so the roll-up follows typing before a refresh.
   const [money, setMoney] = useState<Record<string, PoLineMoney>>(() =>
     Object.fromEntries(
@@ -72,9 +80,14 @@ export function LineGrid({
             {formatCount(lines.length)} {lines.length === 1 ? "line" : "lines"}
           </span>
           {editable && (
-            <LinkButton href={`/purchase-orders/${poId}/pull`} size="sm" variant="secondary">
-              From approved indents
-            </LinkButton>
+            <>
+              <LinkButton href={`/purchase-orders/${poId}/pull`} size="sm" variant="secondary">
+                From approved indents
+              </LinkButton>
+              <Button size="sm" variant="secondary" onClick={() => setPickerOpen(true)}>
+                Add items directly
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -85,7 +98,7 @@ export function LineGrid({
           title="Nothing on this order yet"
           description={
             editable
-              ? "Add lines from the approved indents for this scope, then price them."
+              ? "Add lines from the approved indents for this scope — or directly for a bulk or urgent buy — then price them."
               : undefined
           }
           action={
@@ -151,6 +164,21 @@ export function LineGrid({
           </div>
         </>
       )}
+
+      <CataloguePickerDialog
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        title="Add items to the order"
+        targetLabel="this purchase order"
+        categories={categories}
+        brands={brands}
+        onCommit={(picked) =>
+          addDirectPoLines(
+            poId,
+            picked.map(({ item, quantity }) => ({ itemId: item.id, quantity })),
+          )
+        }
+      />
     </div>
   );
 }
@@ -250,7 +278,9 @@ function LineRow({
         <div className="text-muted text-xs">
           {line.item_code ?? "—"}
           {line.item_brand && <span className="ml-2">{line.item_brand}</span>}
-          <span className="ml-2 italic">from {line.indent_reference}</span>
+          <span className="ml-2 italic">
+            {line.indent_reference ? `from ${line.indent_reference}` : "added directly"}
+          </span>
         </div>
       </TableCell>
       {editable ? (

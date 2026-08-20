@@ -1,10 +1,11 @@
 import "server-only";
 
 import { requireTool } from "@/lib/auth/access";
+import { listActiveUomNames } from "@/lib/masters/uoms";
 import { listWorkCategories, listWorkGroups, listWorkItems } from "@/lib/masters/works";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
-import type { MaterialDef, MixDef, WorkRecipe } from "./calc";
+import type { FrozenLineRow, FrozenTakeoffRow, MaterialDef, MixDef, WorkRecipe } from "./calc";
 
 /**
  * Reads for the Estimator.
@@ -19,11 +20,13 @@ import type { MaterialDef, MixDef, WorkRecipe } from "./calc";
  * Masters (`lib/masters/works.ts`) — a shared surface, money-free, and
  * ungated by design. Nothing here reads another tool's tables.
  *
- * No embeds anywhere: the estimates list needs villa names, and
- * `units` has had two foreign keys to `plots` since 0029, so a bare
- * embed answers HTTP 300 at runtime while compiling perfectly
- * (BUGCATCHER #2). Names are merged through a Map instead — the
- * Directory pattern.
+ * Almost no embeds: the estimates list needs villa names, and `units`
+ * has had two foreign keys to `plots` since 0029, so a bare embed
+ * answers HTTP 300 at runtime while compiling perfectly (BUGCATCHER
+ * #2). Names are merged through a Map instead — the Directory pattern.
+ * The one embed is listMaterials' `items(...)`: estimator_materials has
+ * exactly one path to items (0076), so it cannot go ambiguous, and it
+ * was exercised against staging PostgREST before shipping.
  */
 
 const GRANT = "/estimator";
@@ -39,23 +42,29 @@ function fail(context: string, error: { message: string }): never {
 
 export async function getWelcomeCounts(): Promise<{
   estimates: number;
+  official: number;
   worksSetUp: number;
   materials: number;
 }> {
   await requireTool(GRANT);
   const supabase = await createClient();
 
-  const [estimates, worksSetUp, materials] = await Promise.all([
+  const [estimates, official, worksSetUp, materials] = await Promise.all([
     supabase
       .from("estimator_estimates")
       .select("id", { count: "exact", head: true })
       .eq("is_template", false),
+    supabase
+      .from("estimator_estimates")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "submitted"),
     supabase.from("estimator_work_info").select("id", { count: "exact", head: true }),
     supabase.from("estimator_materials").select("id", { count: "exact", head: true }),
   ]);
 
   return {
     estimates: estimates.count ?? 0,
+    official: official.count ?? 0,
     worksSetUp: worksSetUp.count ?? 0,
     materials: materials.count ?? 0,
   };
@@ -73,6 +82,14 @@ export type MaterialRow = {
   isActive: boolean;
   /** How many mixes and recipes use it — a material in use can't be deleted. */
   useCount: number;
+  /** The catalogue item this material is bought and issued as (0076). */
+  itemId: string | null;
+  /** One <uom> of the material = factor × <default_uom> of the item. */
+  itemUomFactor: number | null;
+  /** Display fields of the linked item; null when unlinked. */
+  itemName: string | null;
+  itemCode: string | null;
+  itemDefaultUom: string | null;
 };
 
 export async function listMaterials(): Promise<MaterialRow[]> {
@@ -80,14 +97,24 @@ export async function listMaterials(): Promise<MaterialRow[]> {
   const supabase = await createClient();
 
   const [materials, mixUses, workUses] = await Promise.all([
-    fetchAll<{ id: string; name: string; uom: string; rate: number | null; is_active: boolean }>(
-      (from, to) =>
-        supabase
-          .from("estimator_materials")
-          .select("id, name, uom, rate, is_active")
-          .order("name")
-          .order("id")
-          .range(from, to),
+    fetchAll<{
+      id: string;
+      name: string;
+      uom: string;
+      rate: number | null;
+      is_active: boolean;
+      item_id: string | null;
+      item_uom_factor: number | null;
+      items: { name: string; code: string | null; default_uom: string } | null;
+    }>((from, to) =>
+      supabase
+        .from("estimator_materials")
+        .select(
+          "id, name, uom, rate, is_active, item_id, item_uom_factor, items(name, code, default_uom)",
+        )
+        .order("name")
+        .order("id")
+        .range(from, to),
     ),
     fetchAll<{ material_id: string }>((from, to) =>
       supabase.from("estimator_mix_components").select("material_id").order("id").range(from, to),
@@ -115,6 +142,11 @@ export async function listMaterials(): Promise<MaterialRow[]> {
     rate: material.rate,
     isActive: material.is_active,
     useCount: uses.get(material.id) ?? 0,
+    itemId: material.item_id,
+    itemUomFactor: material.item_uom_factor,
+    itemName: material.items?.name ?? null,
+    itemCode: material.items?.code ?? null,
+    itemDefaultUom: material.items?.default_uom ?? null,
   }));
 }
 
@@ -122,68 +154,12 @@ export async function listMaterials(): Promise<MaterialRow[]> {
 // Units of measure (0075) — the master behind every uom picker
 // ---------------------------------------------------------------------
 
-export type UomRow = {
-  id: string;
-  name: string;
-  isActive: boolean;
-  /** Rows across materials, mixes and work setups spelling this unit. */
-  useCount: number;
-};
-
-/** Every unit, for the management list on the Materials screen. */
-export async function listUoms(): Promise<UomRow[]> {
-  await requireTool(GRANT);
-  const supabase = await createClient();
-
-  const [uoms, materials, mixes, works] = await Promise.all([
-    fetchAll<{ id: string; name: string; is_active: boolean }>((from, to) =>
-      supabase
-        .from("estimator_uoms")
-        .select("id, name, is_active")
-        .order("sort_order")
-        .order("name")
-        .range(from, to),
-    ),
-    fetchAll<{ uom: string }>((from, to) =>
-      supabase.from("estimator_materials").select("uom").order("id").range(from, to),
-    ),
-    fetchAll<{ uom: string }>((from, to) =>
-      supabase.from("estimator_mixes").select("uom").order("id").range(from, to),
-    ),
-    fetchAll<{ uom: string }>((from, to) =>
-      supabase.from("estimator_work_info").select("uom").order("id").range(from, to),
-    ),
-  ]);
-
-  const uses = new Map<string, number>();
-  for (const row of [...materials, ...mixes, ...works]) {
-    const key = row.uom.toLowerCase();
-    uses.set(key, (uses.get(key) ?? 0) + 1);
-  }
-
-  return uoms.map((uom) => ({
-    id: uom.id,
-    name: uom.name,
-    isActive: uom.is_active,
-    useCount: uses.get(uom.name.toLowerCase()) ?? 0,
-  }));
-}
-
-/** Active unit names in picker order, for every uom select in the tool. */
+/** Active unit names in picker order — since 0082 the ONE Masters list,
+ * not the tool's own (estimator_uoms is retired in place; the table
+ * stays, nothing reads it). Managing the list lives in Masters. */
 export async function listUomNames(): Promise<string[]> {
   await requireTool(GRANT);
-  const supabase = await createClient();
-
-  const rows = await fetchAll<{ name: string }>((from, to) =>
-    supabase
-      .from("estimator_uoms")
-      .select("name")
-      .eq("is_active", true)
-      .order("sort_order")
-      .order("name")
-      .range(from, to),
-  );
-  return rows.map((row) => row.name);
+  return listActiveUomNames();
 }
 
 // ---------------------------------------------------------------------
@@ -604,6 +580,9 @@ export type EstimateRow = {
   unitName: string | null;
   lineCount: number;
   createdAt: string;
+  status: "draft" | "submitted" | "superseded";
+  /** EST/<code>/NNN once submitted; null while a working draft. */
+  reference: string | null;
 };
 
 /**
@@ -623,10 +602,12 @@ export async function listEstimates(): Promise<EstimateRow[]> {
       project_id: string;
       unit_id: string | null;
       created_at: string;
+      status: string;
+      reference: string | null;
     }>((from, to) =>
       supabase
         .from("estimator_estimates")
-        .select("id, name, note, is_template, project_id, unit_id, created_at")
+        .select("id, name, note, is_template, project_id, unit_id, created_at, status, reference")
         .order("created_at", { ascending: false })
         .order("id")
         .range(from, to),
@@ -660,6 +641,8 @@ export async function listEstimates(): Promise<EstimateRow[]> {
     unitName: estimate.unit_id ? (unitById.get(estimate.unit_id) ?? null) : null,
     lineCount: lineCounts.get(estimate.id) ?? 0,
     createdAt: estimate.created_at,
+    status: estimate.status as EstimateRow["status"],
+    reference: estimate.reference,
   }));
 }
 
@@ -684,6 +667,22 @@ export type EstimateDetail = {
   unitName: string | null;
   sourceName: string | null;
   lines: EstimateLineRow[];
+  status: "draft" | "submitted" | "superseded";
+  reference: string | null;
+  submittedByName: string | null;
+  submittedAt: string | null;
+  supersededAt: string | null;
+  /** The revision that replaced (or is replacing) this one, if any. */
+  successor: { id: string; name: string; status: string } | null;
+  /**
+   * The 0077 snapshot, present whenever the estimate is no longer a
+   * draft. The screen renders THIS — costs frozen on the day of submit
+   * — through the same calc.ts grouping as a live draft.
+   */
+  frozen: {
+    lineCosts: FrozenLineRow[];
+    takeoff: FrozenTakeoffRow[];
+  } | null;
 };
 
 export async function getEstimate(estimateId: string): Promise<EstimateDetail | null> {
@@ -692,7 +691,9 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
 
   const { data: estimate, error } = await supabase
     .from("estimator_estimates")
-    .select("id, name, note, is_template, project_id, unit_id, source_estimate_id")
+    .select(
+      "id, name, note, is_template, project_id, unit_id, source_estimate_id, status, reference, submitted_by, submitted_at, superseded_at",
+    )
     .eq("id", estimateId)
     .maybeSingle();
   if (error) fail("the estimate", error);
@@ -728,6 +729,57 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
   const itemById = new Map(items.map((item) => [item.id, item]));
   const categoryById = new Map(categories.map((c) => [c.id, c]));
 
+  // The lifecycle extras: who submitted, what replaced this, and the
+  // frozen snapshot for anything past draft. Fetched after the header
+  // because all three hang off its fields.
+  const [submitter, successor, frozenCosts, frozenTakeoff] = await Promise.all([
+    estimate.submitted_by
+      ? supabase.from("profiles").select("full_name").eq("id", estimate.submitted_by).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    supabase
+      .from("estimator_estimates")
+      .select("id, name, status")
+      .eq("source_estimate_id", estimate.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    estimate.status !== "draft"
+      ? fetchAll<{
+          work_item_id: string;
+          qty: number;
+          uom: string | null;
+          labour_cost: number | null;
+          material_cost: number | null;
+          total_cost: number | null;
+        }>((from, to) =>
+          supabase
+            .from("estimator_estimate_line_costs")
+            .select("work_item_id, qty, uom, labour_cost, material_cost, total_cost")
+            .eq("estimate_id", estimateId)
+            .order("id")
+            .range(from, to),
+        )
+      : Promise.resolve([]),
+    estimate.status !== "draft"
+      ? fetchAll<{
+          work_item_id: string;
+          material_id: string;
+          material_name: string;
+          uom: string;
+          quantity: number;
+          rate: number | null;
+        }>((from, to) =>
+          supabase
+            .from("estimator_estimate_takeoff")
+            .select("work_item_id, material_id, material_name, uom, quantity, rate")
+            .eq("estimate_id", estimateId)
+            .order("id")
+            .range(from, to),
+        )
+      : Promise.resolve([]),
+  ]);
+  if (successor.error) fail("the estimate's revision", successor.error);
+
   return {
     id: estimate.id,
     name: estimate.name,
@@ -738,6 +790,33 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
     unitId: estimate.unit_id,
     unitName: unit.data?.name ?? null,
     sourceName: source.data?.name ?? null,
+    status: estimate.status as EstimateDetail["status"],
+    reference: estimate.reference,
+    submittedByName: submitter.data?.full_name ?? null,
+    submittedAt: estimate.submitted_at,
+    supersededAt: estimate.superseded_at,
+    successor: successor.data ?? null,
+    frozen:
+      estimate.status === "draft"
+        ? null
+        : {
+            lineCosts: frozenCosts.map((row) => ({
+              workItemId: row.work_item_id,
+              qty: row.qty,
+              uom: row.uom,
+              labourCost: row.labour_cost,
+              materialCost: row.material_cost,
+              totalCost: row.total_cost,
+            })),
+            takeoff: frozenTakeoff.map((row) => ({
+              workItemId: row.work_item_id,
+              materialId: row.material_id,
+              materialName: row.material_name,
+              uom: row.uom,
+              quantity: row.quantity,
+              rate: row.rate,
+            })),
+          },
     lines: lines
       .map((line) => {
         const item = itemById.get(line.work_item_id);
@@ -761,4 +840,209 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
 export async function listTemplates(): Promise<EstimateRow[]> {
   const estimates = await listEstimates();
   return estimates.filter((estimate) => estimate.isTemplate);
+}
+
+// ---------------------------------------------------------------------
+// Issued against the official estimate (0080)
+// ---------------------------------------------------------------------
+
+export type IssuedAgainstEstimate = {
+  /** One line per issue line to the villa's plot, work included. */
+  lines: { workItemId: string | null; itemId: string; quantity: number }[];
+  /** The material→item bridge, for compare.ts. */
+  links: { materialId: string; itemId: string; itemUom: string; factor: number | null }[];
+  /** Item names for the unmatched footnote. */
+  itemNamesById: Map<string, string>;
+};
+
+/**
+ * Every quantity that reached the estimate's villa, with the work it
+ * was tagged with: stock issues out of a store (0080) AND deliveries
+ * received straight to site (0081) — a to-site GRN never passes
+ * through a store, so skipping it would under-count everything bought
+ * in bulk and unloaded at the plot. Inventory's reads are open to all
+ * signed-in staff (no money anywhere in that tool), so this needs no
+ * view — the one-way rule stays: Inventory never reads the estimator's
+ * tables, the estimator reads Inventory's open quantities.
+ */
+export async function getIssuedAgainstEstimate(
+  unitId: string,
+): Promise<IssuedAgainstEstimate | null> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+
+  // The villa's plot: strictly 1:1 since 0029.
+  const { data: unit, error: unitError } = await supabase
+    .from("units")
+    .select("plot_id")
+    .eq("id", unitId)
+    .maybeSingle();
+  if (unitError) fail("the villa's plot", unitError);
+  if (!unit?.plot_id) return null;
+
+  const [issues, receipts] = await Promise.all([
+    fetchAll<{ id: string; work_item_id: string | null }>((from, to) =>
+      supabase
+        .from("stock_issues")
+        .select("id, work_item_id")
+        .eq("plot_id", unit.plot_id!)
+        .order("id")
+        .range(from, to),
+    ),
+    // Direct-to-site deliveries: matched on the plot OR the unit — a
+    // to-site GRN carries whichever its PO named (0023).
+    fetchAll<{ id: string; work_item_id: string | null }>((from, to) =>
+      supabase
+        .from("goods_receipts")
+        .select("id, work_item_id")
+        .eq("to_site", true)
+        .or(`plot_id.eq.${unit.plot_id},unit_id.eq.${unitId}`)
+        .order("id")
+        .range(from, to),
+    ),
+  ]);
+  if (issues.length === 0 && receipts.length === 0) {
+    return { lines: [], links: await materialLinks(supabase), itemNamesById: new Map() };
+  }
+
+  const workByIssue = new Map(issues.map((issue) => [issue.id, issue.work_item_id]));
+  const workByReceipt = new Map(receipts.map((receipt) => [receipt.id, receipt.work_item_id]));
+  const [issueLines, receiptLines] = await Promise.all([
+    issues.length
+      ? fetchAll<{ issue_id: string; item_id: string; quantity: number }>((from, to) =>
+          supabase
+            .from("stock_issue_lines")
+            .select("issue_id, item_id, quantity")
+            .in(
+              "issue_id",
+              issues.map((issue) => issue.id),
+            )
+            .order("id")
+            .range(from, to),
+        )
+      : Promise.resolve([]),
+    receipts.length
+      ? fetchAll<{ receipt_id: string; item_id: string; quantity: number }>((from, to) =>
+          supabase
+            .from("goods_receipt_lines")
+            .select("receipt_id, item_id, quantity")
+            .in(
+              "receipt_id",
+              receipts.map((receipt) => receipt.id),
+            )
+            .order("id")
+            .range(from, to),
+        )
+      : Promise.resolve([]),
+  ]);
+
+  const lines = [
+    ...issueLines.map((line) => ({
+      workItemId: workByIssue.get(line.issue_id) ?? null,
+      itemId: line.item_id,
+      quantity: line.quantity,
+    })),
+    ...receiptLines.map((line) => ({
+      workItemId: workByReceipt.get(line.receipt_id) ?? null,
+      itemId: line.item_id,
+      quantity: line.quantity,
+    })),
+  ];
+
+  const itemIds = [...new Set(lines.map((line) => line.itemId))];
+  const { data: items, error: itemsError } = itemIds.length
+    ? await supabase.from("items").select("id, name").in("id", itemIds)
+    : { data: [], error: null };
+  if (itemsError) fail("the issued items", itemsError);
+
+  return {
+    lines,
+    links: await materialLinks(supabase),
+    itemNamesById: new Map((items ?? []).map((item) => [item.id, item.name])),
+  };
+}
+
+async function materialLinks(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<{ materialId: string; itemId: string; itemUom: string; factor: number | null }[]> {
+  const rows = await fetchAll<{
+    id: string;
+    uom: string;
+    item_id: string | null;
+    item_uom_factor: number | null;
+    items: { default_uom: string } | null;
+  }>((from, to) =>
+    supabase
+      .from("estimator_materials")
+      .select("id, uom, item_id, item_uom_factor, items(default_uom)")
+      .not("item_id", "is", null)
+      .order("id")
+      .range(from, to),
+  );
+  return rows
+    .filter((row) => row.item_id !== null)
+    .map((row) => ({
+      materialId: row.id,
+      itemId: row.item_id!,
+      itemUom: row.items?.default_uom ?? "",
+      factor: row.item_uom_factor,
+    }));
+}
+
+// ---------------------------------------------------------------------
+// Reconciliation approvals (0083)
+// ---------------------------------------------------------------------
+
+export type ReconciliationApproval = {
+  workItemId: string | null;
+  itemId: string;
+  note: string | null;
+  approvedByName: string;
+  approvedAt: string;
+};
+
+/**
+ * The estimator's acknowledgements of material that reached the villa
+ * outside the official estimate's plan. The PENDING side is never
+ * stored — compare.ts derives it from what actually arrived — so this
+ * reads only the approvals and the page lines the two up by
+ * (work, item). The flag itself is permanent either way; an approval
+ * changes who has looked, not what happened.
+ */
+export async function getReconciliationApprovals(
+  estimateId: string,
+): Promise<ReconciliationApproval[]> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+
+  const rows = await fetchAll<{
+    work_item_id: string | null;
+    item_id: string;
+    note: string | null;
+    created_by: string | null;
+    created_at: string;
+  }>((from, to) =>
+    supabase
+      .from("estimator_reconciliation_approvals")
+      .select("work_item_id, item_id, note, created_by, created_at")
+      .eq("estimate_id", estimateId)
+      .order("created_at")
+      .range(from, to),
+  );
+  if (rows.length === 0) return [];
+
+  const approverIds = [...new Set(rows.map((row) => row.created_by).filter((id) => id !== null))];
+  const { data: approvers, error } = approverIds.length
+    ? await supabase.from("profiles").select("id, full_name").in("id", approverIds)
+    : { data: [], error: null };
+  if (error) fail("the approvers' names", error);
+  const nameById = new Map((approvers ?? []).map((profile) => [profile.id, profile.full_name]));
+
+  return rows.map((row) => ({
+    workItemId: row.work_item_id,
+    itemId: row.item_id,
+    note: row.note,
+    approvedByName: (row.created_by ? nameById.get(row.created_by) : null) ?? "a colleague",
+    approvedAt: row.created_at,
+  }));
 }

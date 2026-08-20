@@ -472,6 +472,9 @@ export type ReceiptDetail = {
   project_name: string;
   destination: string;
   to_site: boolean;
+  /** The work a to-site delivery serves (0081); null for stores and history. */
+  work_name: string | null;
+  work_category: string | null;
   challan_no: string | null;
   received_at: string;
   note: string | null;
@@ -487,7 +490,7 @@ export const getGoodsReceipt = cache(async (receiptId: string): Promise<ReceiptD
   const { data: receipt } = await supabase
     .from("goods_receipts")
     .select(
-      "id, reference, po_id, project_id, store_id, to_site, plot_id, unit_id, challan_no, received_at, note, created_at, created_by",
+      "id, reference, po_id, project_id, store_id, to_site, plot_id, unit_id, work_item_id, challan_no, received_at, note, created_at, created_by, work_items(name, work_categories(name))",
     )
     .eq("id", receiptId)
     .maybeSingle();
@@ -527,6 +530,12 @@ export const getGoodsReceipt = cache(async (receiptId: string): Promise<ReceiptD
     project_name: projects.get(receipt.project_id) ?? "—",
     destination: describeDestination(receipt, stores, plots, units),
     to_site: receipt.to_site,
+    work_name:
+      (receipt.work_items as { name: string; work_categories: { name: string } | null } | null)
+        ?.name ?? null,
+    work_category:
+      (receipt.work_items as { name: string; work_categories: { name: string } | null } | null)
+        ?.work_categories?.name ?? null,
     challan_no: receipt.challan_no,
     received_at: receipt.received_at,
     note: receipt.note,
