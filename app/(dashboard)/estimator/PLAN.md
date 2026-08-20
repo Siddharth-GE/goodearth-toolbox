@@ -1,6 +1,6 @@
 # Estimator — the rules
 
-**Built 2026-08-19.** Migrations `0074`–`0077`. Grant: `/estimator`.
+**Built 2026-08-19.** Migrations `0074`–`0082` (with `0078`–`0081` shared with Indents and Inventory). Grant: `/estimator`.
 
 What a villa costs to build. Works come from the Masters vocabulary (`0073`); this tool adds what they are measured in, what the labour costs, and what they consume — materials directly, or through a named mix several works share. An estimate is a villa and a list of works with quantities; from that the tool computes the material takeoff and the money.
 
@@ -10,7 +10,7 @@ What a villa costs to build. Works come from the Masters vocabulary (`0073`); th
 2. **Mixes are named and reusable**, and a work's recipe may hold both mixes and direct materials. Change M20 once and every concrete work follows.
 3. **Money is in from day one** — material rates, labour rates, totals.
 4. **An estimate belongs to a villa and starts as a copy of a template.** Saarang has 43 near-identical villas; nobody builds that list 43 times.
-5. **Units are picked, not typed** (first-use feedback, 2026-08-19: "get a units master, we cant have people type all this"). `estimator_uoms` (`0075`) feeds every unit select and is managed on the Materials screen. The uom columns stay text — the master is a vocabulary, not a join key — so removing a unit never touches a saved row.
+5. **Units are picked, not typed** (first-use feedback, 2026-08-19: "get a units master, we cant have people type all this"). Since `0082` the list is the SHARED Masters one (`uoms`, managed at Masters → Units) — the founder's 2026-08-20 "keep it in the masters" ended the tool's private list (`estimator_uoms` stays as a table, nothing reads it). The uom columns now carry a NOT VALID FK to the master: renames cascade, history is excused, and the 0077 snapshot columns stay free text because they are frozen copies.
 6. **The estimate reads as a BOQ** (same feedback round: "the ui of the final estimate isnt simple… think about how an estimator will use it"). One grand total on top, works grouped under their categories with subtotals, one Rate and one Amount column per line, add-a-work behind a button. `groupLineCosts` in `calc.ts` produces that grouping, and anything that later prints an estimate must render its output rather than grouping again.
 7. **No scheduling.** The site team's workbook also tracks dates and delays per plot; the founder cut that from this build ("this whole build is only estimation"). Relay is where progress lives today, and it deliberately stores no per-activity dates — if scheduling is ever built, that gap is where it goes, and `relay/PLAN.md` already reserves "unit stages" for the house screen.
 
@@ -29,12 +29,12 @@ What a villa costs to build. Works come from the Masters vocabulary (`0073`); th
 
 - **Changing a work's unit after estimate lines exist** silently changes what every one of those quantities means — 40 "cum" becoming 40 "sqm" is the same number describing a different building. The setup form warns with the line count, but it does not refuse; nothing in the database can tell the difference.
 - **`copyTemplateToUnit` is two writes with no transaction** — PostgREST gives no way to wrap them. If the lines fail to land the header is deleted again, so a failure is honest rather than a half-copy. A definer function would make it atomic, at the price of another definer surface; not worth it at this scale.
-- **`uom` columns are text; the pickers are the enforcement.** The `0075` master fills every unit select and a saved value no longer in the master is still offered when editing that row, so old rows stay saveable. Nothing stops two units meaning the same thing (cft and cuft) if someone adds both — the Materials screen shows a use-count per unit so the drift is at least visible. **The arithmetic never converts between units** — a component's quantity is in its own unit, per one unit of its parent, and the screens print "bags per cum" so the meaning is visible.
+- **`uom` values come from the shared Masters list** (`0082` — a NOT VALID FK; a saved value no longer in the master is still offered when editing that row, so old rows stay saveable, and updates that don't touch the uom never re-check it). Nothing stops two units meaning the same thing (cft and cuft) if someone adds both in Masters. **The arithmetic never converts between units** — a component's quantity is in its own unit, per one unit of its parent, and the screens print "bags per cum" so the meaning is visible.
 - **A mix with no materials contributes nothing** rather than erroring. The mixes list and the work recipe both flag "nothing in it yet" — that flag is the only thing standing between an empty mix and a quietly cheap estimate.
 
 ## Later, if asked
 
-Locked/frozen estimates. Reference numbers. Estimate against actual — the works, POs and bills already exist to compare with, and that comparison is the reason to build this on the shared works list rather than a private one.
+Estimate against actual on the money side (POs and bills) — the quantity side ships with the backbone: the official estimate already compares issued material per work. The works, POs and bills exist to compare with, and that comparison is the reason to build this on the shared works list rather than a private one.
 
 The founder has sketched the reporting surface to come (2026-08-19), and the pieces already line up under it — none of it needs new arithmetic:
 

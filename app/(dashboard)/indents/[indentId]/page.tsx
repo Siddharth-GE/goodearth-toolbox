@@ -5,6 +5,7 @@ import { getIndent, isCurrentUserApprover } from "@/lib/indents/queries";
 import { canEditIndent } from "@/lib/indents/workflow";
 import { listBrands } from "@/lib/masters/brands";
 import { listItemCategories } from "@/lib/masters/item-categories";
+import { listActiveUomNames } from "@/lib/masters/uoms";
 import { listWorkCategories, listWorkItems } from "@/lib/masters/works";
 import { notFound } from "next/navigation";
 import { IndentStatusBadge } from "../_components/status-badge";
@@ -14,13 +15,14 @@ import { LineGrid } from "./_components/line-grid";
 
 export default async function IndentPage({ params }: { params: Promise<{ indentId: string }> }) {
   const { indentId } = await params;
-  const [indent, decider, categories, brands, workItems, workCategories] = await Promise.all([
+  const [indent, decider, categories, brands, workItems, workCategories, uoms] = await Promise.all([
     getIndent(indentId),
     isCurrentUserApprover(),
     listItemCategories(),
     listBrands(),
     listWorkItems(),
     listWorkCategories(),
+    listActiveUomNames(),
   ]);
   if (!indent) notFound();
 
@@ -120,6 +122,7 @@ export default async function IndentPage({ params }: { params: Promise<{ indentI
         showOrdered={indent.status === "approved"}
         categories={categories.map(({ id, name }) => ({ id, name }))}
         brands={brands.map(({ id, name }) => ({ id, name }))}
+        uoms={uoms}
       />
     </div>
   );

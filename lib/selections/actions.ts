@@ -5,7 +5,7 @@ import { requireTool } from "@/lib/auth/access";
 // VALUES from this file-level "use server" module — importing them from
 // a "server-only" module instead would drag that chain into the client
 // bundle and break the production build (see CLAUDE.md, "Shared masters").
-import { isUom } from "@/lib/masters/constants";
+import { isActiveUom } from "@/lib/masters/uoms";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
@@ -381,7 +381,7 @@ export async function updateLine(
 ): Promise<ActionState> {
   await requireTool("/selections");
   if (!(quantity > 0)) return { error: "Quantity must be more than zero." };
-  if (!isUom(uom)) return { error: "Choose a valid unit of measure." };
+  if (!(await isActiveUom(uom))) return { error: "Choose a valid unit of measure." };
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -441,7 +441,7 @@ export async function requestItem(input: {
   const name = input.name.trim();
   if (!name) return { error: "Give the item a name." };
   if (!input.categoryId) return { error: "Choose a category." };
-  if (!isUom(input.uom)) return { error: "Choose a unit of measure." };
+  if (!(await isActiveUom(input.uom))) return { error: "Choose a unit of measure." };
 
   const supabase = await createClient();
 

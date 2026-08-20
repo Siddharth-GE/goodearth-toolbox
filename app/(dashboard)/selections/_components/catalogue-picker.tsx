@@ -24,6 +24,7 @@ export function CataloguePicker({
   currentSpaceId,
   categories,
   brands,
+  uoms,
 }: {
   selectionId: string;
   unitId: string;
@@ -31,6 +32,8 @@ export function CataloguePicker({
   currentSpaceId: string;
   categories: { id: string; name: string }[];
   brands: { id: string; name: string }[];
+  /** Active unit names from the one master (0082), for item requests. */
+  uoms: string[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -124,6 +127,7 @@ export function CataloguePicker({
           <RequestItemDialog
             categories={categories}
             brands={brands}
+            uoms={uoms}
             prefillName={search}
             onCreated={(itemId, name) => addToBasket(provisionalItem(itemId, name))}
           />

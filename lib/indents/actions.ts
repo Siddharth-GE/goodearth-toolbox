@@ -1,7 +1,7 @@
 "use server";
 
 import { requireTool } from "@/lib/auth/access";
-import { isUom } from "@/lib/masters/constants";
+import { isActiveUom } from "@/lib/masters/uoms";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -475,7 +475,7 @@ export async function updateLine(
   if (!Number.isFinite(input.quantity) || input.quantity <= 0) {
     return { error: "Quantity must be more than 0" };
   }
-  if (!isUom(input.uom)) return { error: "Pick a unit from the list" };
+  if (!(await isActiveUom(input.uom))) return { error: "Pick a unit from the list" };
 
   const supabase = await createClient();
   const { error } = await supabase

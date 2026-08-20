@@ -24,6 +24,7 @@ import { SpaceViews } from "../_components/space-views";
 import { listSpaceViews } from "@/lib/design-views/queries";
 import { listItemCategories } from "@/lib/masters/item-categories";
 import { listBrands } from "@/lib/masters/brands";
+import { listActiveUomNames } from "@/lib/masters/uoms";
 import { formatDate } from "@/lib/format";
 
 export default async function SelectionEditorPage({
@@ -39,12 +40,13 @@ export default async function SelectionEditorPage({
   const selection = await getSelection(selectionId);
   if (!selection) notFound();
 
-  const [spaces, lines, spaceTypes, categories, brands, previous] = await Promise.all([
+  const [spaces, lines, spaceTypes, categories, brands, uoms, previous] = await Promise.all([
     listUnitSpaces(selection.unit_id, selectionId),
     listSelectionLines(selectionId),
     listActiveSpaceTypes(),
     listItemCategories(),
     listBrands(),
+    listActiveUomNames(),
     getPreviousIssued(selection.unit_id, selection.revision_no),
   ]);
 
@@ -229,6 +231,7 @@ export default async function SelectionEditorPage({
                       currentSpaceId={activeSpace.id}
                       categories={categories.map((c) => ({ id: c.id, name: c.name }))}
                       brands={brands.map((b) => ({ id: b.id, name: b.name }))}
+                      uoms={uoms}
                     />
                   )}
                 </div>

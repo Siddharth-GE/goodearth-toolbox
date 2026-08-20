@@ -12,10 +12,13 @@ import { createItem, updateItem } from "@/lib/masters/items-actions";
 export function ItemFormDialog({
   categories,
   brands,
+  uoms,
   item,
 }: {
   categories: ItemCategoryRow[];
   brands: BrandRow[];
+  /** Active unit names from the one master (0082). */
+  uoms: string[];
   item?: ItemRow;
 }) {
   const isEdit = !!item;
@@ -85,14 +88,16 @@ export function ItemFormDialog({
           <option value="" disabled>
             Select a unit
           </option>
-          <option value="each">Each</option>
-          <option value="rft">Running ft (rft)</option>
-          <option value="sqft">Square ft (sqft)</option>
-          <option value="lumpsum">Lump sum</option>
-          <option value="bag">Bag</option>
-          <option value="kg">Kg</option>
-          <option value="litre">Litre</option>
-          <option value="cft">Cubic ft (cft)</option>
+          {/* A saved unit that has since left the master stays choosable
+              once, so an old item can be reopened and saved. */}
+          {item?.default_uom && !uoms.includes(item.default_uom) && (
+            <option value={item.default_uom}>{item.default_uom}</option>
+          )}
+          {uoms.map((uom) => (
+            <option key={uom} value={uom}>
+              {uom}
+            </option>
+          ))}
         </Select>
       </div>
       <div className="space-y-1.5">

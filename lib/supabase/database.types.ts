@@ -1095,6 +1095,13 @@ export type Database = {
             referencedRelation: "construction_stages"
             referencedColumns: ["name"]
           },
+          {
+            foreignKeyName: "construction_budget_lines_uom_fkey"
+            columns: ["uom"]
+            isOneToOne: false
+            referencedRelation: "uoms"
+            referencedColumns: ["name"]
+          },
         ]
       }
       construction_budgets: {
@@ -1640,6 +1647,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "estimator_materials_uom_fkey"
+            columns: ["uom"]
+            isOneToOne: false
+            referencedRelation: "uoms"
+            referencedColumns: ["name"]
+          },
+          {
             foreignKeyName: "estimator_materials_updated_by_fkey"
             columns: ["updated_by"]
             isOneToOne: false
@@ -1751,6 +1765,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimator_mixes_uom_fkey"
+            columns: ["uom"]
+            isOneToOne: false
+            referencedRelation: "uoms"
+            referencedColumns: ["name"]
           },
           {
             foreignKeyName: "estimator_mixes_updated_by_fkey"
@@ -1919,6 +1940,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimator_work_info_uom_fkey"
+            columns: ["uom"]
+            isOneToOne: false
+            referencedRelation: "uoms"
+            referencedColumns: ["name"]
           },
           {
             foreignKeyName: "estimator_work_info_updated_by_fkey"
@@ -2135,6 +2163,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "goods_receipts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goods_receipt_lines_uom_fkey"
+            columns: ["uom"]
+            isOneToOne: false
+            referencedRelation: "uoms"
+            referencedColumns: ["name"]
           },
           {
             foreignKeyName: "goods_receipt_lines_updated_by_fkey"
@@ -2505,6 +2540,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "items"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "indent_lines_uom_fkey"
+            columns: ["uom"]
+            isOneToOne: false
+            referencedRelation: "uoms"
+            referencedColumns: ["name"]
           },
           {
             foreignKeyName: "indent_lines_updated_by_fkey"
@@ -2914,6 +2956,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "item_categories"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "items_default_uom_fkey"
+            columns: ["default_uom"]
+            isOneToOne: false
+            referencedRelation: "uoms"
+            referencedColumns: ["name"]
           },
           {
             foreignKeyName: "items_merged_into_item_id_fkey"
@@ -3593,6 +3642,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "purchase_orders"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_order_lines_uom_fkey"
+            columns: ["uom"]
+            isOneToOne: false
+            referencedRelation: "uoms"
+            referencedColumns: ["name"]
           },
           {
             foreignKeyName: "purchase_order_lines_updated_by_fkey"
@@ -4591,6 +4647,13 @@ export type Database = {
             referencedRelation: "spaces"
             referencedColumns: ["id", "unit_id"]
           },
+          {
+            foreignKeyName: "selection_lines_uom_fkey"
+            columns: ["uom"]
+            isOneToOne: false
+            referencedRelation: "uoms"
+            referencedColumns: ["name"]
+          },
         ]
       }
       selections: {
@@ -4996,6 +5059,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "stock_adjustments_uom_fkey"
+            columns: ["uom"]
+            isOneToOne: false
+            referencedRelation: "uoms"
+            referencedColumns: ["name"]
+          },
+          {
             foreignKeyName: "stock_adjustments_updated_by_fkey"
             columns: ["updated_by"]
             isOneToOne: false
@@ -5062,6 +5132,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "items"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_issue_lines_uom_fkey"
+            columns: ["uom"]
+            isOneToOne: false
+            referencedRelation: "uoms"
+            referencedColumns: ["name"]
           },
           {
             foreignKeyName: "stock_issue_lines_updated_by_fkey"
@@ -5292,6 +5369,54 @@ export type Database = {
           },
           {
             foreignKeyName: "units_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      uoms: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "uoms_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "uoms_updated_by_fkey"
             columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -5879,6 +6004,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "selection_lines_uom_fkey"
+            columns: ["uom"]
+            isOneToOne: false
+            referencedRelation: "uoms"
+            referencedColumns: ["name"]
+          },
+          {
             foreignKeyName: "units_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
@@ -6213,6 +6345,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "purchase_orders"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_order_lines_uom_fkey"
+            columns: ["uom"]
+            isOneToOne: false
+            referencedRelation: "uoms"
+            referencedColumns: ["name"]
           },
         ]
       }
