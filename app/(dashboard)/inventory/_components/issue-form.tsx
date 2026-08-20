@@ -30,17 +30,23 @@ type Destination = "plot" | "store";
  * on screen — the negative-stock guard is still the boundary, this just
  * means a store-keeper rarely meets it.
  */
+export type IssueWorkOption = { id: string; code: string; name: string; category: string };
+
 export function IssueForm({
   store,
   holdings,
   options,
+  works,
 }: {
   store: { id: string; name: string; project_id: string | null };
   holdings: StoreHolding[];
   options: IssueFormOptions;
+  /** Active works from the masters — what a plot issue is FOR (0080). */
+  works: IssueWorkOption[];
 }) {
   const [destination, setDestination] = useState<Destination>("plot");
   const [plotId, setPlotId] = useState("");
+  const [workItemId, setWorkItemId] = useState("");
   const [toStoreId, setToStoreId] = useState("");
   const [projectId, setProjectId] = useState(store.project_id ?? "");
   const [issuedAt, setIssuedAt] = useState(() => new Date().toISOString().slice(0, 10));
@@ -66,8 +72,10 @@ export function IssueForm({
 
   const destinationChosen =
     destination === "plot"
-      ? plotId !== ""
+      ? plotId !== "" && workItemId !== ""
       : toStoreId !== "" && (!needsProject || projectId !== "");
+
+  const workCategories = useMemo(() => [...new Set(works.map((work) => work.category))], [works]);
 
   const toggle = (row: StoreHolding, on: boolean) =>
     setPicked((current) => {
@@ -83,6 +91,7 @@ export function IssueForm({
         storeId: store.id,
         toStoreId: destination === "store" ? toStoreId : null,
         plotId: destination === "plot" ? plotId : null,
+        workItemId: destination === "plot" ? workItemId : null,
         projectId: needsProject ? projectId : null,
         issuedAt: issuedAt || null,
         note: note || null,
@@ -140,6 +149,33 @@ export function IssueForm({
               <p className="text-muted text-xs">
                 It leaves this store and shows against the plot in Stock, where it stays — site
                 material is used where it goes.
+              </p>
+            </div>
+          ) : null}
+          {destination === "plot" ? (
+            <div className="space-y-1.5">
+              <Label htmlFor="issue-work">What work is this for?</Label>
+              <Select
+                id="issue-work"
+                value={workItemId}
+                onChange={(event) => setWorkItemId(event.target.value)}
+              >
+                <option value="">Pick the work…</option>
+                {workCategories.map((category) => (
+                  <optgroup key={category} label={category}>
+                    {works
+                      .filter((work) => work.category === category)
+                      .map((work) => (
+                        <option key={work.id} value={work.id}>
+                          {work.code} — {work.name}
+                        </option>
+                      ))}
+                  </optgroup>
+                ))}
+              </Select>
+              <p className="text-muted text-xs">
+                The work this material serves, from the works list — how issues line up against the
+                villa&apos;s estimate. The stage is the work&apos;s own group.
               </p>
             </div>
           ) : (

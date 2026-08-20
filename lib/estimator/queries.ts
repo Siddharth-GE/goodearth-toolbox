@@ -896,3 +896,108 @@ export async function listTemplates(): Promise<EstimateRow[]> {
   const estimates = await listEstimates();
   return estimates.filter((estimate) => estimate.isTemplate);
 }
+
+// ---------------------------------------------------------------------
+// Issued against the official estimate (0080)
+// ---------------------------------------------------------------------
+
+export type IssuedAgainstEstimate = {
+  /** One line per issue line to the villa's plot, work included. */
+  lines: { workItemId: string | null; itemId: string; quantity: number }[];
+  /** The material→item bridge, for compare.ts. */
+  links: { materialId: string; itemId: string; itemUom: string; factor: number | null }[];
+  /** Item names for the unmatched footnote. */
+  itemNamesById: Map<string, string>;
+};
+
+/**
+ * Every stock issue line to the estimate's villa, with the work each
+ * issue was tagged with. Inventory's reads are open to all signed-in
+ * staff (no money anywhere in that tool), so this needs no view — the
+ * one-way rule stays: Inventory never reads the estimator's tables,
+ * the estimator reads Inventory's open quantities.
+ */
+export async function getIssuedAgainstEstimate(
+  unitId: string,
+): Promise<IssuedAgainstEstimate | null> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+
+  // The villa's plot: strictly 1:1 since 0029.
+  const { data: unit, error: unitError } = await supabase
+    .from("units")
+    .select("plot_id")
+    .eq("id", unitId)
+    .maybeSingle();
+  if (unitError) fail("the villa's plot", unitError);
+  if (!unit?.plot_id) return null;
+
+  const issues = await fetchAll<{ id: string; work_item_id: string | null }>((from, to) =>
+    supabase
+      .from("stock_issues")
+      .select("id, work_item_id")
+      .eq("plot_id", unit.plot_id!)
+      .order("id")
+      .range(from, to),
+  );
+  if (issues.length === 0) {
+    return { lines: [], links: await materialLinks(supabase), itemNamesById: new Map() };
+  }
+
+  const workByIssue = new Map(issues.map((issue) => [issue.id, issue.work_item_id]));
+  const lines = await fetchAll<{ issue_id: string; item_id: string; quantity: number }>(
+    (from, to) =>
+      supabase
+        .from("stock_issue_lines")
+        .select("issue_id, item_id, quantity")
+        .in(
+          "issue_id",
+          issues.map((issue) => issue.id),
+        )
+        .order("id")
+        .range(from, to),
+  );
+
+  const itemIds = [...new Set(lines.map((line) => line.item_id))];
+  const { data: items, error: itemsError } = itemIds.length
+    ? await supabase.from("items").select("id, name").in("id", itemIds)
+    : { data: [], error: null };
+  if (itemsError) fail("the issued items", itemsError);
+
+  return {
+    lines: lines.map((line) => ({
+      workItemId: workByIssue.get(line.issue_id) ?? null,
+      itemId: line.item_id,
+      quantity: line.quantity,
+    })),
+    links: await materialLinks(supabase),
+    itemNamesById: new Map((items ?? []).map((item) => [item.id, item.name])),
+  };
+}
+
+async function materialLinks(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<{ materialId: string; itemId: string; itemUom: string; factor: number | null }[]> {
+  const rows = await fetchAll<{
+    id: string;
+    uom: string;
+    item_id: string | null;
+    item_uom_factor: number | null;
+    items: { default_uom: string } | null;
+  }>((from, to) =>
+    supabase
+      .from("estimator_materials")
+      .select("id, uom, item_id, item_uom_factor, items(default_uom)")
+      .not("item_id", "is", null)
+      .order("id")
+      .range(from, to),
+  );
+  return rows
+    .filter((row) => row.item_id !== null)
+    .map((row) => ({
+      materialId: row.id,
+      itemId: row.item_id!,
+      itemUom: row.items?.default_uom ?? "",
+      factor: row.item_uom_factor,
+    }));
+}

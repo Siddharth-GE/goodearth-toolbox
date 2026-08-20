@@ -62,6 +62,7 @@ export default async function IssuesPage({
                 <TableHeaderCell>Reference</TableHeaderCell>
                 <TableHeaderCell>Out of</TableHeaderCell>
                 <TableHeaderCell>To</TableHeaderCell>
+                <TableHeaderCell>Work</TableHeaderCell>
                 <TableHeaderCell>Date</TableHeaderCell>
                 <TableHeaderCell>Lines</TableHeaderCell>
                 <TableHeaderCell></TableHeaderCell>
@@ -73,6 +74,7 @@ export default async function IssuesPage({
                   <TableCell className="text-foreground font-medium">{issue.reference}</TableCell>
                   <TableCell>{issue.store_name}</TableCell>
                   <TableCell className="text-muted">{issue.destination}</TableCell>
+                  <TableCell className="text-muted">{issue.work_name ?? "—"}</TableCell>
                   <TableCell className="text-muted">{formatDate(issue.issued_at)}</TableCell>
                   <TableCell>{formatCount(issue.line_count)}</TableCell>
                   <TableCell>

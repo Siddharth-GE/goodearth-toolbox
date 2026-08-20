@@ -12,12 +12,27 @@ import {
 } from "@/components/ui/table";
 import { formatDate, formatQuantity } from "@/lib/format";
 import { getStockIssue } from "@/lib/inventory/issues-queries";
+import { listWorkCategories, listWorkItems } from "@/lib/masters/works";
+import { RetagWork } from "../../_components/retag-work";
 import { notFound } from "next/navigation";
 
 export default async function IssuePage({ params }: { params: Promise<{ issueId: string }> }) {
   const { issueId } = await params;
-  const issue = await getStockIssue(issueId);
+  const [issue, workItems, workCategories] = await Promise.all([
+    getStockIssue(issueId),
+    listWorkItems(),
+    listWorkCategories(),
+  ]);
   if (!issue) notFound();
+  const categoryNameById = new Map(workCategories.map((c) => [c.id, c.name]));
+  const works = workItems
+    .filter((work) => work.is_active)
+    .map((work) => ({
+      id: work.id,
+      code: work.code,
+      name: work.name,
+      category: categoryNameById.get(work.category_id) ?? "Other",
+    }));
 
   return (
     <div className="space-y-4">
@@ -36,6 +51,16 @@ export default async function IssuePage({ params }: { params: Promise<{ issueId:
       <section className="border-border bg-surface grid gap-4 rounded-2xl border p-4 sm:grid-cols-4">
         <Field label="Out of" value={issue.store_name} />
         <Field label="To" value={issue.destination} />
+        {!issue.is_transfer && (
+          <div className="min-w-0 sm:col-span-2">
+            <p className="text-muted text-xs font-semibold tracking-widest uppercase">
+              For the work{issue.work_category ? ` · ${issue.work_category}` : ""}
+            </p>
+            <div className="mt-1">
+              <RetagWork issueId={issue.id} workItemId={issue.work_item_id} works={works} />
+            </div>
+          </div>
+        )}
         <Field label="Issued on" value={formatDate(issue.issued_at)} />
         <div className="min-w-0">
           <p className="text-muted text-xs font-semibold tracking-widest uppercase">Issued by</p>
