@@ -911,11 +911,14 @@ export type IssuedAgainstEstimate = {
 };
 
 /**
- * Every stock issue line to the estimate's villa, with the work each
- * issue was tagged with. Inventory's reads are open to all signed-in
- * staff (no money anywhere in that tool), so this needs no view — the
- * one-way rule stays: Inventory never reads the estimator's tables,
- * the estimator reads Inventory's open quantities.
+ * Every quantity that reached the estimate's villa, with the work it
+ * was tagged with: stock issues out of a store (0080) AND deliveries
+ * received straight to site (0081) — a to-site GRN never passes
+ * through a store, so skipping it would under-count everything bought
+ * in bulk and unloaded at the plot. Inventory's reads are open to all
+ * signed-in staff (no money anywhere in that tool), so this needs no
+ * view — the one-way rule stays: Inventory never reads the estimator's
+ * tables, the estimator reads Inventory's open quantities.
  */
 export async function getIssuedAgainstEstimate(
   unitId: string,
@@ -932,44 +935,83 @@ export async function getIssuedAgainstEstimate(
   if (unitError) fail("the villa's plot", unitError);
   if (!unit?.plot_id) return null;
 
-  const issues = await fetchAll<{ id: string; work_item_id: string | null }>((from, to) =>
-    supabase
-      .from("stock_issues")
-      .select("id, work_item_id")
-      .eq("plot_id", unit.plot_id!)
-      .order("id")
-      .range(from, to),
-  );
-  if (issues.length === 0) {
+  const [issues, receipts] = await Promise.all([
+    fetchAll<{ id: string; work_item_id: string | null }>((from, to) =>
+      supabase
+        .from("stock_issues")
+        .select("id, work_item_id")
+        .eq("plot_id", unit.plot_id!)
+        .order("id")
+        .range(from, to),
+    ),
+    // Direct-to-site deliveries: matched on the plot OR the unit — a
+    // to-site GRN carries whichever its PO named (0023).
+    fetchAll<{ id: string; work_item_id: string | null }>((from, to) =>
+      supabase
+        .from("goods_receipts")
+        .select("id, work_item_id")
+        .eq("to_site", true)
+        .or(`plot_id.eq.${unit.plot_id},unit_id.eq.${unitId}`)
+        .order("id")
+        .range(from, to),
+    ),
+  ]);
+  if (issues.length === 0 && receipts.length === 0) {
     return { lines: [], links: await materialLinks(supabase), itemNamesById: new Map() };
   }
 
   const workByIssue = new Map(issues.map((issue) => [issue.id, issue.work_item_id]));
-  const lines = await fetchAll<{ issue_id: string; item_id: string; quantity: number }>(
-    (from, to) =>
-      supabase
-        .from("stock_issue_lines")
-        .select("issue_id, item_id, quantity")
-        .in(
-          "issue_id",
-          issues.map((issue) => issue.id),
+  const workByReceipt = new Map(receipts.map((receipt) => [receipt.id, receipt.work_item_id]));
+  const [issueLines, receiptLines] = await Promise.all([
+    issues.length
+      ? fetchAll<{ issue_id: string; item_id: string; quantity: number }>((from, to) =>
+          supabase
+            .from("stock_issue_lines")
+            .select("issue_id, item_id, quantity")
+            .in(
+              "issue_id",
+              issues.map((issue) => issue.id),
+            )
+            .order("id")
+            .range(from, to),
         )
-        .order("id")
-        .range(from, to),
-  );
+      : Promise.resolve([]),
+    receipts.length
+      ? fetchAll<{ receipt_id: string; item_id: string; quantity: number }>((from, to) =>
+          supabase
+            .from("goods_receipt_lines")
+            .select("receipt_id, item_id, quantity")
+            .in(
+              "receipt_id",
+              receipts.map((receipt) => receipt.id),
+            )
+            .order("id")
+            .range(from, to),
+        )
+      : Promise.resolve([]),
+  ]);
 
-  const itemIds = [...new Set(lines.map((line) => line.item_id))];
+  const lines = [
+    ...issueLines.map((line) => ({
+      workItemId: workByIssue.get(line.issue_id) ?? null,
+      itemId: line.item_id,
+      quantity: line.quantity,
+    })),
+    ...receiptLines.map((line) => ({
+      workItemId: workByReceipt.get(line.receipt_id) ?? null,
+      itemId: line.item_id,
+      quantity: line.quantity,
+    })),
+  ];
+
+  const itemIds = [...new Set(lines.map((line) => line.itemId))];
   const { data: items, error: itemsError } = itemIds.length
     ? await supabase.from("items").select("id, name").in("id", itemIds)
     : { data: [], error: null };
   if (itemsError) fail("the issued items", itemsError);
 
   return {
-    lines: lines.map((line) => ({
-      workItemId: workByIssue.get(line.issue_id) ?? null,
-      itemId: line.item_id,
-      quantity: line.quantity,
-    })),
+    lines,
     links: await materialLinks(supabase),
     itemNamesById: new Map((items ?? []).map((item) => [item.id, item.name])),
   };

@@ -35,6 +35,12 @@ export default async function ReceiptPage({ params }: { params: Promise<{ receip
         <Field label="Challan no." value={receipt.challan_no ?? "—"} />
         <Field label="Received on" value={formatDate(receipt.received_at)} />
         <Field label="Went to" value={receipt.destination} />
+        {receipt.to_site && (
+          <Field
+            label={`For the work${receipt.work_category ? ` · ${receipt.work_category}` : ""}`}
+            value={receipt.work_name ?? "— (before works were recorded)"}
+          />
+        )}
         <div className="min-w-0">
           <p className="text-muted text-xs font-semibold tracking-widest uppercase">Received by</p>
           <div className="mt-1 flex items-center gap-2">

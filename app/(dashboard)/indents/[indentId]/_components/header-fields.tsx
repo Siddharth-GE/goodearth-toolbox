@@ -21,7 +21,6 @@ export type WorkOption = { id: string; code: string; name: string; category: str
 export function HeaderFields({
   indentId,
   stage,
-  stages,
   workItemId,
   works,
   requiredBy,
@@ -29,9 +28,8 @@ export function HeaderFields({
   editable,
 }: {
   indentId: string;
+  /** A legacy stage (0053) — display-only history; the picker is gone. */
   stage: string | null;
-  /** Active stage names from the master list. */
-  stages: string[];
   /** The work this request serves, from the works masters (0078). */
   workItemId: string | null;
   works: WorkOption[];
@@ -39,29 +37,25 @@ export function HeaderFields({
   note: string | null;
   editable: boolean;
 }) {
-  const [stageValue, setStageValue] = useState(stage ?? "");
   const [workValue, setWorkValue] = useState(workItemId ?? "");
   const [requiredByValue, setRequiredByValue] = useState(requiredBy ?? "");
   const [noteValue, setNoteValue] = useState(note ?? "");
 
   const { flush, error, saved } = useSaveOnBlur({
     initial: {
-      stage: stage ?? "",
       work: workItemId ?? "",
       requiredBy: requiredBy ?? "",
       note: note ?? "",
     },
     save: (value) =>
       updateIndentHeader(indentId, {
-        stage: value.stage || null,
         workItemId: value.work || null,
         requiredBy: value.requiredBy || null,
         note: value.note || null,
       }),
   });
 
-  const save = () =>
-    flush({ stage: stageValue, work: workValue, requiredBy: requiredByValue, note: noteValue });
+  const save = () => flush({ work: workValue, requiredBy: requiredByValue, note: noteValue });
 
   const workLabel = (id: string | null) => {
     const work = works.find((row) => row.id === id);
@@ -72,7 +66,7 @@ export function HeaderFields({
   if (!editable) {
     return (
       <div className="border-border bg-surface grid gap-4 rounded-2xl border p-4 sm:grid-cols-4">
-        <ReadOnlyField label="Stage" value={stage ?? "—"} />
+        {stage && <ReadOnlyField label="Stage (old list)" value={stage} />}
         <ReadOnlyField label="Work" value={workLabel(workItemId)} />
         <ReadOnlyField label="Required by" value={formatDate(requiredBy)} />
         <ReadOnlyField label="Note" value={note ?? "—"} />
@@ -82,29 +76,7 @@ export function HeaderFields({
 
   return (
     <div className="border-border bg-surface space-y-3 rounded-2xl border p-4">
-      <div className="grid gap-4 sm:grid-cols-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="header-stage">Stage</Label>
-          <Select
-            id="header-stage"
-            value={stageValue}
-            onChange={(event) => setStageValue(event.target.value)}
-            onBlur={save}
-          >
-            <option value="">No stage</option>
-            {/* A stage this indent already carries stays choosable even
-                if it has since been deactivated — the select must never
-                silently clear a saved value. */}
-            {stageValue && !stages.includes(stageValue) && (
-              <option value={stageValue}>{stageValue}</option>
-            )}
-            {stages.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </Select>
-        </div>
+      <div className="grid gap-4 sm:grid-cols-3">
         <div className="space-y-1.5">
           <Label htmlFor="header-work">Work</Label>
           <Select

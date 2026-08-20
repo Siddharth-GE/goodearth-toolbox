@@ -6,7 +6,7 @@ import { requireTool } from "@/lib/auth/access";
 import { classifyEstimatePull } from "./pull-rules";
 import { listPlots } from "@/lib/masters/plots";
 import { listProjects } from "@/lib/masters/projects";
-import { listActiveStageNames } from "@/lib/masters/stages";
+import { listWorkCategories, listWorkItems } from "@/lib/masters/works";
 import { listUnits } from "@/lib/masters/units";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
@@ -974,20 +974,25 @@ export type IndentFormOptions = {
   projects: ProjectOption[];
   plots: ScopedOption[];
   units: (ScopedOption & { plot_id: string | null })[];
-  /** The active construction stages (0053) — stage is picked, never typed. */
-  stages: string[];
+  /** The works masters — the one vocabulary (founder, 2026-08-20). */
+  works: { id: string; code: string; name: string; category: string }[];
 };
 
 /** Everything the new-indent form needs, in one gated call. The masters
  * reads themselves are ungated by design — this wrapper is the gate. */
 export async function getIndentFormOptions(): Promise<IndentFormOptions> {
   await requireTool("/indents");
-  const [projects, plots, units, stages] = await Promise.all([
+  const [projects, plots, units, workItems, workCategories] = await Promise.all([
     listProjects(),
     listPlots(),
     listUnits(),
-    listActiveStageNames(),
+    listWorkItems(),
+    listWorkCategories(),
   ]);
+  // One vocabulary (founder, 2026-08-20): the works masters, the same
+  // list the estimate speaks. The old construction-stages picker is
+  // gone from these forms; a saved stage still displays as history.
+  const categoryNameById = new Map(workCategories.map((c) => [c.id, c.name]));
   return {
     projects: projects.map(({ id, name, code }) => ({ id, name, code })),
     plots: plots.map(({ id, project_id, name, code }) => ({ id, project_id, name, code })),
@@ -998,7 +1003,14 @@ export async function getIndentFormOptions(): Promise<IndentFormOptions> {
       name,
       code,
     })),
-    stages,
+    works: workItems
+      .filter((work) => work.is_active)
+      .map((work) => ({
+        id: work.id,
+        code: work.code,
+        name: work.name,
+        category: categoryNameById.get(work.category_id) ?? "Other",
+      })),
   };
 }
 

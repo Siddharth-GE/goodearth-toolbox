@@ -2163,6 +2163,7 @@ export type Database = {
           unit_id: string | null
           updated_at: string
           updated_by: string | null
+          work_item_id: string | null
         }
         Insert: {
           challan_no?: string | null
@@ -2181,6 +2182,7 @@ export type Database = {
           unit_id?: string | null
           updated_at?: string
           updated_by?: string | null
+          work_item_id?: string | null
         }
         Update: {
           challan_no?: string | null
@@ -2199,6 +2201,7 @@ export type Database = {
           unit_id?: string | null
           updated_at?: string
           updated_by?: string | null
+          work_item_id?: string | null
         }
         Relationships: [
           {
@@ -2262,6 +2265,13 @@ export type Database = {
             columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goods_receipts_work_item_id_fkey"
+            columns: ["work_item_id"]
+            isOneToOne: false
+            referencedRelation: "work_items"
             referencedColumns: ["id"]
           },
         ]
@@ -6357,17 +6367,30 @@ export type Database = {
         Args: { p_owner_id?: string; p_unit_id: string }
         Returns: string
       }
-      create_goods_receipt: {
-        Args: {
-          p_challan_no: string
-          p_note: string
-          p_po_id: string
-          p_received_at: string
-          p_store_id: string
-          p_to_site: boolean
-        }
-        Returns: string
-      }
+      create_goods_receipt:
+        | {
+            Args: {
+              p_challan_no: string
+              p_note: string
+              p_po_id: string
+              p_received_at: string
+              p_store_id: string
+              p_to_site: boolean
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_challan_no: string
+              p_note: string
+              p_po_id: string
+              p_received_at: string
+              p_store_id: string
+              p_to_site: boolean
+              p_work_item_id: string
+            }
+            Returns: string
+          }
       create_indent: {
         Args: {
           p_note: string
