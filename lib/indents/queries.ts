@@ -489,8 +489,15 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
 });
 
 /* ------------------------------------------------------------------ *
- * Pull path 1 — the construction plan (the site flow)
- * ------------------------------------------------------------------ */
+ * The pull line shape shared by the pull screens
+ * ------------------------------------------------------------------ *
+ * Pull path 1 was the unit's construction plan. Retired 2026-08-20 —
+ * the founder's backbone decision: the Estimator IS the construction
+ * line, so construction requests pull from the villa's official
+ * estimate (pull path 3) instead. The "construction" source label and
+ * indent_lines.construction_line_id stay forever for historic lines;
+ * only the pull UI and its reads are gone.
+ */
 
 export type PullLineRow = {
   /** The source row's id — construction_budget_lines.id. */
@@ -511,112 +518,6 @@ export type PullLineRow = {
   on_this_indent: boolean;
   note: string | null;
 };
-
-export type PullStageGroup = { stage: string; lines: PullLineRow[] };
-
-export type ConstructionPull = {
-  plan_id: string;
-  unit_name: string;
-  stages: PullStageGroup[];
-};
-
-/**
- * The unit's construction plan, stage by stage, annotated with what has
- * already been requested against each line.
- *
- * Reads construction_budget_lines directly under /indents — no money is
- * involved anywhere in the construction tree, which is why its reads are
- * open to all staff (see the note at the top of this file).
- */
-export async function getConstructionPull(
-  unitId: string,
-  indentId: string,
-): Promise<ConstructionPull | null> {
-  await requireTool("/indents");
-  const supabase = await createClient();
-
-  const { data: plan, error: planError } = await withRetry(() =>
-    supabase.from("construction_budgets").select("id, units(name)").eq("unit_id", unitId).single(),
-  );
-  // "No plan for this unit" and "the read failed" both arrive as a null
-  // plan, and returning null here lands the caller on a 404 — which tells
-  // the site team the plan doesn't exist. Throw on a genuine failure so
-  // they get the retryable error screen instead. PGRST116 is the real
-  // "no rows" answer, and keeps the 404.
-  if (planError && planError.code !== "PGRST116") {
-    console.error("construction pull plan read failed:", planError);
-    throw new Error("Could not open the construction plan.", { cause: planError });
-  }
-  if (!plan) return null;
-
-  const lines = await fetchAll((from, to) =>
-    supabase
-      .from("construction_budget_lines")
-      .select("id, stage, item_id, quantity, uom, note, items(name, code, thumb_url, brands(name))")
-      .eq("budget_id", plan.id)
-      .order("created_at")
-      .order("id")
-      .range(from, to),
-  );
-
-  const sourceIds = lines.map((line) => line.id);
-
-  // Read to completion: these sums are the "already requested" figure a
-  // QS decides on, and a truncated read would under-report it — which
-  // reads as "nothing has been ordered yet" and buys the material twice.
-  const raised = sourceIds.length
-    ? await fetchAll((from, to) =>
-        supabase
-          .from("indent_lines")
-          .select("construction_line_id, quantity, indent_id")
-          .in("construction_line_id", sourceIds)
-          .order("id")
-          .range(from, to),
-      )
-    : [];
-
-  const requested = new Map<string, number>();
-  const onThisIndent = new Set<string>();
-  for (const line of raised) {
-    const key = line.construction_line_id;
-    if (!key) continue;
-    requested.set(key, (requested.get(key) ?? 0) + line.quantity);
-    if (line.indent_id === indentId) onThisIndent.add(key);
-  }
-
-  // First-appearance order, so stages stay in construction order rather
-  // than alphabetical — same rule as the plan editor.
-  const groups = new Map<string, PullLineRow[]>();
-  for (const line of lines) {
-    const item = line.items as {
-      name: string;
-      code: string | null;
-      thumb_url: string | null;
-      brands: { name: string } | null;
-    } | null;
-    const group = groups.get(line.stage) ?? [];
-    group.push({
-      source_id: line.id,
-      item_id: line.item_id,
-      item_name: item?.name ?? "—",
-      item_code: item?.code ?? null,
-      item_brand: item?.brands?.name ?? null,
-      item_thumb_url: item?.thumb_url ?? null,
-      uom: line.uom,
-      planned_quantity: line.quantity,
-      already_requested: requested.get(line.id) ?? 0,
-      on_this_indent: onThisIndent.has(line.id),
-      note: line.note,
-    });
-    groups.set(line.stage, group);
-  }
-
-  return {
-    plan_id: plan.id,
-    unit_name: (plan.units as { name: string } | null)?.name ?? "—",
-    stages: [...groups.entries()].map(([stage, stageLines]) => ({ stage, lines: stageLines })),
-  };
-}
 
 /* ------------------------------------------------------------------ *
  * Pull path 2 — an approved interiors budget
@@ -772,8 +673,8 @@ export async function getBudgetPull(
       .eq("id", budgetId)
       .maybeSingle(),
   );
-  // Same rule as getConstructionPull: a failed read must not become a
-  // 404 that says this budget isn't there.
+  // A failed read must not become a 404 that says this budget isn't
+  // there.
   if (budgetError) {
     console.error("indent budget pull read failed:", budgetError);
     throw new Error("Could not open that budget.", { cause: budgetError });
