@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.15"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -2792,6 +2792,97 @@ export type Database = {
           },
         ]
       }
+      issue_requests: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          declined_reason: string | null
+          fulfilled_issue_id: string | null
+          id: string
+          item_id: string
+          note: string | null
+          plot_id: string
+          quantity: number
+          status: string
+          updated_at: string
+          updated_by: string | null
+          work_item_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          declined_reason?: string | null
+          fulfilled_issue_id?: string | null
+          id?: string
+          item_id: string
+          note?: string | null
+          plot_id: string
+          quantity: number
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          work_item_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          declined_reason?: string | null
+          fulfilled_issue_id?: string | null
+          id?: string
+          item_id?: string
+          note?: string | null
+          plot_id?: string
+          quantity?: number
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          work_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issue_requests_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issue_requests_fulfilled_issue_id_fkey"
+            columns: ["fulfilled_issue_id"]
+            isOneToOne: false
+            referencedRelation: "stock_issues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issue_requests_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issue_requests_plot_id_fkey"
+            columns: ["plot_id"]
+            isOneToOne: false
+            referencedRelation: "plots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issue_requests_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issue_requests_work_item_id_fkey"
+            columns: ["work_item_id"]
+            isOneToOne: false
+            referencedRelation: "work_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       item_categories: {
         Row: {
           created_at: string
@@ -3159,6 +3250,90 @@ export type Database = {
             columns: ["vendor_id"]
             isOneToOne: false
             referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      labour_logs: {
+        Row: {
+          contractor_id: string
+          created_at: string
+          created_by: string | null
+          helpers: number
+          id: string
+          log_date: string
+          masons: number
+          note: string | null
+          others: number
+          plot_id: string
+          updated_at: string
+          updated_by: string | null
+          work_item_id: string
+        }
+        Insert: {
+          contractor_id: string
+          created_at?: string
+          created_by?: string | null
+          helpers?: number
+          id?: string
+          log_date?: string
+          masons?: number
+          note?: string | null
+          others?: number
+          plot_id: string
+          updated_at?: string
+          updated_by?: string | null
+          work_item_id: string
+        }
+        Update: {
+          contractor_id?: string
+          created_at?: string
+          created_by?: string | null
+          helpers?: number
+          id?: string
+          log_date?: string
+          masons?: number
+          note?: string | null
+          others?: number
+          plot_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          work_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "labour_logs_contractor_id_fkey"
+            columns: ["contractor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "labour_logs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "labour_logs_plot_id_fkey"
+            columns: ["plot_id"]
+            isOneToOne: false
+            referencedRelation: "plots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "labour_logs_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "labour_logs_work_item_id_fkey"
+            columns: ["work_item_id"]
+            isOneToOne: false
+            referencedRelation: "work_items"
             referencedColumns: ["id"]
           },
         ]
