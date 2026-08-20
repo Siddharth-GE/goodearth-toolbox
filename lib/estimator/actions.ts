@@ -9,7 +9,7 @@ import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { computeLine, computeWorkTakeoff } from "./calc";
-import { getRecipeBook } from "./queries";
+import { applyVariations, getEstimateVariations, getRecipeBook } from "./queries";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -437,6 +437,29 @@ export async function deleteEstimate(id: string): Promise<ActionState> {
     return { error: "Could not delete the estimate. Try again." };
   }
 
+  // Variations (0087) go before their lines — RESTRICT, not cascade.
+  const { data: lineIds, error: lineIdsError } = await supabase
+    .from("estimator_estimate_lines")
+    .select("id")
+    .eq("estimate_id", id);
+  if (lineIdsError) {
+    console.error("deleteEstimate (line ids) failed:", lineIdsError);
+    return { error: "Could not delete the estimate. Try again." };
+  }
+  if (lineIds && lineIds.length > 0) {
+    const { error: variationError } = await supabase
+      .from("estimator_estimate_line_components")
+      .delete()
+      .in(
+        "line_id",
+        lineIds.map((line) => line.id),
+      );
+    if (variationError) {
+      console.error("deleteEstimate (variations) failed:", variationError);
+      return { error: "Could not delete the estimate. Try again." };
+    }
+  }
+
   const { error: lineError } = await supabase
     .from("estimator_estimate_lines")
     .delete()
@@ -514,6 +537,17 @@ export async function updateEstimateLineQty(id: string, qty: number): Promise<Ac
 export async function removeEstimateLine(id: string): Promise<ActionState> {
   await requireTool(GRANT);
   const supabase = await createClient();
+
+  // The line's variation (0087) goes with it — RESTRICT, not cascade.
+  const { error: variationError } = await supabase
+    .from("estimator_estimate_line_components")
+    .delete()
+    .eq("line_id", id);
+  if (variationError) {
+    console.error("removeEstimateLine (variation) failed:", variationError);
+    return { error: "Could not remove the work. Try again." };
+  }
+
   const { error } = await supabase.from("estimator_estimate_lines").delete().eq("id", id);
   if (error) {
     console.error("removeEstimateLine failed:", error);
@@ -524,11 +558,244 @@ export async function removeEstimateLine(id: string): Promise<ActionState> {
   return undefined;
 }
 
+/* ------------------------------------------------------------------ *
+ * Per-villa variations (0087) — "every house is different"
+ *
+ * The Works tab stays the standard. Customise copies the standard's
+ * components onto the line; from then on that list — whole, not a
+ * delta — is what the line means, and it no longer follows the
+ * standard. Reset deletes it. The draft-only trigger is the boundary;
+ * these actions just speak plainly.
+ * ------------------------------------------------------------------ */
+
+export async function customiseEstimateLine(lineId: string): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+  if (!lineId) return { error: "Which work?" };
+  const supabase = await createClient();
+
+  const { data: line, error: lineError } = await supabase
+    .from("estimator_estimate_lines")
+    .select("id, work_item_id")
+    .eq("id", lineId)
+    .maybeSingle();
+  if (lineError || !line) {
+    console.error("customiseEstimateLine (line) failed:", lineError);
+    return { error: "That work is no longer on the estimate." };
+  }
+
+  const { count } = await supabase
+    .from("estimator_estimate_line_components")
+    .select("id", { count: "exact", head: true })
+    .eq("line_id", lineId);
+  if (count) return undefined; // already customised — nothing to copy
+
+  const { data: standard, error: standardError } = await supabase
+    .from("estimator_work_components")
+    .select("item_id, mix_id, material_id, qty_per_unit")
+    .eq("work_item_id", line.work_item_id);
+  if (standardError) {
+    console.error("customiseEstimateLine (standard) failed:", standardError);
+    return { error: "Could not read the standard recipe. Try again." };
+  }
+  if (!standard || standard.length === 0) {
+    // An empty standard has nothing to copy; the first added material
+    // becomes the variation.
+    return undefined;
+  }
+
+  const { error } = await supabase.from("estimator_estimate_line_components").insert(
+    standard.map((component) => ({
+      line_id: lineId,
+      item_id: component.item_id,
+      mix_id: component.mix_id,
+      material_id: component.material_id,
+      qty_per_unit: component.qty_per_unit,
+      created_by: user.id,
+      updated_by: user.id,
+    })),
+  );
+  if (error) {
+    if (error.code === "P0001") return { error: error.message };
+    console.error("customiseEstimateLine failed:", error);
+    return { error: "Could not customise this work. Try again." };
+  }
+
+  revalidatePath("/estimator", "layout");
+  return undefined;
+}
+
+export async function addLineComponent(
+  lineId: string,
+  _state: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+  const choice = text(formData, "component");
+  const qty = parseNumber(formData.get("qty_per_unit"));
+
+  const [kind, refId] = choice.split(":");
+  if (!refId || (kind !== "material" && kind !== "mix")) {
+    return { error: "Pick a material or a mix." };
+  }
+  if (qty === null || Number.isNaN(qty) || qty <= 0) {
+    return { error: "Enter how much of it one unit of the work needs." };
+  }
+
+  const supabase = await createClient();
+  // "material" means a master ITEM (0086).
+  const { error } = await supabase.from("estimator_estimate_line_components").insert({
+    line_id: lineId,
+    item_id: kind === "material" ? refId : null,
+    mix_id: kind === "mix" ? refId : null,
+    qty_per_unit: qty,
+    created_by: user.id,
+    updated_by: user.id,
+  });
+  if (error) {
+    if (error.code === "23505") {
+      return { error: "That is already in this villa's version — edit its quantity instead." };
+    }
+    if (error.code === "P0001") return { error: error.message };
+    console.error("addLineComponent failed:", error);
+    return { error: "Could not add it. Try again." };
+  }
+
+  revalidatePath("/estimator", "layout");
+  return undefined;
+}
+
+export async function updateLineComponentQty(id: string, qty: number): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+  if (!Number.isFinite(qty) || qty <= 0) return { error: "The quantity must be more than zero." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("estimator_estimate_line_components")
+    .update({ qty_per_unit: qty, updated_by: user.id })
+    .eq("id", id);
+  if (error) {
+    if (error.code === "P0001") return { error: error.message };
+    console.error("updateLineComponentQty failed:", error);
+    return { error: "Could not save the quantity. Try again." };
+  }
+
+  revalidatePath("/estimator", "layout");
+  return undefined;
+}
+
+export async function removeLineComponent(id: string): Promise<ActionState> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+  const { error } = await supabase.from("estimator_estimate_line_components").delete().eq("id", id);
+  if (error) {
+    if (error.code === "P0001") return { error: error.message };
+    console.error("removeLineComponent failed:", error);
+    return { error: "Could not remove it. Try again." };
+  }
+
+  revalidatePath("/estimator", "layout");
+  return undefined;
+}
+
+export async function resetEstimateLine(lineId: string): Promise<ActionState> {
+  await requireTool(GRANT);
+  if (!lineId) return { error: "Which work?" };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("estimator_estimate_line_components")
+    .delete()
+    .eq("line_id", lineId);
+  if (error) {
+    if (error.code === "P0001") return { error: error.message };
+    console.error("resetEstimateLine failed:", error);
+    return { error: "Could not reset this work. Try again." };
+  }
+
+  revalidatePath("/estimator", "layout");
+  return undefined;
+}
+
+/**
+ * Copy every line's variation (0087) from one estimate to another, by
+ * work (unique per estimate, so the mapping is honest). Returns an
+ * error message or undefined — the CALLER owns the cleanup, because it
+ * owns the half-created estimate.
+ */
+async function copyLineVariations(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  sourceEstimateId: string,
+  targetEstimateId: string,
+  userId: string,
+): Promise<string | undefined> {
+  const { data: sourceLines, error: sourceError } = await supabase
+    .from("estimator_estimate_lines")
+    .select("id, work_item_id")
+    .eq("estimate_id", sourceEstimateId);
+  if (sourceError) {
+    console.error("copyLineVariations (source lines) failed:", sourceError);
+    return "Could not read the works' variations.";
+  }
+  if (!sourceLines || sourceLines.length === 0) return undefined;
+
+  const { data: components, error: componentsError } = await supabase
+    .from("estimator_estimate_line_components")
+    .select("line_id, item_id, mix_id, material_id, qty_per_unit")
+    .in(
+      "line_id",
+      sourceLines.map((line) => line.id),
+    );
+  if (componentsError) {
+    console.error("copyLineVariations (components) failed:", componentsError);
+    return "Could not read the works' variations.";
+  }
+  if (!components || components.length === 0) return undefined;
+
+  const { data: targetLines, error: targetError } = await supabase
+    .from("estimator_estimate_lines")
+    .select("id, work_item_id")
+    .eq("estimate_id", targetEstimateId);
+  if (targetError) {
+    console.error("copyLineVariations (target lines) failed:", targetError);
+    return "Could not copy the works' variations.";
+  }
+
+  const sourceWorkByLine = new Map(sourceLines.map((line) => [line.id, line.work_item_id]));
+  const targetLineByWork = new Map((targetLines ?? []).map((line) => [line.work_item_id, line.id]));
+
+  const rows = components.flatMap((component) => {
+    const workItemId = sourceWorkByLine.get(component.line_id);
+    const targetLineId = workItemId ? targetLineByWork.get(workItemId) : undefined;
+    if (!targetLineId) return [];
+    return [
+      {
+        line_id: targetLineId,
+        item_id: component.item_id,
+        mix_id: component.mix_id,
+        material_id: component.material_id,
+        qty_per_unit: component.qty_per_unit,
+        created_by: userId,
+        updated_by: userId,
+      },
+    ];
+  });
+  if (rows.length === 0) return undefined;
+
+  const { error: insertError } = await supabase
+    .from("estimator_estimate_line_components")
+    .insert(rows);
+  if (insertError) {
+    console.error("copyLineVariations (insert) failed:", insertError);
+    return "Could not copy the works' variations.";
+  }
+  return undefined;
+}
+
 /**
  * Copy a template onto a villa — the way every villa estimate starts.
  *
- * Only the lines come across: quantities and their notes. Costs are
- * computed live from today's rates, so there is nothing else to copy.
+ * The lines come across — quantities, notes, and any per-villa
+ * variations (0087) the template's works carry. Costs are computed
+ * live from today's rates, so there is nothing else to copy.
  *
  * Two writes with no transaction between them (PostgREST gives us no
  * way to wrap them), so a failure part-way would leave an empty
@@ -621,6 +888,13 @@ export async function copyTemplateToUnit(
       await supabase.from("estimator_estimates").delete().eq("id", created.id);
       return { error: "Could not copy the template's works, so nothing was created. Try again." };
     }
+
+    const variationError = await copyLineVariations(supabase, template.id, created.id, user.id);
+    if (variationError) {
+      await supabase.from("estimator_estimate_lines").delete().eq("estimate_id", created.id);
+      await supabase.from("estimator_estimates").delete().eq("id", created.id);
+      return { error: `${variationError} Nothing was created — try again.` };
+    }
   }
 
   revalidatePath("/estimator", "layout");
@@ -660,8 +934,9 @@ export async function submitEstimate(estimateId: string): Promise<ActionState> {
     return { error: "A template cannot be submitted — copy it onto a villa first." };
   }
 
-  const [book, lines] = await Promise.all([
+  const [book, variations, lines] = await Promise.all([
     getRecipeBook(),
+    getEstimateVariations(estimateId),
     supabase
       .from("estimator_estimate_lines")
       .select("id, work_item_id, qty")
@@ -675,9 +950,15 @@ export async function submitEstimate(estimateId: string): Promise<ActionState> {
     return { error: "Add at least one work before submitting this estimate." };
   }
 
-  const materialsById = new Map(book.materials.map((m) => [m.id, m]));
+  // This villa's variations (0087) replace the standard recipe whole,
+  // per customised line — the freeze captures what THIS house means.
+  const materialsById = new Map(
+    [...book.materials, ...variations.extraMaterials].map((m) => [m.id, m]),
+  );
   const mixesById = new Map(book.mixes.map((m) => [m.id, m]));
-  const recipesByWork = new Map(book.recipes.map((r) => [r.workItemId, r]));
+  const recipesByWork = new Map(
+    applyVariations(book.recipes, variations.byWork).map((r) => [r.workItemId, r]),
+  );
 
   const lineInputs = lines.data.map((line) => ({ workItemId: line.work_item_id, qty: line.qty }));
   const lineCosts = lineInputs.map((line) =>
@@ -727,7 +1008,7 @@ export async function submitEstimate(estimateId: string): Promise<ActionState> {
   if (takeoff.length > 0) {
     // A takeoff id is a master item since 0086, a legacy material
     // before — the snapshot anchors on whichever column it really is.
-    const itemIds = new Set(book.itemIds);
+    const itemIds = new Set([...book.itemIds, ...variations.extraItemIds]);
     const { error: takeoffError } = await supabase.from("estimator_estimate_takeoff").insert(
       takeoff.map((row) => {
         const material = materialsById.get(row.materialId);
@@ -845,6 +1126,15 @@ export async function reviseEstimate(estimateId: string): Promise<ActionState> {
       console.error("reviseEstimate (copy lines) failed:", insertError);
       await supabase.from("estimator_estimates").delete().eq("id", created.id);
       return { error: "Could not copy the works, so nothing was created. Try again." };
+    }
+
+    // The villa's variations travel into the revision — a revise that
+    // silently returned every work to standard would rewrite the house.
+    const variationError = await copyLineVariations(supabase, source.id, created.id, user.id);
+    if (variationError) {
+      await supabase.from("estimator_estimate_lines").delete().eq("estimate_id", created.id);
+      await supabase.from("estimator_estimates").delete().eq("id", created.id);
+      return { error: `${variationError} Nothing was created — try again.` };
     }
   }
 

@@ -1227,6 +1227,88 @@ export type Database = {
           },
         ]
       }
+      estimator_estimate_line_components: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          item_id: string | null
+          line_id: string
+          material_id: string | null
+          mix_id: string | null
+          qty_per_unit: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          item_id?: string | null
+          line_id: string
+          material_id?: string | null
+          mix_id?: string | null
+          qty_per_unit: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          item_id?: string | null
+          line_id?: string
+          material_id?: string | null
+          mix_id?: string | null
+          qty_per_unit?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estimator_estimate_line_components_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimator_estimate_line_components_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimator_estimate_line_components_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "estimator_estimate_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimator_estimate_line_components_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "estimator_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimator_estimate_line_components_mix_id_fkey"
+            columns: ["mix_id"]
+            isOneToOne: false
+            referencedRelation: "estimator_mixes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimator_estimate_line_components_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       estimator_estimate_line_costs: {
         Row: {
           created_at: string

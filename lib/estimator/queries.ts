@@ -605,6 +605,119 @@ export async function getRecipeBook(): Promise<RecipeBook> {
 }
 
 // ---------------------------------------------------------------------
+// Per-villa variations (0087)
+// ---------------------------------------------------------------------
+
+/** One row of a line's own recipe, raw — the screen resolves names
+ * through the book and extraMaterials. */
+export type LineVariationRow = {
+  id: string;
+  itemId: string | null;
+  mixId: string | null;
+  materialId: string | null;
+  qtyPerUnit: number;
+};
+
+export type EstimateVariations = {
+  /** line_id → its components. A line present here IS customised: its
+   * list replaces the standard whole (0087 — no deltas). */
+  byLine: Map<string, LineVariationRow[]>;
+  /** work_item_id → calc-ready components, for merging into recipes. */
+  byWork: Map<string, WorkRecipe["components"]>;
+  /** Defs for variation items the global book may not know. */
+  extraMaterials: MaterialDef[];
+  /** Which of those defs are master items (snapshot anchoring). */
+  extraItemIds: string[];
+};
+
+export async function getEstimateVariations(estimateId: string): Promise<EstimateVariations> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+
+  const lines = await fetchAll<{ id: string; work_item_id: string }>((from, to) =>
+    supabase
+      .from("estimator_estimate_lines")
+      .select("id, work_item_id")
+      .eq("estimate_id", estimateId)
+      .order("id")
+      .range(from, to),
+  );
+  if (lines.length === 0) {
+    return { byLine: new Map(), byWork: new Map(), extraMaterials: [], extraItemIds: [] };
+  }
+
+  const components = await fetchAll<{
+    id: string;
+    line_id: string;
+    item_id: string | null;
+    mix_id: string | null;
+    material_id: string | null;
+    qty_per_unit: number;
+  }>((from, to) =>
+    supabase
+      .from("estimator_estimate_line_components")
+      .select("id, line_id, item_id, mix_id, material_id, qty_per_unit")
+      .in(
+        "line_id",
+        lines.map((line) => line.id),
+      )
+      .order("id")
+      .range(from, to),
+  );
+
+  const itemDefs = await itemDefsByIds(supabase, [
+    ...new Set(components.flatMap((row) => (row.item_id ? [row.item_id] : []))),
+  ]);
+
+  const byLine = new Map<string, LineVariationRow[]>();
+  for (const row of components) {
+    const bucket = byLine.get(row.line_id) ?? [];
+    bucket.push({
+      id: row.id,
+      itemId: row.item_id,
+      mixId: row.mix_id,
+      materialId: row.material_id,
+      qtyPerUnit: row.qty_per_unit,
+    });
+    byLine.set(row.line_id, bucket);
+  }
+
+  const workByLine = new Map(lines.map((line) => [line.id, line.work_item_id]));
+  const byWork = new Map<string, WorkRecipe["components"]>();
+  for (const [lineId, rows] of byLine) {
+    const workItemId = workByLine.get(lineId);
+    if (!workItemId) continue;
+    byWork.set(
+      workItemId,
+      rows.map((row) => ({
+        materialId: row.itemId ?? row.materialId,
+        mixId: row.mixId,
+        qtyPerUnit: row.qtyPerUnit,
+      })),
+    );
+  }
+
+  return {
+    byLine,
+    byWork,
+    extraMaterials: [...itemDefs.values()],
+    extraItemIds: [...itemDefs.keys()],
+  };
+}
+
+/** The estimate's own recipes: standard everywhere, replaced whole
+ * wherever a line carries a variation. */
+export function applyVariations(
+  recipes: WorkRecipe[],
+  byWork: Map<string, WorkRecipe["components"]>,
+): WorkRecipe[] {
+  return recipes.map((recipe) => {
+    const components = byWork.get(recipe.workItemId);
+    return components ? { ...recipe, components } : recipe;
+  });
+}
+
+// ---------------------------------------------------------------------
 // Estimates
 // ---------------------------------------------------------------------
 
