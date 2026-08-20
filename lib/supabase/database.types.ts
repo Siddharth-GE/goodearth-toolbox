@@ -5904,43 +5904,106 @@ export type Database = {
           },
         ]
       }
+      vendor_payment_details: {
+        Row: {
+          account_holder_name: string | null
+          account_number: string | null
+          bank_name: string | null
+          created_at: string
+          id: string
+          ifsc: string | null
+          updated_at: string
+          updated_by: string | null
+          vendor_id: string
+        }
+        Insert: {
+          account_holder_name?: string | null
+          account_number?: string | null
+          bank_name?: string | null
+          created_at?: string
+          id?: string
+          ifsc?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vendor_id: string
+        }
+        Update: {
+          account_holder_name?: string | null
+          account_number?: string | null
+          bank_name?: string | null
+          created_at?: string
+          id?: string
+          ifsc?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_payment_details_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_payment_details_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: true
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendors: {
         Row: {
           address: string | null
+          contact_designation: string | null
           contact_name: string | null
           created_at: string
+          email: string | null
           gst_no: string | null
+          gst_state: string | null
           id: string
           is_active: boolean
           is_contractor: boolean
           mobile: string | null
           name: string
+          payment_term_days: number | null
           updated_at: string | null
           updated_by: string | null
         }
         Insert: {
           address?: string | null
+          contact_designation?: string | null
           contact_name?: string | null
           created_at?: string
+          email?: string | null
           gst_no?: string | null
+          gst_state?: string | null
           id?: string
           is_active?: boolean
           is_contractor?: boolean
           mobile?: string | null
           name: string
+          payment_term_days?: number | null
           updated_at?: string | null
           updated_by?: string | null
         }
         Update: {
           address?: string | null
+          contact_designation?: string | null
           contact_name?: string | null
           created_at?: string
+          email?: string | null
           gst_no?: string | null
+          gst_state?: string | null
           id?: string
           is_active?: boolean
           is_contractor?: boolean
           mobile?: string | null
           name?: string
+          payment_term_days?: number | null
           updated_at?: string | null
           updated_by?: string | null
         }
