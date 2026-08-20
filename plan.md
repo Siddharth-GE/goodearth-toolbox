@@ -8,11 +8,11 @@ The founder supplied `C:\Users\Kaicha\Downloads\Material.xlsx`: the full constru
 
 ## Source data
 
-| Sheet | Rows | What it is |
-| --- | --- | --- |
-| `Material Master_New W` | 2,050 | Full master: code, name (col C "Material Description"), category, unit (403 filled), rate (400 filled) |
-| `Sheet1` | 561 | Cleaner re-extract of 556 of the same codes (Civil/Electrical/Steel/Tiles categories) with group ("Material"), richer description and reliable UoM; **5 rows have no code** (Laterite blocks, Dust Laterite) |
-| `Vendor Extract Report` | 83 | Vendor name (83), bank name/account/holder/IFSC (72), payment term days (67), address (10), GSTIN+state (9), mobile (7), contact name/designation (6), email (4), creator (ignore — AppSheet metadata) |
+| Sheet                   | Rows  | What it is                                                                                                                                                                                                   |
+| ----------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Material Master_New W` | 2,050 | Full master: code, name (col C "Material Description"), category, unit (403 filled), rate (400 filled)                                                                                                       |
+| `Sheet1`                | 561   | Cleaner re-extract of 556 of the same codes (Civil/Electrical/Steel/Tiles categories) with group ("Material"), richer description and reliable UoM; **5 rows have no code** (Laterite blocks, Dust Laterite) |
+| `Vendor Extract Report` | 83    | Vendor name (83), bank name/account/holder/IFSC (72), payment term days (67), address (10), GSTIN+state (9), mobile (7), contact name/designation (6), email (4), creator (ignore — AppSheet metadata)       |
 
 Quirks found and handled below: one duplicated code (`PLD/836` names two different products); 33 rows with blank category; category spellings vary in case and "Miscelleneous" is misspelt; unit spellings vary (`Sq.Ft`/`Sqft`, `Liter`, `Cu.M.`/`M3`…); Sheet1 and the big sheet disagree on some units (Box↔Nos) — Sheet1 wins; exactly one sheet vendor ("Linse V") already exists in the DB (as a contractor) — enriched, never duplicated.
 
@@ -27,6 +27,7 @@ Quirks found and handled below: one duplicated code (`PLD/836` names two differe
 ### 1. `[Sonnet]` Convert the workbook to CSVs in `data/` (gitignored — bank details never enter the public repo)
 
 Python + openpyxl (already installed) one-off, producing:
+
 - `data/material_master.csv` — big sheet as-is (code, name, category, unit, rate)
 - `data/material_master_clean.csv` — Sheet1 as-is (category, code, group, description, uom)
 - `data/vendors.csv` — vendor sheet as-is
@@ -43,7 +44,7 @@ Additive only, re-runnable, house style (`0082` is the template — audit + `set
   - RLS on. **One** SELECT policy: `has_app('/masters') or has_app('/purchase-orders') or has_app('/bills')` (never a second SELECT policy — widen this qual later if needed). Insert/update/delete: `has_app('/masters')`.
   - `audit_row()` and `set_updated_at()` triggers, same shape as `uoms` in 0082.
   - Verification block: table exists with RLS on, exactly 4 policies, the 4 new vendors columns present.
-- No new views, no function changes, no money columns — bank details are payment *instructions*, gated by the estimator-rate precedent (sensitive data never sits on an ungated masters read).
+- No new views, no function changes, no money columns — bank details are payment _instructions_, gated by the estimator-rate precedent (sensitive data never sits on an ungated masters read).
 
 ### 3. `[Fable]` Review 0089, then apply to **staging**
 
@@ -55,10 +56,12 @@ MODELS.md hard rule: an RLS-touching migration reaches `db:apply` only after Fab
 Follows `import-contractors.ts` exactly: `requireProjectRef`/`isCommit`/`sql`/`literal` from `scripts/supabase-management.ts`, dry run by default, `--project <ref> --commit` to write, idempotent (a re-run prints all `=` and writes nothing). Row data moves via `jsonb_populate_recordset` (the `clone-data.ts` rule — no hand-rolled quoting of 2,050 rows).
 
 Merge rule:
+
 - Base = big sheet. For the 556 codes Sheet1 covers: **name** = Sheet1 "Material Description", **description** = Sheet1 "Material" (group), **uom** = Sheet1 UoM. Big-only rows: name = col C, description = col B (2 rows), uom = col E.
 - Append Sheet1's 5 code-less rows (code `null`).
 - `PLD/836`: first occurrence ("Hose Clip1\"SS") keeps the code; the second ("Hose Coller PVC 32mm") is inserted with code `null` and flagged in the dry run for the founder to assign a code in Masters.
 - `kind='material'`, `is_active=true`, `indicative_price` = Rate (400 rows; else null), brand/placement null.
+- **Refinement found during build (Fable):** 74 of the 400 priced rows have a unit dispute between the two sheets (bricks priced per box vs per piece, wire per coil vs per metre) and neither sheet is consistently right. A rate belongs to the unit it was quoted in, so on those 74 rows the unit follows Sheet1 and the **rate is cleared and flagged** in the dry run — a blank price gets noticed and re-entered in Masters; a wrong one silently feeds estimates. 326 rates import untouched.
 
 Category normalisation (canonical names, `kind='material'`, created if missing — dry run lists which):
 Civil Materials, Electrical Materials, Steel Materials, Finishing Materials, Tiles & Granite Materials, Plumbing Materials, Miscellaneous Materials (typo fixed), Hardware & Tools Materials, Wood Work Materials, Safety Materials, Tools and Equipments, Interior Items, Nursery Plants. Case variants merge into these. Blank category (33 rows) derives from the code prefix (`STL`→Steel, `FIN`→Finishing, `TILE`→Tiles & Granite, `ELE`→Electrical, `CVL`→Civil, `TE`→Tools and Equipments, `PLD`→Plumbing, `MIS`/`GEN`→Miscellaneous, `HW`→Hardware & Tools, `INT`→Interior Items, `SAFE`→Safety, `NUR`→Nursery Plants, `WOD`→Wood Work); anything unresolvable → Miscellaneous Materials, flagged in the dry run.
@@ -71,6 +74,7 @@ Idempotency keys: coded rows match existing items on `lower(trim(code))`; code-l
 ### 5. `[Sonnet]` `scripts/import-vendors.ts`
 
 Same skeleton. Reads `data/vendors.csv` (83 rows):
+
 - Match on `lower(trim(name))` against all vendors. Unknown → insert `{name, contact_name, contact_designation, mobile, email, gst_no (GSTIN), gst_state, address, payment_term_days, is_active: true, is_contractor: false}` (blank cells → null). Known ("Linse V", a contractor) → fill only the detail fields the sheet provides, never touching `name`/`is_contractor`/`is_active`; dry run prints exactly what would change.
 - Bank details (72 rows) → `vendor_payment_details` upsert on `vendor_id`.
 - Near-duplicate report (the token heuristic from `import-contractors.ts`) over sheet + DB names, printed for the founder, never auto-merged.
@@ -96,6 +100,7 @@ Same skeleton. Reads `data/vendors.csv` (83 rows):
 ### 8. Founder vets on staging.goodearthkannur.org → `[Fable]` approval pass → production
 
 Only after the founder's explicit go-ahead:
+
 - `npm run db:apply -- --project pajfrgnkapicdgangjey --commit` (0089), `npm run db:compare` empty, `npm run db:types` (from production).
 - Both import scripts: dry-run against production, review, `--commit`, re-run prints `=`.
 - Merge `staging` → `master` after the Fable diff review; confirm the Vercel Production deployment; press one real write button on production (TODO item 1 rides along).
