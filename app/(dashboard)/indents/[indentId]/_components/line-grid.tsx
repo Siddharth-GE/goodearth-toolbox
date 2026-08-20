@@ -23,7 +23,7 @@ import { addDirectLines, removeLine, updateLine } from "@/lib/indents/actions";
 import type { IndentLineRow, IndentLineSource } from "@/lib/indents/queries";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
 import { UOMS } from "@/lib/masters/constants";
-import { HardHat, PackageOpen, Palette, Trash2 } from "lucide-react";
+import { Calculator, HardHat, PackageOpen, Palette, Trash2 } from "lucide-react";
 import { useState, useTransition } from "react";
 
 type Option = { id: string; name: string };
@@ -34,6 +34,7 @@ const SOURCE_LABELS: Record<IndentLineSource, string | null> = {
   direct: null,
   construction: "from the construction plan",
   interiors: "from the interiors budget",
+  estimate: "from the official estimate",
 };
 
 export function LineGrid({
@@ -72,6 +73,16 @@ export function LineGrid({
             <>
               {/* The three sources a line can come from, in the order a
                   site team reaches for them. */}
+              {hasUnit && (
+                <LinkButton
+                  href={`/indents/${indentId}/pull-estimate`}
+                  size="sm"
+                  variant="secondary"
+                >
+                  <Calculator className="size-4" />
+                  From the estimate
+                </LinkButton>
+              )}
               {hasUnit && (
                 <LinkButton href={`/indents/${indentId}/pull`} size="sm" variant="secondary">
                   <HardHat className="size-4" />

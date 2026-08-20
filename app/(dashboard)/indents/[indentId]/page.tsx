@@ -6,6 +6,7 @@ import { canEditIndent } from "@/lib/indents/workflow";
 import { listBrands } from "@/lib/masters/brands";
 import { listItemCategories } from "@/lib/masters/item-categories";
 import { listActiveStageNames } from "@/lib/masters/stages";
+import { listWorkCategories, listWorkItems } from "@/lib/masters/works";
 import { notFound } from "next/navigation";
 import { IndentStatusBadge } from "../_components/status-badge";
 import { ActionButtons } from "./_components/action-buttons";
@@ -14,16 +15,28 @@ import { LineGrid } from "./_components/line-grid";
 
 export default async function IndentPage({ params }: { params: Promise<{ indentId: string }> }) {
   const { indentId } = await params;
-  const [indent, decider, categories, brands, stages] = await Promise.all([
-    getIndent(indentId),
-    isCurrentUserApprover(),
-    listItemCategories(),
-    listBrands(),
-    listActiveStageNames(),
-  ]);
+  const [indent, decider, categories, brands, stages, workItems, workCategories] =
+    await Promise.all([
+      getIndent(indentId),
+      isCurrentUserApprover(),
+      listItemCategories(),
+      listBrands(),
+      listActiveStageNames(),
+      listWorkItems(),
+      listWorkCategories(),
+    ]);
   if (!indent) notFound();
 
   const editable = canEditIndent(indent.status);
+  const categoryNameById = new Map(workCategories.map((c) => [c.id, c.name]));
+  const works = workItems
+    .filter((work) => work.is_active)
+    .map((work) => ({
+      id: work.id,
+      code: work.code,
+      name: work.name,
+      category: categoryNameById.get(work.category_id) ?? "Other",
+    }));
 
   return (
     <div className="space-y-4">
@@ -95,6 +108,8 @@ export default async function IndentPage({ params }: { params: Promise<{ indentI
         indentId={indent.id}
         stage={indent.stage}
         stages={stages}
+        workItemId={indent.work_item_id}
+        works={works}
         requiredBy={indent.required_by}
         note={indent.note}
         editable={editable}
