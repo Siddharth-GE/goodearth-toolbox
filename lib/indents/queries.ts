@@ -3,6 +3,7 @@ import "server-only";
 import { cache } from "react";
 
 import { requireTool } from "@/lib/auth/access";
+import { classifyEstimatePull } from "./pull-rules";
 import { listPlots } from "@/lib/masters/plots";
 import { listProjects } from "@/lib/masters/projects";
 import { listActiveStageNames } from "@/lib/masters/stages";
@@ -139,7 +140,7 @@ export async function listIndents({
 
 /** Where a line came from — provenance, shown on the grid and used by
  * the pull screens (M4) to skip lines already requested. */
-export type IndentLineSource = "direct" | "construction" | "interiors";
+export type IndentLineSource = "direct" | "construction" | "interiors" | "estimate";
 
 export type IndentLineRow = {
   id: string;
@@ -170,6 +171,8 @@ export type IndentDetail = {
   reference: string;
   status: IndentStatus;
   stage: string | null;
+  /** The work this request serves, from the works masters (0078). */
+  work_item_id: string | null;
   required_by: string | null;
   note: string | null;
   rejection_note: string | null;
@@ -237,7 +240,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
     supabase
       .from("indents")
       .select(
-        "id, reference, status, stage, required_by, note, rejection_note, project_id, unit_id, created_at, submitted_by, submitted_at, approved_by, approved_at, projects(name), plots(name), units(name)",
+        "id, reference, status, stage, work_item_id, required_by, note, rejection_note, project_id, unit_id, created_at, submitted_by, submitted_at, approved_by, approved_at, projects(name), plots(name), units(name)",
       )
       .eq("id", indentId)
       .maybeSingle(),
@@ -245,7 +248,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
       supabase
         .from("indent_lines")
         .select(
-          "id, item_id, quantity, uom, note, budget_id, line_key, construction_line_id, created_by, updated_by, created_at, items(name, code, thumb_url, brands(name))",
+          "id, item_id, quantity, uom, note, budget_id, line_key, construction_line_id, estimate_id, created_by, updated_by, created_at, items(name, code, thumb_url, brands(name))",
         )
         .eq("indent_id", indentId)
         .order("created_at")
@@ -448,7 +451,9 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
           ? "interiors"
           : line.construction_line_id != null
             ? "construction"
-            : "direct",
+            : line.estimate_id != null
+              ? "estimate"
+              : "direct",
       updated_by_name: nameOf(line.updated_by ?? line.created_by),
       ordered_quantity: ordered?.quantity ?? 0,
       ordered_po_refs: ordered ? [...ordered.refs].sort().join(", ") : null,
@@ -464,6 +469,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
     reference: indent.reference ?? "—",
     status: indent.status as IndentStatus,
     stage: indent.stage,
+    work_item_id: indent.work_item_id,
     required_by: indent.required_by,
     note: indent.note,
     rejection_note: indent.rejection_note,
@@ -993,5 +999,231 @@ export async function getIndentFormOptions(): Promise<IndentFormOptions> {
       code,
     })),
     stages,
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * Pull path 3 — the villa's official estimate (0078)
+ *
+ * Reads estimate_takeoff_facts, the money-free window over the 0077
+ * submit snapshot: frozen quantities and the material→item link, no
+ * rates anywhere. The takeoff is per (work, material); the pull
+ * AGGREGATES it per material, because construction materials are
+ * bought in bulk for the villa, not per work — and because the anchor
+ * dedupes on (indent, estimate, item), one row per material is the
+ * shape that cannot double-buy.
+ * ------------------------------------------------------------------ */
+
+export type EstimatePullState = "ready" | "needs_qty" | "unlinked";
+
+export type EstimatePullRow = {
+  material_id: string;
+  material_name: string;
+  /** The estimate's own unit for this material, e.g. cum. */
+  material_uom: string;
+  /** Frozen estimate quantity in material_uom, summed across works. */
+  estimate_quantity: number;
+  /** How many works of the estimate consume it. */
+  work_count: number;
+  item_id: string | null;
+  item_name: string | null;
+  item_code: string | null;
+  item_thumb_url: string | null;
+  item_default_uom: string | null;
+  item_uom_factor: number | null;
+  /** What the screen may do: prefill, ask for a quantity, or refuse. */
+  state: EstimatePullState;
+  /** The estimate figure converted into the item's unit; null when the
+   * conversion is unknown (state !== "ready"). */
+  prefill_qty: number | null;
+  /** Requested across EVERY indent anchored to this estimate + item, in
+   * the item's unit — the figure that says it is already covered. */
+  already_requested: number;
+  on_this_indent: boolean;
+};
+
+export type EstimatePull = {
+  estimate_id: string;
+  reference: string;
+  submitted_at: string | null;
+  unit_name: string;
+  rows: EstimatePullRow[];
+  /** Materials the estimate needs that no catalogue item is linked to. */
+  unlinked_count: number;
+};
+
+/**
+ * The official estimate's takeoff for a unit, aggregated per material
+ * and annotated with what has already been requested against it.
+ * Returns null when the unit has no official estimate — the screen
+ * says "submit one in the Estimator" for that.
+ */
+export async function getEstimatePull(
+  unitId: string,
+  indentId: string,
+): Promise<EstimatePull | null> {
+  await requireTool("/indents");
+  const supabase = await createClient();
+
+  // Read to completion — a truncated takeoff silently under-plans.
+  // Every column of a view is nullable in the generated types; the
+  // inner join means the essentials are never null in practice, and the
+  // guard below skips any row that somehow is.
+  const facts = await fetchAll<{
+    estimate_id: string | null;
+    reference: string | null;
+    submitted_at: string | null;
+    work_item_id: string | null;
+    material_id: string | null;
+    material_name: string | null;
+    uom: string | null;
+    quantity: number | null;
+    item_id: string | null;
+    item_uom_factor: number | null;
+  }>((from, to) =>
+    supabase
+      .from("estimate_takeoff_facts")
+      .select(
+        "estimate_id, reference, submitted_at, work_item_id, material_id, material_name, uom, quantity, item_id, item_uom_factor",
+      )
+      .eq("unit_id", unitId)
+      .order("material_id")
+      .order("work_item_id")
+      .range(from, to),
+  );
+  const usable = facts.filter(
+    (
+      fact,
+    ): fact is typeof fact & {
+      estimate_id: string;
+      material_id: string;
+      material_name: string;
+      uom: string;
+      quantity: number;
+    } =>
+      fact.estimate_id !== null &&
+      fact.material_id !== null &&
+      fact.material_name !== null &&
+      fact.uom !== null &&
+      fact.quantity !== null,
+  );
+  if (usable.length === 0) return null;
+  const head = usable[0];
+
+  type Aggregate = {
+    material_id: string;
+    material_name: string;
+    uom: string;
+    quantity: number;
+    work_count: number;
+    item_id: string | null;
+    item_uom_factor: number | null;
+  };
+  const byMaterial = new Map<string, Aggregate>();
+  for (const fact of usable) {
+    const entry = byMaterial.get(fact.material_id) ?? {
+      material_id: fact.material_id,
+      material_name: fact.material_name,
+      uom: fact.uom,
+      quantity: 0,
+      work_count: 0,
+      item_id: fact.item_id,
+      item_uom_factor: fact.item_uom_factor,
+    };
+    entry.quantity += fact.quantity;
+    entry.work_count += 1;
+    byMaterial.set(fact.material_id, entry);
+  }
+
+  const itemIds = [
+    ...new Set(
+      [...byMaterial.values()].map((row) => row.item_id).filter((id): id is string => !!id),
+    ),
+  ];
+
+  const [items, raised] = await Promise.all([
+    itemIds.length
+      ? fetchAll<{
+          id: string;
+          name: string;
+          code: string | null;
+          thumb_url: string | null;
+          default_uom: string;
+        }>((from, to) =>
+          supabase
+            .from("items")
+            .select("id, name, code, thumb_url, default_uom")
+            .in("id", itemIds)
+            .order("id")
+            .range(from, to),
+        )
+      : Promise.resolve([]),
+    // Every indent line anchored to this estimate, this indent included —
+    // the double-buy figure, read to completion like the other two paths.
+    fetchAll<{ item_id: string; quantity: number; indent_id: string }>((from, to) =>
+      supabase
+        .from("indent_lines")
+        .select("item_id, quantity, indent_id")
+        .eq("estimate_id", head.estimate_id)
+        .order("id")
+        .range(from, to),
+    ),
+  ]);
+
+  const itemById = new Map(items.map((item) => [item.id, item]));
+  const requested = new Map<string, number>();
+  const onThisIndent = new Set<string>();
+  for (const line of raised) {
+    requested.set(line.item_id, (requested.get(line.item_id) ?? 0) + line.quantity);
+    if (line.indent_id === indentId) onThisIndent.add(line.item_id);
+  }
+
+  const { data: unit, error: unitError } = await supabase
+    .from("units")
+    .select("name")
+    .eq("id", unitId)
+    .maybeSingle();
+  if (unitError) {
+    console.error("estimate pull unit read failed:", unitError);
+    throw new Error("Could not open the estimate.", { cause: unitError });
+  }
+
+  const rows: EstimatePullRow[] = [...byMaterial.values()]
+    .map((entry) => {
+      const item = entry.item_id ? itemById.get(entry.item_id) : undefined;
+      const verdict = classifyEstimatePull({
+        quantity: entry.quantity,
+        material_uom: entry.uom,
+        item_id: entry.item_id,
+        item_default_uom: item?.default_uom ?? null,
+        item_uom_factor: entry.item_uom_factor,
+      });
+      return {
+        material_id: entry.material_id,
+        material_name: entry.material_name,
+        material_uom: entry.uom,
+        estimate_quantity: entry.quantity,
+        work_count: entry.work_count,
+        item_id: entry.item_id,
+        item_name: item?.name ?? null,
+        item_code: item?.code ?? null,
+        item_thumb_url: item?.thumb_url ?? null,
+        item_default_uom: item?.default_uom ?? null,
+        item_uom_factor: entry.item_uom_factor,
+        state: verdict.state,
+        prefill_qty: verdict.state === "ready" ? verdict.prefillQty : null,
+        already_requested: entry.item_id ? (requested.get(entry.item_id) ?? 0) : 0,
+        on_this_indent: entry.item_id ? onThisIndent.has(entry.item_id) : false,
+      };
+    })
+    .sort((a, b) => a.material_name.localeCompare(b.material_name));
+
+  return {
+    estimate_id: head.estimate_id,
+    reference: head.reference ?? "—",
+    submitted_at: head.submitted_at,
+    unit_name: unit?.name ?? "—",
+    rows,
+    unlinked_count: rows.filter((row) => row.state === "unlinked").length,
   };
 }
