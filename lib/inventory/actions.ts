@@ -39,7 +39,8 @@ function guardError(error: { message: string }, fallback: string): ActionState {
     message.includes("Pick the store") ||
     message.includes("Pick the project") ||
     message.includes("which work") ||
-    message.includes("serves no work")
+    message.includes("serves no work") ||
+    message.includes("names it later")
   ) {
     return { error: message.replace(/^.*?:\s*/, "") };
   }
@@ -61,6 +62,8 @@ export type RecordReceiptInput = {
   /** Exactly one of these two: a store, or straight to the PO's site. */
   storeId: string | null;
   toSite: boolean;
+  /** The work a to-site delivery serves (0081); never sent for a store. */
+  workItemId: string | null;
   challanNo: string | null;
   receivedAt: string | null;
   note: string | null;
@@ -86,6 +89,9 @@ export async function recordGoodsReceipt(input: RecordReceiptInput): Promise<Act
   }
   if ((input.storeId != null) === input.toSite) {
     return { error: "Choose where the goods went: a store, or the site." };
+  }
+  if (input.toSite && !input.workItemId) {
+    return { error: "Say which work this delivery is for." };
   }
 
   const supabase = await createClient();
@@ -127,6 +133,9 @@ export async function recordGoodsReceipt(input: RecordReceiptInput): Promise<Act
     p_po_id: input.poId,
     p_store_id: (input.storeId || null) as unknown as string,
     p_to_site: input.toSite,
+    // Named args pick the 7-arg signature; the 0081 wrapper keeps the
+    // old one alive for code deployed before the migration.
+    p_work_item_id: (input.toSite ? input.workItemId : null) as unknown as string,
     p_challan_no: (input.challanNo?.trim() || null) as unknown as string,
     p_received_at: (input.receivedAt || null) as unknown as string,
     p_note: (input.note?.trim() || null) as unknown as string,

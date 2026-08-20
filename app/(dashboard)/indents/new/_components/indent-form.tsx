@@ -17,7 +17,7 @@ export function IndentForm({ options }: { options: IndentFormOptions }) {
   // "" = general, "unit:<id>" or "plot:<id>" otherwise — one place, one
   // question, since plot ↔ unit became 1:1 (0029).
   const [site, setSite] = useState("");
-  const [stage, setStage] = useState("");
+  const [workItemId, setWorkItemId] = useState("");
   const [requiredBy, setRequiredBy] = useState("");
   const [note, setNote] = useState("");
   const [error, setError] = useState<string>();
@@ -42,7 +42,7 @@ export function IndentForm({ options }: { options: IndentFormOptions }) {
         projectId,
         plotId,
         unitId,
-        stage: stage || null,
+        workItemId: workItemId || null,
         requiredBy: requiredBy || null,
         note: note || null,
       });
@@ -92,17 +92,23 @@ export function IndentForm({ options }: { options: IndentFormOptions }) {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label htmlFor="indent-stage">Stage (optional)</Label>
+          <Label htmlFor="indent-work">Work (optional)</Label>
           <Select
-            id="indent-stage"
-            value={stage}
-            onChange={(event) => setStage(event.target.value)}
+            id="indent-work"
+            value={workItemId}
+            onChange={(event) => setWorkItemId(event.target.value)}
           >
-            <option value="">No stage</option>
-            {options.stages.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
+            <option value="">No work</option>
+            {[...new Set(options.works.map((work) => work.category))].map((category) => (
+              <optgroup key={category} label={category}>
+                {options.works
+                  .filter((work) => work.category === category)
+                  .map((work) => (
+                    <option key={work.id} value={work.id}>
+                      {work.code} — {work.name}
+                    </option>
+                  ))}
+              </optgroup>
             ))}
           </Select>
         </div>

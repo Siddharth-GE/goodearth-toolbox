@@ -414,11 +414,12 @@ export default async function EstimatePage({
         <Card className="space-y-3 p-4">
           <div>
             <p className="text-muted text-xs font-semibold tracking-widest uppercase">
-              Issued from the store
+              Reached the site
             </p>
             <p className="text-muted mt-1 text-sm">
-              What has actually left the store for this villa, per work, against what the estimate
-              froze. An issue names its work when it is recorded — that is what lines these up.
+              What has actually reached this villa — store issues and direct-to-site deliveries —
+              per work, against what the estimate froze. Both name their work when they are
+              recorded; that is what lines these up.
             </p>
           </div>
           {comparison.rows.every((row) => row.issued === 0) && comparison.unmatched.length === 0 ? (

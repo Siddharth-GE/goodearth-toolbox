@@ -29,11 +29,14 @@ import { useMemo, useState, useTransition } from "react";
  * a store-keeper can see the whole order in front of them while they
  * count. Nothing is written until the commit bar at the bottom.
  */
-export function ReceiveBasket({ pool }: { pool: ReceivePool }) {
+type WorkOption = { id: string; code: string; name: string; category: string };
+
+export function ReceiveBasket({ pool, works }: { pool: ReceivePool; works: WorkOption[] }) {
   const router = useRouter();
   const [picked, setPicked] = useState<Record<string, number>>({});
   const [storeId, setStoreId] = useState(pool.stores[0]?.id ?? "");
   const [toSite, setToSite] = useState(false);
+  const [workItemId, setWorkItemId] = useState("");
   const [challanNo, setChallanNo] = useState("");
   const [receivedAt, setReceivedAt] = useState(() => new Date().toISOString().slice(0, 10));
   const [note, setNote] = useState("");
@@ -88,7 +91,8 @@ export function ReceiveBasket({ pool }: { pool: ReceivePool }) {
    * unload at and nowhere in Stock for the goods to show — those must
    * go into a store. The database refuses it too (migration 0024). */
   const hasSite = pool.site_label !== null;
-  const destinationChosen = (toSite && hasSite) || storeId !== "";
+  const destinationChosen = (toSite && hasSite && workItemId !== "") || (!toSite && storeId !== "");
+  const workCategories = useMemo(() => [...new Set(works.map((work) => work.category))], [works]);
 
   const commit = () =>
     startSaving(async () => {
@@ -96,6 +100,7 @@ export function ReceiveBasket({ pool }: { pool: ReceivePool }) {
         poId: pool.po_id,
         storeId: toSite ? null : storeId,
         toSite,
+        workItemId: toSite ? workItemId : null,
         challanNo: challanNo || null,
         receivedAt: receivedAt || null,
         note: note || null,
@@ -165,6 +170,34 @@ export function ReceiveBasket({ pool }: { pool: ReceivePool }) {
                 : "This is a general purchase order with no plot or unit, so there is no site to deliver to. Receive it into a store."}
             </p>
           </div>
+
+          {toSite && hasSite && (
+            <div className="space-y-1.5">
+              <Label htmlFor="receipt-work">What work is this for?</Label>
+              <Select
+                id="receipt-work"
+                value={workItemId}
+                onChange={(event) => setWorkItemId(event.target.value)}
+              >
+                <option value="">Pick the work…</option>
+                {workCategories.map((category) => (
+                  <optgroup key={category} label={category}>
+                    {works
+                      .filter((work) => work.category === category)
+                      .map((work) => (
+                        <option key={work.id} value={work.id}>
+                          {work.code} — {work.name}
+                        </option>
+                      ))}
+                  </optgroup>
+                ))}
+              </Select>
+              <p className="text-muted text-xs">
+                A site delivery never passes through a store, so the work is recorded here — now,
+                while somebody knows — or it slips for good.
+              </p>
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <Label htmlFor="challan-no">Challan / delivery note no.</Label>

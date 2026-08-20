@@ -42,13 +42,13 @@ export type CreateIndentInput = {
   projectId: string;
   plotId: string | null;
   unitId: string | null;
-  stage: string | null;
+  workItemId: string | null;
   requiredBy: string | null;
   note: string | null;
 };
 
 export async function createIndent(input: CreateIndentInput): Promise<ActionState> {
-  await requireTool("/indents");
+  const user = await requireTool("/indents");
 
   if (!input.projectId) return { error: "Pick a project first." };
 
@@ -79,7 +79,10 @@ export async function createIndent(input: CreateIndentInput): Promise<ActionStat
     p_project_id: input.projectId,
     p_plot_id: (input.plotId || null) as unknown as string,
     p_unit_id: (input.unitId || null) as unknown as string,
-    p_stage: (input.stage?.trim() || null) as unknown as string,
+    // The one vocabulary: the work, not the retired stage picker. The
+    // create RPC's p_stage stays for the legacy column; new indents
+    // leave it null and carry the work instead.
+    p_stage: null as unknown as string,
     p_required_by: (input.requiredBy || null) as unknown as string,
     p_note: (input.note?.trim() || null) as unknown as string,
   });
@@ -88,6 +91,18 @@ export async function createIndent(input: CreateIndentInput): Promise<ActionStat
     return guardError(error, "Could not create the indent. Try again.");
   }
   if (!indentId) return { error: "Could not create the indent. Try again." };
+
+  // The work rides in a second write: create_indent()'s signature
+  // predates the works vocabulary and additive-only keeps it as is. A
+  // failure here leaves a draft without its work — visible on the
+  // header, fixable in place, never silent.
+  if (input.workItemId) {
+    const { error: workError } = await supabase
+      .from("indents")
+      .update({ work_item_id: input.workItemId, updated_by: user.id })
+      .eq("id", indentId);
+    if (workError) console.error("createIndent work update failed:", workError);
+  }
 
   revalidatePath("/indents", "layout");
   redirect(`/indents/${indentId}`);
@@ -498,7 +513,6 @@ export async function removeLine(indentId: string, lineId: string): Promise<Acti
 export async function updateIndentHeader(
   indentId: string,
   input: {
-    stage: string | null;
     workItemId: string | null;
     requiredBy: string | null;
     note: string | null;
@@ -507,10 +521,12 @@ export async function updateIndentHeader(
   const user = await requireTool("/indents");
 
   const supabase = await createClient();
+  // `stage` is deliberately absent: the picker is gone (founder,
+  // 2026-08-20 — one vocabulary, the works masters) and a legacy stage
+  // on an old indent stays exactly as history left it.
   const { error } = await supabase
     .from("indents")
     .update({
-      stage: input.stage?.trim() || null,
       work_item_id: input.workItemId || null,
       required_by: input.requiredBy || null,
       note: input.note?.trim() || null,
