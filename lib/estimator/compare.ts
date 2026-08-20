@@ -59,8 +59,11 @@ export type Comparison = {
   rows: ComparisonRow[];
   /** Issued to the plot but not attributable to a takeoff (work, material)
    * pair: untagged history, retired works, or items the estimate never
-   * named. Reported per material/item so nothing disappears. */
-  unmatched: { itemId: string; quantity: number }[];
+   * named. Reported per (work, item) — the work is kept because each of
+   * these is a reconciliation entry the estimator must approve (0083),
+   * and "cement outside the plan for PSC slab" is a different entry
+   * from the same cement untagged. Nothing disappears. */
+  unmatched: { workItemId: string | null; itemId: string; quantity: number }[];
 };
 
 const canon = (u: string) => {
@@ -108,18 +111,20 @@ export function compareIssuesToEstimate(
     };
   });
 
-  const unmatchedByItem = new Map<string, number>();
-  for (const [key, quantity] of issuedByWorkItem) {
-    if (matchedKeys.has(key)) continue;
-    const itemId = key.slice(key.indexOf(" ") + 1);
-    // An item the estimate names under SOME work still lands here when
-    // issued untagged or for another work — the quantity must show
-    // somewhere, or the comparison quietly under-reports.
-    unmatchedByItem.set(itemId, (unmatchedByItem.get(itemId) ?? 0) + quantity);
-  }
+  // An item the estimate names under SOME work still lands here when
+  // issued untagged or for another work — the quantity must show
+  // somewhere, or the comparison quietly under-reports. The map is
+  // already summed per (work, item), so unmatched keys pass through.
+  const unmatched = [...issuedByWorkItem]
+    .filter(([key]) => !matchedKeys.has(key))
+    .map(([key, quantity]) => {
+      const split = key.indexOf(" ");
+      return {
+        workItemId: split === 0 ? null : key.slice(0, split),
+        itemId: key.slice(split + 1),
+        quantity,
+      };
+    });
 
-  return {
-    rows,
-    unmatched: [...unmatchedByItem].map(([itemId, quantity]) => ({ itemId, quantity })),
-  };
+  return { rows, unmatched };
 }

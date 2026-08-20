@@ -26,6 +26,7 @@ import { compareIssuesToEstimate } from "@/lib/estimator/compare";
 import {
   getEstimate,
   getIssuedAgainstEstimate,
+  getReconciliationApprovals,
   getRecipeBook,
   listWorkStatus,
 } from "@/lib/estimator/queries";
@@ -35,6 +36,7 @@ import { notFound } from "next/navigation";
 import { Fragment } from "react";
 import { EstimateFormDialog, DeleteEstimateButton } from "../_components/estimate-forms";
 import { AddLineDialog, LineQtyField, RemoveLineButton } from "./_components/line-forms";
+import { ApproveReconciliationButton } from "./_components/reconciliation-forms";
 import { ReviseEstimateButton, SubmitEstimateButton } from "./_components/submit-forms";
 import { listProjects } from "@/lib/masters/projects";
 import { listUnits } from "@/lib/masters/units";
@@ -78,6 +80,17 @@ export default async function EstimatePage({
     issuedData && estimate.frozen
       ? compareIssuesToEstimate(estimate.frozen.takeoff, issuedData.links, issuedData.lines)
       : null;
+
+  // Reconciliation (0083): every unmatched arrival is an entry the
+  // estimator must approve, and the flag never clears — approved rows
+  // keep their badge with who looked and when.
+  const approvals =
+    comparison && comparison.unmatched.length > 0
+      ? await getReconciliationApprovals(estimateId)
+      : [];
+  const approvalByKey = new Map(
+    approvals.map((approval) => [`${approval.workItemId ?? ""} ${approval.itemId}`, approval]),
+  );
 
   // One calculator for the whole tool: per-line costs, per-unit rates,
   // category subtotals, estimate totals and the takeoff all come out of
@@ -468,16 +481,69 @@ export default async function EstimatePage({
             </Table>
           )}
           {comparison.unmatched.length > 0 && issuedData && (
-            <p className="text-muted text-sm">
-              Also issued to this villa, but not tagged to a work the estimate names:{" "}
-              {comparison.unmatched
-                .map(
-                  (row) =>
-                    `${issuedData.itemNamesById.get(row.itemId) ?? "an item"} × ${formatQuantity(row.quantity)}`,
-                )
-                .join(", ")}
-              .
-            </p>
+            <div className="border-border space-y-2 border-t pt-3">
+              <p className="text-muted text-xs font-semibold tracking-widest uppercase">
+                Outside the estimate
+              </p>
+              <p className="text-muted text-sm">
+                This material reached the villa but the official estimate never planned it — a
+                direct purchase, or an issue for a work the estimate does not pair it with. Each
+                entry needs an estimator&apos;s approval, and it stays here with its flag
+                permanently either way.
+              </p>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableHeaderCell>Work</TableHeaderCell>
+                    <TableHeaderCell>Item</TableHeaderCell>
+                    <TableHeaderCell className="text-right">Reached the site</TableHeaderCell>
+                    <TableHeaderCell></TableHeaderCell>
+                    <TableHeaderCell></TableHeaderCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {comparison.unmatched.map((row) => {
+                    const work = row.workItemId
+                      ? works.find((w) => w.workItemId === row.workItemId)
+                      : null;
+                    const workName = work ? `${work.code} — ${work.name}` : null;
+                    const itemName = issuedData.itemNamesById.get(row.itemId) ?? "An item";
+                    const approval = approvalByKey.get(`${row.workItemId ?? ""} ${row.itemId}`);
+                    return (
+                      <TableRow key={`${row.workItemId ?? "untagged"}-${row.itemId}`}>
+                        <TableCell className="text-sm">
+                          {workName ?? "Not tagged to a work"}
+                        </TableCell>
+                        <TableCell className="text-foreground text-sm">{itemName}</TableCell>
+                        <TableCell className="text-right text-sm whitespace-nowrap">
+                          {formatQuantity(row.quantity)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="warning">Outside the estimate</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {approval ? (
+                            <span className="text-muted text-xs">
+                              Approved by {approval.approvedByName} on{" "}
+                              {formatDate(approval.approvedAt)}
+                              {approval.note ? ` — ${approval.note}` : ""}
+                            </span>
+                          ) : (
+                            <ApproveReconciliationButton
+                              estimateId={estimateId}
+                              itemId={row.itemId}
+                              workItemId={row.workItemId}
+                              itemName={itemName}
+                              workName={workName}
+                            />
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </Card>
       )}
