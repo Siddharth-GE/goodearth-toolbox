@@ -8,8 +8,13 @@
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
-import { computeLine, computeWorkTakeoff } from "./calc";
-import { applyVariations, getEstimateVariations, getRecipeBook } from "./queries";
+import {
+  applyEstimateOverrides,
+  applyRateOverrides,
+  computeLine,
+  computeWorkTakeoff,
+} from "./calc";
+import { getEstimateVariations, getRecipeBook } from "./queries";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -437,6 +442,16 @@ export async function deleteEstimate(id: string): Promise<ActionState> {
     return { error: "Could not delete the estimate. Try again." };
   }
 
+  // This villa's prices (0088) go with the estimate.
+  const staleRates = await supabase
+    .from("estimator_estimate_item_rates")
+    .delete()
+    .eq("estimate_id", id);
+  if (staleRates.error) {
+    console.error("deleteEstimate (prices) failed:", staleRates.error);
+    return { error: "Could not delete the estimate. Try again." };
+  }
+
   // Variations (0087) go before their lines — RESTRICT, not cascade.
   const { data: lineIds, error: lineIdsError } = await supabase
     .from("estimator_estimate_lines")
@@ -702,6 +717,118 @@ export async function removeLineComponent(id: string): Promise<ActionState> {
   return undefined;
 }
 
+/**
+ * This villa's labour rate for one work (0088) — null clears it and the
+ * work's standard rate shows through again. Zero is a real rate (labour
+ * inside a contract), not "unpriced", so it is saved as 0 and only an
+ * empty box clears. The 0077 draft-only line guard is the boundary.
+ */
+export async function updateEstimateLineLabourRate(
+  lineId: string,
+  rate: number | null,
+): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+  if (!lineId) return { error: "Which work?" };
+  if (rate !== null && (!Number.isFinite(rate) || rate < 0)) {
+    return { error: "The labour rate must be a number, or left blank to use the standard." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("estimator_estimate_lines")
+    .update({ labour_rate: rate, updated_by: user.id })
+    .eq("id", lineId);
+  if (error) {
+    if (error.code === "P0001") return { error: error.message };
+    console.error("updateEstimateLineLabourRate failed:", error);
+    return { error: "Could not save the labour rate. Try again." };
+  }
+
+  revalidatePath("/estimator", "layout");
+  return undefined;
+}
+
+/**
+ * This villa's price for one material (0088). Per ESTIMATE, not per
+ * line: cement costing more at a far plot costs more for every work
+ * that uses it, and one row per material makes two works disagreeing
+ * impossible.
+ */
+export async function setEstimateItemRate(
+  estimateId: string,
+  source: { itemId: string | null; materialId: string | null },
+  rate: number | null,
+): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+  if (!estimateId) return { error: "Which estimate?" };
+  if ((source.itemId === null) === (source.materialId === null)) {
+    return { error: "Pick one material." };
+  }
+
+  const supabase = await createClient();
+
+  // Blank clears the override — back to the price in Masters.
+  if (rate === null) {
+    let query = supabase
+      .from("estimator_estimate_item_rates")
+      .delete()
+      .eq("estimate_id", estimateId);
+    query = source.itemId
+      ? query.eq("item_id", source.itemId)
+      : query.eq("material_id", source.materialId as string);
+    const { error } = await query;
+    if (error) {
+      if (error.code === "P0001") return { error: error.message };
+      console.error("setEstimateItemRate (clear) failed:", error);
+      return { error: "Could not clear the price. Try again." };
+    }
+    revalidatePath("/estimator", "layout");
+    return undefined;
+  }
+
+  if (!Number.isFinite(rate) || rate < 0) {
+    return { error: "The price must be a number, or left blank to use the price in Masters." };
+  }
+
+  // Update-then-insert, not upsert: the uniqueness is a PARTIAL index
+  // (one per source column, because a table-level UNIQUE over nullable
+  // columns allows duplicates), and PostgREST cannot infer a conflict
+  // target from a partial index. This order also never leaves the
+  // material momentarily unpriced, which delete-then-insert would.
+  let updateQuery = supabase
+    .from("estimator_estimate_item_rates")
+    .update({ rate, updated_by: user.id }, { count: "exact" })
+    .eq("estimate_id", estimateId);
+  updateQuery = source.itemId
+    ? updateQuery.eq("item_id", source.itemId)
+    : updateQuery.eq("material_id", source.materialId as string);
+  const { error: updateError, count } = await updateQuery;
+  if (updateError) {
+    if (updateError.code === "P0001") return { error: updateError.message };
+    console.error("setEstimateItemRate (update) failed:", updateError);
+    return { error: "Could not save the price. Try again." };
+  }
+
+  if (!count) {
+    const { error } = await supabase.from("estimator_estimate_item_rates").insert({
+      estimate_id: estimateId,
+      item_id: source.itemId,
+      material_id: source.materialId,
+      rate,
+      created_by: user.id,
+      updated_by: user.id,
+    });
+    if (error) {
+      if (error.code === "P0001") return { error: error.message };
+      console.error("setEstimateItemRate (insert) failed:", error);
+      return { error: "Could not save the price. Try again." };
+    }
+  }
+
+  revalidatePath("/estimator", "layout");
+  return undefined;
+}
+
 export async function resetEstimateLine(lineId: string): Promise<ActionState> {
   await requireTool(GRANT);
   if (!lineId) return { error: "Which work?" };
@@ -795,6 +922,65 @@ async function copyLineVariations(
   return undefined;
 }
 
+/** Undo a half-made copy, in the order the foreign keys demand. */
+async function discardCopiedEstimate(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  estimateId: string,
+): Promise<void> {
+  await supabase.from("estimator_estimate_item_rates").delete().eq("estimate_id", estimateId);
+  const { data: lines } = await supabase
+    .from("estimator_estimate_lines")
+    .select("id")
+    .eq("estimate_id", estimateId);
+  if (lines && lines.length > 0) {
+    await supabase
+      .from("estimator_estimate_line_components")
+      .delete()
+      .in(
+        "line_id",
+        lines.map((line) => line.id),
+      );
+  }
+  await supabase.from("estimator_estimate_lines").delete().eq("estimate_id", estimateId);
+  await supabase.from("estimator_estimates").delete().eq("id", estimateId);
+}
+
+/** Copy this villa's material prices (0088) to another estimate. Same
+ * contract as copyLineVariations: a message, or undefined. */
+async function copyItemRates(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  sourceEstimateId: string,
+  targetEstimateId: string,
+  userId: string,
+): Promise<string | undefined> {
+  const { data: rates, error: readError } = await supabase
+    .from("estimator_estimate_item_rates")
+    .select("item_id, material_id, rate, note")
+    .eq("estimate_id", sourceEstimateId);
+  if (readError) {
+    console.error("copyItemRates (read) failed:", readError);
+    return "Could not read this villa's material prices.";
+  }
+  if (!rates || rates.length === 0) return undefined;
+
+  const { error: insertError } = await supabase.from("estimator_estimate_item_rates").insert(
+    rates.map((rate) => ({
+      estimate_id: targetEstimateId,
+      item_id: rate.item_id,
+      material_id: rate.material_id,
+      rate: rate.rate,
+      note: rate.note,
+      created_by: userId,
+      updated_by: userId,
+    })),
+  );
+  if (insertError) {
+    console.error("copyItemRates (insert) failed:", insertError);
+    return "Could not copy this villa's material prices.";
+  }
+  return undefined;
+}
+
 /**
  * Copy a template onto a villa — the way every villa estimate starts.
  *
@@ -852,7 +1038,7 @@ export async function copyTemplateToUnit(
 
   const { data: lines, error: linesError } = await supabase
     .from("estimator_estimate_lines")
-    .select("work_item_id, qty, note")
+    .select("work_item_id, qty, note, labour_rate")
     .eq("estimate_id", templateId);
   if (linesError) {
     console.error("copyTemplateToUnit (lines) failed:", linesError);
@@ -884,6 +1070,7 @@ export async function copyTemplateToUnit(
         work_item_id: line.work_item_id,
         qty: line.qty,
         note: line.note,
+        labour_rate: line.labour_rate,
         created_by: user.id,
         updated_by: user.id,
       })),
@@ -894,10 +1081,11 @@ export async function copyTemplateToUnit(
       return { error: "Could not copy the template's works, so nothing was created. Try again." };
     }
 
-    const variationError = await copyLineVariations(supabase, template.id, created.id, user.id);
+    const variationError =
+      (await copyLineVariations(supabase, template.id, created.id, user.id)) ??
+      (await copyItemRates(supabase, template.id, created.id, user.id));
     if (variationError) {
-      await supabase.from("estimator_estimate_lines").delete().eq("estimate_id", created.id);
-      await supabase.from("estimator_estimates").delete().eq("id", created.id);
+      await discardCopiedEstimate(supabase, created.id);
       return { error: `${variationError} Nothing was created — try again.` };
     }
   }
@@ -955,14 +1143,20 @@ export async function submitEstimate(estimateId: string): Promise<ActionState> {
     return { error: "Add at least one work before submitting this estimate." };
   }
 
-  // This villa's variations (0087) replace the standard recipe whole,
-  // per customised line — the freeze captures what THIS house means.
+  // This villa's variations replace the standard whole, per customised
+  // line (0087 recipes, 0088 labour rates and material prices) — the
+  // freeze then captures what THIS house means, forever.
   const materialsById = new Map(
-    [...book.materials, ...variations.extraMaterials].map((m) => [m.id, m]),
+    applyRateOverrides(
+      [...book.materials, ...variations.extraMaterials],
+      variations.rateByMaterialId,
+    ).map((m) => [m.id, m]),
   );
   const mixesById = new Map(book.mixes.map((m) => [m.id, m]));
   const recipesByWork = new Map(
-    applyVariations(book.recipes, variations.byWork).map((r) => [r.workItemId, r]),
+    applyEstimateOverrides(book.recipes, variations.byWork, variations.labourRateByWork).map(
+      (r) => [r.workItemId, r],
+    ),
   );
 
   const lineInputs = lines.data.map((line) => ({ workItemId: line.work_item_id, qty: line.qty }));
@@ -1090,7 +1284,7 @@ export async function reviseEstimate(estimateId: string): Promise<ActionState> {
 
   const { data: lines, error: linesError } = await supabase
     .from("estimator_estimate_lines")
-    .select("work_item_id, qty, note")
+    .select("work_item_id, qty, note, labour_rate")
     .eq("estimate_id", estimateId);
   if (linesError) {
     console.error("reviseEstimate (lines) failed:", linesError);
@@ -1123,6 +1317,7 @@ export async function reviseEstimate(estimateId: string): Promise<ActionState> {
         work_item_id: line.work_item_id,
         qty: line.qty,
         note: line.note,
+        labour_rate: line.labour_rate,
         created_by: user.id,
         updated_by: user.id,
       })),
@@ -1135,10 +1330,11 @@ export async function reviseEstimate(estimateId: string): Promise<ActionState> {
 
     // The villa's variations travel into the revision — a revise that
     // silently returned every work to standard would rewrite the house.
-    const variationError = await copyLineVariations(supabase, source.id, created.id, user.id);
+    const variationError =
+      (await copyLineVariations(supabase, source.id, created.id, user.id)) ??
+      (await copyItemRates(supabase, source.id, created.id, user.id));
     if (variationError) {
-      await supabase.from("estimator_estimate_lines").delete().eq("estimate_id", created.id);
-      await supabase.from("estimator_estimates").delete().eq("id", created.id);
+      await discardCopiedEstimate(supabase, created.id);
       return { error: `${variationError} Nothing was created — try again.` };
     }
   }
