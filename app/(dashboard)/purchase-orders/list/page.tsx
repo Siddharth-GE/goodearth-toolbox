@@ -50,7 +50,7 @@ export default async function PurchaseOrdersPage({
     <div className="space-y-4">
       <PageTitle
         title="All purchase orders"
-        description="Orders to vendors, raised from approved indent lines — one vendor and one plot/unit per PO."
+        description="Orders to vendors — from approved indents or raised directly — one vendor and one plot/unit per PO."
         backHref="/purchase-orders"
         actions={<LinkButton href="/purchase-orders/new">New PO</LinkButton>}
       />
@@ -73,7 +73,7 @@ export default async function PurchaseOrdersPage({
           description={
             tab.status
               ? undefined
-              : "Raise one from an approved indent — pick the vendor, price the lines, issue it."
+              : "Raise one — pull approved indent lines or add items directly, price them, issue it."
           }
           action={
             tab.status ? undefined : <LinkButton href="/purchase-orders/new">New PO</LinkButton>

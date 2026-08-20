@@ -18,17 +18,21 @@ import { PoStatusBadge } from "../_components/status-badge";
 import { ActionButtons } from "./_components/action-buttons";
 import { BilledSection } from "./_components/billed-section";
 import { HeaderFields } from "./_components/header-fields";
+import { listBrands } from "@/lib/masters/brands";
+import { listItemCategories } from "@/lib/masters/item-categories";
 import { LineGrid } from "./_components/line-grid";
 import { ReceiptsSection } from "./_components/receipts-section";
 
 export default async function PurchaseOrderPage({ params }: { params: Promise<{ poId: string }> }) {
   const { poId } = await params;
-  const [po, actor, gstRates, receipts, billedTotals] = await Promise.all([
+  const [po, actor, gstRates, receipts, billedTotals, categories, brands] = await Promise.all([
     getPurchaseOrder(poId),
     getCurrentPoActor(),
     listActiveGstRates(),
     getPoReceipts(poId),
     getPoBilledTotals(poId),
+    listItemCategories(),
+    listBrands(),
   ]);
   if (!po) notFound();
 
@@ -78,8 +82,8 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
       {editable && (
         <div className="border-border bg-surface flex items-center justify-between gap-3 rounded-xl border px-4 py-3">
           <p className="text-foreground text-sm">
-            A draft — nothing has gone to the vendor. Add lines from approved indents, price every
-            line, then issue it.
+            A draft — nothing has gone to the vendor. Add lines from approved indents or directly,
+            price every line, then issue it.
           </p>
           <Attribution name={po.created_by_name} label="Raised by" />
         </div>
@@ -155,7 +159,14 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
         stores={options.stores}
       />
 
-      <LineGrid poId={po.id} lines={po.lines} editable={editable} gstRates={activeRates} />
+      <LineGrid
+        poId={po.id}
+        lines={po.lines}
+        editable={editable}
+        gstRates={activeRates}
+        categories={categories.map(({ id, name }) => ({ id, name }))}
+        brands={brands.map(({ id, name }) => ({ id, name }))}
+      />
 
       <ReceiptsSection receipts={receipts} />
 
