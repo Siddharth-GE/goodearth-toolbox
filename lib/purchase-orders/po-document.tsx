@@ -100,7 +100,7 @@ const columns: Column<PoLineRow>[] = [
     width: 3.2,
     render: (row) => (row.item_code ? `${row.item_name} (${row.item_code})` : row.item_name),
   },
-  { header: "Indent", width: 1.3, render: (row) => row.indent_reference },
+  { header: "Indent", width: 1.3, render: (row) => row.indent_reference ?? "Direct" },
   { header: "Qty", width: 0.7, align: "right", render: (row) => formatQuantity(row.quantity) },
   { header: "Unit", width: 0.6, render: (row) => row.uom },
   { header: "Rate", width: 1, align: "right", render: (row) => formatAmount(row.rate) },

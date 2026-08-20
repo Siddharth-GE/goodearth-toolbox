@@ -3498,7 +3498,7 @@ export type Database = {
           created_by: string | null
           gst_pct: number | null
           id: string
-          indent_line_id: string
+          indent_line_id: string | null
           item_id: string
           note: string | null
           po_id: string
@@ -3514,7 +3514,7 @@ export type Database = {
           created_by?: string | null
           gst_pct?: number | null
           id?: string
-          indent_line_id: string
+          indent_line_id?: string | null
           item_id: string
           note?: string | null
           po_id: string
@@ -3530,7 +3530,7 @@ export type Database = {
           created_by?: string | null
           gst_pct?: number | null
           id?: string
-          indent_line_id?: string
+          indent_line_id?: string | null
           item_id?: string
           note?: string | null
           po_id?: string

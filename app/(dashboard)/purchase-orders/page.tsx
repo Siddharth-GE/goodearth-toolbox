@@ -13,12 +13,12 @@ export default async function PurchaseOrdersPage() {
     <div className="space-y-4">
       <PageTitle
         title="Purchase Orders"
-        description="Orders to vendors, raised from approved indent lines."
+        description="Orders to vendors — from approved indent lines, or raised directly for bulk and urgent buys."
       />
       <ToolWelcome
         icon="ShoppingCart"
         intro={[
-          "Every order the company places starts from an approved indent line — one vendor and one plot or unit per PO, priced here and issued to the vendor. An issued PO is what deliveries are received against and what bills are recorded against.",
+          "An order starts from an approved indent line, or is raised directly for a bulk or urgent buy that belongs to no one plot — one vendor and one plot, unit or general scope per PO, priced here and issued to the vendor. An issued PO is what deliveries are received against and what bills are recorded against.",
           "Deleting an issued PO is never quiet: it has to be requested, and someone else approves it.",
         ]}
         stats={[

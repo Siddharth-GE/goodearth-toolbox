@@ -11,7 +11,7 @@ export default async function NewPurchaseOrderPage() {
         title="New purchase order"
         backHref="/purchase-orders/list"
         backLabel="All purchase orders"
-        description="One vendor, one plot or unit (or a general purchase). Lines come from approved indents next."
+        description="One vendor, one plot or unit (or a general purchase). Lines come next — from approved indents, or added directly for bulk buys."
       />
       <PoForm options={options} />
     </div>

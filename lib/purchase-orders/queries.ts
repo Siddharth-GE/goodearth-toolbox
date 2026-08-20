@@ -183,8 +183,9 @@ export type PoLineRow = {
   rate: number | null;
   gst_pct: number | null;
   note: string | null;
-  indent_line_id: string;
-  indent_reference: string;
+  /** Null = a direct line (0079) — a bulk or urgent buy with no indent. */
+  indent_line_id: string | null;
+  indent_reference: string | null;
   /** Who last touched the line — the attribution rule. */
   updated_by_name: string | null;
 };
@@ -290,7 +291,7 @@ export const getPurchaseOrder = cache(async (poId: string): Promise<PoDetail | n
       gst_pct: line.gst_pct,
       note: line.note,
       indent_line_id: line.indent_line_id,
-      indent_reference: indent?.indents?.reference ?? "—",
+      indent_reference: indent?.indents?.reference ?? null,
       updated_by_name: nameOf(line.updated_by ?? line.created_by),
     };
   });
@@ -530,6 +531,9 @@ export async function getIndentPool(poId: string): Promise<IndentPool | null> {
   for (const row of ordered) {
     const status = (row.purchase_orders as { status: string } | null)?.status;
     if (status === "cancelled") continue;
+    // Direct lines (0079) carry no indent anchor and don't count against
+    // any indent's remaining quantity.
+    if (row.indent_line_id == null) continue;
     orderedByLine.set(
       row.indent_line_id,
       (orderedByLine.get(row.indent_line_id) ?? 0) + row.quantity,
