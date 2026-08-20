@@ -20,22 +20,56 @@ export function VendorFormDialog({ vendor }: { vendor?: VendorRow }) {
         <Label htmlFor="name">Name</Label>
         <Input id="name" name="name" defaultValue={vendor?.name} required autoComplete="off" />
       </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="contact_name">Contact person</Label>
-        <Input
-          id="contact_name"
-          name="contact_name"
-          defaultValue={vendor?.contact_name ?? ""}
-          autoComplete="off"
-        />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label htmlFor="contact_name">Contact person</Label>
+          <Input
+            id="contact_name"
+            name="contact_name"
+            defaultValue={vendor?.contact_name ?? ""}
+            autoComplete="off"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="contact_designation">Their role</Label>
+          <Input
+            id="contact_designation"
+            name="contact_designation"
+            defaultValue={vendor?.contact_designation ?? ""}
+            autoComplete="off"
+          />
+        </div>
       </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="mobile">Mobile</Label>
-        <Input id="mobile" name="mobile" defaultValue={vendor?.mobile ?? ""} autoComplete="off" />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label htmlFor="mobile">Mobile</Label>
+          <Input id="mobile" name="mobile" defaultValue={vendor?.mobile ?? ""} autoComplete="off" />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            defaultValue={vendor?.email ?? ""}
+            autoComplete="off"
+          />
+        </div>
       </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="gst_no">GST number</Label>
-        <Input id="gst_no" name="gst_no" defaultValue={vendor?.gst_no ?? ""} autoComplete="off" />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label htmlFor="gst_no">GST number</Label>
+          <Input id="gst_no" name="gst_no" defaultValue={vendor?.gst_no ?? ""} autoComplete="off" />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="gst_state">GST state</Label>
+          <Input
+            id="gst_state"
+            name="gst_state"
+            defaultValue={vendor?.gst_state ?? ""}
+            autoComplete="off"
+          />
+        </div>
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="address">Address</Label>
@@ -43,6 +77,18 @@ export function VendorFormDialog({ vendor }: { vendor?: VendorRow }) {
           id="address"
           name="address"
           defaultValue={vendor?.address ?? ""}
+          autoComplete="off"
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="payment_term_days">Payment terms (days of credit)</Label>
+        <Input
+          id="payment_term_days"
+          name="payment_term_days"
+          type="number"
+          min={0}
+          step={1}
+          defaultValue={vendor?.payment_term_days ?? ""}
           autoComplete="off"
         />
       </div>

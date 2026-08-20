@@ -11,6 +11,11 @@ export type VendorRow = {
   mobile: string | null;
   gst_no: string | null;
   address: string | null;
+  /** 0089: the vendor extract's ordinary details. */
+  email: string | null;
+  contact_designation: string | null;
+  gst_state: string | null;
+  payment_term_days: number | null;
   is_active: boolean;
   /** 0073: contractors are vendors (0025's one-counterparty-list rule); the flag only filters. */
   is_contractor: boolean;
