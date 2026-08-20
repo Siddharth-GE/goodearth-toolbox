@@ -1,13 +1,19 @@
 # TODO — what's next
 
-Only the next build lives here (founder, 2026-08-20: this page holds Phase 2 and nothing else). What exists is `STATUS.md`, the rules are `CLAUDE.md`, history is git.
+Only the next build lives here. What exists is `STATUS.md`, the rules are `CLAUDE.md`, history is git.
 
-## Phase 2 — built, waiting on the staging vet
+## Phase 2 is live on production
 
-Everything approved on 2026-08-20 is on staging (`plan.md` holds the build record): the Supervisors app, the store-keeper's request queue, the over-issue warnings, and the founder's corrections — the items master IS the material list (`0085`, then `0086`: no Materials tab at all; mixes and recipes hold items, rates are Masters' indicative prices, quantities speak each item's unit).
+Shipped 2026-08-20 (founder's instruction): migrations `0084`–`0088` applied to production, `db:compare` empty across schema, storage and all 236 auth settings, `staging` → `master` merged at `8f8232c`, and Vercel's newest Production deployment confirmed for that exact commit. What went live is recorded in `STATUS.md`.
 
-1. **Founder vets on staging.goodearthkannur.org** — the hard gate. The browser checklist is in the session summary; nothing below happens first.
-2. **Production promotion, after the vet**: `npm run db:apply -- --project pajfrgnkapicdgangjey --commit` (applies `0084`–`0088` in order) → `npm run db:types` → `npm run db:compare` must report no differences → merge `staging → master` → press one real write button on production (record a labour log).
-3. **Grants nobody has issued yet**: `/supervisors` to the actual site supervisors, once the founder says who.
+## Next, in order
 
-**Data task (Masters, not code):** enter the construction raw materials as `kind='material'` items **with their indicative prices** — that one entry now feeds mixes, recipes, estimates, requests and comparisons. Staging's practice mix has one component still on the retired list (chip says "Old list — re-add from Masters"); remove and re-add it from the master when convenient.
+1. **Press one real write button on production** — the last step of the ship protocol, and the only one not yet done: sign in at toolbox.goodearthkannur.org and save something (a labour log once `/supervisors` is granted, or any existing tool's save). Nobody has used the new code on production yet.
+2. **Grants nobody has issued**: `/supervisors` to the actual site supervisors — the tool is invisible until granted in Settings, so nothing is visible to staff today.
+3. **Enter the construction materials in Masters** as `kind='material'` items **with their indicative prices**. That one entry now feeds mixes, work recipes, estimates, requests and comparisons — production's estimator tables are empty, so this is where the Estimator starts.
+4. **Set up the works** on the Estimator's Works tab: each work's unit, labour rate and recipe. Until a work has materials, an estimate prices labour only.
+
+## Open questions for the founder
+
+- Should a supervisor see only their own plots? Today every supervisor sees every villa through a picker (their 2026-08-20 decision); assignment is a real feature if wanted.
+- The construction budget screens still exist and no longer feed Indents. Retire them, or leave as history?
