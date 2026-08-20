@@ -6,6 +6,7 @@ import { listWorkCategories, listWorkGroups, listWorkItems } from "@/lib/masters
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import type { FrozenLineRow, FrozenTakeoffRow, MaterialDef, MixDef, WorkRecipe } from "./calc";
+import { compareIssuesToEstimate } from "./compare";
 
 /**
  * Reads for the Estimator.
@@ -1045,4 +1046,175 @@ export async function getReconciliationApprovals(
     approvedByName: (row.created_by ? nameById.get(row.created_by) : null) ?? "a colleague",
     approvedAt: row.created_at,
   }));
+}
+
+/* ------------------------------------------------------------------ *
+ * Overruns on the welcome (Phase 2 Step I)
+ *
+ * How many villas have drawn past their official estimate — derived
+ * fresh from the frozen takeoffs and the plots' movements, never
+ * stored (the 0083 principle), so a revision that now covers the
+ * material clears the count by itself. Batched: six reads for ALL
+ * officials, not four per villa — the welcome renders on every visit.
+ * ------------------------------------------------------------------ */
+
+export async function countVillasOverEstimate(): Promise<number> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+
+  const officials = await fetchAll<{ id: string; unit_id: string | null }>((from, to) =>
+    supabase
+      .from("estimator_estimates")
+      .select("id, unit_id")
+      .eq("status", "submitted")
+      .order("id")
+      .range(from, to),
+  );
+  const unitIds = officials.flatMap((estimate) => (estimate.unit_id ? [estimate.unit_id] : []));
+  if (unitIds.length === 0) return 0;
+
+  const [unitsResult, takeoff, links] = await Promise.all([
+    supabase.from("units").select("id, plot_id").in("id", unitIds),
+    fetchAll<{
+      estimate_id: string;
+      work_item_id: string;
+      material_id: string;
+      material_name: string;
+      uom: string;
+      quantity: number;
+    }>((from, to) =>
+      supabase
+        .from("estimator_estimate_takeoff")
+        .select("estimate_id, work_item_id, material_id, material_name, uom, quantity")
+        .in(
+          "estimate_id",
+          officials.map((estimate) => estimate.id),
+        )
+        .order("id")
+        .range(from, to),
+    ),
+    materialLinks(supabase),
+  ]);
+  if (unitsResult.error) fail("the villas", unitsResult.error);
+  const plotByUnit = new Map(
+    (unitsResult.data ?? []).map((unit) => [unit.id, unit.plot_id as string]),
+  );
+  const plotIds = [...plotByUnit.values()];
+
+  const [issues, receipts] = await Promise.all([
+    fetchAll<{ id: string; plot_id: string | null; work_item_id: string | null }>((from, to) =>
+      supabase
+        .from("stock_issues")
+        .select("id, plot_id, work_item_id")
+        .in("plot_id", plotIds)
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAll<{
+      id: string;
+      plot_id: string | null;
+      unit_id: string | null;
+      work_item_id: string | null;
+    }>((from, to) =>
+      supabase
+        .from("goods_receipts")
+        .select("id, plot_id, unit_id, work_item_id")
+        .eq("to_site", true)
+        .or(`plot_id.in.(${plotIds.join(",")}),unit_id.in.(${unitIds.join(",")})`)
+        .order("id")
+        .range(from, to),
+    ),
+  ]);
+
+  const [issueLines, receiptLines] = await Promise.all([
+    issues.length
+      ? fetchAll<{ issue_id: string; item_id: string; quantity: number }>((from, to) =>
+          supabase
+            .from("stock_issue_lines")
+            .select("issue_id, item_id, quantity")
+            .in(
+              "issue_id",
+              issues.map((issue) => issue.id),
+            )
+            .order("id")
+            .range(from, to),
+        )
+      : Promise.resolve([]),
+    receipts.length
+      ? fetchAll<{ receipt_id: string; item_id: string; quantity: number }>((from, to) =>
+          supabase
+            .from("goods_receipt_lines")
+            .select("receipt_id, item_id, quantity")
+            .in(
+              "receipt_id",
+              receipts.map((receipt) => receipt.id),
+            )
+            .order("id")
+            .range(from, to),
+        )
+      : Promise.resolve([]),
+  ]);
+
+  // Movements keyed to the estimate whose villa they landed on.
+  const estimateByUnit = new Map(
+    officials.flatMap((estimate) => (estimate.unit_id ? [[estimate.unit_id, estimate.id]] : [])),
+  );
+  const estimateByPlot = new Map(
+    [...plotByUnit].flatMap(([unitId, plotId]) => {
+      const estimateId = estimateByUnit.get(unitId);
+      return estimateId ? [[plotId, estimateId] as const] : [];
+    }),
+  );
+  const issueTarget = new Map(
+    issues.flatMap((issue) => {
+      const estimateId = issue.plot_id ? estimateByPlot.get(issue.plot_id) : undefined;
+      return estimateId ? [[issue.id, { estimateId, work: issue.work_item_id }] as const] : [];
+    }),
+  );
+  const receiptTarget = new Map(
+    receipts.flatMap((receipt) => {
+      const estimateId =
+        (receipt.unit_id && estimateByUnit.get(receipt.unit_id)) ||
+        (receipt.plot_id && estimateByPlot.get(receipt.plot_id)) ||
+        undefined;
+      return estimateId ? [[receipt.id, { estimateId, work: receipt.work_item_id }] as const] : [];
+    }),
+  );
+
+  const linesByEstimate = new Map<
+    string,
+    { workItemId: string | null; itemId: string; quantity: number }[]
+  >();
+  const push = (
+    target: { estimateId: string; work: string | null } | undefined,
+    itemId: string,
+    quantity: number,
+  ) => {
+    if (!target) return;
+    const bucket = linesByEstimate.get(target.estimateId) ?? [];
+    bucket.push({ workItemId: target.work, itemId, quantity });
+    linesByEstimate.set(target.estimateId, bucket);
+  };
+  for (const line of issueLines) push(issueTarget.get(line.issue_id), line.item_id, line.quantity);
+  for (const line of receiptLines) {
+    push(receiptTarget.get(line.receipt_id), line.item_id, line.quantity);
+  }
+
+  let over = 0;
+  for (const estimate of officials) {
+    const issued = linesByEstimate.get(estimate.id) ?? [];
+    if (issued.length === 0) continue;
+    const rows = takeoff
+      .filter((row) => row.estimate_id === estimate.id)
+      .map((row) => ({
+        workItemId: row.work_item_id,
+        materialId: row.material_id,
+        materialName: row.material_name,
+        uom: row.uom,
+        quantity: row.quantity,
+      }));
+    const comparison = compareIssuesToEstimate(rows, links, issued);
+    if (comparison.rows.some((row) => row.over)) over++;
+  }
+  return over;
 }

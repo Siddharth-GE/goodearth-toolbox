@@ -52,6 +52,9 @@ fulfilled / declined`. The supervisor may edit or withdraw an OPEN
 
 ## Open
 
-- Step H (store-keeper's queue in Inventory) and Step I (over-issue
-  warnings on `recordStockIssue`) — see `plan.md`.
 - Plot assignment per supervisor — only if the founder asks.
+
+Steps H (the store-keeper's queue, `/inventory/requests`) and I
+(over-issue banner on the issue note + the Estimator welcome's overrun
+count) shipped 2026-08-20 with this tool — their mechanics live in
+Inventory's and the Estimator's PLAN.md files.

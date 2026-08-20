@@ -1,5 +1,6 @@
 import { PageTitle } from "@/components/ui/page-title";
 import { getWelcomeCounts } from "@/lib/inventory/receipts-queries";
+import { countOpenSiteRequests } from "@/lib/inventory/requests-queries";
 
 import { ToolWelcome } from "../_components/tool-welcome";
 
@@ -7,7 +8,7 @@ import { ToolWelcome } from "../_components/tool-welcome";
 // Management tool opens on one). The Receive screen lives one click in
 // at /inventory/receive.
 export default async function InventoryPage() {
-  const counts = await getWelcomeCounts();
+  const [counts, openRequests] = await Promise.all([getWelcomeCounts(), countOpenSiteRequests()]);
 
   return (
     <div className="space-y-4">
@@ -33,9 +34,15 @@ export default async function InventoryPage() {
             hint: "goods received",
           },
           { label: "Issues this month", value: counts.issuedThisMonth, hint: "stock sent out" },
+          {
+            label: "Requests from site",
+            value: openRequests,
+            hint: "supervisors waiting on material",
+          },
         ]}
         links={[
           { label: "Receive", href: "/inventory/receive", primary: true },
+          { label: "Requests", href: "/inventory/requests" },
           { label: "Stock", href: "/inventory/stock" },
           { label: "Issues", href: "/inventory/issues" },
         ]}

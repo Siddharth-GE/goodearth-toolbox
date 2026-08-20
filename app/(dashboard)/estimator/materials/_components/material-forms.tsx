@@ -41,9 +41,14 @@ export function MaterialFormDialog({
         }
       : null;
 
-  // The link and the uom live OUTSIDE the dialog content (which Radix
-  // unmounts on close), so onOpen resets them to the saved row.
+  // The link, name and uom live OUTSIDE the dialog content (which Radix
+  // unmounts on close), so onOpen resets them to the saved row. Name and
+  // uom are controlled so picking the master item can prefill them —
+  // since 0085 the master is the one material list (founder,
+  // 2026-08-20), and this dialog only adds the estimator's rate card on
+  // top of a picked item.
   const [linked, setLinked] = useState<LinkedItem | null>(savedItem);
+  const [name, setName] = useState(material?.name ?? "");
   const [uom, setUom] = useState(material?.uom ?? "");
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -60,6 +65,9 @@ export function MaterialFormDialog({
         code: first.item.code,
         default_uom: first.item.default_uom,
       });
+      // Prefill what the master already knows; keep anything typed.
+      setName((current) => (current.trim() ? current : first.item.name));
+      setUom((current) => current || first.item.default_uom);
     }
     return Promise.resolve(undefined);
   };
@@ -73,28 +81,64 @@ export function MaterialFormDialog({
         trigger={trigger}
         onOpen={() => {
           setLinked(savedItem);
+          setName(material?.name ?? "");
           setUom(material?.uom ?? "");
         }}
       >
+        <input type="hidden" name="item_id" value={linked?.id ?? ""} />
         <div className="space-y-1.5">
-          <Label htmlFor="name">Name</Label>
+          <Label>Item from Masters</Label>
+          {linked ? (
+            <div className="border-border flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm">
+              <span className="text-foreground min-w-0 truncate">
+                {linked.name}
+                {linked.code ? <span className="text-muted"> · {linked.code}</span> : null}
+                <span className="text-muted"> · {linked.default_uom}</span>
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="shrink-0"
+                onClick={() => setPickerOpen(true)}
+              >
+                Change
+              </Button>
+            </div>
+          ) : (
+            <div>
+              <Button type="button" variant="secondary" onClick={() => setPickerOpen(true)}>
+                Pick the item
+              </Button>
+            </div>
+          )}
+          <p className="text-muted text-xs">
+            The master is the one material list — a material here is a master item plus the
+            estimator&apos;s rate and unit. It is also what lets estimates feed requests, and store
+            issues be compared against the estimate.
+          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="name">Shown in estimates as</Label>
           <Input
             id="name"
             name="name"
-            defaultValue={material?.name}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
             required
             autoComplete="off"
             placeholder="e.g. OPC 53 Cement"
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="uom">Measured in</Label>
+          <Label htmlFor="uom">Estimated in</Label>
           <UomSelect
             id="uom"
             name="uom"
             uoms={uoms}
             current={material?.uom}
-            defaultValue={material?.uom ?? ""}
+            value={uom}
             required
             onChange={(event) => setUom(event.target.value)}
           />
@@ -112,39 +156,6 @@ export function MaterialFormDialog({
           <p className="text-muted text-xs">
             Leave blank if it isn&apos;t priced yet — estimates will show the quantity and say the
             cost is unknown, rather than counting it as free.
-          </p>
-        </div>
-
-        <input type="hidden" name="item_id" value={linked?.id ?? ""} />
-        <div className="space-y-1.5">
-          <Label>Bought as</Label>
-          {linked ? (
-            <div className="border-border flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm">
-              <span className="text-foreground min-w-0 truncate">
-                {linked.name}
-                {linked.code ? <span className="text-muted"> · {linked.code}</span> : null}
-                <span className="text-muted"> · {linked.default_uom}</span>
-              </span>
-              <span className="flex shrink-0 gap-1">
-                <Button type="button" variant="ghost" size="sm" onClick={() => setPickerOpen(true)}>
-                  Change
-                </Button>
-                <Button type="button" variant="ghost" size="sm" onClick={() => setLinked(null)}>
-                  Unlink
-                </Button>
-              </span>
-            </div>
-          ) : (
-            <div>
-              <Button type="button" variant="secondary" onClick={() => setPickerOpen(true)}>
-                Pick the catalogue item
-              </Button>
-            </div>
-          )}
-          <p className="text-muted text-xs">
-            The catalogue item this material is bought and issued as. Linking it is what lets a
-            villa&apos;s estimate feed material requests, and store issues be compared against the
-            estimate.
           </p>
         </div>
 

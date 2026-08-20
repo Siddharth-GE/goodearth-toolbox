@@ -210,6 +210,9 @@ export type RecordIssueInput = {
   issuedAt: string | null;
   note: string | null;
   lines: IssueLineInput[];
+  /** When this issue answers a supervisor's request (Step H), the
+   * request to stamp fulfilled once the issue is recorded. */
+  requestId?: string | null;
 };
 
 /**
@@ -288,9 +291,59 @@ export async function recordStockIssue(input: RecordIssueInput): Promise<ActionS
     added++;
   }
 
+  // The issue is recorded either way; stamping the supervisor's request
+  // fulfilled is best-effort on top. If it fails the request simply
+  // stays in the queue — decline it there with "issued as …" rather
+  // than lying to the store-keeper that the issue itself failed.
+  // Writing issue_requests from here is the fifth documented cross-tool
+  // write exception (STATUS.md); 0084's guard trigger only lets this
+  // side move requested → fulfilled/declined.
+  if (input.requestId) {
+    const { error: stampError } = await supabase
+      .from("issue_requests")
+      .update({ status: "fulfilled", fulfilled_issue_id: issueId, updated_by: user.id })
+      .eq("id", input.requestId)
+      .eq("status", "requested");
+    if (stampError) console.error("recordStockIssue: request stamp failed:", stampError);
+    revalidatePath("/inventory/requests");
+    revalidatePath("/supervisors", "layout");
+  }
+
   revalidatePath("/inventory/issues");
   revalidatePath("/inventory/stock");
   redirect(`/inventory/issues/${issueId}`);
+}
+
+/* ------------------------------------------------------------------ *
+ * Answering a supervisor's request without stock
+ * ------------------------------------------------------------------ */
+
+export async function declineSiteRequest(id: string, reason: string): Promise<ActionState> {
+  const user = await requireTool("/inventory");
+  if (!id) return { error: "Which request?" };
+  const trimmed = reason.trim();
+  if (!trimmed) return { error: "Say why — the supervisor sees this reason at site." };
+  if (trimmed.length > 500) return { error: "Keep the reason under 500 characters." };
+
+  const supabase = await createClient();
+  const { error, count } = await supabase
+    .from("issue_requests")
+    .update(
+      { status: "declined", declined_reason: trimmed, updated_by: user.id },
+      { count: "exact" },
+    )
+    .eq("id", id)
+    .eq("status", "requested");
+  if (error) {
+    if (error.code === "P0001") return { error: error.message };
+    console.error("declineSiteRequest failed:", error);
+    return { error: "Could not decline the request. Try again." };
+  }
+  if (!count) return { error: "This request has already been answered." };
+
+  revalidatePath("/inventory/requests");
+  revalidatePath("/supervisors", "layout");
+  return undefined;
 }
 
 /* ------------------------------------------------------------------ *

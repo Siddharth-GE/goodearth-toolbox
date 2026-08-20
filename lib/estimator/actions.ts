@@ -107,6 +107,11 @@ export async function createMaterial(
   const user = await requireTool(GRANT);
   const fields = readMaterialFields(formData);
   if ("error" in fields) return fields;
+  // 0085, founder: the master is the one material list. A material is a
+  // picked item plus the estimator's rate and unit — never a free name.
+  if (!fields.item_id) {
+    return { error: "Pick the material from Masters — the catalogue is the one material list." };
+  }
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -138,6 +143,9 @@ export async function updateMaterial(
     .eq("id", id);
   if (error) {
     if (error.code === "23505") return { error: duplicateMaterialMessage(error.message) };
+    // P0001 = the 0085 master-first trigger; its message is written for
+    // the person who clicked (unlinking a linked material is refused).
+    if (error.code === "P0001") return { error: error.message };
     console.error("updateMaterial failed:", error);
     return { error: "Could not update the material. Try again." };
   }
