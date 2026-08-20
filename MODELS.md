@@ -11,12 +11,18 @@ Fable access is limited, so it is spent where judgment matters and nowhere else.
 
 ## The loop for a feature
 
-1. **Fable plans.** One short session: read the flow, write `plan.md` (scope, migration, files, risks, what to verify in the browser). The founder approves the plan.
-2. **Opus and Sonnet build.** Sessions on the feature branch, against `plan.md`. Opus reviews Sonnet's work before each commit. Deviations are not improvised — they are written into `plan.md` as questions for the tier above.
+1. **Fable plans.** One short session: read the flow, write `plan.md` (scope, migration, files, risks, what to verify in the browser) — and **every step in it carries an owner tag**: `[Fable]`, `[Opus]`, `[Sonnet]` or `[Haiku]`, so the plan says who does what before anyone starts. The founder approves the plan.
+2. **Opus and Sonnet build.** Sessions on the feature branch, against `plan.md`. A session takes only the steps tagged for it, and **ticks each step off in `plan.md` as it lands** — mid-build, the plan is the live board of what's done and whose step is next. Opus reviews Sonnet's work before each commit. Deviations are not improvised — they are written into `plan.md` as questions for the tier above.
 3. **Fable approves.** One short session at the end: review the full diff against `plan.md`, `SECURITY.md` and `BUGCATCHER.md`, check any migration, then give the merge/push overview in plain language.
 4. **The founder ships.** Models approve code; only the founder approves shipping — the staging vet gate in CLAUDE.md sits above every model.
 
 A one-file fix doesn't need the ladder: whichever model is in the chair fixes it, and the merge rules still apply.
+
+## Seeing who did what
+
+- **Live:** the model in the chair is whatever the status bar says — `/model` shows and changes it, and it never switches mid-session on its own. A subagent on another model appears in the transcript as a task entry when it is spawned.
+- **Mid-build:** open `plan.md` — the owner tags say whose step each one is, the ticks say what has landed, and the questions section says where a lower tier stopped and waited.
+- **Afterwards:** every commit ends with the committing model's own co-author line (`Co-Authored-By: Claude Fable 5 …`, `Claude Opus …`, `Claude Sonnet …`), so `git log` is the permanent record of which model wrote which piece. A model never signs with another model's name.
 
 ## Hard rules
 
