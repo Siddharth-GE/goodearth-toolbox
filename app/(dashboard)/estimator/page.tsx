@@ -1,4 +1,4 @@
-import { getWelcomeCounts } from "@/lib/estimator/queries";
+import { countVillasOverEstimate, getWelcomeCounts } from "@/lib/estimator/queries";
 
 import { ToolWelcome } from "../_components/tool-welcome";
 
@@ -7,7 +7,7 @@ import { ToolWelcome } from "../_components/tool-welcome";
 // Counts only, never rupees: everything one click in is money, so the
 // welcome is the one screen in this tool that shows none.
 export default async function EstimatorPage() {
-  const counts = await getWelcomeCounts();
+  const [counts, overEstimate] = await Promise.all([getWelcomeCounts(), countVillasOverEstimate()]);
 
   return (
     <ToolWelcome
@@ -22,6 +22,11 @@ export default async function EstimatorPage() {
         { label: "Official", value: counts.official, hint: "submitted, one per villa" },
         { label: "Works set up", value: counts.worksSetUp, hint: "have a unit and a recipe" },
         { label: "Materials", value: counts.materials, hint: "in the price list" },
+        {
+          label: "Over estimate",
+          value: overEstimate,
+          hint: "villas drawing past the plan — see the comparison tab",
+        },
       ]}
       links={[
         { label: "1 · Materials", href: "/estimator/materials" },

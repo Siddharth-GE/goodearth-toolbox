@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDate, formatQuantity } from "@/lib/format";
-import { getStockIssue } from "@/lib/inventory/issues-queries";
+import { getOverIssueRows, getStockIssue } from "@/lib/inventory/issues-queries";
 import { listWorkCategories, listWorkItems } from "@/lib/masters/works";
 import { RetagWork } from "../../_components/retag-work";
 import { notFound } from "next/navigation";
@@ -24,6 +24,15 @@ export default async function IssuePage({ params }: { params: Promise<{ issueId:
     listWorkCategories(),
   ]);
   if (!issue) notFound();
+
+  // Phase 2 Step I — flag, never refuse: the issue is saved either way;
+  // this banner appears the moment the redirect lands after recording,
+  // and again for anyone opening the note later. Derived fresh, so a
+  // resubmitted estimate that now covers the material clears it.
+  const overRows =
+    issue.plot_id && issue.work_item_id
+      ? await getOverIssueRows(issue.plot_id, issue.work_item_id)
+      : [];
   const categoryNameById = new Map(workCategories.map((c) => [c.id, c.name]));
   const works = workItems
     .filter((work) => work.is_active)
@@ -47,6 +56,26 @@ export default async function IssuePage({ params }: { params: Promise<{ issueId:
           </Badge>
         }
       />
+
+      {overRows.length > 0 && (
+        <div className="border-warning/40 bg-warning/10 space-y-1 rounded-xl border px-4 py-3">
+          <p className="text-foreground text-sm font-medium">
+            This work has now drawn past the villa&apos;s official estimate.
+          </p>
+          <ul className="text-foreground/90 space-y-0.5 text-sm">
+            {overRows.map((row) => (
+              <li key={row.materialName}>
+                {row.materialName}: {formatQuantity(row.drawn)} {row.uom} drawn against{" "}
+                {formatQuantity(row.estimated)} {row.uom} estimated.
+              </li>
+            ))}
+          </ul>
+          <p className="text-muted text-xs">
+            Recorded anyway — site work never waits. The estimator sees the same figures on the
+            estimate&apos;s comparison tab.
+          </p>
+        </div>
+      )}
 
       <section className="border-border bg-surface grid gap-4 rounded-2xl border p-4 sm:grid-cols-4">
         <Field label="Out of" value={issue.store_name} />

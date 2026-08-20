@@ -5,6 +5,7 @@ import { cache } from "react";
 import { requireTool } from "@/lib/auth/access";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
+import { findOverIssues, type OverIssueRow } from "./over-issue";
 
 import {
   INVENTORY_LIST_LIMIT,
@@ -106,6 +107,7 @@ export type IssueDetail = {
   store_name: string;
   destination: string;
   is_transfer: boolean;
+  plot_id: string | null;
   /** The work a plot issue served (0080), with its category as the stage. */
   work_item_id: string | null;
   work_name: string | null;
@@ -170,6 +172,7 @@ export const getStockIssue = cache(async (issueId: string): Promise<IssueDetail 
       ? (stores.get(issue.to_store_id) ?? "another store")
       : (plots.get(issue.plot_id ?? "") ?? "—"),
     is_transfer: issue.to_store_id != null,
+    plot_id: issue.plot_id,
     work_item_id: issue.work_item_id,
     work_name:
       (issue.work_items as { name: string; work_categories: { name: string } | null } | null)
@@ -330,4 +333,135 @@ export async function listStockAdjustments({
     pageSize,
     stores,
   };
+}
+
+/* ------------------------------------------------------------------ *
+ * Over-issue check (Phase 2 Step I) — flag, never refuse
+ *
+ * Rendered on the issue note, so the store-keeper sees it the moment
+ * the redirect lands after saving, and anyone opening the note later
+ * sees the same truth. Derived fresh every time (the 0083 principle:
+ * nothing stored means nothing stale) from the frozen takeoff in
+ * estimate_takeoff_facts — which admits /inventory since 0078 and
+ * carries no rates — plus the plot's cumulative movements for the same
+ * work. The arithmetic itself is lib/inventory/over-issue.ts, pure and
+ * tested.
+ * ------------------------------------------------------------------ */
+
+export async function getOverIssueRows(
+  plotId: string,
+  workItemId: string,
+): Promise<OverIssueRow[]> {
+  await requireTool("/inventory");
+  const supabase = await createClient();
+
+  const { data: unit, error: unitError } = await supabase
+    .from("units")
+    .select("id")
+    .eq("plot_id", plotId)
+    .maybeSingle();
+  if (unitError) {
+    console.error("inventory: over-issue unit lookup failed:", unitError);
+    return [];
+  }
+  if (!unit) return [];
+
+  const takeoffRaw = await fetchAll<{
+    material_name: string | null;
+    uom: string | null;
+    quantity: number | null;
+    item_id: string | null;
+    item_uom_factor: number | null;
+  }>((from, to) =>
+    supabase
+      .from("estimate_takeoff_facts")
+      .select("material_name, uom, quantity, item_id, item_uom_factor")
+      .eq("unit_id", unit.id)
+      .eq("work_item_id", workItemId)
+      .order("material_id")
+      .range(from, to),
+  );
+  const takeoff = takeoffRaw
+    .filter((row) => row.material_name !== null && row.uom !== null && row.quantity !== null)
+    .map((row) => ({
+      materialName: row.material_name as string,
+      uom: row.uom as string,
+      quantity: row.quantity as number,
+      itemId: row.item_id,
+      itemUomFactor: row.item_uom_factor,
+    }));
+  if (takeoff.length === 0) return [];
+
+  // Everything this work has drawn at this plot: store issues plus
+  // direct-to-site deliveries (matched on plot OR unit — a to-site GRN
+  // carries whichever its PO named).
+  const [issues, receipts] = await Promise.all([
+    fetchAll<{ id: string }>((from, to) =>
+      supabase
+        .from("stock_issues")
+        .select("id")
+        .eq("plot_id", plotId)
+        .eq("work_item_id", workItemId)
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAll<{ id: string }>((from, to) =>
+      supabase
+        .from("goods_receipts")
+        .select("id")
+        .eq("to_site", true)
+        .eq("work_item_id", workItemId)
+        .or(`plot_id.eq.${plotId},unit_id.eq.${unit.id}`)
+        .order("id")
+        .range(from, to),
+    ),
+  ]);
+
+  const [issueLines, receiptLines] = await Promise.all([
+    issues.length
+      ? fetchAll<{ item_id: string; quantity: number }>((from, to) =>
+          supabase
+            .from("stock_issue_lines")
+            .select("item_id, quantity")
+            .in(
+              "issue_id",
+              issues.map((issue) => issue.id),
+            )
+            .order("id")
+            .range(from, to),
+        )
+      : Promise.resolve([]),
+    receipts.length
+      ? fetchAll<{ item_id: string; quantity: number }>((from, to) =>
+          supabase
+            .from("goods_receipt_lines")
+            .select("item_id, quantity")
+            .in(
+              "receipt_id",
+              receipts.map((receipt) => receipt.id),
+            )
+            .order("id")
+            .range(from, to),
+        )
+      : Promise.resolve([]),
+  ]);
+
+  const drawnByItem = new Map<string, number>();
+  for (const line of [...issueLines, ...receiptLines]) {
+    drawnByItem.set(line.item_id, (drawnByItem.get(line.item_id) ?? 0) + line.quantity);
+  }
+  if (drawnByItem.size === 0) return [];
+
+  const itemIds = [...drawnByItem.keys()];
+  const { data: items, error: itemsError } = await supabase
+    .from("items")
+    .select("id, default_uom")
+    .in("id", itemIds);
+  if (itemsError) {
+    console.error("inventory: over-issue items lookup failed:", itemsError);
+    return [];
+  }
+  const itemUomById = new Map((items ?? []).map((item) => [item.id, item.default_uom as string]));
+
+  return findOverIssues(takeoff, drawnByItem, itemUomById);
 }
