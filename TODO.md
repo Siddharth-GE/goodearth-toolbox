@@ -10,7 +10,7 @@ Shipped 2026-08-20 (founder's instruction): migrations `0084`–`0088` applied t
 
 1. **Press one real write button on production** — the last step of the ship protocol, and the only one not yet done: sign in at toolbox.goodearthkannur.org and save something (a labour log once `/supervisors` is granted, or any existing tool's save). Nobody has used the new code on production yet.
 2. **Grants nobody has issued**: `/supervisors` to the actual site supervisors — the tool is invisible until granted in Settings, so nothing is visible to staff today.
-3. **Enter the construction materials in Masters** as `kind='material'` items **with their indicative prices**. That one entry now feeds mixes, work recipes, estimates, requests and comparisons — production's estimator tables are empty, so this is where the Estimator starts.
+3. **Enter the construction materials in Masters** — DONE ON STAGING 2026-08-20 (PR #48): 2,055 materials and 83 supplier vendors imported from Material.xlsx, awaiting the founder's staging vet before the production run. 74 materials had conflicting units in the source sheets and came in without a price — re-enter those rates in Masters. Originally: That one entry now feeds mixes, work recipes, estimates, requests and comparisons — production's estimator tables are empty, so this is where the Estimator starts.
 4. **Set up the works** on the Estimator's Works tab: each work's unit, labour rate and recipe. Until a work has materials, an estimate prices labour only.
 
 ## Open questions for the founder

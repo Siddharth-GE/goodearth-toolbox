@@ -89,7 +89,7 @@ Same skeleton. Reads `data/vendors.csv` (83 rows):
 - Vendor detail page `app/(dashboard)/masters/vendors/[vendorId]/`: a "Payment details" card (bank name, account number, holder, IFSC, payment term) with edit via `record-form-dialog` pattern; `revalidatePath` in the existing `"/masters/vendors"` form the file already uses.
 - Items/Masters screens need **nothing** — the items UI already handles `kind='material'`, and its pickers read the `uoms` and `item_categories` masters.
 
-### 7. 🔄 `[Fable]` Staging run + checks (imports done; CI + founder vet pending)
+### 7. ✅ `[Fable]` Staging run + checks — CI green (run 32382296102), probe smoke passed both paths (deny: probe without /masters is bounced off the masters routes and RLS answers 0 rows; allow: bank card renders with ELOR's HDFC details), PR #48 merged to staging at 93e7179
 
 1. CI green on the feature branch (`gh run list` — a successful push is not a green build).
 2. Dry-run both scripts against staging; eyeball the reports (new categories, new uoms, flagged rows, near-dup vendor pairs). Then `--commit`, then re-run dry: everything prints `=`.
