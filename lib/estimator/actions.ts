@@ -598,9 +598,14 @@ export async function customiseEstimateLine(lineId: string): Promise<ActionState
     return { error: "Could not read the standard recipe. Try again." };
   }
   if (!standard || standard.length === 0) {
-    // An empty standard has nothing to copy; the first added material
-    // becomes the variation.
-    return undefined;
+    // A labour-only work has nothing to copy. Saying so beats writing
+    // nothing and letting the button look broken — the screen offers
+    // the add form directly in this case, and the first material added
+    // becomes this villa's version.
+    return {
+      error:
+        "This work is labour only — there is no standard recipe to copy. Add the material you need and it applies to this villa alone.",
+    };
   }
 
   const { error } = await supabase.from("estimator_estimate_line_components").insert(

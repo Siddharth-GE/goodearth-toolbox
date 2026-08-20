@@ -66,6 +66,15 @@ export function LineVariationDialog({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string>();
 
+  // A labour-only work has no standard materials to copy, so
+  // "Customise" would write nothing and look broken (it did, on
+  // 2026-08-20). With an empty standard the add form comes out
+  // straight away — the first material added IS this villa's version.
+  // A standard WITH materials still copies first, or adding one would
+  // silently drop the rest.
+  const emptyStandard = !customised && rows.length === 0;
+  const canEdit = customised || emptyStandard;
+
   return (
     <Dialog>
       <DialogTrigger asChild>
@@ -91,7 +100,7 @@ export function LineVariationDialog({
           <p className="text-muted text-sm">
             {customised
               ? "Nothing in this villa's version yet — add its materials below."
-              : "The standard recipe has no materials (labour only)."}
+              : "This work is labour only — the standard recipe has no materials. Anything you add below applies to this villa alone."}
           </p>
         ) : (
           <ul className="divide-border divide-y">
@@ -128,7 +137,7 @@ export function LineVariationDialog({
           </ul>
         )}
 
-        {customised ? (
+        {canEdit ? (
           <>
             <AddComponentForm lineId={lineId} options={options} workUom={workUom} />
             <p className="text-muted text-xs">
@@ -145,7 +154,7 @@ export function LineVariationDialog({
 
         <FormMessage error={error} />
         <DialogFooter>
-          {customised ? (
+          {customised && (
             <Button
               type="button"
               variant="secondary"
@@ -159,7 +168,8 @@ export function LineVariationDialog({
             >
               Reset to standard
             </Button>
-          ) : (
+          )}
+          {!canEdit && (
             <Button
               type="button"
               variant="primary"
