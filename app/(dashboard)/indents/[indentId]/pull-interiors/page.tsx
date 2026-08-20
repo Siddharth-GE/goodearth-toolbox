@@ -69,7 +69,6 @@ export default async function InteriorsPullPage({
             reference={indent.reference}
             groups={pull.spaces.map((space) => ({ label: space.space_label, lines: space.lines }))}
             groupNoun="space"
-            source="interiors"
             budgetId={pull.budget_id}
             showVendor
           />

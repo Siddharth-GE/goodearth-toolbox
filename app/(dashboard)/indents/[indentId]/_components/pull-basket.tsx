@@ -14,7 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCount, formatQuantity } from "@/lib/format";
-import { addBudgetPullLines, addConstructionPullLines } from "@/lib/indents/actions";
+import { addBudgetPullLines } from "@/lib/indents/actions";
 import type { BudgetPullLineRow, PullLineRow } from "@/lib/indents/queries";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
@@ -23,31 +23,27 @@ type Row = PullLineRow & Partial<Pick<BudgetPullLineRow, "vendor_name">>;
 export type PullGroup = { label: string; lines: Row[] };
 
 /**
- * Both pull paths are the same screen: a plan (or an approved budget)
- * laid out group by group, quantities prefilled with what was planned,
- * a local basket and one commit. Nothing is written until Add — ticking
- * costs nothing, exactly like the catalogue picker's basket.
- *
- * `source` rather than an onCommit prop, deliberately: this renders
- * from a Server Component, and a function cannot cross that boundary
- * (the Items-page pagination crash). The component picks its own action.
+ * The interiors pull: an approved budget laid out group by group,
+ * quantities prefilled with what was planned, a local basket and one
+ * commit. Nothing is written until Add — ticking costs nothing, exactly
+ * like the catalogue picker's basket. (The construction plan used this
+ * screen too until 2026-08-20; those requests pull from the villa's
+ * official estimate now.)
  */
 export function PullBasket({
   indentId,
   reference,
   groups,
   groupNoun,
-  source,
   budgetId,
   showVendor = false,
 }: {
   indentId: string;
   reference: string;
   groups: PullGroup[];
-  /** "stage" or "space" — what a group heading means here. */
+  /** What a group heading means here — "space" for a budget. */
   groupNoun: string;
-  source: "construction" | "interiors";
-  budgetId?: string;
+  budgetId: string;
   showVendor?: boolean;
 }) {
   const router = useRouter();
@@ -82,10 +78,7 @@ export function PullBasket({
   const commit = () =>
     startSaving(async () => {
       const lines = pickedEntries.map(([sourceId, quantity]) => ({ sourceId, quantity }));
-      const result =
-        source === "construction"
-          ? await addConstructionPullLines(indentId, lines)
-          : await addBudgetPullLines(indentId, budgetId ?? "", lines);
+      const result = await addBudgetPullLines(indentId, budgetId, lines);
       if (result?.error) {
         setError(result.error);
         // A partial add still changed the indent: drop what went in so a

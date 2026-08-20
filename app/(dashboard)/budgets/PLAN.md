@@ -46,7 +46,7 @@ The tests that matter: an unpriced line never reads as free, a 0% margin charges
 
 ## The Construction tree
 
-`/budgets/construction` is the QS team's **stage-wise quantity plan per unit** — the thing site indents are raised against. Deliberately the opposite of Interiors in every way that matters:
+`/budgets/construction` is the QS team's **stage-wise quantity plan per unit** — until 2026-08-20 the thing site indents were raised against. **It no longer feeds Indents**: the founder's backbone decision made the Estimator the construction line, so construction requests pull from the villa's official estimate, and these screens stay read/write for reference with a line of copy saying so. Whether they retire entirely is a founder question (TODO.md). Deliberately the opposite of Interiors in every way that matters:
 
 - **No money.** `construction_budgets`/`construction_budget_lines` carry materials and quantities only, so reads are open to all signed-in staff and none of the secrecy machinery applies. Writes need `/budgets`.
 - **No status, no approval, no revisions.** One living plan per unit (unique `unit_id`), edited in place as the build progresses.

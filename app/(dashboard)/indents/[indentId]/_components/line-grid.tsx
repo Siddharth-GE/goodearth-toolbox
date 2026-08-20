@@ -22,7 +22,7 @@ import { formatCount, formatQuantity } from "@/lib/format";
 import { addDirectLines, removeLine, updateLine } from "@/lib/indents/actions";
 import type { IndentLineRow, IndentLineSource } from "@/lib/indents/queries";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
-import { Calculator, HardHat, PackageOpen, Palette, Trash2 } from "lucide-react";
+import { Calculator, PackageOpen, Palette, Trash2 } from "lucide-react";
 import { useState, useTransition } from "react";
 
 type Option = { id: string; name: string };
@@ -74,7 +74,9 @@ export function LineGrid({
           {editable && (
             <>
               {/* The three sources a line can come from, in the order a
-                  site team reaches for them. */}
+                  site team reaches for them. Construction requests come
+                  from the official estimate since 2026-08-20; the old
+                  plan pull is retired. */}
               {hasUnit && (
                 <LinkButton
                   href={`/indents/${indentId}/pull-estimate`}
@@ -83,12 +85,6 @@ export function LineGrid({
                 >
                   <Calculator className="size-4" />
                   From the estimate
-                </LinkButton>
-              )}
-              {hasUnit && (
-                <LinkButton href={`/indents/${indentId}/pull`} size="sm" variant="secondary">
-                  <HardHat className="size-4" />
-                  From construction plan
                 </LinkButton>
               )}
               <LinkButton
