@@ -5077,6 +5077,7 @@ export type Database = {
           to_store_id: string | null
           updated_at: string
           updated_by: string | null
+          work_item_id: string | null
         }
         Insert: {
           created_at?: string
@@ -5092,6 +5093,7 @@ export type Database = {
           to_store_id?: string | null
           updated_at?: string
           updated_by?: string | null
+          work_item_id?: string | null
         }
         Update: {
           created_at?: string
@@ -5107,6 +5109,7 @@ export type Database = {
           to_store_id?: string | null
           updated_at?: string
           updated_by?: string | null
+          work_item_id?: string | null
         }
         Relationships: [
           {
@@ -5149,6 +5152,13 @@ export type Database = {
             columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_issues_work_item_id_fkey"
+            columns: ["work_item_id"]
+            isOneToOne: false
+            referencedRelation: "work_items"
             referencedColumns: ["id"]
           },
         ]
@@ -6412,17 +6422,30 @@ export type Database = {
         }
         Returns: string
       }
-      create_stock_issue: {
-        Args: {
-          p_issued_at: string
-          p_note: string
-          p_plot_id: string
-          p_project_id: string
-          p_store_id: string
-          p_to_store_id: string
-        }
-        Returns: string
-      }
+      create_stock_issue:
+        | {
+            Args: {
+              p_issued_at: string
+              p_note: string
+              p_plot_id: string
+              p_project_id: string
+              p_store_id: string
+              p_to_store_id: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_issued_at: string
+              p_note: string
+              p_plot_id: string
+              p_project_id: string
+              p_store_id: string
+              p_to_store_id: string
+              p_work_item_id: string
+            }
+            Returns: string
+          }
       crm_assign_unit: {
         Args: { p_client_id: string; p_status: string; p_unit_id: string }
         Returns: undefined
