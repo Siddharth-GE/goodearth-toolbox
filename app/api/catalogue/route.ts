@@ -45,7 +45,8 @@ export async function GET(request: Request) {
     (await hasApp(user, "/indents")) ||
     (await hasApp(user, "/inventory")) ||
     (await hasApp(user, "/estimator")) ||
-    (await hasApp(user, "/purchase-orders"));
+    (await hasApp(user, "/purchase-orders")) ||
+    (await hasApp(user, "/supervisors"));
   if (!allowed) return new Response("Forbidden", { status: 403 });
 
   const { searchParams } = new URL(request.url);
