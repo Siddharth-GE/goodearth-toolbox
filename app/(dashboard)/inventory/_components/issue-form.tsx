@@ -18,6 +18,7 @@ import {
 import { formatQuantity } from "@/lib/format";
 import { recordStockIssue } from "@/lib/inventory/actions";
 import type { IssueFormOptions } from "@/lib/inventory/issues-queries";
+import type { SiteRequestRow } from "@/lib/inventory/requests-queries";
 import type { StoreHolding } from "@/lib/inventory/stock-queries";
 import { wouldGoNegative } from "@/lib/inventory/stock";
 import { useMemo, useState, useTransition } from "react";
@@ -37,21 +38,29 @@ export function IssueForm({
   holdings,
   options,
   works,
+  request,
 }: {
   store: { id: string; name: string; project_id: string | null };
   holdings: StoreHolding[];
   options: IssueFormOptions;
   /** Active works from the masters — what a plot issue is FOR (0080). */
   works: IssueWorkOption[];
+  /** A supervisor's request being fulfilled (Step H) — prefills the
+   * destination, work, item and quantity; saving stamps it fulfilled. */
+  request?: SiteRequestRow | null;
 }) {
   const [destination, setDestination] = useState<Destination>("plot");
-  const [plotId, setPlotId] = useState("");
-  const [workItemId, setWorkItemId] = useState("");
+  const [plotId, setPlotId] = useState(request?.plotId ?? "");
+  const [workItemId, setWorkItemId] = useState(request?.workItemId ?? "");
   const [toStoreId, setToStoreId] = useState("");
   const [projectId, setProjectId] = useState(store.project_id ?? "");
   const [issuedAt, setIssuedAt] = useState(() => new Date().toISOString().slice(0, 10));
   const [note, setNote] = useState("");
-  const [picked, setPicked] = useState<Record<string, number>>({});
+  const [picked, setPicked] = useState<Record<string, number>>(() =>
+    request && holdings.some((row) => row.item_id === request.itemId)
+      ? { [request.itemId]: request.quantity }
+      : {},
+  );
   const [error, setError] = useState<string>();
   const [saving, startSaving] = useTransition();
 
@@ -95,6 +104,7 @@ export function IssueForm({
         projectId: needsProject ? projectId : null,
         issuedAt: issuedAt || null,
         note: note || null,
+        requestId: destination === "plot" ? (request?.id ?? null) : null,
         lines: pickedEntries.map(([itemId, quantity]) => ({
           itemId,
           quantity,

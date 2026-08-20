@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/table";
 import {
   aggregateFrozenTakeoff,
+  applyEstimateOverrides,
+  applyRateOverrides,
   computeEstimateTotals,
   computeLine,
   computeTakeoff,
@@ -25,9 +27,12 @@ import {
 import { compareIssuesToEstimate } from "@/lib/estimator/compare";
 import {
   getEstimate,
+  getEstimateVariations,
   getIssuedAgainstEstimate,
   getReconciliationApprovals,
   getRecipeBook,
+  listMaterialItems,
+  listMixes,
   listWorkStatus,
 } from "@/lib/estimator/queries";
 import { formatDate, formatMoney, formatQuantity } from "@/lib/format";
@@ -36,6 +41,11 @@ import { notFound } from "next/navigation";
 import { Fragment } from "react";
 import { EstimateFormDialog, DeleteEstimateButton } from "../_components/estimate-forms";
 import { AddLineDialog, LineQtyField, RemoveLineButton } from "./_components/line-forms";
+import {
+  ItemRateField,
+  LineVariationDialog,
+  type VariationRowView,
+} from "./_components/variation-forms";
 import { ApproveReconciliationButton } from "./_components/reconciliation-forms";
 import { ReviseEstimateButton, SubmitEstimateButton } from "./_components/submit-forms";
 import { listProjects } from "@/lib/masters/projects";
@@ -57,13 +67,19 @@ export default async function EstimatePage({
   params: Promise<{ estimateId: string }>;
 }) {
   const { estimateId } = await params;
-  const [estimate, book, works, projects, units] = await Promise.all([
-    getEstimate(estimateId),
-    getRecipeBook(),
-    listWorkStatus(),
-    listProjects(),
-    listUnits(),
-  ]);
+  const [estimate, book, works, projects, units, variations, materialItems, mixRows] =
+    await Promise.all([
+      getEstimate(estimateId),
+      getRecipeBook(),
+      listWorkStatus(),
+      listProjects(),
+      listUnits(),
+      // Per-villa variations (0087) — replace the standard recipe whole
+      // for customised lines, so this page's live costs mean THIS house.
+      getEstimateVariations(estimateId),
+      listMaterialItems(),
+      listMixes(),
+    ]);
   if (!estimate) notFound();
 
   const isDraft = estimate.status === "draft";
@@ -78,7 +94,23 @@ export default async function EstimatePage({
       : null;
   const comparison =
     issuedData && estimate.frozen
-      ? compareIssuesToEstimate(estimate.frozen.takeoff, issuedData.links, issuedData.lines)
+      ? compareIssuesToEstimate(
+          estimate.frozen.takeoff,
+          [
+            ...issuedData.links,
+            // An item-keyed takeoff row (0086) is its own link: the
+            // frozen quantity is already in the item's unit.
+            ...estimate.frozen.takeoff
+              .filter((row) => row.itemId)
+              .map((row) => ({
+                materialId: row.itemId as string,
+                itemId: row.itemId as string,
+                itemUom: row.uom,
+                factor: null,
+              })),
+          ],
+          issuedData.lines,
+        )
       : null;
 
   // Reconciliation (0083): every unmatched arrival is an entry the
@@ -96,9 +128,21 @@ export default async function EstimatePage({
   // category subtotals, estimate totals and the takeoff all come out of
   // lib/estimator/calc.ts, so they can never disagree with each other.
   // The frozen branch feeds the SAME grouping from the snapshot.
-  const materialsById = new Map<string, MaterialDef>(book.materials.map((m) => [m.id, m]));
+  // This villa's variations, laid over the master before any
+  // arithmetic runs: its own recipe per customised line (0087), its own
+  // labour rates and material prices (0088).
+  const materialsById = new Map<string, MaterialDef>(
+    applyRateOverrides(
+      [...book.materials, ...variations.extraMaterials],
+      variations.rateByMaterialId,
+    ).map((m) => [m.id, m]),
+  );
   const mixesById = new Map<string, MixDef>(book.mixes.map((m) => [m.id, m]));
-  const recipesByWork = new Map<string, WorkRecipe>(book.recipes.map((r) => [r.workItemId, r]));
+  const recipesByWork = new Map<string, WorkRecipe>(
+    applyEstimateOverrides(book.recipes, variations.byWork, variations.labourRateByWork).map(
+      (recipe) => [recipe.workItemId, recipe],
+    ),
+  );
 
   const lineInputs = estimate.lines.map((line) => ({
     workItemId: line.workItemId,
@@ -168,6 +212,72 @@ export default async function EstimatePage({
   const categoryOrder = [...new Set(works.map((work) => work.categoryCode))];
   const boq = groupLineCosts(lineCosts, categoryByWork, categoryOrder);
   const lineByWork = new Map(estimate.lines.map((line) => [line.workItemId, line]));
+
+  // What Masters says, before this villa's price overrides — the
+  // placeholder in each price box, so "blank means standard" is visible.
+  const standardRateById = new Map(
+    [...book.materials, ...variations.extraMaterials].map((m) => [m.id, m.rate]),
+  );
+
+  // Per-villa variations (0087): what each line's dialog shows — the
+  // line's own list when customised, the standard read-only otherwise.
+  const variationOptions = {
+    materials: materialItems
+      .filter((material) => material.isActive)
+      .map(({ id, name, uom }) => ({ id, name, uom })),
+    mixes: mixRows.filter((mix) => mix.isActive).map(({ id, name, uom }) => ({ id, name, uom })),
+  };
+  const variationRowsForLine = (lineId: string, workItemId: string): VariationRowView[] => {
+    const custom = variations.byLine.get(lineId);
+    if (custom) {
+      return custom.map((row) => {
+        if (row.mixId) {
+          const mix = mixesById.get(row.mixId);
+          return {
+            id: row.id,
+            kind: "mix" as const,
+            refId: row.mixId,
+            name: mix?.name ?? "Unknown mix",
+            uom: mix?.uom ?? "",
+            qtyPerUnit: row.qtyPerUnit,
+          };
+        }
+        const refId = row.itemId ?? row.materialId ?? "";
+        const def = materialsById.get(refId);
+        return {
+          id: row.id,
+          kind: "material" as const,
+          refId,
+          name: def?.name ?? "Unknown material",
+          uom: def?.uom ?? "",
+          qtyPerUnit: row.qtyPerUnit,
+        };
+      });
+    }
+    const standard = book.recipes.find((r) => r.workItemId === workItemId)?.components ?? [];
+    return standard.map((component) => {
+      if (component.mixId) {
+        const mix = mixesById.get(component.mixId);
+        return {
+          id: null,
+          kind: "mix" as const,
+          refId: component.mixId,
+          name: mix?.name ?? "Unknown mix",
+          uom: mix?.uom ?? "",
+          qtyPerUnit: component.qtyPerUnit,
+        };
+      }
+      const def = component.materialId ? materialsById.get(component.materialId) : undefined;
+      return {
+        id: null,
+        kind: "material" as const,
+        refId: component.materialId ?? "",
+        name: def?.name ?? "Unknown material",
+        uom: def?.uom ?? "",
+        qtyPerUnit: component.qtyPerUnit,
+      };
+    });
+  };
   const setUpWorks = works.filter((work) => work.uom !== null && work.isActive);
 
   const part = (label: string, value: number | null) =>
@@ -363,7 +473,24 @@ export default async function EstimatePage({
                         </TableCell>
                         {isDraft && (
                           <TableCell>
-                            <RemoveLineButton id={line.id} label={line.name} />
+                            <div className="flex items-center justify-end gap-1">
+                              {cost.isSetUp && (
+                                <LineVariationDialog
+                                  lineId={line.id}
+                                  workName={line.name}
+                                  workUom={uom}
+                                  customised={variations.byLine.has(line.id)}
+                                  rows={variationRowsForLine(line.id, line.workItemId)}
+                                  options={variationOptions}
+                                  labourRate={line.labourRate}
+                                  standardLabourRate={
+                                    book.recipes.find((r) => r.workItemId === line.workItemId)
+                                      ?.labourRate ?? null
+                                  }
+                                />
+                              )}
+                              <RemoveLineButton id={line.id} label={line.name} />
+                            </div>
                           </TableCell>
                         )}
                       </TableRow>
@@ -405,7 +532,16 @@ export default async function EstimatePage({
                     {formatQuantity(row.quantity)} {row.uom}
                   </TableCell>
                   <TableCell className="text-right">
-                    {row.missingRate ? (
+                    {isDraft ? (
+                      <ItemRateField
+                        estimateId={estimate.id}
+                        itemId={book.itemIds.includes(row.materialId) ? row.materialId : null}
+                        materialId={book.itemIds.includes(row.materialId) ? null : row.materialId}
+                        rate={variations.rateByMaterialId.get(row.materialId) ?? null}
+                        standardRate={standardRateById.get(row.materialId) ?? null}
+                        label={row.name}
+                      />
+                    ) : row.missingRate ? (
                       <Badge variant="warning">Not priced</Badge>
                     ) : row.quantity > 0 ? (
                       formatMoney(row.cost === null ? null : row.cost / row.quantity)

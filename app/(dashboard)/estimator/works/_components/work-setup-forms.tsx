@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { addWorkComponent, saveWorkInfo } from "@/lib/estimator/actions";
 import { UomSelect } from "../../_components/uom-select";
-import type { MaterialRow, MixRow, WorkSetup } from "@/lib/estimator/queries";
+import type { MaterialItemRow, MixRow, WorkSetup } from "@/lib/estimator/queries";
 import { useActionState, useEffect, useRef, useState } from "react";
 
 /**
@@ -82,7 +82,7 @@ export function AddWorkComponentForm({
 }: {
   workItemId: string;
   workUom: string;
-  materials: MaterialRow[];
+  materials: MaterialItemRow[];
   mixes: MixRow[];
 }) {
   const [state, formAction, pending] = useActionState(

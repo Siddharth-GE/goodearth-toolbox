@@ -10,7 +10,7 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/components/ui/table";
-import { getMix, listMaterials, listUomNames } from "@/lib/estimator/queries";
+import { getMix, listMaterialItems, listUomNames } from "@/lib/estimator/queries";
 import { formatMoney } from "@/lib/format";
 import { notFound } from "next/navigation";
 import {
@@ -25,7 +25,7 @@ export default async function MixPage({ params }: { params: Promise<{ mixId: str
   const { mixId } = await params;
   const [mix, materials, uoms] = await Promise.all([
     getMix(mixId),
-    listMaterials(),
+    listMaterialItems(),
     listUomNames(),
   ]);
   if (!mix) notFound();
@@ -115,6 +115,11 @@ export default async function MixPage({ params }: { params: Promise<{ mixId: str
                 <TableRow key={component.id}>
                   <TableCell className="text-foreground font-medium">
                     {component.materialName}
+                    {component.legacy && (
+                      <Badge variant="neutral" className="ml-2">
+                        Old list — re-add from Masters
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">

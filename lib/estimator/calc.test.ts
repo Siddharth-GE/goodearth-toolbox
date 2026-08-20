@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  applyEstimateOverrides,
+  applyRateOverrides,
   computeEstimateTotals,
   computeLine,
   computeTakeoff,
@@ -474,4 +476,82 @@ test("aggregateFrozenTakeoff sums a material across works and keeps null honest"
   const steel = rows.find((row) => row.materialId === "steel");
   assert.equal(steel?.cost, null);
   assert.equal(steel?.missingRate, true);
+});
+
+// ---------------------------------------------------------------------
+// Per-villa overrides (0087 recipes, 0088 labour and prices)
+// ---------------------------------------------------------------------
+
+test("a villa's component list replaces the standard whole, not as a delta", () => {
+  const recipes = [
+    {
+      workItemId: "w1",
+      uom: "cum",
+      labourRate: 100,
+      components: [{ materialId: "cement", mixId: null, qtyPerUnit: 8 }],
+    },
+    {
+      workItemId: "w2",
+      uom: "sqm",
+      labourRate: 50,
+      components: [{ materialId: "sand", mixId: null, qtyPerUnit: 2 }],
+    },
+  ];
+  const applied = applyEstimateOverrides(
+    recipes,
+    new Map([["w1", [{ materialId: "steel", mixId: null, qtyPerUnit: 3 }]]]),
+    new Map(),
+  );
+  assert.deepEqual(applied[0].components, [{ materialId: "steel", mixId: null, qtyPerUnit: 3 }]);
+  assert.equal(applied[0].labourRate, 100, "labour untouched when only the recipe varies");
+  assert.deepEqual(applied[1], recipes[1], "an untouched work keeps following the standard");
+});
+
+test("a villa labour rate of zero is a real rate, not 'unpriced'", () => {
+  const recipes = [{ workItemId: "w1", uom: "cum", labourRate: 100, components: [] }];
+  const applied = applyEstimateOverrides(recipes, new Map(), new Map([["w1", 0]]));
+  assert.equal(applied[0].labourRate, 0);
+  // And it must reach the money: labour-only line, zero rate, zero cost.
+  const cost = computeLine({ workItemId: "w1", qty: 5 }, applied[0], new Map(), new Map());
+  assert.equal(cost.labourCost, 0);
+  assert.equal(cost.totalCost, 0);
+});
+
+test("a villa labour rate overrides the standard and flows into the cost", () => {
+  const recipes = [{ workItemId: "w1", uom: "cum", labourRate: 100, components: [] }];
+  const applied = applyEstimateOverrides(recipes, new Map(), new Map([["w1", 250]]));
+  const cost = computeLine({ workItemId: "w1", qty: 4 }, applied[0], new Map(), new Map());
+  assert.equal(cost.labourCost, 1000);
+});
+
+test("a villa material price overrides Masters and leaves the rest alone", () => {
+  const materials = [
+    { id: "cement", name: "Cement", uom: "bag", rate: 400 },
+    { id: "sand", name: "Sand", uom: "cft", rate: 60 },
+  ];
+  const applied = applyRateOverrides(materials, new Map([["cement", 460]]));
+  assert.equal(applied.find((m) => m.id === "cement")?.rate, 460);
+  assert.equal(applied.find((m) => m.id === "sand")?.rate, 60);
+  // No overrides at all hands the same array back untouched.
+  assert.equal(applyRateOverrides(materials, new Map()), materials);
+});
+
+test("an overridden price reaches the line's material cost", () => {
+  const recipe = {
+    workItemId: "w1",
+    uom: "cum",
+    labourRate: 0,
+    components: [{ materialId: "cement", mixId: null, qtyPerUnit: 8 }],
+  };
+  const materials = applyRateOverrides(
+    [{ id: "cement", name: "Cement", uom: "bag", rate: 400 }],
+    new Map([["cement", 500]]),
+  );
+  const cost = computeLine(
+    { workItemId: "w1", qty: 2 },
+    recipe,
+    new Map(),
+    new Map(materials.map((m) => [m.id, m])),
+  );
+  assert.equal(cost.materialCost, 8 * 2 * 500);
 });
