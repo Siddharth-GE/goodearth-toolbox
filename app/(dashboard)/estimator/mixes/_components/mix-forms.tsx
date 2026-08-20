@@ -18,7 +18,7 @@ import {
   updateMixComponentQty,
   updateWorkComponentQty,
 } from "@/lib/estimator/actions";
-import type { MaterialRow, MixDetail, MixRow } from "@/lib/estimator/queries";
+import type { MaterialItemRow, MixDetail, MixRow } from "@/lib/estimator/queries";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 
 export function MixFormDialog({
@@ -82,7 +82,8 @@ export function MixFormDialog({
   );
 }
 
-/** Add one material to a mix. Lives on the mix's own screen, not in a dialog. */
+/** Add one material — a master item since 0086 — to a mix. Lives on
+ * the mix's own screen, not in a dialog. */
 export function AddMixComponentForm({
   mixId,
   mixUom,
@@ -90,7 +91,7 @@ export function AddMixComponentForm({
 }: {
   mixId: string;
   mixUom: string;
-  materials: MaterialRow[];
+  materials: MaterialItemRow[];
 }) {
   const [state, formAction, pending] = useActionState(addMixComponent.bind(null, mixId), undefined);
   const formRef = useRef<HTMLFormElement>(null);
@@ -111,10 +112,10 @@ export function AddMixComponentForm({
     <form ref={formRef} action={formAction} className="space-y-2">
       <div className="flex flex-wrap items-end gap-2">
         <div className="min-w-56 flex-1 space-y-1.5">
-          <Label htmlFor="material_id">Material</Label>
+          <Label htmlFor="item_id">Material (from Masters)</Label>
           <Select
-            id="material_id"
-            name="material_id"
+            id="item_id"
+            name="item_id"
             value={materialId}
             onChange={(event) => setMaterialId(event.target.value)}
             required

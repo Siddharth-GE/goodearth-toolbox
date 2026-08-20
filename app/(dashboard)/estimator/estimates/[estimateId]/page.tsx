@@ -78,7 +78,23 @@ export default async function EstimatePage({
       : null;
   const comparison =
     issuedData && estimate.frozen
-      ? compareIssuesToEstimate(estimate.frozen.takeoff, issuedData.links, issuedData.lines)
+      ? compareIssuesToEstimate(
+          estimate.frozen.takeoff,
+          [
+            ...issuedData.links,
+            // An item-keyed takeoff row (0086) is its own link: the
+            // frozen quantity is already in the item's unit.
+            ...estimate.frozen.takeoff
+              .filter((row) => row.itemId)
+              .map((row) => ({
+                materialId: row.itemId as string,
+                itemId: row.itemId as string,
+                itemUom: row.uom,
+                factor: null,
+              })),
+          ],
+          issuedData.lines,
+        )
       : null;
 
   // Reconciliation (0083): every unmatched arrival is an entry the

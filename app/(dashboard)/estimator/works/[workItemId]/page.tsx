@@ -13,7 +13,7 @@ import { computeLine, type MaterialDef, type MixDef } from "@/lib/estimator/calc
 import {
   getRecipeBook,
   getWorkSetup,
-  listMaterials,
+  listMaterialItems,
   listMixes,
   listUomNames,
 } from "@/lib/estimator/queries";
@@ -30,7 +30,7 @@ export default async function WorkSetupPage({
   const { workItemId } = await params;
   const [work, materials, mixes, uoms, book] = await Promise.all([
     getWorkSetup(workItemId),
-    listMaterials(),
+    listMaterialItems(),
     listMixes(),
     listUomNames(),
     getRecipeBook(),
