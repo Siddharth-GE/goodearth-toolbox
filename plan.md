@@ -161,3 +161,7 @@ Each = its own `feature/…` branch off `staging`, PR into `staging`, migration 
 - `lib/estimator/calc.ts` — the single arithmetic implementation; snapshot writer and compare.ts reuse, never duplicate
 - `lib/indents/actions.ts` — templates for `addEstimatePullLines` / `addDirectPoLines`
 - `scripts/view-manifest.ts` — gains the `estimate_takeoff_facts` row
+
+## Correction (founder, 2026-08-20, during the staging soak)
+
+Material that reaches a villa outside the official estimate — a PO delivered to site, or an issue for a work the estimate never paired it with — is a **permanent reconciliation entry on that estimate** (`0083`): flagged "Outside the estimate", needing an estimator's approval, and keeping the flag forever even after approval. Detection stays derived from `compare.ts`'s unmatched bucket (now per work + item); only the approval row is stored (`estimator_reconciliation_approvals`, /estimator-gated, no delete policy). Built with Step F's close-out.

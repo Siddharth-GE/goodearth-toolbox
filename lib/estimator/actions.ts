@@ -955,3 +955,69 @@ export async function reviseEstimate(estimateId: string): Promise<ActionState> {
   revalidatePath("/estimator", "layout");
   redirect(`/estimator/estimates/${created.id}`);
 }
+
+// ---------------------------------------------------------------------
+// Reconciliation approvals (0083)
+// ---------------------------------------------------------------------
+
+/**
+ * Acknowledge material that reached the villa outside the official
+ * estimate. The approval does NOT clear the flag — the founder's rule
+ * is that an unplanned arrival sits in the estimate forever with its
+ * badge; approving records that an estimator has seen it and stands by
+ * it, with an optional note saying why it was needed.
+ */
+export async function approveReconciliation(input: {
+  estimateId: string;
+  itemId: string;
+  workItemId: string | null;
+  note: string;
+}): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+
+  const estimateId = input.estimateId;
+  const itemId = input.itemId;
+  const workItemId = input.workItemId || null;
+  const note = input.note.trim().slice(0, TEXT_LIMIT) || null;
+  if (!estimateId || !itemId) return { error: "This entry is missing its ids — reload the page." };
+
+  const supabase = await createClient();
+
+  // Only the villa's OFFICIAL estimate carries the comparison, so only
+  // it can be reconciled against — a draft has nothing frozen to be
+  // outside of, and a superseded estimate has been replaced.
+  const { data: estimate, error: readError } = await supabase
+    .from("estimator_estimates")
+    .select("status")
+    .eq("id", estimateId)
+    .maybeSingle();
+  if (readError) {
+    console.error("approveReconciliation read failed:", readError);
+    return { error: "Could not check the estimate. Try again." };
+  }
+  if (!estimate) return { error: "That estimate no longer exists." };
+  if (estimate.status !== "submitted") {
+    return { error: "Only the villa's official estimate can be reconciled." };
+  }
+
+  const { error } = await supabase.from("estimator_reconciliation_approvals").insert({
+    estimate_id: estimateId,
+    work_item_id: workItemId,
+    item_id: itemId,
+    note,
+    created_by: user.id,
+    updated_by: user.id,
+  });
+  if (error) {
+    if (error.code === "23505") {
+      // Two estimators looked at once; the first approval stands.
+      revalidatePath("/estimator", "layout");
+      return undefined;
+    }
+    console.error("approveReconciliation failed:", error);
+    return { error: "Could not record the approval. Try again." };
+  }
+
+  revalidatePath("/estimator", "layout");
+  return undefined;
+}

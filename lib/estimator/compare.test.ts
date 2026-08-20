@@ -48,5 +48,17 @@ test("untagged and unknown-work issues land in unmatched, not nowhere", () => {
     { workItemId: "w9", itemId: "i-cem", quantity: 5 },
   ]);
   assert.equal(result.rows.find((row) => row.workItemId === "w1")?.issued, 0);
-  assert.deepEqual(result.unmatched, [{ itemId: "i-cem", quantity: 25 }]);
+  // Kept per (work, item): each is its own reconciliation entry (0083).
+  assert.deepEqual(result.unmatched, [
+    { workItemId: null, itemId: "i-cem", quantity: 25 - 5 },
+    { workItemId: "w9", itemId: "i-cem", quantity: 5 },
+  ]);
+});
+
+test("two arrivals for one unplanned (work, item) sum into one entry", () => {
+  const result = compareIssuesToEstimate(takeoff, links, [
+    { workItemId: "w9", itemId: "i-cem", quantity: 5 },
+    { workItemId: "w9", itemId: "i-cem", quantity: 7 },
+  ]);
+  assert.deepEqual(result.unmatched, [{ workItemId: "w9", itemId: "i-cem", quantity: 12 }]);
 });

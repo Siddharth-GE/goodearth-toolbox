@@ -988,3 +988,61 @@ async function materialLinks(
       factor: row.item_uom_factor,
     }));
 }
+
+// ---------------------------------------------------------------------
+// Reconciliation approvals (0083)
+// ---------------------------------------------------------------------
+
+export type ReconciliationApproval = {
+  workItemId: string | null;
+  itemId: string;
+  note: string | null;
+  approvedByName: string;
+  approvedAt: string;
+};
+
+/**
+ * The estimator's acknowledgements of material that reached the villa
+ * outside the official estimate's plan. The PENDING side is never
+ * stored — compare.ts derives it from what actually arrived — so this
+ * reads only the approvals and the page lines the two up by
+ * (work, item). The flag itself is permanent either way; an approval
+ * changes who has looked, not what happened.
+ */
+export async function getReconciliationApprovals(
+  estimateId: string,
+): Promise<ReconciliationApproval[]> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+
+  const rows = await fetchAll<{
+    work_item_id: string | null;
+    item_id: string;
+    note: string | null;
+    created_by: string | null;
+    created_at: string;
+  }>((from, to) =>
+    supabase
+      .from("estimator_reconciliation_approvals")
+      .select("work_item_id, item_id, note, created_by, created_at")
+      .eq("estimate_id", estimateId)
+      .order("created_at")
+      .range(from, to),
+  );
+  if (rows.length === 0) return [];
+
+  const approverIds = [...new Set(rows.map((row) => row.created_by).filter((id) => id !== null))];
+  const { data: approvers, error } = approverIds.length
+    ? await supabase.from("profiles").select("id, full_name").in("id", approverIds)
+    : { data: [], error: null };
+  if (error) fail("the approvers' names", error);
+  const nameById = new Map((approvers ?? []).map((profile) => [profile.id, profile.full_name]));
+
+  return rows.map((row) => ({
+    workItemId: row.work_item_id,
+    itemId: row.item_id,
+    note: row.note,
+    approvedByName: (row.created_by ? nameById.get(row.created_by) : null) ?? "a colleague",
+    approvedAt: row.created_at,
+  }));
+}

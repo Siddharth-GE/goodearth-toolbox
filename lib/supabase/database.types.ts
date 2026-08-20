@@ -1782,6 +1782,85 @@ export type Database = {
           },
         ]
       }
+      estimator_reconciliation_approvals: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          estimate_id: string
+          id: string
+          item_id: string
+          note: string | null
+          updated_at: string
+          updated_by: string | null
+          work_item_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          estimate_id: string
+          id?: string
+          item_id: string
+          note?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          work_item_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          estimate_id?: string
+          id?: string
+          item_id?: string
+          note?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          work_item_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estimator_reconciliation_approvals_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimator_reconciliation_approvals_estimate_id_fkey"
+            columns: ["estimate_id"]
+            isOneToOne: false
+            referencedRelation: "estimate_takeoff_facts"
+            referencedColumns: ["estimate_id"]
+          },
+          {
+            foreignKeyName: "estimator_reconciliation_approvals_estimate_id_fkey"
+            columns: ["estimate_id"]
+            isOneToOne: false
+            referencedRelation: "estimator_estimates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimator_reconciliation_approvals_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimator_reconciliation_approvals_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimator_reconciliation_approvals_work_item_id_fkey"
+            columns: ["work_item_id"]
+            isOneToOne: false
+            referencedRelation: "work_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       estimator_uoms: {
         Row: {
           created_at: string
