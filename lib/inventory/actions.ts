@@ -37,7 +37,9 @@ function guardError(error: { message: string }, fallback: string): ActionState {
     message.includes("different store") ||
     message.includes("Pick a store") ||
     message.includes("Pick the store") ||
-    message.includes("Pick the project")
+    message.includes("Pick the project") ||
+    message.includes("which work") ||
+    message.includes("serves no work")
   ) {
     return { error: message.replace(/^.*?:\s*/, "") };
   }
@@ -191,6 +193,9 @@ export type RecordIssueInput = {
   /** Exactly one: another store (a transfer) or a plot (used at site). */
   toStoreId: string | null;
   plotId: string | null;
+  /** The work the material serves (0080) — required for a plot issue,
+   * never sent for a transfer. */
+  workItemId: string | null;
   /** Only consulted for a transfer out of a store with no project. */
   projectId: string | null;
   issuedAt: string | null;
@@ -214,6 +219,9 @@ export async function recordStockIssue(input: RecordIssueInput): Promise<ActionS
   if (input.toStoreId && input.toStoreId === input.storeId) {
     return { error: "A transfer needs a different store to go to." };
   }
+  if (input.plotId && !input.workItemId) {
+    return { error: "Say which work this material is for." };
+  }
   if (input.lines.length === 0) return { error: "Add at least one item." };
   if (input.lines.some((line) => !Number.isFinite(line.quantity) || line.quantity <= 0)) {
     return { error: "Quantities must be more than 0." };
@@ -229,6 +237,9 @@ export async function recordStockIssue(input: RecordIssueInput): Promise<ActionS
     p_store_id: input.storeId,
     p_to_store_id: (input.toStoreId || null) as unknown as string,
     p_plot_id: (input.plotId || null) as unknown as string,
+    // Named args pick the 7-arg signature; the 0080 wrapper keeps the
+    // old 6-arg one alive for code deployed before the migration.
+    p_work_item_id: (input.plotId ? input.workItemId : null) as unknown as string,
     p_project_id: (input.projectId || null) as unknown as string,
     p_issued_at: (input.issuedAt || null) as unknown as string,
     p_note: (input.note?.trim() || null) as unknown as string,
@@ -322,5 +333,40 @@ export async function recordStockAdjustment(input: RecordAdjustmentInput): Promi
 
   revalidatePath("/inventory/adjustments");
   revalidatePath("/inventory/stock");
+  return undefined;
+}
+
+/**
+ * Retag which work a plot issue served (0080). A label fix, not a
+ * movement: quantities, store, destination and number are untouched,
+ * and audit_row() records the change. Transfers carry no work.
+ */
+export async function retagIssueWork(issueId: string, workItemId: string): Promise<ActionState> {
+  const user = await requireTool("/inventory");
+  if (!workItemId) return { error: "Pick the work." };
+
+  const supabase = await createClient();
+  const { data: issue, error: readError } = await supabase
+    .from("stock_issues")
+    .select("id, plot_id")
+    .eq("id", issueId)
+    .maybeSingle();
+  if (readError) {
+    console.error("retagIssueWork read failed:", readError);
+    return { error: "Could not save. Try again." };
+  }
+  if (!issue) return { error: "That issue no longer exists." };
+  if (!issue.plot_id) return { error: "A transfer between stores serves no work." };
+
+  const { error } = await supabase
+    .from("stock_issues")
+    .update({ work_item_id: workItemId, updated_by: user.id })
+    .eq("id", issueId);
+  if (error) {
+    console.error("retagIssueWork failed:", error);
+    return guardError(error, "Could not save. Try again.");
+  }
+
+  revalidatePath("/inventory/issues");
   return undefined;
 }

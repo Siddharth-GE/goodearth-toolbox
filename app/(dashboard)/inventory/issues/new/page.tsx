@@ -2,6 +2,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageTitle } from "@/components/ui/page-title";
 import { Select } from "@/components/ui/select";
 import { getIssueFormOptions } from "@/lib/inventory/issues-queries";
+import { listWorkCategories, listWorkItems } from "@/lib/masters/works";
 import { listStoreHoldings } from "@/lib/inventory/stock-queries";
 import { PackageMinus } from "lucide-react";
 import Link from "next/link";
@@ -19,11 +20,22 @@ export default async function NewIssuePage({
   searchParams: Promise<{ store?: string }>;
 }) {
   const { store } = await searchParams;
-  const [options, holdings] = await Promise.all([
+  const [options, holdings, workItems, workCategories] = await Promise.all([
     getIssueFormOptions(),
     store ? listStoreHoldings(store) : Promise.resolve([]),
+    listWorkItems(),
+    listWorkCategories(),
   ]);
   const chosen = options.stores.find((s) => s.id === store) ?? null;
+  const categoryNameById = new Map(workCategories.map((c) => [c.id, c.name]));
+  const works = workItems
+    .filter((work) => work.is_active)
+    .map((work) => ({
+      id: work.id,
+      code: work.code,
+      name: work.name,
+      category: categoryNameById.get(work.category_id) ?? "Other",
+    }));
 
   return (
     <div className="space-y-4">
@@ -75,7 +87,7 @@ export default async function NewIssuePage({
           description="Receive a delivery into it, or enter an opening balance as an adjustment, then come back."
         />
       ) : (
-        <IssueForm store={chosen} holdings={holdings} options={options} />
+        <IssueForm store={chosen} holdings={holdings} options={options} works={works} />
       )}
     </div>
   );

@@ -22,7 +22,13 @@ import {
   type MixDef,
   type WorkRecipe,
 } from "@/lib/estimator/calc";
-import { getEstimate, getRecipeBook, listWorkStatus } from "@/lib/estimator/queries";
+import { compareIssuesToEstimate } from "@/lib/estimator/compare";
+import {
+  getEstimate,
+  getIssuedAgainstEstimate,
+  getRecipeBook,
+  listWorkStatus,
+} from "@/lib/estimator/queries";
 import { formatDate, formatMoney, formatQuantity } from "@/lib/format";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -59,6 +65,19 @@ export default async function EstimatePage({
   if (!estimate) notFound();
 
   const isDraft = estimate.status === "draft";
+
+  // Issued-vs-estimated, for the villa's OFFICIAL estimate only: what
+  // the store has issued to its plot, per work, lined up against the
+  // frozen takeoff. Inventory's reads are open (no money there), so
+  // this crosses no gate — see getIssuedAgainstEstimate.
+  const issuedData =
+    estimate.status === "submitted" && estimate.unitId
+      ? await getIssuedAgainstEstimate(estimate.unitId)
+      : null;
+  const comparison =
+    issuedData && estimate.frozen
+      ? compareIssuesToEstimate(estimate.frozen.takeoff, issuedData.links, issuedData.lines)
+      : null;
 
   // One calculator for the whole tool: per-line costs, per-unit rates,
   // category subtotals, estimate totals and the takeoff all come out of
@@ -388,6 +407,77 @@ export default async function EstimatePage({
               ))}
             </TableBody>
           </Table>
+        </Card>
+      )}
+
+      {comparison && (
+        <Card className="space-y-3 p-4">
+          <div>
+            <p className="text-muted text-xs font-semibold tracking-widest uppercase">
+              Issued from the store
+            </p>
+            <p className="text-muted mt-1 text-sm">
+              What has actually left the store for this villa, per work, against what the estimate
+              froze. An issue names its work when it is recorded — that is what lines these up.
+            </p>
+          </div>
+          {comparison.rows.every((row) => row.issued === 0) && comparison.unmatched.length === 0 ? (
+            <p className="text-muted text-sm">Nothing issued to this villa yet.</p>
+          ) : (
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableHeaderCell>Work</TableHeaderCell>
+                  <TableHeaderCell>Material</TableHeaderCell>
+                  <TableHeaderCell className="text-right">Estimated</TableHeaderCell>
+                  <TableHeaderCell className="text-right">Issued</TableHeaderCell>
+                  <TableHeaderCell></TableHeaderCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {comparison.rows
+                  .filter((row) => row.issued !== 0 || row.over)
+                  .map((row) => {
+                    const work = works.find((w) => w.workItemId === row.workItemId);
+                    return (
+                      <TableRow key={`${row.workItemId}-${row.materialId}`}>
+                        <TableCell className="text-sm">
+                          {work ? `${work.code} — ${work.name}` : "—"}
+                        </TableCell>
+                        <TableCell className="text-foreground text-sm">
+                          {row.materialName}
+                        </TableCell>
+                        <TableCell className="text-right text-sm whitespace-nowrap">
+                          {formatQuantity(row.estimated)} {row.uom}
+                        </TableCell>
+                        <TableCell className="text-right text-sm whitespace-nowrap">
+                          {row.issued !== null
+                            ? `${formatQuantity(row.issued)} ${row.uom}`
+                            : row.issuedRaw
+                              ? `${formatQuantity(row.issuedRaw.quantity)} ${row.issuedRaw.uom} (no conversion set)`
+                              : "—"}
+                        </TableCell>
+                        <TableCell>
+                          {row.over && <Badge variant="warning">Past the estimate</Badge>}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+              </TableBody>
+            </Table>
+          )}
+          {comparison.unmatched.length > 0 && issuedData && (
+            <p className="text-muted text-sm">
+              Also issued to this villa, but not tagged to a work the estimate names:{" "}
+              {comparison.unmatched
+                .map(
+                  (row) =>
+                    `${issuedData.itemNamesById.get(row.itemId) ?? "an item"} × ${formatQuantity(row.quantity)}`,
+                )
+                .join(", ")}
+              .
+            </p>
+          )}
         </Card>
       )}
     </div>
