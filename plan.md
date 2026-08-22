@@ -136,7 +136,7 @@ Landed 2026-08-22, **uncommitted for the Fable vet**. The merge and push are **n
 
 **The probe smoke ran end to end under the real Next runtime** (`npm run dev` against staging, which has `0091`) as `siddharth.cyriac.99+probe@gmail.com` — a throwaway password, the emailed-code step passed with the admin `generate_link`'s `email_otp`, the `auth_verified_sessions` row written the way `markSessionVerified` writes it, and every write driven as a **real `Next-Action` POST** with React's own `encodeReply`, not a direct function call. Decisions 18–20 below record what it proved, what it could not, and what it left behind.
 
-### 8. 🔶 `[Fable]` Merge approval done, staging merged — the founder's vet is next
+### 8. ✅ `[Fable]` Merge approval, founder vet, production — SHIPPED 2026-08-22
 
 Merge-approval pass against this plan, `SECURITY.md`, `BUGCATCHER.md`. **Founder vets on staging.goodearthkannur.org — nothing reaches production before that**; then `0091` to production, `staging` → `master`, and press one real write button on production.
 
