@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PageTitle } from "@/components/ui/page-title";
 import { listVillas } from "@/lib/design-management/queries";
 import { ChevronRight, HardHat } from "lucide-react";
 import Link from "next/link";
@@ -12,13 +13,25 @@ import Link from "next/link";
 export default async function DesignVillasPage() {
   const villas = await listVillas();
 
+  const header = (
+    <PageTitle
+      title="Villas"
+      description="Pick a villa to see its drawings, revisions and transmittals."
+      backHref="/design-management"
+      backLabel="Design Management"
+    />
+  );
+
   if (villas.length === 0) {
     return (
-      <EmptyState
-        icon={HardHat}
-        title="No villas yet"
-        description="Villas come from Masters — once units exist there, they show up here."
-      />
+      <div className="space-y-4">
+        {header}
+        <EmptyState
+          icon={HardHat}
+          title="No villas yet"
+          description="Villas come from Masters — once units exist there, they show up here."
+        />
+      </div>
     );
   }
 
@@ -26,6 +39,7 @@ export default async function DesignVillasPage() {
 
   return (
     <div className="space-y-4">
+      {header}
       {projects.map((projectName) => (
         <Card key={projectName} className="p-0">
           <p className="text-muted border-border border-b px-4 py-2.5 text-xs font-medium tracking-wide uppercase">

@@ -8,6 +8,7 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/components/ui/table";
+import { PageTitle } from "@/components/ui/page-title";
 import { listTransmittals } from "@/lib/design-management/queries";
 import { formatDate } from "@/lib/format";
 import { Send } from "lucide-react";
@@ -31,24 +32,22 @@ export default async function TransmittalsPage({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div className="max-w-2xl">
-          <p className="text-muted text-xs font-semibold tracking-widest uppercase">Transmittals</p>
-          <p className="text-muted mt-1 text-sm">
-            The record of what was formally sent to site: which villa, which design stage, which
-            drawings, and when. A draft can still be changed; issuing one gives it a number and puts
-            its drawings in front of site for good.
-          </p>
-        </div>
-        {villa && (
-          <Link
-            href="/design-management/transmittals"
-            className="text-accent text-sm font-medium hover:underline"
-          >
-            Show all villas
-          </Link>
-        )}
-      </div>
+      <PageTitle
+        title="Transmittals"
+        description="The record of what was formally sent to site: which villa, which design stage, which drawings, and when. A draft can still be changed; issuing one gives it a number and puts its drawings in front of site for good."
+        backHref="/design-management"
+        backLabel="Design Management"
+        actions={
+          villa ? (
+            <Link
+              href="/design-management/transmittals"
+              className="text-accent text-sm font-medium hover:underline"
+            >
+              Show all villas
+            </Link>
+          ) : undefined
+        }
+      />
 
       {villa && (
         <p className="text-muted text-sm">

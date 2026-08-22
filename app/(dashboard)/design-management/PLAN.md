@@ -85,6 +85,14 @@ explain, and a draft cannot squat on a number the counter will mint later.
 The consequence, which is intended: a draft's cover sheet prints as a
 draft with no reference on it.
 
+**Numbers count per villa, from 1** (`0092`, founder on the staging vet:
+"each house should have transmittals starting from 1"). The counter's
+scope is the unit id and uniqueness is `(unit_id, number)` — so "TR-0001"
+alone no longer names one transmittal company-wide; the villa beside it
+completes the reference, and every screen and the cover sheet's footer
+already carry it. Issued numbers are never rewritten — the two staging
+smoke transmittals keep the global numbers they were born with.
+
 **One draft per set per villa**, a partial unique index rather than a
 check in every code path. "Start next revision" is `max(revision_no) + 1`
 for that (unit, set); the new draft copies the master's default work links

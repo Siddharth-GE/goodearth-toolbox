@@ -9,6 +9,7 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/components/ui/table";
+import { PageTitle } from "@/components/ui/page-title";
 import { listDrawingSets } from "@/lib/design-management/queries";
 import { FileStack } from "lucide-react";
 import Link from "next/link";
@@ -20,17 +21,13 @@ export default async function DrawingSetsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div className="max-w-2xl">
-          <p className="text-muted text-xs font-semibold tracking-widest uppercase">Drawing sets</p>
-          <p className="text-muted mt-1 text-sm">
-            The drawing master — one set can serve many works. A villa&apos;s revision history hangs
-            off the set it belongs to; deactivating a set stops it being picked for a new revision
-            without touching what&apos;s already issued.
-          </p>
-        </div>
-        <DrawingSetFormDialog />
-      </div>
+      <PageTitle
+        title="Drawing sets"
+        description="The drawing master — one set can serve many works. A villa's revision history hangs off the set it belongs to; deactivating a set stops it being picked for a new revision without touching what's already issued."
+        backHref="/design-management"
+        backLabel="Design Management"
+        actions={<DrawingSetFormDialog />}
+      />
 
       {sets.length === 0 ? (
         <EmptyState
