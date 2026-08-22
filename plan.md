@@ -22,8 +22,7 @@ Since migration `0086_materials_are_items.sql`, a recipe built against
 the shared items master carries `item_id` and a **null** `material_id` —
 that's by design. But `getVillaDetail()` in `lib/supervisors/queries.ts`
 (the `takeoffRows` filter, ~L251–270) still demands
-`material_id !== null` on every takeoff row, a leftover from before
-0086. Every row of Villa 10's estimate has `material_id` null, so all of
+`material_id !== null` on every takeoff row, a leftover from before 0086. Every row of Villa 10's estimate has `material_id` null, so all of
 them are silently dropped and the villa page believes there is no
 estimate at all.
 
@@ -56,8 +55,15 @@ No migration, no RLS, no view change, no money — pure app-layer filter.
       (e.g. "The supervisors' villa page stops hiding works estimated
       through the items master") and push; confirm the CI run is green
       with `gh run list`, not just the push.
-- [ ] **[Fable]** Review the diff against this plan, SECURITY.md and
-      BUGCATCHER.md; give the merge overview.
+- [x] **[Fable]** Review the diff against this plan, SECURITY.md and
+      BUGCATCHER.md; give the merge overview. **Verdict: approved.** The
+      diff is exactly the two changes the plan named, nothing else moved,
+      556/556 tests and a clean typecheck. No policy, view or money
+      surface is touched. Two findings from the review, recorded where
+      they belong: the same null-`material_id` blindness exists in the
+      Indents estimate-pull path (now in TODO.md — it is real work, not a
+      one-line filter, because that path is keyed on `material_id`
+      end-to-end), and the pattern itself is BUGCATCHER #16.
 - [ ] **[Founder]** Vet on staging.goodearthkannur.org: open
       Supervisors → Villa 10 → "Dry rubble masonry" should now show its
       three materials with estimated quantities, and the Request
@@ -82,3 +88,12 @@ No migration, no RLS, no view change, no money — pure app-layer filter.
   local `npm test` + `npm run typecheck` the accepted gate for
   direct-to-staging commits (with CI proper reserved for the
   staging→master PR)?
+
+**[Fable] Answer on CI:** working as designed — SHIPPING.md puts the CI
+gate on **pull requests**, not on branch pushes ("A merge that skips the
+PR skips the gate — which is the one good reason to always use one").
+A direct push to `staging` runs no workflow, so for this no-migration
+fix the local gate (`npm test` + `npm run typecheck`, both green) is the
+accepted cover, and CI proper runs on the eventual `staging` → `master`
+PR. Do not add a `staging` push trigger off your own bat; if the founder
+wants one it is a one-line workflow change to propose separately.

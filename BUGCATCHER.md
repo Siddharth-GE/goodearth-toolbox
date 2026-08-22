@@ -254,6 +254,18 @@ _Caught 2026-08-22 by the founder, pressing "Add a drawing" on staging during th
 
 **The check.** When a deployed button fails with a Reference code that `app_errors` doesn't hold, go straight to `npx vercel logs` for that deployment (the CLI on the founder's machine is signed in) — and go quickly, the logs are gone within the hour. After any deploy that changes dependencies or Vercel's build behaves oddly, press one button in each file that touches `sharp`: a staff photo, a design view, a drawing sheet.
 
+### 16. A type-narrowing filter quietly enforced a schema that no longer exists
+
+_Caught 2026-08-22 by a supervisor on staging: Villa 10's freshly submitted estimate showed nothing at all on the Supervisors villa page, so no material could be requested._
+
+**What happened.** Migration `0086` changed the meaning of `estimate_takeoff_facts`: a recipe built against the shared items master carries `item_id` and a **null `material_id`, by design**. The Supervisors read (`lib/supervisors/queries.ts`) still narrowed the view's all-nullable rows with `row.material_id !== null` — correct before `0086`, silently wrong after. Every takeoff row of a post-`0086` estimate failed that guard, so the villa page concluded the villa had **no official estimate at all** and offered nothing to request. The estimate, the snapshot and the view were all perfect; the drop happened in the last twenty lines before the screen.
+
+**Why every gate missed it.** The generated types make **every** column of a view nullable, so some narrowing filter is mandatory — and typecheck is _happier_ the stricter it is. An over-strict guard is indistinguishable, to every mechanical gate, from a correct one: it lints, type-checks, builds, and the unit tests exercise the pure arithmetic downstream of the filter. The page renders fine too, because "this villa has no estimate yet" is a legal, styled state — the screen showed a truthful-looking emptiness. And `0086` itself shipped green: the drift was between a migration's _meaning_ and a consumer's _assumption_, which no single diff ever contained.
+
+**The rule.** **When a migration changes which columns of a shared view can be null — or what a null means — grep every consumer of that view for its narrowing filter in the same session, and widen each one deliberately.** STATUS.md's contract table names the consumers; the table is the checklist, not just documentation. A narrowing `.filter()` over a view's row type is a **restatement of the schema contract in code**, and it does not update itself. (Same session's second find: the Indents estimate-pull path has the identical assumption, keyed on `material_id` end-to-end — in TODO.md, because that one is a redesign of the row key, not a dropped guard.)
+
+**The check.** Submit an estimate whose recipe uses a post-`0086` items-master component, then open **every screen in the view's contract row** — Supervisors villa page, Indents pull-from-estimate, the Inventory issue note — and confirm the materials actually appear. A view's consumers are only ever proven by data shaped like the _new_ world; every old fixture and every old villa passes forever.
+
 ---
 
 ## Adding to this file
