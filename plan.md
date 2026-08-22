@@ -98,9 +98,18 @@ Villa design page, revision lifecycle, upload action + file route. Upload one re
 
 Landed 2026-08-22: villa picker + villa design page (stage board, revision history, add-a-drawing), six revision/file actions, the private file route, and the works checkbox tree shared with the sets screen. Vetted by Fable the same day — the four in-report decisions all follow named precedents and are accepted; one fix applied in the vet: createDraftRevision now reports honestly when the default work links fail to copy (partial success, the line-pull doctrine) instead of showing plain success over an unlabelled empty list. The real-upload magic-byte smoke remains with step 7.
 
-### 5. ⬜ `[Opus]` Transmittals
+### 5. ✅ `[Opus]` Transmittals
 
 Transmittal create/issue + PDF cover sheet; Opus vets steps 3–4 before each commit.
+
+Built 2026-08-22 and vetted by Fable the same day: diff read against the plan and the guards,
+decisions 10–16 all accepted, and the cover sheet **render-smoked** — both variants (issued and
+draft) rendered to real PDFs from type-correct synthetic data, which the build alone cannot prove.
+(The first smoke crashed on wrongly-shaped hand-made data — a reminder that the type contract is
+load-bearing; the component and route are typechecked against it.) Landed: three queries and six actions in `lib/design-management/`, the transmittals list and
+detail screens, the create dialog on the villa design page, and the letterhead cover sheet at
+`transmittals/[transmittalId]/pdf`. Full checks green (prettier, lint, tsc, test, build,
+check:actions). Seven decisions the plan didn't spell out are below, numbered 10–16.
 
 ### 6. ⬜ `[Sonnet]` Supervisors surfacing
 
@@ -132,6 +141,47 @@ Five notes from step 3 (Sonnet, 2026-08-22) — the plan named the screens but n
 7. **`drawing_set_works` write is a whole-list diff** (`setDrawingSetWorks(setId, workItemIds[])`, insert what's newly checked, delete what's newly unchecked) rather than per-checkbox insert/delete calls — the plan said "insert/delete, there is no update" but not the call shape. Followed Relay's `setTrailSetActivities` precedent (`app/(dashboard)/relay/sets/_components/set-editor.tsx`) so a tree of ~230 works saves as one atomic diff instead of one request per toggle.
 8. **Design stage reorder swaps `sort_order` with the adjacent neighbour** (two updates) rather than rewriting the whole ordered list on every move — cheaper than Relay's rewrite-the-list pattern since a stage move never changes membership, only position. New stages still land at `max + 10`, per the plan.
 9. **The Villas link on the welcome screen points at `/design-management/villas`, which doesn't exist yet** (step 4's territory) — the plan explicitly said to link it anyway and call out that it's dead for now. Confirming that's exactly what shipped: no `villas/` route was created in this step.
+
+Seven notes from step 5 (Opus, 2026-08-22) — the plan named the screens and the rules; where it
+left a choice open, each was settled by following the nearest existing convention rather than
+inventing one.
+
+10. **A transmittal cannot be created empty** — the plan allowed either branch, and this is the
+    "at least one line before it can be created" one: the dialog refuses with "Tick at least one
+    drawing to send." A draft can still _reach_ zero by having its last line removed, and that
+    state is handled honestly rather than hidden: the detail screen says so in danger text, and
+    **Issue stays pressable**, so the RPC's own sentence ("Add at least one drawing before issuing
+    this transmittal") is what the person reads. A greyed-out button teaches nothing.
+11. **The list is ordered by `created_at`, newest first, capped at 100 with a real total.** A draft
+    has no issue date and PostgREST cannot order on a coalesce; in practice a transmittal is issued
+    minutes after it is raised, so the two orders agree, and an unfinished draft belongs at the top
+    anyway. The cap is stated on screen ("Showing the N newest of M"), the `LOGS_SHOWN` convention
+    from Supervisors.
+12. **The issued number reaches the screen through the URL, not through a wider `ActionState`.**
+    `issue_transmittal` returns `TR-0001`; `issueTransmittal` redirects to
+    `…/transmittals/<id>?issued=TR-0001` and the page says "Issued as TR-0001. The drawings on it
+    are now released to site." The alternative was declaring a richer state type in a `"use server"`
+    file (the Marathon `EntryState` precedent), which is exactly the shape CLAUDE.md's red line
+    tells every other action to stay away from. The header shows the number regardless.
+13. **Villa → transmittals is a filtered list**, the option the plan offered: the villa design page
+    links to `/design-management/transmittals?villa=<unitId>`, which says whose transmittals it is
+    showing and offers "Show all villas". The **"New transmittal" dialog sits in the villa page's
+    title actions**, because a transmittal is always for one villa and that is the page that knows
+    which. The welcome screen gained a **Transmittals** link — without it the list was reachable
+    only by guessing the URL.
+14. **Line order follows the pick list, which follows the drawing-set master's own `sort_order`** —
+    not the order the boxes were ticked, which `FormData.getAll` does not preserve anyway. One
+    sequence on the screen, on the transmittal and in the PDF, which is what "sheet order" has to
+    mean.
+15. **The cover sheet carries a signature strip on an issued sheet only** — "Issued by, for
+    Goodearth" and "Received at site" — following `SelectionDocument`, where a draft is deliberately
+    never made to look signable. A draft prints with the DRAFT watermark and a reference reading
+    "Draft", since 0091 refuses to let one hold a number.
+16. **`createTransmittal` cleans up after itself.** The header and its lines are two requests (a
+    `create_draft_transmittal` function was not in the migration and this build does not add one),
+    so if the lines fail the header is deleted again rather than left as an empty draft nobody
+    asked for. If even the cleanup fails it is logged and the empty draft is visible on the list
+    with a working Delete — never silence.
 
 ## Verification — the founder's browser checklist (staging)
 

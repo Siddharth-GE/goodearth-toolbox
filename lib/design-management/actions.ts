@@ -8,12 +8,14 @@ import { DRAWINGS_BUCKET } from "@/lib/design-management/storage";
 import { designView } from "@/lib/pdf/theme";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import sharp from "sharp";
 
 const GRANT = "/design-management";
 const NAME_LIMIT = 120;
 const CODE_LIMIT = 30;
 const DESCRIPTION_LIMIT = 500;
+const NOTE_LIMIT = 1000;
 
 // The server-action body cap (next.config.ts) and the `drawings` bucket's
 // own `file_size_limit` (0091) — stated again here so a file that slips
@@ -30,8 +32,10 @@ function friendlyDbError(error: { message: string }, fallback: string): string {
 }
 
 /**
- * Writes for the Design Management app's own masters: drawing sets,
- * their default work links, and design stages. Every action opens with
+ * Writes for the Design Management app: its own masters (drawing sets,
+ * their default work links, design stages), a villa's drawing revisions
+ * and the sheets on them, and the transmittals that send those drawings
+ * to site. Every action opens with
  * requireTool and ends by revalidating the layout — an exact-path call
  * would leave the welcome counts stale while the moved list refreshes
  * (the exact-path trap in CLAUDE.md). Nothing here writes another
@@ -700,4 +704,237 @@ export async function deleteDrawingRevisionFile(fileId: string): Promise<ActionS
 
   revalidatePath("/design-management", "layout");
   return undefined;
+}
+
+// ---------------------------------------------------------------------
+// Transmittals — the formal record of what went to site
+// ---------------------------------------------------------------------
+
+/**
+ * Raises a draft transmittal and its lines in one go.
+ *
+ * The header carries no number: 0091's CHECK ties `number`, `issued_at`
+ * and `issued_by` to the issued status both ways, so a draft holding a
+ * number is refused by the database. The number is minted on Issue and
+ * nowhere else, which is why an abandoned draft cannot burn TR-0003.
+ *
+ * The lines denormalise `unit_id` on purpose — the composite FKs then
+ * make a line carrying another villa's drawing impossible. `sort_order`
+ * follows the order of the pick list, which is the drawing sets' own
+ * master order, so the screen and the PDF read in the same sequence.
+ */
+export async function createTransmittal(
+  unitId: string,
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+
+  const stageId = text(formData, "design_stage_id");
+  if (!stageId) return { error: "Pick the design stage this goes out at." };
+
+  const note = text(formData, "note");
+  if (note.length > NOTE_LIMIT) return { error: `Keep the note under ${NOTE_LIMIT} characters.` };
+
+  const revisionIds = formData
+    .getAll("revision_id")
+    .map((value) => String(value))
+    .filter(Boolean);
+  if (revisionIds.length === 0) return { error: "Tick at least one drawing to send." };
+
+  const supabase = await createClient();
+  const { data: transmittal, error } = await supabase
+    .from("transmittals")
+    .insert({
+      unit_id: unitId,
+      design_stage_id: stageId,
+      note: note || null,
+      created_by: user.id,
+    })
+    .select("id")
+    .single();
+  if (error) {
+    console.error("createTransmittal insert failed:", error);
+    return { error: friendlyDbError(error, "Could not start the transmittal. Try again.") };
+  }
+
+  const { error: linesError } = await supabase.from("transmittal_lines").insert(
+    revisionIds.map((revisionId, index) => ({
+      transmittal_id: transmittal.id,
+      unit_id: unitId,
+      drawing_revision_id: revisionId,
+      sort_order: index,
+      created_by: user.id,
+    })),
+  );
+  if (linesError) {
+    console.error("createTransmittal lines failed:", linesError);
+    // Nothing landed under the header, so take the header away too
+    // rather than leave an empty draft nobody asked for. It is still a
+    // draft with no lines, which both the delete policy and the guard
+    // allow; if even that fails the draft is visible on the list and
+    // can be deleted by hand, which is why the failure is only logged.
+    const { error: cleanupError } = await supabase
+      .from("transmittals")
+      .delete()
+      .eq("id", transmittal.id);
+    if (cleanupError) console.error("createTransmittal cleanup failed:", cleanupError);
+    return { error: friendlyDbError(linesError, "Could not add those drawings. Try again.") };
+  }
+
+  revalidatePath("/design-management", "layout");
+  redirect(`/design-management/transmittals/${transmittal.id}`);
+}
+
+/** Note and stage, editable only while the transmittal is a draft — the
+ *  guard trigger refuses both once it has been issued, and that refusal
+ *  is shown rather than swallowed. */
+export async function updateDraftTransmittal(
+  transmittalId: string,
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireTool(GRANT);
+
+  const stageId = text(formData, "design_stage_id");
+  if (!stageId) return { error: "Pick the design stage this goes out at." };
+
+  const note = text(formData, "note");
+  if (note.length > NOTE_LIMIT) return { error: `Keep the note under ${NOTE_LIMIT} characters.` };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("transmittals")
+    .update({ design_stage_id: stageId, note: note || null })
+    .eq("id", transmittalId);
+  if (error) {
+    console.error("updateDraftTransmittal failed:", error);
+    return { error: friendlyDbError(error, "Could not save this transmittal. Try again.") };
+  }
+
+  revalidatePath("/design-management", "layout");
+  return undefined;
+}
+
+/**
+ * Adds one drawing to a draft. `unit_id` is read from the header rather
+ * than passed in from the browser — the composite FK would refuse a
+ * mismatched pair anyway, and reading it here means the screen can never
+ * be the thing that decides which villa a line belongs to.
+ */
+export async function addTransmittalLine(
+  transmittalId: string,
+  revisionId: string,
+): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+  const supabase = await createClient();
+
+  const { data: transmittal, error: readError } = await supabase
+    .from("transmittals")
+    .select("unit_id")
+    .eq("id", transmittalId)
+    .maybeSingle();
+  if (readError) {
+    console.error("addTransmittalLine read failed:", readError);
+    return { error: "Could not add that drawing. Try again." };
+  }
+  if (!transmittal) return { error: "That transmittal no longer exists." };
+
+  const { data: last } = await supabase
+    .from("transmittal_lines")
+    .select("sort_order")
+    .eq("transmittal_id", transmittalId)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { error } = await supabase.from("transmittal_lines").insert({
+    transmittal_id: transmittalId,
+    unit_id: transmittal.unit_id,
+    drawing_revision_id: revisionId,
+    sort_order: (last?.sort_order ?? -1) + 1,
+    created_by: user.id,
+  });
+  if (error) {
+    if (error.code === "23505") return { error: "That drawing is already on this transmittal." };
+    if (error.code === "23503") {
+      return { error: "That drawing belongs to another villa and can't go on this transmittal." };
+    }
+    console.error("addTransmittalLine insert failed:", error);
+    return { error: friendlyDbError(error, "Could not add that drawing. Try again.") };
+  }
+
+  revalidatePath("/design-management", "layout");
+  return undefined;
+}
+
+export async function removeTransmittalLine(lineId: string): Promise<ActionState> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("transmittal_lines").delete().eq("id", lineId);
+  if (error) {
+    console.error("removeTransmittalLine failed:", error);
+    return { error: friendlyDbError(error, "Could not take that drawing off. Try again.") };
+  }
+
+  revalidatePath("/design-management", "layout");
+  return undefined;
+}
+
+/**
+ * The one act that puts a drawing in front of site.
+ *
+ * `issue_transmittal` (0091 §10) does the whole thing in one
+ * transaction: it refuses an empty transmittal, releases every draft
+ * revision on it, supersedes whatever that set had released before, and
+ * mints the number — which it returns. The number goes into the URL so
+ * the refreshed page can say it in words; the header shows it too, but
+ * "Issued as TR-0001" is the sentence the person pressing the button is
+ * waiting for.
+ *
+ * Every refusal in that function is a RAISE written for a person to
+ * read, so it is passed through rather than replaced — including "Add at
+ * least one drawing before issuing this transmittal", which is why the
+ * button stays pressable on an empty draft instead of quietly hiding.
+ */
+export async function issueTransmittal(transmittalId: string): Promise<ActionState> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+
+  const { data: number, error } = await supabase.rpc("issue_transmittal", {
+    p_transmittal_id: transmittalId,
+  });
+  if (error) {
+    console.error("issueTransmittal failed:", error);
+    return { error: friendlyDbError(error, "Could not issue this transmittal. Try again.") };
+  }
+
+  revalidatePath("/design-management", "layout");
+  redirect(
+    `/design-management/transmittals/${transmittalId}?issued=${encodeURIComponent(number ?? "")}`,
+  );
+}
+
+/**
+ * A draft raised by mistake, gone entirely — header and lines in one
+ * transaction (`delete_draft_transmittal`, 0091 §10), because two
+ * requests can fail in between and strand a header with its lines gone.
+ * An issued transmittal is refused by the function and by the guard: it
+ * is the answer to "what did site have on the 22nd".
+ */
+export async function deleteDraftTransmittal(transmittalId: string): Promise<ActionState> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+
+  const { error } = await supabase.rpc("delete_draft_transmittal", {
+    p_transmittal_id: transmittalId,
+  });
+  if (error) {
+    console.error("deleteDraftTransmittal failed:", error);
+    return { error: friendlyDbError(error, "Could not delete this draft. Try again.") };
+  }
+
+  revalidatePath("/design-management", "layout");
+  redirect("/design-management/transmittals");
 }

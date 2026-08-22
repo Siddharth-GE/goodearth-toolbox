@@ -5,11 +5,6 @@ import { ToolWelcome } from "../_components/tool-welcome";
 // The welcome screen (founder, 2026-08-13: every Management/Operations
 // tool opens on one). Counts only, never rupees — this tool has no
 // money anywhere in it, not even a fact view to gate.
-//
-// The "Villas" link points at /design-management/villas, which step 4
-// of this build (the running plan.md) still has to create — a dead
-// link on a feature branch for a day, not shipped to staging until
-// that step lands.
 export default async function DesignManagementPage() {
   const counts = await getWelcomeCounts();
 
@@ -33,6 +28,7 @@ export default async function DesignManagementPage() {
       ]}
       links={[
         { label: "Villas", href: "/design-management/villas", primary: true },
+        { label: "Transmittals", href: "/design-management/transmittals" },
         { label: "Drawing sets", href: "/design-management/sets" },
         { label: "Design stages", href: "/design-management/stages" },
       ]}

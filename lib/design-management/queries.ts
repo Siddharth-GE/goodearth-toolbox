@@ -539,3 +539,433 @@ export async function getVillaDesignDetail(unitId: string): Promise<VillaDesignD
     availableSets,
   };
 }
+
+// ---------------------------------------------------------------------
+// Transmittals
+// ---------------------------------------------------------------------
+
+/**
+ * The list shows this many and says how many there are in total — the
+ * Supervisors labour-log convention (`LOGS_SHOWN`). Nobody scrolls a
+ * hundred rows back; the per-villa filter is how you narrow it.
+ */
+const TRANSMITTALS_SHOWN = 100;
+
+export type TransmittalListRow = {
+  id: string;
+  /** Null while it is a draft — the number is minted on Issue (0091 §7). */
+  number: string | null;
+  status: "draft" | "issued";
+  unitId: string;
+  villaName: string;
+  plotName: string;
+  projectName: string;
+  stageName: string;
+  lineCount: number;
+  issuedAt: string | null;
+  issuedByName: string | null;
+  createdAt: string;
+};
+
+/**
+ * Every transmittal, drafts and issued together, newest first.
+ *
+ * Ordered by `created_at` rather than the issue date: a draft has no
+ * issue date at all, and PostgREST cannot order on a coalesce. In
+ * practice a transmittal is issued within minutes of being raised, so
+ * the two orders agree — and an unfinished draft belongs at the top
+ * anyway, since it is the one still asking for attention.
+ *
+ * `unitId` narrows it to one villa — the villa design page's link.
+ */
+export async function listTransmittals(
+  unitId?: string,
+): Promise<{ rows: TransmittalListRow[]; total: number }> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+
+  let query = supabase
+    .from("transmittals")
+    .select("id, unit_id, design_stage_id, number, status, issued_at, issued_by, created_at", {
+      count: "exact",
+    })
+    .order("created_at", { ascending: false })
+    .order("id");
+  if (unitId) query = query.eq("unit_id", unitId);
+
+  const page = await query.range(0, TRANSMITTALS_SHOWN - 1);
+  if (page.error) fail("the transmittals", page.error);
+
+  const transmittals = page.data ?? [];
+  const total = page.count ?? transmittals.length;
+  if (transmittals.length === 0) return { rows: [], total };
+
+  const unitIds = [...new Set(transmittals.map((row) => row.unit_id))];
+  const stageIds = [...new Set(transmittals.map((row) => row.design_stage_id))];
+  const issuerIds = [
+    ...new Set(transmittals.map((row) => row.issued_by).filter((id): id is string => id !== null)),
+  ];
+  const transmittalIds = transmittals.map((row) => row.id);
+
+  // Names merge through Maps, never an embed: `units` has two FK paths
+  // to `plots` (BUGCATCHER #2) and `transmittals` carries two FKs to
+  // `profiles` (created_by and issued_by).
+  const [units, stages, issuers, lines] = await Promise.all([
+    fetchAll<{ id: string; name: string; plot_id: string; project_id: string }>((from, to) =>
+      supabase
+        .from("units")
+        .select("id, name, plot_id, project_id")
+        .in("id", unitIds)
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAll<{ id: string; name: string }>((from, to) =>
+      supabase
+        .from("design_stages")
+        .select("id, name")
+        .in("id", stageIds)
+        .order("id")
+        .range(from, to),
+    ),
+    issuerIds.length > 0
+      ? fetchAll<{ id: string; full_name: string | null }>((from, to) =>
+          supabase
+            .from("profiles")
+            .select("id, full_name")
+            .in("id", issuerIds)
+            .order("id")
+            .range(from, to),
+        )
+      : Promise.resolve([]),
+    fetchAll<{ transmittal_id: string }>((from, to) =>
+      supabase
+        .from("transmittal_lines")
+        .select("transmittal_id")
+        .in("transmittal_id", transmittalIds)
+        .order("id")
+        .range(from, to),
+    ),
+  ]);
+
+  const plotIds = [...new Set(units.map((unit) => unit.plot_id))];
+  const projectIds = [...new Set(units.map((unit) => unit.project_id))];
+  const [plots, projects] = await Promise.all([
+    fetchAll<{ id: string; name: string }>((from, to) =>
+      supabase.from("plots").select("id, name").in("id", plotIds).order("id").range(from, to),
+    ),
+    fetchAll<{ id: string; name: string }>((from, to) =>
+      supabase.from("projects").select("id, name").in("id", projectIds).order("id").range(from, to),
+    ),
+  ]);
+
+  const plotNames = new Map(plots.map((plot) => [plot.id, plot.name]));
+  const projectNames = new Map(projects.map((project) => [project.id, project.name]));
+  const unitsById = new Map(units.map((unit) => [unit.id, unit]));
+  const stageNames = new Map(stages.map((stage) => [stage.id, stage.name]));
+  const issuerNames = new Map(issuers.map((issuer) => [issuer.id, issuer.full_name]));
+
+  const lineCounts = new Map<string, number>();
+  for (const line of lines) {
+    lineCounts.set(line.transmittal_id, (lineCounts.get(line.transmittal_id) ?? 0) + 1);
+  }
+
+  return {
+    rows: transmittals.map((row) => {
+      const unit = unitsById.get(row.unit_id);
+      return {
+        id: row.id,
+        number: row.number,
+        status: row.status as TransmittalListRow["status"],
+        unitId: row.unit_id,
+        villaName: unit?.name ?? "—",
+        plotName: unit ? (plotNames.get(unit.plot_id) ?? "—") : "—",
+        projectName: unit ? (projectNames.get(unit.project_id) ?? "—") : "—",
+        stageName: stageNames.get(row.design_stage_id) ?? "—",
+        lineCount: lineCounts.get(row.id) ?? 0,
+        issuedAt: row.issued_at,
+        issuedByName: row.issued_by ? (issuerNames.get(row.issued_by) ?? null) : null,
+        createdAt: row.created_at,
+      };
+    }),
+    total,
+  };
+}
+
+export type TransmittalCandidate = {
+  setId: string;
+  setCode: string | null;
+  setName: string;
+  revisionId: string;
+  revisionNo: number;
+  /** Never "superseded" — a transmittal only carries what is current. */
+  status: "draft" | "released";
+  note: string | null;
+  fileCount: number;
+};
+
+/**
+ * What a transmittal for this villa could carry: every drawing set with
+ * a revision here, at its CURRENT revision — the draft if one is open,
+ * otherwise the released one. A superseded revision is never offered;
+ * re-sending a retired drawing is the confusion this tool exists to end.
+ * A released revision can be picked on purpose: the same set going out
+ * again at a new design stage, which 0091's issue function expects and
+ * leaves alone.
+ */
+export async function listTransmittalCandidates(unitId: string): Promise<TransmittalCandidate[]> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+
+  const revisions = await fetchAll<{
+    id: string;
+    drawing_set_id: string;
+    revision_no: number;
+    status: string;
+    note: string | null;
+  }>((from, to) =>
+    supabase
+      .from("drawing_revisions")
+      .select("id, drawing_set_id, revision_no, status, note")
+      .eq("unit_id", unitId)
+      .in("status", ["draft", "released"])
+      .order("drawing_set_id")
+      .order("revision_no", { ascending: false })
+      .range(from, to),
+  );
+  if (revisions.length === 0) return [];
+
+  // One per set, and the draft wins — it is the newer drawing and the
+  // one the designer has been working on.
+  const currentBySet = new Map<string, (typeof revisions)[number]>();
+  for (const revision of revisions) {
+    const held = currentBySet.get(revision.drawing_set_id);
+    if (!held || (held.status !== "draft" && revision.status === "draft")) {
+      currentBySet.set(revision.drawing_set_id, revision);
+    }
+  }
+
+  const setIds = [...currentBySet.keys()];
+  const revisionIds = [...currentBySet.values()].map((revision) => revision.id);
+
+  const [sets, files] = await Promise.all([
+    fetchAll<{ id: string; code: string | null; name: string; sort_order: number }>((from, to) =>
+      supabase
+        .from("drawing_sets")
+        .select("id, code, name, sort_order")
+        .in("id", setIds)
+        .order("sort_order")
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAll<{ drawing_revision_id: string }>((from, to) =>
+      supabase
+        .from("drawing_revision_files")
+        .select("drawing_revision_id")
+        .in("drawing_revision_id", revisionIds)
+        .order("id")
+        .range(from, to),
+    ),
+  ]);
+
+  const fileCounts = new Map<string, number>();
+  for (const file of files) {
+    fileCounts.set(file.drawing_revision_id, (fileCounts.get(file.drawing_revision_id) ?? 0) + 1);
+  }
+
+  // In the set master's own order, so the pick list, the transmittal and
+  // the PDF all read in the same sequence.
+  return sets.flatMap((set) => {
+    const revision = currentBySet.get(set.id);
+    if (!revision) return [];
+    return [
+      {
+        setId: set.id,
+        setCode: set.code,
+        setName: set.name,
+        revisionId: revision.id,
+        revisionNo: revision.revision_no,
+        status: revision.status as TransmittalCandidate["status"],
+        note: revision.note,
+        fileCount: fileCounts.get(revision.id) ?? 0,
+      },
+    ];
+  });
+}
+
+export type TransmittalLineRow = {
+  lineId: string;
+  revisionId: string;
+  setCode: string | null;
+  setName: string;
+  revisionNo: number;
+  revisionStatus: "draft" | "released" | "superseded";
+  revisionNote: string | null;
+  files: { id: string; fileName: string }[];
+};
+
+export type TransmittalDetail = {
+  id: string;
+  number: string | null;
+  status: "draft" | "issued";
+  note: string | null;
+  stageId: string;
+  stageName: string;
+  unitId: string;
+  villaName: string;
+  plotName: string;
+  projectName: string;
+  issuedAt: string | null;
+  issuedByName: string | null;
+  createdAt: string;
+  /** In sheet order — what the screen lists and the PDF prints. */
+  lines: TransmittalLineRow[];
+};
+
+/**
+ * One transmittal, everything the detail screen and the PDF cover sheet
+ * need. `null` when the id doesn't exist — the caller's `notFound()`,
+ * and also what someone without this tool's grant gets for a draft,
+ * since the widened SELECT qual (0091 §11) hides it rather than
+ * refusing.
+ */
+export async function getTransmittalDetail(
+  transmittalId: string,
+): Promise<TransmittalDetail | null> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+
+  const { data: transmittal, error } = await supabase
+    .from("transmittals")
+    .select("id, unit_id, design_stage_id, number, note, status, issued_at, issued_by, created_at")
+    .eq("id", transmittalId)
+    .maybeSingle();
+  if (error) fail("the transmittal", error);
+  if (!transmittal) return null;
+
+  const [unit, stage, issuer, lines] = await Promise.all([
+    supabase
+      .from("units")
+      .select("name, plot_id, project_id")
+      .eq("id", transmittal.unit_id)
+      .maybeSingle(),
+    supabase
+      .from("design_stages")
+      .select("name")
+      .eq("id", transmittal.design_stage_id)
+      .maybeSingle(),
+    transmittal.issued_by
+      ? supabase.from("profiles").select("full_name").eq("id", transmittal.issued_by).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    fetchAll<{ id: string; drawing_revision_id: string; sort_order: number }>((from, to) =>
+      supabase
+        .from("transmittal_lines")
+        .select("id, drawing_revision_id, sort_order")
+        .eq("transmittal_id", transmittalId)
+        .order("sort_order")
+        .order("id")
+        .range(from, to),
+    ),
+  ]);
+  if (unit.error) fail("the transmittal", unit.error);
+  if (stage.error) fail("the transmittal", stage.error);
+  if (issuer.error) fail("the transmittal", issuer.error);
+
+  const [plot, project] = await Promise.all([
+    unit.data
+      ? supabase.from("plots").select("name").eq("id", unit.data.plot_id).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    unit.data
+      ? supabase.from("projects").select("name").eq("id", unit.data.project_id).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+  ]);
+  if (plot.error) fail("the transmittal", plot.error);
+  if (project.error) fail("the transmittal", project.error);
+
+  const revisionIds = lines.map((line) => line.drawing_revision_id);
+  const [revisions, files] = await Promise.all([
+    revisionIds.length > 0
+      ? fetchAll<{
+          id: string;
+          drawing_set_id: string;
+          revision_no: number;
+          status: string;
+          note: string | null;
+        }>((from, to) =>
+          supabase
+            .from("drawing_revisions")
+            .select("id, drawing_set_id, revision_no, status, note")
+            .in("id", revisionIds)
+            .order("id")
+            .range(from, to),
+        )
+      : Promise.resolve([]),
+    revisionIds.length > 0
+      ? fetchAll<{
+          id: string;
+          drawing_revision_id: string;
+          file_name: string;
+          sort_order: number;
+        }>((from, to) =>
+          supabase
+            .from("drawing_revision_files")
+            .select("id, drawing_revision_id, file_name, sort_order")
+            .in("drawing_revision_id", revisionIds)
+            .order("sort_order")
+            .order("id")
+            .range(from, to),
+        )
+      : Promise.resolve([]),
+  ]);
+
+  const setIds = [...new Set(revisions.map((revision) => revision.drawing_set_id))];
+  const sets =
+    setIds.length > 0
+      ? await fetchAll<{ id: string; code: string | null; name: string }>((from, to) =>
+          supabase
+            .from("drawing_sets")
+            .select("id, code, name")
+            .in("id", setIds)
+            .order("id")
+            .range(from, to),
+        )
+      : [];
+
+  const setsById = new Map(sets.map((set) => [set.id, set]));
+  const revisionsById = new Map(revisions.map((revision) => [revision.id, revision]));
+  const filesByRevision = new Map<string, { id: string; fileName: string }[]>();
+  for (const file of files) {
+    const list = filesByRevision.get(file.drawing_revision_id) ?? [];
+    list.push({ id: file.id, fileName: file.file_name });
+    filesByRevision.set(file.drawing_revision_id, list);
+  }
+
+  return {
+    id: transmittal.id,
+    number: transmittal.number,
+    status: transmittal.status as TransmittalDetail["status"],
+    note: transmittal.note,
+    stageId: transmittal.design_stage_id,
+    stageName: stage.data?.name ?? "—",
+    unitId: transmittal.unit_id,
+    villaName: unit.data?.name ?? "—",
+    plotName: plot.data?.name ?? "—",
+    projectName: project.data?.name ?? "—",
+    issuedAt: transmittal.issued_at,
+    issuedByName: issuer.data?.full_name ?? null,
+    createdAt: transmittal.created_at,
+    lines: lines.map((line) => {
+      const revision = revisionsById.get(line.drawing_revision_id);
+      const set = revision ? setsById.get(revision.drawing_set_id) : undefined;
+      return {
+        lineId: line.id,
+        revisionId: line.drawing_revision_id,
+        setCode: set?.code ?? null,
+        setName: set?.name ?? "Unknown drawing set",
+        revisionNo: revision?.revision_no ?? 0,
+        revisionStatus: (revision?.status ?? "draft") as TransmittalLineRow["revisionStatus"],
+        revisionNote: revision?.note ?? null,
+        files: filesByRevision.get(line.drawing_revision_id) ?? [],
+      };
+    }),
+  };
+}
