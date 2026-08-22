@@ -1,129 +1,123 @@
-# Import the material master and supplier vendors (Material.xlsx)
-
-> On approval, this file becomes repo-root `plan.md` (the running build plan, per CLAUDE.md/MODELS.md). Steps carry owner tags.
+# Design Management — build plan
 
 ## Context
 
-The founder supplied `C:\Users\Kaicha\Downloads\Material.xlsx`: the full construction material master (~2,050 materials) and 83 supplier vendors with contact, GST, bank and payment-term details. This is **TODO.md item 3** ("Enter the construction materials in Masters as `kind='material'` items with their indicative prices") — since `0086`, materials ARE the items master, and this data feeds mixes, work recipes, estimates, requests and comparisons. The vendors master currently holds only 85 contractors; the materials band holds 2 seed rows. Both databases are at migration `0088`; branch `staging` is clean and synced.
+The design team issues drawings to site today outside the toolbox — there is no record of which drawing revision a supervisor is building from, and no transmittal trail. Relay deliberately refuses this territory (its PLAN.md: "nothing here stores a drawing, a decision or a document" — it tracks accountability only). This tool holds the artefacts Relay refuses: a **drawing-set master** linked to the works master, per-villa **revisions** with notes, **transmittals** issued per design stage, and the released drawing surfacing in the **Supervisors app** against each work. One drawing set serves many works/activities.
 
-## Source data
+Founder decisions taken 2026-08-22 (this session): own customizable design-stage list (coexists with Relay's stages, the works-vs-construction-stages precedent from `0073`); revisions live **per drawing set per villa** (R0, R1… with a note — the Selections model); a revision may hold **several files**; sharing is **in-app + a letterhead PDF cover sheet** to forward manually. Reviving the tool partially reverses the "Relay replaced Design Management" settled decision — the boundary now is: **Relay keeps who-has-the-baton; Design Management keeps the drawings themselves.** STATUS.md's settled-decisions line gets amended to say so.
 
-| Sheet                   | Rows  | What it is                                                                                                                                                                                                   |
-| ----------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `Material Master_New W` | 2,050 | Full master: code, name (col C "Material Description"), category, unit (403 filled), rate (400 filled)                                                                                                       |
-| `Sheet1`                | 561   | Cleaner re-extract of 556 of the same codes (Civil/Electrical/Steel/Tiles categories) with group ("Material"), richer description and reliable UoM; **5 rows have no code** (Laterite blocks, Dust Laterite) |
-| `Vendor Extract Report` | 83    | Vendor name (83), bank name/account/holder/IFSC (72), payment term days (67), address (10), GSTIN+state (9), mobile (7), contact name/designation (6), email (4), creator (ignore — AppSheet metadata)       |
+## Facts already established (do not re-derive)
 
-Quirks found and handled below: one duplicated code (`PLD/836` names two different products); 33 rows with blank category; category spellings vary in case and "Miscelleneous" is misspelt; unit spellings vary (`Sq.Ft`/`Sqft`, `Liter`, `Cu.M.`/`M3`…); Sheet1 and the big sheet disagree on some units (Box↔Nos) — Sheet1 wins; exactly one sheet vendor ("Linse V") already exists in the DB (as a contractor) — enriched, never duplicated.
+- **`/design-management` is already a legal slug** in both `user_apps_app_known` and `role_apps_app_known` (since `0030`, restated through `0084`). **No CHECK migration needed.**
+- Next migration number: **`0091`**. Highest applied is `0090`.
+- Anchor: design side anchors **`unit_id`** (like Selections/Estimator); Supervisors bridges plot→unit via the `0029` 1:1 exactly as `lib/supervisors/queries.ts:211` already does.
+- No money anywhere in this tool — no fact view needed; plain tables with widened SELECT quals (the `issue_requests` pattern from `0084`), **no view-manifest change**.
+- Server-action body cap is 4 MB (`next.config.ts`) and Vercel caps request bodies ~4.5 MB — so **each drawing file is capped at 4 MB**; a big set is uploaded as several sheet files (multiple files per revision makes this workable). If real drawings outgrow this, the later escape hatch is signed upload URLs direct to storage — not now.
 
-## Decisions (founder, via AskUserQuestion, 2026-08-20)
+## Migration `0091_design_management.sql` — one migration, everything below
 
-1. **Bank details go in a gated side-table**, not on the ungated vendors master (estimator-rate precedent: masters reads are open to all staff).
-2. **All 2,050 materials** are imported; Sheet1's description/unit win where it covers a code.
-3. **Blank units default to `nos`**, corrected in Masters as noticed.
+Copy `0084_supervisors.sql`'s structure: numbered sections, audit + `set_updated_at` triggers, RLS on every table, revokes in the same migration, closing `do $$` assertion block (RLS on, policy counts, trigger presence, bucket shape).
 
-## Steps
+**Tables** (all RLS on; writes gated `has_app('/design-management')` unless noted):
 
-### 1. ✅ `[Fable]` Convert the workbook to CSVs in `data/` (gitignored — bank details never enter the public repo)
+1. `design_stages` — id, name (unique on `lower(name)`), sort_order, is_active, audit cols. Seed: Concept, Approvals, Working Drawings, Structural, MEP, Interiors. SELECT open to authenticated (names only, the works-masters shape).
+2. `drawing_sets` (the drawing master) — id, code (unique, optional), name, description, sort_order, is_active, audit cols. SELECT open.
+3. `drawing_set_works` — set_id → drawing_sets, work_item_id → work_items, unique pair. The master's **default** work links. SELECT open.
+4. `drawing_revisions` — id, unit_id → units, drawing_set_id, revision_no int ≥ 0, note text, status `draft|released|superseded`, released_at, released_by → profiles, superseded_by → drawing_revisions, created_by, timestamps. `unique (unit_id, drawing_set_id, revision_no)`; partial unique index: **one draft per (unit, set)**; `unique (id, unit_id)` as composite-FK target (the `0006` selections shape). SELECT qual: `has_app('/design-management') or (has_app('/supervisors') and status <> 'draft')` — **one policy, widened qual, never a second**.
+5. `drawing_revision_works` — revision_id, work_item_id, unique pair, plus denormalised unit consistency if trivial. **Copied from `drawing_set_works` when the revision is created, editable while draft** — this is "customizable on release". Draft-only trigger (the `selection_lines_draft_only` pattern from `0006:177`). SELECT via `exists` on the parent revision's qual.
+6. `drawing_revision_files` — id, revision_id, storage_path (object key, never a URL), file_name, content_type, sort_order, uploaded_by, created_at. Draft-only insert/delete. SELECT via `exists` like above.
+7. `transmittals` — id, unit_id → units, design_stage_id → design_stages, number text unique (`TR-0001` — reuse the existing document-number mechanism POs use; if it is PO-specific, add a row/branch of the same shape), note, status `draft|issued`, issued_at, issued_by, created_by, timestamps; `unique (id, unit_id)`. SELECT qual: `has_app('/design-management') or (has_app('/supervisors') and status = 'issued')`. Draft deletable; **issued transmittal immutable and deletion refused** (guard trigger, the `selections_guard` pattern).
+8. `transmittal_lines` — id, transmittal_id, unit_id (denormalised on purpose), drawing_revision_id; composite FKs `(transmittal_id, unit_id) → transmittals(id, unit_id)` and `(drawing_revision_id, unit_id) → drawing_revisions(id, unit_id)` so a cross-villa line is impossible (the `0006` selection_lines trick); unique (transmittal_id, drawing_revision_id). Draft-only trigger.
 
-Python + openpyxl (already installed) one-off, producing:
+**Guard triggers**: `drawing_revisions_guard` — once status ≠ draft, only `status`/`superseded_by` may move; legal transitions `draft→released`, `released→superseded`. Files/works/lines draft-only as above. Deletion of a released revision refused, not cascaded.
 
-- `data/material_master.csv` — big sheet as-is (code, name, category, unit, rate)
-- `data/material_master_clean.csv` — Sheet1 as-is (category, code, group, description, uom)
-- `data/vendors.csv` — vendor sheet as-is
+**Function** `issue_transmittal(p_transmittal_id uuid)` — `security invoker` (RLS applies), the `issue_selection` shape from `0007:17-53`: `select … for update`; refuse unless draft; refuse zero lines; then for each line's revision — if draft, mark released (stamp released_at/by); supersede any previously-released revision of the same (unit, set), setting `superseded_by`; a line may also carry an **already-released** revision (re-sharing the same set at a new stage — one set, many activities). Finally stamp the transmittal issued. `revoke execute from public, anon` in the same migration. RAISE messages written for a person to read.
 
-Confirm `git check-ignore data/vendors.csv` passes before anything else. Scripts must fail with a plain message if a CSV is missing (import-catalogue precedent).
+**Bucket** `drawings` — private, `file_size_limit` 4194304, MIME allow-list `application/pdf, image/jpeg, image/png`. Path `revisions/<revisionId>/<uuid>.<ext>`. Exactly 3 `storage.objects` policies with **fully-qualified `public.has_app(...)`** (`0061`'s lesson — unqualified fails at upload time, not apply time): SELECT `public.has_app('/design-management') or public.has_app('/supervisors')`; INSERT and DELETE `/design-management` only. No UPDATE policy — a replacement is a new object at a new path. Assertion block pinning bucket private + 3 policies, the `0061`/`0069` shape.
 
-### 2. ✅ `[Fable]` Migration `supabase/migrations/0089_vendor_details.sql`
+Apply protocol (`SHIPPING.md`): `npm run db:apply -- --project ipstebqawrvhkyntctrv --commit` (staging) → `npm run db:types:staging`; production only after the founder's staging vet, then `db:types`.
 
-Additive only, re-runnable, house style (`0082` is the template — audit + `set_updated_at` triggers, drop-if-exists policies, verification DO block):
+## Code
 
-- `alter table vendors add column if not exists` ×4: `email text`, `contact_designation text`, `gst_state text`, `payment_term_days int` (`gst_no`, `address`, `mobile`, `contact_name` already exist).
-- New table `vendor_payment_details`:
-  - `vendor_id uuid primary key references vendors (id)` (1:1), `bank_name text`, `account_number text`, `account_holder_name text`, `ifsc text`, `updated_by uuid references profiles (id)`, `created_at`/`updated_at timestamptz not null default now()`.
-  - RLS on. **One** SELECT policy: `has_app('/masters') or has_app('/purchase-orders') or has_app('/bills')` (never a second SELECT policy — widen this qual later if needed). Insert/update/delete: `has_app('/masters')`.
-  - `audit_row()` and `set_updated_at()` triggers, same shape as `uoms` in 0082.
-  - Verification block: table exists with RLS on, exactly 4 policies, the 4 new vendors columns present.
-- No new views, no function changes, no money columns — bank details are payment _instructions_, gated by the estimator-rate precedent (sensitive data never sits on an ungated masters read).
+**Registry & shell**
+- `lib/tools.ts`: add `DraftingCompass` (lucide) to `TOOL_ICONS`; new entry — name "Design Management", href `/design-management`, group **Management**, `built: true`, plain-English description. Amend the lines 182–185 comment: Relay keeps accountability; this tool now holds the artefacts.
+- `CLAUDE.md`: add `lib/drawings/` to the shared-utilities list (one line).
 
-### 3. ✅ `[Fable]` Review 0089, then apply to **staging**
+**New shared module `lib/drawings/`** (the `lib/design-views` precedent: Design Management owns all writes; reads shared, no grant check inside — each caller gates itself): `queries.ts` with `listReleasedDrawingsForUnit(unitId)` → sets with latest released revision, note, files, work links; and `downloadDrawingFile(fileId)`. Consumed by Supervisors and by Design Management's own screens.
 
-MODELS.md hard rule: an RLS-touching migration reaches `db:apply` only after Fable review.
-`npm run db:apply -- --project ipstebqawrvhkyntctrv --commit`, then `npm run db:types:staging`… **no** — types must keep coming from wherever the team currently generates them; run `npm run db:types:staging` during the build, and regenerate from production after the production apply (the 7de62cd precedent).
+**Tool code** — `lib/design-management/queries.ts` + `actions.ts` (module-level `const GRANT = "/design-management"`, every function opens `requireTool(GRANT)`, actions return `ActionState`, never throw, **no `export type` re-exports from `"use server"` files**, every action ends `revalidatePath("/design-management", "layout")`). `getWelcomeCounts()` in one `Promise.all` of `head: true, count: "exact"` reads: drawing sets, villas with released drawings, draft revisions, transmittals issued — counts, never rupees.
 
-### 4. ✅ `[Fable]` `scripts/import-material-master.ts`
+**Upload action** — copy `uploadMyPhoto` (`lib/directory/actions.ts:158-259`) step-for-step: `requireTool` first; `file instanceof File`, size ≤ 4 MB, MIME allow-list; images re-normalised via `sharp` to JPEG (`fit: "contain"` on white — never crop a drawing, per `lib/pdf/theme.ts` designView doctrine), PDFs stored as-is; **`new Blob([new Uint8Array(buf)], { type })` — BUGCATCHER #1**; upload, then `storage.list` size-verify, remove on mismatch; object-then-row with `storage.remove` on row failure; delete is row-first-then-object.
 
-Follows `import-contractors.ts` exactly: `requireProjectRef`/`isCommit`/`sql`/`literal` from `scripts/supabase-management.ts`, dry run by default, `--project <ref> --commit` to write, idempotent (a re-run prints all `=` and writes nothing). Row data moves via `jsonb_populate_recordset` (the `clone-data.ts` rule — no hand-rolled quoting of 2,050 rows).
+**File serving route** — `app/(dashboard)/design-management/files/[fileId]/route.ts` (the `selections/views/[viewId]/route.ts` shape): `getCurrentUser()` → 401; `hasApp('/design-management') || hasApp('/supervisors')` → else 403 (`hasApp`, not `requireTool` — a redirect is meaningless in a fetch response); look up the file row **via the RLS-scoped client** so the widened qual hides draft files from supervisors automatically; stream `download()`, `Content-Type` from the stored `content_type`, `Cache-Control: private, max-age=3600`.
 
-Merge rule:
+**Screens** — `app/(dashboard)/design-management/`: `PLAN.md`, `layout.tsx` (`requireUser` → `requireApp`), `loading.tsx` with shared `Spinner` on every route, all UI from `components/ui/*`, read `DESIGN.md` before styling:
+- `page.tsx` — welcome via `tool-welcome.tsx` (the `supervisors/page.tsx` template).
+- `sets/` — drawing master list + create/edit; work-links editor over `getWorksTree()` from `lib/masters/works.ts` (checkbox tree, the established works picker data).
+- `stages/` — the stage master (rename, reorder, retire).
+- `villas/` — picker (copy the Supervisors villa list pattern; display villa + plot + project names, merge names through `Map`s — **no bare embeds**: units→plots has two FK paths, BUGCATCHER #2, and `drawing_revisions` has multiple FKs to `profiles`, so profile names also merge through Maps).
+- `villas/[unitId]/` — the villa design page: stage board (per stage: transmittals issued + last date — **derived, never stored**), each set with its revision history (R#, note, files, status), upload-revision dialog (creates the draft, copies default work links), edit note/work-links while draft, "Start next revision" (max+1 for the unit+set, the `create_next_revision` numbering rule).
+- `transmittals/` + `transmittals/[transmittalId]/` — create draft (villa + stage + pick sets at their current revision + note), detail with Issue button calling the RPC (strip the plpgsql prefix from RAISE messages, `lib/selections/actions.ts:85` pattern), and `pdf/route.ts` — `DocumentPage` with `documentType="TRANSMITTAL"`, `reference=number`, `isDraft` until issued, one `DocumentTable` of set code / name / revision / note / files; `createElement` not JSX (route.ts cannot compile JSX); filename `Goodearth-Transmittal-<number>.pdf`; `Cache-Control: no-store`.
 
-- Base = big sheet. For the 556 codes Sheet1 covers: **name** = Sheet1 "Material Description", **description** = Sheet1 "Material" (group), **uom** = Sheet1 UoM. Big-only rows: name = col C, description = col B (2 rows), uom = col E.
-- Append Sheet1's 5 code-less rows (code `null`).
-- `PLD/836`: first occurrence ("Hose Clip1\"SS") keeps the code; the second ("Hose Coller PVC 32mm") is inserted with code `null` and flagged in the dry run for the founder to assign a code in Masters.
-- `kind='material'`, `is_active=true`, `indicative_price` = Rate (400 rows; else null), brand/placement null.
-- **Refinement found during build (Fable):** 74 of the 400 priced rows have a unit dispute between the two sheets (bricks priced per box vs per piece, wire per coil vs per metre) and neither sheet is consistently right. A rate belongs to the unit it was quoted in, so on those 74 rows the unit follows Sheet1 and the **rate is cleared and flagged** in the dry run — a blank price gets noticed and re-entered in Masters; a wrong one silently feeds estimates. 326 rates import untouched.
+**Supervisors surfacing** (their folder, via `lib/drawings/` only — one tool never imports another tool's code; a shared module is the sanctioned answer):
+- Villa page (`app/(dashboard)/supervisors/villas/[plotId]/page.tsx`): a **Drawings section** (released sets: name, R#, date, note, tappable files — phone-first) after the estimate line; and a **"Drawing · R2" chip** in each per-work `Section` header (`page.tsx:174-180`) where a released revision's work links include that `work_item_id`, linking to the file route.
 
-Category normalisation (canonical names, `kind='material'`, created if missing — dry run lists which):
-Civil Materials, Electrical Materials, Steel Materials, Finishing Materials, Tiles & Granite Materials, Plumbing Materials, Miscellaneous Materials (typo fixed), Hardware & Tools Materials, Wood Work Materials, Safety Materials, Tools and Equipments, Interior Items, Nursery Plants. Case variants merge into these. Blank category (33 rows) derives from the code prefix (`STL`→Steel, `FIN`→Finishing, `TILE`→Tiles & Granite, `ELE`→Electrical, `CVL`→Civil, `TE`→Tools and Equipments, `PLD`→Plumbing, `MIS`/`GEN`→Miscellaneous, `HW`→Hardware & Tools, `INT`→Interior Items, `SAFE`→Safety, `NUR`→Nursery Plants, `WOD`→Wood Work); anything unresolvable → Miscellaneous Materials, flagged in the dry run.
+**Not in scope** (say no, note for later): Relay's `pusher_chain_links` gaining a `'transmittal'` target kind; outbound email; per-supervisor plot assignment; catalogue-picker allow-list (this tool doesn't use the catalogue picker).
 
-UoM mapping (case-insensitive; targets are `uoms.name` values):
-`Nos`→`nos`, `Cft`→`cft`, `Kg`→`kg`, `Bag`→`bag`, `Sqft`/`Sq.Ft`/`Sq.ft`→`sqft`, `Liter`→`litre`, `Cu.M.`/`M3`→`cum`, `SET`→`set`, `Unit`→`each`, blank→`nos`; **six new uoms** inserted into the `uoms` master (sort_order continuing from 140): `box`, `mtr`, `roll`, `length`, `pkt`, `ml`. Dry run prints the new-uom list and a count per mapping.
+## Docs, in the same PR
 
-Idempotency keys: coded rows match existing items on `lower(trim(code))`; code-less rows on `lower(trim(name))` within `kind='material'`. Existing rows are skipped, never updated (the 2 seed materials and staging's test "cement" stay untouched). Commit run wraps everything in one transaction and prints per-category counts afterwards.
+- `STATUS.md`: Tools table row (state **Staging**); contract-table rows — **Design Management**: shared `units`/`plots`/`projects`/`profiles` + works masters via `lib/masters/works.ts`; **Supervisors**: add the drawings read via `lib/drawings/`; amend the settled-decisions Relay line.
+- New `app/(dashboard)/design-management/PLAN.md` — the boundary with Relay, the four founder decisions, the 4 MB file rule and why.
+- `TODO.md`: this build replaces the current "next" once the running plan lands at repo-root `plan.md`.
 
-### 5. ✅ `[Fable]` `scripts/import-vendors.ts`
+## Steps and owners (MODELS.md ladder)
 
-Same skeleton. Reads `data/vendors.csv` (83 rows):
+Tick each step here as it lands — mid-build, this list is the live board. A build session takes only the steps tagged for it.
 
-- Match on `lower(trim(name))` against all vendors. Unknown → insert `{name, contact_name, contact_designation, mobile, email, gst_no (GSTIN), gst_state, address, payment_term_days, is_active: true, is_contractor: false}` (blank cells → null). Known ("Linse V", a contractor) → fill only the detail fields the sheet provides, never touching `name`/`is_contractor`/`is_active`; dry run prints exactly what would change.
-- Bank details (72 rows) → `vendor_payment_details` upsert on `vendor_id`.
-- Near-duplicate report (the token heuristic from `import-contractors.ts`) over sheet + DB names, printed for the founder, never auto-merged.
-- "Creator Name" ignored.
+### 1. ✅ `[Fable]` This plan
 
-### 6. ✅ `[Fable]` UI: the new vendor fields become visible and editable
+Approved by the founder 2026-08-22; this file is the running board. Branch `feature/design-management`.
 
-- [lib/masters/vendors.ts](lib/masters/vendors.ts): extend `VendorRow` with `email`, `contact_designation`, `gst_state`, `payment_term_days`.
-- [lib/masters/vendors-actions.ts](lib/masters/vendors-actions.ts): extend `readVendorForm` + both actions with the four fields.
-- Vendor form in `app/(dashboard)/masters/vendors/_components/`: add the four inputs (shared `components/ui/*` inputs only; plain-English labels).
-- [lib/masters/vendor-detail.ts](lib/masters/vendor-detail.ts): also read `vendor_payment_details` for the vendor (**check `error`, not just `data`** — RLS refusal must not render as "no bank details"). New `lib/masters/vendor-payment-actions.ts` (or extend vendors-actions): one upsert action, `requireTool("/masters")` first, `ActionState` return, no `export type` beyond the state alias pattern already used.
-- Vendor detail page `app/(dashboard)/masters/vendors/[vendorId]/`: a "Payment details" card (bank name, account number, holder, IFSC, payment term) with edit via `record-form-dialog` pattern; `revalidatePath` in the existing `"/masters/vendors"` form the file already uses.
-- Items/Masters screens need **nothing** — the items UI already handles `kind='material'`, and its pickers read the `uoms` and `item_categories` masters.
+### 2. ⬜ `[Opus]` draft + ⬜ `[Fable]` review/apply — migration `0091`
 
-### 7. ✅ `[Fable]` Staging run + checks — CI green (run 32382296102), probe smoke passed both paths (deny: probe without /masters is bounced off the masters routes and RLS answers 0 rows; allow: bank card renders with ELOR's HDFC details), PR #48 merged to staging at 93e7179
+Draft `0091` exactly per the spec above (tables, guards, RPC, bucket, revokes, assertions). Then **Fable** reviews it (hard rule: RLS/grants/storage reach `db:apply` only after a Fable review), applies to **staging** (`npm run db:apply -- --project ipstebqawrvhkyntctrv --commit`) and runs `db:types:staging`.
 
-1. CI green on the feature branch (`gh run list` — a successful push is not a green build).
-2. Dry-run both scripts against staging; eyeball the reports (new categories, new uoms, flagged rows, near-dup vendor pairs). Then `--commit`, then re-run dry: everything prints `=`.
-3. Open the pages on staging (BUGCATCHER: a green build proves nothing about a select string): Masters → Items filtered to materials (counts ≈ 2,056 incl. seeds), Masters → Vendors (suppliers filter shows the 83), a vendor detail page showing bank details.
-4. Probe (single-grant) smoke: a probe account **without** `/masters` must not read `vendor_payment_details` (verify via a tool page or direct PostgREST answer — the RLS gate is the point of step 2).
-5. STATUS.md: add `vendor_payment_details` to the cross-tool contract table (Masters-owned; SELECT by `/masters`, `/purchase-orders`, `/bills`).
+### 3. ⬜ `[Sonnet]` Registry + masters screens
 
-### 8. Founder vets on staging.goodearthkannur.org → `[Fable]` approval pass → production
+Registry entry, `lib/design-management/` skeleton, welcome screen, sets + stages master screens.
 
-Only after the founder's explicit go-ahead:
+### 4. ⬜ `[Sonnet]` Villa design page + revisions + files
 
-- `npm run db:apply -- --project pajfrgnkapicdgangjey --commit` (0089), `npm run db:compare` empty, `npm run db:types` (from production).
-- Both import scripts: dry-run against production, review, `--commit`, re-run prints `=`.
-- Merge `staging` → `master` after the Fable diff review; confirm the Vercel Production deployment; press one real write button on production (TODO item 1 rides along).
-- TODO.md: tick item 3; note item 4 (works recipes) is now unblocked.
+Villa design page, revision lifecycle, upload action + file route. Upload one real PDF and one photo on staging, **read both back, check `%PDF` / `ffd8ff` magic bytes and sizes** (BUGCATCHER #1's check).
 
-> **Build note (Fable, 2026-08-20):** the whole build ran in the planning session itself — single autonomous session, so the Opus/Sonnet handoff did not apply; every commit is signed Fable. 0090 was added mid-build: audit_row() requires an `id` column on every audited table, which 0089's vendor_id-keyed table lacked; the first vendor insert caught it and rolled back cleanly.
+### 5. ⬜ `[Opus]` Transmittals
 
-## Branch
+Transmittal create/issue + PDF cover sheet; Opus vets steps 3–4 before each commit.
 
-`feature/masters-vendor-import` off `staging`. Commit each working piece (migration; materials script; vendors script; UI) with plain-English messages and the committing model's co-author line.
+### 6. ⬜ `[Sonnet]` Supervisors surfacing
 
-## Risks / notes
+Via `lib/drawings/` only.
 
-- **Bank details are the sensitive payload.** They exist only in the gitignored `data/` CSV and the gated table. Never inline them in a script (the repo is public — the Marathon-PIN lesson).
-- The `uoms` FK means an unmapped unit fails the insert loudly, not silently — the mapping table above is exhaustive for the spellings present.
-- Importing `indicative_price` onto items is founder-settled ground (0086: "the RATE is the item's indicative_price… as visible as item prices already are").
-- Scripts write via the management API (postgres role, bypasses RLS) — sanctioned import-script precedent; `--project` required, no defaults.
-- No contract-table columns are renamed or dropped; everything is additive.
+### 7. ⬜ `[Opus]` Docs, probe smoke, staging push
 
-## Verification (founder's browser checklist, staging)
+Docs (STATUS/PLAN/CLAUDE/TODO), probe smoke as a single-grant account (grant the probe `/supervisors`, confirm it sees released drawings and **not** drafts; then `/design-management` alone for the write side — the browser-smoke sign-in technique), full CI green via `gh run list`, merge to `staging` and push.
 
-1. Open **Masters → Items**, filter kind Material — the list should hold ~2,056 materials across 13+ categories with units and (for ~400) rates.
-2. Search a few you know: "Jelly6mm" (Cft, ₹45), "MS L Angle", any Simpolo tile.
-3. Open **Masters → Vendors**, filter Suppliers — 83 names from the sheet.
-4. Open **ELOR LIGHTING PVT LTD** — address, GSTIN, contact and a Payment details card with HDFC account + IFSC.
-5. Edit one vendor's payment term, save, reopen — it sticks.
+### 8. ⬜ `[Fable]` Merge approval, founder vet, production
+
+Merge-approval pass against this plan, `SECURITY.md`, `BUGCATCHER.md`. **Founder vets on staging.goodearthkannur.org — nothing reaches production before that**; then `0091` to production, `staging` → `master`, and press one real write button on production.
+
+Commit each working piece with a plain-English message.
+
+## Questions for the tier above
+
+_None yet. A lower tier that hits anything ambiguous or off-plan writes it here and waits — it does not improvise._
+
+## Verification — the founder's browser checklist (staging)
+
+1. Open **Design Management** → the welcome reads sensibly, counts are zeroes.
+2. **Sets**: create "Working Drawings — Ground Floor", tick a few works it serves.
+3. **Villas**: pick a Saarang villa → upload a PDF as R0 with a note → the set shows R0 · draft.
+4. Create a **transmittal** for stage "Working Drawings", include the set, press **Issue** → number TR-0001 appears, revision reads Released, the PDF cover sheet downloads on the letterhead.
+5. Open **Supervisors** on a phone → same villa → the Drawings section lists the set at R0, the linked work's section shows the "Drawing · R0" chip, tapping opens the PDF.
+6. Upload R1 with a note, issue a second transmittal → Supervisors now shows R1; R0 reads superseded in Design Management's history.
+7. As the probe with `/supervisors` only: draft revisions are invisible; with no grant, `/design-management` refuses.
