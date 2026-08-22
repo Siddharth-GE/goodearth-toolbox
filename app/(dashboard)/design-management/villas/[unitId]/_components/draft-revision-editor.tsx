@@ -239,6 +239,20 @@ function WorksEditor({
     });
   };
 
+  // The category ticker: set the whole list one way, never toggle each —
+  // toggling a mixed selection would invert it instead of completing it.
+  const setMany = (ids: string[], check: boolean) => {
+    setJustSaved(false);
+    setChecked((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) {
+        if (check) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  };
+
   const save = () => {
     setError(undefined);
     startTransition(async () => {
@@ -257,7 +271,13 @@ function WorksEditor({
         <Badge variant="neutral">{checked.size} picked</Badge>
       </div>
 
-      <WorksCheckboxTree tree={tree} checked={checked} onToggle={toggle} disabled={pending} />
+      <WorksCheckboxTree
+        tree={tree}
+        checked={checked}
+        onToggle={toggle}
+        onSetMany={setMany}
+        disabled={pending}
+      />
 
       <div className="flex items-center gap-3">
         <Button type="button" size="sm" disabled={!dirty || pending} onClick={save}>
