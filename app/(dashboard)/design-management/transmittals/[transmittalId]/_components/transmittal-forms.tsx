@@ -4,12 +4,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FormMessage } from "@/components/ui/form-message";
 import { IconButton } from "@/components/ui/icon-button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
   addTransmittalLine,
   createRevisionOnTransmittal,
+  createSetOnTransmittal,
   deleteDraftTransmittal,
   issueTransmittal,
   removeTransmittalLine,
@@ -74,16 +76,17 @@ export function DraftDetailsForm({
 }
 
 /**
- * The board the founder asked for: every drawing set this villa could
- * carry, each with the one press that makes sense for where it stands.
+ * The board the founder asked for: THIS VILLA'S drawing sets, each with
+ * the one press that makes sense for where it stands.
  *
  * "under new transmittal you either upload a new set of drawings or you
- * revise a set that can be seen there" (2026-08-22). A set that has
- * never been drawn here offers R0; one with a released revision offers
- * the next revision; one with a draft already open continues it rather
- * than starting a second, which the database would refuse anyway.
+ * revise a set that can be seen there" (2026-08-22). A set with a draft
+ * open continues it rather than starting a second, which the database
+ * would refuse anyway; any other set offers its next revision. A set
+ * this villa has never drawn is not here at all — that is what the New
+ * drawing set control beneath is for.
  *
- * All three are the same action — `createRevisionOnTransmittal` reads
+ * Both offers are the same action: `createRevisionOnTransmittal` reads
  * the villa's state itself, so the label is the only thing that differs
  * and the screen can never disagree with the database about which case
  * it is in.
@@ -102,7 +105,7 @@ export function AddDrawingsBoard({
   if (sets.length === 0) {
     return (
       <p className="text-muted text-sm">
-        No drawing sets in the master yet — add one under Drawing sets first.
+        No drawings on this villa yet. Name the first set below and upload its sheets.
       </p>
     );
   }
@@ -159,11 +162,12 @@ function AddSetButton({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string>();
 
+  // Two labels, not three: a set only reaches this board if this villa
+  // already has a revision of it, so "the first drawings" is the New
+  // drawing set control's job and never this button's.
   const label = set.draft
     ? `Continue draft R${set.draft.revisionNo}`
-    : set.released
-      ? `Revise — starts R${set.nextRevisionNo}`
-      : `Upload first drawings — R${set.nextRevisionNo}`;
+    : `Revise — starts R${set.nextRevisionNo}`;
 
   return (
     <div className="flex items-center gap-2">
@@ -184,6 +188,47 @@ function AddSetButton({
         {pending ? "Adding…" : label}
       </Button>
     </div>
+  );
+}
+
+/**
+ * A drawing set is born here, inside a transmittal, and nowhere else
+ * (founder, 2026-08-22 evening: "dont make a new drawing set outside").
+ *
+ * One press creates the set, starts its R0 on this villa and puts it on
+ * this transmittal — after which the draft editor appears on its line
+ * for the sheets, the note and the works it serves. It asks for a name
+ * and nothing else: a set born on a plot needs no code, and its works
+ * are ticked one level down on the revision itself.
+ */
+export function NewDrawingSetForm({ transmittalId }: { transmittalId: string }) {
+  const [state, formAction, pending] = useActionState(
+    createSetOnTransmittal.bind(null, transmittalId),
+    undefined,
+  );
+
+  return (
+    <form action={formAction}>
+      <fieldset disabled={pending} className="space-y-2">
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <Label htmlFor="new-set-name">New drawing set</Label>
+            <Input
+              id="new-set-name"
+              name="name"
+              required
+              maxLength={120}
+              autoComplete="off"
+              placeholder="e.g. Working Drawings — Ground Floor"
+            />
+          </div>
+          <Button type="submit" variant="secondary" disabled={pending}>
+            {pending ? "Adding…" : "Add set and start R0"}
+          </Button>
+        </div>
+        <FormMessage error={state?.error} size="xs" />
+      </fieldset>
+    </form>
   );
 }
 

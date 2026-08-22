@@ -18,8 +18,6 @@ import { redirect } from "next/navigation";
 
 const GRANT = "/design-management";
 const NAME_LIMIT = 120;
-const CODE_LIMIT = 30;
-const DESCRIPTION_LIMIT = 500;
 const NOTE_LIMIT = 1000;
 
 // The server-action body cap (next.config.ts) and the `drawings` bucket's
@@ -37,10 +35,11 @@ function friendlyDbError(error: { message: string }, fallback: string): string {
 }
 
 /**
- * Writes for the Design Management app: its own masters (drawing sets,
- * their default work links, design stages), a villa's drawing revisions
- * and the sheets on them, and the transmittals that send those drawings
- * to site. Every action opens with
+ * Writes for the Design Management app: design stages (its one master),
+ * a villa's drawing revisions and the sheets on them, the drawing sets
+ * those revisions belong to — which are born inside a transmittal, never
+ * in a master screen — and the transmittals that send it all to site.
+ * Every action opens with
  * requireTool and ends by revalidating the layout — an exact-path call
  * would leave the welcome counts stale while the moved list refreshes
  * (the exact-path trap in CLAUDE.md). Nothing here writes another
@@ -49,186 +48,6 @@ function friendlyDbError(error: { message: string }, fallback: string): string {
 
 function text(formData: FormData, field: string): string {
   return String(formData.get(field) ?? "").trim();
-}
-
-// ---------------------------------------------------------------------
-// Drawing sets
-// ---------------------------------------------------------------------
-
-function readDrawingSetForm(
-  formData: FormData,
-): { name: string; code: string | null; description: string | null } | { error: string } {
-  const name = text(formData, "name");
-  const code = text(formData, "code");
-  const description = text(formData, "description");
-
-  if (!name) return { error: "Give the drawing set a name." };
-  if (name.length > NAME_LIMIT) return { error: `Keep the name under ${NAME_LIMIT} characters.` };
-  if (code.length > CODE_LIMIT) return { error: `Keep the code under ${CODE_LIMIT} characters.` };
-  if (description.length > DESCRIPTION_LIMIT) {
-    return { error: `Keep the description under ${DESCRIPTION_LIMIT} characters.` };
-  }
-
-  return { name, code: code || null, description: description || null };
-}
-
-export async function createDrawingSet(
-  _prev: ActionState,
-  formData: FormData,
-): Promise<ActionState> {
-  const user = await requireTool(GRANT);
-  const fields = readDrawingSetForm(formData);
-  if ("error" in fields) return fields;
-
-  const supabase = await createClient();
-  const { data: last } = await supabase
-    .from("drawing_sets")
-    .select("sort_order")
-    .order("sort_order", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  // New sets land at the end of the sequence; steps of 10 leave room to
-  // slot one between two later by editing sort_order in the database.
-  const { error } = await supabase.from("drawing_sets").insert({
-    ...fields,
-    sort_order: (last?.sort_order ?? 0) + 10,
-    created_by: user.id,
-    updated_by: user.id,
-  });
-  if (error) {
-    if (error.code === "23505") return { error: "That code is already used by another set." };
-    console.error("createDrawingSet failed:", error);
-    return { error: "Could not add the drawing set. Try again." };
-  }
-
-  revalidatePath("/design-management", "layout");
-  return undefined;
-}
-
-export async function updateDrawingSet(
-  id: string,
-  _prev: ActionState,
-  formData: FormData,
-): Promise<ActionState> {
-  const user = await requireTool(GRANT);
-  const fields = readDrawingSetForm(formData);
-  if ("error" in fields) return fields;
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("drawing_sets")
-    .update({ ...fields, updated_by: user.id })
-    .eq("id", id);
-  if (error) {
-    if (error.code === "23505") return { error: "That code is already used by another set." };
-    console.error("updateDrawingSet failed:", error);
-    return { error: "Could not update the drawing set. Try again." };
-  }
-
-  revalidatePath("/design-management", "layout");
-  return undefined;
-}
-
-export async function setDrawingSetActive(id: string, isActive: boolean): Promise<ActionState> {
-  const user = await requireTool(GRANT);
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("drawing_sets")
-    .update({ is_active: isActive, updated_by: user.id })
-    .eq("id", id);
-  if (error) {
-    console.error("setDrawingSetActive failed:", error);
-    return { error: "Could not update the drawing set. Try again." };
-  }
-
-  revalidatePath("/design-management", "layout");
-  return undefined;
-}
-
-/**
- * Only succeeds when nothing references the set. A villa's revision
- * history is exactly that kind of reference and is meant to be
- * permanent, so the FK refuses rather than cascades (CLAUDE.md's line
- * chain rule) — surfaced here as a friendly nudge toward deactivating
- * instead, never a thrown error.
- */
-export async function deleteDrawingSet(id: string): Promise<ActionState> {
-  await requireTool(GRANT);
-
-  const supabase = await createClient();
-  const { error } = await supabase.from("drawing_sets").delete().eq("id", id);
-  if (error) {
-    if (error.code === "23503") {
-      return {
-        error:
-          "This drawing set has revisions against a villa and can't be deleted — deactivate it instead.",
-      };
-    }
-    console.error("deleteDrawingSet failed:", error);
-    return { error: "Could not delete the drawing set. Try again." };
-  }
-
-  revalidatePath("/design-management", "layout");
-  return undefined;
-}
-
-/**
- * The set's default work links, written as one whole-list diff — insert
- * what's newly checked, delete what's newly unchecked — so a toggle
- * can't half-save. There is no update; a link either exists or it
- * doesn't (the Relay `setTrailSetActivities` shape).
- */
-export async function setDrawingSetWorks(
-  setId: string,
-  workItemIds: string[],
-): Promise<ActionState> {
-  const user = await requireTool(GRANT);
-  const supabase = await createClient();
-
-  const { data: existingRows, error: readError } = await supabase
-    .from("drawing_set_works")
-    .select("work_item_id")
-    .eq("drawing_set_id", setId);
-  if (readError) {
-    console.error("setDrawingSetWorks read failed:", readError);
-    return { error: "Could not load the current work links. Try again." };
-  }
-
-  const existing = new Set((existingRows ?? []).map((row) => row.work_item_id));
-  const next = new Set(workItemIds);
-  const toAdd = [...next].filter((workItemId) => !existing.has(workItemId));
-  const toRemove = [...existing].filter((workItemId) => !next.has(workItemId));
-
-  if (toAdd.length > 0) {
-    const { error } = await supabase.from("drawing_set_works").insert(
-      toAdd.map((workItemId) => ({
-        drawing_set_id: setId,
-        work_item_id: workItemId,
-        created_by: user.id,
-      })),
-    );
-    if (error) {
-      console.error("setDrawingSetWorks insert failed:", error);
-      return { error: "Could not save the work links. Try again." };
-    }
-  }
-
-  if (toRemove.length > 0) {
-    const { error } = await supabase
-      .from("drawing_set_works")
-      .delete()
-      .eq("drawing_set_id", setId)
-      .in("work_item_id", toRemove);
-    if (error) {
-      console.error("setDrawingSetWorks delete failed:", error);
-      return { error: "Could not save the work links. Try again." };
-    }
-  }
-
-  revalidatePath("/design-management", "layout");
-  return undefined;
 }
 
 // ---------------------------------------------------------------------
@@ -509,7 +328,9 @@ export async function updateDraftRevisionNote(
 
 /**
  * A revision's own work links, written as one whole-list diff — the same
- * shape as setDrawingSetWorks, one level finer. The draft-only trigger
+ * shape as the set-level diff that used to exist, one level finer —
+ * and now the only place work links are ticked at all. The draft-only
+ * trigger
  * refuses this once the revision has gone to site; that refusal is
  * surfaced here rather than thrown.
  */
@@ -772,6 +593,98 @@ export async function createTransmittal(
 
   revalidatePath("/design-management", "layout");
   redirect(`/design-management/transmittals/${transmittal.id}`);
+}
+
+/**
+ * Creates a drawing set INSIDE a transmittal, with its first drawings
+ * already started: the set row, its R0 draft on this villa, and the
+ * transmittal line, in that order.
+ *
+ * Founder, 2026-08-22 evening: "dont make a new drawing set outside …
+ * there maybe a list of all drawing sets released within a plot … not a
+ * master set for the whole damn project." So there is no master screen
+ * left to create one from, and a set only ever surfaces on the villa
+ * whose revisions it carries.
+ *
+ * A set born here has **no code and no default work links** — the code
+ * belonged to a company-wide catalogue that no longer exists, and the
+ * works are ticked on the revision itself, one level down, where they
+ * were always editable. `startDraftRevision` copies whatever defaults
+ * the set has, which for a set one statement old is none; that is the
+ * intended zero, not a failure.
+ *
+ * Two villas both making a "Working Drawings" make two rows. That is
+ * the point: `drawing_sets` stays one global table, and the scoping is
+ * "has a revision on this unit" rather than a column.
+ */
+export async function createSetOnTransmittal(
+  transmittalId: string,
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+
+  const name = text(formData, "name");
+  if (!name) return { error: "Give the drawing set a name." };
+  if (name.length > NAME_LIMIT) return { error: `Keep the name under ${NAME_LIMIT} characters.` };
+
+  const supabase = await createClient();
+
+  const { data: transmittal, error: readError } = await supabase
+    .from("transmittals")
+    .select("unit_id, status")
+    .eq("id", transmittalId)
+    .maybeSingle();
+  if (readError) {
+    console.error("createSetOnTransmittal read failed:", readError);
+    return { error: "Could not add the drawing set. Try again." };
+  }
+  if (!transmittal) return { error: "That transmittal no longer exists." };
+  if (transmittal.status !== "draft") {
+    return { error: "This transmittal has been issued — what was sent cannot be changed." };
+  }
+
+  const { data: last } = await supabase
+    .from("drawing_sets")
+    .select("sort_order")
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { data: set, error } = await supabase
+    .from("drawing_sets")
+    .insert({
+      name,
+      sort_order: (last?.sort_order ?? 0) + 10,
+      created_by: user.id,
+      updated_by: user.id,
+    })
+    .select("id")
+    .single();
+  if (error) {
+    console.error("createSetOnTransmittal insert failed:", error);
+    return { error: friendlyDbError(error, "Could not add the drawing set. Try again.") };
+  }
+
+  const started = await startDraftRevision(supabase, user.id, transmittal.unit_id, set.id);
+  if ("error" in started) {
+    // The set exists but has nothing on it — invisible either way, since
+    // a set only surfaces where it has a revision. Said out loud rather
+    // than shown as a success over a screen that hasn't changed.
+    revalidatePath("/design-management", "layout");
+    return started;
+  }
+
+  const lineError = await appendTransmittalLine(
+    supabase,
+    user.id,
+    transmittalId,
+    transmittal.unit_id,
+    started.revisionId,
+  );
+
+  revalidatePath("/design-management", "layout");
+  return lineError ? { error: lineError } : undefined;
 }
 
 /**
@@ -1064,6 +977,15 @@ export async function deleteDraftTransmittal(transmittalId: string): Promise<Act
   await requireTool(GRANT);
   const supabase = await createClient();
 
+  // Read the villa BEFORE the row goes: there is no company-wide
+  // transmittals list to land on any more, and one step back from a
+  // transmittal is its plot.
+  const { data: transmittal } = await supabase
+    .from("transmittals")
+    .select("unit_id")
+    .eq("id", transmittalId)
+    .maybeSingle();
+
   const { error } = await supabase.rpc("delete_draft_transmittal", {
     p_transmittal_id: transmittalId,
   });
@@ -1073,5 +995,7 @@ export async function deleteDraftTransmittal(transmittalId: string): Promise<Act
   }
 
   revalidatePath("/design-management", "layout");
-  redirect("/design-management/transmittals");
+  redirect(
+    transmittal ? `/design-management/villas/${transmittal.unit_id}` : "/design-management/villas",
+  );
 }

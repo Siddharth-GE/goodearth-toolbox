@@ -1,26 +1,39 @@
+import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageTitle } from "@/components/ui/page-title";
-import { getVillaDesignDetail, listDesignStages } from "@/lib/design-management/queries";
-import { FileStack } from "lucide-react";
-import Link from "next/link";
+import { Section } from "@/components/ui/section";
+import {
+  getVillaDesignDetail,
+  listDesignStages,
+  listVillaDrawingSetStates,
+} from "@/lib/design-management/queries";
+import { Send } from "lucide-react";
 import { notFound } from "next/navigation";
 
 import { CreateTransmittalDialog } from "./_components/create-transmittal-dialog";
-import { DrawingSetCard } from "./_components/drawing-set-card";
-import { StageBoard } from "./_components/stage-board";
+import { TransmittalList } from "./_components/transmittal-list";
 
 /**
- * The villa's record of what has gone to site: the stage board, and each
- * drawing set's released history. Nothing here is editable.
+ * The plot's home: every transmittal on this villa, and the drawing sets
+ * that live here.
  *
- * Founder, 2026-08-22, on the staging vet: "in the overview you just see
- * what's been issued". The work — starting a revision, uploading sheets,
- * revising a set — happens on a transmittal, which "New transmittal"
- * opens.
+ * Founder, 2026-08-22 evening: "person sees all villas (as cards) goes
+ * into the villa there all transmittals of that plot, filters by group,
+ * and then a new transmittal selector … there maybe a list of all
+ * drawing sets released within a plot if that makes revision tracking
+ * viable, not a master set for the whole damn project."
+ *
+ * So: the transmittals are the page, the sets list is a short reference
+ * underneath it, and the stage board is gone — it said the same thing as
+ * the list above it, one level less usefully.
  */
 export default async function VillaDesignPage({ params }: { params: Promise<{ unitId: string }> }) {
   const { unitId } = await params;
-  const [villa, stages] = await Promise.all([getVillaDesignDetail(unitId), listDesignStages()]);
+  const [villa, stages, sets] = await Promise.all([
+    getVillaDesignDetail(unitId),
+    listDesignStages(),
+    listVillaDrawingSetStates(unitId),
+  ]);
   if (!villa) notFound();
 
   const activeStages = stages
@@ -33,43 +46,53 @@ export default async function VillaDesignPage({ params }: { params: Promise<{ un
         title={villa.villaName}
         description={`Plot ${villa.plotName} · ${villa.projectName}`}
         backHref="/design-management/villas"
-        backLabel="All villas"
+        backLabel="Villas"
         actions={<CreateTransmittalDialog unitId={villa.unitId} stages={activeStages} />}
       />
 
-      <div className="space-y-2">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-muted text-xs font-semibold tracking-widest uppercase">
-            Design stages
-          </p>
-          <Link
-            href={`/design-management/transmittals?villa=${villa.unitId}`}
-            className="text-accent text-sm font-medium hover:underline"
-          >
-            Transmittals for this villa
-          </Link>
-        </div>
-        <StageBoard stages={villa.stageBoard} />
-      </div>
+      {villa.transmittals.length === 0 ? (
+        <EmptyState
+          icon={Send}
+          title="Nothing has been sent to site for this villa yet"
+          description="Press New transmittal to start one, upload its drawings, and issue them."
+        />
+      ) : (
+        <Section title="Transmittals" note="Newest first. Open one to see what went out on it.">
+          <TransmittalList transmittals={villa.transmittals} stages={villa.stages} />
+        </Section>
+      )}
 
-      <div className="space-y-2">
-        <p className="text-muted text-xs font-semibold tracking-widest uppercase">
-          Drawings issued
-        </p>
-        {villa.setsWithRevisions.length === 0 ? (
-          <EmptyState
-            icon={FileStack}
-            title="Nothing has gone to site for this villa yet"
-            description="Press New transmittal to put the first drawings together and issue them."
-          />
-        ) : (
-          <div className="space-y-3">
-            {villa.setsWithRevisions.map((set) => (
-              <DrawingSetCard key={set.setId} set={set} />
-            ))}
-          </div>
-        )}
-      </div>
+      {sets.length > 0 && (
+        <Section
+          title="Drawing sets on this plot"
+          note="Each set at its latest revision. Open the transmittal that carried it to see the sheets."
+        >
+          <ul className="divide-border divide-y">
+            {sets.map((set) => {
+              const latest = set.draft ?? set.released;
+              return (
+                <li
+                  key={set.setId}
+                  className="flex flex-wrap items-center justify-between gap-2 py-2"
+                >
+                  <span className="text-foreground min-w-0 text-sm">
+                    {set.setCode ? `${set.setCode} — ${set.setName}` : set.setName}
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <span className="text-muted text-xs">
+                      R{latest?.revisionNo ?? 0} · {latest?.fileCount ?? 0}{" "}
+                      {latest?.fileCount === 1 ? "file" : "files"}
+                    </span>
+                    <Badge variant={set.draft ? "warning" : "success"}>
+                      {set.draft ? "Draft" : "Released"}
+                    </Badge>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </Section>
+      )}
     </div>
   );
 }

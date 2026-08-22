@@ -37,7 +37,9 @@ the reader's head, not by a foreign key.
    Interiors; renameable, reorderable and retirable in the tool. A stage
    is what a transmittal is filed under, and it is not Relay's stage even
    where the words match.
-2. **Revisions live per drawing set per villa** — R0, R1, … each with a
+2. **Revisions live per drawing set per villa** — and, since the evening
+   of the same day, the SET lives per villa too in everything but the
+   table it sits in (see "Drawing sets are born on a plot"). R0, R1, … each with a
    note. The Selections model from `0006`, one level finer: a selection
    revision covers a whole unit, a drawing revision covers one set within
    one unit. Not one revision number per villa.
@@ -47,41 +49,86 @@ the reader's head, not by a foreign key.
    hand. There is no outbound email anywhere in this tool, and none was
    built.
 
-## Where the work happens: the transmittal, not the villa
+## The flow: plot level, everything
 
-**The transmittal is the workspace. The villa page is the record.** The
-founder redirected the flow on the staging vet, 2026-08-22, after using
-the first build:
+**Everything is reached through a villa, and every screen goes back
+exactly one step.** The founder set this out on 2026-08-22 evening,
+after using the previous build:
 
-> "let this new drawing sets thing come inside the new transmittal
-> instead of under the villa overview, press new transmittal, upload the
-> docs and issue to site, in the overview you just see what's been
-> issued, under new transmittal you either upload a new set of drawings
-> or you revise a set that can be seen there."
+> "change the flow, dont make a new drawing set outside, the flow overall
+> should be person sees all villas (as cards) goes into the villa there
+> all transmitals of that plot, filters by group, and then a new
+> transmital selector, and in that all the details etc and then upload
+> drawings right there. thats it. from there revisions etc should be
+> tracked. there maybe a list of all drawing sets released within a plot
+> if that makes revision tracking viable not a master set for the whole
+> damn project. outside no need of an all transmittals page either plot
+> level everything, and then you go in and in and go back one step where
+> required. the flow is super cluttered right now."
 
-So the two screens divide like this, and neither borrows the other's job:
+Four screens, one chain, no cross-links:
 
-- **`villas/[unitId]`** — the stage board and each drawing set's
-  **released and superseded** history, read-only. `getVillaDesignDetail`
-  filters drafts out in the query rather than on the screen, so there is
-  no path by which one shows up here. Its one action is "New
-  transmittal"; its one link is this villa's transmittals.
+| Screen                           | What it is                                                                                       | Back to     |
+| -------------------------------- | ------------------------------------------------------------------------------------------------ | ----------- |
+| `/design-management`             | welcome: three plot-level counts, two doors — Villas and Design stages                           | the sidebar |
+| `…/villas`                       | one **card** per villa, labelled by project: issued count, drafts, last issued                   | welcome     |
+| `…/villas/[unitId]`              | the plot's home: **its transmittals**, stage filter chips, New transmittal, and its drawing sets | Villas      |
+| `…/transmittals/[transmittalId]` | the workspace while draft; the record once issued                                                | its villa   |
+
+**There is no company-wide anything.** The all-transmittals list and the
+drawing-set master screens were deleted, not hidden: a global list of
+transmittals across every project answers a question nobody in this
+company asks, and a project-wide set catalogue made people name a set
+before they had drawn it. `lib/design-management/queries.ts` lost
+`listTransmittals`, `listDrawingSets` and `getDrawingSetDetail` with
+them, and `actions.ts` lost the five drawing-set master writes.
+
+## Drawing sets are born on a plot
+
+**`drawing_sets` is still one global table — the scoping is UX, not
+schema.** No migration moved. What changed is where a set comes from and
+where it can be seen:
+
+- A set is created **inside a draft transmittal**, by
+  `createSetOnTransmittal`: the set row, its R0 draft on that villa, and
+  the transmittal line, in one press.
+- A set **surfaces only where its revisions live**.
+  `listVillaDrawingSetStates` reads the villa's revisions first and the
+  sets second, so "this villa's sets" is derived, never filtered — a set
+  born on villa A is simply absent from villa B's screens.
+- A set born this way has **no code and no default work links**. The code
+  belonged to the catalogue that no longer exists; the works are ticked
+  on the revision itself, one level down, where they were always
+  editable. `drawing_set_works` keeps working for the rows that have it
+  and is written by nothing.
+- **Two villas both naming a "Working Drawings" make two rows.** That is
+  intended, not a duplicate to clean up. The alternative — one row, two
+  plots' revision histories — is exactly the project-wide master the
+  founder threw out.
+
+## The transmittal is the workspace; the villa page is the record
+
+- **`villas/[unitId]`** — its transmittals, newest first, with a chip per
+  design stage that actually appears (Radix `Tabs`: same-page panels, no
+  navigation — `NavTabs` would be the wrong primitive, DESIGN.md draws
+  that line). Underneath, a tight read-only list of the plot's drawing
+  sets at their latest revision, which is what makes revision tracking
+  legible without becoming a second file browser. The old **stage board
+  is gone**: it said what the list above it already says.
 - **`transmittals/[transmittalId]`, while draft** — everything else. The
-  stage and note, the drawings going out, an **Add drawings** board
-  listing every drawing set with the one press that fits where this
-  villa stands on it, and the draft editor (note, sheets, work links)
-  sitting **inline on each draft line**.
+  stage and note, the drawings going out, the **Add drawings** board, the
+  **New drawing set** control, and the draft editor (note, sheets, work
+  links) sitting **inline on each draft line**.
 
-The Add drawings board is three offers and one action
+The Add drawings board is two offers and one action
 (`createRevisionOnTransmittal`), because the screen must never disagree
 with the database about which case it is in — the action re-reads the
 villa's state itself and the label is the only thing that differs:
 
-| What this villa has of the set | The button                   | What happens                        |
-| ------------------------------ | ---------------------------- | ----------------------------------- |
-| a draft already open           | "Continue draft R2"          | that draft goes on; nothing created |
-| only released revisions        | "Revise — starts R3"         | R+1 started, then added             |
-| nothing at all                 | "Upload first drawings — R0" | R0 started, then added              |
+| What this villa has of the set | The button           | What happens                        |
+| ------------------------------ | -------------------- | ----------------------------------- |
+| a draft already open           | "Continue draft R2"  | that draft goes on; nothing created |
+| anything else                  | "Revise — starts R3" | R+1 started, then added             |
 
 A set already on the transmittal is offered neither, and shows "On this
 transmittal" instead: one line per set per transmittal is a screen rule,
@@ -90,13 +137,13 @@ Sending an already-released drawing again, unchanged, is a separate
 picker with its own words — it is a different act (`addTransmittalLine`,
 nothing created, nothing superseded on issue).
 
-**Creating a transmittal creates an EMPTY draft.** The first build made
+**Creating a transmittal creates an EMPTY draft.** An earlier build made
 you pick at least one drawing up front, which assumed the drawings
 already existed; the founder's flow is the opposite way round. "At least
-one drawing" is now enforced only where it always belonged — at Issue,
-by `issue_transmittal` itself, whose refusal is shown verbatim. The
-Issue button therefore stays pressable on an empty draft rather than
-greying out.
+one drawing" is enforced only where it always belonged — at Issue, by
+`issue_transmittal` itself, whose refusal is shown verbatim. The Issue
+button therefore stays pressable on an empty draft rather than greying
+out.
 
 **Taking a draft line off is two different acts, so it is two presses.**
 The trash icon takes the drawing off this transmittal and leaves the
@@ -163,9 +210,10 @@ smoke transmittals keep the global numbers they were born with.
 check in every code path — which is why "Revise" continues an open draft
 instead of starting a second one. A new draft is `max(revision_no) + 1`
 across every status for that (unit, set), so a number is spent once and
-never re-used, and it copies the master's default work links so it starts
-where the set says and can then differ for this villa alone. One helper,
-`startDraftRevision`, is the only code that does this.
+never re-used, and it copies whatever default work links the set carries
+— none, for a set born on a plot, which is the intended zero rather than
+a failure. One helper, `startDraftRevision`, is the only code that starts
+a revision anywhere in this tool.
 
 ## The 4 MB rule, and why
 

@@ -15,7 +15,6 @@ import {
 import { formatDate } from "@/lib/format";
 import { getWorksTree, type WorksTreeCategory } from "@/lib/masters/works";
 import { FileText } from "lucide-react";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { DraftRevisionEditor } from "../../_components/draft-revision-editor";
@@ -24,6 +23,7 @@ import {
   DeleteDraftTransmittalButton,
   DraftDetailsForm,
   IssueTransmittalButton,
+  NewDrawingSetForm,
   RemoveLineButton,
   ResendReleasedPicker,
 } from "./_components/transmittal-forms";
@@ -92,8 +92,8 @@ export default async function TransmittalDetailPage({
       <PageTitle
         title={transmittal.number ?? "Draft transmittal"}
         description={`${transmittal.villaName} · Plot ${transmittal.plotName} · ${transmittal.projectName}`}
-        backHref="/design-management/transmittals"
-        backLabel="All transmittals"
+        backHref={`/design-management/villas/${transmittal.unitId}`}
+        backLabel={transmittal.villaName}
         actions={
           <>
             <Badge variant={isDraft ? "warning" : "success"}>{isDraft ? "Draft" : "Issued"}</Badge>
@@ -234,13 +234,16 @@ export default async function TransmittalDetailPage({
       {isDraft && (
         <Section
           title="Add drawings"
-          note="Start a set's first drawings, revise one that has already gone out, or continue a draft."
+          note="Revise a set this villa already has, name a new one, or send a released drawing again."
         >
           <AddDrawingsBoard
             transmittalId={transmittal.id}
             sets={setStates}
             setIdsOnTransmittal={setIdsOnTransmittal}
           />
+          <div className="border-border mt-3 border-t pt-3">
+            <NewDrawingSetForm transmittalId={transmittal.id} />
+          </div>
           {resendOptions.length > 0 && (
             <div className="border-border mt-3 border-t pt-3">
               <ResendReleasedPicker transmittalId={transmittal.id} options={resendOptions} />
@@ -249,15 +252,13 @@ export default async function TransmittalDetailPage({
         </Section>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Link
-          href={`/design-management/villas/${transmittal.unitId}`}
-          className="text-accent text-sm font-medium hover:underline"
-        >
-          Open {transmittal.villaName}&apos;s issued drawings
-        </Link>
-        {isDraft && <DeleteDraftTransmittalButton transmittalId={transmittal.id} />}
-      </div>
+      {/* One way back and one way out. The link to the villa is the back
+          link at the top — repeating it here was part of the clutter. */}
+      {isDraft && (
+        <div className="flex justify-end">
+          <DeleteDraftTransmittalButton transmittalId={transmittal.id} />
+        </div>
+      )}
     </div>
   );
 }

@@ -157,6 +157,24 @@ removal. Full checks green (prettier, lint, tsc, test, build, check:actions) plu
 render of both cover sheets. Decisions 21–26 below; the flow itself is written up in the tool's
 own `PLAN.md` under "Where the work happens".
 
+### 10. ⬜ `[Opus]` The founder's second redesign — plot level, everything
+
+**Founder saw the redesign live and cut deeper, 2026-08-22 evening**: _"change the flow, dont make
+a new drawing set outside … person sees all villas (as cards) goes into the villa there all
+transmitals of that plot, filters by group, and then a new transmital selector … not a master set
+for the whole damn project … outside no need of an all transmittals page either plot level
+everything, and then you go in and in and go back one step where required. the flow is super
+cluttered right now."_
+
+Built the same evening on `staging`, **awaiting the Fable vet before it is committed**. **No
+migration** — `drawing_sets` is untouched; what died is the idea of it as a project-wide master.
+Three routes deleted (the global transmittals list and both drawing-set master screens), the stage
+board deleted, three queries and five actions deleted; one action added
+(`createSetOnTransmittal`). Villas are cards, the villa page is its own transmittal list with stage
+chips, and a drawing set is born inside a transmittal. Full checks green (prettier, lint, tsc,
+test, build, check:actions). Decisions 27–32 below; the flow is written up in the tool's own
+`PLAN.md` under "The flow: plot level, everything".
+
 Commit each working piece with a plain-English message.
 
 ## Questions for the tier above
@@ -332,27 +350,80 @@ now carries the whole flow under "Where the work happens".
     already written down what speculative leftovers cost (DESIGN.md, on the four deleted
     components).
 
+Six notes from the second flow redesign (Opus, 2026-08-22 evening) — the founder saw the first
+redesign live and cut deeper: _"the flow is super cluttered right now … plot level everything, and
+then you go in and in and go back one step where required."_ This build **removes more than it
+adds**. No migration: `drawing_sets` stays exactly as `0091` shaped it, and what died is the idea
+of it as a project-wide master.
+
+27. **Villa-scoping is derived, not stored.** `listVillaDrawingSetStates` now reads the villa's
+    revisions first and looks the sets up from them, so "this villa's drawing sets" is a fact about
+    where revisions live rather than a filter over a global list — and a set born on villa A is
+    absent from villa B's screens without a column, a flag or a migration. Two villas naming a
+    "Working Drawings" make two rows, which is the intended shape and not a duplicate to clean up.
+28. **Six screens became four, and three routes were deleted outright.** Gone:
+    `/design-management/transmittals` (the global list), `/design-management/sets/**` (the master
+    and its editor), the villa page's stage board, and the per-set history cards. A company-wide
+    transmittal list answers a question nobody at Goodearth asks, and the stage board said what the
+    transmittal list above it already said. Their queries and actions went with them
+    (`listTransmittals`, `listDrawingSets`, `getDrawingSetDetail`; `createDrawingSet`,
+    `updateDrawingSet`, `setDrawingSetActive`, `deleteDrawingSet`, `setDrawingSetWorks`) rather
+    than being left exported with nothing calling them.
+29. **One back link per screen, and no cross-links.** welcome ← villas ← villa ← transmittal, each
+    going exactly one step up, as the founder asked. The transmittal's back link is now its villa's
+    page; its footer link to the same villa was deleted as the duplicate it had become; and
+    `deleteDraftTransmittal` reads the unit id **before** the row goes so it can land on the plot
+    rather than on a list that no longer exists.
+30. **The villa's set list is deliberately not a file browser.** It shows each set at its latest
+    revision with a status and a file count, and stops there — "a list of all drawing sets released
+    within a plot if that makes revision tracking viable", in the founder's words. Sheets are
+    opened from the transmittal that carried them, which is the one place that also says who was
+    told and when. This is the one thing the redesign takes away: released files used to be one
+    click from the villa page and are now two.
+31. **The stage filter is Radix `Tabs`, not `NavTabs` and not a search param.** A filter is
+    same-page panel state — no navigation, no URL change — which is exactly the line DESIGN.md
+    draws between the two primitives. One `TabsContent` per stage renders the same row component
+    over a filtered list, so the ARIA is correct for free. Only stages that actually appear on this
+    villa get a chip: a chip that can only ever show an empty list is the clutter being removed.
+    With fewer than two stages present the chips do not render at all.
+32. **A set born on a transmittal has no code and no default work links.** The code belonged to the
+    catalogue that no longer exists, and the works are ticked on the revision itself, one level
+    down, where they were always editable. `startDraftRevision` copies whatever defaults the set
+    carries, which for a set one statement old is none — the intended zero, and its comment says
+    so, because a future reader will otherwise read it as the seed-copy failure it looks like.
+
 ## Verification — the founder's browser checklist (staging)
 
-**Rewritten for the redesigned flow, 2026-08-22.** The counts in step 1 are not zeroes — the
-probe smoke left one drawing set and two issued transmittals on staging permanently (note 20).
+**Rewritten again for the plot-level flow, 2026-08-22 evening.** Two things to know before you
+open it: the earlier probe smoke left permanent rows (an issued transmittal cannot be deleted), so
+the counts do not start at zero; and the smoke's drawing set belongs to the two villas it was used
+on, so other villas will correctly show none.
 
-1. Open **Design Management** → the welcome reads sensibly. Expect 1 drawing set, 2 villas with
-   released drawings and 2 transmittals: smoke residue, not a bug.
-2. **Sets**: create "Working Drawings — Ground Floor", tick a few works it serves.
-3. **Villas**: pick a Saarang villa → it shows only what has been issued, and nothing to edit.
-   Press **New transmittal**, choose stage "Working Drawings", save → the transmittal opens.
-4. On the transmittal: under **Add drawings**, press **Upload first drawings — R0** against your
-   set → it appears as a draft line with the editor on it → write a note, add a PDF, tick a work
-   or two. Press **Issue** → TR-0001 appears, the line reads Released, and the cover sheet
-   downloads on the letterhead.
-5. Back on the villa → the drawing now shows under **Drawings issued** at R0, read-only.
-6. Open **Supervisors** on a phone → same villa → the Drawings section lists the set at R0, the
+1. Open **Design Management** → the welcome reads sensibly, with two doors: **Villas** and
+   **Design stages**. Expect 2 villas with issued drawings and 2 transmittals issued — smoke
+   residue, not a bug. There is no Drawing sets door any more, and no all-transmittals door.
+2. **Villas** → every villa as a card, grouped by project, each saying how much has gone out and
+   when. Open a Saarang villa.
+3. The villa shows **its transmittals** (the smoke ones, if you picked Villa 9 or Villa 1) and, if
+   it has any, its drawing sets underneath. Press **New transmittal**, choose stage "Working
+   Drawings", save → the transmittal opens.
+4. On the transmittal, under **Add drawings** → type a name into **New drawing set**, e.g.
+   "Working Drawings — Ground Floor", press **Add set and start R0** → it appears as a draft line
+   with the editor on it. Write a note, add a PDF, tick a work or two.
+5. Press **Issue** → TR-0001 (or the next number for that villa) appears, the line reads Released,
+   and the cover sheet downloads on the letterhead.
+6. Press **back** at the top → you land on the villa, and the transmittal is in its list. The
+   drawing set now appears under **Drawing sets on this plot** at R0 · Released.
+7. Open **Supervisors** on a phone → same villa → the Drawings section lists the set at R0, the
    linked work's section shows the "Drawing · R0" chip, tapping opens the PDF.
-7. New transmittal again → the same set now offers **Revise — starts R1**. Add a sheet, issue it →
-   Supervisors shows R1; the villa page reads R1 released and R0 superseded.
-8. Raise a third transmittal, add a set, then press the trash icon on its line → the drawing comes
-   off and the draft survives (the next transmittal offers "Continue draft R…"). Press **Delete
-   this draft** on the transmittal itself → it is gone from the list.
-9. As the probe with `/supervisors` only: draft revisions are invisible; with no grant,
-   `/design-management` refuses.
+8. New transmittal again → the same set now offers **Revise — starts R1**. Add a sheet, issue it →
+   Supervisors shows R1; the villa's set list reads R1.
+9. Open a **different** villa → your new set is not there, and its Add drawings board is empty
+   with an invitation to name the first set. That is the plot-level scoping working.
+10. On a filtered villa with transmittals at two or more stages, the **stage chips** appear above
+    the list and narrow it.
+11. Raise one more transmittal, add a set, then press the trash icon on its line → the drawing
+    comes off and the draft survives (the next transmittal offers "Continue draft R…"). Press
+    **Delete this draft** on the transmittal → you land back on the villa.
+12. As the probe with `/supervisors` only: draft revisions are invisible; with no grant,
+    `/design-management` refuses.

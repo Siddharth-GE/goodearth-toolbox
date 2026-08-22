@@ -33,19 +33,16 @@ function fail(context: string, error: { message: string }): never {
 // ---------------------------------------------------------------------
 
 export async function getWelcomeCounts(): Promise<{
-  activeSets: number;
   villasWithReleasedDrawings: number;
-  draftRevisions: number;
+  draftTransmittals: number;
   transmittalsIssued: number;
 }> {
   await requireTool(GRANT);
   const supabase = await createClient();
 
-  const [sets, releasedRevisionUnits, draftRevisions, issuedTransmittals] = await Promise.all([
-    supabase
-      .from("drawing_sets")
-      .select("id", { count: "exact", head: true })
-      .eq("is_active", true),
+  // No count of drawing sets: there is no master list to count any more
+  // (founder, 2026-08-22 evening). Everything here is plot-level.
+  const [releasedRevisionUnits, draftTransmittals, issuedTransmittals] = await Promise.all([
     // "Villas with at least one released drawing" is a
     // COUNT(DISTINCT unit_id) — `head: true` counts rows, not distinct
     // values, so it can't express this. Reading the (single, small)
@@ -62,7 +59,7 @@ export async function getWelcomeCounts(): Promise<{
         .range(from, to),
     ),
     supabase
-      .from("drawing_revisions")
+      .from("transmittals")
       .select("id", { count: "exact", head: true })
       .eq("status", "draft"),
     supabase
@@ -72,108 +69,9 @@ export async function getWelcomeCounts(): Promise<{
   ]);
 
   return {
-    activeSets: sets.count ?? 0,
     villasWithReleasedDrawings: new Set(releasedRevisionUnits.map((row) => row.unit_id)).size,
-    draftRevisions: draftRevisions.count ?? 0,
+    draftTransmittals: draftTransmittals.count ?? 0,
     transmittalsIssued: issuedTransmittals.count ?? 0,
-  };
-}
-
-// ---------------------------------------------------------------------
-// Drawing sets (the drawing master)
-// ---------------------------------------------------------------------
-
-export type DrawingSetRow = {
-  id: string;
-  code: string | null;
-  name: string;
-  description: string | null;
-  isActive: boolean;
-  sortOrder: number;
-  /** Count of work_items this set links by default (drawing_set_works). */
-  workCount: number;
-};
-
-export async function listDrawingSets(): Promise<DrawingSetRow[]> {
-  await requireTool(GRANT);
-  const supabase = await createClient();
-
-  const [sets, links] = await Promise.all([
-    fetchAll<{
-      id: string;
-      code: string | null;
-      name: string;
-      description: string | null;
-      is_active: boolean;
-      sort_order: number;
-    }>((from, to) =>
-      supabase
-        .from("drawing_sets")
-        .select("id, code, name, description, is_active, sort_order")
-        .order("sort_order")
-        .order("name")
-        .order("id")
-        .range(from, to),
-    ),
-    fetchAll<{ drawing_set_id: string }>((from, to) =>
-      supabase.from("drawing_set_works").select("drawing_set_id").order("id").range(from, to),
-    ),
-  ]);
-
-  const workCountBySet = new Map<string, number>();
-  for (const link of links) {
-    workCountBySet.set(link.drawing_set_id, (workCountBySet.get(link.drawing_set_id) ?? 0) + 1);
-  }
-
-  return sets.map((set) => ({
-    id: set.id,
-    code: set.code,
-    name: set.name,
-    description: set.description,
-    isActive: set.is_active,
-    sortOrder: set.sort_order,
-    workCount: workCountBySet.get(set.id) ?? 0,
-  }));
-}
-
-export type DrawingSetDetail = {
-  id: string;
-  code: string | null;
-  name: string;
-  description: string | null;
-  isActive: boolean;
-  /** work_item ids this set links by default — the checkbox tree's state. */
-  workItemIds: string[];
-};
-
-export async function getDrawingSetDetail(id: string): Promise<DrawingSetDetail | null> {
-  await requireTool(GRANT);
-  const supabase = await createClient();
-
-  const { data: set, error } = await supabase
-    .from("drawing_sets")
-    .select("id, code, name, description, is_active")
-    .eq("id", id)
-    .maybeSingle();
-  if (error) fail("the drawing set", error);
-  if (!set) return null;
-
-  const links = await fetchAll<{ work_item_id: string }>((from, to) =>
-    supabase
-      .from("drawing_set_works")
-      .select("work_item_id")
-      .eq("drawing_set_id", id)
-      .order("id")
-      .range(from, to),
-  );
-
-  return {
-    id: set.id,
-    code: set.code,
-    name: set.name,
-    description: set.description,
-    isActive: set.is_active,
-    workItemIds: links.map((link) => link.work_item_id),
   };
 }
 
@@ -221,28 +119,34 @@ export async function listDesignStages(): Promise<DesignStageRow[]> {
 
 export type DesignVillaRow = {
   unitId: string;
-  plotId: string;
   villaName: string;
   plotName: string;
   projectName: string;
-  /** Distinct drawing sets with a released revision on this villa. */
-  setsReleased: number;
-  /** Draft revisions open across every set on this villa. */
-  draftsOpen: number;
+  /** Transmittals issued on this villa — a draft is not one yet. */
+  transmittalsIssued: number;
+  /** Drafts still being put together here. */
+  draftTransmittals: number;
+  lastIssuedAt: string | null;
 };
 
 /**
- * Every villa, grouped by project on screen — the Supervisors picker's
- * shape (`lib/supervisors/queries.ts:listVillas`), anchored on `unit_id`
- * rather than `plot_id` because this tool's own tables key off units. The
- * per-villa summary reads the whole (small) `drawing_revisions` set once
- * via `fetchAll` and tallies it in JS rather than one query per villa.
+ * Every villa as a card: where its drawings stand, said in transmittals.
+ *
+ * Founder, 2026-08-22 evening: "person sees all villas (as cards) goes
+ * into the villa there all transmittals of that plot". So the summary is
+ * plot-level — how much has gone out and when — rather than a count of
+ * revisions, which is detail belonging one level in.
+ *
+ * Anchored on `unit_id` rather than `plot_id` because this tool's own
+ * tables key off units. The per-villa tallies read the whole (small)
+ * transmittals table once via `fetchAll` and count in JS rather than
+ * running one query per villa.
  */
 export async function listVillas(): Promise<DesignVillaRow[]> {
   await requireTool(GRANT);
   const supabase = await createClient();
 
-  const [units, plots, projects, revisions] = await Promise.all([
+  const [units, plots, projects, transmittals] = await Promise.all([
     fetchAll<{ id: string; project_id: string; plot_id: string; name: string }>((from, to) =>
       supabase
         .from("units")
@@ -257,11 +161,12 @@ export async function listVillas(): Promise<DesignVillaRow[]> {
     fetchAll<{ id: string; name: string }>((from, to) =>
       supabase.from("projects").select("id, name").order("id").range(from, to),
     ),
-    fetchAll<{ unit_id: string; drawing_set_id: string; status: string }>((from, to) =>
+    fetchAll<{ unit_id: string; status: string; issued_at: string | null }>((from, to) =>
       supabase
-        .from("drawing_revisions")
-        .select("unit_id, drawing_set_id, status")
+        .from("transmittals")
+        .select("unit_id, status, issued_at")
         .order("unit_id")
+        .order("id")
         .range(from, to),
     ),
   ]);
@@ -269,37 +174,31 @@ export async function listVillas(): Promise<DesignVillaRow[]> {
   const plotNames = new Map(plots.map((plot) => [plot.id, plot.name]));
   const projectNames = new Map(projects.map((project) => [project.id, project.name]));
 
-  const releasedSetsByUnit = new Map<string, Set<string>>();
-  const draftsByUnit = new Map<string, number>();
-  for (const revision of revisions) {
-    if (revision.status === "released") {
-      const set = releasedSetsByUnit.get(revision.unit_id) ?? new Set<string>();
-      set.add(revision.drawing_set_id);
-      releasedSetsByUnit.set(revision.unit_id, set);
-    } else if (revision.status === "draft") {
-      draftsByUnit.set(revision.unit_id, (draftsByUnit.get(revision.unit_id) ?? 0) + 1);
+  const issued = new Map<string, number>();
+  const drafts = new Map<string, number>();
+  const lastIssued = new Map<string, string>();
+  for (const transmittal of transmittals) {
+    if (transmittal.status === "issued") {
+      issued.set(transmittal.unit_id, (issued.get(transmittal.unit_id) ?? 0) + 1);
+      const held = lastIssued.get(transmittal.unit_id);
+      if (transmittal.issued_at && (!held || transmittal.issued_at > held)) {
+        lastIssued.set(transmittal.unit_id, transmittal.issued_at);
+      }
+    } else {
+      drafts.set(transmittal.unit_id, (drafts.get(transmittal.unit_id) ?? 0) + 1);
     }
   }
 
   return units.map((unit) => ({
     unitId: unit.id,
-    plotId: unit.plot_id,
     villaName: unit.name,
     plotName: plotNames.get(unit.plot_id) ?? "—",
     projectName: projectNames.get(unit.project_id) ?? "—",
-    setsReleased: releasedSetsByUnit.get(unit.id)?.size ?? 0,
-    draftsOpen: draftsByUnit.get(unit.id) ?? 0,
+    transmittalsIssued: issued.get(unit.id) ?? 0,
+    draftTransmittals: drafts.get(unit.id) ?? 0,
+    lastIssuedAt: lastIssued.get(unit.id) ?? null,
   }));
 }
-
-export type DesignStageBoardRow = {
-  stageId: string;
-  stageName: string;
-  isActive: boolean;
-  /** Issued transmittals for this villa at this stage — never a draft. */
-  transmittalCount: number;
-  lastIssuedAt: string | null;
-};
 
 export type DrawingRevisionFileRow = {
   id: string;
@@ -323,36 +222,52 @@ export type DrawingRevisionRow = {
   workItemIds: string[] | null;
 };
 
-export type DrawingSetWithRevisions = {
-  setId: string;
-  setCode: string | null;
-  setName: string;
-  /** Newest first. */
-  revisions: DrawingRevisionRow[];
+export type VillaTransmittalRow = {
+  id: string;
+  /** Null while it is a draft — the number is minted on Issue (0091 §7). */
+  number: string | null;
+  status: "draft" | "issued";
+  stageId: string;
+  stageName: string;
+  lineCount: number;
+  issuedAt: string | null;
+  issuedByName: string | null;
+  createdAt: string;
 };
 
 export type VillaDesignDetail = {
   unitId: string;
-  plotId: string;
   villaName: string;
   plotName: string;
   projectName: string;
-  stageBoard: DesignStageBoardRow[];
-  /** Only sets that have had something released on this villa. */
-  setsWithRevisions: DrawingSetWithRevisions[];
+  /** Newest first, and complete — one villa's transmittals are few. */
+  transmittals: VillaTransmittalRow[];
+  /**
+   * The design stages that actually appear on this villa's transmittals,
+   * in the stage master's own order — the filter chips. A stage nobody
+   * has issued against here is not offered: a chip that can only ever
+   * show an empty list is clutter, which is the thing being removed.
+   */
+  stages: { id: string; name: string }[];
 };
 
 /**
- * The villa design page's one read: header, the stage board (derived
- * fresh from issued transmittals, never stored), and the RELEASED
- * revision history of each drawing set. `null` when the unit id doesn't
- * exist — the caller's `notFound()`.
+ * The villa's home page: who it is, and every transmittal on it.
  *
- * Drafts are deliberately absent (founder, 2026-08-22, on the staging
- * vet): a draft lives on the transmittal that will send it, and the
- * villa page is the record of what has actually gone out. Showing a
- * half-finished drawing beside the issued ones is what made the two
- * screens read as the same thing.
+ * Founder, 2026-08-22 evening: "goes into the villa there all
+ * transmittals of that plot, filters by group". So this replaced both
+ * the old stage board and the global transmittals list — everything is
+ * plot-level now, and there is no company-wide list to consolidate with.
+ *
+ * Read complete rather than capped: a villa accumulates transmittals at
+ * the speed a design team issues drawings, and the filter chips have to
+ * be able to say honestly which stages appear. `null` when the unit id
+ * doesn't exist — the caller's `notFound()`.
+ *
+ * Ordered by `created_at`: a draft has no issue date at all, and
+ * PostgREST cannot order on a coalesce. A transmittal is issued within
+ * minutes of being raised, so the two orders agree — and an unfinished
+ * draft belongs at the top anyway.
  */
 export async function getVillaDesignDetail(unitId: string): Promise<VillaDesignDetail | null> {
   await requireTool(GRANT);
@@ -366,58 +281,31 @@ export async function getVillaDesignDetail(unitId: string): Promise<VillaDesignD
   if (unitError) fail("the villa", unitError);
   if (!unit) return null;
 
-  const [plot, project, stages, sets, revisions, transmittals] = await Promise.all([
+  const [plot, project, transmittals, stages] = await Promise.all([
     supabase.from("plots").select("name").eq("id", unit.plot_id).maybeSingle(),
     supabase.from("projects").select("name").eq("id", unit.project_id).maybeSingle(),
-    fetchAll<{ id: string; name: string; sort_order: number; is_active: boolean }>((from, to) =>
-      supabase
-        .from("design_stages")
-        .select("id, name, sort_order, is_active")
-        .order("sort_order")
-        .order("id")
-        .range(from, to),
-    ),
     fetchAll<{
       id: string;
-      code: string | null;
-      name: string;
-      sort_order: number;
-      is_active: boolean;
-    }>((from, to) =>
-      supabase
-        .from("drawing_sets")
-        .select("id, code, name, sort_order, is_active")
-        .order("sort_order")
-        .order("id")
-        .range(from, to),
-    ),
-    fetchAll<{
-      id: string;
-      drawing_set_id: string;
-      revision_no: number;
+      design_stage_id: string;
+      number: string | null;
       status: string;
-      note: string | null;
-      released_at: string | null;
+      issued_at: string | null;
+      issued_by: string | null;
+      created_at: string;
     }>((from, to) =>
-      supabase
-        .from("drawing_revisions")
-        .select("id, drawing_set_id, revision_no, status, note, released_at")
-        .eq("unit_id", unitId)
-        // Released and superseded only. A draft belongs to the
-        // transmittal that is assembling it, not to this page.
-        .neq("status", "draft")
-        .order("drawing_set_id")
-        .order("revision_no", { ascending: false })
-        .range(from, to),
-    ),
-    // Issued only — the stage board counts what site was told, not what's
-    // still being assembled.
-    fetchAll<{ id: string; design_stage_id: string; issued_at: string | null }>((from, to) =>
       supabase
         .from("transmittals")
-        .select("id, design_stage_id, issued_at")
+        .select("id, design_stage_id, number, status, issued_at, issued_by, created_at")
         .eq("unit_id", unitId)
-        .eq("status", "issued")
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAll<{ id: string; name: string; sort_order: number }>((from, to) =>
+      supabase
+        .from("design_stages")
+        .select("id, name, sort_order")
+        .order("sort_order")
         .order("id")
         .range(from, to),
     ),
@@ -425,192 +313,25 @@ export async function getVillaDesignDetail(unitId: string): Promise<VillaDesignD
   if (plot.error) fail("the villa", plot.error);
   if (project.error) fail("the villa", project.error);
 
-  const revisionIds = revisions.map((revision) => revision.id);
-
-  // Work links are not fetched here: they are frozen on release and this
-  // page never offers to edit them. Editing happens on the draft, which
-  // lives on its transmittal.
-  const files =
-    revisionIds.length > 0
-      ? await fetchAll<{
-          id: string;
-          drawing_revision_id: string;
-          file_name: string;
-          content_type: string;
-          sort_order: number;
-        }>((from, to) =>
-          supabase
-            .from("drawing_revision_files")
-            .select("id, drawing_revision_id, file_name, content_type, sort_order")
-            .in("drawing_revision_id", revisionIds)
-            .order("sort_order")
-            .order("id")
-            .range(from, to),
-        )
-      : [];
-
-  const filesByRevision = new Map<string, DrawingRevisionFileRow[]>();
-  for (const file of files) {
-    const list = filesByRevision.get(file.drawing_revision_id) ?? [];
-    list.push({
-      id: file.id,
-      fileName: file.file_name,
-      contentType: file.content_type,
-      sortOrder: file.sort_order,
-    });
-    filesByRevision.set(file.drawing_revision_id, list);
-  }
-
-  const transmittalsByStage = new Map<string, { count: number; lastIssuedAt: string | null }>();
-  for (const transmittal of transmittals) {
-    const current = transmittalsByStage.get(transmittal.design_stage_id) ?? {
-      count: 0,
-      lastIssuedAt: null,
-    };
-    current.count += 1;
-    if (
-      transmittal.issued_at &&
-      (!current.lastIssuedAt || transmittal.issued_at > current.lastIssuedAt)
-    ) {
-      current.lastIssuedAt = transmittal.issued_at;
-    }
-    transmittalsByStage.set(transmittal.design_stage_id, current);
-  }
-
-  // Retired stages only appear if they carry history — an active stage
-  // always shows, even at zero transmittals.
-  const stageBoard: DesignStageBoardRow[] = stages
-    .filter((stage) => stage.is_active || transmittalsByStage.has(stage.id))
-    .map((stage) => ({
-      stageId: stage.id,
-      stageName: stage.name,
-      isActive: stage.is_active,
-      transmittalCount: transmittalsByStage.get(stage.id)?.count ?? 0,
-      lastIssuedAt: transmittalsByStage.get(stage.id)?.lastIssuedAt ?? null,
-    }));
-
-  const revisionsBySet = new Map<string, DrawingRevisionRow[]>();
-  for (const revision of revisions) {
-    const list = revisionsBySet.get(revision.drawing_set_id) ?? [];
-    list.push({
-      id: revision.id,
-      revisionNo: revision.revision_no,
-      status: revision.status as DrawingRevisionRow["status"],
-      note: revision.note,
-      releasedAt: revision.released_at,
-      files: filesByRevision.get(revision.id) ?? [],
-      workItemIds: null,
-    });
-    revisionsBySet.set(revision.drawing_set_id, list);
-  }
-
-  const setsWithRevisions: DrawingSetWithRevisions[] = sets
-    .filter((set) => revisionsBySet.has(set.id))
-    .map((set) => ({
-      setId: set.id,
-      setCode: set.code,
-      setName: set.name,
-      revisions: revisionsBySet.get(set.id) ?? [],
-    }));
-
-  return {
-    unitId: unit.id,
-    plotId: unit.plot_id,
-    villaName: unit.name,
-    plotName: plot.data?.name ?? "—",
-    projectName: project.data?.name ?? "—",
-    stageBoard,
-    setsWithRevisions,
-  };
-}
-
-// ---------------------------------------------------------------------
-// Transmittals
-// ---------------------------------------------------------------------
-
-/**
- * The list shows this many and says how many there are in total — the
- * Supervisors labour-log convention (`LOGS_SHOWN`). Nobody scrolls a
- * hundred rows back; the per-villa filter is how you narrow it.
- */
-const TRANSMITTALS_SHOWN = 100;
-
-export type TransmittalListRow = {
-  id: string;
-  /** Null while it is a draft — the number is minted on Issue (0091 §7). */
-  number: string | null;
-  status: "draft" | "issued";
-  unitId: string;
-  villaName: string;
-  plotName: string;
-  projectName: string;
-  stageName: string;
-  lineCount: number;
-  issuedAt: string | null;
-  issuedByName: string | null;
-  createdAt: string;
-};
-
-/**
- * Every transmittal, drafts and issued together, newest first.
- *
- * Ordered by `created_at` rather than the issue date: a draft has no
- * issue date at all, and PostgREST cannot order on a coalesce. In
- * practice a transmittal is issued within minutes of being raised, so
- * the two orders agree — and an unfinished draft belongs at the top
- * anyway, since it is the one still asking for attention.
- *
- * `unitId` narrows it to one villa — the villa design page's link.
- */
-export async function listTransmittals(
-  unitId?: string,
-): Promise<{ rows: TransmittalListRow[]; total: number }> {
-  await requireTool(GRANT);
-  const supabase = await createClient();
-
-  let query = supabase
-    .from("transmittals")
-    .select("id, unit_id, design_stage_id, number, status, issued_at, issued_by, created_at", {
-      count: "exact",
-    })
-    .order("created_at", { ascending: false })
-    .order("id");
-  if (unitId) query = query.eq("unit_id", unitId);
-
-  const page = await query.range(0, TRANSMITTALS_SHOWN - 1);
-  if (page.error) fail("the transmittals", page.error);
-
-  const transmittals = page.data ?? [];
-  const total = page.count ?? transmittals.length;
-  if (transmittals.length === 0) return { rows: [], total };
-
-  const unitIds = [...new Set(transmittals.map((row) => row.unit_id))];
-  const stageIds = [...new Set(transmittals.map((row) => row.design_stage_id))];
+  const transmittalIds = transmittals.map((row) => row.id);
   const issuerIds = [
     ...new Set(transmittals.map((row) => row.issued_by).filter((id): id is string => id !== null)),
   ];
-  const transmittalIds = transmittals.map((row) => row.id);
 
-  // Names merge through Maps, never an embed: `units` has two FK paths
-  // to `plots` (BUGCATCHER #2) and `transmittals` carries two FKs to
-  // `profiles` (created_by and issued_by).
-  const [units, stages, issuers, lines] = await Promise.all([
-    fetchAll<{ id: string; name: string; plot_id: string; project_id: string }>((from, to) =>
-      supabase
-        .from("units")
-        .select("id, name, plot_id, project_id")
-        .in("id", unitIds)
-        .order("id")
-        .range(from, to),
-    ),
-    fetchAll<{ id: string; name: string }>((from, to) =>
-      supabase
-        .from("design_stages")
-        .select("id, name")
-        .in("id", stageIds)
-        .order("id")
-        .range(from, to),
-    ),
+  // Names merge through Maps, never an embed: `transmittals` carries two
+  // FKs to `profiles` (created_by and issued_by), which is a PGRST201 at
+  // runtime that every local gate passes (BUGCATCHER #2).
+  const [lines, issuers] = await Promise.all([
+    transmittalIds.length > 0
+      ? fetchAll<{ transmittal_id: string }>((from, to) =>
+          supabase
+            .from("transmittal_lines")
+            .select("transmittal_id")
+            .in("transmittal_id", transmittalIds)
+            .order("id")
+            .range(from, to),
+        )
+      : Promise.resolve([]),
     issuerIds.length > 0
       ? fetchAll<{ id: string; full_name: string | null }>((from, to) =>
           supabase
@@ -621,57 +342,38 @@ export async function listTransmittals(
             .range(from, to),
         )
       : Promise.resolve([]),
-    fetchAll<{ transmittal_id: string }>((from, to) =>
-      supabase
-        .from("transmittal_lines")
-        .select("transmittal_id")
-        .in("transmittal_id", transmittalIds)
-        .order("id")
-        .range(from, to),
-    ),
   ]);
-
-  const plotIds = [...new Set(units.map((unit) => unit.plot_id))];
-  const projectIds = [...new Set(units.map((unit) => unit.project_id))];
-  const [plots, projects] = await Promise.all([
-    fetchAll<{ id: string; name: string }>((from, to) =>
-      supabase.from("plots").select("id, name").in("id", plotIds).order("id").range(from, to),
-    ),
-    fetchAll<{ id: string; name: string }>((from, to) =>
-      supabase.from("projects").select("id, name").in("id", projectIds).order("id").range(from, to),
-    ),
-  ]);
-
-  const plotNames = new Map(plots.map((plot) => [plot.id, plot.name]));
-  const projectNames = new Map(projects.map((project) => [project.id, project.name]));
-  const unitsById = new Map(units.map((unit) => [unit.id, unit]));
-  const stageNames = new Map(stages.map((stage) => [stage.id, stage.name]));
-  const issuerNames = new Map(issuers.map((issuer) => [issuer.id, issuer.full_name]));
 
   const lineCounts = new Map<string, number>();
   for (const line of lines) {
     lineCounts.set(line.transmittal_id, (lineCounts.get(line.transmittal_id) ?? 0) + 1);
   }
+  const issuerNames = new Map(issuers.map((issuer) => [issuer.id, issuer.full_name]));
+  const stageNames = new Map(stages.map((stage) => [stage.id, stage.name]));
+
+  const rows: VillaTransmittalRow[] = transmittals.map((row) => ({
+    id: row.id,
+    number: row.number,
+    status: row.status as VillaTransmittalRow["status"],
+    stageId: row.design_stage_id,
+    stageName: stageNames.get(row.design_stage_id) ?? "—",
+    lineCount: lineCounts.get(row.id) ?? 0,
+    issuedAt: row.issued_at,
+    issuedByName: row.issued_by ? (issuerNames.get(row.issued_by) ?? null) : null,
+    createdAt: row.created_at,
+  }));
+
+  const present = new Set(rows.map((row) => row.stageId));
 
   return {
-    rows: transmittals.map((row) => {
-      const unit = unitsById.get(row.unit_id);
-      return {
-        id: row.id,
-        number: row.number,
-        status: row.status as TransmittalListRow["status"],
-        unitId: row.unit_id,
-        villaName: unit?.name ?? "—",
-        plotName: unit ? (plotNames.get(unit.plot_id) ?? "—") : "—",
-        projectName: unit ? (projectNames.get(unit.project_id) ?? "—") : "—",
-        stageName: stageNames.get(row.design_stage_id) ?? "—",
-        lineCount: lineCounts.get(row.id) ?? 0,
-        issuedAt: row.issued_at,
-        issuedByName: row.issued_by ? (issuerNames.get(row.issued_by) ?? null) : null,
-        createdAt: row.created_at,
-      };
-    }),
-    total,
+    unitId: unit.id,
+    villaName: unit.name,
+    plotName: plot.data?.name ?? "—",
+    projectName: project.data?.name ?? "—",
+    transmittals: rows,
+    stages: stages
+      .filter((stage) => present.has(stage.id))
+      .map((stage) => ({ id: stage.id, name: stage.name })),
   };
 }
 
@@ -699,58 +401,66 @@ export type VillaDrawingSetState = {
 };
 
 /**
- * Every drawing set, and where this villa stands on each: the open
+ * THIS VILLA'S drawing sets, and where it stands on each: the open
  * draft, the current released revision, and the number the next
  * revision would take.
  *
- * This is what the transmittal's "Add drawings" board is built from
- * (founder, 2026-08-22, redirecting the flow on the staging vet: "under
- * new transmittal you either upload a new set of drawings or you revise
- * a set that can be seen there"). A set with nothing on this villa still
- * appears — that is the "upload the first drawings" case, and it could
- * never be offered by a list of what already exists.
+ * A set is only this villa's if a revision of it lives on this unit.
+ * That is the whole of the villa-scoping the founder asked for on
+ * 2026-08-22 evening — "not a master set for the whole damn project" —
+ * and it needs no column: `drawing_sets` stays one global table, and a
+ * set born on another villa's transmittal simply never appears here.
+ * Two villas that both make a "Working Drawings" are two rows, which is
+ * intended.
+ *
+ * It feeds two screens: the villa page's read-only "Drawing sets on this
+ * plot", and the transmittal's Add-drawings board (Continue draft /
+ * Revise). A set that has never been drawn here cannot be reached from
+ * either — that is what the transmittal's "New drawing set" control is
+ * for.
  *
  * A retired set still appears if it carries history here, so a villa
- * mid-flight is never stranded; a retired set with nothing here does
- * not, because starting a drawing on a set the master has retired is
- * the one thing retiring it was meant to stop.
+ * mid-flight is never stranded.
  */
 export async function listVillaDrawingSetStates(unitId: string): Promise<VillaDrawingSetState[]> {
   await requireTool(GRANT);
   const supabase = await createClient();
 
-  const [sets, revisions] = await Promise.all([
-    fetchAll<{
-      id: string;
-      code: string | null;
-      name: string;
-      sort_order: number;
-      is_active: boolean;
-    }>((from, to) =>
-      supabase
-        .from("drawing_sets")
-        .select("id, code, name, sort_order, is_active")
-        .order("sort_order")
-        .order("id")
-        .range(from, to),
-    ),
-    fetchAll<{
-      id: string;
-      drawing_set_id: string;
-      revision_no: number;
-      status: string;
-      note: string | null;
-    }>((from, to) =>
-      supabase
-        .from("drawing_revisions")
-        .select("id, drawing_set_id, revision_no, status, note")
-        .eq("unit_id", unitId)
-        .order("drawing_set_id")
-        .order("revision_no", { ascending: false })
-        .order("id")
-        .range(from, to),
-    ),
-  ]);
+  // The villa's revisions come first, and the sets follow from them —
+  // the order that makes the scoping true rather than filtered.
+  const revisions = await fetchAll<{
+    id: string;
+    drawing_set_id: string;
+    revision_no: number;
+    status: string;
+    note: string | null;
+  }>((from, to) =>
+    supabase
+      .from("drawing_revisions")
+      .select("id, drawing_set_id, revision_no, status, note")
+      .eq("unit_id", unitId)
+      .order("drawing_set_id")
+      .order("revision_no", { ascending: false })
+      .order("id")
+      .range(from, to),
+  );
+  if (revisions.length === 0) return [];
+
+  const setIds = [...new Set(revisions.map((revision) => revision.drawing_set_id))];
+  const sets = await fetchAll<{
+    id: string;
+    code: string | null;
+    name: string;
+    sort_order: number;
+  }>((from, to) =>
+    supabase
+      .from("drawing_sets")
+      .select("id, code, name, sort_order")
+      .in("id", setIds)
+      .order("sort_order")
+      .order("id")
+      .range(from, to),
+  );
 
   // Only the drafts and the current released rows ever have their files
   // counted — a superseded revision's sheets are history nobody is about
@@ -800,7 +510,6 @@ export async function listVillaDrawingSetStates(unitId: string): Promise<VillaDr
 
   return sets.flatMap((set) => {
     const held = bySet.get(set.id);
-    if (!set.is_active && !held) return [];
     return [
       {
         setId: set.id,

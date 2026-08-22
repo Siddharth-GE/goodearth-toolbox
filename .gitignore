@@ -59,3 +59,5 @@ REPO-MAP.md
 /.github/agents
 /.github/hooks
 vercel-env-values.txt
+
+.vercel
