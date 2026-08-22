@@ -47,6 +47,72 @@ the reader's head, not by a foreign key.
    hand. There is no outbound email anywhere in this tool, and none was
    built.
 
+## Where the work happens: the transmittal, not the villa
+
+**The transmittal is the workspace. The villa page is the record.** The
+founder redirected the flow on the staging vet, 2026-08-22, after using
+the first build:
+
+> "let this new drawing sets thing come inside the new transmittal
+> instead of under the villa overview, press new transmittal, upload the
+> docs and issue to site, in the overview you just see what's been
+> issued, under new transmittal you either upload a new set of drawings
+> or you revise a set that can be seen there."
+
+So the two screens divide like this, and neither borrows the other's job:
+
+- **`villas/[unitId]`** — the stage board and each drawing set's
+  **released and superseded** history, read-only. `getVillaDesignDetail`
+  filters drafts out in the query rather than on the screen, so there is
+  no path by which one shows up here. Its one action is "New
+  transmittal"; its one link is this villa's transmittals.
+- **`transmittals/[transmittalId]`, while draft** — everything else. The
+  stage and note, the drawings going out, an **Add drawings** board
+  listing every drawing set with the one press that fits where this
+  villa stands on it, and the draft editor (note, sheets, work links)
+  sitting **inline on each draft line**.
+
+The Add drawings board is three offers and one action
+(`createRevisionOnTransmittal`), because the screen must never disagree
+with the database about which case it is in — the action re-reads the
+villa's state itself and the label is the only thing that differs:
+
+| What this villa has of the set | The button                   | What happens                        |
+| ------------------------------ | ---------------------------- | ----------------------------------- |
+| a draft already open           | "Continue draft R2"          | that draft goes on; nothing created |
+| only released revisions        | "Revise — starts R3"         | R+1 started, then added             |
+| nothing at all                 | "Upload first drawings — R0" | R0 started, then added              |
+
+A set already on the transmittal is offered neither, and shows "On this
+transmittal" instead: one line per set per transmittal is a screen rule,
+not a database one, and it is what keeps "what went out" readable.
+Sending an already-released drawing again, unchanged, is a separate
+picker with its own words — it is a different act (`addTransmittalLine`,
+nothing created, nothing superseded on issue).
+
+**Creating a transmittal creates an EMPTY draft.** The first build made
+you pick at least one drawing up front, which assumed the drawings
+already existed; the founder's flow is the opposite way round. "At least
+one drawing" is now enforced only where it always belonged — at Issue,
+by `issue_transmittal` itself, whose refusal is shown verbatim. The
+Issue button therefore stays pressable on an empty draft rather than
+greying out.
+
+**Taking a draft line off is two different acts, so it is two presses.**
+The trash icon takes the drawing off this transmittal and leaves the
+draft alone; "Remove and delete the draft" does both. The order is
+forced by the database: `delete_draft_revision` refuses while the
+revision still sits on a line, so the line goes first, then the rows,
+then the storage objects. If the second half fails, the first half is
+still reported as having happened.
+
+**A draft revision outlives the transmittal it was raised on.** Deleting
+a draft transmittal deletes its lines and header, never the drawings —
+that would destroy uploaded sheets nobody asked to lose. The draft is
+not stranded: it is still the villa's one open draft for that set, so
+the next transmittal's board offers "Continue draft R2" and picks it
+straight back up.
+
 ## The lifecycle, which is the whole tool
 
 `draft → released → superseded`, and the only legal transitions are those
@@ -94,9 +160,12 @@ already carry it. Issued numbers are never rewritten — the two staging
 smoke transmittals keep the global numbers they were born with.
 
 **One draft per set per villa**, a partial unique index rather than a
-check in every code path. "Start next revision" is `max(revision_no) + 1`
-for that (unit, set); the new draft copies the master's default work links
-so it starts where the set says and can then differ for this villa alone.
+check in every code path — which is why "Revise" continues an open draft
+instead of starting a second one. A new draft is `max(revision_no) + 1`
+across every status for that (unit, set), so a number is spent once and
+never re-used, and it copies the master's default work links so it starts
+where the set says and can then differ for this villa alone. One helper,
+`startDraftRevision`, is the only code that does this.
 
 ## The 4 MB rule, and why
 

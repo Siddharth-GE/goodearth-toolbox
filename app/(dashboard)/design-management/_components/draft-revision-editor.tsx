@@ -7,7 +7,6 @@ import { IconButton } from "@/components/ui/icon-button";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  deleteDraftRevision,
   deleteDrawingRevisionFile,
   setDrawingRevisionWorks,
   updateDraftRevisionNote,
@@ -19,16 +18,22 @@ import type { WorksTreeCategory } from "@/lib/masters/works";
 import { FileText, Trash2, UploadCloud } from "lucide-react";
 import { useMemo, useRef, useState, useTransition } from "react";
 
-import { WorksCheckboxTree } from "../../../_components/works-checkbox-tree";
+import { WorksCheckboxTree } from "./works-checkbox-tree";
 
 const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 
 /**
- * The draft's own workspace: note, files, and its work links — the only
- * revision status this tool ever offers an edit surface for. Once
+ * The draft's own workspace: note, sheets, and the works it serves — the
+ * only revision status this tool ever offers an edit surface for. Once
  * released or superseded, the guard triggers in 0091 refuse every one of
- * these writes anyway; this component simply never renders for that row
- * (drawing-set-card.tsx branches on status before reaching here).
+ * these writes anyway; this component simply never renders for that row.
+ *
+ * It sits INSIDE a transmittal line (founder, 2026-08-22: "under new
+ * transmittal you either upload a new set of drawings or you revise a
+ * set"). Which is why it has no delete button of its own: on a
+ * transmittal, discarding a draft is the second half of taking its line
+ * off, and `delete_draft_revision` refuses while the line is still
+ * there. The line's own Remove control offers both.
  */
 export function DraftRevisionEditor({
   revision,
@@ -39,43 +44,9 @@ export function DraftRevisionEditor({
 }) {
   return (
     <div className="border-warning/30 bg-warning/5 space-y-3 rounded-xl border p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className="text-foreground text-sm font-medium">R{revision.revisionNo}</span>
-          <Badge variant="warning">Draft</Badge>
-        </div>
-        <DeleteDraftButton revisionId={revision.id} />
-      </div>
-
       <NoteField revisionId={revision.id} note={revision.note} />
       <FilesEditor revisionId={revision.id} files={revision.files} />
       <WorksEditor revisionId={revision.id} tree={tree} workItemIds={revision.workItemIds ?? []} />
-    </div>
-  );
-}
-
-function DeleteDraftButton({ revisionId }: { revisionId: string }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
-
-  return (
-    <div className="flex items-center gap-2">
-      <FormMessage error={error} size="xs" />
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        disabled={pending}
-        onClick={() => {
-          setError(undefined);
-          startTransition(async () => {
-            const result = await deleteDraftRevision(revisionId);
-            if (result?.error) setError(result.error);
-          });
-        }}
-      >
-        {pending ? "Deleting…" : "Delete this draft"}
-      </Button>
     </div>
   );
 }

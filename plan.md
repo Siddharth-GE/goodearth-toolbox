@@ -142,6 +142,21 @@ Merge-approval pass against this plan, `SECURITY.md`, `BUGCATCHER.md`. **Founder
 
 2026-08-22, Fable: approval pass complete — every step's diff was vetted before its commit, the whole-branch scan found no admin client, no raw-Buffer upload, no manifest drift, no out-of-lane files; PR #51 ran CI green and merged to `staging` at 136fbd9. **Waiting on the founder's vet at staging.goodearthkannur.org** (checklist below; the welcome starts at 1 smoke set and 2 transmittals, not zeroes — smoke residue, recorded in step 7's notes). Production (0091 apply + master merge + the write-button press) happens only after their word.
 
+### 9. ⬜ `[Opus]` The founder's redesign of the flow
+
+**Founder vetted on staging 2026-08-22 and redirected the flow**: _"let this new drawing sets thing
+come inside the new transmittal instead of under the villa overview, press new transmittal, upload
+the docs and issue to site, in the overview you just see what's been issued, under new transmittal
+you either upload a new set of drawings or you revise a set that can be seen there."_
+
+Built the same day on `staging`, **awaiting the Fable vet before it is committed** — the box stays
+open until then. **No migration**: `0091` and `0092` already model all of it, and no guard moved.
+The villa page became the record of what has been issued; the draft transmittal became the
+workspace, carrying the Add drawings board, the inline draft editor and the two-question line
+removal. Full checks green (prettier, lint, tsc, test, build, check:actions) plus a synthetic-data
+render of both cover sheets. Decisions 21–26 below; the flow itself is written up in the tool's
+own `PLAN.md` under "Where the work happens".
+
 Commit each working piece with a plain-English message.
 
 ## Questions for the tier above
@@ -165,7 +180,10 @@ Seven notes from step 5 (Opus, 2026-08-22) — the plan named the screens and th
 left a choice open, each was settled by following the nearest existing convention rather than
 inventing one.
 
-10. **A transmittal cannot be created empty** — the plan allowed either branch, and this is the
+10. **REVERSED by the founder on the staging vet — see note 21.** A transmittal is now created
+    empty and "at least one drawing" is enforced only at Issue. What follows is what shipped
+    first, kept because the reversal only makes sense beside it. **A transmittal cannot be created
+    empty** — the plan allowed either branch, and this was the
     "at least one line before it can be created" one: the dialog refuses with "Tick at least one
     drawing to send." A draft can still _reach_ zero by having its last line removed, and that
     state is handled honestly rather than hidden: the detail screen says so in danger text, and
@@ -270,12 +288,71 @@ Working Drawings, Ground Floor"`, `TR-0001` on Saarang Villa 9 with R0 and two s
     2026-08-19 Estimator smoke), its session was signed out globally, its `auth_verified_sessions`
     row deleted and its throwaway password rotated to a value nobody holds.
 
+Six notes from the flow redesign (Opus, 2026-08-22) — the founder used the first build on staging
+and moved the work from the villa page onto the transmittal: _"press new transmittal, upload the
+docs and issue to site, in the overview you just see what's been issued"_. **This reverses decision
+10 above**, which is recorded there rather than quietly dropped. `app/(dashboard)/design-management/PLAN.md`
+now carries the whole flow under "Where the work happens".
+
+21. **Decision 10 is reversed: a transmittal is created EMPTY.** The dialog asks only for the
+    design stage and an optional note, then opens the transmittal. Requiring a drawing up front
+    assumed the drawings already existed, which is the assumption the founder's flow inverts. "At
+    least one drawing" is now enforced in exactly one place — `issue_transmittal`, which already
+    refused an empty one — and its sentence is what the person reads. Issue therefore stays
+    pressable on an empty draft, which is the half of decision 10 that survives intact.
+22. **Three offers, one action.** The Add drawings board lists every drawing set and labels the
+    button from what the villa has of it: "Continue draft R2", "Revise — starts R3", or "Upload
+    first drawings — R0". All three call `createRevisionOnTransmittal`, which re-reads the state
+    itself and continues an open draft rather than starting a second (the partial unique index
+    would refuse one anyway). The label is the only thing that differs, so the screen cannot
+    disagree with the database about which case it is in. Numbering and the default-work-links
+    copy moved into one private helper, `startDraftRevision`, which is now the only code in the
+    tool that starts a revision.
+23. **One line per drawing set per transmittal — a screen rule, not a database one.** A set already
+    on the transmittal shows "On this transmittal" and is offered neither path. The database is
+    happy to carry a set's released R1 and its draft R2 on the same transmittal (issuing would
+    then release R2 and supersede R1 in the same breath), but nobody reading the cover sheet
+    afterwards could say what went out, so the screen declines to offer it.
+24. **Removing a draft line asks a second question rather than guessing.** The trash icon takes the
+    drawing off this transmittal; "Remove and delete the draft" also destroys it. They are
+    different acts — one is a change of mind about today, the other loses uploaded sheets — and the
+    database forces the order: `delete_draft_revision` refuses while the line still exists, so the
+    line goes first, then the rows, then the storage objects, and a failure in the second half is
+    reported without un-saying the first.
+25. **A draft revision outlives the transmittal it was raised on.** `delete_draft_transmittal`
+    takes the lines and the header, never the drawings. That leaves an open draft with no
+    transmittal — but not a stranded one: it is still the villa's one open draft for that set, so
+    the next transmittal's board offers "Continue draft R2" and picks it straight back up. The
+    alternative (cascading into the revisions) would destroy uploaded sheets to tidy up a header.
+26. **Two exported actions were deleted rather than left dead.** `createDraftRevision` and
+    `deleteDraftRevision` existed only for the villa-page editors the founder removed;
+    `listTransmittalCandidates` likewise. Their behaviour survives inside `startDraftRevision` and
+    `discardDraftRevision`, called from the actions that now own those flows. An exported server
+    action nothing calls is a live write path with no screen watching it, and this codebase has
+    already written down what speculative leftovers cost (DESIGN.md, on the four deleted
+    components).
+
 ## Verification — the founder's browser checklist (staging)
 
-1. Open **Design Management** → the welcome reads sensibly, counts are zeroes.
+**Rewritten for the redesigned flow, 2026-08-22.** The counts in step 1 are not zeroes — the
+probe smoke left one drawing set and two issued transmittals on staging permanently (note 20).
+
+1. Open **Design Management** → the welcome reads sensibly. Expect 1 drawing set, 2 villas with
+   released drawings and 2 transmittals: smoke residue, not a bug.
 2. **Sets**: create "Working Drawings — Ground Floor", tick a few works it serves.
-3. **Villas**: pick a Saarang villa → upload a PDF as R0 with a note → the set shows R0 · draft.
-4. Create a **transmittal** for stage "Working Drawings", include the set, press **Issue** → number TR-0001 appears, revision reads Released, the PDF cover sheet downloads on the letterhead.
-5. Open **Supervisors** on a phone → same villa → the Drawings section lists the set at R0, the linked work's section shows the "Drawing · R0" chip, tapping opens the PDF.
-6. Upload R1 with a note, issue a second transmittal → Supervisors now shows R1; R0 reads superseded in Design Management's history.
-7. As the probe with `/supervisors` only: draft revisions are invisible; with no grant, `/design-management` refuses.
+3. **Villas**: pick a Saarang villa → it shows only what has been issued, and nothing to edit.
+   Press **New transmittal**, choose stage "Working Drawings", save → the transmittal opens.
+4. On the transmittal: under **Add drawings**, press **Upload first drawings — R0** against your
+   set → it appears as a draft line with the editor on it → write a note, add a PDF, tick a work
+   or two. Press **Issue** → TR-0001 appears, the line reads Released, and the cover sheet
+   downloads on the letterhead.
+5. Back on the villa → the drawing now shows under **Drawings issued** at R0, read-only.
+6. Open **Supervisors** on a phone → same villa → the Drawings section lists the set at R0, the
+   linked work's section shows the "Drawing · R0" chip, tapping opens the PDF.
+7. New transmittal again → the same set now offers **Revise — starts R1**. Add a sheet, issue it →
+   Supervisors shows R1; the villa page reads R1 released and R0 superseded.
+8. Raise a third transmittal, add a set, then press the trash icon on its line → the drawing comes
+   off and the draft survives (the next transmittal offers "Continue draft R…"). Press **Delete
+   this draft** on the transmittal itself → it is gone from the list.
+9. As the probe with `/supervisors` only: draft revisions are invisible; with no grant,
+   `/design-management` refuses.

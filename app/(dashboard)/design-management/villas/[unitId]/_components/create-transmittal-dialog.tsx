@@ -2,41 +2,34 @@
 
 import { RecordFormDialog } from "@/components/masters/record-form-dialog";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { createTransmittal } from "@/lib/design-management/actions";
-import type { TransmittalCandidate } from "@/lib/design-management/queries";
 
 /**
- * Raise a transmittal for this villa: the design stage it goes out at, a
- * note, and which drawings ride on it.
+ * Start a transmittal for this villa. Two questions only — the design
+ * stage it goes out at, and an optional note — and then it opens.
  *
- * The drawings are PICKED, never typed, and each one is offered at its
- * CURRENT revision only — the draft if the designer has one open, else
- * the released one. A superseded revision is never in this list; sending
- * a retired drawing to site is the mistake this tool exists to prevent.
- *
- * Issuing is a separate press on the transmittal's own page, because
- * issuing is what releases the drawings and it should never happen as a
- * side effect of filling in a form.
+ * Founder, 2026-08-22, redirecting the flow on the staging vet: "press
+ * new transmittal, upload the docs and issue to site". The drawings are
+ * chosen, revised and uploaded ON the transmittal, because that is the
+ * order the work actually happens in; picking finished drawings up front
+ * assumed they already existed.
  */
 export function CreateTransmittalDialog({
   unitId,
   stages,
-  candidates,
 }: {
   unitId: string;
   stages: { id: string; name: string }[];
-  candidates: TransmittalCandidate[];
 }) {
-  // Nothing to send, or nowhere to send it against: say why rather than
-  // offering a dialog that can only fail.
-  if (stages.length === 0 || candidates.length === 0) {
+  // Nowhere to file it: say why rather than opening a dialog that can
+  // only fail. Stages are a master, one click away in this same tool.
+  if (stages.length === 0) {
     return (
       <Button variant="secondary" disabled>
-        {stages.length === 0 ? "No design stages yet" : "No drawings to send yet"}
+        No design stages yet
       </Button>
     );
   }
@@ -72,30 +65,10 @@ export function CreateTransmittalDialog({
         />
       </div>
 
-      <div className="space-y-1.5">
-        <p className="text-muted text-xs font-semibold tracking-widest uppercase">Drawings</p>
-        <ul className="border-border divide-border max-h-56 divide-y overflow-y-auto rounded-xl border">
-          {candidates.map((candidate) => (
-            <li key={candidate.revisionId}>
-              <label className="flex cursor-pointer items-start gap-2 p-2.5">
-                <Checkbox name="revision_id" value={candidate.revisionId} className="mt-0.5" />
-                <span className="min-w-0">
-                  <span className="text-foreground block text-sm">
-                    {candidate.setCode
-                      ? `${candidate.setCode} — ${candidate.setName}`
-                      : candidate.setName}{" "}
-                    — R{candidate.revisionNo} ({candidate.status})
-                  </span>
-                  <span className="text-muted block text-xs">
-                    {candidate.fileCount} {candidate.fileCount === 1 ? "file" : "files"}
-                    {candidate.note ? ` · ${candidate.note}` : ""}
-                  </span>
-                </span>
-              </label>
-            </li>
-          ))}
-        </ul>
-      </div>
+      <p className="text-muted text-xs">
+        Saving opens the transmittal. Add or revise its drawings there, then press Issue to send
+        them to site.
+      </p>
     </RecordFormDialog>
   );
 }

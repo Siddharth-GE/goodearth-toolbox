@@ -1,5 +1,6 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FormMessage } from "@/components/ui/form-message";
 import { IconButton } from "@/components/ui/icon-button";
@@ -8,12 +9,13 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
   addTransmittalLine,
+  createRevisionOnTransmittal,
   deleteDraftTransmittal,
   issueTransmittal,
   removeTransmittalLine,
   updateDraftTransmittal,
 } from "@/lib/design-management/actions";
-import type { TransmittalCandidate } from "@/lib/design-management/queries";
+import type { VillaDrawingSetState } from "@/lib/design-management/queries";
 import { Trash2 } from "lucide-react";
 import { useActionState, useState, useTransition } from "react";
 
@@ -72,45 +74,152 @@ export function DraftDetailsForm({
 }
 
 /**
- * Adds one more drawing to the draft, at its current revision. The list
- * has already had the drawings on this transmittal taken out of it, so
- * the unique constraint is a backstop rather than the everyday path.
+ * The board the founder asked for: every drawing set this villa could
+ * carry, each with the one press that makes sense for where it stands.
+ *
+ * "under new transmittal you either upload a new set of drawings or you
+ * revise a set that can be seen there" (2026-08-22). A set that has
+ * never been drawn here offers R0; one with a released revision offers
+ * the next revision; one with a draft already open continues it rather
+ * than starting a second, which the database would refuse anyway.
+ *
+ * All three are the same action — `createRevisionOnTransmittal` reads
+ * the villa's state itself, so the label is the only thing that differs
+ * and the screen can never disagree with the database about which case
+ * it is in.
  */
-export function AddLinePicker({
+export function AddDrawingsBoard({
   transmittalId,
-  candidates,
+  sets,
+  setIdsOnTransmittal,
 }: {
   transmittalId: string;
-  candidates: TransmittalCandidate[];
+  sets: VillaDrawingSetState[];
+  setIdsOnTransmittal: string[];
 }) {
-  const [revisionId, setRevisionId] = useState("");
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const onTransmittal = new Set(setIdsOnTransmittal);
 
-  if (candidates.length === 0) {
+  if (sets.length === 0) {
     return (
       <p className="text-muted text-sm">
-        No other current drawing on this villa to add. Start a revision on the villa&apos;s design
-        page first.
+        No drawing sets in the master yet — add one under Drawing sets first.
       </p>
     );
   }
 
   return (
+    <ul className="divide-border divide-y">
+      {sets.map((set) => (
+        <li key={set.setId} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
+          <div className="min-w-0">
+            <p className="text-foreground text-sm font-medium">
+              {set.setCode ? `${set.setCode} — ${set.setName}` : set.setName}
+            </p>
+            <p className="text-muted text-xs">{stateLine(set)}</p>
+          </div>
+          {onTransmittal.has(set.setId) ? (
+            <Badge variant="info">On this transmittal</Badge>
+          ) : (
+            <AddSetButton transmittalId={transmittalId} set={set} />
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** What this villa has of the set, said plainly. */
+function stateLine(set: VillaDrawingSetState): string {
+  const parts: string[] = [];
+  if (set.draft) {
+    parts.push(`Draft R${set.draft.revisionNo} · ${fileCount(set.draft.fileCount)}`);
+  }
+  if (set.released) {
+    parts.push(
+      set.draft
+        ? `last released R${set.released.revisionNo}`
+        : `Released R${set.released.revisionNo} · ${fileCount(set.released.fileCount)}`,
+    );
+  }
+  if (parts.length === 0) return "Not drawn for this villa yet";
+  return parts.join(" · ");
+}
+
+function fileCount(count: number): string {
+  return `${count} ${count === 1 ? "file" : "files"}`;
+}
+
+function AddSetButton({
+  transmittalId,
+  set,
+}: {
+  transmittalId: string;
+  set: VillaDrawingSetState;
+}) {
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string>();
+
+  const label = set.draft
+    ? `Continue draft R${set.draft.revisionNo}`
+    : set.released
+      ? `Revise — starts R${set.nextRevisionNo}`
+      : `Upload first drawings — R${set.nextRevisionNo}`;
+
+  return (
+    <div className="flex items-center gap-2">
+      <FormMessage error={error} size="xs" />
+      <Button
+        type="button"
+        variant="secondary"
+        size="sm"
+        disabled={pending}
+        onClick={() => {
+          setError(undefined);
+          startTransition(async () => {
+            const result = await createRevisionOnTransmittal(transmittalId, set.setId);
+            if (result?.error) setError(result.error);
+          });
+        }}
+      >
+        {pending ? "Adding…" : label}
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * Sending a drawing that is already released, exactly as it is — the
+ * same set going out again at a new design stage. Nothing is revised
+ * and nothing is created; `issue_transmittal` leaves these lines alone.
+ */
+export function ResendReleasedPicker({
+  transmittalId,
+  options,
+}: {
+  transmittalId: string;
+  options: { revisionId: string; label: string }[];
+}) {
+  const [revisionId, setRevisionId] = useState("");
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string>();
+
+  if (options.length === 0) return null;
+
+  return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-end gap-2">
         <div className="min-w-0 flex-1 space-y-1.5">
-          <Label htmlFor="add-line">Add a drawing</Label>
+          <Label htmlFor="resend-revision">Send an already-released drawing again, unchanged</Label>
           <Select
-            id="add-line"
+            id="resend-revision"
             value={revisionId}
             disabled={pending}
             onChange={(event) => setRevisionId(event.target.value)}
           >
-            <option value="">Choose a drawing set…</option>
-            {candidates.map((candidate) => (
-              <option key={candidate.revisionId} value={candidate.revisionId}>
-                {candidateLabel(candidate)}
+            <option value="">Choose a released drawing…</option>
+            {options.map((option) => (
+              <option key={option.revisionId} value={option.revisionId}>
+                {option.label}
               </option>
             ))}
           </Select>
@@ -136,32 +245,54 @@ export function AddLinePicker({
   );
 }
 
-/** "WD-GF — Working Drawings — R2 (draft) · 2 files", in one line
- *  because a <select> option can only ever be one line of text. */
-function candidateLabel(candidate: TransmittalCandidate): string {
-  const set = candidate.setCode ? `${candidate.setCode} — ${candidate.setName}` : candidate.setName;
-  const files = `${candidate.fileCount} ${candidate.fileCount === 1 ? "file" : "files"}`;
-  return `${set} — R${candidate.revisionNo} (${candidate.status}) · ${files}`;
-}
-
-export function RemoveLineButton({ lineId, label }: { lineId: string; label: string }) {
+/**
+ * Taking a drawing off, and — for a draft — the separate question of
+ * whether to throw the drawing away too.
+ *
+ * They are deliberately two presses. Off-this-transmittal is a change of
+ * mind about what goes out today; deleting the draft destroys uploaded
+ * sheets. Guessing between them would either strand a draft nobody can
+ * find or lose work nobody meant to lose, so the screen asks.
+ */
+export function RemoveLineButton({
+  lineId,
+  label,
+  isDraft,
+}: {
+  lineId: string;
+  label: string;
+  isDraft: boolean;
+}) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string>();
 
+  const remove = (discardDraft: boolean) => {
+    setError(undefined);
+    startTransition(async () => {
+      const result = await removeTransmittalLine(lineId, discardDraft);
+      if (result?.error) setError(result.error);
+    });
+  };
+
   return (
-    <div className="flex items-center justify-end gap-2">
+    <div className="flex flex-wrap items-center justify-end gap-2">
       <FormMessage error={error} size="xs" />
+      {isDraft && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={pending}
+          onClick={() => remove(true)}
+        >
+          {pending ? "Working…" : "Remove and delete the draft"}
+        </Button>
+      )}
       <IconButton
         aria-label={`Take ${label} off this transmittal`}
         tone="danger"
         disabled={pending}
-        onClick={() => {
-          setError(undefined);
-          startTransition(async () => {
-            const result = await removeTransmittalLine(lineId);
-            if (result?.error) setError(result.error);
-          });
-        }}
+        onClick={() => remove(false)}
       >
         <Trash2 className="size-3.5" />
       </IconButton>

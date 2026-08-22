@@ -338,17 +338,21 @@ export type VillaDesignDetail = {
   plotName: string;
   projectName: string;
   stageBoard: DesignStageBoardRow[];
-  /** Only sets that carry at least one revision on this villa. */
+  /** Only sets that have had something released on this villa. */
   setsWithRevisions: DrawingSetWithRevisions[];
-  /** Active sets with no revision here yet — the "Add a drawing" picker. */
-  availableSets: { id: string; code: string | null; name: string }[];
 };
 
 /**
  * The villa design page's one read: header, the stage board (derived
- * fresh from issued transmittals, never stored), and every drawing set's
- * revision history. `null` when the unit id doesn't exist — the caller's
- * `notFound()`.
+ * fresh from issued transmittals, never stored), and the RELEASED
+ * revision history of each drawing set. `null` when the unit id doesn't
+ * exist — the caller's `notFound()`.
+ *
+ * Drafts are deliberately absent (founder, 2026-08-22, on the staging
+ * vet): a draft lives on the transmittal that will send it, and the
+ * villa page is the record of what has actually gone out. Showing a
+ * half-finished drawing beside the issued ones is what made the two
+ * screens read as the same thing.
  */
 export async function getVillaDesignDetail(unitId: string): Promise<VillaDesignDetail | null> {
   await requireTool(GRANT);
@@ -399,6 +403,9 @@ export async function getVillaDesignDetail(unitId: string): Promise<VillaDesignD
         .from("drawing_revisions")
         .select("id, drawing_set_id, revision_no, status, note, released_at")
         .eq("unit_id", unitId)
+        // Released and superseded only. A draft belongs to the
+        // transmittal that is assembling it, not to this page.
+        .neq("status", "draft")
         .order("drawing_set_id")
         .order("revision_no", { ascending: false })
         .range(from, to),
@@ -419,13 +426,13 @@ export async function getVillaDesignDetail(unitId: string): Promise<VillaDesignD
   if (project.error) fail("the villa", project.error);
 
   const revisionIds = revisions.map((revision) => revision.id);
-  const draftRevisionIds = revisions
-    .filter((revision) => revision.status === "draft")
-    .map((revision) => revision.id);
 
-  const [files, works] = await Promise.all([
+  // Work links are not fetched here: they are frozen on release and this
+  // page never offers to edit them. Editing happens on the draft, which
+  // lives on its transmittal.
+  const files =
     revisionIds.length > 0
-      ? fetchAll<{
+      ? await fetchAll<{
           id: string;
           drawing_revision_id: string;
           file_name: string;
@@ -440,18 +447,7 @@ export async function getVillaDesignDetail(unitId: string): Promise<VillaDesignD
             .order("id")
             .range(from, to),
         )
-      : Promise.resolve([]),
-    draftRevisionIds.length > 0
-      ? fetchAll<{ drawing_revision_id: string; work_item_id: string }>((from, to) =>
-          supabase
-            .from("drawing_revision_works")
-            .select("drawing_revision_id, work_item_id")
-            .in("drawing_revision_id", draftRevisionIds)
-            .order("id")
-            .range(from, to),
-        )
-      : Promise.resolve([]),
-  ]);
+      : [];
 
   const filesByRevision = new Map<string, DrawingRevisionFileRow[]>();
   for (const file of files) {
@@ -463,13 +459,6 @@ export async function getVillaDesignDetail(unitId: string): Promise<VillaDesignD
       sortOrder: file.sort_order,
     });
     filesByRevision.set(file.drawing_revision_id, list);
-  }
-
-  const worksByRevision = new Map<string, string[]>();
-  for (const work of works) {
-    const list = worksByRevision.get(work.drawing_revision_id) ?? [];
-    list.push(work.work_item_id);
-    worksByRevision.set(work.drawing_revision_id, list);
   }
 
   const transmittalsByStage = new Map<string, { count: number; lastIssuedAt: string | null }>();
@@ -510,7 +499,7 @@ export async function getVillaDesignDetail(unitId: string): Promise<VillaDesignD
       note: revision.note,
       releasedAt: revision.released_at,
       files: filesByRevision.get(revision.id) ?? [],
-      workItemIds: revision.status === "draft" ? (worksByRevision.get(revision.id) ?? []) : null,
+      workItemIds: null,
     });
     revisionsBySet.set(revision.drawing_set_id, list);
   }
@@ -524,10 +513,6 @@ export async function getVillaDesignDetail(unitId: string): Promise<VillaDesignD
       revisions: revisionsBySet.get(set.id) ?? [],
     }));
 
-  const availableSets = sets
-    .filter((set) => set.is_active && !revisionsBySet.has(set.id))
-    .map((set) => ({ id: set.id, code: set.code, name: set.name }));
-
   return {
     unitId: unit.id,
     plotId: unit.plot_id,
@@ -536,7 +521,6 @@ export async function getVillaDesignDetail(unitId: string): Promise<VillaDesignD
     projectName: project.data?.name ?? "—",
     stageBoard,
     setsWithRevisions,
-    availableSets,
   };
 }
 
@@ -691,102 +675,140 @@ export async function listTransmittals(
   };
 }
 
-export type TransmittalCandidate = {
-  setId: string;
-  setCode: string | null;
-  setName: string;
+export type VillaRevisionSummary = {
   revisionId: string;
   revisionNo: number;
-  /** Never "superseded" — a transmittal only carries what is current. */
-  status: "draft" | "released";
   note: string | null;
   fileCount: number;
 };
 
+export type VillaDrawingSetState = {
+  setId: string;
+  setCode: string | null;
+  setName: string;
+  /** The one open draft on this villa, if there is one. */
+  draft: VillaRevisionSummary | null;
+  /** The current released revision, if this set has ever gone out here. */
+  released: VillaRevisionSummary | null;
+  /**
+   * What "Revise" would number the next draft — max + 1 across every
+   * status, or 0 for a set never drawn for this villa. Superseded rows
+   * count: a number is spent once and never re-used.
+   */
+  nextRevisionNo: number;
+};
+
 /**
- * What a transmittal for this villa could carry: every drawing set with
- * a revision here, at its CURRENT revision — the draft if one is open,
- * otherwise the released one. A superseded revision is never offered;
- * re-sending a retired drawing is the confusion this tool exists to end.
- * A released revision can be picked on purpose: the same set going out
- * again at a new design stage, which 0091's issue function expects and
- * leaves alone.
+ * Every drawing set, and where this villa stands on each: the open
+ * draft, the current released revision, and the number the next
+ * revision would take.
+ *
+ * This is what the transmittal's "Add drawings" board is built from
+ * (founder, 2026-08-22, redirecting the flow on the staging vet: "under
+ * new transmittal you either upload a new set of drawings or you revise
+ * a set that can be seen there"). A set with nothing on this villa still
+ * appears — that is the "upload the first drawings" case, and it could
+ * never be offered by a list of what already exists.
+ *
+ * A retired set still appears if it carries history here, so a villa
+ * mid-flight is never stranded; a retired set with nothing here does
+ * not, because starting a drawing on a set the master has retired is
+ * the one thing retiring it was meant to stop.
  */
-export async function listTransmittalCandidates(unitId: string): Promise<TransmittalCandidate[]> {
+export async function listVillaDrawingSetStates(unitId: string): Promise<VillaDrawingSetState[]> {
   await requireTool(GRANT);
   const supabase = await createClient();
 
-  const revisions = await fetchAll<{
-    id: string;
-    drawing_set_id: string;
-    revision_no: number;
-    status: string;
-    note: string | null;
-  }>((from, to) =>
-    supabase
-      .from("drawing_revisions")
-      .select("id, drawing_set_id, revision_no, status, note")
-      .eq("unit_id", unitId)
-      .in("status", ["draft", "released"])
-      .order("drawing_set_id")
-      .order("revision_no", { ascending: false })
-      .range(from, to),
-  );
-  if (revisions.length === 0) return [];
-
-  // One per set, and the draft wins — it is the newer drawing and the
-  // one the designer has been working on.
-  const currentBySet = new Map<string, (typeof revisions)[number]>();
-  for (const revision of revisions) {
-    const held = currentBySet.get(revision.drawing_set_id);
-    if (!held || (held.status !== "draft" && revision.status === "draft")) {
-      currentBySet.set(revision.drawing_set_id, revision);
-    }
-  }
-
-  const setIds = [...currentBySet.keys()];
-  const revisionIds = [...currentBySet.values()].map((revision) => revision.id);
-
-  const [sets, files] = await Promise.all([
-    fetchAll<{ id: string; code: string | null; name: string; sort_order: number }>((from, to) =>
+  const [sets, revisions] = await Promise.all([
+    fetchAll<{
+      id: string;
+      code: string | null;
+      name: string;
+      sort_order: number;
+      is_active: boolean;
+    }>((from, to) =>
       supabase
         .from("drawing_sets")
-        .select("id, code, name, sort_order")
-        .in("id", setIds)
+        .select("id, code, name, sort_order, is_active")
         .order("sort_order")
         .order("id")
         .range(from, to),
     ),
-    fetchAll<{ drawing_revision_id: string }>((from, to) =>
+    fetchAll<{
+      id: string;
+      drawing_set_id: string;
+      revision_no: number;
+      status: string;
+      note: string | null;
+    }>((from, to) =>
       supabase
-        .from("drawing_revision_files")
-        .select("drawing_revision_id")
-        .in("drawing_revision_id", revisionIds)
+        .from("drawing_revisions")
+        .select("id, drawing_set_id, revision_no, status, note")
+        .eq("unit_id", unitId)
+        .order("drawing_set_id")
+        .order("revision_no", { ascending: false })
         .order("id")
         .range(from, to),
     ),
   ]);
+
+  // Only the drafts and the current released rows ever have their files
+  // counted — a superseded revision's sheets are history nobody is about
+  // to send again.
+  const countableIds = revisions
+    .filter((revision) => revision.status !== "superseded")
+    .map((revision) => revision.id);
+  const files =
+    countableIds.length > 0
+      ? await fetchAll<{ drawing_revision_id: string }>((from, to) =>
+          supabase
+            .from("drawing_revision_files")
+            .select("drawing_revision_id")
+            .in("drawing_revision_id", countableIds)
+            .order("id")
+            .range(from, to),
+        )
+      : [];
 
   const fileCounts = new Map<string, number>();
   for (const file of files) {
     fileCounts.set(file.drawing_revision_id, (fileCounts.get(file.drawing_revision_id) ?? 0) + 1);
   }
 
-  // In the set master's own order, so the pick list, the transmittal and
-  // the PDF all read in the same sequence.
+  const bySet = new Map<
+    string,
+    { draft: VillaRevisionSummary | null; released: VillaRevisionSummary | null; highest: number }
+  >();
+  for (const revision of revisions) {
+    const held = bySet.get(revision.drawing_set_id) ?? { draft: null, released: null, highest: -1 };
+    if (revision.revision_no > held.highest) held.highest = revision.revision_no;
+
+    const summary: VillaRevisionSummary = {
+      revisionId: revision.id,
+      revisionNo: revision.revision_no,
+      note: revision.note,
+      fileCount: fileCounts.get(revision.id) ?? 0,
+    };
+    if (revision.status === "draft") {
+      // The partial unique index allows only one, so this never fights.
+      held.draft = summary;
+    } else if (revision.status === "released" && !held.released) {
+      held.released = summary;
+    }
+    bySet.set(revision.drawing_set_id, held);
+  }
+
   return sets.flatMap((set) => {
-    const revision = currentBySet.get(set.id);
-    if (!revision) return [];
+    const held = bySet.get(set.id);
+    if (!set.is_active && !held) return [];
     return [
       {
         setId: set.id,
         setCode: set.code,
         setName: set.name,
-        revisionId: revision.id,
-        revisionNo: revision.revision_no,
-        status: revision.status as TransmittalCandidate["status"],
-        note: revision.note,
-        fileCount: fileCounts.get(revision.id) ?? 0,
+        draft: held?.draft ?? null,
+        released: held?.released ?? null,
+        nextRevisionNo: (held?.highest ?? -1) + 1,
       },
     ];
   });
@@ -795,12 +817,19 @@ export async function listTransmittalCandidates(unitId: string): Promise<Transmi
 export type TransmittalLineRow = {
   lineId: string;
   revisionId: string;
+  setId: string;
   setCode: string | null;
   setName: string;
   revisionNo: number;
   revisionStatus: "draft" | "released" | "superseded";
   revisionNote: string | null;
-  files: { id: string; fileName: string }[];
+  files: DrawingRevisionFileRow[];
+  /**
+   * The draft's work links, for the editor that now sits inline on this
+   * page. Null for a released or superseded line — those are frozen, so
+   * there is nothing to edit and nothing to fetch.
+   */
+  draftWorkItemIds: string[] | null;
 };
 
 export type TransmittalDetail = {
@@ -904,11 +933,12 @@ export async function getTransmittalDetail(
           id: string;
           drawing_revision_id: string;
           file_name: string;
+          content_type: string;
           sort_order: number;
         }>((from, to) =>
           supabase
             .from("drawing_revision_files")
-            .select("id, drawing_revision_id, file_name, sort_order")
+            .select("id, drawing_revision_id, file_name, content_type, sort_order")
             .in("drawing_revision_id", revisionIds)
             .order("sort_order")
             .order("id")
@@ -916,6 +946,23 @@ export async function getTransmittalDetail(
         )
       : Promise.resolve([]),
   ]);
+
+  // The draft lines carry the editor that now lives on this page, so
+  // their work links are read here. A released line has none to read.
+  const draftRevisionIds = revisions
+    .filter((revision) => revision.status === "draft")
+    .map((revision) => revision.id);
+  const works =
+    draftRevisionIds.length > 0
+      ? await fetchAll<{ drawing_revision_id: string; work_item_id: string }>((from, to) =>
+          supabase
+            .from("drawing_revision_works")
+            .select("drawing_revision_id, work_item_id")
+            .in("drawing_revision_id", draftRevisionIds)
+            .order("id")
+            .range(from, to),
+        )
+      : [];
 
   const setIds = [...new Set(revisions.map((revision) => revision.drawing_set_id))];
   const sets =
@@ -932,11 +979,23 @@ export async function getTransmittalDetail(
 
   const setsById = new Map(sets.map((set) => [set.id, set]));
   const revisionsById = new Map(revisions.map((revision) => [revision.id, revision]));
-  const filesByRevision = new Map<string, { id: string; fileName: string }[]>();
+  const filesByRevision = new Map<string, DrawingRevisionFileRow[]>();
   for (const file of files) {
     const list = filesByRevision.get(file.drawing_revision_id) ?? [];
-    list.push({ id: file.id, fileName: file.file_name });
+    list.push({
+      id: file.id,
+      fileName: file.file_name,
+      contentType: file.content_type,
+      sortOrder: file.sort_order,
+    });
     filesByRevision.set(file.drawing_revision_id, list);
+  }
+
+  const worksByRevision = new Map<string, string[]>();
+  for (const work of works) {
+    const list = worksByRevision.get(work.drawing_revision_id) ?? [];
+    list.push(work.work_item_id);
+    worksByRevision.set(work.drawing_revision_id, list);
   }
 
   return {
@@ -956,15 +1015,19 @@ export async function getTransmittalDetail(
     lines: lines.map((line) => {
       const revision = revisionsById.get(line.drawing_revision_id);
       const set = revision ? setsById.get(revision.drawing_set_id) : undefined;
+      const status = (revision?.status ?? "draft") as TransmittalLineRow["revisionStatus"];
       return {
         lineId: line.id,
         revisionId: line.drawing_revision_id,
+        setId: revision?.drawing_set_id ?? "",
         setCode: set?.code ?? null,
         setName: set?.name ?? "Unknown drawing set",
         revisionNo: revision?.revision_no ?? 0,
-        revisionStatus: (revision?.status ?? "draft") as TransmittalLineRow["revisionStatus"],
+        revisionStatus: status,
         revisionNote: revision?.note ?? null,
         files: filesByRevision.get(line.drawing_revision_id) ?? [],
+        draftWorkItemIds:
+          status === "draft" ? (worksByRevision.get(line.drawing_revision_id) ?? []) : null,
       };
     }),
   };

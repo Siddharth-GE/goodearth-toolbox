@@ -359,18 +359,36 @@ export async function moveDesignStage(id: string, direction: "up" | "down"): Pro
 // Drawing revisions — a villa's own workspace on a set
 // ---------------------------------------------------------------------
 
-/**
- * Starts a new draft: revision_no is max+1 for this (unit, set), or 0 for
- * the first. Seeds drawing_revision_works from the set's current default
- * links — the "customizable on release" the plan asks for, editable from
- * here while the revision stays a draft. The partial unique index
- * (one draft per unit+set) is the real guard; its violation comes back as
- * a friendly message rather than a raw 23505.
- */
-export async function createDraftRevision(unitId: string, setId: string): Promise<ActionState> {
-  const user = await requireTool(GRANT);
-  const supabase = await createClient();
+/** The RLS-scoped client, so the helpers below can be handed the one the
+ *  action already made rather than each opening another. Declared, never
+ *  exported — a "use server" file exports async functions only (the
+ *  lib/budgets/actions.ts precedent). */
+type DesignClient = Awaited<ReturnType<typeof createClient>>;
 
+/**
+ * Starts a draft revision for one (villa, set) and hands back its id.
+ *
+ * `revision_no` is max + 1 across every status for that pair, or 0 for
+ * the first — a number is spent once and never re-used. The new draft
+ * copies the set master's default work links, which is the
+ * "customisable on release" rule: it starts where the set says and can
+ * then differ for this villa alone.
+ *
+ * The partial unique index (one draft per unit+set) is the real guard;
+ * its 23505 comes back as a sentence rather than a code. `seedFailed`
+ * is handed back rather than swallowed so the caller can report the
+ * partial honestly — the revision exists but its work links did not
+ * copy, and silence there would ship an unlabelled empty list.
+ *
+ * Not an action: no `requireTool`, no `revalidatePath`. Its callers do
+ * both, and it is never reachable except through one of them.
+ */
+async function startDraftRevision(
+  supabase: DesignClient,
+  userId: string,
+  unitId: string,
+  setId: string,
+): Promise<{ revisionId: string; revisionNo: number; seedFailed: boolean } | { error: string }> {
   const { data: last, error: readError } = await supabase
     .from("drawing_revisions")
     .select("revision_no")
@@ -380,7 +398,7 @@ export async function createDraftRevision(unitId: string, setId: string): Promis
     .limit(1)
     .maybeSingle();
   if (readError) {
-    console.error("createDraftRevision read failed:", readError);
+    console.error("startDraftRevision read failed:", readError);
     return { error: "Could not start the revision. Try again." };
   }
   const revisionNo = (last?.revision_no ?? -1) + 1;
@@ -391,17 +409,18 @@ export async function createDraftRevision(unitId: string, setId: string): Promis
       unit_id: unitId,
       drawing_set_id: setId,
       revision_no: revisionNo,
-      created_by: user.id,
+      created_by: userId,
     })
     .select("id")
     .single();
   if (error) {
     if (error.code === "23505") {
       return {
-        error: "A draft already exists for this set on this villa — finish or delete it first.",
+        error:
+          "A draft already exists for this set on this villa — it is on another transmittal. Finish or delete that one first.",
       };
     }
-    console.error("createDraftRevision insert failed:", error);
+    console.error("startDraftRevision insert failed:", error);
     return { error: "Could not start the revision. Try again." };
   }
 
@@ -411,32 +430,60 @@ export async function createDraftRevision(unitId: string, setId: string): Promis
     .eq("drawing_set_id", setId);
   let seedFailed = defaultsError !== null;
   if (defaultsError) {
-    console.error("createDraftRevision defaults read failed:", defaultsError);
+    console.error("startDraftRevision defaults read failed:", defaultsError);
   } else if (defaults && defaults.length > 0) {
     const { error: seedError } = await supabase.from("drawing_revision_works").insert(
       defaults.map((link) => ({
         drawing_revision_id: revision.id,
         work_item_id: link.work_item_id,
-        created_by: user.id,
+        created_by: userId,
       })),
     );
     if (seedError) {
-      console.error("createDraftRevision seed failed:", seedError);
+      console.error("startDraftRevision seed failed:", seedError);
       seedFailed = true;
     }
   }
 
-  revalidatePath("/design-management", "layout");
-  // Partial success is reported honestly (the line-pull doctrine): the
-  // revision exists — the refreshed page shows it — but its work links
-  // did not copy, and silence here would ship an unlabelled empty list.
-  if (seedFailed) {
-    return {
-      error:
-        "The revision was started, but the set's usual work links could not be copied onto it — tick them by hand.",
-    };
+  return { revisionId: revision.id, revisionNo, seedFailed };
+}
+
+/**
+ * Deletes a draft revision's rows and then its files in storage.
+ *
+ * ROWS FIRST, THEN OBJECTS — a failure part-way leaves an orphaned file
+ * nobody can see, never a row pointing at a file that isn't there. The
+ * paths are read BEFORE the RPC, because the RPC deletes
+ * `drawing_revision_files` itself. `delete_draft_revision` (0091 §10)
+ * refuses while the revision still sits on a transmittal line, so the
+ * caller takes the line off first.
+ */
+async function discardDraftRevision(
+  supabase: DesignClient,
+  revisionId: string,
+): Promise<{ error?: string }> {
+  const { data: files, error: filesError } = await supabase
+    .from("drawing_revision_files")
+    .select("storage_path")
+    .eq("drawing_revision_id", revisionId);
+  if (filesError) {
+    console.error("discardDraftRevision files read failed:", filesError);
+    return { error: "Could not delete this draft. Try again." };
   }
-  return undefined;
+
+  const { error } = await supabase.rpc("delete_draft_revision", { p_revision_id: revisionId });
+  if (error) {
+    console.error("discardDraftRevision failed:", error);
+    return { error: friendlyDbError(error, "Could not delete this draft. Try again.") };
+  }
+
+  const paths = (files ?? []).map((file) => file.storage_path);
+  if (paths.length > 0) {
+    const { error: removeError } = await supabase.storage.from(DRAWINGS_BUCKET).remove(paths);
+    if (removeError) console.error("discardDraftRevision storage cleanup failed:", removeError);
+  }
+
+  return {};
 }
 
 /** The note is the designer's own words on what changed — editable while draft. */
@@ -510,45 +557,6 @@ export async function setDrawingRevisionWorks(
     if (error) {
       console.error("setDrawingRevisionWorks delete failed:", error);
       return { error: friendlyDbError(error, "Could not save the work links. Try again.") };
-    }
-  }
-
-  revalidatePath("/design-management", "layout");
-  return undefined;
-}
-
-/**
- * A draft raised by mistake, gone entirely. `delete_draft_revision` (0091)
- * removes the rows atomically and refuses if the revision is already on a
- * transmittal; the storage objects are the caller's job, and only after
- * the rows are confirmed gone — so a failure here leaves an orphaned file,
- * never a row pointing at nothing. The file paths are read BEFORE the RPC
- * runs, since the RPC deletes drawing_revision_files itself.
- */
-export async function deleteDraftRevision(revisionId: string): Promise<ActionState> {
-  await requireTool(GRANT);
-  const supabase = await createClient();
-
-  const { data: files, error: filesError } = await supabase
-    .from("drawing_revision_files")
-    .select("storage_path")
-    .eq("drawing_revision_id", revisionId);
-  if (filesError) {
-    console.error("deleteDraftRevision files read failed:", filesError);
-    return { error: "Could not delete this draft. Try again." };
-  }
-
-  const { error } = await supabase.rpc("delete_draft_revision", { p_revision_id: revisionId });
-  if (error) {
-    console.error("deleteDraftRevision failed:", error);
-    return { error: friendlyDbError(error, "Could not delete this draft. Try again.") };
-  }
-
-  const paths = (files ?? []).map((file) => file.storage_path);
-  if (paths.length > 0) {
-    const { error: removeError } = await supabase.storage.from(DRAWINGS_BUCKET).remove(paths);
-    if (removeError) {
-      console.error("deleteDraftRevision storage cleanup failed:", removeError);
     }
   }
 
@@ -717,17 +725,21 @@ export async function deleteDrawingRevisionFile(fileId: string): Promise<ActionS
 // ---------------------------------------------------------------------
 
 /**
- * Raises a draft transmittal and its lines in one go.
+ * Raises an EMPTY draft transmittal and opens it.
+ *
+ * The founder redirected the flow on the staging vet (2026-08-22):
+ * "press new transmittal, upload the docs and issue to site". So this
+ * asks only what a transmittal is _for_ — the villa it belongs to, the
+ * design stage it goes out at, and an optional note — and the drawings
+ * are assembled on the transmittal itself, which is now the workspace.
  *
  * The header carries no number: 0091's CHECK ties `number`, `issued_at`
  * and `issued_by` to the issued status both ways, so a draft holding a
  * number is refused by the database. The number is minted on Issue and
  * nowhere else, which is why an abandoned draft cannot burn TR-0003.
  *
- * The lines denormalise `unit_id` on purpose — the composite FKs then
- * make a line carrying another villa's drawing impossible. `sort_order`
- * follows the order of the pick list, which is the drawing sets' own
- * master order, so the screen and the PDF read in the same sequence.
+ * "At least one drawing" is not checked here any more — it is enforced
+ * where it belongs, at Issue, by `issue_transmittal` itself.
  */
 export async function createTransmittal(
   unitId: string,
@@ -741,12 +753,6 @@ export async function createTransmittal(
 
   const note = text(formData, "note");
   if (note.length > NOTE_LIMIT) return { error: `Keep the note under ${NOTE_LIMIT} characters.` };
-
-  const revisionIds = formData
-    .getAll("revision_id")
-    .map((value) => String(value))
-    .filter(Boolean);
-  if (revisionIds.length === 0) return { error: "Tick at least one drawing to send." };
 
   const supabase = await createClient();
   const { data: transmittal, error } = await supabase
@@ -764,32 +770,127 @@ export async function createTransmittal(
     return { error: friendlyDbError(error, "Could not start the transmittal. Try again.") };
   }
 
-  const { error: linesError } = await supabase.from("transmittal_lines").insert(
-    revisionIds.map((revisionId, index) => ({
-      transmittal_id: transmittal.id,
-      unit_id: unitId,
-      drawing_revision_id: revisionId,
-      sort_order: index,
-      created_by: user.id,
-    })),
-  );
-  if (linesError) {
-    console.error("createTransmittal lines failed:", linesError);
-    // Nothing landed under the header, so take the header away too
-    // rather than leave an empty draft nobody asked for. It is still a
-    // draft with no lines, which both the delete policy and the guard
-    // allow; if even that fails the draft is visible on the list and
-    // can be deleted by hand, which is why the failure is only logged.
-    const { error: cleanupError } = await supabase
-      .from("transmittals")
-      .delete()
-      .eq("id", transmittal.id);
-    if (cleanupError) console.error("createTransmittal cleanup failed:", cleanupError);
-    return { error: friendlyDbError(linesError, "Could not add those drawings. Try again.") };
-  }
-
   revalidatePath("/design-management", "layout");
   redirect(`/design-management/transmittals/${transmittal.id}`);
+}
+
+/**
+ * Puts a drawing set on this transmittal, starting a draft revision for
+ * it if one isn't already open.
+ *
+ * This is the "Add drawings" board's one action, and it covers all three
+ * of the founder's cases with the same press:
+ *
+ *   - the set has a draft open on this villa → that draft goes on the
+ *     transmittal, nothing new is created ("Continue draft R2");
+ *   - the set has only released revisions → R+1 is started and goes on
+ *     ("Revise — starts R3");
+ *   - the set has nothing here at all → R0 is started and goes on
+ *     ("Upload first drawings — R0").
+ *
+ * The numbering and the default-work-links copy are `startDraftRevision`,
+ * the same code path the whole tool uses; nothing is duplicated here.
+ * Only a draft transmittal reaches this — the line trigger would refuse
+ * anyway, but refusing early gives a sentence instead of a raise.
+ */
+export async function createRevisionOnTransmittal(
+  transmittalId: string,
+  setId: string,
+): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+  const supabase = await createClient();
+
+  const { data: transmittal, error: readError } = await supabase
+    .from("transmittals")
+    .select("unit_id, status")
+    .eq("id", transmittalId)
+    .maybeSingle();
+  if (readError) {
+    console.error("createRevisionOnTransmittal read failed:", readError);
+    return { error: "Could not add that drawing. Try again." };
+  }
+  if (!transmittal) return { error: "That transmittal no longer exists." };
+  if (transmittal.status !== "draft") {
+    return { error: "This transmittal has been issued — what was sent cannot be changed." };
+  }
+
+  // An open draft is continued, never duplicated: the partial unique
+  // index allows exactly one per (villa, set), so starting a second is
+  // not a thing that can happen even by racing.
+  const { data: openDraft, error: draftError } = await supabase
+    .from("drawing_revisions")
+    .select("id")
+    .eq("unit_id", transmittal.unit_id)
+    .eq("drawing_set_id", setId)
+    .eq("status", "draft")
+    .maybeSingle();
+  if (draftError) {
+    console.error("createRevisionOnTransmittal draft read failed:", draftError);
+    return { error: "Could not add that drawing. Try again." };
+  }
+
+  let revisionId = openDraft?.id;
+  let seedFailed = false;
+  if (!revisionId) {
+    const started = await startDraftRevision(supabase, user.id, transmittal.unit_id, setId);
+    if ("error" in started) return started;
+    revisionId = started.revisionId;
+    seedFailed = started.seedFailed;
+  }
+
+  const lineError = await appendTransmittalLine(
+    supabase,
+    user.id,
+    transmittalId,
+    transmittal.unit_id,
+    revisionId,
+  );
+
+  revalidatePath("/design-management", "layout");
+  // Both partials are said out loud rather than shown as a plain
+  // success over a screen that doesn't match (the line-pull doctrine).
+  if (lineError) return { error: lineError };
+  if (seedFailed) {
+    return {
+      error:
+        "The revision was started, but the set's usual work links could not be copied onto it — tick them by hand.",
+    };
+  }
+  return undefined;
+}
+
+/** The insert both add-paths share: `unit_id` denormalised from the
+ *  header (never from the browser) and `sort_order` at the end. */
+async function appendTransmittalLine(
+  supabase: DesignClient,
+  userId: string,
+  transmittalId: string,
+  unitId: string,
+  revisionId: string,
+): Promise<string | undefined> {
+  const { data: last } = await supabase
+    .from("transmittal_lines")
+    .select("sort_order")
+    .eq("transmittal_id", transmittalId)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { error } = await supabase.from("transmittal_lines").insert({
+    transmittal_id: transmittalId,
+    unit_id: unitId,
+    drawing_revision_id: revisionId,
+    sort_order: (last?.sort_order ?? -1) + 1,
+    created_by: userId,
+  });
+  if (!error) return undefined;
+
+  if (error.code === "23505") return "That drawing is already on this transmittal.";
+  if (error.code === "23503") {
+    return "That drawing belongs to another villa and can't go on this transmittal.";
+  }
+  console.error("appendTransmittalLine failed:", error);
+  return friendlyDbError(error, "Could not add that drawing. Try again.");
 }
 
 /** Note and stage, editable only while the transmittal is a draft — the
@@ -823,10 +924,15 @@ export async function updateDraftTransmittal(
 }
 
 /**
- * Adds one drawing to a draft. `unit_id` is read from the header rather
- * than passed in from the browser — the composite FK would refuse a
- * mismatched pair anyway, and reading it here means the screen can never
- * be the thing that decides which villa a line belongs to.
+ * Puts an ALREADY-RELEASED revision on a draft transmittal, unchanged —
+ * the same set going out again at a new design stage, which one set
+ * serving many activities makes normal. Nothing is revised and nothing
+ * is created; `issue_transmittal` leaves an already-released line alone.
+ *
+ * `unit_id` is read from the header rather than passed in from the
+ * browser — the composite FK would refuse a mismatched pair anyway, and
+ * reading it here means the screen can never be the thing that decides
+ * which villa a line belongs to.
  */
 export async function addTransmittalLine(
   transmittalId: string,
@@ -846,42 +952,67 @@ export async function addTransmittalLine(
   }
   if (!transmittal) return { error: "That transmittal no longer exists." };
 
-  const { data: last } = await supabase
-    .from("transmittal_lines")
-    .select("sort_order")
-    .eq("transmittal_id", transmittalId)
-    .order("sort_order", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const { error } = await supabase.from("transmittal_lines").insert({
-    transmittal_id: transmittalId,
-    unit_id: transmittal.unit_id,
-    drawing_revision_id: revisionId,
-    sort_order: (last?.sort_order ?? -1) + 1,
-    created_by: user.id,
-  });
-  if (error) {
-    if (error.code === "23505") return { error: "That drawing is already on this transmittal." };
-    if (error.code === "23503") {
-      return { error: "That drawing belongs to another villa and can't go on this transmittal." };
-    }
-    console.error("addTransmittalLine insert failed:", error);
-    return { error: friendlyDbError(error, "Could not add that drawing. Try again.") };
-  }
+  const lineError = await appendTransmittalLine(
+    supabase,
+    user.id,
+    transmittalId,
+    transmittal.unit_id,
+    revisionId,
+  );
 
   revalidatePath("/design-management", "layout");
-  return undefined;
+  return lineError ? { error: lineError } : undefined;
 }
 
-export async function removeTransmittalLine(lineId: string): Promise<ActionState> {
+/**
+ * Takes a drawing off a draft transmittal.
+ *
+ * `discardDraft` is the second half of the choice the screen offers on a
+ * draft line: taking it off this transmittal is not the same act as
+ * throwing the drawing away, and guessing between them would either
+ * strand a draft nobody can find or destroy work nobody meant to lose.
+ *
+ * The ORDER is the whole point when both are asked for. The line goes
+ * first, because `delete_draft_revision` refuses while the revision is
+ * still sitting on a transmittal; then the rows; then the storage
+ * objects. If the second half fails, the first half is still reported as
+ * having happened — the drawing is off the transmittal and the draft is
+ * still there to be dealt with.
+ */
+export async function removeTransmittalLine(
+  lineId: string,
+  discardDraft = false,
+): Promise<ActionState> {
   await requireTool(GRANT);
   const supabase = await createClient();
+
+  // Read the revision before the line goes, or there is nothing left
+  // pointing at what to discard.
+  const { data: line, error: readError } = await supabase
+    .from("transmittal_lines")
+    .select("drawing_revision_id")
+    .eq("id", lineId)
+    .maybeSingle();
+  if (readError) {
+    console.error("removeTransmittalLine read failed:", readError);
+    return { error: "Could not take that drawing off. Try again." };
+  }
+  if (!line) return undefined; // Already gone.
 
   const { error } = await supabase.from("transmittal_lines").delete().eq("id", lineId);
   if (error) {
     console.error("removeTransmittalLine failed:", error);
     return { error: friendlyDbError(error, "Could not take that drawing off. Try again.") };
+  }
+
+  if (discardDraft) {
+    const discarded = await discardDraftRevision(supabase, line.drawing_revision_id);
+    if (discarded.error) {
+      revalidatePath("/design-management", "layout");
+      return {
+        error: `The drawing is off this transmittal, but its draft could not be deleted: ${discarded.error}`,
+      };
+    }
   }
 
   revalidatePath("/design-management", "layout");
