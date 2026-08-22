@@ -78,7 +78,7 @@ Tick each step here as it lands — mid-build, this list is the live board. A bu
 
 Approved by the founder 2026-08-22; this file is the running board. Branch `feature/design-management`.
 
-### 2. ⬜ `[Opus]` draft + ⬜ `[Fable]` review/apply — migration `0091`
+### 2. ✅ `[Opus]` draft + ⬜ `[Fable]` review/apply — migration `0091`
 
 Draft `0091` exactly per the spec above (tables, guards, RPC, bucket, revokes, assertions). Then **Fable** reviews it (hard rule: RLS/grants/storage reach `db:apply` only after a Fable review), applies to **staging** (`npm run db:apply -- --project ipstebqawrvhkyntctrv --commit`) and runs `db:types:staging`.
 
@@ -110,7 +110,12 @@ Commit each working piece with a plain-English message.
 
 ## Questions for the tier above
 
-_None yet. A lower tier that hits anything ambiguous or off-plan writes it here and waits — it does not improvise._
+Four notes from drafting `0091` (Opus, 2026-08-22). Nothing here blocks the review — each is a decision Fable should accept or strike before applying.
+
+1. **Two delete functions the plan did not name.** `delete_draft_transmittal(uuid)` and `delete_draft_revision(uuid)`, both `security invoker`, in the `0017 §8` shape. The plan makes a draft transmittal deletable, and both it and a draft revision have child rows — deleting them as two requests is the exact bug `delete_draft_selection()` exists to prevent. `delete_draft_revision` also refuses if the revision is already on a transmittal, and leaves the storage objects to the caller (rows first, then objects). Strike them and a draft raised by mistake has no way out.
+2. **The transmittal number is minted on Issue, not on create.** The founder's checklist reads "press **Issue** → number TR-0001 appears", so `transmittals.number` is null until issued (unique, with a CHECK tying it to the status) and an abandoned draft cannot burn a number. Consequence for step 5: the PDF cover sheet of a draft has no reference and prints as a draft.
+3. **The `drawings` bucket SELECT policy is coarser than the table's**, exactly as the plan specifies (`/design-management or /supervisors`). So a supervisor holding a draft sheet's storage path could fetch the object directly. Both path segments are UUIDs and the revision id is unreadable to them, so it is not reachable in practice — but the path is `revisions/<revisionId>/<uuid>.<ext>`, and `0061`'s `(storage.foldername(name))[2]` trick would close it exactly by joining back to `drawing_revisions`. Left as planned rather than improvised; Fable's call.
+4. **Nothing asserts that the storage policies qualify `public.has_app`.** Postgres resolves the function to an OID at `create policy` time, so `pg_policies` renders both forms identically and any such check could only ever pass. The source text is qualified; §14 of the migration says why the assertion is absent rather than leaving a silent gap.
 
 ## Verification — the founder's browser checklist (staging)
 
