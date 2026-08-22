@@ -539,6 +539,8 @@ export type TransmittalLineRow = {
    * there is nothing to edit and nothing to fetch.
    */
   draftWorkItemIds: string[] | null;
+  /** Every revision of this set that has gone to site, newest first. */
+  revisionLog: { revisionNo: number; note: string | null; releasedAt: string | null }[];
 };
 
 export type TransmittalDetail = {
@@ -686,6 +688,35 @@ export async function getTransmittalDetail(
         )
       : [];
 
+  // The revision log per set: every revision of this villa's sets that
+  // has gone to site, for the "Revision log" button beside a released
+  // line — long change text folded behind a click (founder, 2026-08-22).
+  const logRows =
+    setIds.length > 0
+      ? await fetchAll<{
+          drawing_set_id: string;
+          revision_no: number;
+          note: string | null;
+          released_at: string | null;
+        }>((from, to) =>
+          supabase
+            .from("drawing_revisions")
+            .select("drawing_set_id, revision_no, note, released_at")
+            .eq("unit_id", transmittal.unit_id)
+            .in("drawing_set_id", setIds)
+            .neq("status", "draft")
+            .order("revision_no", { ascending: false })
+            .order("id")
+            .range(from, to),
+        )
+      : [];
+  const logBySet = new Map<string, TransmittalLineRow["revisionLog"]>();
+  for (const row of logRows) {
+    const list = logBySet.get(row.drawing_set_id) ?? [];
+    list.push({ revisionNo: row.revision_no, note: row.note, releasedAt: row.released_at });
+    logBySet.set(row.drawing_set_id, list);
+  }
+
   const setsById = new Map(sets.map((set) => [set.id, set]));
   const revisionsById = new Map(revisions.map((revision) => [revision.id, revision]));
   const filesByRevision = new Map<string, DrawingRevisionFileRow[]>();
@@ -737,6 +768,7 @@ export async function getTransmittalDetail(
         files: filesByRevision.get(line.drawing_revision_id) ?? [],
         draftWorkItemIds:
           status === "draft" ? (worksByRevision.get(line.drawing_revision_id) ?? []) : null,
+        revisionLog: revision ? (logBySet.get(revision.drawing_set_id) ?? []) : [],
       };
     }),
   };

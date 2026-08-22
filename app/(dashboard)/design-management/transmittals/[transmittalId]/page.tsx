@@ -18,6 +18,7 @@ import { FileText } from "lucide-react";
 import { notFound } from "next/navigation";
 
 import { DraftRevisionEditor } from "../../_components/draft-revision-editor";
+import { RevisionLog } from "../../_components/revision-log";
 import {
   AddDrawingsBoard,
   DeleteDraftTransmittalButton,
@@ -186,9 +187,7 @@ export default async function TransmittalDetailPage({
                               : "Superseded"}
                         </Badge>
                       </p>
-                      {!lineIsDraft && line.revisionNote && (
-                        <p className="text-muted mt-0.5 text-xs">{line.revisionNote}</p>
-                      )}
+                      {!lineIsDraft && <RevisionLog entries={line.revisionLog} />}
                       {!lineIsDraft &&
                         (line.files.length === 0 ? (
                           <p className="text-muted mt-1 text-xs">No files on this revision.</p>
