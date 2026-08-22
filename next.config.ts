@@ -8,6 +8,21 @@ const supabaseHostname = process.env.NEXT_PUBLIC_SUPABASE_URL
   : undefined;
 
 const nextConfig: NextConfig = {
+  // sharp's Linux native pieces (@img/sharp-linux-x64 + the libvips it
+  // dlopens) must be traced into every serverless function that can load
+  // it. Discovered 2026-08-22 on staging: the tracer dropped
+  // libvips-cpp.so, so EVERY server action in any file importing sharp
+  // died at module load — "Add a drawing" crashed without touching an
+  // image, and the error screen's own logger died the same way, so
+  // app_errors stayed empty. Only `vercel logs` showed the cause. The
+  // globs match nothing on a Windows install (npm skips other-platform
+  // optionals) and everything needed on Vercel's linux-x64 build.
+  outputFileTracingIncludes: {
+    "/**": [
+      "./node_modules/@img/sharp-linux-x64/**/*",
+      "./node_modules/@img/sharp-libvips-linux-x64/**/*",
+    ],
+  },
   experimental: {
     serverActions: {
       // Design-view uploads. The browser already normalises each image to

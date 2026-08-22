@@ -2,6 +2,7 @@ import {
   Boxes,
   Calculator,
   ClipboardList,
+  DraftingCompass,
   FileChartColumn,
   Footprints,
   GraduationCap,
@@ -29,6 +30,7 @@ export const TOOL_ICONS = {
   Boxes,
   Calculator,
   ClipboardList,
+  DraftingCompass,
   FileChartColumn,
   Footprints,
   GraduationCap,
@@ -179,15 +181,27 @@ export const TOOLS: Tool[] = [
     group: "Admin",
     built: true,
   },
-  // Relay is the whole design-management AND project-management layer:
-  // it replaced both of those planned tools rather than sitting beside
-  // them. Their slugs stay in the database CHECKs (0036 §1 says why) but
-  // nothing links to them any more.
+  // Relay replaced both the planned Design Management AND
+  // project-management layers when it shipped — but 2026-08-22 revived
+  // Design Management to hold the artefacts Relay deliberately refuses
+  // to store. The boundary now: Relay keeps accountability (who is
+  // holding the baton); Design Management holds the artefacts
+  // themselves (the drawings). Both slugs stay legal in the database
+  // CHECKs (0036 §1 says why).
   {
     name: "Relay",
     description: "Who is holding each task, and for how long.",
     href: "/relay",
     icon: "Route",
+    group: "Management",
+    built: true,
+  },
+  {
+    name: "Design Management",
+    description:
+      "Drawing sets and their revisions for each villa, and the transmittals that send them to site.",
+    href: "/design-management",
+    icon: "DraftingCompass",
     group: "Management",
     built: true,
   },

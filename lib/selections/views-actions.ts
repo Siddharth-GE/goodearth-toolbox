@@ -5,7 +5,9 @@ import { requireTool } from "@/lib/auth/access";
 import { designView } from "@/lib/pdf/theme";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import sharp from "sharp";
+// sharp loads LAZILY inside the resize branch — a top-level import means
+// a missing native binary on the deployed runtime kills every action in
+// this file at load (the 2026-08-22 staging lesson).
 
 // Re-declared rather than imported from lib/design-views/queries.ts, which
 // is "server-only": importing a value from it into this file-level
@@ -54,6 +56,7 @@ export async function uploadSpaceView(
 
   let normalised: Buffer;
   try {
+    const { default: sharp } = await import("sharp");
     normalised = await sharp(Buffer.from(await file.arrayBuffer()))
       // `contain` keeps the whole drawing and pads to 16:9. `cover` would
       // give the same consistency while quietly cropping a corner off an

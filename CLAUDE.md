@@ -22,7 +22,7 @@ Every conversation starts the same way: the founder says **"read CLAUDE.md"**, a
 
 ## The one principle
 
-**It's a toolbox.** Each tool is a self-contained instrument. Adding one touches only its own folders plus a registry entry; breaking one must not take the others down. Tools connect through exactly three threads: the shell (auth, `lib/tools.ts`, per-user grants), the shared database (including the line chain), and shared UI/utilities (`components/ui/*`, `components/masters/*`, `lib/masters/`, `lib/hooks/`, `lib/format.ts`, `lib/pdf/`, `lib/charts/`, `lib/design-views/`).
+**It's a toolbox.** Each tool is a self-contained instrument. Adding one touches only its own folders plus a registry entry; breaking one must not take the others down. Tools connect through exactly three threads: the shell (auth, `lib/tools.ts`, per-user grants), the shared database (including the line chain), and shared UI/utilities (`components/ui/*`, `components/masters/*`, `lib/masters/`, `lib/hooks/`, `lib/format.ts`, `lib/pdf/`, `lib/charts/`, `lib/design-views/`, `lib/drawings/`).
 
 **One tool never imports another tool's code, and shared code never imports a tool's.** When two tools want the same read, the answer is a shared module, not an import. `lib/overview/` is the shell's home, not a tool — the **one** module allowed to import other tools' queries (reads only, each call wrapped so one tool's failure can't take down the home page).
 

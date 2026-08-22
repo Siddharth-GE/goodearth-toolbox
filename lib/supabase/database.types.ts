@@ -1204,6 +1204,329 @@ export type Database = {
           },
         ]
       }
+      design_stages: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "design_stages_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "design_stages_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      drawing_revision_files: {
+        Row: {
+          content_type: string
+          created_at: string
+          drawing_revision_id: string
+          file_name: string
+          id: string
+          sort_order: number
+          storage_path: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          content_type: string
+          created_at?: string
+          drawing_revision_id: string
+          file_name: string
+          id?: string
+          sort_order?: number
+          storage_path: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          content_type?: string
+          created_at?: string
+          drawing_revision_id?: string
+          file_name?: string
+          id?: string
+          sort_order?: number
+          storage_path?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drawing_revision_files_drawing_revision_id_fkey"
+            columns: ["drawing_revision_id"]
+            isOneToOne: false
+            referencedRelation: "drawing_revisions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drawing_revision_files_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      drawing_revision_works: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          drawing_revision_id: string
+          id: string
+          work_item_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          drawing_revision_id: string
+          id?: string
+          work_item_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          drawing_revision_id?: string
+          id?: string
+          work_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drawing_revision_works_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drawing_revision_works_drawing_revision_id_fkey"
+            columns: ["drawing_revision_id"]
+            isOneToOne: false
+            referencedRelation: "drawing_revisions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drawing_revision_works_work_item_id_fkey"
+            columns: ["work_item_id"]
+            isOneToOne: false
+            referencedRelation: "work_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      drawing_revisions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          drawing_set_id: string
+          id: string
+          note: string | null
+          released_at: string | null
+          released_by: string | null
+          revision_no: number
+          status: string
+          superseded_by: string | null
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          drawing_set_id: string
+          id?: string
+          note?: string | null
+          released_at?: string | null
+          released_by?: string | null
+          revision_no: number
+          status?: string
+          superseded_by?: string | null
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          drawing_set_id?: string
+          id?: string
+          note?: string | null
+          released_at?: string | null
+          released_by?: string | null
+          revision_no?: number
+          status?: string
+          superseded_by?: string | null
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drawing_revisions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drawing_revisions_drawing_set_id_fkey"
+            columns: ["drawing_set_id"]
+            isOneToOne: false
+            referencedRelation: "drawing_sets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drawing_revisions_released_by_fkey"
+            columns: ["released_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drawing_revisions_superseded_by_fkey"
+            columns: ["superseded_by"]
+            isOneToOne: false
+            referencedRelation: "drawing_revisions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drawing_revisions_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      drawing_set_works: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          drawing_set_id: string
+          id: string
+          work_item_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          drawing_set_id: string
+          id?: string
+          work_item_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          drawing_set_id?: string
+          id?: string
+          work_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drawing_set_works_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drawing_set_works_drawing_set_id_fkey"
+            columns: ["drawing_set_id"]
+            isOneToOne: false
+            referencedRelation: "drawing_sets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drawing_set_works_work_item_id_fkey"
+            columns: ["work_item_id"]
+            isOneToOne: false
+            referencedRelation: "work_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      drawing_sets: {
+        Row: {
+          code: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          code?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drawing_sets_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drawing_sets_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       est_counters: {
         Row: {
           last_no: number
@@ -5749,6 +6072,144 @@ export type Database = {
           },
         ]
       }
+      transmittal_counters: {
+        Row: {
+          last_no: number
+          scope: string
+        }
+        Insert: {
+          last_no?: number
+          scope: string
+        }
+        Update: {
+          last_no?: number
+          scope?: string
+        }
+        Relationships: []
+      }
+      transmittal_lines: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          drawing_revision_id: string
+          id: string
+          sort_order: number
+          transmittal_id: string
+          unit_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          drawing_revision_id: string
+          id?: string
+          sort_order?: number
+          transmittal_id: string
+          unit_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          drawing_revision_id?: string
+          id?: string
+          sort_order?: number
+          transmittal_id?: string
+          unit_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transmittal_lines_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transmittal_lines_drawing_revision_id_unit_id_fkey"
+            columns: ["drawing_revision_id", "unit_id"]
+            isOneToOne: false
+            referencedRelation: "drawing_revisions"
+            referencedColumns: ["id", "unit_id"]
+          },
+          {
+            foreignKeyName: "transmittal_lines_transmittal_id_unit_id_fkey"
+            columns: ["transmittal_id", "unit_id"]
+            isOneToOne: false
+            referencedRelation: "transmittals"
+            referencedColumns: ["id", "unit_id"]
+          },
+        ]
+      }
+      transmittals: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          design_stage_id: string
+          id: string
+          issued_at: string | null
+          issued_by: string | null
+          note: string | null
+          number: string | null
+          status: string
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          design_stage_id: string
+          id?: string
+          issued_at?: string | null
+          issued_by?: string | null
+          note?: string | null
+          number?: string | null
+          status?: string
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          design_stage_id?: string
+          id?: string
+          issued_at?: string | null
+          issued_by?: string | null
+          note?: string | null
+          number?: string | null
+          status?: string
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transmittals_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transmittals_design_stage_id_fkey"
+            columns: ["design_stage_id"]
+            isOneToOne: false
+            referencedRelation: "design_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transmittals_issued_by_fkey"
+            columns: ["issued_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transmittals_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       units: {
         Row: {
           client_id: string | null
@@ -7125,8 +7586,16 @@ export type Database = {
         Args: { p_po_id: string }
         Returns: undefined
       }
+      delete_draft_revision: {
+        Args: { p_revision_id: string }
+        Returns: undefined
+      }
       delete_draft_selection: {
         Args: { p_selection_id: string }
+        Returns: undefined
+      }
+      delete_draft_transmittal: {
+        Args: { p_transmittal_id: string }
         Returns: undefined
       }
       directory_emails: {
@@ -7144,6 +7613,7 @@ export type Database = {
       has_app: { Args: { slug: string }; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
       issue_selection: { Args: { p_selection_id: string }; Returns: undefined }
+      issue_transmittal: { Args: { p_transmittal_id: string }; Returns: string }
       marathon_create_entry: {
         Args: {
           p_age: number

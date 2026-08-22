@@ -242,6 +242,18 @@ _Caught 2026-08-20 by the founder, reading the release summary of features they 
 
 **The check.** Before `staging → master`, ask one question of the diff: **has the founder seen every feature in this on the staging site?** If any part of it was built since their last look, the answer is no, and the merge waits for one sentence from them.
 
+### 15. A native module the deploy forgot took down every button in the file
+
+_Caught 2026-08-22 by the founder, pressing "Add a drawing" on staging during their vet._
+
+**What happened.** Vercel's build stopped packing `sharp`'s Linux binary (`libvips-cpp.so`) into the serverless functions. `sharp` was imported at the top of `lib/design-management/actions.ts`, so **every server action in that file died at module load** — including "Add a drawing", which never touches an image. Worse: the crash killed the error screen's own `recordAppError` call too (it posts through the same broken route), so `app_errors` stayed empty while the founder held a Reference code that led nowhere. Local `next build` + `next start` at the same commit worked perfectly — the Windows install has its own platform binaries and no tracing step.
+
+**Why every gate missed it.** Lint, types, tests and `next build` all pass — the defect is in **which files the deploy packs into the lambda**, decided after the build, on Vercel, per platform. The step-7 probe smoke proved the whole path against a local production build and was still blind, because it never ran on the deployed runtime. Two wrong theories (an RLS mismatch, Vercel's SSO wall eating POSTs) each fit the evidence for a while — the thing that settled it in one line was **`npx vercel logs <deployment>`**, which held the real stack trace with its digest. Those logs age out in about an hour.
+
+**The rule.** **Never import a native module (`sharp`, anything with a `.so`/`.node`) at the top of a `"use server"` file** — load it lazily inside the one branch that uses it, so a packaging failure is confined to that button and answers with that action's own error message. And `next.config.ts` pins `outputFileTracingIncludes` for sharp's Linux packages — do not remove it because local builds work; local builds are exactly the place this cannot reproduce.
+
+**The check.** When a deployed button fails with a Reference code that `app_errors` doesn't hold, go straight to `npx vercel logs` for that deployment (the CLI on the founder's machine is signed in) — and go quickly, the logs are gone within the hour. After any deploy that changes dependencies or Vercel's build behaves oddly, press one button in each file that touches `sharp`: a staff photo, a design view, a drawing sheet.
+
 ---
 
 ## Adding to this file

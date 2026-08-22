@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 
-import sharp from "sharp";
+// sharp loads LAZILY inside the resize branch — a top-level import means
+// a missing native binary on the deployed runtime kills every action in
+// this file at load, name edits included (the 2026-08-22 staging lesson).
 
 import { requireAdmin } from "@/lib/auth/access";
 import { requireUser } from "@/lib/auth/dal";
@@ -169,6 +171,7 @@ export async function uploadMyPhoto(formData: FormData): Promise<ActionState> {
 
   let normalised: Buffer;
   try {
+    const { default: sharp } = await import("sharp");
     normalised = await sharp(Buffer.from(await file.arrayBuffer()))
       // `cover`, not `contain`. A face may lose its corners and that is
       // fine; letterboxing a portrait onto white looks wrong on a card.
