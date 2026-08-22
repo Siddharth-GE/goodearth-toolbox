@@ -40,6 +40,7 @@ Apply protocol (`SHIPPING.md`): `npm run db:apply -- --project ipstebqawrvhkyntc
 ## Code
 
 **Registry & shell**
+
 - `lib/tools.ts`: add `DraftingCompass` (lucide) to `TOOL_ICONS`; new entry — name "Design Management", href `/design-management`, group **Management**, `built: true`, plain-English description. Amend the lines 182–185 comment: Relay keeps accountability; this tool now holds the artefacts.
 - `CLAUDE.md`: add `lib/drawings/` to the shared-utilities list (one line).
 
@@ -52,6 +53,7 @@ Apply protocol (`SHIPPING.md`): `npm run db:apply -- --project ipstebqawrvhkyntc
 **File serving route** — `app/(dashboard)/design-management/files/[fileId]/route.ts` (the `selections/views/[viewId]/route.ts` shape): `getCurrentUser()` → 401; `hasApp('/design-management') || hasApp('/supervisors')` → else 403 (`hasApp`, not `requireTool` — a redirect is meaningless in a fetch response); look up the file row **via the RLS-scoped client** so the widened qual hides draft files from supervisors automatically; stream `download()`, `Content-Type` from the stored `content_type`, `Cache-Control: private, max-age=3600`.
 
 **Screens** — `app/(dashboard)/design-management/`: `PLAN.md`, `layout.tsx` (`requireUser` → `requireApp`), `loading.tsx` with shared `Spinner` on every route, all UI from `components/ui/*`, read `DESIGN.md` before styling:
+
 - `page.tsx` — welcome via `tool-welcome.tsx` (the `supervisors/page.tsx` template).
 - `sets/` — drawing master list + create/edit; work-links editor over `getWorksTree()` from `lib/masters/works.ts` (checkbox tree, the established works picker data).
 - `stages/` — the stage master (rename, reorder, retire).
@@ -60,6 +62,7 @@ Apply protocol (`SHIPPING.md`): `npm run db:apply -- --project ipstebqawrvhkyntc
 - `transmittals/` + `transmittals/[transmittalId]/` — create draft (villa + stage + pick sets at their current revision + note), detail with Issue button calling the RPC (strip the plpgsql prefix from RAISE messages, `lib/selections/actions.ts:85` pattern), and `pdf/route.ts` — `DocumentPage` with `documentType="TRANSMITTAL"`, `reference=number`, `isDraft` until issued, one `DocumentTable` of set code / name / revision / note / files; `createElement` not JSX (route.ts cannot compile JSX); filename `Goodearth-Transmittal-<number>.pdf`; `Cache-Control: no-store`.
 
 **Supervisors surfacing** (their folder, via `lib/drawings/` only — one tool never imports another tool's code; a shared module is the sanctioned answer):
+
 - Villa page (`app/(dashboard)/supervisors/villas/[plotId]/page.tsx`): a **Drawings section** (released sets: name, R#, date, note, tappable files — phone-first) after the estimate line; and a **"Drawing · R2" chip** in each per-work `Section` header (`page.tsx:174-180`) where a released revision's work links include that `work_item_id`, linking to the file route.
 
 **Not in scope** (say no, note for later): Relay's `pusher_chain_links` gaining a `'transmittal'` target kind; outbound email; per-supervisor plot assignment; catalogue-picker allow-list (this tool doesn't use the catalogue picker).
@@ -85,9 +88,9 @@ Reviewed, tightened and **applied to staging** 2026-08-22 (`db:types:staging` re
 - `drawing_revisions_guard` now freezes `released_at`/`released_by` once a revision is off draft — they are set exactly once, on release; the drafted guard would have let a direct REST update rewrite when a drawing went to site.
 - `transmittals_issue_shape` now ties `number`, `issued_at` and `issued_by` each to issued status **both ways** — the drafted one-directional CHECK let a draft hold a number (false = false passes), and a draft squatting on TR-0005 would collide with the counter the day it minted the same one.
 
-### 3. ⬜ `[Sonnet]` Registry + masters screens
+### 3. ✅ `[Sonnet]` Registry + masters screens
 
-Registry entry, `lib/design-management/` skeleton, welcome screen, sets + stages master screens.
+Registry entry, `lib/design-management/` skeleton, welcome screen, sets + stages master screens. Landed 2026-08-22 — `lib/tools.ts`, `lib/design-management/{queries,actions}.ts`, and `app/(dashboard)/design-management/{layout,page,loading}.tsx` + `sets/` + `stages/`. Full checks green (prettier, lint, tsc, test, build, check:actions). Vetted by Fable 2026-08-22 — diff read against the plan and the red lines, welcome-count error handling confirmed to match the shipped Supervisors convention — and committed. Decisions taken where the plan didn't specify are below, all five accepted.
 
 ### 4. ⬜ `[Sonnet]` Villa design page + revisions + files
 
@@ -119,6 +122,14 @@ Four notes from drafting `0091` (Opus, 2026-08-22). **All four accepted by the F
 2. **The transmittal number is minted on Issue, not on create.** The founder's checklist reads "press **Issue** → number TR-0001 appears", so `transmittals.number` is null until issued (unique, with a CHECK tying it to the status) and an abandoned draft cannot burn a number. Consequence for step 5: the PDF cover sheet of a draft has no reference and prints as a draft.
 3. **The `drawings` bucket SELECT policy is coarser than the table's**, exactly as the plan specifies (`/design-management or /supervisors`). So a supervisor holding a draft sheet's storage path could fetch the object directly. Both path segments are UUIDs and the revision id is unreadable to them, so it is not reachable in practice — but the path is `revisions/<revisionId>/<uuid>.<ext>`, and `0061`'s `(storage.foldername(name))[2]` trick would close it exactly by joining back to `drawing_revisions`. Left as planned rather than improvised; Fable's call.
 4. **Nothing asserts that the storage policies qualify `public.has_app`.** Postgres resolves the function to an OID at `create policy` time, so `pg_policies` renders both forms identically and any such check could only ever pass. The source text is qualified; §14 of the migration says why the assertion is absent rather than leaving a silent gap.
+
+Five notes from step 3 (Sonnet, 2026-08-22) — the plan named the screens but not every detail; each was decided by following the nearest existing convention rather than improvising something new. **All five accepted by the Fable vet, 2026-08-22** — each follows a named precedent, and the dead Villas link is exactly what the plan asked for until step 4 lands.
+
+5. **`getWelcomeCounts`'s "villas with released drawings" reads the full `unit_id` column, not a `head:true` count**, exactly as the plan allowed ("a cheap fetchAll if head-count can't express it — state a limit honestly"). It's one column via `fetchAll` (paged, complete, no cap) and dedupes with a `Set` — the doc comment in `lib/design-management/queries.ts` says why. Cheap today; worth revisiting only if drawing_revisions ever gets large enough for this to matter, which nothing in this tool's scale suggests.
+6. **Drawing set delete vs. deactivate**: `deleteDrawingSet` attempts a real delete and surfaces the FK's `23503` as a friendly "deactivate instead" message (never a throw) — the plan's own wording ("a plain delete of an unreferenced set may be offered if the DB allows it"). No confirmation dialog before delete, matching the existing convention (`deleteLabourLog` in Supervisors, `withdrawIssueRequest`) — nothing in this codebase does a browser `confirm()` before a destructive action; the FK refusal is the safety net for a set already in use, and for one that isn't, delete is cheap to redo by mistake.
+7. **`drawing_set_works` write is a whole-list diff** (`setDrawingSetWorks(setId, workItemIds[])`, insert what's newly checked, delete what's newly unchecked) rather than per-checkbox insert/delete calls — the plan said "insert/delete, there is no update" but not the call shape. Followed Relay's `setTrailSetActivities` precedent (`app/(dashboard)/relay/sets/_components/set-editor.tsx`) so a tree of ~230 works saves as one atomic diff instead of one request per toggle.
+8. **Design stage reorder swaps `sort_order` with the adjacent neighbour** (two updates) rather than rewriting the whole ordered list on every move — cheaper than Relay's rewrite-the-list pattern since a stage move never changes membership, only position. New stages still land at `max + 10`, per the plan.
+9. **The Villas link on the welcome screen points at `/design-management/villas`, which doesn't exist yet** (step 4's territory) — the plan explicitly said to link it anyway and call out that it's dead for now. Confirming that's exactly what shipped: no `villas/` route was created in this step.
 
 ## Verification — the founder's browser checklist (staging)
 
