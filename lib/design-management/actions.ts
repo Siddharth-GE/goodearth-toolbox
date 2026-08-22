@@ -9,7 +9,12 @@ import { designView } from "@/lib/pdf/theme";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import sharp from "sharp";
+// sharp is imported LAZILY inside the one branch that resizes an image —
+// never at module level. A top-level import means a missing native
+// binary on the deployed runtime kills EVERY action in this file at
+// load, including ones that never touch an image (2026-08-22: "Add a
+// drawing" died this way on staging). Lazy, the blast radius is one
+// upload branch with its own error message.
 
 const GRANT = "/design-management";
 const NAME_LIMIT = 120;
@@ -592,6 +597,7 @@ export async function uploadDrawingRevisionFile(
     extension = "pdf";
   } else {
     try {
+      const { default: sharp } = await import("sharp");
       bytes = await sharp(Buffer.from(await file.arrayBuffer()))
         // `contain` keeps the whole drawing and pads to the shared
         // spec's 16:9 — `cover` would give the same consistency while
