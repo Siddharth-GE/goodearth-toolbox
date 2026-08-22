@@ -1,6 +1,7 @@
 import "server-only";
 
 import { requireTool } from "@/lib/auth/access";
+import { listReleasedDrawingsForUnit, type ReleasedDrawingSet } from "@/lib/drawings/queries";
 import { listVendors } from "@/lib/masters/vendors";
 import { listWorkCategories, listWorkItems } from "@/lib/masters/works";
 import { fetchAll } from "@/lib/supabase/fetch-all";
@@ -21,8 +22,12 @@ import {
  * no rates; the view's WHERE admits /supervisors since 0084),
  * `stock_issues(_lines)` and `goods_receipts(_lines)` (open
  * quantity-only reads since 0023 — what the plot has drawn), the works
- * vocabulary and vendors/plots/units/projects/items from Masters.
- * Never a rupee anywhere: labour is heads, materials are quantities.
+ * vocabulary and vendors/plots/units/projects/items from Masters, and —
+ * since Design Management (0091) — the villa's released drawings via
+ * `lib/drawings/listReleasedDrawingsForUnit`, the shared module Design
+ * Management's own screens read too (Design Management owns every
+ * write; this tool only reads what has already been released). Never a
+ * rupee anywhere: labour is heads, materials are quantities.
  *
  * No embeds except plots→projects (single FK path): units has had two
  * paths to plots since 0029, so unit and plot names merge through Maps
@@ -192,6 +197,8 @@ export type VillaDetail = {
   requests: IssueRequestRow[];
   /** The estimate's linked materials, ready to prefill a request. */
   quickPicks: EstimateQuickPick[];
+  /** Released drawing sets for this villa — empty when there is no unit row. */
+  drawings: ReleasedDrawingSet[];
 };
 
 const LOGS_SHOWN = 30;
@@ -264,8 +271,10 @@ export async function getVillaDetail(plotId: string): Promise<VillaDetail | null
 
   // Every movement onto the plot: store issues, plus direct-to-site
   // deliveries matched on the plot OR the unit — a to-site GRN carries
-  // whichever its PO named (0023).
-  const [issues, receipts] = await Promise.all([
+  // whichever its PO named (0023). The villa's released drawings ride
+  // along in the same Promise.all — skipped gracefully with no unit row,
+  // the same guard the takeoff read above already uses.
+  const [issues, receipts, drawings] = await Promise.all([
     fetchAll<{ id: string; work_item_id: string | null }>((from, to) =>
       supabase
         .from("stock_issues")
@@ -281,6 +290,7 @@ export async function getVillaDetail(plotId: string): Promise<VillaDetail | null
         : query.eq("plot_id", plotId);
       return query.order("id").range(from, to);
     }),
+    unit ? listReleasedDrawingsForUnit(unit.id) : Promise.resolve<ReleasedDrawingSet[]>([]),
   ]);
 
   const workByIssue = new Map(issues.map((issue) => [issue.id, issue.work_item_id]));
@@ -493,6 +503,7 @@ export async function getVillaDetail(plotId: string): Promise<VillaDetail | null
       createdAt: request.created_at,
     })),
     quickPicks,
+    drawings,
   };
 }
 

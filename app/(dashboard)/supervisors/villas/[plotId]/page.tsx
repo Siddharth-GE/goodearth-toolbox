@@ -18,7 +18,9 @@ import {
   listContractors,
   listWorkOptions,
   type IssueRequestRow,
+  type VillaDetail,
 } from "@/lib/supervisors/queries";
+import { FileText } from "lucide-react";
 import { notFound } from "next/navigation";
 import { DeleteLabourLogButton, LabourLogDialog } from "./_components/labour-forms";
 import { RequestIssueDialog, WithdrawRequestButton } from "./_components/request-forms";
@@ -76,6 +78,52 @@ export default async function VillaPage({ params }: { params: Promise<{ plotId: 
           check against. The Estimator submits one.
         </p>
       )}
+
+      <div id="drawings" className="scroll-mt-4">
+        <Section
+          title="Drawings"
+          note={
+            villa.drawings.length
+              ? `${villa.drawings.length} set${villa.drawings.length === 1 ? "" : "s"} released to site.`
+              : undefined
+          }
+        >
+          {villa.drawings.length === 0 ? (
+            <p className="text-muted text-sm">No drawings have been released for this villa yet.</p>
+          ) : (
+            <ul className="divide-border divide-y">
+              {villa.drawings.map((set) => (
+                <li key={set.setId} className="space-y-2 py-3">
+                  <div>
+                    <p className="text-foreground text-sm font-medium">
+                      {set.setCode ? `${set.setCode} · ${set.setName}` : set.setName} · R
+                      {set.revision.revisionNo}
+                    </p>
+                    <p className="text-muted text-xs">
+                      Released {formatDate(set.revision.releasedAt)}
+                      {set.revision.note ? ` · ${set.revision.note}` : ""}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {set.files.map((file) => (
+                      <a
+                        key={file.id}
+                        href={`/design-management/files/${file.id}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="border-border bg-background text-foreground hover:border-accent hover:text-accent inline-flex min-h-11 items-center gap-1.5 rounded-xl border px-3 text-sm font-medium"
+                      >
+                        <FileText className="size-4 shrink-0" aria-hidden />
+                        {file.fileName}
+                      </a>
+                    ))}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Section>
+      </div>
 
       <Section
         title="Labour"
@@ -175,6 +223,7 @@ export default async function VillaPage({ params }: { params: Promise<{ plotId: 
               key={group.workItemId}
               title={group.workLabel}
               note={group.categoryName}
+              aside={drawingChip(group.workItemId, villa.drawings)}
               collapsible
               defaultOpen={group.rows.some((row) => row.over) || group.unplanned.length > 0}
             >
@@ -263,4 +312,27 @@ function RequestBadge({ status }: { status: IssueRequestRow["status"] }) {
   if (status === "fulfilled") return <Badge variant="success">Issued</Badge>;
   if (status === "declined") return <Badge variant="danger">Declined</Badge>;
   return <Badge variant="info">Waiting</Badge>;
+}
+
+// A work can carry more than one released drawing set (rare, but the
+// master allows it) — the chip names the first and counts the rest
+// rather than picking one arbitrarily and hiding the others. It always
+// points at the Drawings section above rather than a specific file:
+// with several sets in play there is no single "right" file to jump to,
+// and one target keeps the rule the same whether there's one match or
+// several.
+function drawingChip(workItemId: string, drawings: VillaDetail["drawings"]) {
+  const matches = drawings.filter((set) => set.workItemIds.includes(workItemId));
+  if (matches.length === 0) return null;
+  const [first, ...rest] = matches;
+  return (
+    <a
+      href="#drawings"
+      className="border-border bg-background text-accent hover:border-accent inline-flex min-h-9 items-center gap-1 rounded-lg border px-2.5 text-xs font-medium"
+    >
+      <FileText className="size-3.5 shrink-0" aria-hidden />
+      Drawing · R{first.revision.revisionNo}
+      {rest.length > 0 ? ` +${rest.length} more` : ""}
+    </a>
+  );
 }

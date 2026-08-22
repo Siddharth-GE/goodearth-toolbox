@@ -111,9 +111,22 @@ detail screens, the create dialog on the villa design page, and the letterhead c
 `transmittals/[transmittalId]/pdf`. Full checks green (prettier, lint, tsc, test, build,
 check:actions). Seven decisions the plan didn't spell out are below, numbered 10–16.
 
-### 6. ⬜ `[Sonnet]` Supervisors surfacing
+### 6. ✅ `[Sonnet]` Supervisors surfacing
 
 Via `lib/drawings/` only.
+
+Built 2026-08-22: new shared `lib/drawings/queries.ts` (`listReleasedDrawingsForUnit`, no grant
+check, imports only the Supabase client + `fetchAll`, never `lib/design-management/` or
+`lib/supervisors/`), consumed from `lib/supervisors/queries.ts` (its `getVillaDetail` now folds
+the drawings read into its existing `[issues, receipts]` `Promise.all`, and its module doc comment
+names the new cross-tool read), and two additions to the villa page
+(`app/(dashboard)/supervisors/villas/[plotId]/page.tsx`): a **Drawings** section between the
+estimate line and Labour (released sets, R#, release date, note, tappable files opening
+`/design-management/files/<fileId>` in a new tab, phone-sized touch targets, empty state exactly
+as specified), and a **"Drawing · R…"** chip in each per-work section header linking to that
+section. One decision recorded below (17). Not yet vetted or committed — full CI (prettier, lint,
+tsc, test, build, check:actions) run and reported to the tier above; step 7 owns the probe smoke
+and the merge.
 
 ### 7. ⬜ `[Opus]` Docs, probe smoke, staging push
 
@@ -182,6 +195,25 @@ inventing one.
     so if the lines fail the header is deleted again rather than left as an empty draft nobody
     asked for. If even the cleanup fails it is logged and the empty draft is visible on the list
     with a working Delete — never silence.
+
+One note from step 6 (Sonnet, 2026-08-22) — the plan named the module, the section and the chip
+but left the multi-set case and the failure shape open; both were settled by following the
+nearest existing convention rather than inventing one.
+
+17. **A work section's "Drawing · R…" chip always links to the Drawings section's anchor
+    (`#drawings`), never straight to a file** — even when exactly one set matches. With more than
+    one set linked to the same work (the master allows it, though rare in practice) there is no
+    single "right" file to jump to, so the chip names the first match's revision and counts the
+    rest (`Drawing · R2 +1 more`) and one link target keeps the rule identical whether there's one
+    match or several — the smallest change that reads well, as the plan asked for. Separately,
+    `lib/drawings/queries.ts` throws (with context) rather than returning an empty list on a failed
+    read or a released revision missing its `released_at` stamp — an empty Drawings section that
+    is actually a database error would read as "nothing released yet," and the guard trigger from
+    0091 that stamps `released_at` exactly once means a missing value there is a data-integrity
+    problem worth failing loudly over, not a display choice. The drawings read itself folds into
+    `getVillaDetail`'s existing `[issues, receipts]` `Promise.all` (now `[issues, receipts,
+drawings]`), conditioned on the unit row exactly like the takeoff read above it — no second
+    Promise.all, and a villa with no unit row gets an empty drawings list rather than a query.
 
 ## Verification — the founder's browser checklist (staging)
 
