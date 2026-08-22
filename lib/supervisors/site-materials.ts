@@ -21,7 +21,7 @@
 
 export type SiteTakeoffRow = {
   workItemId: string;
-  materialId: string;
+  materialId: string | null;
   materialName: string;
   /** The material's own unit — what `quantity` is measured in. */
   uom: string;

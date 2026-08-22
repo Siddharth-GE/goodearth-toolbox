@@ -255,7 +255,6 @@ export async function getVillaDetail(plotId: string): Promise<VillaDetail | null
       reference: string;
       submitted_at: string;
       work_item_id: string;
-      material_id: string;
       material_name: string;
       uom: string;
       quantity: number;
@@ -263,7 +262,6 @@ export async function getVillaDetail(plotId: string): Promise<VillaDetail | null
       row.reference !== null &&
       row.submitted_at !== null &&
       row.work_item_id !== null &&
-      row.material_id !== null &&
       row.material_name !== null &&
       row.uom !== null &&
       row.quantity !== null,
