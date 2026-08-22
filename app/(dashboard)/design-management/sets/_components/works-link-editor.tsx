@@ -3,11 +3,12 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { FormMessage } from "@/components/ui/form-message";
 import { setDrawingSetWorks } from "@/lib/design-management/actions";
 import type { WorksTreeCategory } from "@/lib/masters/works";
 import { useMemo, useState, useTransition } from "react";
+
+import { WorksCheckboxTree } from "../../_components/works-checkbox-tree";
 
 /**
  * The set's default work links: a checkbox tree over the works
@@ -74,42 +75,7 @@ export function WorksLinkEditor({
         <Badge variant="neutral">{checked.size} picked</Badge>
       </div>
 
-      {tree.length === 0 ? (
-        <p className="text-muted text-sm">
-          No works exist yet — add them under Masters → Works first.
-        </p>
-      ) : (
-        <div className="max-h-[28rem] space-y-4 overflow-y-auto pr-1">
-          {tree.map(({ category, directItems, groups }) => {
-            const items = [...directItems, ...groups.flatMap((g) => g.items)];
-            if (items.length === 0) return null;
-            return (
-              <div key={category.id}>
-                <p className="text-foreground text-xs font-semibold tracking-wide uppercase">
-                  {category.code} — {category.name}
-                </p>
-                <div className="mt-1.5 grid gap-1.5 sm:grid-cols-2">
-                  {items.map((item) => (
-                    <label
-                      key={item.id}
-                      className="text-foreground flex items-center gap-2 text-sm"
-                    >
-                      <Checkbox
-                        checked={checked.has(item.id)}
-                        onChange={() => toggle(item.id)}
-                        disabled={pending}
-                      />
-                      <span className={item.is_active ? "" : "text-muted"}>
-                        {item.code} — {item.name}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      <WorksCheckboxTree tree={tree} checked={checked} onToggle={toggle} disabled={pending} />
 
       <div className="flex items-center gap-3">
         <Button type="button" disabled={!dirty || pending} onClick={save}>

@@ -92,9 +92,11 @@ Reviewed, tightened and **applied to staging** 2026-08-22 (`db:types:staging` re
 
 Registry entry, `lib/design-management/` skeleton, welcome screen, sets + stages master screens. Landed 2026-08-22 — `lib/tools.ts`, `lib/design-management/{queries,actions}.ts`, and `app/(dashboard)/design-management/{layout,page,loading}.tsx` + `sets/` + `stages/`. Full checks green (prettier, lint, tsc, test, build, check:actions). Vetted by Fable 2026-08-22 — diff read against the plan and the red lines, welcome-count error handling confirmed to match the shipped Supervisors convention — and committed. Decisions taken where the plan didn't specify are below, all five accepted.
 
-### 4. ⬜ `[Sonnet]` Villa design page + revisions + files
+### 4. ✅ `[Sonnet]` Villa design page + revisions + files
 
 Villa design page, revision lifecycle, upload action + file route. Upload one real PDF and one photo on staging, **read both back, check `%PDF` / `ffd8ff` magic bytes and sizes** (BUGCATCHER #1's check).
+
+Landed 2026-08-22: villa picker + villa design page (stage board, revision history, add-a-drawing), six revision/file actions, the private file route, and the works checkbox tree shared with the sets screen. Vetted by Fable the same day — the four in-report decisions all follow named precedents and are accepted; one fix applied in the vet: createDraftRevision now reports honestly when the default work links fail to copy (partial success, the line-pull doctrine) instead of showing plain success over an unlabelled empty list. The real-upload magic-byte smoke remains with step 7.
 
 ### 5. ⬜ `[Opus]` Transmittals
 
