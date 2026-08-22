@@ -78,9 +78,12 @@ Tick each step here as it lands — mid-build, this list is the live board. A bu
 
 Approved by the founder 2026-08-22; this file is the running board. Branch `feature/design-management`.
 
-### 2. ✅ `[Opus]` draft + ⬜ `[Fable]` review/apply — migration `0091`
+### 2. ✅ `[Opus]` draft + ✅ `[Fable]` review/apply — migration `0091`
 
-Draft `0091` exactly per the spec above (tables, guards, RPC, bucket, revokes, assertions). Then **Fable** reviews it (hard rule: RLS/grants/storage reach `db:apply` only after a Fable review), applies to **staging** (`npm run db:apply -- --project ipstebqawrvhkyntctrv --commit`) and runs `db:types:staging`.
+Reviewed, tightened and **applied to staging** 2026-08-22 (`db:types:staging` regenerated, typecheck clean; production waits for the founder's staging vet at step 8). The Fable pass accepted all four drafting decisions below and closed two gaps before applying:
+
+- `drawing_revisions_guard` now freezes `released_at`/`released_by` once a revision is off draft — they are set exactly once, on release; the drafted guard would have let a direct REST update rewrite when a drawing went to site.
+- `transmittals_issue_shape` now ties `number`, `issued_at` and `issued_by` each to issued status **both ways** — the drafted one-directional CHECK let a draft hold a number (false = false passes), and a draft squatting on TR-0005 would collide with the counter the day it minted the same one.
 
 ### 3. ⬜ `[Sonnet]` Registry + masters screens
 
@@ -110,7 +113,7 @@ Commit each working piece with a plain-English message.
 
 ## Questions for the tier above
 
-Four notes from drafting `0091` (Opus, 2026-08-22). Nothing here blocks the review — each is a decision Fable should accept or strike before applying.
+Four notes from drafting `0091` (Opus, 2026-08-22). **All four accepted by the Fable review pass, 2026-08-22** — the delete functions and issue-time minting are right; the coarser storage SELECT follows the `design-views` precedent (bucket coarse, route fine, paths unguessable UUIDs) and is not worth a cross-schema subquery in a storage policy; and the absent qualification assertion is correctly absent — a check that cannot fail is worse than no check. Step 4's upload smoke remains the real proof that `public.has_app` was qualified.
 
 1. **Two delete functions the plan did not name.** `delete_draft_transmittal(uuid)` and `delete_draft_revision(uuid)`, both `security invoker`, in the `0017 §8` shape. The plan makes a draft transmittal deletable, and both it and a draft revision have child rows — deleting them as two requests is the exact bug `delete_draft_selection()` exists to prevent. `delete_draft_revision` also refuses if the revision is already on a transmittal, and leaves the storage objects to the caller (rows first, then objects). Strike them and a draft raised by mistake has no way out.
 2. **The transmittal number is minted on Issue, not on create.** The founder's checklist reads "press **Issue** → number TR-0001 appears", so `transmittals.number` is null until issued (unique, with a CHECK tying it to the status) and an abandoned draft cannot burn a number. Consequence for step 5: the PDF cover sheet of a draft has no reference and prints as a draft.

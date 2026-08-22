@@ -242,8 +242,16 @@ create table if not exists transmittals (
   updated_at timestamptz not null default now(),
   -- Target of transmittal_lines' composite FK.
   unique (id, unit_id),
+  -- Each issue field is tied to the status BOTH ways. The one-directional
+  -- form ((issued) = (number and issued_at)) let a draft hold a number —
+  -- false = false passes — and a draft squatting on TR-0005 would collide
+  -- with the counter the day it minted the same number. (Fable review.)
   constraint transmittals_issue_shape
-    check ((status = 'issued') = (number is not null and issued_at is not null))
+    check (
+      (number is not null) = (status = 'issued')
+      and (issued_at is not null) = (status = 'issued')
+      and (issued_by is not null) = (status = 'issued')
+    )
 );
 
 create index if not exists transmittals_unit_idx on transmittals (unit_id);
@@ -307,7 +315,13 @@ begin
   end if;
 
   -- Once released, only the status and the supersede pointer may move.
-  if old.status <> 'draft' and new.note is distinct from old.note then
+  -- released_at and released_by are the record of WHEN and BY WHOM it went
+  -- to site — rewriting them after the fact is the history-edit this tool
+  -- exists to refuse. They are set exactly once, on draft -> released,
+  -- where old.status = 'draft' skips this check. (Fable review.)
+  if old.status <> 'draft'
+     and (new.note, new.released_at, new.released_by)
+         is distinct from (old.note, old.released_at, old.released_by) then
     raise exception 'R% is % — a drawing that has gone to site never changes. Start the next revision instead.',
       old.revision_no, old.status;
   end if;
