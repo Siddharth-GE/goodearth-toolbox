@@ -66,4 +66,19 @@ No migration, no RLS, no view change, no money — pure app-layer filter.
 
 ## Questions for the tier above
 
-(none yet)
+- **CI never ran for this push, by design of the workflow — not a
+  failure.** `.github/workflows/ci.yml` triggers only on
+  `push: branches: [master]` and on `pull_request`; a direct push to
+  `staging` fires neither. Checked `gh run list` against the last four
+  direct-to-`staging` commits (`ed257a2`, `eff3145`, `f4fbc99`,
+  `e4aadda`) — none has a CI run either, so this push (`2d64f93`)
+  matching that pattern is expected, not a regression. Ran the gate
+  locally instead: `npm test` — 556/556 pass; `npm run typecheck` —
+  clean, no output. Flagging because plan step 4 asked me to "confirm
+  the CI run is green with `gh run list`," which isn't obtainable for
+  a plain push under the current trigger config — opening a PR myself
+  to force one felt like scope I wasn't asked for. Should staging
+  pushes get their own `push: branches: [staging]` trigger, or is
+  local `npm test` + `npm run typecheck` the accepted gate for
+  direct-to-staging commits (with CI proper reserved for the
+  staging→master PR)?
