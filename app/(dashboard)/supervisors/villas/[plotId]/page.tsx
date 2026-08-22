@@ -22,6 +22,7 @@ import {
 } from "@/lib/supervisors/queries";
 import { FileText } from "lucide-react";
 import { notFound } from "next/navigation";
+import { DrawingHistory } from "./_components/drawing-history";
 import { DeleteLabourLogButton, LabourLogDialog } from "./_components/labour-forms";
 import { RequestIssueDialog, WithdrawRequestButton } from "./_components/request-forms";
 
@@ -118,6 +119,7 @@ export default async function VillaPage({ params }: { params: Promise<{ plotId: 
                       </a>
                     ))}
                   </div>
+                  <DrawingHistory history={set.history} />
                 </li>
               ))}
             </ul>

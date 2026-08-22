@@ -66,7 +66,7 @@ function NoteField({ revisionId, note }: { revisionId: string; note: string | nu
         value={value}
         onChange={(event) => setValue(event.target.value)}
         onBlur={() => noteSave.flush(value)}
-        placeholder="What changed in this revision…"
+        placeholder="What changed in this revision — required before it can go to site…"
       />
       <FormMessage error={noteSave.error} size="xs" />
     </div>

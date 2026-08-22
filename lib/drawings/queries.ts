@@ -43,6 +43,12 @@ export type ReleasedDrawingFile = {
   contentType: string;
 };
 
+export type DrawingHistoryEntry = {
+  revisionNo: number;
+  note: string | null;
+  releasedAt: string | null;
+};
+
 export type ReleasedDrawingSet = {
   setId: string;
   setCode: string | null;
@@ -55,6 +61,14 @@ export type ReleasedDrawingSet = {
   };
   files: ReleasedDrawingFile[];
   workItemIds: string[];
+  /**
+   * The change log: SUPERSEDED revisions, newest first — revision
+   * number, note and release date only. Deliberately NO files: site
+   * builds from the latest sheet and nothing older, so an old sheet is
+   * never one tap away (founder, 2026-08-22: the history must be seen,
+   * as an expandable change list).
+   */
+  history: DrawingHistoryEntry[];
 };
 
 /**
@@ -86,6 +100,7 @@ export async function listReleasedDrawingsForUnit(unitId: string): Promise<Relea
     revision_no: number;
     note: string | null;
     released_at: string | null;
+    status: string;
   }[];
   let sets: { id: string; code: string | null; name: string; sort_order: number }[];
   let files: {
@@ -100,17 +115,22 @@ export async function listReleasedDrawingsForUnit(unitId: string): Promise<Relea
     revisions = await fetchAll((from, to) =>
       supabase
         .from("drawing_revisions")
-        .select("id, drawing_set_id, revision_no, note, released_at")
+        .select("id, drawing_set_id, revision_no, note, released_at, status")
         .eq("unit_id", unitId)
-        .eq("status", "released")
+        .neq("status", "draft")
         .order("drawing_set_id")
+        .order("revision_no")
         .order("id")
         .range(from, to),
     );
 
     if (revisions.length === 0) return [];
 
-    const revisionIds = revisions.map((revision) => revision.id);
+    // Files and work links are fetched for the RELEASED (current)
+    // revisions only — the history carries notes and dates, never files.
+    const releasedIds = revisions
+      .filter((revision) => revision.status === "released")
+      .map((revision) => revision.id);
     const setIds = [...new Set(revisions.map((revision) => revision.drawing_set_id))];
 
     [sets, files, works] = await Promise.all([
@@ -127,7 +147,7 @@ export async function listReleasedDrawingsForUnit(unitId: string): Promise<Relea
         supabase
           .from("drawing_revision_files")
           .select("id, drawing_revision_id, file_name, content_type")
-          .in("drawing_revision_id", revisionIds)
+          .in("drawing_revision_id", releasedIds)
           .order("sort_order")
           .order("id")
           .range(from, to),
@@ -136,7 +156,7 @@ export async function listReleasedDrawingsForUnit(unitId: string): Promise<Relea
         supabase
           .from("drawing_revision_works")
           .select("drawing_revision_id, work_item_id")
-          .in("drawing_revision_id", revisionIds)
+          .in("drawing_revision_id", releasedIds)
           .order("id")
           .range(from, to),
       ),
@@ -162,7 +182,22 @@ export async function listReleasedDrawingsForUnit(unitId: string): Promise<Relea
     workIdsByRevision.set(work.drawing_revision_id, list);
   }
 
-  const ordered = [...revisions].sort((a, b) => {
+  const historyBySet = new Map<string, DrawingHistoryEntry[]>();
+  for (const revision of revisions) {
+    if (revision.status !== "superseded") continue;
+    const list = historyBySet.get(revision.drawing_set_id) ?? [];
+    list.push({
+      revisionNo: revision.revision_no,
+      note: revision.note,
+      releasedAt: revision.released_at,
+    });
+    historyBySet.set(revision.drawing_set_id, list);
+  }
+  // Newest change first — the fetch ordered revision_no ascending.
+  for (const list of historyBySet.values()) list.reverse();
+
+  const released = revisions.filter((revision) => revision.status === "released");
+  const ordered = [...released].sort((a, b) => {
     const setA = setsById.get(a.drawing_set_id);
     const setB = setsById.get(b.drawing_set_id);
     const orderA = setA?.sort_order ?? 0;
@@ -194,6 +229,7 @@ export async function listReleasedDrawingsForUnit(unitId: string): Promise<Relea
       },
       files: filesByRevision.get(revision.id) ?? [],
       workItemIds: workIdsByRevision.get(revision.id) ?? [],
+      history: historyBySet.get(revision.drawing_set_id) ?? [],
     };
   });
 }
