@@ -128,9 +128,13 @@ section. One decision recorded below (17). Not yet vetted or committed — full 
 tsc, test, build, check:actions) run and reported to the tier above; step 7 owns the probe smoke
 and the merge.
 
-### 7. ⬜ `[Opus]` Docs, probe smoke, staging push
+### 7. ✅ `[Opus]` Docs and the probe smoke
 
 Docs (STATUS/PLAN/CLAUDE/TODO), probe smoke as a single-grant account (grant the probe `/supervisors`, confirm it sees released drawings and **not** drafts; then `/design-management` alone for the write side — the browser-smoke sign-in technique), full CI green via `gh run list`, merge to `staging` and push.
+
+Landed 2026-08-22, **uncommitted for the Fable vet**. The merge and push are **not** this step's — MODELS.md's hard rule sends every `staging` merge through the Fable approval pass, which is step 8. Docs: STATUS.md gained the Tools row (state Staging) and the Design Management contract row, the Supervisors contract row gained the `lib/drawings/` read and 0091's widened quals, and the Relay settled-decisions line now records the 2026-08-22 boundary; CLAUDE.md lists `lib/drawings/` among the shared utilities; the tool's `PLAN.md` is new; TODO.md was replaced per its own rule, with the four still-open items carried forward.
+
+**The probe smoke ran end to end under the real Next runtime** (`npm run dev` against staging, which has `0091`) as `siddharth.cyriac.99+probe@gmail.com` — a throwaway password, the emailed-code step passed with the admin `generate_link`'s `email_otp`, the `auth_verified_sessions` row written the way `markSessionVerified` writes it, and every write driven as a **real `Next-Action` POST** with React's own `encodeReply`, not a direct function call. Decisions 18–20 below record what it proved, what it could not, and what it left behind.
 
 ### 8. ⬜ `[Fable]` Merge approval, founder vet, production
 
@@ -214,6 +218,55 @@ nearest existing convention rather than inventing one.
     `getVillaDetail`'s existing `[issues, receipts]` `Promise.all` (now `[issues, receipts,
 drawings]`), conditioned on the unit row exactly like the takeoff read above it — no second
     Promise.all, and a villa with no unit row gets an empty drawings list rather than a query.
+
+Three notes from step 7 (Opus, 2026-08-22) — the smoke, and the two things it costs.
+
+18. **The smoke drove the real server actions over HTTP, not the functions directly.** Each write
+    was a `POST` to the page that owns the action with its `Next-Action` id (read from
+    `.next/dev/server/.../server-reference-manifest.json`) and a body built by React's own
+    `encodeReply` — so Next's patched `fetch`, the RSC action decoding and the RLS-scoped
+    request cookies were all in the path. That matters most for **BUGCATCHER #1**, which by its
+    own entry does not reproduce outside the Next runtime. **Proved:** a real 1,940-byte PDF and
+    a real 105,759-byte JPEG uploaded through `uploadDrawingRevisionFile`, then downloaded back
+    through `/design-management/files/<id>` — the PDF returned **byte-for-byte identical**
+    (sha256 `4e4c7631…dbaa` both ways, magic `25504446` = `%PDF-`), the image returned a real
+    JPEG (`ffd8ffdb`, 265,313 bytes after the `sharp` contain-resize the action performs on
+    purpose), and **zero `EF BF BD` sequences** in either — the exact corruption signature.
+    `public.has_app` in the storage policies is therefore proved qualified, which is the check
+    §14 of `0091` deliberately could not make. Also proved end to end: the six screens render as
+    a single-grant user; `TR-0001` minted only on Issue; R0 released with `released_at`/`released_by`
+    stamped; both cover sheets render real PDFs (`Goodearth-Transmittal-Draft-Villa-9.pdf`,
+    `Goodearth-Transmittal-TR-0001.pdf`, `no-store`); all five guards refuse with their own
+    sentences and leave the state untouched; the one-draft-per-set-per-villa index refuses a
+    second draft in plain English; an object orphaned by a refused row write is removed (three
+    storage objects for three rows, none stranded); with `/supervisors` alone the villa page shows
+    the released set and its sheets, the **draft R1 is invisible — name, id and all** — the draft's
+    file id answers **404** on the file route while the released one answers 200 with `%PDF-`, and
+    `/design-management` serves no tool content at all; the per-work **"Drawing · R0" chip**
+    renders against `IN.1 · Cabinet Fabrication` and anchors at `#drawings`. `app_errors` stayed
+    empty and the only `console.error` lines in the dev log are the four guard refusals that were
+    fired on purpose.
+19. **What the smoke could not prove, and needs the founder's browser.** It drove the actions, not
+    the forms — so the client components' own wiring (the file input, the works checkbox tree's
+    submit, the create-transmittal dialog, `useActionState` error rendering) is still only
+    typechecked. Nothing here looked at a rendered page: layout, dark mode, and phone-width
+    behaviour on the Supervisors villa page are unproven, and BUGCATCHER #4 and #8 both live in
+    exactly that gap. The PDF cover sheets were confirmed to be real PDFs of a plausible size —
+    **nobody has looked at one**. And this was `npm run dev` on this machine, not
+    `staging.goodearthkannur.org`; the founder's vet still has to happen there.
+20. **The smoke left permanent rows on staging, by design, and the founder's checklist step 1 is
+    now wrong.** An issued transmittal and a released revision cannot be deleted — that is the
+    tool's whole point — so the practice database keeps: one drawing set `SMK-WD-GF · "SMOKE —
+Working Drawings, Ground Floor"`, `TR-0001` on Saarang Villa 9 with R0 and two sheets, and
+    `TR-0002` on Saarang Villa 1 with R0 and one sheet (Villa 1 was needed because it is the only
+    plot with material drawn against a work, and without a per-work section there is nothing for
+    the chip to hang on). Everything deletable was deleted: the R1 draft, its sheet and its storage
+    object are gone, leaving three objects for three rows. **So step 1 below will read "1 drawing
+    set, 2 villas, 2 transmittals", not zeroes** — that is smoke residue, not a bug, and the
+    founder should be told before they open the page. The probe's grants are back to exactly what
+    was found (`/inventory`, `/estimator` — the second one predates this session, left from the
+    2026-08-19 Estimator smoke), its session was signed out globally, its `auth_verified_sessions`
+    row deleted and its throwaway password rotated to a value nobody holds.
 
 ## Verification — the founder's browser checklist (staging)
 
