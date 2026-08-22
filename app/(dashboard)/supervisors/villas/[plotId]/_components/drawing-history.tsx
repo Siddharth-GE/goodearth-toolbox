@@ -21,7 +21,7 @@ export function DrawingHistory({ history }: { history: DrawingHistoryEntry[] }) 
     <div>
       <Button type="button" variant="ghost" size="sm" onClick={() => setOpen((value) => !value)}>
         {open ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
-        {open ? "Hide changes" : `Changes (${history.length})`}
+        {open ? "Hide revision log" : `Revision log (${history.length})`}
       </Button>
       {open && (
         <ul className="border-border mt-1 space-y-1.5 border-l-2 pl-3">

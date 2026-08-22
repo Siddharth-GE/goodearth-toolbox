@@ -102,7 +102,6 @@ export default async function VillaPage({ params }: { params: Promise<{ plotId: 
                     </p>
                     <p className="text-muted text-xs">
                       Released {formatDate(set.revision.releasedAt)}
-                      {set.revision.note ? ` · ${set.revision.note}` : ""}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -119,7 +118,16 @@ export default async function VillaPage({ params }: { params: Promise<{ plotId: 
                       </a>
                     ))}
                   </div>
-                  <DrawingHistory history={set.history} />
+                  <DrawingHistory
+                    history={[
+                      {
+                        revisionNo: set.revision.revisionNo,
+                        note: set.revision.note,
+                        releasedAt: set.revision.releasedAt,
+                      },
+                      ...set.history,
+                    ]}
+                  />
                 </li>
               ))}
             </ul>
