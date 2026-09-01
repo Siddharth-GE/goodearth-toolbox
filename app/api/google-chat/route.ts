@@ -24,6 +24,26 @@ function card(text: string) {
   return Response.json({ text });
 }
 
+// The named claims of a refused token, for the server log — enough to
+// say WHY the door stayed shut (wrong audience? unknown key? expired?)
+// without ever logging the signature that could replay it.
+function tokenSummary(token: string) {
+  try {
+    const [headerB64, payloadB64] = token.split(".");
+    const header = JSON.parse(Buffer.from(headerB64, "base64url").toString("utf8"));
+    const payload = JSON.parse(Buffer.from(payloadB64, "base64url").toString("utf8"));
+    return {
+      alg: header.alg,
+      kid: header.kid,
+      iss: payload.iss,
+      aud: payload.aud,
+      exp: payload.exp,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(request: Request) {
   // Two failure regimes, split on proof. Anything that goes wrong BEFORE
   // the token is proven — missing header, bad signature, the project
@@ -33,9 +53,10 @@ export async function POST(request: Request) {
   // thrown error there would surface as a raw Google failure message in
   // the space.
   let claims;
+  let token = "";
   try {
     const authorization = request.headers.get("authorization") ?? "";
-    const token = authorization.startsWith("Bearer ") ? authorization.slice("Bearer ".length) : "";
+    token = authorization.startsWith("Bearer ") ? authorization.slice("Bearer ".length) : "";
     if (!token) return new Response("Unauthorized", { status: 401 });
 
     claims = verifyChatToken(
@@ -48,7 +69,10 @@ export async function POST(request: Request) {
     console.error("google-chat verification failed", error);
     return new Response("Unauthorized", { status: 401 });
   }
-  if (!claims) return new Response("Unauthorized", { status: 401 });
+  if (!claims) {
+    console.error("google-chat token refused", tokenSummary(token));
+    return new Response("Unauthorized", { status: 401 });
+  }
 
   try {
     // Only now, with Google proven, is the body read at all.
