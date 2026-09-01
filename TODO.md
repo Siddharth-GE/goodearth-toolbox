@@ -4,21 +4,22 @@ Only the next build lives here. What exists is `STATUS.md`, the rules are `CLAUD
 
 ## The next build: Relay × Google Chat slash commands
 
-Approved by the founder 2026-08-31. The full phased plan is **`google-chat-plan.md`** at the repo root — read it before touching anything. Start at Phase 1 (the verified door: JWT check, route stub, `PUBLIC_PATHS`, tests — no migration, no relay changes). Phase 2 needs a sit-down with the founder for Workspace admin access. Root `plan.md` still holds the running Supervisors fix awaiting the founder's staging vet — don't overwrite it.
+Approved by the founder 2026-08-31; the phased plan is **`plan.md`** at the repo root — read it before touching anything. **Phases 1–2 are done (2026-09-01): the bot is alive on staging** — greets on joining a space, answers DMs and mentions, and the door verifies every request against the project's own service agent. The plan's phase notes carry the three Google traps that cost the debugging rounds; read them before assuming anything about how Chat talks to us.
 
-## Design Management is live on production
+**First move next session: type `/court` in the Relay test space.** Slash commands are declared and recognized but Google wasn't dispatching them yet on 2026-09-01 evening — propagation lag. If the bot answers, start Phase 3 (Identity: sender email → toolbox account). If still mute after a full day, that's a real problem to dig at before Phase 3.
 
-Shipped 2026-08-22 on the founder's instruction after their staging vet: migrations `0091`–`0093` applied to production, `db:compare` clean across 4,000+ objects and all 236 auth settings, `staging` merged to `master`. The founder's vet reshaped it live: everything plot-level, sets born inside transmittals, per-villa TR numbers, mandatory files and change notes, revision logs behind buttons on both sides.
+## Awaiting the founder's staging vet
+
+- **The Supervisors fix (2026-08-22)** — still unvetted, still not on `master`. On staging: Supervisors → Villa 10 → "Dry rubble masonry" should show its three materials and the Request dialog should offer them; open one already-working villa to see nothing regressed. After the vet: `staging` → `master` PR (that PR is where CI runs). Full story: git history of the old `plan.md` and BUGCATCHER #16.
 
 ## Next, in order
 
-1. **Grant `/design-management` to the design team** in Settings. The slug has been legal in both CHECKs since `0030`, so granting works the moment the tool is live — but the tool is invisible to everyone until someone is granted it. Nobody holds it today.
-2. **Press one real write button on production** — the last step of the ship protocol, still not done from the Phase 2 / masters releases: sign in at toolbox.goodearthkannur.org and save something. Editing one of the 74 price-less materials (item 5) is the natural candidate — a real write on the newest code.
-3. **Grants nobody has issued**: `/supervisors` to the actual site supervisors. The tool is invisible until granted in Settings, so nothing is visible to staff today — and Design Management's whole point is that the drawing reaches the supervisor, which needs this grant as much as item 2.
-4. **Re-enter 74 material rates in Masters.** The two source sheets disagreed about those materials' units (bricks priced per box on one, per piece on the other), so the import brought the unit through and left the price blank rather than restate a rate against the wrong unit. `npx tsx scripts/import-material-master.ts --project <ref>` prints the list. One material also needs a code: `PLD/836` named two different products, so "Hose Coller PVC 32mm" came in without one.
-5. **Set up the works** on the Estimator's Works tab: each work's unit, labour rate and recipe. The materials they draw on now exist — until a work has them, an estimate prices labour only.
-
-6. **Indents' pull-from-estimate is blind to post-`0086` estimates** — the same null-`material_id` bug just fixed in Supervisors (BUGCATCHER #16), but deeper: `getEstimatePull` (`lib/indents/queries.ts`) drops every row with a null `material_id`, and the whole pull path — client basket, `addEstimatePullLines`, its server re-read — is keyed on `material_id`, which post-`0086` rows don't have. Fixing it means re-keying the path on the item (or `material_id ?? item_id`), not deleting a guard, so it needs its own small plan. Until then, pull path 3 shows "no official estimate" for any estimate whose recipes were authored after 2026-08-20.
+1. **Grant `/design-management` to the design team** in Settings. The slug has been legal in both CHECKs since `0030` — but the tool is invisible to everyone until someone is granted it. Nobody holds it today.
+2. **Press one real write button on production** — the last step of the ship protocol, still not done from the Phase 2 / masters releases: sign in at toolbox.goodearthkannur.org and save something. Editing one of the 74 price-less materials (item 4) is the natural candidate.
+3. **Grants nobody has issued**: `/supervisors` to the actual site supervisors. Nothing is visible to staff today — and Design Management's whole point is that the drawing reaches the supervisor, which needs this grant as much as item 2.
+4. **Re-enter 74 material rates in Masters.** The two source sheets disagreed about those materials' units, so the import left prices blank rather than restate a rate against the wrong unit. `npx tsx scripts/import-material-master.ts --project <ref>` prints the list. One material also needs a code: `PLD/836` named two different products, so "Hose Coller PVC 32mm" came in without one.
+5. **Set up the works** on the Estimator's Works tab: each work's unit, labour rate and recipe. Until a work has them, an estimate prices labour only.
+6. **Indents' pull-from-estimate is blind to post-`0086` estimates** (BUGCATCHER #16, deeper than the Supervisors case): `getEstimatePull` (`lib/indents/queries.ts`) drops every row with a null `material_id`, and the whole pull path is keyed on `material_id`, which post-`0086` rows don't have. Fixing it means re-keying the path on the item (or `material_id ?? item_id`), so it needs its own small plan. Until then, pull path 3 shows "no official estimate" for any estimate whose recipes were authored after 2026-08-20.
 
 ## Open questions for the founder
 

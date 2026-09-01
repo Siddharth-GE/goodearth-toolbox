@@ -15,7 +15,7 @@ import {
  *
  * Phase 1 is the locked door and a friendly stub — no identity mapping,
  * no relay reads or writes. Those arrive phase by phase behind this
- * check (google-chat-plan.md).
+ * check (plan.md at the repo root).
  */
 
 // What Phase 1 needs from an event, nothing more. Add-on-style Chat
