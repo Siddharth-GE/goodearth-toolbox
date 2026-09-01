@@ -13,6 +13,11 @@ const PUBLIC_PATHS = [
   "/forgot-password",
   "/auth/confirm",
   "/auth/callback",
+  // Google Chat posts events here directly — there is no browser session
+  // to check. The real gate is the Google-signed JWT verified inside the
+  // route (lib/google-chat/verify.ts); this entry only stops the login
+  // redirect from swallowing the request.
+  "/api/google-chat",
 ];
 
 /**
