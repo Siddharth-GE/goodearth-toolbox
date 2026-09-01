@@ -2,6 +2,10 @@
 
 Only the next build lives here. What exists is `STATUS.md`, the rules are `CLAUDE.md`, history is git.
 
+## The next build: Relay × Google Chat slash commands
+
+Approved by the founder 2026-08-31. The full phased plan is **`google-chat-plan.md`** at the repo root — read it before touching anything. Start at Phase 1 (the verified door: JWT check, route stub, `PUBLIC_PATHS`, tests — no migration, no relay changes). Phase 2 needs a sit-down with the founder for Workspace admin access. Root `plan.md` still holds the running Supervisors fix awaiting the founder's staging vet — don't overwrite it.
+
 ## Design Management is live on production
 
 Shipped 2026-08-22 on the founder's instruction after their staging vet: migrations `0091`–`0093` applied to production, `db:compare` clean across 4,000+ objects and all 236 auth settings, `staging` merged to `master`. The founder's vet reshaped it live: everything plot-level, sets born inside transmittals, per-villa TR numbers, mandatory files and change notes, revision logs behind buttons on both sides.
