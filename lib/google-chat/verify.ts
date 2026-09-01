@@ -2,11 +2,22 @@
  * The door's lock: proof that a request to /api/google-chat really came
  * from Google Chat, checked before anything else runs.
  *
- * Google signs every event with a JWT from chat@system.gserviceaccount.com,
- * audience = our Cloud project number. Verification is split so the
- * cryptography is pure and testable: verifyChatToken takes the keys, the
- * expected audience and the clock as arguments; only getGoogleKeys and
- * projectNumber touch the network and the environment.
+ * Reality, learned from Google's own tokens on 2026-09-01: new Chat apps
+ * are registered as Workspace add-ons, and those sign events with a
+ * Google ID token — issuer https://accounts.google.com, audience = the
+ * exact endpoint URL — not the classic chat@system.gserviceaccount.com /
+ * project-number pair the docs still describe. Issuer + audience alone
+ * would be a hole, not a lock: ANY Google service account can mint an
+ * accounts.google.com ID token naming our URL as audience. What ties the
+ * token to OUR Cloud project is its email claim, which must be the
+ * project's own Chat service agent
+ * (service-<projectNumber>@gcp-sa-gsuiteaddons.iam.gserviceaccount.com).
+ * All three are checked, always.
+ *
+ * Verification is split so the cryptography is pure and testable:
+ * verifyChatToken takes the keys, the expected audience, the expected
+ * service agent and the clock as arguments; only getGoogleKeys and the
+ * env accessors touch the network and the environment.
  *
  * No JWT library — node:crypto does RS256 natively, and one algorithm
  * against a pinned issuer is exactly the case where a general-purpose
@@ -19,28 +30,33 @@ import {
   type KeyObject,
 } from "node:crypto";
 
-export const CHAT_ISSUER = "chat@system.gserviceaccount.com";
+export const CHAT_ISSUER = "https://accounts.google.com";
 
-const CERTS_URL =
-  "https://www.googleapis.com/service_accounts/v1/metadata/x509/chat@system.gserviceaccount.com";
+// Google's OIDC signing certs, kid → x509 PEM — same shape as the old
+// per-service-account certs URL, so keyFromPem covers both.
+const CERTS_URL = "https://www.googleapis.com/oauth2/v1/certs";
 
 export type ChatTokenClaims = {
   iss: string;
   aud: string;
   exp: number;
+  email: string;
   [claim: string]: unknown;
 };
 
 /**
  * Verify a Google Chat bearer token. Returns the claims when everything
- * holds — RS256 signature by a known key, the Chat issuer, our audience,
- * not expired — and null for anything else. Never throws: a malformed
- * token is a stranger at the door, not an exception.
+ * holds — RS256 signature by a known key, the accounts.google.com
+ * issuer, our exact endpoint URL as audience, the project's own Chat
+ * service agent as verified email, not expired — and null for anything
+ * else. Never throws: a malformed token is a stranger at the door, not
+ * an exception.
  */
 export function verifyChatToken(
   token: string,
   keys: Map<string, KeyObject>,
   audience: string,
+  serviceAgent: string,
   nowSeconds: number,
 ): ChatTokenClaims | null {
   const parts = token.split(".");
@@ -82,6 +98,10 @@ export function verifyChatToken(
   const claims = payload as ChatTokenClaims;
   if (claims.iss !== CHAT_ISSUER) return null;
   if (claims.aud !== audience) return null;
+  // The claim that makes this OUR lock and not just "a Google lock":
+  // without it, any Google service account could mint a passing token.
+  if (claims.email !== serviceAgent) return null;
+  if (claims.email_verified !== true) return null;
   if (typeof claims.exp !== "number" || claims.exp <= nowSeconds) return null;
 
   return claims;
@@ -128,7 +148,8 @@ export async function getGoogleKeys(): Promise<Map<string, KeyObject>> {
 }
 
 /**
- * The Cloud project number Google stamps as the JWT audience — different
+ * The Cloud project number — it names the project's Chat service agent,
+ * which every accepted token must carry as its email claim. Different
  * per Chat app, so staging and production each verify only their own
  * traffic. Throws by name when unset rather than quietly verifying
  * nothing (the MARATHON_SESSION_SECRET idiom).
@@ -136,5 +157,21 @@ export async function getGoogleKeys(): Promise<Map<string, KeyObject>> {
 export function projectNumber(): string {
   const value = process.env.GOOGLE_CHAT_PROJECT_NUMBER;
   if (!value) throw new Error("GOOGLE_CHAT_PROJECT_NUMBER is not set");
+  return value;
+}
+
+/** The one Google identity allowed through: this project's Chat service agent. */
+export function chatServiceAgent(): string {
+  return `service-${projectNumber()}@gcp-sa-gsuiteaddons.iam.gserviceaccount.com`;
+}
+
+/**
+ * The audience Google stamps into the token: the endpoint URL exactly as
+ * registered in the Chat app's connection settings — so it differs per
+ * environment and must match character for character.
+ */
+export function chatAudience(): string {
+  const value = process.env.GOOGLE_CHAT_AUDIENCE;
+  if (!value) throw new Error("GOOGLE_CHAT_AUDIENCE is not set");
   return value;
 }

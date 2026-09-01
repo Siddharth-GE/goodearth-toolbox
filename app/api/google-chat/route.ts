@@ -1,4 +1,9 @@
-import { getGoogleKeys, projectNumber, verifyChatToken } from "@/lib/google-chat/verify";
+import {
+  chatAudience,
+  chatServiceAgent,
+  getGoogleKeys,
+  verifyChatToken,
+} from "@/lib/google-chat/verify";
 
 /**
  * The Google Chat door — the app's first unauthenticated POST endpoint.
@@ -37,6 +42,8 @@ function tokenSummary(token: string) {
       kid: header.kid,
       iss: payload.iss,
       aud: payload.aud,
+      email: payload.email,
+      email_verified: payload.email_verified,
       exp: payload.exp,
     };
   } catch {
@@ -62,7 +69,8 @@ export async function POST(request: Request) {
     claims = verifyChatToken(
       token,
       await getGoogleKeys(),
-      projectNumber(),
+      chatAudience(),
+      chatServiceAgent(),
       Math.floor(Date.now() / 1000),
     );
   } catch (error) {
