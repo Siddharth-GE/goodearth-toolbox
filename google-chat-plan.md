@@ -42,7 +42,7 @@ Visibility mechanics: private replies via `privateMessageViewer`; action confirm
 
 Branch `feature/google-chat`; each phase committed and pushed separately with a plain-English message; CI confirmed via `gh run list` (a successful push is not a green build).
 
-- **Phase 1 — The door.** JWT verification + route handler answering every event with a friendly stub + `PUBLIC_PATHS` entry + env vars + pure-logic tests. _(Detailed below.)_
+- **Phase 1 — The door.** ✅ Done 2026-09-01 (`feature/google-chat`, PR #54). JWT verification + route handler answering every event with a friendly stub + `PUBLIC_PATHS` entry + env vars + pure-logic tests. _(Detailed below.)_ Verified locally: POST without/with garbage token → 401, GET → 405, other API paths still redirect. Note for Phase 2: Vercel's SSO protection blocks preview URLs entirely, so the Chat app endpoint must be `staging.goodearthkannur.org` (custom domain, unprotected) — a raw preview URL will never reach the route.
 - **Phase 2 — Google-side setup (with the founder; needs Workspace admin).** Free Cloud project, Chat API on, **staging** Chat app registered (endpoint `https://staging.goodearthkannur.org/api/google-chat`, slash commands declared), bot added to a test space. Acceptance: the stub says hello in chat.
 - **Phase 3 — Identity.** Email→person mapping, refusal cards for unlinked/inactive accounts.
 - **Phase 4 — Space linking.** Migration `google_chat_spaces` (staging first: `npm run db:apply -- --project <ref> --commit`); `ADDED_TO_SPACE` auto-match + announcement; `/link` dialog.
