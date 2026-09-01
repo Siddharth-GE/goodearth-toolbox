@@ -25,19 +25,32 @@ function card(text: string) {
 }
 
 export async function POST(request: Request) {
+  // Two failure regimes, split on proof. Anything that goes wrong BEFORE
+  // the token is proven — missing header, bad signature, the project
+  // number unset, the certs unreachable — is a 401: the caller has not
+  // shown they are Google, and an unproven caller gets no friendliness.
+  // Only a failure AFTER proof earns the polite 200 below, because a
+  // thrown error there would surface as a raw Google failure message in
+  // the space.
+  let claims;
   try {
     const authorization = request.headers.get("authorization") ?? "";
     const token = authorization.startsWith("Bearer ") ? authorization.slice("Bearer ".length) : "";
     if (!token) return new Response("Unauthorized", { status: 401 });
 
-    const claims = verifyChatToken(
+    claims = verifyChatToken(
       token,
       await getGoogleKeys(),
       projectNumber(),
       Math.floor(Date.now() / 1000),
     );
-    if (!claims) return new Response("Unauthorized", { status: 401 });
+  } catch (error) {
+    console.error("google-chat verification failed", error);
+    return new Response("Unauthorized", { status: 401 });
+  }
+  if (!claims) return new Response("Unauthorized", { status: 401 });
 
+  try {
     // Only now, with Google proven, is the body read at all.
     const event = (await request.json().catch(() => null)) as ChatEvent | null;
     if (!event) return card("I couldn't read that message. Please try again.");
@@ -76,9 +89,6 @@ export async function POST(request: Request) {
         return new Response(null, { status: 200 });
     }
   } catch (error) {
-    // A thrown error would surface as a raw Google failure message in
-    // the space. Answer 200 with plain English instead, and leave the
-    // real story in the Vercel logs.
     console.error("google-chat handler failed", error);
     return card("Something went wrong on our side. Please try again in a moment.");
   }
