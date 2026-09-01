@@ -18,15 +18,46 @@ import {
  * check (google-chat-plan.md).
  */
 
-// What Phase 1 needs from an event, nothing more.
+// What Phase 1 needs from an event, nothing more. Add-on-style Chat
+// apps (which is what Google's console registers now) wrap everything
+// in a `chat` payload — one member per kind of interaction.
+type ChatMessage = { text?: string; argumentText?: string };
+type ChatSpace = { name?: string; displayName?: string };
 type ChatEvent = {
-  type?: string;
-  space?: { name?: string; displayName?: string };
-  message?: { text?: string; argumentText?: string };
+  chat?: {
+    addedToSpacePayload?: { space?: ChatSpace };
+    removedFromSpacePayload?: { space?: ChatSpace };
+    messagePayload?: { message?: ChatMessage; space?: ChatSpace };
+    appCommandPayload?: {
+      appCommandMetadata?: { appCommandId?: number; appCommandType?: string };
+      message?: ChatMessage;
+      space?: ChatSpace;
+    };
+  };
 };
 
+// The slash commands as declared in the Chat app's configuration —
+// Google sends only the numeric id, so the id → name map lives here and
+// must match that form.
+const COMMANDS: Record<number, string> = {
+  1: "/court",
+  2: "/push",
+  3: "/bounce",
+  4: "/finish",
+  5: "/trail",
+  6: "/newtrail",
+  7: "/link",
+};
+
+// An add-on-style synchronous reply: the message rides inside an action
+// envelope, not as bare `{ text }` — Google shows "Relay not responding"
+// if the envelope is missing, even on a 200.
 function card(text: string) {
-  return Response.json({ text });
+  return Response.json({
+    hostAppDataAction: {
+      chatDataAction: { createMessageAction: { message: { text } } },
+    },
+  });
 }
 
 // The named claims of a refused token, for the server log — enough to
@@ -90,36 +121,40 @@ export async function POST(request: Request) {
     // Optional belt-and-braces: when set, only listed spaces get answers.
     // Unset means any space in the Workspace — the Chat app itself is
     // already private to the Goodearth Workspace.
+    const chat = event.chat ?? {};
     const allowedSpaces = (process.env.GOOGLE_CHAT_ALLOWED_SPACES ?? "")
       .split(",")
       .map((space) => space.trim())
       .filter(Boolean);
-    const spaceId = event.space?.name ?? "";
+    const spaceId =
+      chat.addedToSpacePayload?.space?.name ??
+      chat.messagePayload?.space?.name ??
+      chat.appCommandPayload?.space?.name ??
+      "";
     if (allowedSpaces.length > 0 && !allowedSpaces.includes(spaceId)) {
       return card("This space isn't set up for Relay yet.");
     }
 
-    switch (event.type) {
-      case "ADDED_TO_SPACE":
-        return card(
-          "Hello! I'm the Relay bot. I can't do anything just yet — " +
-            "slash commands for trails are on their way.",
-        );
-      case "MESSAGE": {
-        const text = (event.message?.text ?? "").trim();
-        const command = text.startsWith("/") ? text.split(/\s+/)[0] : null;
-        return card(
-          command
-            ? `I heard ${command} — that command isn't wired up yet, but it's coming. ` +
-                "For now, the Relay tool in the toolbox is the place."
-            : "Hello! Slash commands are on their way — nothing to run just yet.",
-        );
-      }
-      case "REMOVED_FROM_SPACE":
-        return new Response(null, { status: 200 });
-      default:
-        return new Response(null, { status: 200 });
+    if (chat.addedToSpacePayload) {
+      return card(
+        "Hello! I'm the Relay bot. I can't do anything just yet — " +
+          "slash commands for trails are on their way.",
+      );
     }
+    if (chat.appCommandPayload) {
+      const id = chat.appCommandPayload.appCommandMetadata?.appCommandId;
+      const command = (id !== undefined && COMMANDS[id]) || "that command";
+      return card(
+        `I heard ${command} — it isn't wired up yet, but it's coming. ` +
+          "For now, the Relay tool in the toolbox is the place.",
+      );
+    }
+    if (chat.messagePayload) {
+      return card("Hello! Slash commands are on their way — nothing to run just yet.");
+    }
+    // Removal, and any interaction kind Phase 1 doesn't know: acknowledge
+    // with an empty envelope so Google has a well-formed answer.
+    return Response.json({});
   } catch (error) {
     console.error("google-chat handler failed", error);
     return card("Something went wrong on our side. Please try again in a moment.");
