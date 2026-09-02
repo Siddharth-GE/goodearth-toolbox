@@ -135,6 +135,7 @@ export async function POST(request: Request) {
       chat.addedToSpacePayload?.space?.name ??
       chat.messagePayload?.space?.name ??
       chat.appCommandPayload?.space?.name ??
+      chat.removedFromSpacePayload?.space?.name ??
       "";
 
     // One line per event for the Vercel log: which kind arrived, from

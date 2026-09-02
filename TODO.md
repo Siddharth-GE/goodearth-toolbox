@@ -4,9 +4,9 @@ Only the next build lives here. What exists is `STATUS.md`, the rules are `CLAUD
 
 ## The next build: Relay × Google Chat slash commands
 
-Approved by the founder 2026-08-31; the phased plan is **`plan.md`** at the repo root — read it before touching anything. **Phases 1–2 are done (2026-09-01): the bot is alive on staging** — greets on joining a space, answers DMs and mentions, and the door verifies every request against the project's own service agent. The plan's phase notes carry the three Google traps that cost the debugging rounds; read them before assuming anything about how Chat talks to us.
+Approved by the founder 2026-08-31; the phased plan is **`plan.md`** at the repo root — read it before touching anything. **Phases 1–2 are done (2026-09-01): the bot is alive on staging** — greets on joining a space, answers DMs and mentions, and the door verifies every request against the project's own service agent. The plan's phase notes carry the four Google traps that cost the debugging rounds; read them before assuming anything about how Chat talks to us.
 
-**First move next session: type `/court` in the Relay test space.** Slash commands are declared and recognized but Google wasn't dispatching them yet on 2026-09-01 evening — propagation lag. If the bot answers, start Phase 3 (Identity: sender email → toolbox account). If still mute after a full day, that's a real problem to dig at before Phase 3.
+**Slash commands reach the door as of 2026-09-02** — all seven dispatch in the DM and the test space (the `/court` mystery was an em-dash in its description; plan.md trap (d)). **Next: Phase 3 (Identity)** — sender email → toolbox account, refusal cards for unlinked/inactive accounts. Fable writes the Phase 3 detail into `plan.md` first, in the Phase 1 form, then a Sonnet/Opus session builds it.
 
 ## Awaiting the founder's staging vet
 
