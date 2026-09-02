@@ -24,6 +24,7 @@ import "server-only";
  * Anything ADDED to this file is therefore reachable by a holder of
  * either grant — so it must stay narrowly about design photographs.
  */
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -58,15 +59,18 @@ export async function listSpaceViews(spaceIds: string[]): Promise<Map<string, Sp
   if (spaceIds.length === 0) return bySpace;
 
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("space_views")
-    .select("id, space_id, storage_path, caption, sort_order")
-    .in("space_id", spaceIds)
-    .order("sort_order")
-    .order("created_at");
-  if (error) throw new Error(`Could not read the design views: ${error.message}`);
+  const data = await fetchAll((from, to) =>
+    supabase
+      .from("space_views")
+      .select("id, space_id, storage_path, caption, sort_order")
+      .in("space_id", spaceIds)
+      .order("sort_order")
+      .order("created_at")
+      .order("id")
+      .range(from, to),
+  );
 
-  for (const view of (data ?? []) as SpaceViewRow[]) {
+  for (const view of data as SpaceViewRow[]) {
     const existing = bySpace.get(view.space_id);
     if (existing) existing.push(view);
     else bySpace.set(view.space_id, [view]);

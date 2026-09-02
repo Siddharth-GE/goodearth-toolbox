@@ -290,27 +290,18 @@ export async function getMyDetails(): Promise<{
   // The company-owned half is read-only here, but it is SHOWN — someone
   // who cannot see their own department just asks why it is missing.
   // Both lookups are separate flat reads; see the no-embeds rule above.
-  let departmentName: string | null = null;
-  if (card?.department_id) {
-    const { data, error: deptError } = await supabase
-      .from("staff_departments")
-      .select("name")
-      .eq("id", card.department_id)
-      .maybeSingle();
-    fail("your department", deptError);
-    departmentName = data?.name ?? null;
-  }
-
-  let reportsToName: string | null = null;
-  if (card?.reports_to_id) {
-    const { data, error: managerError } = await supabase
-      .from("profiles")
-      .select("full_name")
-      .eq("id", card.reports_to_id)
-      .maybeSingle();
-    fail("who you report to", managerError);
-    reportsToName = data?.full_name ?? null;
-  }
+  const [department, manager] = await Promise.all([
+    card?.department_id
+      ? supabase.from("staff_departments").select("name").eq("id", card.department_id).maybeSingle()
+      : null,
+    card?.reports_to_id
+      ? supabase.from("profiles").select("full_name").eq("id", card.reports_to_id).maybeSingle()
+      : null,
+  ]);
+  if (department) fail("your department", department.error);
+  if (manager) fail("who you report to", manager.error);
+  const departmentName = department?.data?.name ?? null;
+  const reportsToName = manager?.data?.full_name ?? null;
 
   return {
     id: user.id,

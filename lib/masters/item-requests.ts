@@ -30,14 +30,15 @@ export async function listItemRequests(
 ): Promise<ItemRequestRow[]> {
   const supabase = await createClient();
 
-  const { data, error } = await supabase
-    .from("item_requests")
-    .select("*, item_categories(name), brands(name)")
-    .eq("status", status)
-    .order("created_at", { ascending: false });
-  if (error) console.error("listItemRequests failed:", error);
-
-  const requests = data ?? [];
+  const requests = await fetchAll((from, to) =>
+    supabase
+      .from("item_requests")
+      .select("*, item_categories(name), brands(name)")
+      .eq("status", status)
+      .order("created_at", { ascending: false })
+      .order("id")
+      .range(from, to),
+  );
   if (requests.length === 0) return [];
 
   // How widely each provisional item is already used — the thing that

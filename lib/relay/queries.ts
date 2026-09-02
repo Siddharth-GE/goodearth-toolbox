@@ -187,26 +187,31 @@ export async function listTrails(filters: TrailFilters = {}) {
   return { rows, total, page, pageCount: Math.max(1, Math.ceil(total / RELAY_LIST_LIMIT)) };
 }
 
-/** The batons in one person's hand, worst first. Never paged — nobody holds 50. */
+/**
+ * The batons one person is holding, worst first. Read to completion —
+ * nobody holds 50, but a court that silently stopped listing would look
+ * exactly like an empty one, so it throws to the error screen rather
+ * than answer with nothing (BUGCATCHER entry 9).
+ */
 export async function listMyCourt(userId: string): Promise<ChainRow[]> {
   await requireTool("/relay");
   const supabase = await createClient();
 
-  const { data, error } = await supabase
-    .from("pusher_chain_state")
-    .select(STATE_COLUMNS)
-    .eq("holder_id", userId)
-    .eq("is_finished", false)
-    .order("is_stuck", { ascending: false })
-    .order("days_in_leg", { ascending: false })
-    .order("chain_id");
-
-  if (error) {
-    console.error("relay listMyCourt failed:", error);
-    return [];
-  }
-  const names = await nameMap();
-  return ((data ?? []) as StateRow[]).map((r) => toRow(r, names));
+  const [data, names] = await Promise.all([
+    fetchAll((from, to) =>
+      supabase
+        .from("pusher_chain_state")
+        .select(STATE_COLUMNS)
+        .eq("holder_id", userId)
+        .eq("is_finished", false)
+        .order("is_stuck", { ascending: false })
+        .order("days_in_leg", { ascending: false })
+        .order("chain_id")
+        .range(from, to),
+    ),
+    nameMap(),
+  ]);
+  return (data as StateRow[]).map((r) => toRow(r, names));
 }
 
 /**
@@ -218,25 +223,23 @@ export async function listStrandedTrails(): Promise<ChainRow[]> {
   await requireTool("/relay");
   const supabase = await createClient();
 
-  const [{ data, error }, active] = await Promise.all([
-    supabase
-      .from("pusher_chain_state")
-      .select(STATE_COLUMNS)
-      .eq("is_finished", false)
-      .not("holder_id", "is", null)
-      .order("days_in_leg", { ascending: false })
-      .order("chain_id"),
+  const [data, active, names] = await Promise.all([
+    fetchAll((from, to) =>
+      supabase
+        .from("pusher_chain_state")
+        .select(STATE_COLUMNS)
+        .eq("is_finished", false)
+        .not("holder_id", "is", null)
+        .order("days_in_leg", { ascending: false })
+        .order("chain_id")
+        .range(from, to),
+    ),
     listPeople(),
+    nameMap(),
   ]);
 
-  if (error) {
-    console.error("relay listStrandedTrails failed:", error);
-    return [];
-  }
-
   const activeIds = new Set(active.map((p) => p.id));
-  const names = await nameMap();
-  return ((data ?? []) as StateRow[])
+  return (data as StateRow[])
     .filter((r) => r.holder_id && !activeIds.has(r.holder_id))
     .map((r) => toRow(r, names));
 }

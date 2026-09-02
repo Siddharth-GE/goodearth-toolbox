@@ -889,12 +889,15 @@ export async function listDues(
   await requireTool(GRANT);
   const supabase = await createClient();
 
-  let query = supabase.from("client_engagements").select(ENGAGEMENT_SELECT);
-  if (filters.project) query = query.eq("project_id", filters.project);
-  const { data, error } = await query.order("id");
-  fail("the dues board", error);
+  // Read to completion: a dues board cut off at 1,000 rows is money owed
+  // that nobody is chasing. fetchAll throws if a page fails.
+  const data = await fetchAll((from, to) => {
+    let query = supabase.from("client_engagements").select(ENGAGEMENT_SELECT);
+    if (filters.project) query = query.eq("project_id", filters.project);
+    return query.order("id").range(from, to);
+  });
 
-  const records = (data ?? []) as unknown as EngagementRecord[];
+  const records = data as unknown as EngagementRecord[];
   const money = await loadMoney(
     supabase,
     records.map((r) => r.id),
@@ -969,14 +972,15 @@ export async function getHeadlines(projectId?: string): Promise<Headlines> {
   await requireTool(GRANT);
   const supabase = await createClient();
 
-  let query = supabase
-    .from("client_engagements")
-    .select("id, sale_deed_status, ca_status, registration_stage, units!inner(status)");
-  if (projectId) query = query.eq("project_id", projectId);
-  const { data, error } = await query.order("id");
-  fail("the summary figures", error);
+  const data = await fetchAll((from, to) => {
+    let query = supabase
+      .from("client_engagements")
+      .select("id, sale_deed_status, ca_status, registration_stage, units!inner(status)");
+    if (projectId) query = query.eq("project_id", projectId);
+    return query.order("id").range(from, to);
+  });
 
-  const rows = (data ?? []) as unknown as {
+  const rows = data as unknown as {
     id: string;
     sale_deed_status: string;
     ca_status: string;
