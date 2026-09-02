@@ -18,6 +18,7 @@ import {
   linkConfirmation,
   linkDialog,
   linkSaveFailed,
+  noticeDialog,
 } from "@/lib/google-chat/cards";
 import { resolveIdentity } from "@/lib/google-chat/identity";
 import {
@@ -244,11 +245,14 @@ async function handleLinkSubmit(
  * with a card Google will drop on the floor.
  */
 async function handleLinkCommand(event: ChatEvent, spaceId: string, privateTo: string | null) {
-  if (isDirectMessage(event)) return card(dmCannotLink(), privateTo);
+  // Google asked for a dialog, so from here on every answer IS a dialog:
+  // a message envelope in reply to a dialog request is "invalid" and
+  // shows as "Could not load dialog" (the first vet, /link in a DM).
   if (dialogEventType(event) !== "REQUEST_DIALOG") return card(dialogNotEnabled(), privateTo);
+  if (isDirectMessage(event)) return pushCard(noticeDialog(dmCannotLink()));
 
   const targets = await listLinkTargets();
-  if (!targets) return card(SOMETHING_WENT_WRONG, privateTo);
+  if (!targets) return pushCard(noticeDialog(SOMETHING_WENT_WRONG));
 
   const current = await getSpaceLink(spaceId);
   const selected = current
@@ -257,7 +261,12 @@ async function handleLinkCommand(event: ChatEvent, spaceId: string, privateTo: s
       : `project:${current.projectId}`
     : NO_LINK_VALUE;
 
-  return pushCard(linkDialog(linkTargetRows(targets.projects, targets.units), selected));
+  // The Save button posts back to the door itself: for an HTTP app the
+  // button's function is a URL, and the registered endpoint URL is
+  // exactly what chatAudience() holds.
+  return pushCard(
+    linkDialog(linkTargetRows(targets.projects, targets.units), selected, chatAudience()),
+  );
 }
 
 // The named claims of a refused token, for the server log — enough to
@@ -385,6 +394,9 @@ export async function POST(request: Request) {
       const privateTo = senderName(event);
       if (identity.kind !== "ok") {
         const refusal = identityRefusal(identity.kind);
+        // A dialog request must be answered with a dialog, so the
+        // refusal becomes one; a dialog already open is shut instead.
+        if (dialogEventType(event) === "REQUEST_DIALOG") return pushCard(noticeDialog(refusal));
         return chat.buttonClickedPayload
           ? closeDialog(refusal, privateTo)
           : card(refusal, privateTo);

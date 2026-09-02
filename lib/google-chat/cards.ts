@@ -89,8 +89,19 @@ export type LinkTarget = { value: string; text: string };
  * card. The door wraps this in the `pushCard` navigation envelope — this
  * function knows nothing about that envelope, only the card. The caller
  * supplies every row, including the "none" one; this builder invents none.
+ *
+ * `submitUrl` is where Google posts the Save press. For an HTTP app the
+ * button's `action.function` is a URL, not a name — the first vet
+ * (2026-09-02) had "link" there, Google tried to reach a URL called
+ * "link", and showed "the app is not responding" without ever calling
+ * the door. The `action` parameter names the button so the door can tell
+ * this Save from the trail buttons that arrive in Phase 6.
  */
-export function linkDialog(targets: LinkTarget[], current: string): Record<string, unknown> {
+export function linkDialog(
+  targets: LinkTarget[],
+  current: string,
+  submitUrl: string,
+): Record<string, unknown> {
   return {
     sections: [
       {
@@ -109,11 +120,32 @@ export function linkDialog(targets: LinkTarget[], current: string): Record<strin
           },
           {
             buttonList: {
-              buttons: [{ text: "Save", onClick: { action: { function: "link" } } }],
+              buttons: [
+                {
+                  text: "Save",
+                  onClick: {
+                    action: {
+                      function: submitUrl,
+                      parameters: [{ key: "action", value: "link" }],
+                    },
+                  },
+                },
+              ],
             },
           },
         ],
       },
     ],
   };
+}
+
+/**
+ * A dialog that only says something. When Google has asked the app for
+ * a dialog, the answer MUST be a dialog — a plain message envelope in
+ * reply to a dialog request is "invalid" and shows as "Could not load
+ * dialog" (the first vet, /link in a DM). So a refusal or an apology at
+ * that moment is this: one paragraph, and the dialog's own close button.
+ */
+export function noticeDialog(text: string): Record<string, unknown> {
+  return { sections: [{ widgets: [{ textParagraph: { text } }] }] };
 }
