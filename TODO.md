@@ -8,10 +8,6 @@ Approved by the founder 2026-08-31; the phased plan is **`plan.md`** at the repo
 
 **Slash commands reach the door as of 2026-09-02** — all seven dispatch in the DM and the test space (the `/court` mystery was an em-dash in its description; plan.md trap (d)). **Next: Phase 3 (Identity)** — sender email → toolbox account, refusal cards for unlinked/inactive accounts. Fable writes the Phase 3 detail into `plan.md` first, in the Phase 1 form, then a Sonnet/Opus session builds it.
 
-## Awaiting the founder's staging vet
-
-- **The Supervisors fix (2026-08-22)** — still unvetted, still not on `master`. On staging: Supervisors → Villa 10 → "Dry rubble masonry" should show its three materials and the Request dialog should offer them; open one already-working villa to see nothing regressed. After the vet: `staging` → `master` PR (that PR is where CI runs). Full story: git history of the old `plan.md` and BUGCATCHER #16.
-
 ## Next, in order
 
 1. **Grant `/design-management` to the design team** in Settings. The slug has been legal in both CHECKs since `0030` — but the tool is invisible to everyone until someone is granted it. Nobody holds it today.
