@@ -204,20 +204,3 @@ export function combineSummaries(summaries: readonly DuesSummary[]): DuesSummary
     nextDueAmount: next?.nextDueAmount ?? null,
   };
 }
-
-/**
- * Today in India, as 'YYYY-MM-DD'.
- *
- * The one clock-reading function here, kept beside the arithmetic that
- * consumes it but never called by it — every function above takes `today`
- * as an argument so the tests can pin it. Asia/Kolkata is named explicitly
- * because Vercel runs in UTC and the people using this do not.
- */
-export function todayInIndia(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-}

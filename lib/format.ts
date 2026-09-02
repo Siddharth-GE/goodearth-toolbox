@@ -165,6 +165,24 @@ export function formatTime(value: string | Date | null | undefined): string {
   return date.toLocaleTimeString(LOCALE, { hour: "numeric", minute: "2-digit" });
 }
 
+/**
+ * Today in India, as "YYYY-MM-DD".
+ *
+ * The one clock-reading function in the toolbox. Asia/Kolkata is named
+ * explicitly because Vercel runs in UTC and the people using this do not
+ * — for five and a half hours a day the two disagree about what day it
+ * is. Pure modules never call it: they take `today` as an argument so
+ * tests can pin the clock, and the screen or action reads it once here.
+ */
+export function todayInIndia(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
 /** A plain grouped integer: counts, totals of things rather than money. */
 export function formatCount(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "—";

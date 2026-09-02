@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { updateStaffPosting } from "@/lib/directory/actions";
-import { todayInIndia } from "@/lib/directory/birthdays";
+import { todayInIndia } from "@/lib/format";
 import { validatePosting } from "@/lib/directory/people";
 import { useState } from "react";
 

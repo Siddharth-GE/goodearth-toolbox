@@ -2,8 +2,9 @@
  * Birthday arithmetic for the Directory.
  *
  * Pure and dependency-free, so `npm test` can reach it — there is no
- * database and no browser in CI. Everything except `todayInIndia()` takes
- * `today` as an argument, so the tests pin the clock rather than hoping.
+ * database and no browser in CI. Everything takes `today` as an argument
+ * (todayInIndia() in lib/format.ts reads the clock), so the tests pin
+ * the clock rather than hoping.
  *
  * THE YEAR IS NEVER DISPLAYED. `date_of_birth` stores a full date because
  * that is the fact, but `formatBirthday` gives day and month only and
@@ -13,29 +14,6 @@
 
 /** An ISO 'YYYY-MM-DD' date. */
 type IsoDate = string;
-
-/**
- * Today in India, as 'YYYY-MM-DD'.
- *
- * The one clock-reading function in this tool, kept beside the arithmetic
- * that consumes it but never called by it. Asia/Kolkata is named
- * explicitly because Vercel runs in UTC and the people using this do not —
- * for five and a half hours a day the two disagree about whose birthday
- * it is.
- *
- * DUPLICATED, NOT IMPORTED. `lib/client-relations/dues.ts` and
- * `lib/financial-management/interest.ts` each carry their own, and one
- * tool never imports another tool's code. This is the third copy, which
- * is the point at which it earns a shared home — see TODO.md.
- */
-export function todayInIndia(): IsoDate {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-}
 
 const MONTHS = [
   "January",
