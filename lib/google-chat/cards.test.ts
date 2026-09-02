@@ -13,6 +13,7 @@ import {
   joinHello,
   linkConfirmation,
   linkDialog,
+  noticeDialog,
   linkSaveFailed,
   type LinkTarget,
   type RefusalKind,
@@ -125,7 +126,7 @@ test("linkDialog shapes a dropdown named target with one Save button", () => {
     { value: "project:1", text: "Saarang (whole project)" },
     { value: "unit:2", text: "Saarang · Villa 12" },
   ];
-  const dialog = linkDialog(targets, "unit:2") as {
+  const dialog = linkDialog(targets, "unit:2", "https://example.test/api/google-chat") as {
     sections: {
       widgets: [
         {
@@ -158,7 +159,10 @@ test("linkDialog shapes a dropdown named target with one Save button", () => {
 
   assert.equal(buttonWidget.buttonList.buttons.length, 1);
   assert.equal(buttonWidget.buttonList.buttons[0].text, "Save");
-  assert.equal(buttonWidget.buttonList.buttons[0].onClick.action.function, "link");
+  assert.equal(
+    buttonWidget.buttonList.buttons[0].onClick.action.function,
+    "https://example.test/api/google-chat",
+  );
 });
 
 test("linkDialog selects exactly the current item", () => {
@@ -167,7 +171,7 @@ test("linkDialog selects exactly the current item", () => {
     { value: "project:1", text: "Saarang" },
     { value: "unit:2", text: "Saarang · Villa 12" },
   ];
-  const dialog = linkDialog(targets, "project:1") as {
+  const dialog = linkDialog(targets, "project:1", "https://example.test/api/google-chat") as {
     sections: {
       widgets: [{ selectionInput: { items: { value: string; selected: boolean }[] } }, unknown];
     }[];
@@ -188,4 +192,13 @@ test("none of the Phase 4 sentences contains an email", () => {
   assert.ok(!linkSaveFailed().includes("@"));
   assert.ok(!linkConfirmation("Saarang (whole project)").includes("@"));
   assert.ok(!linkConfirmation(null).includes("@"));
+});
+
+test("noticeDialog is one paragraph and nothing else", () => {
+  const dialog = noticeDialog("A DM can't be linked.") as {
+    sections: { widgets: { textParagraph: { text: string } }[] }[];
+  };
+  assert.equal(dialog.sections.length, 1);
+  assert.equal(dialog.sections[0].widgets.length, 1);
+  assert.equal(dialog.sections[0].widgets[0].textParagraph.text, "A DM can't be linked.");
 });
