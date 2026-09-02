@@ -30,7 +30,7 @@ export async function listPlots(projectId?: string): Promise<PlotRow[]> {
   return data as PlotRow[];
 }
 
-export const PLOTS_PAGE_SIZE = 50;
+const PLOTS_PAGE_SIZE = 50;
 
 export type PlotFilters = {
   projectId?: string;

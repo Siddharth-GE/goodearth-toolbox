@@ -1,6 +1,7 @@
 "use server";
 
 import { requireTool } from "@/lib/auth/access";
+import { dbErrorMessage, guardError } from "@/lib/db-error";
 import { isActiveUom } from "@/lib/masters/uoms";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
@@ -24,19 +25,13 @@ import type { ActionState } from "@/lib/action-state";
 
 /** The guard raises human-readable messages (written for exactly this).
  * Surface the known ones instead of a generic "try again". */
-function guardError(error: { message: string }, fallback: string): ActionState {
-  const message = error.message;
-  if (
-    message.includes("draft") ||
-    message.includes("permanent") ||
-    message.includes("no longer be edited") ||
-    message.includes("before submitting") ||
-    message.includes("short code")
-  ) {
-    return { error: message.replace(/^.*?:\s*/, "") };
-  }
-  return { error: fallback };
-}
+const INDENT_GUARD_PHRASES = [
+  "draft",
+  "permanent",
+  "no longer be edited",
+  "before submitting",
+  "short code",
+] as const;
 
 export type CreateIndentInput = {
   projectId: string;
@@ -88,7 +83,7 @@ export async function createIndent(input: CreateIndentInput): Promise<ActionStat
   });
   if (error) {
     console.error("createIndent failed:", error);
-    return guardError(error, "Could not create the indent. Try again.");
+    return guardError(error, "Could not create the indent. Try again.", INDENT_GUARD_PHRASES);
   }
   if (!indentId) return { error: "Could not create the indent. Try again." };
 
@@ -165,7 +160,7 @@ export async function addDirectLines(
         .eq("id", current.id);
       if (error) {
         console.error("addDirectLines merge failed:", error);
-        return guardError(error, "Could not add those items. Try again.");
+        return guardError(error, "Could not add those items. Try again.", INDENT_GUARD_PHRASES);
       }
     } else {
       inserts.push({
@@ -183,7 +178,7 @@ export async function addDirectLines(
     const { error } = await supabase.from("indent_lines").insert(inserts);
     if (error) {
       console.error("addDirectLines insert failed:", error);
-      return guardError(error, "Could not add those items. Try again.");
+      return guardError(error, "Could not add those items. Try again.", INDENT_GUARD_PHRASES);
     }
   }
 
@@ -338,7 +333,7 @@ export async function addBudgetPullLines(
   const { error } = await supabase.from("indent_lines").insert(inserts);
   if (error) {
     console.error("addBudgetPullLines insert failed:", error);
-    return guardError(error, "Could not add those lines. Try again.");
+    return guardError(error, "Could not add those lines. Try again.", INDENT_GUARD_PHRASES);
   }
 
   revalidatePath(`/indents/${indentId}`);
@@ -378,7 +373,7 @@ export async function updateLine(
     .eq("id", lineId);
   if (error) {
     console.error("updateLine failed:", error);
-    return guardError(error, "Could not save. Try again.");
+    return guardError(error, "Could not save. Try again.", INDENT_GUARD_PHRASES);
   }
   return undefined;
 }
@@ -390,7 +385,7 @@ export async function removeLine(indentId: string, lineId: string): Promise<Acti
   const { error } = await supabase.from("indent_lines").delete().eq("id", lineId);
   if (error) {
     console.error("removeLine failed:", error);
-    return guardError(error, "Could not remove that line. Try again.");
+    return guardError(error, "Could not remove that line. Try again.", INDENT_GUARD_PHRASES);
   }
 
   revalidatePath(`/indents/${indentId}`);
@@ -424,7 +419,7 @@ export async function updateIndentHeader(
     .eq("id", indentId);
   if (error) {
     console.error("updateIndentHeader failed:", error);
-    return guardError(error, "Could not save. Try again.");
+    return guardError(error, "Could not save. Try again.", INDENT_GUARD_PHRASES);
   }
   return undefined;
 }
@@ -462,7 +457,7 @@ export async function submitIndent(indentId: string): Promise<ActionState> {
     .eq("id", indentId);
   if (error) {
     console.error("submitIndent failed:", error);
-    return guardError(error, "Could not submit. Try again.");
+    return guardError(error, "Could not submit. Try again.", INDENT_GUARD_PHRASES);
   }
 
   revalidatePath(`/indents/${indentId}`);
@@ -495,7 +490,7 @@ export async function approveIndent(indentId: string): Promise<ActionState> {
     if (error.message.includes("approver")) {
       return { error: "Only a named indent approver or an admin can approve an indent." };
     }
-    return guardError(error, "Could not approve this indent. Try again.");
+    return guardError(error, "Could not approve this indent. Try again.", INDENT_GUARD_PHRASES);
   }
 
   revalidatePath(`/indents/${indentId}`);
@@ -530,7 +525,7 @@ export async function rejectIndent(indentId: string, note: string): Promise<Acti
     .eq("id", indentId);
   if (error) {
     console.error("rejectIndent failed:", error);
-    return guardError(error, "Could not send this indent back. Try again.");
+    return guardError(error, "Could not send this indent back. Try again.", INDENT_GUARD_PHRASES);
   }
 
   revalidatePath(`/indents/${indentId}`);
@@ -548,7 +543,7 @@ export async function deleteIndent(indentId: string): Promise<ActionState> {
   if (error) {
     console.error("deleteIndent failed:", error);
     // Written for a person to read by the RAISE EXCEPTION in the function.
-    return { error: error.message.replace(/^.*?:\s*/, "") || "Could not delete this indent." };
+    return { error: dbErrorMessage(error, "Could not delete this indent.") };
   }
 
   revalidatePath("/indents", "layout");
@@ -670,7 +665,7 @@ export async function addEstimatePullLines(
   const { error } = await supabase.from("indent_lines").insert(inserts);
   if (error) {
     console.error("addEstimatePullLines insert failed:", error);
-    return guardError(error, "Could not add those materials. Try again.");
+    return guardError(error, "Could not add those materials. Try again.", INDENT_GUARD_PHRASES);
   }
 
   revalidatePath("/indents", "layout");

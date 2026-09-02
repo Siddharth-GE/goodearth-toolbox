@@ -37,7 +37,7 @@ export async function listVendors(activeOnly = false): Promise<VendorRow[]> {
   return data as VendorRow[];
 }
 
-export const VENDORS_PAGE_SIZE = 50;
+const VENDORS_PAGE_SIZE = 50;
 
 export type VendorFilters = {
   search?: string;

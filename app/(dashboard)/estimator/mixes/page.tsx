@@ -10,7 +10,8 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/components/ui/table";
-import { listMixes, listUomNames } from "@/lib/estimator/queries";
+import { listMixes } from "@/lib/estimator/mixes-queries";
+import { listUomNames } from "@/lib/estimator/shared";
 import { Blend } from "lucide-react";
 import Link from "next/link";
 import { MixFormDialog } from "./_components/mix-forms";

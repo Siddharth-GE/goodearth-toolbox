@@ -4,8 +4,10 @@ import { requireTool } from "@/lib/auth/access";
 import { requireUser } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAll } from "@/lib/supabase/fetch-all";
+import { assertRead } from "@/lib/supabase/read-failed";
 
-import { todayInIndia, upcomingBirthdays } from "./birthdays";
+import { todayInIndia } from "@/lib/format";
+import { upcomingBirthdays } from "./birthdays";
 
 /**
  * Reads for the Directory.
@@ -41,11 +43,8 @@ const GRANT = "/directory";
 /** How far ahead the birthday list looks, unless a caller says otherwise. */
 export const BIRTHDAY_WINDOW_DAYS = 30;
 
-function fail(context: string, error: { message: string } | null): void {
-  if (error) {
-    console.error(`Directory read failed (${context}):`, error);
-    throw new Error(`Could not load ${context}: ${error.message}`, { cause: error });
-  }
+function fail(context: string, error: { message: string } | null): asserts error is null {
+  assertRead("Directory", context, error);
 }
 
 export type DirectoryPerson = {
@@ -290,27 +289,18 @@ export async function getMyDetails(): Promise<{
   // The company-owned half is read-only here, but it is SHOWN — someone
   // who cannot see their own department just asks why it is missing.
   // Both lookups are separate flat reads; see the no-embeds rule above.
-  let departmentName: string | null = null;
-  if (card?.department_id) {
-    const { data, error: deptError } = await supabase
-      .from("staff_departments")
-      .select("name")
-      .eq("id", card.department_id)
-      .maybeSingle();
-    fail("your department", deptError);
-    departmentName = data?.name ?? null;
-  }
-
-  let reportsToName: string | null = null;
-  if (card?.reports_to_id) {
-    const { data, error: managerError } = await supabase
-      .from("profiles")
-      .select("full_name")
-      .eq("id", card.reports_to_id)
-      .maybeSingle();
-    fail("who you report to", managerError);
-    reportsToName = data?.full_name ?? null;
-  }
+  const [department, manager] = await Promise.all([
+    card?.department_id
+      ? supabase.from("staff_departments").select("name").eq("id", card.department_id).maybeSingle()
+      : null,
+    card?.reports_to_id
+      ? supabase.from("profiles").select("full_name").eq("id", card.reports_to_id).maybeSingle()
+      : null,
+  ]);
+  if (department) fail("your department", department.error);
+  if (manager) fail("who you report to", manager.error);
+  const departmentName = department?.data?.name ?? null;
+  const reportsToName = manager?.data?.full_name ?? null;
 
   return {
     id: user.id,

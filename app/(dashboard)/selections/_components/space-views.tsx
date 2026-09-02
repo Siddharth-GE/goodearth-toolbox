@@ -249,9 +249,7 @@ function ViewCard({
             tone="danger"
             bordered
             disabled={busy}
-            onClick={() =>
-              startTransition(async () => void (await deleteSpaceView(view.id, selectionId)))
-            }
+            onClick={() => startTransition(async () => void (await deleteSpaceView(view.id)))}
           >
             <Trash2 className="size-3.5" />
           </IconButton>

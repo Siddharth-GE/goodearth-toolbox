@@ -43,18 +43,19 @@ export async function startConstructionPlan(unitId: string): Promise<ActionState
 
   if (error) {
     if (error.code === "23505") {
-      const { data: existing } = await supabase
+      const { data: existing, error: existingError } = await supabase
         .from("construction_budgets")
         .select("id")
         .eq("unit_id", unitId)
-        .single();
+        .maybeSingle();
+      if (existingError) console.error("startConstructionPlan re-read failed:", existingError);
       if (existing) redirect(`/budgets/construction/${existing.id}`);
     }
     console.error("startConstructionPlan failed:", error);
     return { error: "Could not start this plan. Try again." };
   }
 
-  revalidatePath("/budgets/construction");
+  revalidatePath("/budgets", "layout");
   redirect(`/budgets/construction/${data.id}`);
 }
 
@@ -137,7 +138,7 @@ export async function addConstructionLines(
     }
   }
 
-  revalidatePath(`/budgets/construction/${planId}`);
+  revalidatePath("/budgets", "layout");
   return undefined;
 }
 
@@ -222,7 +223,7 @@ export async function removeConstructionLine(planId: string, lineId: string): Pr
     return { error: "Could not remove that line. Try again." };
   }
 
-  revalidatePath(`/budgets/construction/${planId}`);
+  revalidatePath("/budgets", "layout");
   return undefined;
 }
 
@@ -249,6 +250,6 @@ export async function renameStage(planId: string, from: string, to: string): Pro
     return { error: "Could not rename the stage. Try again." };
   }
 
-  revalidatePath(`/budgets/construction/${planId}`);
+  revalidatePath("/budgets", "layout");
   return undefined;
 }

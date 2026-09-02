@@ -4,6 +4,7 @@
 // 2026-08-03 outage rule, enforced by npm run check:actions.
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
+import { text } from "@/lib/form-data";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
@@ -19,10 +20,6 @@ const COUNT_LIMIT = 999;
  * revalidates the layout, or the welcome counts go stale while the
  * moved list refreshes (the exact-path trap in CLAUDE.md).
  */
-
-function text(formData: FormData, field: string): string {
-  return String(formData.get(field) ?? "").trim();
-}
 
 function count(formData: FormData, field: string): number {
   const raw = String(formData.get(field) ?? "").trim();

@@ -9,6 +9,11 @@
 # It runs exactly the checks that were already being run manually. No new
 # tools, no coverage thresholds, nothing to argue with.
 #
+# The four static checks (formatting, lint, types, tests) each run even
+# when an earlier one fails, so one push shows every verdict instead of
+# only the first; the build and everything after it still wait for all
+# four to pass.
+#
 # ONE SECRET LIVES HERE: SUPABASE_ACCESS_TOKEN, the management API key,
 # used by the migration check below and nothing else. It is account-level
 # — Supabase has no way to narrow it — so it reaches both databases with
@@ -35,6 +40,16 @@ jobs:
           node-version: 22
           cache: npm
 
+      # Next's build cache, keyed on the lockfile and the source, so a push
+      # that changes a few files does not rebuild the whole app. Sits before
+      # npm ci so the hash never walks node_modules.
+      - uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: nextjs-${{ hashFiles('package-lock.json') }}-${{ hashFiles('**/*.ts', '**/*.tsx') }}
+          restore-keys: |
+            nextjs-${{ hashFiles('package-lock.json') }}-
+
       # `npm ci` rather than `npm install`: it installs exactly what the
       # lockfile says, so CI can't pass on a different set of packages
       # than a developer has.
@@ -44,12 +59,15 @@ jobs:
         run: npm run format:check
 
       - name: Lint
+        if: ${{ !cancelled() }}
         run: npm run lint
 
       - name: Types
+        if: ${{ !cancelled() }}
         run: npm run typecheck
 
       - name: Tests
+        if: ${{ !cancelled() }}
         run: npm test
 
       # Second-to-last, because it's the slowest and the ones above catch

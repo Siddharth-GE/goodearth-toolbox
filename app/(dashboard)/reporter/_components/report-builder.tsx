@@ -24,6 +24,7 @@ import { Select } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import type { Aggregate } from "@/lib/reporter/datasets";
+import type { ProjectOption, UnitOption, VendorOption } from "@/lib/reporter/queries";
 import {
   MAX_FILTERS,
   MAX_MEASURES,
@@ -54,10 +55,6 @@ const CHART_TYPE_LABELS: [ChartType, string][] = [
   ["stacked", "Stacked bars"],
   ["meter", "Meter — value against a limit"],
 ];
-
-export type ProjectOption = { id: string; name: string };
-export type UnitOption = { id: string; name: string; projectId: string };
-export type VendorOption = { id: string; name: string };
 
 function toUiFilters(spec: ReportSpec): UiFilter[] {
   return spec.filters.map((filter) => ({

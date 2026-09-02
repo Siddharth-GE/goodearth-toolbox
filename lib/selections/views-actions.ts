@@ -23,8 +23,6 @@ const BUCKET = "design-views";
 const MAX_UPLOAD_BYTES = 3 * 1024 * 1024;
 const ACCEPTED = ["image/jpeg", "image/png", "image/webp", "image/avif"];
 
-export type ViewActionState = ActionState;
-
 /**
  * Uploads a design view for a space.
  *
@@ -38,7 +36,7 @@ export async function uploadSpaceView(
   spaceId: string,
   selectionId: string,
   formData: FormData,
-): Promise<ViewActionState> {
+): Promise<ActionState> {
   const user = await requireTool("/selections");
 
   const file = formData.get("file");
@@ -132,7 +130,7 @@ export async function uploadSpaceView(
     return { error: "Could not save the image. Try again." };
   }
 
-  revalidatePath(`/selections/${selectionId}`);
+  revalidatePath("/selections", "layout");
   return undefined;
 }
 
@@ -140,7 +138,7 @@ export async function captionSpaceView(
   viewId: string,
   selectionId: string,
   caption: string,
-): Promise<ViewActionState> {
+): Promise<ActionState> {
   await requireTool("/selections");
   const supabase = await createClient();
 
@@ -163,18 +161,22 @@ export async function moveSpaceView(
   viewId: string,
   selectionId: string,
   direction: "up" | "down",
-): Promise<ViewActionState> {
+): Promise<ActionState> {
   await requireTool("/selections");
   const supabase = await createClient();
 
-  const { data: view } = await supabase
+  const { data: view, error: viewError } = await supabase
     .from("space_views")
     .select("id, space_id, sort_order")
     .eq("id", viewId)
-    .single();
+    .maybeSingle();
+  if (viewError) {
+    console.error("moveSpaceView read failed:", viewError);
+    return { error: "Could not load that image. Try again." };
+  }
   if (!view) return { error: "That image no longer exists." };
 
-  const { data: neighbour } = await supabase
+  const { data: neighbour, error: neighbourError } = await supabase
     .from("space_views")
     .select("id, sort_order")
     .eq("space_id", view.space_id)
@@ -182,6 +184,10 @@ export async function moveSpaceView(
     .order("sort_order", { ascending: direction !== "up" })
     .limit(1)
     .maybeSingle();
+  if (neighbourError) {
+    console.error("moveSpaceView neighbour read failed:", neighbourError);
+    return { error: "Could not reorder. Try again." };
+  }
 
   // Already at the end — not an error, just nothing to do.
   if (!neighbour) return undefined;
@@ -196,22 +202,23 @@ export async function moveSpaceView(
     return { error: "Could not reorder. Try again." };
   }
 
-  revalidatePath(`/selections/${selectionId}`);
+  revalidatePath("/selections", "layout");
   return undefined;
 }
 
-export async function deleteSpaceView(
-  viewId: string,
-  selectionId: string,
-): Promise<ViewActionState> {
+export async function deleteSpaceView(viewId: string): Promise<ActionState> {
   await requireTool("/selections");
   const supabase = await createClient();
 
-  const { data: view } = await supabase
+  const { data: view, error: viewError } = await supabase
     .from("space_views")
     .select("storage_path")
     .eq("id", viewId)
-    .single();
+    .maybeSingle();
+  if (viewError) {
+    console.error("deleteSpaceView read failed:", viewError);
+    return { error: "Could not load that image. Try again." };
+  }
 
   const { error } = await supabase.from("space_views").delete().eq("id", viewId);
   if (error) {
@@ -223,6 +230,6 @@ export async function deleteSpaceView(
   // row pointing at a deleted file is a broken image on a client document.
   if (view?.storage_path) await supabase.storage.from(BUCKET).remove([view.storage_path]);
 
-  revalidatePath(`/selections/${selectionId}`);
+  revalidatePath("/selections", "layout");
   return undefined;
 }

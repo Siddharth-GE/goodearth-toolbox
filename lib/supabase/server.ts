@@ -1,8 +1,17 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { cache } from "react";
 import type { Database } from "./database.types";
 
-export async function createClient() {
+/**
+ * One client per request. Every gated query and action calls this, and a
+ * page rendering six of them used to build six clients — each re-reading
+ * the cookie jar and re-creating the fetch wrapper. `cache()` memoises
+ * the promise for the life of the request the same way getCurrentUser
+ * in lib/auth/dal.ts is memoised, and is a no-op outside a request
+ * (scripts never import this file).
+ */
+export const createClient = cache(async () => {
   const cookieStore = await cookies();
 
   return createServerClient<Database>(
@@ -26,4 +35,4 @@ export async function createClient() {
       },
     },
   );
-}
+});

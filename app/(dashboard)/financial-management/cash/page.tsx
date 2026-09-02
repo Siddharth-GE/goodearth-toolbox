@@ -9,7 +9,7 @@ import {
   lastMonths,
   sumAmounts,
 } from "@/lib/financial-management/cashflow";
-import { todayInIndia } from "@/lib/financial-management/interest";
+import { todayInIndia } from "@/lib/format";
 import { getCashPosition } from "@/lib/financial-management/queries";
 import { formatCount, formatCrore } from "@/lib/format";
 import { Wallet } from "lucide-react";

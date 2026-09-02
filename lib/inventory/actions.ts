@@ -1,6 +1,7 @@
 "use server";
 
 import { requireTool } from "@/lib/auth/access";
+import { guardError } from "@/lib/db-error";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -21,31 +22,25 @@ import type { ActionState } from "@/lib/action-state";
 
 /** The guards raise human-readable messages (written for exactly this).
  * Surface the known ones instead of a generic "try again". */
-function guardError(error: { message: string }, fallback: string): ActionState {
-  const message = error.message;
-  if (
-    message.includes("still to come") ||
-    message.includes("is in that store") ||
-    message.includes("ISSUED purchase order") ||
-    message.includes("no longer exists") ||
-    message.includes("permanent") ||
-    message.includes("short code") ||
-    message.includes("inactive") ||
-    message.includes("where the goods went") ||
-    message.includes("no site to deliver to") ||
-    message.includes("one place") ||
-    message.includes("different store") ||
-    message.includes("Pick a store") ||
-    message.includes("Pick the store") ||
-    message.includes("Pick the project") ||
-    message.includes("which work") ||
-    message.includes("serves no work") ||
-    message.includes("names it later")
-  ) {
-    return { error: message.replace(/^.*?:\s*/, "") };
-  }
-  return { error: fallback };
-}
+const INVENTORY_GUARD_PHRASES = [
+  "still to come",
+  "is in that store",
+  "ISSUED purchase order",
+  "no longer exists",
+  "permanent",
+  "short code",
+  "inactive",
+  "where the goods went",
+  "no site to deliver to",
+  "one place",
+  "different store",
+  "Pick a store",
+  "Pick the store",
+  "Pick the project",
+  "which work",
+  "serves no work",
+  "names it later",
+] as const;
 
 /* ------------------------------------------------------------------ *
  * Receiving goods against a purchase order
@@ -142,7 +137,7 @@ export async function recordGoodsReceipt(input: RecordReceiptInput): Promise<Act
   });
   if (error) {
     console.error("create_goods_receipt failed:", error);
-    return guardError(error, "Could not record this delivery. Try again.");
+    return guardError(error, "Could not record this delivery. Try again.", INVENTORY_GUARD_PHRASES);
   }
   if (!receiptId) return { error: "Could not record this delivery. Try again." };
 
@@ -170,7 +165,7 @@ export async function recordGoodsReceipt(input: RecordReceiptInput): Promise<Act
     if (lineError) {
       console.error("recordGoodsReceipt line insert failed:", lineError);
       revalidatePath("/inventory", "layout");
-      const friendly = guardError(lineError, "A line was refused.");
+      const friendly = guardError(lineError, "A line was refused.", INVENTORY_GUARD_PHRASES);
       return {
         error:
           added > 0
@@ -182,7 +177,6 @@ export async function recordGoodsReceipt(input: RecordReceiptInput): Promise<Act
   }
 
   revalidatePath("/inventory", "layout");
-  revalidatePath("/inventory/stock");
   revalidatePath(`/purchase-orders/${input.poId}`);
   redirect(`/inventory/receipts/${receiptId}`);
 }
@@ -258,7 +252,7 @@ export async function recordStockIssue(input: RecordIssueInput): Promise<ActionS
   });
   if (error) {
     console.error("create_stock_issue failed:", error);
-    return guardError(error, "Could not record this issue. Try again.");
+    return guardError(error, "Could not record this issue. Try again.", INVENTORY_GUARD_PHRASES);
   }
   if (!issueId) return { error: "Could not record this issue. Try again." };
 
@@ -279,8 +273,8 @@ export async function recordStockIssue(input: RecordIssueInput): Promise<ActionS
     });
     if (lineError) {
       console.error("recordStockIssue line insert failed:", lineError);
-      revalidatePath("/inventory/issues");
-      const friendly = guardError(lineError, "A line was refused.");
+      revalidatePath("/inventory", "layout");
+      const friendly = guardError(lineError, "A line was refused.", INVENTORY_GUARD_PHRASES);
       return {
         error:
           added > 0
@@ -305,12 +299,11 @@ export async function recordStockIssue(input: RecordIssueInput): Promise<ActionS
       .eq("id", input.requestId)
       .eq("status", "requested");
     if (stampError) console.error("recordStockIssue: request stamp failed:", stampError);
-    revalidatePath("/inventory/requests");
+    revalidatePath("/inventory", "layout");
     revalidatePath("/supervisors", "layout");
   }
 
-  revalidatePath("/inventory/issues");
-  revalidatePath("/inventory/stock");
+  revalidatePath("/inventory", "layout");
   redirect(`/inventory/issues/${issueId}`);
 }
 
@@ -341,7 +334,7 @@ export async function declineSiteRequest(id: string, reason: string): Promise<Ac
   }
   if (!count) return { error: "This request has already been answered." };
 
-  revalidatePath("/inventory/requests");
+  revalidatePath("/inventory", "layout");
   revalidatePath("/supervisors", "layout");
   return undefined;
 }
@@ -390,11 +383,10 @@ export async function recordStockAdjustment(input: RecordAdjustmentInput): Promi
   });
   if (error) {
     console.error("recordStockAdjustment failed:", error);
-    return guardError(error, "Could not save that adjustment. Try again.");
+    return guardError(error, "Could not save that adjustment. Try again.", INVENTORY_GUARD_PHRASES);
   }
 
-  revalidatePath("/inventory/adjustments");
-  revalidatePath("/inventory/stock");
+  revalidatePath("/inventory", "layout");
   return undefined;
 }
 
@@ -426,9 +418,9 @@ export async function retagIssueWork(issueId: string, workItemId: string): Promi
     .eq("id", issueId);
   if (error) {
     console.error("retagIssueWork failed:", error);
-    return guardError(error, "Could not save. Try again.");
+    return guardError(error, "Could not save. Try again.", INVENTORY_GUARD_PHRASES);
   }
 
-  revalidatePath("/inventory/issues");
+  revalidatePath("/inventory", "layout");
   return undefined;
 }

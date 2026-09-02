@@ -1,6 +1,7 @@
 "use server";
 
 import { requireTool } from "@/lib/auth/access";
+import { dbErrorMessage } from "@/lib/db-error";
 // constants.ts is import-free, which is what makes it safe to use as
 // VALUES from this file-level "use server" module — importing them from
 // a "server-only" module instead would drag that chain into the client
@@ -82,7 +83,7 @@ export async function issueSelection(
     console.error("issueSelection failed:", error);
     // These come from RAISE EXCEPTION in the function and are already
     // written for a person to read.
-    return { error: error.message.replace(/^.*?:\s*/, "") || "Could not issue this revision." };
+    return { error: dbErrorMessage(error, "Could not issue this revision.") };
   }
 
   revalidatePath("/selections", "layout");
@@ -103,35 +104,11 @@ export async function createNextRevision(fromSelectionId: string): Promise<Actio
   });
   if (error) {
     console.error("createNextRevision failed:", error);
-    return {
-      error: error.message.replace(/^.*?:\s*/, "") || "Could not create the next revision.",
-    };
+    return { error: dbErrorMessage(error, "Could not create the next revision.") };
   }
 
   revalidatePath("/selections", "layout");
   redirect(`/selections/${data}`);
-}
-
-export async function deleteDraft(selectionId: string): Promise<ActionState> {
-  await requireTool("/selections");
-  const supabase = await createClient();
-
-  // One database function, one transaction (migration 0017). This used
-  // to be two requests — delete the lines, then the draft — and a
-  // failure between them (someone issuing the draft at that moment)
-  // stranded a draft with every line permanently gone.
-  const { error } = await supabase.rpc("delete_draft_selection", {
-    p_selection_id: selectionId,
-  });
-  if (error) {
-    console.error("deleteDraft failed:", error);
-    return {
-      error: error.message.replace(/^.*?:\s*/, "") || "Could not discard this draft. Try again.",
-    };
-  }
-
-  revalidatePath("/selections", "layout");
-  redirect("/selections/units");
 }
 
 // ---------------------------------------------------------------------
@@ -169,13 +146,17 @@ export async function addSpaces(unitId: string, spaces: NewSpace[]): Promise<Act
 
   const supabase = await createClient();
 
-  const { data: last } = await supabase
+  const { data: last, error: lastError } = await supabase
     .from("spaces")
     .select("sort_order")
     .eq("unit_id", unitId)
     .order("sort_order", { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (lastError) {
+    console.error("spaces next sort_order read failed:", lastError);
+    return { error: "Could not work out where to add it. Try again." };
+  }
 
   let sortOrder = (last?.sort_order ?? -1) + 1;
   const { error } = await supabase.from("spaces").insert(
@@ -193,25 +174,6 @@ export async function addSpaces(unitId: string, spaces: NewSpace[]): Promise<Act
     }
     console.error("addSpaces failed:", error);
     return { error: "Could not add the spaces. Try again." };
-  }
-
-  revalidatePath("/selections", "layout");
-  return undefined;
-}
-
-export async function removeSpace(spaceId: string): Promise<ActionState> {
-  await requireTool("/selections");
-  const supabase = await createClient();
-
-  const { error } = await supabase.from("spaces").delete().eq("id", spaceId);
-  if (error) {
-    // 23503 = still referenced by selection_lines. That's the FK doing its
-    // job, not a bug — a space holding lines must not silently vanish.
-    if (error.code === "23503") {
-      return { error: "This space still has items in it. Remove them first." };
-    }
-    console.error("removeSpace failed:", error);
-    return { error: "Could not remove the space. Try again." };
   }
 
   revalidatePath("/selections", "layout");

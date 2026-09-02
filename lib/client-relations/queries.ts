@@ -2,14 +2,15 @@ import "server-only";
 
 import { requireTool } from "@/lib/auth/access";
 import { cleanSearch, pagedList, type PagedResult } from "@/lib/masters/paged";
+import { todayInIndia } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAll } from "@/lib/supabase/fetch-all";
+import { assertRead } from "@/lib/supabase/read-failed";
 
 import {
   allocateReceipts,
   combineSummaries,
   summariseDues,
-  todayInIndia,
   type DuesSummary,
   type MilestoneDue,
   type MilestoneInput,
@@ -30,16 +31,13 @@ import { invoiceStageOf, type Bottleneck, type ClientStage, type MilestoneStage 
  * between them is a due of zero and a due of forty lakh.
  */
 
-export const CRM_PAGE_SIZE = 50;
+const CRM_PAGE_SIZE = 50;
 
 const GRANT = "/client-relations";
 
-/** Anything that must be complete needs a unique tiebreaker — see fetchAll. */
-function fail(context: string, error: { message: string } | null): void {
-  if (error) {
-    console.error(`Client Relations read failed (${context}):`, error);
-    throw new Error(`Could not load ${context}: ${error.message}`, { cause: error });
-  }
+/** Delegates to the shared readFailed. */
+function fail(context: string, error: { message: string } | null): asserts error is null {
+  assertRead("Client Relations", context, error);
 }
 
 /** Headline counts for the tool's welcome screen. Counts only — dues,
@@ -889,12 +887,15 @@ export async function listDues(
   await requireTool(GRANT);
   const supabase = await createClient();
 
-  let query = supabase.from("client_engagements").select(ENGAGEMENT_SELECT);
-  if (filters.project) query = query.eq("project_id", filters.project);
-  const { data, error } = await query.order("id");
-  fail("the dues board", error);
+  // Read to completion: a dues board cut off at 1,000 rows is money owed
+  // that nobody is chasing. fetchAll throws if a page fails.
+  const data = await fetchAll((from, to) => {
+    let query = supabase.from("client_engagements").select(ENGAGEMENT_SELECT);
+    if (filters.project) query = query.eq("project_id", filters.project);
+    return query.order("id").range(from, to);
+  });
 
-  const records = (data ?? []) as unknown as EngagementRecord[];
+  const records = data as unknown as EngagementRecord[];
   const money = await loadMoney(
     supabase,
     records.map((r) => r.id),
@@ -969,14 +970,15 @@ export async function getHeadlines(projectId?: string): Promise<Headlines> {
   await requireTool(GRANT);
   const supabase = await createClient();
 
-  let query = supabase
-    .from("client_engagements")
-    .select("id, sale_deed_status, ca_status, registration_stage, units!inner(status)");
-  if (projectId) query = query.eq("project_id", projectId);
-  const { data, error } = await query.order("id");
-  fail("the summary figures", error);
+  const data = await fetchAll((from, to) => {
+    let query = supabase
+      .from("client_engagements")
+      .select("id, sale_deed_status, ca_status, registration_stage, units!inner(status)");
+    if (projectId) query = query.eq("project_id", projectId);
+    return query.order("id").range(from, to);
+  });
 
-  const rows = (data ?? []) as unknown as {
+  const rows = data as unknown as {
     id: string;
     sale_deed_status: string;
     ca_status: string;

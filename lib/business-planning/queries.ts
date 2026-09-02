@@ -1,6 +1,7 @@
 import "server-only";
 
 import { requireTool } from "@/lib/auth/access";
+import { profileNames } from "@/lib/masters/names";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { cache } from "react";
@@ -68,7 +69,10 @@ export async function listPlans(): Promise<PlanSummaryRow[]> {
       .range(from, to),
   );
 
-  const names = await lookupNames(rows.map((row) => row.updated_by));
+  const names = await profileNames(
+    supabase,
+    rows.map((row) => row.updated_by),
+  );
 
   return rows.map((row) => {
     const inputs = parsePlanInputs(row.inputs);
@@ -117,7 +121,7 @@ export const getPlan = cache(async (planId: string): Promise<PlanDetail | null> 
   }
   if (!data) return null;
 
-  const names = await lookupNames([data.updated_by]);
+  const names = await profileNames(supabase, [data.updated_by]);
 
   return {
     id: data.id,
@@ -129,19 +133,3 @@ export const getPlan = cache(async (planId: string): Promise<PlanDetail | null> 
     updated_by_name: data.updated_by ? (names.get(data.updated_by) ?? null) : null,
   };
 });
-
-/** Profile ids to display names, in one query, skipping the nulls. */
-async function lookupNames(ids: (string | null)[]): Promise<Map<string, string | null>> {
-  const unique = [...new Set(ids.filter((id): id is string => id != null))];
-  if (unique.length === 0) return new Map();
-
-  const supabase = await createClient();
-  const { data, error } = await supabase.from("profiles").select("id, full_name").in("id", unique);
-  if (error) {
-    // A missing name is cosmetic — the plan still opens, the byline just
-    // shows a dash. Not worth failing a page over.
-    console.error("lookupNames failed:", error);
-    return new Map();
-  }
-  return new Map((data ?? []).map((profile) => [profile.id, profile.full_name]));
-}

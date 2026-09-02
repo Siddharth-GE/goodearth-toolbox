@@ -26,7 +26,7 @@ export type ItemRow = {
   created_at: string;
 };
 
-export const ITEMS_PAGE_SIZE = 50;
+const ITEMS_PAGE_SIZE = 50;
 
 export type ItemFilters = {
   kind?: ItemKind;

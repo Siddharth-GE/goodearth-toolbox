@@ -1,7 +1,4 @@
-"use client";
-
-import { NavTabs } from "@/components/ui/tabs";
-import { usePathname } from "next/navigation";
+import { ToolNav } from "@/components/ui/tool-nav";
 
 /**
  * NavTabs rather than Radix Tabs: three separate routes with their own
@@ -15,10 +12,5 @@ const TABS = [
 ] as const;
 
 export function FmNav() {
-  const pathname = usePathname();
-  // The tool root is the welcome screen, which carries its own doors —
-  // showing the tabs above them reads as two competing menus.
-  if (pathname === "/financial-management") return null;
-  const active = TABS.find((tab) => pathname.startsWith(tab.href))?.key ?? "cash";
-  return <NavTabs tabs={[...TABS]} active={active} />;
+  return <ToolNav root="/financial-management" tabs={TABS} defaultKey="cash" />;
 }

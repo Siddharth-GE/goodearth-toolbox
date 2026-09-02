@@ -21,7 +21,7 @@ test("a grant and a revoke read as opposites, named by their app", () => {
     old_data: null,
     new_data: { app: "/purchase-orders" },
   });
-  assert.equal(granted?.what, "Granted Purchase orders");
+  assert.equal(granted?.what, "Granted Purchase Orders");
 
   const revoked = describeAccessEvent({
     ...base,
@@ -157,7 +157,7 @@ test("the history keeps order and silently drops what it can't explain", () => {
 });
 
 test("app labels are readable, not slugs", () => {
-  assert.equal(appLabel("/masters"), "Masters");
-  assert.equal(appLabel("/purchase-orders"), "Purchase orders");
+  assert.equal(appLabel("/masters"), "Projects & Masters");
+  assert.equal(appLabel("/purchase-orders"), "Purchase Orders");
   assert.equal(appLabel("/management-dashboard"), "Management dashboard");
 });

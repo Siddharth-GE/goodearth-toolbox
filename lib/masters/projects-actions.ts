@@ -9,8 +9,6 @@ import type { ProjectStatus, ProjectType } from "./projects";
 const PROJECT_TYPES = ["apartment_villa_community", "eco_village", "mixed_residential_commercial"];
 const PROJECT_STATUSES = ["planning", "active", "completed"];
 
-export type ProjectFormState = ActionState;
-
 function readProjectForm(formData: FormData) {
   return {
     name: String(formData.get("name") ?? "").trim(),
@@ -36,10 +34,7 @@ function validateCode(code: string | null): string | undefined {
   return undefined;
 }
 
-export async function createProject(
-  _state: ProjectFormState,
-  formData: FormData,
-): Promise<ProjectFormState> {
+export async function createProject(_state: ActionState, formData: FormData): Promise<ActionState> {
   await requireTool("/masters");
 
   const { name, code, location, project_type, status } = readProjectForm(formData);
@@ -65,9 +60,9 @@ export async function createProject(
 
 export async function updateProject(
   id: string,
-  _state: ProjectFormState,
+  _state: ActionState,
   formData: FormData,
-): Promise<ProjectFormState> {
+): Promise<ActionState> {
   const user = await requireTool("/masters");
 
   const { name, code, location, project_type, status } = readProjectForm(formData);

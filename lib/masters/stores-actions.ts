@@ -5,8 +5,6 @@ import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
-export type StoreFormState = ActionState;
-
 function readStoreForm(formData: FormData) {
   return {
     name: String(formData.get("name") ?? "").trim(),
@@ -16,10 +14,7 @@ function readStoreForm(formData: FormData) {
   };
 }
 
-export async function createStore(
-  _state: StoreFormState,
-  formData: FormData,
-): Promise<StoreFormState> {
+export async function createStore(_state: ActionState, formData: FormData): Promise<ActionState> {
   await requireTool("/masters");
 
   const { name, project_id, location, is_active } = readStoreForm(formData);
@@ -38,9 +33,9 @@ export async function createStore(
 
 export async function updateStore(
   id: string,
-  _state: StoreFormState,
+  _state: ActionState,
   formData: FormData,
-): Promise<StoreFormState> {
+): Promise<ActionState> {
   const user = await requireTool("/masters");
 
   const { name, project_id, location, is_active } = readStoreForm(formData);

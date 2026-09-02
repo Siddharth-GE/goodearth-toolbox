@@ -8,8 +8,6 @@ import type { PlotStatus } from "./plots";
 
 const PLOT_STATUSES = ["available", "reserved", "sold"];
 
-export type PlotFormState = ActionState;
-
 function readPlotForm(formData: FormData) {
   return {
     project_id: String(formData.get("project_id") ?? ""),
@@ -35,10 +33,7 @@ function validateCode(code: string | null): string | undefined {
   return undefined;
 }
 
-export async function createPlot(
-  _state: PlotFormState,
-  formData: FormData,
-): Promise<PlotFormState> {
+export async function createPlot(_state: ActionState, formData: FormData): Promise<ActionState> {
   await requireTool("/masters");
 
   const { project_id, name, code, area, status } = readPlotForm(formData);
@@ -63,9 +58,9 @@ export async function createPlot(
 
 export async function updatePlot(
   id: string,
-  _state: PlotFormState,
+  _state: ActionState,
   formData: FormData,
-): Promise<PlotFormState> {
+): Promise<ActionState> {
   const user = await requireTool("/masters");
 
   const { project_id, name, code, area, status } = readPlotForm(formData);

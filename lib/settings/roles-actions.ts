@@ -51,7 +51,7 @@ export async function createRole(_state: ActionState, formData: FormData): Promi
     return { error: "Could not create the role. Try again." };
   }
 
-  revalidatePath("/settings/roles");
+  revalidatePath("/settings", "layout");
   return undefined;
 }
 
@@ -162,7 +162,6 @@ export async function setPersonRole(userId: string, roleId: string): Promise<Act
     return { error: "Could not change their role. Try again." };
   }
 
-  revalidatePath("/settings");
-  revalidatePath(`/settings/people/${userId}`);
+  revalidatePath("/settings", "layout");
   return undefined;
 }

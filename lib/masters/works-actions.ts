@@ -7,8 +7,6 @@ import { revalidatePath } from "next/cache";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
-export type WorksFormState = ActionState;
-
 /**
  * Groups and items share one numbering space per category on the site
  * team's sheet (FD.3 is a group, FD.4 an item) but live in two tables,
@@ -65,9 +63,9 @@ function readWorksForm(formData: FormData) {
 // ---------------------------------------------------------------------
 
 export async function addWorkCategory(
-  _state: WorksFormState,
+  _state: ActionState,
   formData: FormData,
-): Promise<WorksFormState> {
+): Promise<ActionState> {
   const user = await requireTool("/masters");
 
   const { code, name } = readWorksForm(formData);
@@ -77,12 +75,16 @@ export async function addWorkCategory(
   if (name.length > 80) return { error: "Keep the name under 80 characters." };
 
   const supabase = await createClient();
-  const { data: last } = await supabase
+  const { data: last, error: lastError } = await supabase
     .from("work_categories")
     .select("sort_order")
     .order("sort_order", { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (lastError) {
+    console.error("work_categories next sort_order read failed:", lastError);
+    return { error: "Could not work out where to add it. Try again." };
+  }
 
   const { error } = await supabase.from("work_categories").insert({
     code,
@@ -103,9 +105,9 @@ export async function addWorkCategory(
 
 export async function updateWorkCategory(
   id: string,
-  _state: WorksFormState,
+  _state: ActionState,
   formData: FormData,
-): Promise<WorksFormState> {
+): Promise<ActionState> {
   const user = await requireTool("/masters");
 
   const { code, name, is_active } = readWorksForm(formData);
@@ -128,10 +130,7 @@ export async function updateWorkCategory(
   return undefined;
 }
 
-export async function setWorkCategoryActive(
-  id: string,
-  isActive: boolean,
-): Promise<WorksFormState> {
+export async function setWorkCategoryActive(id: string, isActive: boolean): Promise<ActionState> {
   const user = await requireTool("/masters");
 
   const supabase = await createClient();
@@ -152,10 +151,7 @@ export async function setWorkCategoryActive(
 // Groups
 // ---------------------------------------------------------------------
 
-export async function addWorkGroup(
-  _state: WorksFormState,
-  formData: FormData,
-): Promise<WorksFormState> {
+export async function addWorkGroup(_state: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireTool("/masters");
 
   const { code, name, category_id } = readWorksForm(formData);
@@ -191,9 +187,9 @@ export async function addWorkGroup(
 
 export async function updateWorkGroup(
   id: string,
-  _state: WorksFormState,
+  _state: ActionState,
   formData: FormData,
-): Promise<WorksFormState> {
+): Promise<ActionState> {
   const user = await requireTool("/masters");
 
   const { code, name, is_active } = readWorksForm(formData);
@@ -227,7 +223,7 @@ export async function updateWorkGroup(
   return undefined;
 }
 
-export async function setWorkGroupActive(id: string, isActive: boolean): Promise<WorksFormState> {
+export async function setWorkGroupActive(id: string, isActive: boolean): Promise<ActionState> {
   const user = await requireTool("/masters");
 
   const supabase = await createClient();
@@ -248,10 +244,7 @@ export async function setWorkGroupActive(id: string, isActive: boolean): Promise
 // Items
 // ---------------------------------------------------------------------
 
-export async function addWorkItem(
-  _state: WorksFormState,
-  formData: FormData,
-): Promise<WorksFormState> {
+export async function addWorkItem(_state: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireTool("/masters");
 
   const { code, name, category_id, group_id } = readWorksForm(formData);
@@ -290,9 +283,9 @@ export async function addWorkItem(
 
 export async function updateWorkItem(
   id: string,
-  _state: WorksFormState,
+  _state: ActionState,
   formData: FormData,
-): Promise<WorksFormState> {
+): Promise<ActionState> {
   const user = await requireTool("/masters");
 
   const { code, name, group_id, is_active } = readWorksForm(formData);
@@ -328,7 +321,7 @@ export async function updateWorkItem(
   return undefined;
 }
 
-export async function setWorkItemActive(id: string, isActive: boolean): Promise<WorksFormState> {
+export async function setWorkItemActive(id: string, isActive: boolean): Promise<ActionState> {
   const user = await requireTool("/masters");
 
   const supabase = await createClient();

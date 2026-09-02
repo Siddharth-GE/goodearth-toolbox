@@ -3,15 +3,14 @@ import "server-only";
 import { cache } from "react";
 
 import { requireTool } from "@/lib/auth/access";
+import { labelsById, profileNames } from "@/lib/masters/names";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 
 import {
   INVENTORY_LIST_LIMIT,
   itemsById,
-  labelsById,
   listActiveStores,
-  namesById,
   poReferencesById,
   type Client,
 } from "./queries";
@@ -390,7 +389,7 @@ export async function listGoodsReceipts({
   }
 
   const rows = data ?? [];
-  const [poRefs, stores, plots, units, nameOf] = await Promise.all([
+  const [poRefs, stores, plots, units, names] = await Promise.all([
     poReferencesById(
       supabase,
       rows.map((r) => r.po_id),
@@ -410,11 +409,12 @@ export async function listGoodsReceipts({
       "units",
       rows.map((r) => r.unit_id),
     ),
-    namesById(
+    profileNames(
       supabase,
       rows.map((r) => r.created_by),
     ),
   ]);
+  const nameOf = (id: string | null | undefined) => (id ? (names.get(id) ?? null) : null);
 
   const total = count ?? 0;
   return {
@@ -506,7 +506,7 @@ export const getGoodsReceipt = cache(async (receiptId: string): Promise<ReceiptD
       .range(from, to),
   );
 
-  const [items, poRefs, projects, stores, plots, units, nameOf] = await Promise.all([
+  const [items, poRefs, projects, stores, plots, units, names] = await Promise.all([
     itemsById(
       supabase,
       lines.map((line) => line.item_id),
@@ -516,11 +516,12 @@ export const getGoodsReceipt = cache(async (receiptId: string): Promise<ReceiptD
     labelsById(supabase, "stores", [receipt.store_id]),
     labelsById(supabase, "plots", [receipt.plot_id]),
     labelsById(supabase, "units", [receipt.unit_id]),
-    namesById(supabase, [
+    profileNames(supabase, [
       receipt.created_by,
       ...lines.map((line) => line.updated_by ?? line.created_by),
     ]),
   ]);
+  const nameOf = (id: string | null | undefined) => (id ? (names.get(id) ?? null) : null);
 
   return {
     id: receipt.id,

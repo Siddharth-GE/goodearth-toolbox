@@ -5,9 +5,11 @@ import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { addWorkComponent, saveWorkInfo } from "@/lib/estimator/actions";
+import { addWorkComponent, saveWorkInfo } from "@/lib/estimator/works-actions";
 import { UomSelect } from "../../_components/uom-select";
-import type { MaterialItemRow, MixRow, WorkSetup } from "@/lib/estimator/queries";
+import type { MixRow } from "@/lib/estimator/mixes-queries";
+import type { MaterialItemRow } from "@/lib/estimator/shared";
+import type { WorkSetup } from "@/lib/estimator/works-queries";
 import { useActionState, useEffect, useRef, useState } from "react";
 
 /**

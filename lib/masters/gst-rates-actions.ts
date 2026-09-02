@@ -5,12 +5,7 @@ import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
-export type GstRateFormState = ActionState;
-
-export async function addGstRate(
-  _state: GstRateFormState,
-  formData: FormData,
-): Promise<GstRateFormState> {
+export async function addGstRate(_state: ActionState, formData: FormData): Promise<ActionState> {
   await requireTool("/masters");
 
   const raw = String(formData.get("rate") ?? "").trim();
@@ -30,7 +25,7 @@ export async function addGstRate(
   return undefined;
 }
 
-export async function setGstRateActive(rate: number, isActive: boolean): Promise<GstRateFormState> {
+export async function setGstRateActive(rate: number, isActive: boolean): Promise<ActionState> {
   const user = await requireTool("/masters");
 
   const supabase = await createClient();

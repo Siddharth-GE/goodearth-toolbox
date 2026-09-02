@@ -3,6 +3,7 @@ import "server-only";
 import { requireTool } from "@/lib/auth/access";
 import { listWorkItems } from "@/lib/masters/works";
 import { fetchAll } from "@/lib/supabase/fetch-all";
+import { readFailed } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -14,10 +15,8 @@ import { createClient } from "@/lib/supabase/server";
  * `requested → fulfilled/declined`, never rewrite what was asked.
  */
 
-function fail(context: string, error: { message: string }): never {
-  console.error(`inventory requests: ${context} failed:`, error);
-  throw new Error(`Could not load ${context}.`);
-}
+const fail = (context: string, error: { message: string }): never =>
+  readFailed("inventory requests", context, error);
 
 export type SiteRequestRow = {
   id: string;

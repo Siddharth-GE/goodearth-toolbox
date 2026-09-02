@@ -7,6 +7,8 @@
  * falls back to a plain "changed" line rather than inventing a story.
  */
 
+import { TOOLS } from "@/lib/tools";
+
 export type AccessAuditRow = {
   table_name: string;
   action: string;
@@ -29,8 +31,14 @@ function field(data: Record<string, unknown> | null, key: string): string | null
   return typeof value === "string" ? value : null;
 }
 
-/** "/purchase-orders" → "Purchase orders" — readable without a tools lookup. */
+/**
+ * The name the sidebar shows for a grant ("Purchase Orders"), so the access
+ * log and the menu agree; a slug that has left the registry still reads as
+ * words ("/management-dashboard" → "Management dashboard").
+ */
 export function appLabel(app: string): string {
+  const tool = TOOLS.find((tool) => tool.href === app);
+  if (tool) return tool.name;
   const slug = app.replace(/^\//, "").replace(/-/g, " ");
   return slug.charAt(0).toUpperCase() + slug.slice(1);
 }

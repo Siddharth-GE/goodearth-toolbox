@@ -11,7 +11,7 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/components/ui/table";
-import { listWorkStatus, type WorkStatusRow } from "@/lib/estimator/queries";
+import { listWorkStatus, type WorkStatusRow } from "@/lib/estimator/works-queries";
 import { formatMoney } from "@/lib/format";
 import { Hammer } from "lucide-react";
 

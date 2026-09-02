@@ -1,6 +1,7 @@
 "use server";
 
 import { requireTool } from "@/lib/auth/access";
+import { dbErrorMessage } from "@/lib/db-error";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
@@ -71,11 +72,12 @@ export async function startPricing(selectionId: string): Promise<ActionState> {
     // 23505 = selection_id is unique. Two people pressed Start pricing at
     // once; the loser should land on the budget rather than see an error.
     if (error.code === "23505") {
-      const { data: existing } = await supabase
+      const { data: existing, error: existingError } = await supabase
         .from("budgets")
         .select("id")
         .eq("selection_id", selectionId)
-        .single();
+        .maybeSingle();
+      if (existingError) console.error("startPricing re-read failed:", existingError);
       if (existing) redirect(`/budgets/${existing.id}`);
     }
     console.error("startPricing failed:", error);
@@ -437,7 +439,7 @@ export async function reopenBudget(budgetId: string): Promise<ActionState> {
   if (error) {
     console.error("reopenBudget failed:", error);
     // Written for a person to read by the RAISE EXCEPTION in the function.
-    return { error: error.message.replace(/^.*?:\s*/, "") || "Could not re-open this budget." };
+    return { error: dbErrorMessage(error, "Could not re-open this budget.") };
   }
 
   revalidatePath("/budgets", "layout");

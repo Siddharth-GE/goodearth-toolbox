@@ -5,12 +5,10 @@ import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
-export type StageFormState = ActionState;
-
 export async function addConstructionStage(
-  _state: StageFormState,
+  _state: ActionState,
   formData: FormData,
-): Promise<StageFormState> {
+): Promise<ActionState> {
   const user = await requireTool("/masters");
 
   const name = String(formData.get("name") ?? "").trim();
@@ -21,12 +19,16 @@ export async function addConstructionStage(
 
   // New stages land at the end of the sequence; steps of 10 leave room
   // to slot one between two later by editing sort_order in the database.
-  const { data: last } = await supabase
+  const { data: last, error: lastError } = await supabase
     .from("construction_stages")
     .select("sort_order")
     .order("sort_order", { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (lastError) {
+    console.error("construction_stages next sort_order read failed:", lastError);
+    return { error: "Could not work out where to add it. Try again." };
+  }
 
   const { error } = await supabase.from("construction_stages").insert({
     name,
@@ -49,7 +51,7 @@ export async function addConstructionStage(
  * carrying the stage — the FKs cascade on update (0053), so the word
  * changes everywhere at once and history keeps making sense.
  */
-export async function renameConstructionStage(id: string, name: string): Promise<StageFormState> {
+export async function renameConstructionStage(id: string, name: string): Promise<ActionState> {
   const user = await requireTool("/masters");
 
   const trimmed = name.trim();
@@ -74,7 +76,7 @@ export async function renameConstructionStage(id: string, name: string): Promise
 export async function setConstructionStageActive(
   id: string,
   isActive: boolean,
-): Promise<StageFormState> {
+): Promise<ActionState> {
   const user = await requireTool("/masters");
 
   const supabase = await createClient();

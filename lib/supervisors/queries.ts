@@ -5,6 +5,7 @@ import { listReleasedDrawingsForUnit, type ReleasedDrawingSet } from "@/lib/draw
 import { listVendors } from "@/lib/masters/vendors";
 import { listWorkCategories, listWorkItems } from "@/lib/masters/works";
 import { fetchAll } from "@/lib/supabase/fetch-all";
+import { readFailed } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
 import {
   groupSiteMaterials,
@@ -36,10 +37,8 @@ import {
 
 const GRANT = "/supervisors";
 
-function fail(context: string, error: { message: string }): never {
-  console.error(`supervisors: ${context} failed:`, error);
-  throw new Error(`Could not load ${context}.`);
-}
+const fail = (context: string, error: { message: string }): never =>
+  readFailed("supervisors", context, error);
 
 // ---------------------------------------------------------------------
 // Welcome

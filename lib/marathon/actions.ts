@@ -37,11 +37,15 @@ export async function verifyAgentPin(
   if (locked) return { error: lockoutMessage(locked) };
 
   const supabase = createAdminClient();
-  const { data: agent } = await supabase
+  const { data: agent, error: agentError } = await supabase
     .from("marathon_agents")
     .select("id, pin_hash, pin_salt")
     .eq("id", agentId)
-    .single();
+    .maybeSingle();
+  if (agentError) {
+    console.error("agent PIN check read failed:", agentError);
+    return { error: "Could not check that PIN. Try again." };
+  }
 
   if (!agent || !verifyPinHash(pin, agent.pin_hash, agent.pin_salt)) {
     const nowLocked = await recordFailure(agentId);
@@ -165,7 +169,11 @@ export async function changeAdminPin(
 
   const { hash, salt } = hashPin(next);
   const supabase = createAdminClient();
-  const { data: config } = await supabase.from("marathon_config").select("id").single();
+  const { data: config, error: configError } = await supabase
+    .from("marathon_config")
+    .select("id")
+    .maybeSingle();
+  if (configError) console.error("admin PIN change config read failed:", configError);
   if (!config) return { error: "Could not read the event settings. Try again." };
 
   // updated_at is the set_updated_at trigger's job (migration 0016).

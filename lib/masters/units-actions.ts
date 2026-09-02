@@ -9,8 +9,6 @@ import type { UnitStatus, UnitType } from "./units";
 const UNIT_TYPES = ["apartment", "villa", "duplex_row_house"];
 const UNIT_STATUSES = ["available", "reserved", "sold"];
 
-export type UnitFormState = ActionState;
-
 function readUnitForm(formData: FormData) {
   return {
     project_id: String(formData.get("project_id") ?? ""),
@@ -49,10 +47,7 @@ function duplicateError(message: string): string {
   return "That code is already used by another unit in this project.";
 }
 
-export async function createUnit(
-  _state: UnitFormState,
-  formData: FormData,
-): Promise<UnitFormState> {
+export async function createUnit(_state: ActionState, formData: FormData): Promise<ActionState> {
   await requireTool("/masters");
 
   const { project_id, plot_id, name, code, unit_type, client_id, status } = readUnitForm(formData);
@@ -82,9 +77,9 @@ export async function createUnit(
 // client picker, no separate action needed.
 export async function updateUnit(
   id: string,
-  _state: UnitFormState,
+  _state: ActionState,
   formData: FormData,
-): Promise<UnitFormState> {
+): Promise<ActionState> {
   const user = await requireTool("/masters");
 
   const { project_id, plot_id, name, code, unit_type, client_id, status } = readUnitForm(formData);

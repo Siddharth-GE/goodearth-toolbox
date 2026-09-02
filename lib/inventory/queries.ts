@@ -67,33 +67,6 @@ export async function itemsById(supabase: Client, ids: string[]): Promise<Map<st
   );
 }
 
-/** Actor names for a set of profile ids — the attribution rule. */
-export async function namesById(
-  supabase: Client,
-  ids: (string | null | undefined)[],
-): Promise<(id: string | null | undefined) => string | null> {
-  const unique = [...new Set(ids.filter((id): id is string => id != null))];
-  const { data } = unique.length
-    ? await supabase.from("profiles").select("id, full_name").in("id", unique)
-    : { data: [] };
-  const names = new Map((data ?? []).map((profile) => [profile.id, profile.full_name]));
-  return (id) => (id ? (names.get(id) ?? null) : null);
-}
-
-/** name-by-id for any master table with an `id` and a `name`. */
-export async function labelsById(
-  supabase: Client,
-  table: "stores" | "plots" | "units" | "projects" | "vendors",
-  ids: (string | null | undefined)[],
-): Promise<Map<string, string>> {
-  const unique = [...new Set(ids.filter((id): id is string => id != null))];
-  if (unique.length === 0) return new Map();
-  const data = await fetchAll((from, to) =>
-    supabase.from(table).select("id, name").in("id", unique).order("id").range(from, to),
-  );
-  return new Map(data.map((row) => [row.id, row.name]));
-}
-
 /** The active stores, for destination pickers and filters. */
 export async function listActiveStores(supabase: Client): Promise<{ id: string; name: string }[]> {
   const data = await fetchAll((from, to) =>

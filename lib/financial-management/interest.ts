@@ -144,21 +144,3 @@ export function facilityPosition(
     isSettled,
   };
 }
-
-/**
- * Today in India, as 'YYYY-MM-DD'.
- *
- * The one clock-reading function here, never called by the arithmetic —
- * `today` is always an argument so the tests can pin it. Asia/Kolkata is
- * named explicitly because Vercel runs in UTC and the people using this
- * do not. (dues.ts has the same function for the same reason; the
- * duplication is the price of tools that do not import each other.)
- */
-export function todayInIndia(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-}

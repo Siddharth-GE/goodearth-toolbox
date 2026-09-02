@@ -2,6 +2,7 @@
 
 import { requireTool } from "@/lib/auth/access";
 import { getCurrentUser } from "@/lib/auth/dal";
+import { guardError } from "@/lib/db-error";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
@@ -34,25 +35,23 @@ import type { ActionState } from "@/lib/action-state";
  * The guard's messages are written to be read by a person; pass the known
  * ones straight through instead of burying them under "try again".
  */
-function guardError(error: { message: string }, fallback: string): ActionState {
-  const message = error.message ?? "";
-  if (
-    message.includes("baton") ||
-    message.includes("trail") ||
-    message.includes("leg") ||
-    message.includes("switched off") ||
-    message.includes("permanent") ||
-    message.includes("signed-in")
-  ) {
-    return { error: message.replace(/^.*?:\s*/, "") };
-  }
-  return { error: fallback };
-}
+const RELAY_GUARD_PHRASES = [
+  "baton",
+  "trail",
+  "leg",
+  "switched off",
+  "permanent",
+  "signed-in",
+] as const;
 
-function revalidate(chainId?: string) {
-  revalidatePath("/relay/court");
-  revalidatePath("/relay/trails");
-  if (chainId) revalidatePath(`/relay/trails/${chainId}`);
+/**
+ * The layout form, always: the Relay welcome screen renders four live
+ * counters (in flight, gone cold, in your court, with a client) and an
+ * exact-path call left every one of them stale — the exact-path trap in
+ * CLAUDE.md. One call covers every screen under /relay.
+ */
+function revalidateRelay() {
+  revalidatePath("/relay", "layout");
 }
 
 /** A leg IS an activity (0043) — there is no label to type any more. */
@@ -125,7 +124,7 @@ export async function openTrail(
     p_start: input.start !== false,
   });
 
-  if (error) return guardError(error, "Could not open this trail.") ?? {};
+  if (error) return guardError(error, "Could not open this trail.", RELAY_GUARD_PHRASES) ?? {};
 
   const chainId = data as string;
 
@@ -141,7 +140,7 @@ export async function openTrail(
     if (deptError) console.error("relay openTrail departments failed:", deptError);
   }
 
-  revalidate();
+  revalidateRelay();
   return { chainId };
 }
 
@@ -167,8 +166,8 @@ export async function pushBaton(
     note: note?.trim() || null,
   });
 
-  if (error) return guardError(error, "Could not push this trail forward.");
-  revalidate(chainId);
+  if (error) return guardError(error, "Could not push this trail forward.", RELAY_GUARD_PHRASES);
+  revalidateRelay();
   return undefined;
 }
 
@@ -196,8 +195,9 @@ export async function holdForClient(
     note: note?.trim() || null,
   });
 
-  if (error) return guardError(error, "Could not mark this trail as with the client.");
-  revalidate(chainId);
+  if (error)
+    return guardError(error, "Could not mark this trail as with the client.", RELAY_GUARD_PHRASES);
+  revalidateRelay();
   return undefined;
 }
 
@@ -217,8 +217,13 @@ export async function clientReturned(
     note: note?.trim() || null,
   });
 
-  if (error) return guardError(error, "Could not take this trail back from the client.");
-  revalidate(chainId);
+  if (error)
+    return guardError(
+      error,
+      "Could not take this trail back from the client.",
+      RELAY_GUARD_PHRASES,
+    );
+  revalidateRelay();
   return undefined;
 }
 
@@ -237,8 +242,8 @@ export async function finishTrail(
     note: note?.trim() || null,
   });
 
-  if (error) return guardError(error, "Could not finish this trail.");
-  revalidate(chainId);
+  if (error) return guardError(error, "Could not finish this trail.", RELAY_GUARD_PHRASES);
+  revalidateRelay();
   return undefined;
 }
 
@@ -267,8 +272,8 @@ export async function bounceBaton(
     note: note.trim(),
   });
 
-  if (error) return guardError(error, "Could not bounce this trail back.");
-  revalidate(chainId);
+  if (error) return guardError(error, "Could not bounce this trail back.", RELAY_GUARD_PHRASES);
+  revalidateRelay();
   return undefined;
 }
 
@@ -294,8 +299,8 @@ export async function handBaton(
     p_note: note.trim(),
   });
 
-  if (error) return guardError(error, "Could not hand this baton over.");
-  revalidate(chainId);
+  if (error) return guardError(error, "Could not hand this baton over.", RELAY_GUARD_PHRASES);
+  revalidateRelay();
   return undefined;
 }
 
@@ -332,8 +337,8 @@ export async function replaceFutureLegs(chainId: string, legs: LegInput[]): Prom
     })),
   });
 
-  if (error) return guardError(error, "Could not change the legs ahead.");
-  revalidate(chainId);
+  if (error) return guardError(error, "Could not change the legs ahead.", RELAY_GUARD_PHRASES);
+  revalidateRelay();
   return undefined;
 }
 
@@ -361,8 +366,7 @@ export async function setProjectStart(projectId: string, startDate: string): Pro
   );
 
   if (error) return { error: "Could not set the start date." };
-  revalidatePath("/relay/projects");
-  revalidatePath(`/relay/projects/${projectId}`);
+  revalidateRelay();
   return undefined;
 }
 
@@ -383,13 +387,17 @@ export async function addProjectStage(
 
   // Appended to the end. Reordering is its own action, so adding a stage
   // never silently reshuffles the plan.
-  const { data: last } = await supabase
+  const { data: last, error: lastError } = await supabase
     .from("project_stages")
     .select("sort_order")
     .eq("project_id", projectId)
     .order("sort_order", { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (lastError) {
+    console.error("project_stages next sort_order read failed:", lastError);
+    return { error: "Could not work out where to add it. Try again." };
+  }
 
   const { error } = await supabase.from("project_stages").insert({
     project_id: projectId,
@@ -405,7 +413,7 @@ export async function addProjectStage(
     return { error: "Could not add this stage." };
   }
 
-  revalidatePath(`/relay/projects/${projectId}`);
+  revalidateRelay();
   return undefined;
 }
 
@@ -431,14 +439,14 @@ export async function updateProjectStage(
 
   if (error) {
     if (error.code === "23505") return { error: `"${name.trim()}" is already a stage here.` };
-    return guardError(error, "Could not change this stage.");
+    return guardError(error, "Could not change this stage.", RELAY_GUARD_PHRASES);
   }
 
-  revalidatePath(`/relay/projects/${projectId}`);
+  revalidateRelay();
   return undefined;
 }
 
-export async function deleteProjectStage(stageId: string, projectId: string): Promise<ActionState> {
+export async function deleteProjectStage(stageId: string): Promise<ActionState> {
   await requireTool("/relay");
 
   const supabase = await createClient();
@@ -446,9 +454,9 @@ export async function deleteProjectStage(stageId: string, projectId: string): Pr
 
   // The guard refuses a stage that still has trails in it, and says how
   // many — pass that through rather than a generic failure.
-  if (error) return guardError(error, "Could not remove this stage.");
+  if (error) return guardError(error, "Could not remove this stage.", RELAY_GUARD_PHRASES);
 
-  revalidatePath(`/relay/projects/${projectId}`);
+  revalidateRelay();
   return undefined;
 }
 
@@ -487,7 +495,7 @@ export async function moveProjectStage(
   ]);
 
   if (first.error || second.error) return { error: "Could not reorder the stages." };
-  revalidatePath(`/relay/projects/${projectId}`);
+  revalidateRelay();
   return undefined;
 }
 
@@ -505,9 +513,9 @@ export async function setTrailStage(
     .update({ project_stage_id: projectStageId, updated_by: user?.id })
     .eq("id", chainId);
 
-  if (error) return guardError(error, "Could not move this trail to that stage.");
-  revalidate(chainId);
-  revalidatePath("/relay/projects");
+  if (error)
+    return guardError(error, "Could not move this trail to that stage.", RELAY_GUARD_PHRASES);
+  revalidateRelay();
   return undefined;
 }
 
@@ -524,8 +532,9 @@ export async function setTrailDepartments(
     p_department_ids: departmentIds,
   });
 
-  if (error) return guardError(error, "Could not change this trail's departments.");
-  revalidate(chainId);
+  if (error)
+    return guardError(error, "Could not change this trail's departments.", RELAY_GUARD_PHRASES);
+  revalidateRelay();
   return undefined;
 }
 
@@ -549,7 +558,7 @@ export async function createDepartment(
     return { error: "Could not add this department." };
   }
 
-  revalidatePath("/relay/activities");
+  revalidateRelay();
   return undefined;
 }
 
@@ -565,7 +574,7 @@ export async function setDepartmentActive(id: string, isActive: boolean): Promis
     .eq("id", id);
 
   if (error) return { error: "Could not change this department." };
-  revalidatePath("/relay/activities");
+  revalidateRelay();
   return undefined;
 }
 
@@ -589,7 +598,7 @@ export async function createActivity(
     return { error: "Could not add this activity." };
   }
 
-  revalidatePath("/relay/activities");
+  revalidateRelay();
   return undefined;
 }
 
@@ -605,20 +614,13 @@ export async function setActivityActive(id: string, isActive: boolean): Promise<
     .eq("id", id);
 
   if (error) return { error: "Could not change this activity." };
-  revalidatePath("/relay/activities");
+  revalidateRelay();
   return undefined;
 }
 
 // ---------------------------------------------------------------------
 // Standard trails at the house level
 // ---------------------------------------------------------------------
-
-function revalidateHouse(projectId: string, unitId?: string) {
-  revalidatePath("/relay/projects");
-  revalidatePath(`/relay/projects/${projectId}`);
-  if (unitId) revalidatePath(`/relay/projects/${projectId}/houses/${unitId}`);
-  revalidatePath("/relay/trails");
-}
 
 /**
  * Lay a standard set down on a house.
@@ -698,7 +700,7 @@ export async function applyTrailSet(
     p_start: start,
   });
 
-  if (error) return guardError(error, "Could not add this trail type.") ?? {};
+  if (error) return guardError(error, "Could not add this trail type.", RELAY_GUARD_PHRASES) ?? {};
 
   const chainId = typeof data === "string" ? data : undefined;
   const departmentIds = departments.get(setId) ?? [];
@@ -713,20 +715,19 @@ export async function applyTrailSet(
     });
   }
 
-  revalidateHouse(projectId, unitId);
+  revalidateRelay();
   return undefined;
 }
 
-export async function startTrail(chainId: string, projectId: string, unitId: string) {
+export async function startTrail(chainId: string) {
   await requireTool("/relay");
   if (!chainId) return { error: "Pick a trail first." };
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("start_chain", { p_chain_id: chainId });
-  if (error) return guardError(error, "Could not start this trail.") ?? {};
+  if (error) return guardError(error, "Could not start this trail.", RELAY_GUARD_PHRASES) ?? {};
 
-  revalidate(chainId);
-  revalidateHouse(projectId, unitId);
+  revalidateRelay();
   return undefined;
 }
 
@@ -737,15 +738,15 @@ export async function startTrail(chainId: string, projectId: string, unitId: str
  * The database refuses the moment it has started, so the button is a
  * courtesy and the guard is the boundary, as everywhere else here.
  */
-export async function discardTrail(chainId: string, projectId: string, unitId: string) {
+export async function discardTrail(chainId: string) {
   await requireTool("/relay");
   if (!chainId) return { error: "Pick a trail first." };
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("discard_chain", { p_chain_id: chainId });
-  if (error) return guardError(error, "Could not remove this trail.") ?? {};
+  if (error) return guardError(error, "Could not remove this trail.", RELAY_GUARD_PHRASES) ?? {};
 
-  revalidateHouse(projectId, unitId);
+  revalidateRelay();
   return undefined;
 }
 
@@ -769,7 +770,7 @@ export async function createTrailSet(
     return { error: "Could not add this trail type." };
   }
 
-  revalidatePath("/relay/sets");
+  revalidateRelay();
   return undefined;
 }
 
@@ -785,7 +786,7 @@ export async function setTrailSetActive(id: string, isActive: boolean): Promise<
     .eq("id", id);
 
   if (error) return { error: "Could not change this trail type." };
-  revalidatePath("/relay/sets");
+  revalidateRelay();
   return undefined;
 }
 
@@ -838,6 +839,6 @@ export async function setTrailSetActivities(
     if (error) return { error: "Could not update this trail type." };
   }
 
-  revalidatePath("/relay/sets");
+  revalidateRelay();
   return undefined;
 }

@@ -1,6 +1,7 @@
 "use server";
 
 import { requireTool } from "@/lib/auth/access";
+import { dbErrorMessage, guardError } from "@/lib/db-error";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -20,32 +21,26 @@ import type { ActionState } from "@/lib/action-state";
 
 /** The guards raise human-readable messages (written for exactly this).
  * Surface the known ones instead of a generic "try again". */
-function guardError(error: { message: string }, fallback: string): ActionState {
-  const message = error.message;
-  if (
-    message.includes("draft") ||
-    message.includes("permanent") ||
-    message.includes("no longer be edited") ||
-    message.includes("unordered") ||
-    message.includes("APPROVED") ||
-    message.includes("short code") ||
-    message.includes("inactive") ||
-    message.includes("not both") ||
-    message.includes("before issuing") ||
-    message.includes("rate and a GST") ||
-    message.includes("no longer exists") ||
-    message.includes("deletion request") ||
-    message.includes("admin can approve") ||
-    message.includes("receiving its goods") ||
-    // Migration 0023: an issued PO whose goods are already in a store
-    // can no longer be cancelled.
-    message.includes("already been received") ||
-    message.includes("still outstanding")
-  ) {
-    return { error: message.replace(/^.*?:\s*/, "") };
-  }
-  return { error: fallback };
-}
+const PO_GUARD_PHRASES = [
+  "draft",
+  "permanent",
+  "no longer be edited",
+  "unordered",
+  "APPROVED",
+  "short code",
+  "inactive",
+  "not both",
+  "before issuing",
+  "rate and a GST",
+  "no longer exists",
+  "deletion request",
+  "admin can approve",
+  "receiving its goods",
+  // Migration 0023: an issued PO whose goods are already in a store
+  // can no longer be cancelled.
+  "already been received",
+  "still outstanding",
+] as const;
 
 export type CreatePoInput = {
   projectId: string;
@@ -86,7 +81,7 @@ export async function createPurchaseOrder(input: CreatePoInput): Promise<ActionS
   });
   if (error) {
     console.error("createPurchaseOrder failed:", error);
-    return guardError(error, "Could not create the purchase order. Try again.");
+    return guardError(error, "Could not create the purchase order. Try again.", PO_GUARD_PHRASES);
   }
   if (!poId) return { error: "Could not create the purchase order. Try again." };
 
@@ -164,7 +159,7 @@ export async function addPoolLines(poId: string, lines: PoolLineInput[]): Promis
     if (error) {
       console.error("addPoolLines insert failed:", error);
       revalidatePath(`/purchase-orders/${poId}`);
-      const friendly = guardError(error, "Could not add those lines. Try again.");
+      const friendly = guardError(error, "Could not add those lines. Try again.", PO_GUARD_PHRASES);
       return {
         error:
           added > 0
@@ -220,7 +215,7 @@ export async function updatePoLine(
     .eq("id", lineId);
   if (error) {
     console.error("updatePoLine failed:", error);
-    return guardError(error, "Could not save. Try again.");
+    return guardError(error, "Could not save. Try again.", PO_GUARD_PHRASES);
   }
   return undefined;
 }
@@ -232,7 +227,7 @@ export async function removePoLine(poId: string, lineId: string): Promise<Action
   const { error } = await supabase.from("purchase_order_lines").delete().eq("id", lineId);
   if (error) {
     console.error("removePoLine failed:", error);
-    return guardError(error, "Could not remove that line. Try again.");
+    return guardError(error, "Could not remove that line. Try again.", PO_GUARD_PHRASES);
   }
 
   revalidatePath(`/purchase-orders/${poId}`);
@@ -271,7 +266,7 @@ export async function updatePoHeader(
     .eq("id", poId);
   if (error) {
     console.error("updatePoHeader failed:", error);
-    return guardError(error, "Could not save. Try again.");
+    return guardError(error, "Could not save. Try again.", PO_GUARD_PHRASES);
   }
   return undefined;
 }
@@ -324,7 +319,7 @@ export async function issuePo(poId: string): Promise<ActionState> {
     .eq("id", poId);
   if (error) {
     console.error("issuePo failed:", error);
-    return guardError(error, "Could not issue. Try again.");
+    return guardError(error, "Could not issue. Try again.", PO_GUARD_PHRASES);
   }
 
   revalidatePath(`/purchase-orders/${poId}`);
@@ -357,7 +352,7 @@ export async function requestPoDeletion(poId: string, note: string): Promise<Act
     .eq("id", poId);
   if (error) {
     console.error("requestPoDeletion failed:", error);
-    return guardError(error, "Could not request deletion. Try again.");
+    return guardError(error, "Could not request deletion. Try again.", PO_GUARD_PHRASES);
   }
 
   revalidatePath(`/purchase-orders/${poId}`);
@@ -383,7 +378,7 @@ export async function withdrawPoDeletion(poId: string): Promise<ActionState> {
     .eq("id", poId);
   if (error) {
     console.error("withdrawPoDeletion failed:", error);
-    return guardError(error, "Could not withdraw the request. Try again.");
+    return guardError(error, "Could not withdraw the request. Try again.", PO_GUARD_PHRASES);
   }
 
   revalidatePath(`/purchase-orders/${poId}`);
@@ -411,7 +406,7 @@ export async function approvePoDeletion(poId: string): Promise<ActionState> {
     .eq("id", poId);
   if (error) {
     console.error("approvePoDeletion failed:", error);
-    return guardError(error, "Could not cancel this purchase order. Try again.");
+    return guardError(error, "Could not cancel this purchase order. Try again.", PO_GUARD_PHRASES);
   }
 
   revalidatePath(`/purchase-orders/${poId}`);
@@ -430,9 +425,7 @@ export async function deleteDraftPo(poId: string): Promise<ActionState> {
   if (error) {
     console.error("deleteDraftPo failed:", error);
     // Written for a person to read by the RAISE EXCEPTION in the function.
-    return {
-      error: error.message.replace(/^.*?:\s*/, "") || "Could not delete this purchase order.",
-    };
+    return { error: dbErrorMessage(error, "Could not delete this purchase order.") };
   }
 
   revalidatePath("/purchase-orders", "layout");
@@ -492,7 +485,7 @@ export async function addDirectPoLines(
         .eq("id", current.id);
       if (error) {
         console.error("addDirectPoLines merge failed:", error);
-        return guardError(error, "Could not add those items. Try again.");
+        return guardError(error, "Could not add those items. Try again.", PO_GUARD_PHRASES);
       }
     } else {
       inserts.push({
@@ -510,7 +503,7 @@ export async function addDirectPoLines(
     const { error } = await supabase.from("purchase_order_lines").insert(inserts);
     if (error) {
       console.error("addDirectPoLines insert failed:", error);
-      return guardError(error, "Could not add those items. Try again.");
+      return guardError(error, "Could not add those items. Try again.", PO_GUARD_PHRASES);
     }
   }
 

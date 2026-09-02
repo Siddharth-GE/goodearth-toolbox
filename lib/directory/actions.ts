@@ -8,9 +8,10 @@ import { revalidatePath } from "next/cache";
 
 import { requireAdmin } from "@/lib/auth/access";
 import { requireUser } from "@/lib/auth/dal";
+import { guardError } from "@/lib/db-error";
 import { createClient } from "@/lib/supabase/server";
 
-import { todayInIndia } from "./birthdays";
+import { todayInIndia } from "@/lib/format";
 import {
   ACCEPTED_PHOTO_TYPES,
   MAX_PHOTO_BYTES,
@@ -66,17 +67,15 @@ function revalidateAll(): void {
  * admin can change a department, designation, reporting line or joining
  * date"). Surface those intact; fall back for anything else.
  */
+const DIRECTORY_GUARD_PHRASES = [
+  "Only an admin can",
+  "date of birth is in the future",
+  "belongs to one account",
+] as const;
 function friendly(error: { message: string }, fallback: string): ActionState {
-  const message = error.message;
-  if (
-    message.includes("Only an admin can") ||
-    message.includes("date of birth is in the future") ||
-    message.includes("belongs to one account")
-  ) {
-    return { error: message.replace(/^.*?:\s*/, "") };
-  }
-  console.error("Directory write failed:", error);
-  return { error: fallback };
+  const state = guardError(error, fallback, DIRECTORY_GUARD_PHRASES);
+  if (state?.error === fallback) console.error("Directory write failed:", error);
+  return state;
 }
 
 // ---------------------------------------------------------------------
