@@ -1,4 +1,13 @@
 import {
+  COMMANDS,
+  commandId,
+  senderName,
+  spaceName,
+  type ChatEvent,
+} from "@/lib/google-chat/events";
+import { greeting, identityRefusal } from "@/lib/google-chat/cards";
+import { resolveIdentity } from "@/lib/google-chat/identity";
+import {
   chatAudience,
   chatServiceAgent,
   getGoogleKeys,
@@ -13,54 +22,30 @@ import {
  * before the body is read; the proxy's PUBLIC_PATHS entry only stops the
  * login redirect from eating the request first.
  *
- * Phase 1 is the locked door and a friendly stub — no identity mapping,
- * no relay reads or writes. Those arrive phase by phase behind this
- * check (plan.md at the repo root).
+ * Phase 3 adds the second trust step: once Google is proven, the person
+ * behind the message is mapped to a toolbox account (identity.ts), and
+ * anyone the toolbox doesn't know — or doesn't hold /relay for — gets a
+ * polite refusal, privately. Still no relay reads or writes; those
+ * arrive phase by phase behind these two checks (plan.md at the repo
+ * root).
  */
 
-// What Phase 1 needs from an event, nothing more. Add-on-style Chat
-// apps (which is what Google's console registers now) wrap everything
-// in a `chat` payload — one member per kind of interaction.
-type ChatMessage = {
-  text?: string;
-  argumentText?: string;
-  slashCommand?: { commandId?: number | string };
-};
-type ChatSpace = { name?: string; displayName?: string };
-type ChatEvent = {
-  chat?: {
-    addedToSpacePayload?: { space?: ChatSpace };
-    removedFromSpacePayload?: { space?: ChatSpace };
-    messagePayload?: { message?: ChatMessage; space?: ChatSpace };
-    appCommandPayload?: {
-      // Google documents the id as an int64, which arrives as a string.
-      appCommandMetadata?: { appCommandId?: number | string; appCommandType?: string };
-      message?: ChatMessage;
-      space?: ChatSpace;
-    };
-  };
-};
-
-// The slash commands as declared in the Chat app's configuration —
-// Google sends only the numeric id, so the id → name map lives here and
-// must match that form.
-const COMMANDS: Record<number, string> = {
-  1: "/court",
-  2: "/push",
-  3: "/bounce",
-  4: "/finish",
-  5: "/trail",
-  6: "/newtrail",
-  7: "/link",
-};
-
-// An add-on-style synchronous reply: the message rides inside an action
-// envelope, not as bare `{ text }` — Google shows "Relay not responding"
-// if the envelope is missing, even on a 200.
-function card(text: string) {
+/**
+ * An add-on-style synchronous reply: the message rides inside an action
+ * envelope, not as bare `{ text }` — Google shows "Relay not responding"
+ * if the envelope is missing, even on a 200.
+ *
+ * Given a sender's `users/<id>` name, the reply is private to them.
+ * Everything that is about one person — a refusal, a greeting, later a
+ * lookup — goes back privately; only what the whole space should see
+ * (the hello on joining, later the action confirmations) goes public.
+ */
+function card(text: string, privateTo?: string | null) {
+  const message: { text: string; privateMessageViewer?: { name: string } } = { text };
+  if (privateTo) message.privateMessageViewer = { name: privateTo };
   return Response.json({
     hostAppDataAction: {
-      chatDataAction: { createMessageAction: { message: { text } } },
+      chatDataAction: { createMessageAction: { message } },
     },
   });
 }
@@ -131,38 +116,46 @@ export async function POST(request: Request) {
       .split(",")
       .map((space) => space.trim())
       .filter(Boolean);
-    const spaceId =
-      chat.addedToSpacePayload?.space?.name ??
-      chat.messagePayload?.space?.name ??
-      chat.appCommandPayload?.space?.name ??
-      chat.removedFromSpacePayload?.space?.name ??
-      "";
+    const spaceId = spaceName(event);
 
     // One line per event for the Vercel log: which kind arrived, from
-    // which space, and which command id if any — never the message text.
-    // This is how "did Google dispatch the slash command?" gets answered
-    // without guessing from what appears in chat.
-    console.log(
-      "google-chat event",
-      JSON.stringify({
-        kind: chat.appCommandPayload
-          ? "command"
-          : chat.messagePayload
-            ? "message"
-            : chat.addedToSpacePayload
-              ? "added"
-              : chat.removedFromSpacePayload
-                ? "removed"
-                : "other",
-        space: spaceId,
-        commandId: chat.appCommandPayload?.appCommandMetadata?.appCommandId ?? null,
-        commandType: chat.appCommandPayload?.appCommandMetadata?.appCommandType ?? null,
-        slashCommandInMessage: chat.messagePayload?.message?.slashCommand?.commandId ?? null,
-      }),
-    );
+    // which space, which command id if any, and which of the six
+    // identity decisions was reached — never the message text, and
+    // never the email. This is how "did Google dispatch the slash
+    // command, and did it know who sent it?" gets answered without
+    // guessing from what appears in chat.
+    const logEvent = (sender: string | null) =>
+      console.log(
+        "google-chat event",
+        JSON.stringify({
+          kind: chat.appCommandPayload
+            ? "command"
+            : chat.messagePayload
+              ? "message"
+              : chat.addedToSpacePayload
+                ? "added"
+                : chat.removedFromSpacePayload
+                  ? "removed"
+                  : "other",
+          space: spaceId,
+          commandId: chat.appCommandPayload?.appCommandMetadata?.appCommandId ?? null,
+          commandType: chat.appCommandPayload?.appCommandMetadata?.appCommandType ?? null,
+          slashCommandInMessage: chat.messagePayload?.message?.slashCommand?.commandId ?? null,
+          sender,
+        }),
+      );
+
     if (allowedSpaces.length > 0 && !allowedSpaces.includes(spaceId)) {
+      logEvent(null);
       return card("This space isn't set up for Relay yet.");
     }
+
+    // Only a person's message or command needs a person behind it.
+    // Joining and leaving a space are the space's business, not
+    // anybody's, so they never cost a lookup.
+    const identity =
+      chat.messagePayload || chat.appCommandPayload ? await resolveIdentity(event) : null;
+    logEvent(identity?.kind ?? null);
 
     if (chat.addedToSpacePayload) {
       return card(
@@ -170,23 +163,27 @@ export async function POST(request: Request) {
           "slash commands for trails are on their way.",
       );
     }
-    // A typed slash command arrives as an appCommandPayload; Google's
-    // older shape tags the message itself instead. Answer both the same.
-    const commandId =
-      chat.appCommandPayload?.appCommandMetadata?.appCommandId ??
-      chat.messagePayload?.message?.slashCommand?.commandId;
-    if (chat.appCommandPayload || commandId !== undefined) {
-      const command = (commandId !== undefined && COMMANDS[Number(commandId)]) || "that command";
-      return card(
-        `I heard ${command} — it isn't wired up yet, but it's coming. ` +
-          "For now, the Relay tool in the toolbox is the place.",
-      );
+
+    if (identity) {
+      // Anyone the toolbox can't act for is told so privately, in one
+      // of the five fixed sentences — never anything that says more
+      // about who does or doesn't have an account.
+      const privateTo = senderName(event);
+      if (identity.kind !== "ok") return card(identityRefusal(identity.kind), privateTo);
+
+      // A typed slash command arrives as an appCommandPayload; Google's
+      // older shape tags the message itself instead. Answer both the same.
+      const id = commandId(event);
+      if (chat.appCommandPayload || id !== null) {
+        const command = (id !== null && COMMANDS[id]) || "that command";
+        return card(greeting(identity.firstName, command), privateTo);
+      }
+      return card(greeting(identity.firstName, null), privateTo);
     }
-    if (chat.messagePayload) {
-      return card("Hello! Slash commands are on their way — nothing to run just yet.");
-    }
-    // Removal, and any interaction kind Phase 1 doesn't know: acknowledge
-    // with an empty envelope so Google has a well-formed answer.
+
+    // Removal, and any interaction kind this phase doesn't know:
+    // acknowledge with an empty envelope so Google has a well-formed
+    // answer.
     return Response.json({});
   } catch (error) {
     console.error("google-chat handler failed", error);
