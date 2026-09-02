@@ -115,11 +115,11 @@ Google's docs are silent on whether `chat.user.email` is populated for add-on-st
 ### Files
 
 1. **`lib/google-chat/events.ts`** `[Opus]` — the `ChatEvent`/`ChatMessage`/`ChatSpace` types move here out of `route.ts`, and grow a `ChatUser` (`name?: string` — `users/<id>`; `displayName?`; `email?`; `type?: "HUMAN" | "BOT" | string`) on `chat.user` and on `message.sender`. Plus pure helpers, tested in `events.test.ts`: `senderEmail(event): string | null` (trimmed, lower-cased, must contain `@`, null for a BOT sender), `senderName(event): string | null` (the `users/…` resource name, for private replies), and `spaceName(event)` / `commandId(event)` lifted from the route so it reads as dispatch only. The `COMMANDS` map moves here too.
-2. **`lib/google-chat/identity.ts`** `[Opus]` — split pure/impure like `verify.ts`:
+2. **`lib/google-chat/identity.ts`** `[Opus]` — split pure/impure. _(Built as two files, Fable 2026-09-02: `identity-rules.ts` holds the pure `decideIdentity`, the `Identity` type and `IdentityProfile` and imports nothing; `identity.ts` carries `import "server-only"` and only `resolveIdentity`, re-exporting the type — the `lib/indents/pull-rules.ts` precedent, and the only shape a pure test can import.)_
    - `export type Identity = { kind: "ok"; userId: string; fullName: string | null; firstName: string; isAdmin: boolean; grantedApps: string[] } | { kind: "no-email" | "unknown" | "inactive" | "no-relay" | "failed" }`.
    - `decideIdentity(email: string | null, authUser: { id: string } | null, profile: { id: string; full_name: string | null; role: string; is_active: boolean; apps: string[] } | null): Identity` — **pure**, no I/O, the whole decision table above in one function. Admin (`role === "admin"`) counts as holding `/relay`. `firstName` is the first word of `full_name`, or `"there"` when blank, so the greeting reads "Hi there".
    - `resolveIdentity(event): Promise<Identity>` — the I/O wrapper: `senderEmail` → `null` short-circuits to `no-email`; `admin.auth.admin.listUsers({ perPage: 1000 })` and a case-insensitive match on `user.email` (about 70 accounts, one page; **the `perPage` is load-bearing** — the default page is 50 and would silently miss people); then the profile read with the exact `dal.ts` select — `id, full_name, role, is_active, user_apps(app), roles!profiles_role_id_fkey(role_apps(app))` — **the FK is named** (BUGCATCHER #2). Any `error` → `failed` with a `console.error` that never includes the email. Never throws.
-   - `lib/google-chat/identity.test.ts` `[Opus]` — `decideIdentity` for all six decisions, plus: an admin with no explicit grant is `ok`; a grant through a role bundle is `ok`; a profile row for a different id than the auth user is `failed`.
+   - `lib/google-chat/identity-rules.test.ts` `[Opus]` — `decideIdentity` for all six decisions, plus: an admin with no explicit grant is `ok`; a grant through a role bundle is `ok`; a profile row for a different id than the auth user is `failed`.
 3. **`lib/google-chat/cards.ts`** `[Sonnet]` — words only, no I/O: `identityRefusal(kind: Exclude<Identity["kind"], "ok">): string` returning the six-table sentences above verbatim, and `greeting(firstName: string, command: string | null): string` for the Phase 3 stub ("Hi Siddharth! I heard /court — it isn't wired up yet, but now I know who's asking." / without a command: "Hi Siddharth! Slash commands are on their way — nothing to run just yet."). Message text may use em-dashes; trap (d) was about the command _description_ field in Google's console, not about replies. `cards.test.ts` `[Sonnet]` pins every sentence and that no text contains an `@`.
 4. **`app/api/google-chat/route.ts`** `[Opus]` —
    - imports the types and helpers from `events.ts`; keeps the token gate and allowed-spaces logic byte-for-byte.
@@ -146,11 +146,15 @@ The bot greets you by name and knows which command you asked for; anyone without
 
 ### Steps, ticked as they land
 
-- [ ] `[Opus]` `events.ts` + `events.test.ts`, `identity.ts` + `identity.test.ts`, route wiring, `SECURITY.md` line, `admin.ts` comment.
-- [ ] `[Sonnet]` `cards.ts` + `cards.test.ts`.
+- [x] `[Opus]` `events.ts` + `events.test.ts`, `identity-rules.ts` + `identity-rules.test.ts`, `identity.ts`, route wiring, `SECURITY.md` line, `admin.ts` comment. _(2026-09-02; prettier, lint, typecheck, tests and check:actions green locally.)_
+- [x] `[Sonnet]` `cards.ts` + `cards.test.ts`.
 - [ ] `[Fable]` review the diff against this section and `SECURITY.md`; builders commit with their own co-author lines; push `feature/google-chat`; CI green; PR into `staging`.
 - [ ] Founder vets on staging (the probe above); trap list updated if the email lived somewhere else.
 
 ### Questions for the tier above
 
-_(none yet — a builder writes here and stops when something is off-plan)_
+**Q1 `[Opus]`, 2026-09-02 — `identity.ts` cannot be both `server-only` and testable.** `server-only` is not an installed package here (only Next's bundler and a type declaration know it), so `tsx --test` dies with `Cannot find module 'server-only'` the moment a test imports such a file — and `lib/supabase/admin.ts` carries the same import, so even a static `createAdminClient` import breaks the test.
+
+Resolved by Fable 2026-09-02: split into identity-rules.ts (pure) + identity.ts (server-only), the pull-rules precedent.
+
+**Q2 `[Opus]`, 2026-09-02 — the plain-message reply is now private too.** The plan's acceptance says the `/court` greeting is "visible only to them", and refusals are private; it doesn't say what a plain non-command message gets. Phase 1's reply to a plain message was public. It is now private as well, on the reading that everything about one person stays private until Phase 6 starts posting action confirmations. Easy to flip back if the founder wants the bot audible when someone just says hello. Accepted by Fable 2026-09-02.
