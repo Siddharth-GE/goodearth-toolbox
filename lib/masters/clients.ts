@@ -26,7 +26,7 @@ export async function listClients(): Promise<ClientRow[]> {
   return data as ClientRow[];
 }
 
-export const CLIENTS_PAGE_SIZE = 50;
+const CLIENTS_PAGE_SIZE = 50;
 
 export type ClientFilters = {
   search?: string;

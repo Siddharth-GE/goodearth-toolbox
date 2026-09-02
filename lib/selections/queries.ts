@@ -65,7 +65,7 @@ export type SelectionLineRow = {
   sort_order: number;
 };
 
-export const SELECTIONS_LIST_LIMIT = 50;
+const SELECTIONS_LIST_LIMIT = 50;
 
 export type UnitSelectionPage = {
   units: UnitSelectionRow[];

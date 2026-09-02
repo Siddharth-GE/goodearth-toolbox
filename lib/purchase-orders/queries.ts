@@ -22,7 +22,7 @@ import type { PoStatus } from "./workflow";
 // their RLS requires this tool's grant to SELECT, so nothing here can be
 // read by a user who only holds /indents.
 
-export const PO_LIST_LIMIT = 50;
+const PO_LIST_LIMIT = 50;
 
 export type PoListRow = {
   id: string;

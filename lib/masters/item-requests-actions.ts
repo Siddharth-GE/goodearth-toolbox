@@ -5,8 +5,6 @@ import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
-export type RequestActionState = ActionState;
-
 /**
  * Accepts the provisional item into the catalogue as it stands.
  * An optional code lets Masters give it the catalogue's own convention
@@ -16,7 +14,7 @@ export async function approveItemRequest(
   requestId: string,
   provisionalItemId: string,
   code: string | null,
-): Promise<RequestActionState> {
+): Promise<ActionState> {
   const user = await requireTool("/masters");
   const supabase = await createClient();
 
@@ -57,7 +55,7 @@ export async function mergeItemRequest(
   requestId: string,
   provisionalItemId: string,
   targetItemId: string,
-): Promise<RequestActionState> {
+): Promise<ActionState> {
   const user = await requireTool("/masters");
   if (!targetItemId) return { error: "Choose the item this duplicates." };
   if (targetItemId === provisionalItemId) return { error: "An item can't be merged into itself." };
@@ -101,7 +99,7 @@ export async function mergeItemRequest(
 export async function rejectItemRequest(
   requestId: string,
   provisionalItemId: string,
-): Promise<RequestActionState> {
+): Promise<ActionState> {
   const user = await requireTool("/masters");
   const supabase = await createClient();
 

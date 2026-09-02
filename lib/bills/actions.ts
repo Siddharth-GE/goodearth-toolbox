@@ -162,8 +162,6 @@ export async function createNmrBill(input: CreateNmrBillInput): Promise<ActionSt
  * Labour contracts — created and approved inside Bills
  * ------------------------------------------------------------------ */
 
-export type LabourContractFormState = ActionState;
-
 function readContractForm(formData: FormData) {
   // One "scope" select encoding plot:<id> / unit:<id> / "" (general) —
   // picking both is structurally impossible, mirroring the DB CHECK.
@@ -190,9 +188,9 @@ function validateContract(form: ReturnType<typeof readContractForm>): string | u
 /** New contracts start pending — a bill approver or an admin must
  * approve before bills can be recorded against them. */
 export async function createLabourContract(
-  _state: LabourContractFormState,
+  _state: ActionState,
   formData: FormData,
-): Promise<LabourContractFormState> {
+): Promise<ActionState> {
   const user = await requireTool("/bills");
 
   const form = readContractForm(formData);
@@ -216,9 +214,9 @@ export async function createLabourContract(
  * approval (deactivate and record a new one instead). */
 export async function updateLabourContract(
   id: string,
-  _state: LabourContractFormState,
+  _state: ActionState,
   formData: FormData,
-): Promise<LabourContractFormState> {
+): Promise<ActionState> {
   const user = await requireTool("/bills");
 
   const form = readContractForm(formData);

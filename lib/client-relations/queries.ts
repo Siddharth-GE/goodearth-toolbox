@@ -31,7 +31,7 @@ import { invoiceStageOf, type Bottleneck, type ClientStage, type MilestoneStage 
  * between them is a due of zero and a due of forty lakh.
  */
 
-export const CRM_PAGE_SIZE = 50;
+const CRM_PAGE_SIZE = 50;
 
 const GRANT = "/client-relations";
 

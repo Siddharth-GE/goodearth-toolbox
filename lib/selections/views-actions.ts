@@ -23,8 +23,6 @@ const BUCKET = "design-views";
 const MAX_UPLOAD_BYTES = 3 * 1024 * 1024;
 const ACCEPTED = ["image/jpeg", "image/png", "image/webp", "image/avif"];
 
-export type ViewActionState = ActionState;
-
 /**
  * Uploads a design view for a space.
  *
@@ -38,7 +36,7 @@ export async function uploadSpaceView(
   spaceId: string,
   selectionId: string,
   formData: FormData,
-): Promise<ViewActionState> {
+): Promise<ActionState> {
   const user = await requireTool("/selections");
 
   const file = formData.get("file");
@@ -140,7 +138,7 @@ export async function captionSpaceView(
   viewId: string,
   selectionId: string,
   caption: string,
-): Promise<ViewActionState> {
+): Promise<ActionState> {
   await requireTool("/selections");
   const supabase = await createClient();
 
@@ -163,7 +161,7 @@ export async function moveSpaceView(
   viewId: string,
   selectionId: string,
   direction: "up" | "down",
-): Promise<ViewActionState> {
+): Promise<ActionState> {
   await requireTool("/selections");
   const supabase = await createClient();
 
@@ -208,7 +206,7 @@ export async function moveSpaceView(
   return undefined;
 }
 
-export async function deleteSpaceView(viewId: string): Promise<ViewActionState> {
+export async function deleteSpaceView(viewId: string): Promise<ActionState> {
   await requireTool("/selections");
   const supabase = await createClient();
 

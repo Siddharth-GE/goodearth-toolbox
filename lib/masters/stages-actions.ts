@@ -5,12 +5,10 @@ import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
-export type StageFormState = ActionState;
-
 export async function addConstructionStage(
-  _state: StageFormState,
+  _state: ActionState,
   formData: FormData,
-): Promise<StageFormState> {
+): Promise<ActionState> {
   const user = await requireTool("/masters");
 
   const name = String(formData.get("name") ?? "").trim();
@@ -53,7 +51,7 @@ export async function addConstructionStage(
  * carrying the stage — the FKs cascade on update (0053), so the word
  * changes everywhere at once and history keeps making sense.
  */
-export async function renameConstructionStage(id: string, name: string): Promise<StageFormState> {
+export async function renameConstructionStage(id: string, name: string): Promise<ActionState> {
   const user = await requireTool("/masters");
 
   const trimmed = name.trim();
@@ -78,7 +76,7 @@ export async function renameConstructionStage(id: string, name: string): Promise
 export async function setConstructionStageActive(
   id: string,
   isActive: boolean,
-): Promise<StageFormState> {
+): Promise<ActionState> {
   const user = await requireTool("/masters");
 
   const supabase = await createClient();

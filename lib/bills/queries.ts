@@ -17,7 +17,7 @@ import type { BillKind, BillStatus, ContractStatus } from "./workflow";
 // module (the lib/purchase-orders/queries.ts rule). Bill money lives on
 // the bills table and its RLS requires this tool's grant to SELECT.
 
-export const BILL_LIST_LIMIT = 50;
+const BILL_LIST_LIMIT = 50;
 
 export type BillListRow = {
   id: string;

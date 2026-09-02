@@ -5,8 +5,6 @@ import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
-export type VendorFormState = ActionState;
-
 function readVendorForm(formData: FormData) {
   const termsRaw = String(formData.get("payment_term_days") ?? "").trim();
   return {
@@ -28,10 +26,7 @@ function badTerms(days: number | null): boolean {
   return days !== null && (!Number.isInteger(days) || days < 0);
 }
 
-export async function createVendor(
-  _state: VendorFormState,
-  formData: FormData,
-): Promise<VendorFormState> {
+export async function createVendor(_state: ActionState, formData: FormData): Promise<ActionState> {
   await requireTool("/masters");
 
   const input = readVendorForm(formData);
@@ -52,9 +47,9 @@ export async function createVendor(
 
 export async function updateVendor(
   id: string,
-  _state: VendorFormState,
+  _state: ActionState,
   formData: FormData,
-): Promise<VendorFormState> {
+): Promise<ActionState> {
   const user = await requireTool("/masters");
 
   const input = readVendorForm(formData);
@@ -83,9 +78,9 @@ export async function updateVendor(
  */
 export async function saveVendorPaymentDetails(
   vendorId: string,
-  _state: VendorFormState,
+  _state: ActionState,
   formData: FormData,
-): Promise<VendorFormState> {
+): Promise<ActionState> {
   const user = await requireTool("/masters");
 
   const details = {

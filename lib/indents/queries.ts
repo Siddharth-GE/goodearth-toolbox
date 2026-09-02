@@ -18,6 +18,7 @@ import {
   type BudgetCandidate,
   type DriftLine,
   type DriftStatus,
+  type EstimatePullState as EstimateVerdict,
   type IssuedRevision,
 } from "./pull-rules";
 import type { IndentStatus } from "./workflow";
@@ -35,7 +36,7 @@ import type { IndentStatus } from "./workflow";
 // through (M4) is the approved_budgets/approved_budget_lines views,
 // whose column lists exclude the secret side of the 0011 boundary.
 
-export const INDENTS_LIST_LIMIT = 50;
+const INDENTS_LIST_LIMIT = 50;
 
 export type IndentListRow = {
   id: string;
@@ -927,7 +928,7 @@ export async function getIndentFormOptions(): Promise<IndentFormOptions> {
  * shape that cannot double-buy.
  * ------------------------------------------------------------------ */
 
-export type EstimatePullState = "ready" | "needs_qty" | "unlinked";
+export type EstimatePullState = EstimateVerdict["state"];
 
 export type EstimatePullRow = {
   material_id: string;

@@ -5,8 +5,6 @@ import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
-export type ClientFormState = ActionState;
-
 function readClientForm(formData: FormData) {
   return {
     name: String(formData.get("name") ?? "").trim(),
@@ -18,9 +16,9 @@ function readClientForm(formData: FormData) {
 }
 
 export async function createClientRecord(
-  _state: ClientFormState,
+  _state: ActionState,
   formData: FormData,
-): Promise<ClientFormState> {
+): Promise<ActionState> {
   await requireTool("/masters");
 
   const { name, mobile, email, notes, is_active } = readClientForm(formData);
@@ -41,9 +39,9 @@ export async function createClientRecord(
 
 export async function updateClientRecord(
   id: string,
-  _state: ClientFormState,
+  _state: ActionState,
   formData: FormData,
-): Promise<ClientFormState> {
+): Promise<ActionState> {
   const user = await requireTool("/masters");
 
   const { name, mobile, email, notes, is_active } = readClientForm(formData);

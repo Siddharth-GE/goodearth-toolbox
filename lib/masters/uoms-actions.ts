@@ -5,9 +5,7 @@ import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
-export type UomFormState = ActionState;
-
-export async function addUom(_state: UomFormState, formData: FormData): Promise<UomFormState> {
+export async function addUom(_state: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireTool("/masters");
 
   const name = String(formData.get("name") ?? "").trim();
@@ -48,7 +46,7 @@ export async function addUom(_state: UomFormState, formData: FormData): Promise<
  * request lines, movements, estimator setups — because all the FKs
  * cascade on update (0082). The word changes everywhere at once.
  */
-export async function renameUom(id: string, name: string): Promise<UomFormState> {
+export async function renameUom(id: string, name: string): Promise<ActionState> {
   const user = await requireTool("/masters");
 
   const trimmed = name.trim();
@@ -70,7 +68,7 @@ export async function renameUom(id: string, name: string): Promise<UomFormState>
   return undefined;
 }
 
-export async function setUomActive(id: string, isActive: boolean): Promise<UomFormState> {
+export async function setUomActive(id: string, isActive: boolean): Promise<ActionState> {
   const user = await requireTool("/masters");
 
   const supabase = await createClient();

@@ -25,7 +25,7 @@ import type { ChainEvent, EventKind, Leg } from "./events";
  *    court. requireTool is what decides who gets in at all.
  */
 
-export const RELAY_LIST_LIMIT = 50;
+const RELAY_LIST_LIMIT = 50;
 
 /** Columns are normalised here because a view's columns all come back nullable from the type generator. */
 export type ChainRow = {

@@ -6,12 +6,10 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { isItemKind } from "./constants";
 
-export type ItemCategoryFormState = ActionState;
-
 export async function createItemCategory(
-  _state: ItemCategoryFormState,
+  _state: ActionState,
   formData: FormData,
-): Promise<ItemCategoryFormState> {
+): Promise<ActionState> {
   await requireTool("/masters");
 
   const name = String(formData.get("name") ?? "").trim();
@@ -36,9 +34,9 @@ export async function createItemCategory(
 // all at once. Rename or deactivate instead.
 export async function updateItemCategory(
   id: string,
-  _state: ItemCategoryFormState,
+  _state: ActionState,
   formData: FormData,
-): Promise<ItemCategoryFormState> {
+): Promise<ActionState> {
   const user = await requireTool("/masters");
 
   const name = String(formData.get("name") ?? "").trim();

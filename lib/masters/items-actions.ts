@@ -7,8 +7,6 @@ import { revalidatePath } from "next/cache";
 import { isItemKind, type ItemKind, type Placement } from "./constants";
 import { isActiveUom } from "./uoms";
 
-export type ItemFormState = ActionState;
-
 function readItemForm(formData: FormData) {
   return {
     code: String(formData.get("code") ?? "").trim() || null,
@@ -25,10 +23,7 @@ function readItemForm(formData: FormData) {
   };
 }
 
-export async function createItem(
-  _state: ItemFormState,
-  formData: FormData,
-): Promise<ItemFormState> {
+export async function createItem(_state: ActionState, formData: FormData): Promise<ActionState> {
   await requireTool("/masters");
 
   const input = readItemForm(formData);
@@ -51,9 +46,9 @@ export async function createItem(
 
 export async function updateItem(
   id: string,
-  _state: ItemFormState,
+  _state: ActionState,
   formData: FormData,
-): Promise<ItemFormState> {
+): Promise<ActionState> {
   const user = await requireTool("/masters");
 
   const input = readItemForm(formData);

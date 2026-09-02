@@ -5,12 +5,7 @@ import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
-export type BrandFormState = ActionState;
-
-export async function createBrand(
-  _state: BrandFormState,
-  formData: FormData,
-): Promise<BrandFormState> {
+export async function createBrand(_state: ActionState, formData: FormData): Promise<ActionState> {
   await requireTool("/masters");
 
   const name = String(formData.get("name") ?? "").trim();
@@ -30,9 +25,9 @@ export async function createBrand(
 
 export async function updateBrand(
   id: string,
-  _state: BrandFormState,
+  _state: ActionState,
   formData: FormData,
-): Promise<BrandFormState> {
+): Promise<ActionState> {
   const user = await requireTool("/masters");
 
   const name = String(formData.get("name") ?? "").trim();

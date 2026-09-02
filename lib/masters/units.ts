@@ -36,7 +36,7 @@ export async function listUnits(projectId?: string): Promise<UnitRow[]> {
   return data as UnitRow[];
 }
 
-export const UNITS_LIST_LIMIT = 50;
+const UNITS_LIST_LIMIT = 50;
 
 export type UnitPage = {
   units: UnitRow[];
