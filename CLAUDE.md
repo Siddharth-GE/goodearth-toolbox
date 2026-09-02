@@ -54,7 +54,7 @@ Every screen from `components/ui/*` (+ `components/masters/*`) — no one-off st
 
 ## Tests, CI and git
 
-Pure logic only (`npm test`) — no database, no browser. CI runs **prettier → lint → typecheck → test → build → check:actions, stopping at the first failure**; confirm with `gh run list` — a successful push is not a green build, and a green build is not a working feature (`BUGCATCHER.md`). Uploads to Supabase Storage take a `Blob`, never a raw `Buffer`. Smoke-test as the probe (single-grant) account before merging — an admin passes every check and never sees grant bugs; after any deploy changing server actions or policies, press one real write button on production. **Commit each working piece and push it; never leave work uncommitted.** Branch flow (`feature/<tool>` → `staging` → `master`), migration gates and deploy verification live in `SHIPPING.md`.
+Pure logic only (`npm test`) — no database, no browser. CI runs **prettier, lint, typecheck and test — all four report even when one fails — then build → check:actions only once they pass**; confirm with `gh run list` — a successful push is not a green build, and a green build is not a working feature (`BUGCATCHER.md`). Uploads to Supabase Storage take a `Blob`, never a raw `Buffer`. Smoke-test as the probe (single-grant) account before merging — an admin passes every check and never sees grant bugs; after any deploy changing server actions or policies, press one real write button on production. **Commit each working piece and push it; never leave work uncommitted.** Branch flow (`feature/<tool>` → `staging` → `master`), migration gates and deploy verification live in `SHIPPING.md`.
 
 ## Working with the founder
 
