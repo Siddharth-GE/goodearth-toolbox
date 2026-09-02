@@ -1,7 +1,4 @@
-"use client";
-
-import { NavTabs } from "@/components/ui/tabs";
-import { usePathname } from "next/navigation";
+import { ToolNav } from "@/components/ui/tool-nav";
 
 /**
  * The two trees inside Budgets: Interiors (priced revisions, client
@@ -15,7 +12,5 @@ const TABS = [
 ] as const;
 
 export function BudgetsNav() {
-  const pathname = usePathname();
-  const active = pathname.startsWith("/budgets/construction") ? "construction" : "interiors";
-  return <NavTabs tabs={[...TABS]} active={active} />;
+  return <ToolNav root="/budgets" tabs={TABS} defaultKey="interiors" />;
 }

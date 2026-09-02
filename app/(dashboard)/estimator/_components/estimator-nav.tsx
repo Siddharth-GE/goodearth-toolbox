@@ -1,7 +1,4 @@
-"use client";
-
-import { NavTabs } from "@/components/ui/tabs";
-import { usePathname } from "next/navigation";
+import { ToolNav } from "@/components/ui/tool-nav";
 
 /**
  * Four separate routes with their own data and their own loading.tsx,
@@ -15,9 +12,5 @@ const TABS = [
 ] as const;
 
 export function EstimatorNav() {
-  const pathname = usePathname();
-  // The tool root is the welcome screen, which carries its own doors.
-  if (pathname === "/estimator") return null;
-  const active = TABS.find((tab) => pathname.startsWith(tab.href))?.key ?? "estimates";
-  return <NavTabs tabs={[...TABS]} active={active} />;
+  return <ToolNav root="/estimator" tabs={TABS} defaultKey="estimates" />;
 }

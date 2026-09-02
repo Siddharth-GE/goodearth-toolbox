@@ -1,7 +1,4 @@
-"use client";
-
-import { NavTabs } from "@/components/ui/tabs";
-import { usePathname } from "next/navigation";
+import { ToolNav } from "@/components/ui/tool-nav";
 
 /**
  * NavTabs rather than Radix Tabs: these are separate routes with their own
@@ -20,16 +17,8 @@ const TABS = [
 const DEPARTMENTS = { key: "departments", href: "/directory/departments", label: "Departments" };
 
 export function DirectoryNav({ isAdmin }: { isAdmin: boolean }) {
-  const pathname = usePathname();
-  // The tool root is the welcome screen, which carries its own doors —
-  // showing the tabs above them reads as two competing menus.
-  if (pathname === "/directory") return null;
-
   const tabs = isAdmin ? [...TABS, DEPARTMENTS] : [...TABS];
   // Everything else (including one person's page) belongs to People
   // unless a longer href says otherwise.
-  const active =
-    tabs.find((tab) => pathname.startsWith(tab.href) && tab.key !== "people")?.key ?? "people";
-
-  return <NavTabs tabs={tabs} active={active} />;
+  return <ToolNav root="/directory" tabs={tabs} defaultKey="people" />;
 }

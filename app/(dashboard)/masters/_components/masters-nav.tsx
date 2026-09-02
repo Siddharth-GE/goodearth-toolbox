@@ -1,7 +1,4 @@
-"use client";
-
-import { NavTabs } from "@/components/ui/tabs";
-import { usePathname } from "next/navigation";
+import { ToolNav } from "@/components/ui/tool-nav";
 
 const TABS = [
   { key: "projects", href: "/masters/projects", label: "Projects" },
@@ -20,7 +17,5 @@ const TABS = [
 ] as const;
 
 export function MastersNav() {
-  const pathname = usePathname();
-  const active = TABS.find((tab) => pathname.startsWith(tab.href))?.key ?? "projects";
-  return <NavTabs tabs={[...TABS]} active={active} />;
+  return <ToolNav root="/masters" tabs={TABS} defaultKey="projects" />;
 }
