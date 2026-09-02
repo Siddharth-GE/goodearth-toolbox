@@ -10,8 +10,8 @@ import {
   addEstimateLine,
   removeEstimateLine,
   updateEstimateLineQty,
-} from "@/lib/estimator/actions";
-import type { WorkStatusRow } from "@/lib/estimator/queries";
+} from "@/lib/estimator/estimate-actions";
+import type { WorkStatusRow } from "@/lib/estimator/works-queries";
 import { useState, useTransition } from "react";
 
 /**

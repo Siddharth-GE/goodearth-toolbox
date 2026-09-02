@@ -13,12 +13,12 @@ import {
   createMix,
   deleteMix,
   removeMixComponent,
-  removeWorkComponent,
   updateMix,
   updateMixComponentQty,
-  updateWorkComponentQty,
-} from "@/lib/estimator/actions";
-import type { MaterialItemRow, MixDetail, MixRow } from "@/lib/estimator/queries";
+} from "@/lib/estimator/mixes-actions";
+import type { MixDetail, MixRow } from "@/lib/estimator/mixes-queries";
+import type { MaterialItemRow } from "@/lib/estimator/shared";
+import { removeWorkComponent, updateWorkComponentQty } from "@/lib/estimator/works-actions";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 
 export function MixFormDialog({

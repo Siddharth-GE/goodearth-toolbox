@@ -11,7 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { FormMessage } from "@/components/ui/form-message";
-import { reviseEstimate, submitEstimate } from "@/lib/estimator/actions";
+import { reviseEstimate, submitEstimate } from "@/lib/estimator/estimate-actions";
 import { useState, useTransition } from "react";
 
 /**

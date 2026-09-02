@@ -10,7 +10,7 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/components/ui/table";
-import { listEstimates, type EstimateRow } from "@/lib/estimator/queries";
+import { listEstimates, type EstimateRow } from "@/lib/estimator/estimate-queries";
 import { formatDate } from "@/lib/format";
 import { listProjects } from "@/lib/masters/projects";
 import { listUnits } from "@/lib/masters/units";

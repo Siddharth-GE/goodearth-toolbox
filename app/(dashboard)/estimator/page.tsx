@@ -1,4 +1,4 @@
-import { countVillasOverEstimate, getWelcomeCounts } from "@/lib/estimator/queries";
+import { countVillasOverEstimate, getWelcomeCounts } from "@/lib/estimator/estimate-queries";
 
 import { ToolWelcome } from "../_components/tool-welcome";
 
