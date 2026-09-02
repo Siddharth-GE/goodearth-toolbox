@@ -89,21 +89,26 @@ function pushCard(cardBody: Record<string, unknown>) {
 }
 
 /**
- * Shut the dialog, optionally posting a message as it goes — the public
- * confirmation rides along on the close, because Google gives the app
- * one answer and one only. Without a viewer the message is public
- * (the confirmation the whole space should see); with one it is private
- * (a refusal or an apology, which is nobody else's business).
+ * Shut the dialog, optionally saying something as it goes. Google gives
+ * the app one answer and one only, and — learned on the second vet,
+ * 2026-09-02 — it accepts exactly three shapes here, never a mix:
+ *
+ *   - a message to the space closes the dialog by itself: the
+ *     hostAppDataAction envelope ALONE, with no navigation beside it
+ *     (the two together are "invalid" and show "Could not load dialog");
+ *   - a private word to the person is a `notification` toast on the
+ *     close navigation — visible to them only, nothing posted;
+ *   - a plain close is the navigation alone.
+ *
+ * So the public confirmation is the first shape, and a refusal or an
+ * apology (nobody else's business) is the second.
  */
 function closeDialog(text?: string, privateTo?: string | null) {
+  if (text && !privateTo) return card(text);
   const body: Record<string, unknown> = {
     action: { navigations: [{ endNavigation: { action: "CLOSE_DIALOG" } }] },
   };
-  if (text) {
-    const message: { text: string; privateMessageViewer?: { name: string } } = { text };
-    if (privateTo) message.privateMessageViewer = { name: privateTo };
-    body.hostAppDataAction = { chatDataAction: { createMessageAction: { message } } };
-  }
+  if (text) (body.action as Record<string, unknown>).notification = { text };
   return Response.json(body);
 }
 
