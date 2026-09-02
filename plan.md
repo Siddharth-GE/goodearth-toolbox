@@ -149,7 +149,7 @@ The bot greets you by name and knows which command you asked for; anyone without
 - [x] `[Opus]` `events.ts` + `events.test.ts`, `identity-rules.ts` + `identity-rules.test.ts`, `identity.ts`, route wiring, `SECURITY.md` line, `admin.ts` comment. _(2026-09-02; prettier, lint, typecheck, tests and check:actions green locally.)_
 - [x] `[Sonnet]` `cards.ts` + `cards.test.ts`.
 - [ ] `[Fable]` review the diff against this section and `SECURITY.md`; builders commit with their own co-author lines; push `feature/google-chat`; CI green; PR into `staging`.
-- [ ] Founder vets on staging (the probe above); trap list updated if the email lived somewhere else.
+- [x] Founder vets on staging (the probe above); trap list updated if the email lived somewhere else. _(2026-09-02 evening: `/court` in the DM answered "Hi Siddharth! I heard /court…", marked "Only visible to you". So: Google DOES send the sender's email on add-on-style events, `senderEmail` finds it, and `privateMessageViewer` works inside the `createMessageAction` envelope — two open questions closed by one screenshot.)_
 
 ### Questions for the tier above
 
