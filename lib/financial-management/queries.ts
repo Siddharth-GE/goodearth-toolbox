@@ -1,11 +1,13 @@
 import "server-only";
 
 import { requireTool } from "@/lib/auth/access";
+import { profileNames } from "@/lib/masters/names";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { cache } from "react";
 import type { DatedAmount, ForwardMilestone } from "./cashflow";
-import { facilityPosition, todayInIndia, type FacilityPosition } from "./interest";
+import { todayInIndia } from "@/lib/format";
+import { facilityPosition, type FacilityPosition } from "./interest";
 import type { FacilityKind, MovementKind } from "./kinds";
 
 /**
@@ -149,7 +151,10 @@ export const getFacility = cache(async (facilityId: string): Promise<FacilityDet
       .range(from, to),
   );
 
-  const names = await lookupNames(movements.map((movement) => movement.created_by));
+  const names = await profileNames(
+    supabase,
+    movements.map((movement) => movement.created_by),
+  );
 
   const inputs = movements.map((movement) => ({
     kind: movement.kind as MovementKind,
@@ -391,20 +396,4 @@ export async function getForwardView(): Promise<ForwardView> {
       0,
     ),
   };
-}
-
-/** Profile ids to display names, in one query, skipping the nulls. */
-async function lookupNames(ids: (string | null)[]): Promise<Map<string, string | null>> {
-  const unique = [...new Set(ids.filter((id): id is string => id != null))];
-  if (unique.length === 0) return new Map();
-
-  const supabase = await createClient();
-  const { data, error } = await supabase.from("profiles").select("id, full_name").in("id", unique);
-  if (error) {
-    // A missing name is cosmetic — the ledger still opens, the byline
-    // just shows a dash. Not worth failing a page over.
-    console.error("lookupNames failed:", error);
-    return new Map();
-  }
-  return new Map((data ?? []).map((profile) => [profile.id, profile.full_name]));
 }

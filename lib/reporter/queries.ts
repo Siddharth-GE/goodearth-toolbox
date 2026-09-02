@@ -4,6 +4,7 @@ import { cache } from "react";
 
 import { requireTool } from "@/lib/auth/access";
 import { cleanSearch } from "@/lib/masters/paged";
+import { profileNames } from "@/lib/masters/names";
 import { listProjects } from "@/lib/masters/projects";
 import { listUnits } from "@/lib/masters/units";
 import { listVendors } from "@/lib/masters/vendors";
@@ -288,7 +289,10 @@ export async function listReports(): Promise<ReportSummary[]> {
       .range(from, to),
   );
 
-  const names = await lookupNames(rows.map((row) => row.updated_by));
+  const names = await profileNames(
+    supabase,
+    rows.map((row) => row.updated_by),
+  );
 
   return rows.map((row) => {
     const dataset = DATASETS[row.dataset];
@@ -343,7 +347,7 @@ export const getReport = cache(async (reportId: string): Promise<LoadedReport | 
   }
   if (!data) return null;
 
-  const names = await lookupNames([data.updated_by]);
+  const names = await profileNames(supabase, [data.updated_by]);
 
   return {
     id: data.id,
@@ -375,22 +379,6 @@ export async function getReportSpecLoss(reportId: string): Promise<string[]> {
     .maybeSingle();
   if (error || !data) return [];
   return describeSpecLoss(data.spec);
-}
-
-/** Profile ids to display names, in one query, skipping the nulls. */
-async function lookupNames(ids: (string | null)[]): Promise<Map<string, string | null>> {
-  const unique = [...new Set(ids.filter((id): id is string => id != null))];
-  if (unique.length === 0) return new Map();
-
-  const supabase = await createClient();
-  const { data, error } = await supabase.from("profiles").select("id, full_name").in("id", unique);
-  if (error) {
-    // A missing name is cosmetic — the report still opens, the byline
-    // just shows a dash. Not worth failing a page over.
-    console.error("lookupNames failed:", error);
-    return new Map();
-  }
-  return new Map((data ?? []).map((profile) => [profile.id, profile.full_name]));
 }
 
 export type ProjectOption = { id: string; name: string };

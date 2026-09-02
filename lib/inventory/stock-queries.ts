@@ -1,17 +1,11 @@
 import "server-only";
 
 import { requireTool } from "@/lib/auth/access";
+import { labelsById, profileNames } from "@/lib/masters/names";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 
-import {
-  INVENTORY_LIST_LIMIT,
-  itemsById,
-  labelsById,
-  namesById,
-  poReferencesById,
-  type Client,
-} from "./queries";
+import { INVENTORY_LIST_LIMIT, itemsById, poReferencesById, type Client } from "./queries";
 
 /**
  * Stock reads — the balance at every location, and how it got there.
@@ -375,7 +369,7 @@ export async function getItemMovements(
     return isStore ? parent.to_store_id === locationId : parent.plot_id === locationId;
   });
 
-  const [poRefs, otherStores, plots, nameOf] = await Promise.all([
+  const [poRefs, otherStores, plots, names] = await Promise.all([
     poReferencesById(
       supabase,
       receipts.map((line) => (line.goods_receipts as ReceiptParent).po_id),
@@ -387,13 +381,14 @@ export async function getItemMovements(
     labelsById(supabase, "plots", [
       ...issuesOut.map((line) => (line.stock_issues as IssueParent).plot_id),
     ]),
-    namesById(supabase, [
+    profileNames(supabase, [
       ...receipts.map((l) => l.created_by),
       ...issuesOut.map((l) => l.created_by),
       ...transfersIn.map((l) => l.created_by),
       ...adjustments.map((a) => a.created_by),
     ]),
   ]);
+  const nameOf = (id: string | null | undefined) => (id ? (names.get(id) ?? null) : null);
 
   const movements: MovementRow[] = [
     ...receipts.map((line): MovementRow => {

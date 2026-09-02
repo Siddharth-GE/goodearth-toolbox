@@ -3,6 +3,7 @@ import "server-only";
 import { cache } from "react";
 
 import { requireTool } from "@/lib/auth/access";
+import { labelsById, profileNames } from "@/lib/masters/names";
 import { listPlots } from "@/lib/masters/plots";
 import { listProjects } from "@/lib/masters/projects";
 import { listUnits } from "@/lib/masters/units";
@@ -587,33 +588,6 @@ export async function getIndentPool(poId: string): Promise<IndentPool | null> {
 
 type Client = SupabaseClient<Database>;
 
-/** name-by-id for any master table with an `id` and a `name`. */
-async function labelsById(
-  supabase: Client,
-  table: "stores" | "plots" | "units",
-  ids: (string | null | undefined)[],
-): Promise<Map<string, string>> {
-  const unique = [...new Set(ids.filter((id): id is string => id != null))];
-  if (unique.length === 0) return new Map();
-  const data = await fetchAll((from, to) =>
-    supabase.from(table).select("id, name").in("id", unique).order("id").range(from, to),
-  );
-  return new Map(data.map((row) => [row.id, row.name]));
-}
-
-/** Actor names for a set of profile ids — the attribution rule. */
-async function namesById(
-  supabase: Client,
-  ids: (string | null | undefined)[],
-): Promise<(id: string | null | undefined) => string | null> {
-  const unique = [...new Set(ids.filter((id): id is string => id != null))];
-  const { data } = unique.length
-    ? await supabase.from("profiles").select("id, full_name").in("id", unique)
-    : { data: [] };
-  const names = new Map((data ?? []).map((profile) => [profile.id, profile.full_name]));
-  return (id) => (id ? (names.get(id) ?? null) : null);
-}
-
 /** Item names for a set of ids — only the name; the receipt rows on the
  * PO page show no thumbnails or codes. */
 async function itemNamesById(supabase: Client, ids: string[]): Promise<Map<string, string>> {
@@ -686,7 +660,7 @@ export async function getPoReceipts(poId: string): Promise<PoReceiptRow[]> {
       .range(from, to),
   );
 
-  const [items, stores, plots, units, nameOf] = await Promise.all([
+  const [items, stores, plots, units, names] = await Promise.all([
     itemNamesById(
       supabase,
       lines.map((line) => line.item_id),
@@ -706,7 +680,7 @@ export async function getPoReceipts(poId: string): Promise<PoReceiptRow[]> {
       "units",
       receipts.map((r) => r.unit_id),
     ),
-    namesById(
+    profileNames(
       supabase,
       receipts.map((r) => r.created_by),
     ),
@@ -729,7 +703,7 @@ export async function getPoReceipts(poId: string): Promise<PoReceiptRow[]> {
     destination: describeDestination(receipt, stores, plots, units),
     challan_no: receipt.challan_no,
     received_at: receipt.received_at,
-    received_by_name: nameOf(receipt.created_by),
+    received_by_name: receipt.created_by ? (names.get(receipt.created_by) ?? null) : null,
     lines: linesByReceipt.get(receipt.id) ?? [],
   }));
 }

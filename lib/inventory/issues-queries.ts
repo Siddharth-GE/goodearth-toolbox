@@ -3,17 +3,12 @@ import "server-only";
 import { cache } from "react";
 
 import { requireTool } from "@/lib/auth/access";
+import { labelsById, profileNames } from "@/lib/masters/names";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { findOverIssues, type OverIssueRow } from "./over-issue";
 
-import {
-  INVENTORY_LIST_LIMIT,
-  itemsById,
-  labelsById,
-  listActiveStores,
-  namesById,
-} from "./queries";
+import { INVENTORY_LIST_LIMIT, itemsById, listActiveStores } from "./queries";
 
 /**
  * Issues and adjustments reads — material leaving a store (to a site or
@@ -64,7 +59,7 @@ export async function listStockIssues({ page = 1 }: { page?: number } = {}): Pro
   }
 
   const rows = data ?? [];
-  const [stores, plots, nameOf] = await Promise.all([
+  const [stores, plots, names] = await Promise.all([
     labelsById(supabase, "stores", [
       ...rows.map((r) => r.store_id),
       ...rows.map((r) => r.to_store_id),
@@ -74,11 +69,12 @@ export async function listStockIssues({ page = 1 }: { page?: number } = {}): Pro
       "plots",
       rows.map((r) => r.plot_id),
     ),
-    namesById(
+    profileNames(
       supabase,
       rows.map((r) => r.created_by),
     ),
   ]);
+  const nameOf = (id: string | null | undefined) => (id ? (names.get(id) ?? null) : null);
 
   const total = count ?? 0;
   return {
@@ -151,18 +147,19 @@ export const getStockIssue = cache(async (issueId: string): Promise<IssueDetail 
       .range(from, to),
   );
 
-  const [items, stores, plots, nameOf] = await Promise.all([
+  const [items, stores, plots, names] = await Promise.all([
     itemsById(
       supabase,
       lines.map((line) => line.item_id),
     ),
     labelsById(supabase, "stores", [issue.store_id, issue.to_store_id]),
     labelsById(supabase, "plots", [issue.plot_id]),
-    namesById(supabase, [
+    profileNames(supabase, [
       issue.created_by,
       ...lines.map((line) => line.updated_by ?? line.created_by),
     ]),
   ]);
+  const nameOf = (id: string | null | undefined) => (id ? (names.get(id) ?? null) : null);
 
   return {
     id: issue.id,
@@ -294,7 +291,7 @@ export async function listStockAdjustments({
   }
 
   const rows = data ?? [];
-  const [items, storeNames, nameOf] = await Promise.all([
+  const [items, storeNames, names] = await Promise.all([
     itemsById(
       supabase,
       rows.map((row) => row.item_id),
@@ -304,11 +301,12 @@ export async function listStockAdjustments({
       "stores",
       rows.map((row) => row.store_id),
     ),
-    namesById(
+    profileNames(
       supabase,
       rows.map((row) => row.created_by),
     ),
   ]);
+  const nameOf = (id: string | null | undefined) => (id ? (names.get(id) ?? null) : null);
 
   const total = count ?? 0;
   return {
