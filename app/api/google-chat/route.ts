@@ -21,7 +21,11 @@ import {
 // What Phase 1 needs from an event, nothing more. Add-on-style Chat
 // apps (which is what Google's console registers now) wrap everything
 // in a `chat` payload — one member per kind of interaction.
-type ChatMessage = { text?: string; argumentText?: string };
+type ChatMessage = {
+  text?: string;
+  argumentText?: string;
+  slashCommand?: { commandId?: number | string };
+};
 type ChatSpace = { name?: string; displayName?: string };
 type ChatEvent = {
   chat?: {
@@ -29,7 +33,8 @@ type ChatEvent = {
     removedFromSpacePayload?: { space?: ChatSpace };
     messagePayload?: { message?: ChatMessage; space?: ChatSpace };
     appCommandPayload?: {
-      appCommandMetadata?: { appCommandId?: number; appCommandType?: string };
+      // Google documents the id as an int64, which arrives as a string.
+      appCommandMetadata?: { appCommandId?: number | string; appCommandType?: string };
       message?: ChatMessage;
       space?: ChatSpace;
     };
@@ -131,6 +136,29 @@ export async function POST(request: Request) {
       chat.messagePayload?.space?.name ??
       chat.appCommandPayload?.space?.name ??
       "";
+
+    // One line per event for the Vercel log: which kind arrived, from
+    // which space, and which command id if any — never the message text.
+    // This is how "did Google dispatch the slash command?" gets answered
+    // without guessing from what appears in chat.
+    console.log(
+      "google-chat event",
+      JSON.stringify({
+        kind: chat.appCommandPayload
+          ? "command"
+          : chat.messagePayload
+            ? "message"
+            : chat.addedToSpacePayload
+              ? "added"
+              : chat.removedFromSpacePayload
+                ? "removed"
+                : "other",
+        space: spaceId,
+        commandId: chat.appCommandPayload?.appCommandMetadata?.appCommandId ?? null,
+        commandType: chat.appCommandPayload?.appCommandMetadata?.appCommandType ?? null,
+        slashCommandInMessage: chat.messagePayload?.message?.slashCommand?.commandId ?? null,
+      }),
+    );
     if (allowedSpaces.length > 0 && !allowedSpaces.includes(spaceId)) {
       return card("This space isn't set up for Relay yet.");
     }
@@ -141,9 +169,13 @@ export async function POST(request: Request) {
           "slash commands for trails are on their way.",
       );
     }
-    if (chat.appCommandPayload) {
-      const id = chat.appCommandPayload.appCommandMetadata?.appCommandId;
-      const command = (id !== undefined && COMMANDS[id]) || "that command";
+    // A typed slash command arrives as an appCommandPayload; Google's
+    // older shape tags the message itself instead. Answer both the same.
+    const commandId =
+      chat.appCommandPayload?.appCommandMetadata?.appCommandId ??
+      chat.messagePayload?.message?.slashCommand?.commandId;
+    if (chat.appCommandPayload || commandId !== undefined) {
+      const command = (commandId !== undefined && COMMANDS[Number(commandId)]) || "that command";
       return card(
         `I heard ${command} — it isn't wired up yet, but it's coming. ` +
           "For now, the Relay tool in the toolbox is the place.",
