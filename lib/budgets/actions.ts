@@ -1,6 +1,7 @@
 "use server";
 
 import { requireTool } from "@/lib/auth/access";
+import { dbErrorMessage } from "@/lib/db-error";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
@@ -438,7 +439,7 @@ export async function reopenBudget(budgetId: string): Promise<ActionState> {
   if (error) {
     console.error("reopenBudget failed:", error);
     // Written for a person to read by the RAISE EXCEPTION in the function.
-    return { error: error.message.replace(/^.*?:\s*/, "") || "Could not re-open this budget." };
+    return { error: dbErrorMessage(error, "Could not re-open this budget.") };
   }
 
   revalidatePath("/budgets", "layout");

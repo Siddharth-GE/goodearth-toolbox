@@ -2,6 +2,7 @@
 
 import { requireTool } from "@/lib/auth/access";
 import { getCurrentUser } from "@/lib/auth/dal";
+import { guardError } from "@/lib/db-error";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
@@ -34,20 +35,14 @@ import type { ActionState } from "@/lib/action-state";
  * The guard's messages are written to be read by a person; pass the known
  * ones straight through instead of burying them under "try again".
  */
-function guardError(error: { message: string }, fallback: string): ActionState {
-  const message = error.message ?? "";
-  if (
-    message.includes("baton") ||
-    message.includes("trail") ||
-    message.includes("leg") ||
-    message.includes("switched off") ||
-    message.includes("permanent") ||
-    message.includes("signed-in")
-  ) {
-    return { error: message.replace(/^.*?:\s*/, "") };
-  }
-  return { error: fallback };
-}
+const RELAY_GUARD_PHRASES = [
+  "baton",
+  "trail",
+  "leg",
+  "switched off",
+  "permanent",
+  "signed-in",
+] as const;
 
 /**
  * The layout form, always: the Relay welcome screen renders four live
@@ -129,7 +124,7 @@ export async function openTrail(
     p_start: input.start !== false,
   });
 
-  if (error) return guardError(error, "Could not open this trail.") ?? {};
+  if (error) return guardError(error, "Could not open this trail.", RELAY_GUARD_PHRASES) ?? {};
 
   const chainId = data as string;
 
@@ -171,7 +166,7 @@ export async function pushBaton(
     note: note?.trim() || null,
   });
 
-  if (error) return guardError(error, "Could not push this trail forward.");
+  if (error) return guardError(error, "Could not push this trail forward.", RELAY_GUARD_PHRASES);
   revalidateRelay();
   return undefined;
 }
@@ -200,7 +195,8 @@ export async function holdForClient(
     note: note?.trim() || null,
   });
 
-  if (error) return guardError(error, "Could not mark this trail as with the client.");
+  if (error)
+    return guardError(error, "Could not mark this trail as with the client.", RELAY_GUARD_PHRASES);
   revalidateRelay();
   return undefined;
 }
@@ -221,7 +217,12 @@ export async function clientReturned(
     note: note?.trim() || null,
   });
 
-  if (error) return guardError(error, "Could not take this trail back from the client.");
+  if (error)
+    return guardError(
+      error,
+      "Could not take this trail back from the client.",
+      RELAY_GUARD_PHRASES,
+    );
   revalidateRelay();
   return undefined;
 }
@@ -241,7 +242,7 @@ export async function finishTrail(
     note: note?.trim() || null,
   });
 
-  if (error) return guardError(error, "Could not finish this trail.");
+  if (error) return guardError(error, "Could not finish this trail.", RELAY_GUARD_PHRASES);
   revalidateRelay();
   return undefined;
 }
@@ -271,7 +272,7 @@ export async function bounceBaton(
     note: note.trim(),
   });
 
-  if (error) return guardError(error, "Could not bounce this trail back.");
+  if (error) return guardError(error, "Could not bounce this trail back.", RELAY_GUARD_PHRASES);
   revalidateRelay();
   return undefined;
 }
@@ -298,7 +299,7 @@ export async function handBaton(
     p_note: note.trim(),
   });
 
-  if (error) return guardError(error, "Could not hand this baton over.");
+  if (error) return guardError(error, "Could not hand this baton over.", RELAY_GUARD_PHRASES);
   revalidateRelay();
   return undefined;
 }
@@ -336,7 +337,7 @@ export async function replaceFutureLegs(chainId: string, legs: LegInput[]): Prom
     })),
   });
 
-  if (error) return guardError(error, "Could not change the legs ahead.");
+  if (error) return guardError(error, "Could not change the legs ahead.", RELAY_GUARD_PHRASES);
   revalidateRelay();
   return undefined;
 }
@@ -438,7 +439,7 @@ export async function updateProjectStage(
 
   if (error) {
     if (error.code === "23505") return { error: `"${name.trim()}" is already a stage here.` };
-    return guardError(error, "Could not change this stage.");
+    return guardError(error, "Could not change this stage.", RELAY_GUARD_PHRASES);
   }
 
   revalidateRelay();
@@ -453,7 +454,7 @@ export async function deleteProjectStage(stageId: string): Promise<ActionState> 
 
   // The guard refuses a stage that still has trails in it, and says how
   // many — pass that through rather than a generic failure.
-  if (error) return guardError(error, "Could not remove this stage.");
+  if (error) return guardError(error, "Could not remove this stage.", RELAY_GUARD_PHRASES);
 
   revalidateRelay();
   return undefined;
@@ -512,7 +513,8 @@ export async function setTrailStage(
     .update({ project_stage_id: projectStageId, updated_by: user?.id })
     .eq("id", chainId);
 
-  if (error) return guardError(error, "Could not move this trail to that stage.");
+  if (error)
+    return guardError(error, "Could not move this trail to that stage.", RELAY_GUARD_PHRASES);
   revalidateRelay();
   return undefined;
 }
@@ -530,7 +532,8 @@ export async function setTrailDepartments(
     p_department_ids: departmentIds,
   });
 
-  if (error) return guardError(error, "Could not change this trail's departments.");
+  if (error)
+    return guardError(error, "Could not change this trail's departments.", RELAY_GUARD_PHRASES);
   revalidateRelay();
   return undefined;
 }
@@ -697,7 +700,7 @@ export async function applyTrailSet(
     p_start: start,
   });
 
-  if (error) return guardError(error, "Could not add this trail type.") ?? {};
+  if (error) return guardError(error, "Could not add this trail type.", RELAY_GUARD_PHRASES) ?? {};
 
   const chainId = typeof data === "string" ? data : undefined;
   const departmentIds = departments.get(setId) ?? [];
@@ -722,7 +725,7 @@ export async function startTrail(chainId: string) {
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("start_chain", { p_chain_id: chainId });
-  if (error) return guardError(error, "Could not start this trail.") ?? {};
+  if (error) return guardError(error, "Could not start this trail.", RELAY_GUARD_PHRASES) ?? {};
 
   revalidateRelay();
   return undefined;
@@ -741,7 +744,7 @@ export async function discardTrail(chainId: string) {
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("discard_chain", { p_chain_id: chainId });
-  if (error) return guardError(error, "Could not remove this trail.") ?? {};
+  if (error) return guardError(error, "Could not remove this trail.", RELAY_GUARD_PHRASES) ?? {};
 
   revalidateRelay();
   return undefined;

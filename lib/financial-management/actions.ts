@@ -7,6 +7,7 @@
 // production outage). Import it from "@/lib/action-state" instead.
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
+import { parseNumber } from "@/lib/form-data";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -15,17 +16,6 @@ import { FACILITY_KINDS, MOVEMENT_KINDS, type FacilityKind, type MovementKind } 
 const PARTY_LIMIT = 120;
 const TEXT_LIMIT = 2000;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-
-/**
- * "1,50,000" → 150000. Null for blank, NaN for nonsense — the caller
- * decides which of those is an error. People paste amounts with the
- * commas their bank statement prints.
- */
-function parseAmount(raw: FormDataEntryValue | null): number | null {
-  const cleaned = String(raw ?? "").replace(/[,\s₹]/g, "");
-  if (!cleaned) return null;
-  return Number(cleaned);
-}
 
 type FacilityFields = {
   party: string;
@@ -48,7 +38,7 @@ function readFacilityFields(formData: FormData): FacilityFields | { error: strin
     return { error: "Pick what kind of money this is." };
   }
 
-  const rate = parseAmount(formData.get("interest_rate_pct"));
+  const rate = parseNumber(formData.get("interest_rate_pct"));
   if (rate !== null && (!Number.isFinite(rate) || rate < 0)) {
     return { error: "The interest rate must be a number, 0 or more. Leave it blank for equity." };
   }
@@ -56,7 +46,7 @@ function readFacilityFields(formData: FormData): FacilityFields | { error: strin
     return { error: "That rate reads as more than 100% a year — check it." };
   }
 
-  const sanctioned = parseAmount(formData.get("sanctioned_amount"));
+  const sanctioned = parseNumber(formData.get("sanctioned_amount"));
   if (sanctioned !== null && (!Number.isFinite(sanctioned) || sanctioned <= 0)) {
     return { error: "The sanctioned amount must be a number above zero, or blank for no cap." };
   }
@@ -202,7 +192,7 @@ export async function recordMovement(
     return { error: "Pick what kind of movement this is." };
   }
 
-  const amount = parseAmount(formData.get("amount"));
+  const amount = parseNumber(formData.get("amount"));
   if (amount === null || !Number.isFinite(amount) || amount <= 0) {
     return { error: "Enter the amount as a number above zero." };
   }

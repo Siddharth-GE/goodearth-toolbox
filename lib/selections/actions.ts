@@ -1,6 +1,7 @@
 "use server";
 
 import { requireTool } from "@/lib/auth/access";
+import { dbErrorMessage } from "@/lib/db-error";
 // constants.ts is import-free, which is what makes it safe to use as
 // VALUES from this file-level "use server" module — importing them from
 // a "server-only" module instead would drag that chain into the client
@@ -82,7 +83,7 @@ export async function issueSelection(
     console.error("issueSelection failed:", error);
     // These come from RAISE EXCEPTION in the function and are already
     // written for a person to read.
-    return { error: error.message.replace(/^.*?:\s*/, "") || "Could not issue this revision." };
+    return { error: dbErrorMessage(error, "Could not issue this revision.") };
   }
 
   revalidatePath("/selections", "layout");
@@ -103,9 +104,7 @@ export async function createNextRevision(fromSelectionId: string): Promise<Actio
   });
   if (error) {
     console.error("createNextRevision failed:", error);
-    return {
-      error: error.message.replace(/^.*?:\s*/, "") || "Could not create the next revision.",
-    };
+    return { error: dbErrorMessage(error, "Could not create the next revision.") };
   }
 
   revalidatePath("/selections", "layout");

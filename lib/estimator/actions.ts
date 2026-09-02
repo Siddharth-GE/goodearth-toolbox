@@ -7,6 +7,7 @@
 // production outage). Import it from "@/lib/action-state" instead.
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
+import { parseNumber, text } from "@/lib/form-data";
 import { createClient } from "@/lib/supabase/server";
 import {
   applyEstimateOverrides,
@@ -22,21 +23,6 @@ const GRANT = "/estimator";
 const NAME_LIMIT = 120;
 const UOM_LIMIT = 20;
 const TEXT_LIMIT = 2000;
-
-/**
- * "1,200.50" → 1200.5. Null for blank — which for a rate means "not
- * priced yet" and is a legitimate saved value, not an error. NaN for
- * nonsense; the caller decides.
- */
-function parseNumber(raw: FormDataEntryValue | null): number | null {
-  const cleaned = String(raw ?? "").replace(/[,\s₹]/g, "");
-  if (!cleaned) return null;
-  return Number(cleaned);
-}
-
-function text(formData: FormData, field: string): string {
-  return String(formData.get(field) ?? "").trim();
-}
 
 /**
  * A foreign key refusing a delete is not a bug — it is the house rule

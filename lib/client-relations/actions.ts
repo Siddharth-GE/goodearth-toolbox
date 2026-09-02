@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 
 import { requireTool } from "@/lib/auth/access";
+import { guardError } from "@/lib/db-error";
+import { optionalText, text } from "@/lib/form-data";
 import { createClient } from "@/lib/supabase/server";
 import { normaliseBottlenecks } from "./stages";
 
@@ -33,17 +35,15 @@ function revalidateAll(): void {
  * raises "You need the Client Relations app to assign a plot", not a
  * constraint name). Surface those; fall back for anything else.
  */
+const CRM_GUARD_PHRASES = [
+  "no longer exists",
+  "You need the Client Relations app",
+  "Unknown unit status",
+] as const;
 function friendly(error: { message: string }, fallback: string): ActionState {
-  const message = error.message;
-  if (
-    message.includes("no longer exists") ||
-    message.includes("You need the Client Relations app") ||
-    message.includes("Unknown unit status")
-  ) {
-    return { error: message.replace(/^.*?:\s*/, "") };
-  }
-  console.error("Client Relations write failed:", error);
-  return { error: fallback };
+  const state = guardError(error, fallback, CRM_GUARD_PHRASES);
+  if (state?.error === fallback) console.error("Client Relations write failed:", error);
+  return state;
 }
 
 // ---------------------------------------------------------------------
@@ -145,20 +145,16 @@ export async function updateClientRecord(
  * is not the empty string.
  */
 function clientFromForm(formData: FormData): ClientInput {
-  const text = (key: string) => {
-    const value = formData.get(key);
-    return typeof value === "string" && value.trim() ? value : null;
-  };
   return {
-    name: (formData.get("name") as string) ?? "",
-    mobile: text("mobile"),
-    email: text("email"),
-    stage: (formData.get("stage") as string) ?? "prospect",
-    ownerId: text("ownerId"),
-    source: text("source"),
-    firstContactOn: text("firstContactOn"),
-    lostReason: text("lostReason"),
-    notes: text("notes"),
+    name: text(formData, "name"),
+    mobile: optionalText(formData, "mobile"),
+    email: optionalText(formData, "email"),
+    stage: text(formData, "stage") || "prospect",
+    ownerId: optionalText(formData, "ownerId"),
+    source: optionalText(formData, "source"),
+    firstContactOn: optionalText(formData, "firstContactOn"),
+    lostReason: optionalText(formData, "lostReason"),
+    notes: optionalText(formData, "notes"),
   };
 }
 

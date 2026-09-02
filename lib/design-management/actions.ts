@@ -4,7 +4,9 @@
 // 2026-08-03 outage rule, enforced by npm run check:actions.
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
+import { dbErrorMessage } from "@/lib/db-error";
 import { DRAWINGS_BUCKET } from "@/lib/design-management/storage";
+import { text } from "@/lib/form-data";
 import { designView } from "@/lib/pdf/theme";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
@@ -27,13 +29,6 @@ const NOTE_LIMIT = 1000;
 const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 const ACCEPTED_FILE_TYPES = ["application/pdf", "image/jpeg", "image/png"];
 
-/** RAISE EXCEPTION text is already written for a person to read; strip
- * whatever PostgREST prefixes it with (the lib/selections/actions.ts:85
- * pattern). */
-function friendlyDbError(error: { message: string }, fallback: string): string {
-  return error.message.replace(/^.*?:\s*/, "") || fallback;
-}
-
 /**
  * Writes for the Design Management app: design stages (its one master),
  * a villa's drawing revisions and the sheets on them, the drawing sets
@@ -45,10 +40,6 @@ function friendlyDbError(error: { message: string }, fallback: string): string {
  * (the exact-path trap in CLAUDE.md). Nothing here writes another
  * tool's table.
  */
-
-function text(formData: FormData, field: string): string {
-  return String(formData.get(field) ?? "").trim();
-}
 
 // ---------------------------------------------------------------------
 // Design stages
@@ -297,7 +288,7 @@ async function discardDraftRevision(
   const { error } = await supabase.rpc("delete_draft_revision", { p_revision_id: revisionId });
   if (error) {
     console.error("discardDraftRevision failed:", error);
-    return { error: friendlyDbError(error, "Could not delete this draft. Try again.") };
+    return { error: dbErrorMessage(error, "Could not delete this draft. Try again.") };
   }
 
   const paths = (files ?? []).map((file) => file.storage_path);
@@ -323,7 +314,7 @@ export async function updateDraftRevisionNote(
     .eq("id", revisionId);
   if (error) {
     console.error("updateDraftRevisionNote failed:", error);
-    return { error: friendlyDbError(error, "Could not save the note. Try again.") };
+    return { error: dbErrorMessage(error, "Could not save the note. Try again.") };
   }
 
   revalidatePath("/design-management", "layout");
@@ -369,7 +360,7 @@ export async function setDrawingRevisionWorks(
     );
     if (error) {
       console.error("setDrawingRevisionWorks insert failed:", error);
-      return { error: friendlyDbError(error, "Could not save the work links. Try again.") };
+      return { error: dbErrorMessage(error, "Could not save the work links. Try again.") };
     }
   }
 
@@ -381,7 +372,7 @@ export async function setDrawingRevisionWorks(
       .in("work_item_id", toRemove);
     if (error) {
       console.error("setDrawingRevisionWorks delete failed:", error);
-      return { error: friendlyDbError(error, "Could not save the work links. Try again.") };
+      return { error: dbErrorMessage(error, "Could not save the work links. Try again.") };
     }
   }
 
@@ -511,7 +502,7 @@ export async function uploadDrawingRevisionFile(
     // orphan rather than a row pointing at nothing.
     await supabase.storage.from(DRAWINGS_BUCKET).remove([path]);
     console.error("uploadDrawingRevisionFile row write failed:", error);
-    return { error: friendlyDbError(error, "Could not save the file. Try again.") };
+    return { error: dbErrorMessage(error, "Could not save the file. Try again.") };
   }
 
   revalidatePath("/design-management", "layout");
@@ -537,7 +528,7 @@ export async function deleteDrawingRevisionFile(fileId: string): Promise<ActionS
   const { error } = await supabase.from("drawing_revision_files").delete().eq("id", fileId);
   if (error) {
     console.error("deleteDrawingRevisionFile delete failed:", error);
-    return { error: friendlyDbError(error, "Could not remove the file. Try again.") };
+    return { error: dbErrorMessage(error, "Could not remove the file. Try again.") };
   }
 
   const { error: removeError } = await supabase.storage
@@ -596,7 +587,7 @@ export async function createTransmittal(
     .single();
   if (error) {
     console.error("createTransmittal insert failed:", error);
-    return { error: friendlyDbError(error, "Could not start the transmittal. Try again.") };
+    return { error: dbErrorMessage(error, "Could not start the transmittal. Try again.") };
   }
 
   revalidatePath("/design-management", "layout");
@@ -675,7 +666,7 @@ export async function createSetOnTransmittal(
     .single();
   if (error) {
     console.error("createSetOnTransmittal insert failed:", error);
-    return { error: friendlyDbError(error, "Could not add the drawing set. Try again.") };
+    return { error: dbErrorMessage(error, "Could not add the drawing set. Try again.") };
   }
 
   const started = await startDraftRevision(supabase, user.id, transmittal.unit_id, set.id);
@@ -819,7 +810,7 @@ async function appendTransmittalLine(
     return "That drawing belongs to another villa and can't go on this transmittal.";
   }
   console.error("appendTransmittalLine failed:", error);
-  return friendlyDbError(error, "Could not add that drawing. Try again.");
+  return dbErrorMessage(error, "Could not add that drawing. Try again.");
 }
 
 /** Note and stage, editable only while the transmittal is a draft — the
@@ -845,7 +836,7 @@ export async function updateDraftTransmittal(
     .eq("id", transmittalId);
   if (error) {
     console.error("updateDraftTransmittal failed:", error);
-    return { error: friendlyDbError(error, "Could not save this transmittal. Try again.") };
+    return { error: dbErrorMessage(error, "Could not save this transmittal. Try again.") };
   }
 
   revalidatePath("/design-management", "layout");
@@ -931,7 +922,7 @@ export async function removeTransmittalLine(
   const { error } = await supabase.from("transmittal_lines").delete().eq("id", lineId);
   if (error) {
     console.error("removeTransmittalLine failed:", error);
-    return { error: friendlyDbError(error, "Could not take that drawing off. Try again.") };
+    return { error: dbErrorMessage(error, "Could not take that drawing off. Try again.") };
   }
 
   if (discardDraft) {
@@ -973,7 +964,7 @@ export async function issueTransmittal(transmittalId: string): Promise<ActionSta
   });
   if (error) {
     console.error("issueTransmittal failed:", error);
-    return { error: friendlyDbError(error, "Could not issue this transmittal. Try again.") };
+    return { error: dbErrorMessage(error, "Could not issue this transmittal. Try again.") };
   }
 
   revalidatePath("/design-management", "layout");
@@ -1007,7 +998,7 @@ export async function deleteDraftTransmittal(transmittalId: string): Promise<Act
   });
   if (error) {
     console.error("deleteDraftTransmittal failed:", error);
-    return { error: friendlyDbError(error, "Could not delete this draft. Try again.") };
+    return { error: dbErrorMessage(error, "Could not delete this draft. Try again.") };
   }
 
   revalidatePath("/design-management", "layout");

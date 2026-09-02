@@ -1,6 +1,7 @@
 "use server";
 
 import { requireTool } from "@/lib/auth/access";
+import { guardError } from "@/lib/db-error";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -19,35 +20,29 @@ import type { ActionState } from "@/lib/action-state";
 
 /** The guards raise human-readable messages (written for exactly this).
  * Surface the known ones instead of a generic "try again". */
-function guardError(error: { message: string }, fallback: string): ActionState {
-  const message = error.message;
-  if (
-    message.includes("permanent") ||
-    message.includes("no longer be edited") ||
-    message.includes("exactly one") ||
-    message.includes("issued purchase order") ||
-    message.includes("inactive") ||
-    message.includes("short code") ||
-    message.includes("no longer exists") ||
-    message.includes("approver") ||
-    message.includes("send-back needs a note") ||
-    message.includes("payment reference") ||
-    message.includes("invoice") ||
-    message.includes("can''t be negative") ||
-    message.includes("can't be negative") ||
-    message.includes("more than zero") ||
-    message.includes("status change") ||
-    message.includes("must clear") ||
-    message.includes("must record") ||
-    message.includes("approved yet") ||
-    message.includes("does not belong") ||
-    message.includes("not both") ||
-    message.includes("muster roll")
-  ) {
-    return { error: message.replace(/^.*?:\s*/, "") };
-  }
-  return { error: fallback };
-}
+const BILL_GUARD_PHRASES = [
+  "permanent",
+  "no longer be edited",
+  "exactly one",
+  "issued purchase order",
+  "inactive",
+  "short code",
+  "no longer exists",
+  "approver",
+  "send-back needs a note",
+  "payment reference",
+  "invoice",
+  "can''t be negative",
+  "can't be negative",
+  "more than zero",
+  "status change",
+  "must clear",
+  "must record",
+  "approved yet",
+  "does not belong",
+  "not both",
+  "muster roll",
+] as const;
 
 export type CreateBillInput = {
   poId: string | null;
@@ -97,7 +92,7 @@ export async function createBill(input: CreateBillInput): Promise<ActionState> {
   });
   if (error) {
     console.error("createBill failed:", error);
-    return guardError(error, "Could not record the bill. Try again.");
+    return guardError(error, "Could not record the bill. Try again.", BILL_GUARD_PHRASES);
   }
   if (!billId) return { error: "Could not record the bill. Try again." };
 
@@ -155,7 +150,7 @@ export async function createNmrBill(input: CreateNmrBillInput): Promise<ActionSt
   });
   if (error) {
     console.error("createNmrBill failed:", error);
-    return guardError(error, "Could not record the bill. Try again.");
+    return guardError(error, "Could not record the bill. Try again.", BILL_GUARD_PHRASES);
   }
   if (!billId) return { error: "Could not record the bill. Try again." };
 
@@ -237,7 +232,11 @@ export async function updateLabourContract(
     .eq("id", id);
   if (error) {
     console.error("updateLabourContract failed:", error);
-    return guardError(error, "Could not update the labour contract. Try again.");
+    return guardError(
+      error,
+      "Could not update the labour contract. Try again.",
+      BILL_GUARD_PHRASES,
+    );
   }
 
   revalidatePath("/bills", "layout");
@@ -261,7 +260,7 @@ export async function approveLabourContract(contractId: string): Promise<ActionS
     .eq("id", contractId);
   if (error) {
     console.error("approveLabourContract failed:", error);
-    return guardError(error, "Could not approve the contract. Try again.");
+    return guardError(error, "Could not approve the contract. Try again.", BILL_GUARD_PHRASES);
   }
 
   revalidatePath("/bills", "layout");
@@ -283,7 +282,7 @@ export async function setLabourContractActive(
     .eq("id", contractId);
   if (error) {
     console.error("setLabourContractActive failed:", error);
-    return guardError(error, "Could not update the contract. Try again.");
+    return guardError(error, "Could not update the contract. Try again.", BILL_GUARD_PHRASES);
   }
 
   revalidatePath("/bills", "layout");
@@ -337,7 +336,7 @@ export async function updateBill(billId: string, input: UpdateBillInput): Promis
     .eq("id", billId);
   if (error) {
     console.error("updateBill failed:", error);
-    return guardError(error, "Could not save. Try again.");
+    return guardError(error, "Could not save. Try again.", BILL_GUARD_PHRASES);
   }
 
   revalidatePath("/bills", "layout");
@@ -366,7 +365,7 @@ export async function approveBill(billId: string): Promise<ActionState> {
     .eq("id", billId);
   if (error) {
     console.error("approveBill failed:", error);
-    return guardError(error, "Could not approve. Try again.");
+    return guardError(error, "Could not approve. Try again.", BILL_GUARD_PHRASES);
   }
 
   revalidatePath("/bills", "layout");
@@ -393,7 +392,7 @@ export async function sendBackBill(billId: string, note: string): Promise<Action
     .eq("id", billId);
   if (error) {
     console.error("sendBackBill failed:", error);
-    return guardError(error, "Could not send the bill back. Try again.");
+    return guardError(error, "Could not send the bill back. Try again.", BILL_GUARD_PHRASES);
   }
 
   revalidatePath("/bills", "layout");
@@ -421,7 +420,7 @@ export async function markBillPaid(billId: string, paymentRef: string): Promise<
     .eq("id", billId);
   if (error) {
     console.error("markBillPaid failed:", error);
-    return guardError(error, "Could not mark the bill paid. Try again.");
+    return guardError(error, "Could not mark the bill paid. Try again.", BILL_GUARD_PHRASES);
   }
 
   revalidatePath("/bills", "layout");
@@ -440,7 +439,7 @@ export async function deleteBill(billId: string): Promise<ActionState> {
   const { count, error } = await supabase.from("bills").delete({ count: "exact" }).eq("id", billId);
   if (error) {
     console.error("deleteBill failed:", error);
-    return guardError(error, "Could not delete the bill. Try again.");
+    return guardError(error, "Could not delete the bill. Try again.", BILL_GUARD_PHRASES);
   }
   if (!count) {
     return {
