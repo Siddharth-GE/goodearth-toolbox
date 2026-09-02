@@ -1,0 +1,212 @@
+// ---------------------------------------------------------------------
+// budget_report_lines — priced budget lines, including margin
+// ---------------------------------------------------------------------
+// Reads the 0055 view of the same name: flat columns, no embeds, no
+// chance of the ambiguous-embed trap. The view is security_invoker, so
+// this dataset sees exactly what the signed-in user's widened policies
+// allow — margin included, per the founder's explicit reversal of
+// 0011's margin boundary.
+
+import type { DatasetDef } from "./types";
+
+const BUDGET_LINES_SELECT =
+  "id, quantity, uom, unit_cost, margin_pct, client_rate, line_status, needs_review, " +
+  "priced_at, approved_at, budget_status, version, unit_id, unit_name, project_id, " +
+  "project_name, item_id, item_name, item_code, expected_vendor_id, vendor_name";
+
+const BUDGET_LINES_OPTIONS_SELECT = "line_status, budget_status, uom, item_name, item_code";
+
+export const budgetReportLines: DatasetDef = {
+  label: "Budget lines",
+  description: "Every priced budget line — cost, client rate, and the margin between them.",
+  source: "budget_report_lines",
+  select: BUDGET_LINES_SELECT,
+  optionsSelect: BUDGET_LINES_OPTIONS_SELECT,
+  projectField: "project",
+  dateFields: ["priced_on", "approved_on"],
+  money: true,
+  defaultColumns: ["project", "unit", "item", "quantity", "uom", "unit_cost", "margin_pct", "client_rate", "line_status"], // prettier-ignore
+  defaultSort: [{ field: "priced_on", dir: "desc" }],
+  fields: {
+    project: {
+      label: "Project",
+      type: "text",
+      path: "project_name",
+      identityPath: "project_id",
+      filterColumn: "project_id",
+      sortColumn: "project_name",
+      groupable: true,
+      aggregates: ["count_distinct"],
+      lookup: "projects",
+    },
+    unit: {
+      label: "Unit",
+      type: "text",
+      path: "unit_name",
+      identityPath: "unit_id",
+      filterColumn: "unit_id",
+      sortColumn: "unit_name",
+      groupable: true,
+      aggregates: ["count_distinct"],
+      lookup: "units",
+    },
+    item: {
+      label: "Item",
+      type: "text",
+      path: "item_name",
+      identityPath: "item_id",
+      filterColumn: "item_name",
+      sortColumn: "item_name",
+      groupable: true,
+      aggregates: ["count_distinct"],
+      filterOptions: "distinct",
+    },
+    item_code: {
+      label: "Item code",
+      type: "text",
+      path: "item_code",
+      identityPath: "item_id",
+      filterColumn: "item_code",
+      sortColumn: "item_code",
+      groupable: true,
+      aggregates: ["count_distinct"],
+      filterOptions: "distinct",
+    },
+    vendor: {
+      label: "Expected vendor",
+      type: "text",
+      path: "vendor_name",
+      identityPath: "expected_vendor_id",
+      filterColumn: "expected_vendor_id",
+      sortColumn: "vendor_name",
+      groupable: true,
+      aggregates: ["count_distinct"],
+      lookup: "vendors",
+    },
+    quantity: {
+      label: "Quantity",
+      type: "number",
+      path: "quantity",
+      filterColumn: "quantity",
+      sortColumn: "quantity",
+      groupable: false,
+      aggregates: ["sum", "avg", "min", "max", "count"],
+    },
+    uom: {
+      label: "Unit of measure",
+      type: "text",
+      path: "uom",
+      filterColumn: "uom",
+      sortColumn: "uom",
+      groupable: true,
+      aggregates: [],
+      filterOptions: "distinct",
+    },
+    unit_cost: {
+      label: "Unit cost",
+      type: "money",
+      path: "unit_cost",
+      filterColumn: "unit_cost",
+      sortColumn: "unit_cost",
+      groupable: false,
+      aggregates: ["avg", "min", "max", "count"],
+    },
+    margin_pct: {
+      label: "Margin %",
+      type: "number",
+      path: "margin_pct",
+      filterColumn: "margin_pct",
+      sortColumn: "margin_pct",
+      groupable: false,
+      aggregates: ["avg", "min", "max"],
+    },
+    client_rate: {
+      label: "Client rate",
+      type: "money",
+      path: "client_rate",
+      filterColumn: "client_rate",
+      sortColumn: "client_rate",
+      groupable: false,
+      aggregates: ["avg", "min", "max", "count"],
+    },
+    cost_value: {
+      label: "Cost value",
+      type: "money",
+      path: "cost_value",
+      derive: "budget_cost_value",
+      groupable: false,
+      aggregates: ["sum", "avg", "min", "max", "count"],
+    },
+    client_value: {
+      label: "Client value",
+      type: "money",
+      path: "client_value",
+      derive: "budget_client_value",
+      groupable: false,
+      aggregates: ["sum", "avg", "min", "max", "count"],
+    },
+    margin_value: {
+      label: "Margin value",
+      type: "money",
+      path: "margin_value",
+      derive: "budget_margin_value",
+      groupable: false,
+      aggregates: ["sum", "avg", "min", "max", "count"],
+    },
+    line_status: {
+      label: "Line status",
+      type: "text",
+      path: "line_status",
+      filterColumn: "line_status",
+      sortColumn: "line_status",
+      groupable: true,
+      aggregates: [],
+      filterOptions: "distinct",
+    },
+    budget_status: {
+      label: "Budget status",
+      type: "text",
+      path: "budget_status",
+      filterColumn: "budget_status",
+      sortColumn: "budget_status",
+      groupable: true,
+      aggregates: [],
+      filterOptions: "distinct",
+    },
+    needs_review: {
+      label: "Needs review",
+      type: "bool",
+      path: "needs_review",
+      filterColumn: "needs_review",
+      groupable: true,
+      aggregates: [],
+    },
+    version: {
+      label: "Budget version",
+      type: "number",
+      path: "version",
+      filterColumn: "version",
+      sortColumn: "version",
+      groupable: true,
+      aggregates: ["max", "count"],
+    },
+    priced_on: {
+      label: "Priced on",
+      type: "date",
+      path: "priced_at",
+      filterColumn: "priced_at",
+      sortColumn: "priced_at",
+      groupable: false,
+      aggregates: [],
+    },
+    approved_on: {
+      label: "Approved on",
+      type: "date",
+      path: "approved_at",
+      filterColumn: "approved_at",
+      sortColumn: "approved_at",
+      groupable: false,
+      aggregates: [],
+    },
+  },
+};
