@@ -71,11 +71,12 @@ export async function startPricing(selectionId: string): Promise<ActionState> {
     // 23505 = selection_id is unique. Two people pressed Start pricing at
     // once; the loser should land on the budget rather than see an error.
     if (error.code === "23505") {
-      const { data: existing } = await supabase
+      const { data: existing, error: existingError } = await supabase
         .from("budgets")
         .select("id")
         .eq("selection_id", selectionId)
-        .single();
+        .maybeSingle();
+      if (existingError) console.error("startPricing re-read failed:", existingError);
       if (existing) redirect(`/budgets/${existing.id}`);
     }
     console.error("startPricing failed:", error);

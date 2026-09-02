@@ -77,12 +77,16 @@ export async function addWorkCategory(
   if (name.length > 80) return { error: "Keep the name under 80 characters." };
 
   const supabase = await createClient();
-  const { data: last } = await supabase
+  const { data: last, error: lastError } = await supabase
     .from("work_categories")
     .select("sort_order")
     .order("sort_order", { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (lastError) {
+    console.error("work_categories next sort_order read failed:", lastError);
+    return { error: "Could not work out where to add it. Try again." };
+  }
 
   const { error } = await supabase.from("work_categories").insert({
     code,

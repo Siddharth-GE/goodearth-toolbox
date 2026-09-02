@@ -15,11 +15,15 @@ export default async function MarathonPinPage({
   if (!agentId) notFound();
 
   const supabase = createAdminClient();
-  const { data: agent } = await supabase
+  const { data: agent, error } = await supabase
     .from("marathon_agents")
     .select("id, name")
     .eq("id", agentId)
-    .single();
+    .maybeSingle();
+  if (error) {
+    console.error("marathon pin page read failed:", error);
+    throw new Error("Could not load that agent.");
+  }
 
   if (!agent) notFound();
 

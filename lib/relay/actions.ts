@@ -386,13 +386,17 @@ export async function addProjectStage(
 
   // Appended to the end. Reordering is its own action, so adding a stage
   // never silently reshuffles the plan.
-  const { data: last } = await supabase
+  const { data: last, error: lastError } = await supabase
     .from("project_stages")
     .select("sort_order")
     .eq("project_id", projectId)
     .order("sort_order", { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (lastError) {
+    console.error("project_stages next sort_order read failed:", lastError);
+    return { error: "Could not work out where to add it. Try again." };
+  }
 
   const { error } = await supabase.from("project_stages").insert({
     project_id: projectId,

@@ -167,14 +167,18 @@ export async function moveSpaceView(
   await requireTool("/selections");
   const supabase = await createClient();
 
-  const { data: view } = await supabase
+  const { data: view, error: viewError } = await supabase
     .from("space_views")
     .select("id, space_id, sort_order")
     .eq("id", viewId)
-    .single();
+    .maybeSingle();
+  if (viewError) {
+    console.error("moveSpaceView read failed:", viewError);
+    return { error: "Could not load that image. Try again." };
+  }
   if (!view) return { error: "That image no longer exists." };
 
-  const { data: neighbour } = await supabase
+  const { data: neighbour, error: neighbourError } = await supabase
     .from("space_views")
     .select("id, sort_order")
     .eq("space_id", view.space_id)
@@ -182,6 +186,10 @@ export async function moveSpaceView(
     .order("sort_order", { ascending: direction !== "up" })
     .limit(1)
     .maybeSingle();
+  if (neighbourError) {
+    console.error("moveSpaceView neighbour read failed:", neighbourError);
+    return { error: "Could not reorder. Try again." };
+  }
 
   // Already at the end — not an error, just nothing to do.
   if (!neighbour) return undefined;
@@ -204,11 +212,15 @@ export async function deleteSpaceView(viewId: string): Promise<ViewActionState> 
   await requireTool("/selections");
   const supabase = await createClient();
 
-  const { data: view } = await supabase
+  const { data: view, error: viewError } = await supabase
     .from("space_views")
     .select("storage_path")
     .eq("id", viewId)
-    .single();
+    .maybeSingle();
+  if (viewError) {
+    console.error("deleteSpaceView read failed:", viewError);
+    return { error: "Could not load that image. Try again." };
+  }
 
   const { error } = await supabase.from("space_views").delete().eq("id", viewId);
   if (error) {

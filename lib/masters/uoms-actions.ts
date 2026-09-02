@@ -16,12 +16,16 @@ export async function addUom(_state: UomFormState, formData: FormData): Promise<
 
   const supabase = await createClient();
 
-  const { data: last } = await supabase
+  const { data: last, error: lastError } = await supabase
     .from("uoms")
     .select("sort_order")
     .order("sort_order", { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (lastError) {
+    console.error("uoms next sort_order read failed:", lastError);
+    return { error: "Could not work out where to add it. Try again." };
+  }
 
   const { error } = await supabase.from("uoms").insert({
     name,

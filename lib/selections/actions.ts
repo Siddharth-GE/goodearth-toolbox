@@ -169,13 +169,17 @@ export async function addSpaces(unitId: string, spaces: NewSpace[]): Promise<Act
 
   const supabase = await createClient();
 
-  const { data: last } = await supabase
+  const { data: last, error: lastError } = await supabase
     .from("spaces")
     .select("sort_order")
     .eq("unit_id", unitId)
     .order("sort_order", { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (lastError) {
+    console.error("spaces next sort_order read failed:", lastError);
+    return { error: "Could not work out where to add it. Try again." };
+  }
 
   let sortOrder = (last?.sort_order ?? -1) + 1;
   const { error } = await supabase.from("spaces").insert(

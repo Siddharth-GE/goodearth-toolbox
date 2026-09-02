@@ -61,12 +61,16 @@ export async function addDesignStage(_prev: ActionState, formData: FormData): Pr
   if (name.length > NAME_LIMIT) return { error: `Keep the name under ${NAME_LIMIT} characters.` };
 
   const supabase = await createClient();
-  const { data: last } = await supabase
+  const { data: last, error: lastError } = await supabase
     .from("design_stages")
     .select("sort_order")
     .order("sort_order", { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (lastError) {
+    console.error("design_stages next sort_order read failed:", lastError);
+    return { error: "Could not work out where to add it. Try again." };
+  }
 
   // Steps of 10, the construction_stages/work_items convention — room
   // to slot one between two later without renumbering everything.
@@ -482,13 +486,17 @@ export async function uploadDrawingRevisionFile(
     return { error: "The file did not save correctly. Try again." };
   }
 
-  const { data: last } = await supabase
+  const { data: last, error: lastError } = await supabase
     .from("drawing_revision_files")
     .select("sort_order")
     .eq("drawing_revision_id", revisionId)
     .order("sort_order", { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (lastError) {
+    console.error("drawing_revision_files next sort_order read failed:", lastError);
+    return { error: "Could not work out where to add it. Try again." };
+  }
 
   const { error } = await supabase.from("drawing_revision_files").insert({
     drawing_revision_id: revisionId,
@@ -644,12 +652,16 @@ export async function createSetOnTransmittal(
     return { error: "This transmittal has been issued — what was sent cannot be changed." };
   }
 
-  const { data: last } = await supabase
+  const { data: last, error: lastError } = await supabase
     .from("drawing_sets")
     .select("sort_order")
     .order("sort_order", { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (lastError) {
+    console.error("drawing_sets next sort_order read failed:", lastError);
+    return { error: "Could not work out where to add it. Try again." };
+  }
 
   const { data: set, error } = await supabase
     .from("drawing_sets")
@@ -781,13 +793,17 @@ async function appendTransmittalLine(
   unitId: string,
   revisionId: string,
 ): Promise<string | undefined> {
-  const { data: last } = await supabase
+  const { data: last, error: lastError } = await supabase
     .from("transmittal_lines")
     .select("sort_order")
     .eq("transmittal_id", transmittalId)
     .order("sort_order", { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (lastError) {
+    console.error("transmittal_lines next sort_order read failed:", lastError);
+    return "Could not add that drawing to the transmittal. Try again.";
+  }
 
   const { error } = await supabase.from("transmittal_lines").insert({
     transmittal_id: transmittalId,

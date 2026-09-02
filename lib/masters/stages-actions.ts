@@ -21,12 +21,16 @@ export async function addConstructionStage(
 
   // New stages land at the end of the sequence; steps of 10 leave room
   // to slot one between two later by editing sort_order in the database.
-  const { data: last } = await supabase
+  const { data: last, error: lastError } = await supabase
     .from("construction_stages")
     .select("sort_order")
     .order("sort_order", { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (lastError) {
+    console.error("construction_stages next sort_order read failed:", lastError);
+    return { error: "Could not work out where to add it. Try again." };
+  }
 
   const { error } = await supabase.from("construction_stages").insert({
     name,
