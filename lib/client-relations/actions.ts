@@ -224,23 +224,6 @@ export async function assignPlot(
   return undefined;
 }
 
-/**
- * Undo a booking: the plot goes back to available and loses its buyer.
- *
- * Its own function rather than crm_assign_unit with a null client — see
- * 0051 for why. The person stays a client; they simply hold no plot.
- */
-export async function unassignPlot(unitId: string): Promise<ActionState> {
-  await requireTool(GRANT);
-
-  const supabase = await createClient();
-  const { error } = await supabase.rpc("crm_release_unit", { p_unit_id: unitId });
-  if (error) return friendly(error, "Could not release that plot. Try again.");
-
-  revalidateAll();
-  return undefined;
-}
-
 // ---------------------------------------------------------------------
 // The plot record
 // ---------------------------------------------------------------------

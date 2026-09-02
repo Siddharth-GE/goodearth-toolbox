@@ -1036,12 +1036,6 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
   };
 }
 
-/** The templates a new villa estimate can be copied from. */
-export async function listTemplates(): Promise<EstimateRow[]> {
-  const estimates = await listEstimates();
-  return estimates.filter((estimate) => estimate.isTemplate);
-}
-
 // ---------------------------------------------------------------------
 // Issued against the official estimate (0080)
 // ---------------------------------------------------------------------

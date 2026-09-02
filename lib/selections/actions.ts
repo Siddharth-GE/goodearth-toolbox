@@ -112,28 +112,6 @@ export async function createNextRevision(fromSelectionId: string): Promise<Actio
   redirect(`/selections/${data}`);
 }
 
-export async function deleteDraft(selectionId: string): Promise<ActionState> {
-  await requireTool("/selections");
-  const supabase = await createClient();
-
-  // One database function, one transaction (migration 0017). This used
-  // to be two requests — delete the lines, then the draft — and a
-  // failure between them (someone issuing the draft at that moment)
-  // stranded a draft with every line permanently gone.
-  const { error } = await supabase.rpc("delete_draft_selection", {
-    p_selection_id: selectionId,
-  });
-  if (error) {
-    console.error("deleteDraft failed:", error);
-    return {
-      error: error.message.replace(/^.*?:\s*/, "") || "Could not discard this draft. Try again.",
-    };
-  }
-
-  revalidatePath("/selections", "layout");
-  redirect("/selections/units");
-}
-
 // ---------------------------------------------------------------------
 // Spaces
 // ---------------------------------------------------------------------
@@ -197,25 +175,6 @@ export async function addSpaces(unitId: string, spaces: NewSpace[]): Promise<Act
     }
     console.error("addSpaces failed:", error);
     return { error: "Could not add the spaces. Try again." };
-  }
-
-  revalidatePath("/selections", "layout");
-  return undefined;
-}
-
-export async function removeSpace(spaceId: string): Promise<ActionState> {
-  await requireTool("/selections");
-  const supabase = await createClient();
-
-  const { error } = await supabase.from("spaces").delete().eq("id", spaceId);
-  if (error) {
-    // 23503 = still referenced by selection_lines. That's the FK doing its
-    // job, not a bug — a space holding lines must not silently vanish.
-    if (error.code === "23503") {
-      return { error: "This space still has items in it. Remove them first." };
-    }
-    console.error("removeSpace failed:", error);
-    return { error: "Could not remove the space. Try again." };
   }
 
   revalidatePath("/selections", "layout");
