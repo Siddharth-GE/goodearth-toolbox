@@ -8,7 +8,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { COMMANDS, commandId, senderEmail, senderName, spaceName } from "./events";
+import {
+  COMMANDS,
+  commandId,
+  dialogEventType,
+  formValue,
+  isDirectMessage,
+  senderEmail,
+  senderName,
+  spaceDisplayName,
+  spaceName,
+} from "./events";
 
 test("the email is read from chat.user", () => {
   assert.equal(
@@ -126,4 +136,104 @@ test("every declared command id maps to a slash command name", () => {
   for (const name of Object.values(COMMANDS)) {
     assert.match(name, /^\/[a-z]+$/);
   }
+});
+
+test("a button click names its space and its sender like any other event", () => {
+  const event = {
+    chat: {
+      buttonClickedPayload: {
+        space: { name: "spaces/e" },
+        message: { sender: { name: "users/7", email: "Sid@Goodearth.test" } },
+      },
+    },
+  };
+  assert.equal(spaceName(event), "spaces/e");
+  assert.equal(senderName(event), "users/7");
+  assert.equal(senderEmail(event), "sid@goodearth.test");
+});
+
+test("the space's display name is what the join match reads", () => {
+  assert.equal(
+    spaceDisplayName({
+      chat: {
+        addedToSpacePayload: { space: { name: "spaces/a", displayName: "Saarang Villa 12" } },
+      },
+    }),
+    "Saarang Villa 12",
+  );
+  assert.equal(
+    spaceDisplayName({ chat: { appCommandPayload: { space: { displayName: "  Baveli 1  " } } } }),
+    "Baveli 1",
+  );
+  assert.equal(spaceDisplayName({ chat: { messagePayload: { space: { name: "spaces/b" } } } }), "");
+  assert.equal(spaceDisplayName({}), "");
+});
+
+test("a DM is recognised from either field Google uses", () => {
+  assert.equal(isDirectMessage({ chat: { messagePayload: { space: { type: "DM" } } } }), true);
+  assert.equal(
+    isDirectMessage({ chat: { appCommandPayload: { space: { spaceType: "DIRECT_MESSAGE" } } } }),
+    true,
+  );
+  assert.equal(
+    isDirectMessage({
+      chat: { addedToSpacePayload: { space: { type: "ROOM", spaceType: "SPACE" } } },
+    }),
+    false,
+  );
+  assert.equal(isDirectMessage({}), false);
+});
+
+test("the dialog step is read from the command and from the button click", () => {
+  assert.equal(
+    dialogEventType({
+      chat: { appCommandPayload: { isDialogEvent: true, dialogEventType: "REQUEST_DIALOG" } },
+    }),
+    "REQUEST_DIALOG",
+  );
+  assert.equal(
+    dialogEventType({ chat: { buttonClickedPayload: { dialogEventType: "SUBMIT_DIALOG" } } }),
+    "SUBMIT_DIALOG",
+  );
+  assert.equal(
+    dialogEventType({ chat: { buttonClickedPayload: { dialogEventType: "CANCEL_DIALOG" } } }),
+    "CANCEL_DIALOG",
+  );
+});
+
+test("a command that arrived without the dialog tick has no dialog step", () => {
+  assert.equal(
+    dialogEventType({ chat: { appCommandPayload: { appCommandMetadata: { appCommandId: 7 } } } }),
+    null,
+  );
+  assert.equal(
+    dialogEventType({ chat: { appCommandPayload: { dialogEventType: "SOMETHING_NEW" } } }),
+    null,
+  );
+  assert.equal(dialogEventType({}), null);
+});
+
+test("a form value is the first string under its input name, or null", () => {
+  const event = {
+    commonEventObject: {
+      formInputs: { target: { stringInputs: { value: ["unit:u-villa-12"] } } },
+    },
+  };
+  assert.equal(formValue(event, "target"), "unit:u-villa-12");
+  assert.equal(formValue(event, "other"), null);
+  assert.equal(formValue({}, "target"), null);
+  assert.equal(
+    formValue(
+      { commonEventObject: { formInputs: { target: { stringInputs: { value: [] } } } } },
+      "target",
+    ),
+    null,
+  );
+  assert.equal(
+    formValue(
+      { commonEventObject: { formInputs: { target: { stringInputs: { value: ["  "] } } } } },
+      "target",
+    ),
+    null,
+  );
 });
