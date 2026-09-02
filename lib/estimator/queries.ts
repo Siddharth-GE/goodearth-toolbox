@@ -4,6 +4,7 @@ import { requireTool } from "@/lib/auth/access";
 import { listActiveUomNames } from "@/lib/masters/uoms";
 import { listWorkCategories, listWorkGroups, listWorkItems } from "@/lib/masters/works";
 import { fetchAll } from "@/lib/supabase/fetch-all";
+import { readFailed } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
 import type { FrozenLineRow, FrozenTakeoffRow, MaterialDef, MixDef, WorkRecipe } from "./calc";
 import { compareIssuesToEstimate } from "./compare";
@@ -35,10 +36,8 @@ import { compareIssuesToEstimate } from "./compare";
 
 const GRANT = "/estimator";
 
-function fail(context: string, error: { message: string }): never {
-  console.error(`estimator: ${context} failed:`, error);
-  throw new Error(`Could not load ${context}.`);
-}
+const fail = (context: string, error: { message: string }): never =>
+  readFailed("estimator", context, error);
 
 // ---------------------------------------------------------------------
 // Welcome

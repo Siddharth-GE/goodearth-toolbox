@@ -4,8 +4,10 @@ import { requireTool } from "@/lib/auth/access";
 import { requireUser } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAll } from "@/lib/supabase/fetch-all";
+import { assertRead } from "@/lib/supabase/read-failed";
 
-import { todayInIndia, upcomingBirthdays } from "./birthdays";
+import { todayInIndia } from "@/lib/format";
+import { upcomingBirthdays } from "./birthdays";
 
 /**
  * Reads for the Directory.
@@ -41,11 +43,8 @@ const GRANT = "/directory";
 /** How far ahead the birthday list looks, unless a caller says otherwise. */
 export const BIRTHDAY_WINDOW_DAYS = 30;
 
-function fail(context: string, error: { message: string } | null): void {
-  if (error) {
-    console.error(`Directory read failed (${context}):`, error);
-    throw new Error(`Could not load ${context}: ${error.message}`, { cause: error });
-  }
+function fail(context: string, error: { message: string } | null): asserts error is null {
+  assertRead("Directory", context, error);
 }
 
 export type DirectoryPerson = {
