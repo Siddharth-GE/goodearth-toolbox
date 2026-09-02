@@ -6,12 +6,11 @@ import { FormMessage } from "@/components/ui/form-message";
 import { IconButton } from "@/components/ui/icon-button";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { setDrawingRevisionWorks, updateDraftRevisionNote } from "@/lib/design-management/actions";
 import {
   deleteDrawingRevisionFile,
-  setDrawingRevisionWorks,
-  updateDraftRevisionNote,
   uploadDrawingRevisionFile,
-} from "@/lib/design-management/actions";
+} from "@/lib/design-management/files-actions";
 import type { DrawingRevisionRow } from "@/lib/design-management/queries";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
 import type { WorksTreeCategory } from "@/lib/masters/works";
