@@ -135,9 +135,7 @@ export function HouseQueue({
                   size="sm"
                   variant="ghost"
                   disabled={busy !== null}
-                  onClick={() =>
-                    run(trail.chainId, () => startTrail(trail.chainId, projectId, unitId))
-                  }
+                  onClick={() => run(trail.chainId, () => startTrail(trail.chainId))}
                 >
                   <Play className="size-4" />
                   {busy === trail.chainId ? "Starting…" : "Start"}
@@ -147,9 +145,7 @@ export function HouseQueue({
                   tone="danger"
                   aria-label={`Remove ${trail.activityName}`}
                   disabled={busy !== null}
-                  onClick={() =>
-                    run(`x-${trail.chainId}`, () => discardTrail(trail.chainId, projectId, unitId))
-                  }
+                  onClick={() => run(`x-${trail.chainId}`, () => discardTrail(trail.chainId))}
                 >
                   <X className="size-4" />
                 </IconButton>

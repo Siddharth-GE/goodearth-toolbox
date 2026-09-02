@@ -132,7 +132,7 @@ export async function uploadSpaceView(
     return { error: "Could not save the image. Try again." };
   }
 
-  revalidatePath(`/selections/${selectionId}`);
+  revalidatePath("/selections", "layout");
   return undefined;
 }
 
@@ -196,14 +196,11 @@ export async function moveSpaceView(
     return { error: "Could not reorder. Try again." };
   }
 
-  revalidatePath(`/selections/${selectionId}`);
+  revalidatePath("/selections", "layout");
   return undefined;
 }
 
-export async function deleteSpaceView(
-  viewId: string,
-  selectionId: string,
-): Promise<ViewActionState> {
+export async function deleteSpaceView(viewId: string): Promise<ViewActionState> {
   await requireTool("/selections");
   const supabase = await createClient();
 
@@ -223,6 +220,6 @@ export async function deleteSpaceView(
   // row pointing at a deleted file is a broken image on a client document.
   if (view?.storage_path) await supabase.storage.from(BUCKET).remove([view.storage_path]);
 
-  revalidatePath(`/selections/${selectionId}`);
+  revalidatePath("/selections", "layout");
   return undefined;
 }

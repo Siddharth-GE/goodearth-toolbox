@@ -182,7 +182,6 @@ export async function recordGoodsReceipt(input: RecordReceiptInput): Promise<Act
   }
 
   revalidatePath("/inventory", "layout");
-  revalidatePath("/inventory/stock");
   revalidatePath(`/purchase-orders/${input.poId}`);
   redirect(`/inventory/receipts/${receiptId}`);
 }
@@ -279,7 +278,7 @@ export async function recordStockIssue(input: RecordIssueInput): Promise<ActionS
     });
     if (lineError) {
       console.error("recordStockIssue line insert failed:", lineError);
-      revalidatePath("/inventory/issues");
+      revalidatePath("/inventory", "layout");
       const friendly = guardError(lineError, "A line was refused.");
       return {
         error:
@@ -305,12 +304,11 @@ export async function recordStockIssue(input: RecordIssueInput): Promise<ActionS
       .eq("id", input.requestId)
       .eq("status", "requested");
     if (stampError) console.error("recordStockIssue: request stamp failed:", stampError);
-    revalidatePath("/inventory/requests");
+    revalidatePath("/inventory", "layout");
     revalidatePath("/supervisors", "layout");
   }
 
-  revalidatePath("/inventory/issues");
-  revalidatePath("/inventory/stock");
+  revalidatePath("/inventory", "layout");
   redirect(`/inventory/issues/${issueId}`);
 }
 
@@ -341,7 +339,7 @@ export async function declineSiteRequest(id: string, reason: string): Promise<Ac
   }
   if (!count) return { error: "This request has already been answered." };
 
-  revalidatePath("/inventory/requests");
+  revalidatePath("/inventory", "layout");
   revalidatePath("/supervisors", "layout");
   return undefined;
 }
@@ -393,8 +391,7 @@ export async function recordStockAdjustment(input: RecordAdjustmentInput): Promi
     return guardError(error, "Could not save that adjustment. Try again.");
   }
 
-  revalidatePath("/inventory/adjustments");
-  revalidatePath("/inventory/stock");
+  revalidatePath("/inventory", "layout");
   return undefined;
 }
 
@@ -429,6 +426,6 @@ export async function retagIssueWork(issueId: string, workItemId: string): Promi
     return guardError(error, "Could not save. Try again.");
   }
 
-  revalidatePath("/inventory/issues");
+  revalidatePath("/inventory", "layout");
   return undefined;
 }

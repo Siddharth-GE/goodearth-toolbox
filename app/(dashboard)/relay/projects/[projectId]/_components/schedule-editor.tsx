@@ -232,7 +232,7 @@ function StageRow({
         tone="danger"
         size="sm"
         disabled={disabled}
-        onClick={() => run(() => deleteProjectStage(stage.id, projectId))}
+        onClick={() => run(() => deleteProjectStage(stage.id))}
       >
         <X className="size-4" />
       </IconButton>

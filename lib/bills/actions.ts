@@ -213,7 +213,7 @@ export async function createLabourContract(
     return { error: "Could not record the labour contract. Try again." };
   }
 
-  revalidatePath("/bills/contracts");
+  revalidatePath("/bills", "layout");
   return undefined;
 }
 
@@ -240,7 +240,7 @@ export async function updateLabourContract(
     return guardError(error, "Could not update the labour contract. Try again.");
   }
 
-  revalidatePath("/bills/contracts");
+  revalidatePath("/bills", "layout");
   return undefined;
 }
 
@@ -264,7 +264,7 @@ export async function approveLabourContract(contractId: string): Promise<ActionS
     return guardError(error, "Could not approve the contract. Try again.");
   }
 
-  revalidatePath("/bills/contracts");
+  revalidatePath("/bills", "layout");
   return undefined;
 }
 
@@ -286,8 +286,7 @@ export async function setLabourContractActive(
     return guardError(error, "Could not update the contract. Try again.");
   }
 
-  revalidatePath("/bills/contracts");
-  revalidatePath("/bills/new");
+  revalidatePath("/bills", "layout");
   return undefined;
 }
 
@@ -341,7 +340,6 @@ export async function updateBill(billId: string, input: UpdateBillInput): Promis
     return guardError(error, "Could not save. Try again.");
   }
 
-  revalidatePath(`/bills/${billId}`);
   revalidatePath("/bills", "layout");
   return undefined;
 }
@@ -371,7 +369,6 @@ export async function approveBill(billId: string): Promise<ActionState> {
     return guardError(error, "Could not approve. Try again.");
   }
 
-  revalidatePath(`/bills/${billId}`);
   revalidatePath("/bills", "layout");
   return undefined;
 }
@@ -399,7 +396,6 @@ export async function sendBackBill(billId: string, note: string): Promise<Action
     return guardError(error, "Could not send the bill back. Try again.");
   }
 
-  revalidatePath(`/bills/${billId}`);
   revalidatePath("/bills", "layout");
   return undefined;
 }
@@ -428,7 +424,6 @@ export async function markBillPaid(billId: string, paymentRef: string): Promise<
     return guardError(error, "Could not mark the bill paid. Try again.");
   }
 
-  revalidatePath(`/bills/${billId}`);
   revalidatePath("/bills", "layout");
   return undefined;
 }
