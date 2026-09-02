@@ -41,7 +41,7 @@ Every conversation starts the same way: the founder says **"read CLAUDE.md"**, a
 - **Never add a money column to a fact view. Never add a second SELECT policy to a gated table** — widen the existing qual.
 - **Redefining `has_app()` or `is_admin()` must carry `session_is_verified()` forward.**
 - Every unauthenticated route goes in `PUBLIC_PATHS` as an **exact string**.
-- Actions return `ActionState`, never throw. **Never `export type` from a `"use server"` file.**
+- Actions return `ActionState`, never throw. **Never re-export a type from a `"use server"` file** — `export type { X }`, `export { type X }`, `export type * from` — a plain `export type X = …` declaration is fine, and `check:actions` enforces exactly that line.
 - **Always check `error`, not just `data`.** Completeness goes through `fetchAll`. An embed through a table with two FKs to the same target names the key. **A green build proves nothing about a `select` string — open the page.**
 - In the line chain, **deletion is refused, not cascaded**; anchor on stable ids or the composite FK, never a bare `line_key`.
 - **Never seed a real default credential** — a seed is a fixture in development and a credential in production.
