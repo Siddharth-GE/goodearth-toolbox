@@ -1,4 +1,5 @@
 import { hasApp } from "@/lib/auth/access";
+import { CATALOGUE_TOOLS } from "@/lib/tools";
 import { CATALOGUE_PAGE_SIZE, catalogueSearchFilter } from "@/lib/masters/catalogue";
 import { getCurrentUser } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
@@ -21,16 +22,14 @@ import { createClient } from "@/lib/supabase/server";
 export async function GET(request: Request) {
   const user = await getCurrentUser();
   if (!user) return new Response("Unauthorized", { status: 401 });
-  // Seven tools browse the catalogue: designers picking items, Masters
-  // checking a request against what already exists, Budgets setting a
-  // product's default margin, Indents adding direct request lines,
-  // Inventory choosing the item a stock adjustment applies to, the
-  // Estimator linking a material to the item it is bought as, and
-  // Purchase Orders adding direct bulk-buy lines (0079). Every
-  // tool that renders components/masters/catalogue-picker.tsx must be
-  // listed here — a missing grant fails as an unparseable fetch
-  // response inside the dialog, not as a friendly refusal (found by the
-  // Phase 7 store-keeper smoke, where /inventory was absent).
+  // The tools that browse the catalogue are the ones flagged `catalogue`
+  // in lib/tools.ts — designers picking items, Masters checking a request
+  // against what exists, Budgets setting a default margin, Indents and
+  // Purchase Orders adding direct lines, Inventory choosing the item an
+  // adjustment applies to, Supervisors requesting material. The list used
+  // to be typed here by hand and drifted: a missing grant fails as an
+  // unparseable fetch inside the dialog, not as a friendly refusal (found
+  // by the Phase 7 store-keeper smoke, where /inventory was absent).
   //
   // hasApp rather than requireApp because a redirect is meaningless in a
   // fetch response.
@@ -38,15 +37,8 @@ export async function GET(request: Request) {
   // Note what this returns: name, code, brand, thumbnail and the
   // indicative price. No cost and no margin — those live in tables only
   // /budgets can read, and this endpoint never touches them.
-  const allowed =
-    (await hasApp(user, "/selections")) ||
-    (await hasApp(user, "/masters")) ||
-    (await hasApp(user, "/budgets")) ||
-    (await hasApp(user, "/indents")) ||
-    (await hasApp(user, "/inventory")) ||
-    (await hasApp(user, "/estimator")) ||
-    (await hasApp(user, "/purchase-orders")) ||
-    (await hasApp(user, "/supervisors"));
+  const grants = await Promise.all(CATALOGUE_TOOLS.map((href) => hasApp(user, href)));
+  const allowed = grants.some(Boolean);
   if (!allowed) return new Response("Forbidden", { status: 403 });
 
   const { searchParams } = new URL(request.url);

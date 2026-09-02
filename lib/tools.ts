@@ -67,6 +67,14 @@ export type Tool = {
    * that Settings says it out loud, next to the tick, not in a doc.
    */
   grantWarning?: string;
+  /**
+   * Renders the shared catalogue picker or margins browser, so this grant
+   * must reach /api/catalogue. The route derives its allow-list from this
+   * flag: a tool that adopts the picker without setting it fails as an
+   * unparseable fetch inside the dialog, not as a friendly refusal — the
+   * way /inventory once did, when the route kept a hand list.
+   */
+  catalogue?: true;
 };
 
 // A tool is visible to admins (always, every tool), and to staff who've
@@ -92,6 +100,7 @@ export const TOOLS: Tool[] = [
     icon: "HardHat",
     group: "Operations",
     built: true,
+    catalogue: true,
   },
   {
     name: "Selections",
@@ -100,6 +109,7 @@ export const TOOLS: Tool[] = [
     icon: "Palette",
     group: "Operations",
     built: true,
+    catalogue: true,
   },
   {
     name: "Budgets",
@@ -108,6 +118,7 @@ export const TOOLS: Tool[] = [
     icon: "PiggyBank",
     group: "Operations",
     built: true,
+    catalogue: true,
   },
   {
     name: "Indents",
@@ -116,6 +127,7 @@ export const TOOLS: Tool[] = [
     icon: "ClipboardList",
     group: "Operations",
     built: true,
+    catalogue: true,
   },
   {
     name: "Purchase Orders",
@@ -124,6 +136,7 @@ export const TOOLS: Tool[] = [
     icon: "ShoppingCart",
     group: "Operations",
     built: true,
+    catalogue: true,
   },
   {
     name: "Inventory",
@@ -132,6 +145,7 @@ export const TOOLS: Tool[] = [
     icon: "Warehouse",
     group: "Operations",
     built: true,
+    catalogue: true,
   },
   {
     name: "Bills",
@@ -172,6 +186,7 @@ export const TOOLS: Tool[] = [
     icon: "Boxes",
     group: "Admin",
     built: true,
+    catalogue: true,
   },
   {
     name: "Settings",
@@ -250,6 +265,9 @@ export const TOOLS: Tool[] = [
 // Tools a user can actually be granted (Settings manages access, so it
 // isn't itself grantable — only reachable via the admin bypass).
 export const GRANTABLE_TOOLS = TOOLS.filter((tool) => tool.href !== "/settings");
+
+// The grants that may search the catalogue — see Tool.catalogue.
+export const CATALOGUE_TOOLS = TOOLS.filter((tool) => tool.catalogue).map((tool) => tool.href);
 
 export function visibleTools(profile: { role: string } | null, grantedApps: string[]) {
   if (!profile) return [];
