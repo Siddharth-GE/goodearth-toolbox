@@ -44,7 +44,7 @@ Branch `feature/google-chat`; each phase committed and pushed separately with a 
 
 - **Phase 1 — The door.** ✅ Done 2026-09-01 (`feature/google-chat`, PR #54). JWT verification + route handler answering every event with a friendly stub + `PUBLIC_PATHS` entry + env vars + pure-logic tests. _(Detailed below.)_ Verified locally: POST without/with garbage token → 401, GET → 405, other API paths still redirect. Note for Phase 2: Vercel's SSO protection blocks preview URLs entirely, so the Chat app endpoint must be `staging.goodearthkannur.org` (custom domain, unprotected) — a raw preview URL will never reach the route.
 - **Phase 2 — Google-side setup (with the founder; needs Workspace admin).** ✅ Done 2026-09-01. Cloud project `goodearth-relay-staging` (number `172003223574`), Chat API on, staging app registered at the clean endpoint URL, bot live in a test space and DM — greets on join, answers messages and mentions. Hard-won knowledge: **(a)** Vercel's SSO protection also covered the staging custom domain and Google appears to validate the endpoint at save time, so **Vercel Authentication is now switched OFF for the project** (staging's login page is public, production's posture; the bypass-secret detour didn't survive because the secret would sit inside the signed token's audience). **(b)** Google saves after an endpoint change only start delivering after a re-save once the endpoint answers — re-save the config if deliveries seem dead. **(c)** Slash commands are declared (ids 1–7, `/court`…`/link`) and reached the door on 2026-09-02 — message/mention/join delivery took minutes, commands took overnight. **(d)** One command stayed dead while the other six worked: `/court`, whose description contained an em-dash. Google's client half-knew it (the space marked it "Only visible to you", the DM sent it as plain text) and the dispatcher never sent it — silently, with no "not responding" error. Retyping the description in plain ASCII fixed it within a minute. **Rule: plain ASCII in every command name and description.** The door now logs one line per event (`google-chat event {kind, space, commandId}`, never the text) — `npx vercel logs staging.goodearthkannur.org --json` is how "did Google send it?" gets answered.
-- **Phase 3 — Identity.** Email→person mapping, refusal cards for unlinked/inactive accounts.
+- **Phase 3 — Identity.** 🔨 In progress 2026-09-02 — Fable planned it, Opus and Sonnet are building. Email→person mapping, refusal cards for unlinked/inactive accounts. _(Detailed below.)_
 - **Phase 4 — Space linking.** Migration `google_chat_spaces` (staging first: `npm run db:apply -- --project <ref> --commit`); `ADDED_TO_SPACE` auto-match + announcement; `/link` dialog.
 - **Phase 5 — Reads.** `/trail` and `/court` cards, scope-aware.
 - **Phase 6 — Writes, buttons first.** `act-as.ts` session minting (reuse the row-write inside `markSessionVerified` in `lib/auth/verified-session.ts`; extract a shared helper if it proves cookie-coupled); push / finish / hold / return via `CARD_CLICKED`; public confirmations; revalidation.
@@ -84,3 +84,73 @@ Branch `feature/google-chat`; each phase committed and pushed separately with a 
 ### What the founder sees after Phase 1
 
 Nothing in chat yet — this phase is the locked door. The demo moment is the end of Phase 2, when the bot says hello in the test space. Phase 2 needs a short sit-down with Workspace admin access.
+
+---
+
+## Phase 3 in detail — identity
+
+**Goal:** every command and message knows WHO typed it, as a toolbox account, before anything else happens. Refusals are polite, private and specific. Still no relay reads, no writes, no migration. Owner tags: `[Opus]` builds the mapping and the door; `[Sonnet]` writes the words; `[Fable]` reviews, and each commit carries its builder's own co-author line.
+
+### The idea
+
+Google names the sender on every event. The door turns that into one of six answers and never anything else:
+
+| Decision   | Meaning                                                                        | What the person sees                                                                              |
+| ---------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `ok`       | A live toolbox account holding `/relay` (admins hold everything)               | The command proceeds — for Phase 3, the stub reply greets them by first name                      |
+| `no-email` | Google sent no usable email (external user, a bot, or a shape we haven't seen) | "Google didn't tell me who you are, so I can't act for you. Ask an admin to check the Relay bot." |
+| `unknown`  | The email matches no toolbox account                                           | "I don't know you yet: there's no toolbox account for this email. Ask an admin in Settings."      |
+| `inactive` | The account exists and is deactivated                                          | "Your toolbox account is switched off, so I can't act for you. Ask an admin in Settings."         |
+| `no-relay` | Live account, but no `/relay` grant                                            | "You don't have the Relay tool yet. Ask an admin to grant it in Settings."                        |
+| `failed`   | The lookup itself broke (auth API down, profile read error)                    | "I couldn't check who you are just now. Please try again in a moment."                            |
+
+Two things that never happen: the email is never logged or echoed, and the door never says more about who exists in the system than these fixed sentences.
+
+**Admin-client use, sanctioned here:** the door has no browser session, so the email lookup (`auth.admin.listUsers`) and the profile-plus-grants read go through `createAdminClient()`. Both are reads of shell-owned tables, and the result is only ever a decision — the same shape as `markSessionVerified`. `SECURITY.md`'s sanctioned list gains one line in the same commit, not in Phase 8.
+
+### Where the email is
+
+Google's docs are silent on whether `chat.user.email` is populated for add-on-style events (the `User` resource lists no email; classic events carried `user.email` for same-Workspace users). So the code reads the first of `chat.user.email`, `chat.messagePayload.message.sender.email`, `chat.appCommandPayload.message.sender.email` that is a string, and treats absence as the `no-email` decision — a polite reply, not a crash. **The founder's first `/court` on staging after this deploys is the probe:** the log line says which decision was reached, and if it says `no-email` the fix is a shape change in one function, not a redesign. Also refused before any lookup: `chat.user.type === "BOT"`.
+
+### Files
+
+1. **`lib/google-chat/events.ts`** `[Opus]` — the `ChatEvent`/`ChatMessage`/`ChatSpace` types move here out of `route.ts`, and grow a `ChatUser` (`name?: string` — `users/<id>`; `displayName?`; `email?`; `type?: "HUMAN" | "BOT" | string`) on `chat.user` and on `message.sender`. Plus pure helpers, tested in `events.test.ts`: `senderEmail(event): string | null` (trimmed, lower-cased, must contain `@`, null for a BOT sender), `senderName(event): string | null` (the `users/…` resource name, for private replies), and `spaceName(event)` / `commandId(event)` lifted from the route so it reads as dispatch only. The `COMMANDS` map moves here too.
+2. **`lib/google-chat/identity.ts`** `[Opus]` — split pure/impure like `verify.ts`:
+   - `export type Identity = { kind: "ok"; userId: string; fullName: string | null; firstName: string; isAdmin: boolean; grantedApps: string[] } | { kind: "no-email" | "unknown" | "inactive" | "no-relay" | "failed" }`.
+   - `decideIdentity(email: string | null, authUser: { id: string } | null, profile: { id: string; full_name: string | null; role: string; is_active: boolean; apps: string[] } | null): Identity` — **pure**, no I/O, the whole decision table above in one function. Admin (`role === "admin"`) counts as holding `/relay`. `firstName` is the first word of `full_name`, or `"there"` when blank, so the greeting reads "Hi there".
+   - `resolveIdentity(event): Promise<Identity>` — the I/O wrapper: `senderEmail` → `null` short-circuits to `no-email`; `admin.auth.admin.listUsers({ perPage: 1000 })` and a case-insensitive match on `user.email` (about 70 accounts, one page; **the `perPage` is load-bearing** — the default page is 50 and would silently miss people); then the profile read with the exact `dal.ts` select — `id, full_name, role, is_active, user_apps(app), roles!profiles_role_id_fkey(role_apps(app))` — **the FK is named** (BUGCATCHER #2). Any `error` → `failed` with a `console.error` that never includes the email. Never throws.
+   - `lib/google-chat/identity.test.ts` `[Opus]` — `decideIdentity` for all six decisions, plus: an admin with no explicit grant is `ok`; a grant through a role bundle is `ok`; a profile row for a different id than the auth user is `failed`.
+3. **`lib/google-chat/cards.ts`** `[Sonnet]` — words only, no I/O: `identityRefusal(kind: Exclude<Identity["kind"], "ok">): string` returning the six-table sentences above verbatim, and `greeting(firstName: string, command: string | null): string` for the Phase 3 stub ("Hi Siddharth! I heard /court — it isn't wired up yet, but now I know who's asking." / without a command: "Hi Siddharth! Slash commands are on their way — nothing to run just yet."). Message text may use em-dashes; trap (d) was about the command _description_ field in Google's console, not about replies. `cards.test.ts` `[Sonnet]` pins every sentence and that no text contains an `@`.
+4. **`app/api/google-chat/route.ts`** `[Opus]` —
+   - imports the types and helpers from `events.ts`; keeps the token gate and allowed-spaces logic byte-for-byte.
+   - `card(text)` gains an optional viewer: `card(text, privateTo?: string)` sets `message.privateMessageViewer = { name: privateTo }` when given — refusals go private to the sender; the `ADDED_TO_SPACE` hello stays public. If Google rejects the field inside the add-on envelope, the fallback is a public reply, noted in the phase's trap list — not a debugging round.
+   - After the allow-list check, for `messagePayload` and `appCommandPayload` events only: `const identity = await resolveIdentity(event)`. Not `ok` → `card(identityRefusal(identity.kind), senderName(event))`. `ok` → the existing stub, now `greeting(identity.firstName, commandName)`.
+   - The one log line gains `sender: identity.kind` (and stays free of the email and the text). `ADDED_TO_SPACE`/`REMOVED` never look up identity.
+   - The outer `try` still turns any surprise into the polite 200.
+5. **`SECURITY.md`** `[Opus]` — the sanctioned-exceptions sentence in "Auth and permissions" gains the Google Chat door's `lib/google-chat/identity.ts` (email → account lookup via the auth admin API plus a profile-and-grants read — reads only, no session, decision-only).
+6. **`lib/supabase/admin.ts`** `[Opus]` — its comment names the Chat door as a caller (one line).
+
+### What is NOT in Phase 3
+
+No session minting (Phase 6), no relay reads (Phase 5), no `google_chat_spaces` (Phase 4), no per-Google-user cache table (round-one deferral; the auth API is one call per command at this size), no domain allow-list beyond "matches an existing account".
+
+### Acceptance
+
+- `npm test`, `npm run typecheck`, `npm run lint`, `npm run format:check` green locally; full CI green via `gh run list`.
+- On staging, in the test space: the founder types `/court` and sees a greeting with their first name, visible only to them. The refusal paths are proven by the tests; never deactivate a real colleague to try one. If a Workspace member without a toolbox account is at hand, their `/court` proves `unknown`.
+- `npx vercel logs staging.goodearthkannur.org --json` shows `sender: "ok"` on the founder's command.
+
+### What the founder sees after Phase 3
+
+The bot greets you by name and knows which command you asked for; anyone without an account or without the Relay tool is told so, privately. Still no trails moving — that is Phases 5 and 6.
+
+### Steps, ticked as they land
+
+- [ ] `[Opus]` `events.ts` + `events.test.ts`, `identity.ts` + `identity.test.ts`, route wiring, `SECURITY.md` line, `admin.ts` comment.
+- [ ] `[Sonnet]` `cards.ts` + `cards.test.ts`.
+- [ ] `[Fable]` review the diff against this section and `SECURITY.md`; builders commit with their own co-author lines; push `feature/google-chat`; CI green; PR into `staging`.
+- [ ] Founder vets on staging (the probe above); trap list updated if the email lived somewhere else.
+
+### Questions for the tier above
+
+_(none yet — a builder writes here and stops when something is off-plan)_
