@@ -326,3 +326,20 @@ test("buttonParams: a non-string value is dropped, not coerced", () => {
     { action: "push" },
   );
 });
+
+test("a press on the bot's own card still names the person in chat.user", () => {
+  // Google sends the card as the message behind a button press, and the
+  // card's sender is the bot — that must not hide the human who pressed.
+  assert.equal(
+    senderEmail({
+      chat: {
+        user: { name: "users/1", type: "HUMAN", email: "Person@Goodearth.test" },
+        buttonClickedPayload: {
+          message: { sender: { name: "users/bot", type: "BOT" } },
+          dialogEventType: "REQUEST_DIALOG",
+        },
+      },
+    }),
+    "person@goodearth.test",
+  );
+});

@@ -133,10 +133,18 @@ function spaces(event: ChatEvent): (ChatSpace | undefined)[] {
  * happens to sit elsewhere in the envelope.
  */
 export function senderEmail(event: ChatEvent): string | null {
-  const candidates = senders(event);
-  if (candidates.some((user) => user?.type === "BOT")) return null;
+  // The person Google names on the event itself. A bot there is a bot
+  // talking to us, and is refused outright.
+  if (event.chat?.user?.type === "BOT") return null;
 
-  for (const user of candidates) {
+  // The message positions are fallbacks only, and a bot in one of them
+  // is skipped rather than fatal: when someone presses a button on the
+  // bot's OWN card, Google sends that card as the message behind the
+  // press — whose sender is the bot — with the person in `chat.user`.
+  // Refusing on that shape turned every court-card button into "Google
+  // didn't tell me who you are" (the founder's first Bounce, 2026-09-03).
+  for (const user of senders(event)) {
+    if (user?.type === "BOT") continue;
     const email = typeof user?.email === "string" ? user.email.trim().toLowerCase() : "";
     if (email.includes("@")) return email;
   }
