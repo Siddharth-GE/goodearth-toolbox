@@ -237,6 +237,25 @@ export function commandId(event: ChatEvent): number | null {
 }
 
 /**
+ * The parameters a card button carries — set by whoever built the card
+ * (cards.ts's action buttons and Save buttons both put `action`, `chain`
+ * and `leg` here), read back as a plain string record. `{}` when Google
+ * sent none, so a caller can destructure it without a null check; every
+ * value that isn't a string is dropped rather than coerced, since a
+ * button never has any reason to carry anything else.
+ */
+export function buttonParams(event: ChatEvent): Record<string, string> {
+  const params = event.commonEventObject?.parameters;
+  if (!params) return {};
+
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(params)) {
+    if (typeof value === "string") result[key] = value;
+  }
+  return result;
+}
+
+/**
  * The words typed after a slash command — "villa 12" out of "/trail
  * villa 12". Google's own `argumentText` is what it is meant for, and is
  * read from wherever the command arrived; a command posted through the

@@ -7,22 +7,34 @@ import { test } from "node:test";
 
 import {
   askForWords,
-  buttonsComingNote,
+  bounceDialog,
+  bouncedText,
+  cannotActNow,
   courtCard,
   dialogNotEnabled,
   dmCannotLink,
+  doneText,
+  finishedText,
   greeting,
+  heldText,
   identityRefusal,
   joinHello,
   linkConfirmation,
   linkDialog,
+  newTrailDialog,
+  newTrailNeedsDialog,
   noticeDialog,
   linkSaveFailed,
+  openedText,
+  pushedText,
+  returnedText,
   trailCard,
   type LinkTarget,
   type RefusalKind,
 } from "./cards";
-import type { TrailSummary } from "./trail-rules";
+import type { LegOption, TrailSetOption, TrailSummary } from "./trail-rules";
+
+const SUBMIT_URL = "https://example.test/api/google-chat";
 
 test("no-email refusal", () => {
   assert.equal(
@@ -210,24 +222,40 @@ test("noticeDialog is one paragraph and nothing else", () => {
 
 // --- Phase 5: /court and /trail cards --------------------------------
 
+type CardButton = {
+  text: string;
+  onClick: {
+    openLink?: { url: string };
+    action?: { function: string; parameters: { key: string; value: string }[] };
+    interaction?: string;
+  };
+};
+
 type Widget =
-  | { decoratedText: { topLabel: string; text: string; bottomLabel: string; wrapText: boolean } }
-  | { buttonList: { buttons: { text: string; onClick: { openLink: { url: string } } }[] } }
-  | { textParagraph: { text: string } };
+  | { decoratedText: Record<string, unknown> }
+  | { buttonList: { buttons: CardButton[] } }
+  | { textParagraph: { text: string } }
+  | { selectionInput: Record<string, unknown> }
+  | { textInput: Record<string, unknown> };
 
 type ChatCard = {
-  cardId: string;
-  card: { header: { title: string; subtitle: string }; sections: { widgets: Widget[] }[] };
+  cardId?: string;
+  card?: { header: { title: string; subtitle: string }; sections: { widgets: Widget[] }[] };
+  sections?: { widgets: Widget[] }[];
 };
 
 function widgetsOf(built: Record<string, unknown>): Widget[] {
-  return (built as ChatCard).card.sections[0].widgets;
+  const card = built as ChatCard;
+  const sections = card.card?.sections ?? card.sections ?? [];
+  return sections.flatMap((s) => s.widgets);
 }
 
 function decoratedTexts(built: Record<string, unknown>) {
   return widgetsOf(built)
-    .filter((w): w is Extract<Widget, { decoratedText: unknown }> => "decoratedText" in w)
-    .map((w) => w.decoratedText);
+    .filter(
+      (w): w is Extract<Widget, { decoratedText: Record<string, unknown> }> => "decoratedText" in w,
+    )
+    .map((w) => w.decoratedText as { topLabel: string; text: string; bottomLabel: string });
 }
 
 function paragraphs(built: Record<string, unknown>) {
@@ -236,14 +264,35 @@ function paragraphs(built: Record<string, unknown>) {
     .map((w) => w.textParagraph.text);
 }
 
-function openLinks(built: Record<string, unknown>) {
+/** Every row's buttonList, in card order — one array of buttons per trail row. */
+function buttonLists(built: Record<string, unknown>): CardButton[][] {
   return widgetsOf(built)
     .filter((w): w is Extract<Widget, { buttonList: unknown }> => "buttonList" in w)
-    .map((w) => w.buttonList.buttons[0].onClick.openLink.url);
+    .map((w) => w.buttonList.buttons);
+}
+
+/** The Open in the toolbox link out of each row — always the buttonList's last button. */
+function openLinks(built: Record<string, unknown>) {
+  return buttonLists(built).map((buttons) => buttons[buttons.length - 1].onClick.openLink?.url);
 }
 
 function headerOf(built: Record<string, unknown>) {
-  return (built as ChatCard).card.header;
+  return (built as ChatCard).card!.header;
+}
+
+function selectionInputs(built: Record<string, unknown>) {
+  return widgetsOf(built)
+    .filter(
+      (w): w is Extract<Widget, { selectionInput: Record<string, unknown> }> =>
+        "selectionInput" in w,
+    )
+    .map((w) => w.selectionInput);
+}
+
+function textInputs(built: Record<string, unknown>) {
+  return widgetsOf(built)
+    .filter((w): w is Extract<Widget, { textInput: Record<string, unknown> }> => "textInput" in w)
+    .map((w) => w.textInput);
 }
 
 function row(overrides: Partial<TrailSummary> = {}): TrailSummary {
@@ -277,13 +326,6 @@ test("askForWords", () => {
   );
 });
 
-test("buttonsComingNote", () => {
-  assert.equal(
-    buttonsComingNote(),
-    "Push, Bounce and Finish buttons arrive with the next release — Open a trail to move it in the toolbox.",
-  );
-});
-
 test("courtCard: on time", () => {
   const built = courtCard({
     firstName: "Siddharth",
@@ -292,6 +334,7 @@ test("courtCard: on time", () => {
     more: 0,
     moreElsewhere: 0,
     origin: ORIGIN,
+    submitUrl: SUBMIT_URL,
   });
   assert.match(decoratedTexts(built)[0].bottomLabel, /day 2 of 3, on time$/);
 });
@@ -304,6 +347,7 @@ test("courtCard: cold", () => {
     more: 0,
     moreElsewhere: 0,
     origin: ORIGIN,
+    submitUrl: SUBMIT_URL,
   });
   assert.match(decoratedTexts(built)[0].bottomLabel, /day 4 of 3, cold$/);
 });
@@ -318,6 +362,7 @@ test("courtCard: with the client", () => {
     more: 0,
     moreElsewhere: 0,
     origin: ORIGIN,
+    submitUrl: SUBMIT_URL,
   });
   assert.match(decoratedTexts(built)[0].bottomLabel, /day 6 of 3, with the client 4 days$/);
 });
@@ -332,6 +377,7 @@ test("courtCard: cold and with the client at once", () => {
     more: 0,
     moreElsewhere: 0,
     origin: ORIGIN,
+    submitUrl: SUBMIT_URL,
   });
   assert.match(decoratedTexts(built)[0].bottomLabel, /cold, with the client 4 days$/);
 });
@@ -344,6 +390,7 @@ test("courtCard: a single with-client day is not pluralised", () => {
     more: 0,
     moreElsewhere: 0,
     origin: ORIGIN,
+    submitUrl: SUBMIT_URL,
   });
   assert.match(decoratedTexts(built)[0].bottomLabel, /with the client 1 day$/);
 });
@@ -356,6 +403,7 @@ test("courtCard: leg number and label lead the bottom label, label omitted when 
     more: 0,
     moreElsewhere: 0,
     origin: ORIGIN,
+    submitUrl: SUBMIT_URL,
   });
   assert.match(decoratedTexts(withLabel)[0].bottomLabel, /^Leg 2 of 5 · Structural drawings —/);
 
@@ -366,6 +414,7 @@ test("courtCard: leg number and label lead the bottom label, label omitted when 
     more: 0,
     moreElsewhere: 0,
     origin: ORIGIN,
+    submitUrl: SUBMIT_URL,
   });
   assert.match(decoratedTexts(withoutLabel)[0].bottomLabel, /^Leg 2 of 5 —/);
 });
@@ -378,11 +427,12 @@ test("courtCard: an empty court says the app's own sentence", () => {
     more: 0,
     moreElsewhere: 0,
     origin: ORIGIN,
+    submitUrl: SUBMIT_URL,
   });
   assert.deepEqual(paragraphs(built), ["Court cleared — nothing is waiting on you."]);
 });
 
-test("courtCard: header names the scope, or everything, and the note when given", () => {
+test("courtCard: header names the scope, or everything", () => {
   const everything = courtCard({
     firstName: "S",
     scopeLabel: null,
@@ -390,6 +440,7 @@ test("courtCard: header names the scope, or everything, and the note when given"
     more: 0,
     moreElsewhere: 0,
     origin: ORIGIN,
+    submitUrl: SUBMIT_URL,
   });
   assert.equal(headerOf(everything).title, "Your court");
   assert.equal(headerOf(everything).subtitle, "everything");
@@ -401,19 +452,9 @@ test("courtCard: header names the scope, or everything, and the note when given"
     more: 0,
     moreElsewhere: 0,
     origin: ORIGIN,
+    submitUrl: SUBMIT_URL,
   });
   assert.equal(headerOf(scoped).subtitle, "Saarang · Villa 12");
-
-  const noted = courtCard({
-    firstName: "S",
-    scopeLabel: "Saarang · Villa 12",
-    rows: [],
-    more: 0,
-    moreElsewhere: 0,
-    origin: ORIGIN,
-    note: buttonsComingNote(),
-  });
-  assert.equal(headerOf(noted).subtitle, `Saarang · Villa 12 · ${buttonsComingNote()}`);
 });
 
 test("courtCard: more and moreElsewhere footers, singular and plural", () => {
@@ -424,6 +465,7 @@ test("courtCard: more and moreElsewhere footers, singular and plural", () => {
     more: 3,
     moreElsewhere: 1,
     origin: ORIGIN,
+    submitUrl: SUBMIT_URL,
   });
   const lines = paragraphs(one);
   assert.ok(lines.some((line) => line.startsWith("and 3 more —") && line.includes(ORIGIN)));
@@ -436,6 +478,7 @@ test("courtCard: more and moreElsewhere footers, singular and plural", () => {
     more: 0,
     moreElsewhere: 5,
     origin: ORIGIN,
+    submitUrl: SUBMIT_URL,
   });
   assert.ok(paragraphs(many).includes("You also hold 5 trails outside this space."));
 });
@@ -448,6 +491,7 @@ test("courtCard: every row's link lands on that trail, on the given origin", () 
     more: 0,
     moreElsewhere: 0,
     origin: ORIGIN,
+    submitUrl: SUBMIT_URL,
   });
   assert.deepEqual(openLinks(built), [`${ORIGIN}/relay/trails/c-42`]);
 });
@@ -568,4 +612,486 @@ test("cards escape a title or search word that carries HTML-special characters",
   const [text] = paragraphs(empty);
   assert.ok(text.includes("&lt;script&gt;"));
   assert.ok(!text.includes("<script>"));
+});
+
+test("row text: a title shows under the activity only when it says something new", () => {
+  const withTitle = courtCard({
+    firstName: "Sid",
+    scopeLabel: null,
+    rows: [row({ title: "Ground floor" })],
+    more: 0,
+    moreElsewhere: 0,
+    origin: ORIGIN,
+    submitUrl: SUBMIT_URL,
+  });
+  assert.equal(decoratedTexts(withTitle)[0].text, "<b>Structural drawings</b><br>Ground floor");
+
+  const repeated = courtCard({
+    firstName: "Sid",
+    scopeLabel: null,
+    rows: [row({ activityName: "Standard villa", title: "standard villa " })],
+    more: 0,
+    moreElsewhere: 0,
+    origin: ORIGIN,
+    submitUrl: SUBMIT_URL,
+  });
+  assert.equal(decoratedTexts(repeated)[0].text, "<b>Standard villa</b>");
+});
+
+// --- Phase 6/7: action buttons, the two dialogs, and every write sentence --
+
+test("courtCard: a row's buttons follow buttonsFor for its state, Open in the toolbox last", () => {
+  const built = courtCard({
+    firstName: "S",
+    scopeLabel: null,
+    rows: [row({ currentLeg: 2, legCount: 5, isWithClient: false })],
+    more: 0,
+    moreElsewhere: 0,
+    origin: ORIGIN,
+    submitUrl: SUBMIT_URL,
+  });
+  const [buttons] = buttonLists(built);
+  assert.deepEqual(
+    buttons.map((b) => b.text),
+    ["Push", "Bounce", "With client", "Open in the toolbox"],
+  );
+});
+
+test("courtCard: a queued row (no current leg) offers only Open in the toolbox", () => {
+  const built = courtCard({
+    firstName: "S",
+    scopeLabel: null,
+    rows: [row({ currentLeg: null })],
+    more: 0,
+    moreElsewhere: 0,
+    origin: ORIGIN,
+    submitUrl: SUBMIT_URL,
+  });
+  const [buttons] = buttonLists(built);
+  assert.deepEqual(
+    buttons.map((b) => b.text),
+    ["Open in the toolbox"],
+  );
+});
+
+test("courtCard: the last leg offers Finish instead of Push", () => {
+  const built = courtCard({
+    firstName: "S",
+    scopeLabel: null,
+    rows: [row({ currentLeg: 5, legCount: 5, isWithClient: false })],
+    more: 0,
+    moreElsewhere: 0,
+    origin: ORIGIN,
+    submitUrl: SUBMIT_URL,
+  });
+  const [buttons] = buttonLists(built);
+  assert.deepEqual(
+    buttons.map((b) => b.text),
+    ["Finish", "Bounce", "With client", "Open in the toolbox"],
+  );
+});
+
+test("courtCard: with the client swaps 'With client' for 'Back from client'", () => {
+  const built = courtCard({
+    firstName: "S",
+    scopeLabel: null,
+    rows: [row({ currentLeg: 2, legCount: 5, isWithClient: true })],
+    more: 0,
+    moreElsewhere: 0,
+    origin: ORIGIN,
+    submitUrl: SUBMIT_URL,
+  });
+  const [buttons] = buttonLists(built);
+  assert.deepEqual(
+    buttons.map((b) => b.text),
+    ["Push", "Bounce", "Back from client", "Open in the toolbox"],
+  );
+});
+
+test("courtCard: Bounce alone opens a dialog; every other button acts straight away", () => {
+  const built = courtCard({
+    firstName: "S",
+    scopeLabel: null,
+    rows: [row({ currentLeg: 2, legCount: 5, isWithClient: false })],
+    more: 0,
+    moreElsewhere: 0,
+    origin: ORIGIN,
+    submitUrl: SUBMIT_URL,
+  });
+  const [buttons] = buttonLists(built);
+  for (const button of buttons) {
+    if (button.text === "Bounce") {
+      assert.equal(button.onClick.interaction, "OPEN_DIALOG");
+    } else {
+      assert.equal(button.onClick.interaction, undefined);
+    }
+  }
+});
+
+test("courtCard: every action button carries action/chain/leg; Open in the toolbox carries an openLink instead", () => {
+  const built = courtCard({
+    firstName: "S",
+    scopeLabel: null,
+    rows: [row({ chainId: "c-9", currentLeg: 2, legCount: 5, isWithClient: false })],
+    more: 0,
+    moreElsewhere: 0,
+    origin: ORIGIN,
+    submitUrl: SUBMIT_URL,
+  });
+  const [buttons] = buttonLists(built);
+  const [push, bounce, hold, open] = buttons;
+
+  assert.equal(push.onClick.action?.function, SUBMIT_URL);
+  assert.deepEqual(push.onClick.action?.parameters, [
+    { key: "action", value: "push" },
+    { key: "chain", value: "c-9" },
+    { key: "leg", value: "2" },
+  ]);
+  assert.deepEqual(bounce.onClick.action?.parameters, [
+    { key: "action", value: "bounce" },
+    { key: "chain", value: "c-9" },
+    { key: "leg", value: "2" },
+  ]);
+  assert.deepEqual(hold.onClick.action?.parameters, [
+    { key: "action", value: "hold" },
+    { key: "chain", value: "c-9" },
+    { key: "leg", value: "2" },
+  ]);
+  assert.equal(open.onClick.action, undefined);
+  assert.equal(open.onClick.openLink?.url, `${ORIGIN}/relay/trails/c-9`);
+});
+
+test("trailCard rows carry only the Open in the toolbox link, no action buttons", () => {
+  const built = trailCard({
+    words: [],
+    scopeLabel: null,
+    rows: [row({ currentLeg: 2, legCount: 5, isWithClient: false })],
+    more: 0,
+    origin: ORIGIN,
+  });
+  const [buttons] = buttonLists(built);
+  assert.deepEqual(
+    buttons.map((b) => b.text),
+    ["Open in the toolbox"],
+  );
+});
+
+function legOption(overrides: Partial<LegOption> = {}): LegOption {
+  return { legNo: 1, label: "Client sign-off", assigneeName: "Anil", ...overrides };
+}
+
+test("bounceDialog: names the trail and its current leg", () => {
+  const dialog = bounceDialog({
+    trail: row({ activityName: "Standard villa", currentLeg: 3, legCount: 8 }),
+    legs: [legOption()],
+    submitUrl: SUBMIT_URL,
+  });
+  const [paragraph] = paragraphs(dialog);
+  assert.match(paragraph, /Standard villa/);
+  assert.match(paragraph, /leg 3 of 8/);
+});
+
+test("bounceDialog: the to_leg dropdown lists every leg given, the last one selected", () => {
+  const dialog = bounceDialog({
+    trail: row({ currentLeg: 3, legCount: 8 }),
+    legs: [
+      { legNo: 1, label: "Intake", assigneeName: "Priya" },
+      { legNo: 2, label: "Client sign-off", assigneeName: "Anil" },
+    ],
+    submitUrl: SUBMIT_URL,
+  });
+  const [toLeg] = selectionInputs(dialog) as {
+    name: string;
+    label: string;
+    items: { text: string; value: string; selected: boolean }[];
+  }[];
+  assert.equal(toLeg.name, "to_leg");
+  assert.equal(toLeg.label, "Send it back to");
+  assert.deepEqual(
+    toLeg.items.map((i) => [i.text, i.value, i.selected]),
+    [
+      ["Leg 1 · Intake · Priya", "1", false],
+      ["Leg 2 · Client sign-off · Anil", "2", true],
+    ],
+  );
+});
+
+test("bounceDialog: a leg with no label or no assignee still reads plainly", () => {
+  const dialog = bounceDialog({
+    trail: row({ currentLeg: 2, legCount: 8 }),
+    legs: [{ legNo: 1, label: null, assigneeName: null }],
+    submitUrl: SUBMIT_URL,
+  });
+  const [toLeg] = selectionInputs(dialog) as { items: { text: string }[] }[];
+  assert.equal(toLeg.items[0].text, "Leg 1 · Unnamed");
+});
+
+test("bounceDialog: builds even with an empty legs list", () => {
+  const dialog = bounceDialog({
+    trail: row({ currentLeg: 1, legCount: 5 }),
+    legs: [],
+    submitUrl: SUBMIT_URL,
+  });
+  const [toLeg] = selectionInputs(dialog) as { items: unknown[] }[];
+  assert.deepEqual(toLeg.items, []);
+});
+
+test("bounceDialog: the reason dropdown lists BOUNCE_REASONS in order, none selected", () => {
+  const dialog = bounceDialog({
+    trail: row({ currentLeg: 3, legCount: 8 }),
+    legs: [legOption()],
+    submitUrl: SUBMIT_URL,
+  });
+  const [, reasonInput] = selectionInputs(dialog) as {
+    name: string;
+    label: string;
+    items: { text: string; value: string; selected: boolean }[];
+  }[];
+  assert.equal(reasonInput.name, "reason");
+  assert.equal(reasonInput.label, "Reason");
+  assert.deepEqual(
+    reasonInput.items.map((i) => i.value),
+    ["rework", "missing_info", "wrong_person", "client_change", "other"],
+  );
+  assert.ok(reasonInput.items.every((i) => i.selected === false));
+});
+
+test("bounceDialog: the note is a required multi-line input with the right hint", () => {
+  const dialog = bounceDialog({
+    trail: row({ currentLeg: 3, legCount: 8 }),
+    legs: [legOption()],
+    submitUrl: SUBMIT_URL,
+  });
+  const [note] = textInputs(dialog) as {
+    name: string;
+    label: string;
+    type: string;
+    hintText: string;
+  }[];
+  assert.equal(note.name, "note");
+  assert.equal(note.label, "What needs to change");
+  assert.equal(note.type, "MULTIPLE_LINE");
+  assert.equal(note.hintText, "A bounce is never silent.");
+});
+
+test("bounceDialog: Save posts action bounce with the trail's chain and current leg", () => {
+  const dialog = bounceDialog({
+    trail: row({ chainId: "c-7", currentLeg: 3, legCount: 8 }),
+    legs: [legOption()],
+    submitUrl: SUBMIT_URL,
+  });
+  const [buttons] = buttonLists(dialog);
+  const [save] = buttons;
+  assert.equal(save.text, "Save");
+  assert.equal(save.onClick.action?.function, SUBMIT_URL);
+  assert.deepEqual(save.onClick.action?.parameters, [
+    { key: "action", value: "bounce" },
+    { key: "chain", value: "c-7" },
+    { key: "leg", value: "3" },
+  ]);
+});
+
+function trailSetOption(overrides: Partial<TrailSetOption> = {}): TrailSetOption {
+  return { id: "set-1", name: "Standard villa", ...overrides };
+}
+
+test("newTrailDialog: unit dropdown lists every unit, pre-selecting the given one", () => {
+  const dialog = newTrailDialog({
+    units: [
+      { value: "u-1", text: "Saarang · Villa 1" },
+      { value: "u-12", text: "Saarang · Villa 12" },
+    ],
+    sets: [trailSetOption()],
+    selectedUnit: "u-12",
+    submitUrl: SUBMIT_URL,
+  });
+  const [unitInput] = selectionInputs(dialog) as {
+    name: string;
+    label: string;
+    items: { text: string; value: string; selected: boolean }[];
+  }[];
+  assert.equal(unitInput.name, "unit");
+  assert.equal(unitInput.label, "Which house");
+  assert.deepEqual(
+    unitInput.items.map((i) => [i.value, i.selected]),
+    [
+      ["u-1", false],
+      ["u-12", true],
+    ],
+  );
+});
+
+test("newTrailDialog: no selectedUnit pre-selects nothing", () => {
+  const dialog = newTrailDialog({
+    units: [{ value: "u-1", text: "Saarang · Villa 1" }],
+    sets: [trailSetOption()],
+    selectedUnit: null,
+    submitUrl: SUBMIT_URL,
+  });
+  const [unitInput] = selectionInputs(dialog) as { items: { selected: boolean }[] }[];
+  assert.ok(unitInput.items.every((i) => i.selected === false));
+});
+
+test("newTrailDialog: trail type dropdown lists every set, none pre-selected", () => {
+  const dialog = newTrailDialog({
+    units: [{ value: "u-1", text: "Saarang · Villa 1" }],
+    sets: [
+      trailSetOption({ id: "s1", name: "Standard villa" }),
+      trailSetOption({ id: "s2", name: "Fast track" }),
+    ],
+    selectedUnit: "u-1",
+    submitUrl: SUBMIT_URL,
+  });
+  const [, setInput] = selectionInputs(dialog) as {
+    name: string;
+    label: string;
+    items: { text: string; value: string; selected: boolean }[];
+  }[];
+  assert.equal(setInput.name, "set");
+  assert.equal(setInput.label, "Trail type");
+  assert.deepEqual(
+    setInput.items.map((i) => [i.text, i.value]),
+    [
+      ["Standard villa", "s1"],
+      ["Fast track", "s2"],
+    ],
+  );
+  assert.ok(setInput.items.every((i) => i.selected === false));
+});
+
+test("newTrailDialog: the start switch defaults on", () => {
+  const dialog = newTrailDialog({
+    units: [{ value: "u-1", text: "Saarang · Villa 1" }],
+    sets: [trailSetOption()],
+    selectedUnit: "u-1",
+    submitUrl: SUBMIT_URL,
+  });
+  const [decoratedWidget] = widgetsOf(dialog).filter(
+    (w): w is { decoratedText: Record<string, unknown> } => "decoratedText" in w,
+  );
+  const decorated = decoratedWidget.decoratedText as {
+    text: string;
+    bottomLabel: string;
+    switchControl: { name: string; value: string; selected: boolean; controlType: string };
+  };
+  assert.equal(decorated.text, "Start now");
+  assert.deepEqual(decorated.switchControl, {
+    name: "start",
+    value: "on",
+    selected: true,
+    controlType: "SWITCH",
+  });
+});
+
+test("newTrailDialog: Save posts action newtrail", () => {
+  const dialog = newTrailDialog({
+    units: [{ value: "u-1", text: "Saarang · Villa 1" }],
+    sets: [trailSetOption()],
+    selectedUnit: "u-1",
+    submitUrl: SUBMIT_URL,
+  });
+  const [buttons] = buttonLists(dialog);
+  const [save] = buttons;
+  assert.equal(save.text, "Save");
+  assert.equal(save.onClick.action?.function, SUBMIT_URL);
+  assert.deepEqual(save.onClick.action?.parameters, [{ key: "action", value: "newtrail" }]);
+});
+
+function pushedRow(overrides: Partial<TrailSummary> = {}): TrailSummary {
+  return row({
+    activityName: "Standard villa",
+    projectName: "Saarang",
+    unitName: "Villa 12",
+    currentLeg: 3,
+    legCount: 8,
+    legLabel: "Client sign-off",
+    holderName: "Anil",
+    ...overrides,
+  });
+}
+
+test("pushedText", () => {
+  assert.equal(
+    pushedText("Sid", pushedRow()),
+    "*Sid* pushed *Standard villa* on Villa 12 to leg 3 of 8 · Client sign-off — now with Anil.",
+  );
+});
+
+test("pushedText: no leg label, no holder, no unit are each omitted or worded gracefully", () => {
+  assert.equal(
+    pushedText("Sid", pushedRow({ legLabel: null })),
+    "*Sid* pushed *Standard villa* on Villa 12 to leg 3 of 8 — now with Anil.",
+  );
+  assert.equal(
+    pushedText("Sid", pushedRow({ holderName: null })),
+    "*Sid* pushed *Standard villa* on Villa 12 to leg 3 of 8 · Client sign-off — now with nobody named.",
+  );
+  assert.equal(
+    pushedText("Sid", pushedRow({ unitName: null })),
+    "*Sid* pushed *Standard villa* on Saarang to leg 3 of 8 · Client sign-off — now with Anil.",
+  );
+});
+
+test("finishedText", () => {
+  assert.equal(finishedText("Sid", pushedRow()), "*Sid* finished *Standard villa* on Villa 12 🎉");
+});
+
+test("bouncedText", () => {
+  assert.equal(
+    bouncedText("Sid", pushedRow({ currentLeg: 1 }), "Rework needed", "Wrong finish colour"),
+    "*Sid* bounced *Standard villa* on Villa 12 back to leg 1 of 8 · Client sign-off — with Anil. Rework needed: Wrong finish colour",
+  );
+});
+
+test("heldText", () => {
+  assert.equal(
+    heldText("Sid", pushedRow()),
+    "*Sid* marked *Standard villa* on Villa 12 as with the client.",
+  );
+});
+
+test("returnedText", () => {
+  assert.equal(
+    returnedText("Sid", pushedRow()),
+    "*Sid* took *Standard villa* on Villa 12 back from the client.",
+  );
+});
+
+test("openedText: a started trail names the leg it landed on", () => {
+  assert.equal(
+    openedText("Sid", pushedRow({ currentLeg: 1 })),
+    "*Sid* opened *Standard villa* on Villa 12 — leg 1 of 8 · Client sign-off, with Anil.",
+  );
+});
+
+test("openedText: a queued trail says so instead of naming a leg", () => {
+  assert.equal(
+    openedText("Sid", pushedRow({ currentLeg: null })),
+    "*Sid* queued *Standard villa* on Villa 12 — not started yet.",
+  );
+});
+
+test("doneText, cannotActNow and newTrailNeedsDialog", () => {
+  assert.equal(doneText(), "Done.");
+  assert.equal(cannotActNow(), "I couldn't act as you just now. Please try again in a moment.");
+  assert.equal(
+    newTrailNeedsDialog(),
+    "The /newtrail command needs 'Opens a dialog' ticked in the Chat app's configuration — an admin can do that in the Google Cloud console.",
+  );
+});
+
+test("none of the write sentences leak an email", () => {
+  const trail = pushedRow();
+  const sentences = [
+    pushedText("Sid", trail),
+    finishedText("Sid", trail),
+    bouncedText("Sid", trail, "Rework needed", "note"),
+    heldText("Sid", trail),
+    returnedText("Sid", trail),
+    openedText("Sid", trail),
+    doneText(),
+    cannotActNow(),
+    newTrailNeedsDialog(),
+  ];
+  for (const sentence of sentences) assert.ok(!sentence.includes("@"));
 });

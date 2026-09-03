@@ -26,6 +26,7 @@ test("a live account holding /relay is ok, named by its first word", () => {
   assert.equal(identity.kind, "ok");
   if (identity.kind !== "ok") return;
   assert.equal(identity.userId, "user-1");
+  assert.equal(identity.email, "sid@goodearth.test");
   assert.equal(identity.fullName, "Siddharth Cyriac");
   assert.equal(identity.firstName, "Siddharth");
   assert.equal(identity.isAdmin, false);
@@ -75,6 +76,7 @@ test("an admin holds Relay without an explicit grant", () => {
   assert.equal(identity.kind, "ok");
   if (identity.kind !== "ok") return;
   assert.equal(identity.isAdmin, true);
+  assert.equal(identity.email, "sid@goodearth.test");
 });
 
 test("a grant through a role bundle counts, same as a personal one", () => {

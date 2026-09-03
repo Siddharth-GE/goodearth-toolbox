@@ -19,6 +19,13 @@ export type Identity =
   | {
       kind: "ok";
       userId: string;
+      /**
+       * The normalised address that got them here — carried forward so
+       * Phase 6's act-as.ts can mint a session for exactly the email
+       * that was proven, without a second lookup or a second chance for
+       * the two to disagree.
+       */
+      email: string;
       fullName: string | null;
       firstName: string;
       isAdmin: boolean;
@@ -70,6 +77,7 @@ export function decideIdentity(
   return {
     kind: "ok",
     userId: profile.id,
+    email,
     fullName: profile.full_name,
     firstName,
     isAdmin,

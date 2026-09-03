@@ -126,3 +126,124 @@ export const CARD_LIMIT = 10;
 export function takeForCard(rows: TrailSummary[]): { shown: TrailSummary[]; more: number } {
   return { shown: rows.slice(0, CARD_LIMIT), more: Math.max(0, rows.length - CARD_LIMIT) };
 }
+
+// --- Phase 6/7: buttons, the bounce reasons and the three form parsers ---
+
+/** The five things a court-card button can offer for one trail. */
+export type ButtonAction = "push" | "finish" | "bounce" | "hold" | "return";
+
+const BUTTON_ACTIONS: readonly ButtonAction[] = ["push", "finish", "bounce", "hold", "return"];
+
+/**
+ * Which buttons a row's card gets — the app's own MoveBatonButtons rules
+ * (app/(dashboard)/relay/_components/move-baton.tsx) restated for a chat
+ * card: push while there's a leg ahead, finish on the last leg, bounce
+ * once the baton has moved past the first leg, and exactly one of
+ * hold/return depending on whether the client currently has it. A queued
+ * trail (`currentLeg` null) gets nothing — there is no baton yet for a
+ * button here to move.
+ *
+ * Order matters: it's the order the buttons render in, push first.
+ */
+export function buttonsFor(row: TrailSummary): ButtonAction[] {
+  if (row.currentLeg === null) return [];
+  const actions: ButtonAction[] = [];
+  if (row.currentLeg < row.legCount) actions.push("push");
+  if (row.currentLeg === row.legCount) actions.push("finish");
+  if (row.currentLeg > 1) actions.push("bounce");
+  actions.push(row.isWithClient ? "return" : "hold");
+  return actions;
+}
+
+/**
+ * The 0036 bounce reasons, in the order the dropdown renders them — same
+ * five as the app's own BOUNCE_REASONS (lib/relay/events.ts), reworded
+ * for a one-line dropdown row rather than a chip.
+ */
+export const BOUNCE_REASONS: { value: string; text: string }[] = [
+  { value: "rework", text: "Rework needed" },
+  { value: "missing_info", text: "Missing information" },
+  { value: "wrong_person", text: "Wrong person" },
+  { value: "client_change", text: "Client changed something" },
+  { value: "other", text: "Other" },
+];
+
+/** A reason's dropdown text, or the raw value when it isn't one of the five. */
+export function bounceReasonText(value: string): string {
+  return BOUNCE_REASONS.find((r) => r.value === value)?.text ?? value;
+}
+
+/** What a court-card button's parameters name: which action, which trail, which leg it was pressed from. */
+export type ButtonPress = { action: ButtonAction; chainId: string; fromLeg: number };
+
+/**
+ * A button press, read back from its parameters. Anything that doesn't
+ * shape up as a real press — an action outside the five, a blank chain
+ * id, a leg that isn't a positive whole number — is null, so a stale or
+ * tampered card is refused politely rather than acted on as a guess.
+ */
+export function parseButton(params: Record<string, string>): ButtonPress | null {
+  const action = params.action;
+  if (!BUTTON_ACTIONS.includes(action as ButtonAction)) return null;
+
+  const chainId = params.chain;
+  if (!chainId) return null;
+
+  const legRaw = params.leg ?? "";
+  if (!/^[1-9]\d*$/.test(legRaw)) return null;
+
+  return { action: action as ButtonAction, chainId, fromLeg: Number(legRaw) };
+}
+
+/**
+ * The bounce dialog's three fields, checked in the same order and the
+ * same words as bounceBaton (lib/relay/actions.ts) — the database
+ * refuses the same three things (migration 0036 §6), so the dialog can
+ * say so without a round trip that would read like a crash.
+ */
+export function parseBounceForm(
+  values: { toLeg: string | null; reason: string | null; note: string | null },
+  fromLeg: number,
+): { ok: true; toLeg: number; reason: string; note: string } | { ok: false; error: string } {
+  const reason = values.reason ?? "";
+  if (!BOUNCE_REASONS.some((r) => r.value === reason)) {
+    return { ok: false, error: "Pick a reason — a bounce is never silent." };
+  }
+
+  const note = (values.note ?? "").trim();
+  if (!note) {
+    return { ok: false, error: "Say what needs to change before it comes back." };
+  }
+
+  const toLegRaw = values.toLeg ?? "";
+  const toLeg = /^[1-9]\d*$/.test(toLegRaw) ? Number(toLegRaw) : NaN;
+  if (!Number.isInteger(toLeg) || toLeg >= fromLeg) {
+    return { ok: false, error: "A bounce goes backwards, to a leg the trail has passed." };
+  }
+
+  return { ok: true, toLeg, reason, note };
+}
+
+/**
+ * The new-trail dialog's two required pickers, plus the start toggle —
+ * the toggle has no wrong answer, so it never produces an error.
+ */
+export function parseNewTrailForm(values: {
+  unit: string | null;
+  set: string | null;
+  start: string | null;
+}): { ok: true; unitId: string; setId: string; start: boolean } | { ok: false; error: string } {
+  const unitId = (values.unit ?? "").trim();
+  if (!unitId) return { ok: false, error: "Pick a house first." };
+
+  const setId = (values.set ?? "").trim();
+  if (!setId) return { ok: false, error: "Pick a trail type first." };
+
+  return { ok: true, unitId, setId, start: values.start !== null };
+}
+
+/** One trail type, for the /newtrail dialog's "Trail type" dropdown. */
+export type TrailSetOption = { id: string; name: string };
+
+/** One leg, for the /bounce dialog's "Send it back to" dropdown. */
+export type LegOption = { legNo: number; label: string | null; assigneeName: string | null };

@@ -7,10 +7,16 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  BOUNCE_REASONS,
   CARD_LIMIT,
+  bounceReasonText,
+  buttonsFor,
   inScope,
   matchesWords,
   orderColdestFirst,
+  parseBounceForm,
+  parseButton,
+  parseNewTrailForm,
   scopeOf,
   searchWords,
   splitByScope,
@@ -195,4 +201,179 @@ test("orderColdestFirst returns a new array, leaving the input untouched", () =>
     rows.map((r) => r.chainId),
     ["b", "a"],
   );
+});
+
+// --- Phase 6/7: buttonsFor, BOUNCE_REASONS, parseButton, the two forms --
+
+test("buttonsFor: a queued trail (no current leg) offers nothing", () => {
+  assert.deepEqual(buttonsFor(row({ currentLeg: null })), []);
+});
+
+test("buttonsFor: mid-trail, not with the client — push, bounce, hold", () => {
+  assert.deepEqual(buttonsFor(row({ currentLeg: 2, legCount: 5, isWithClient: false })), [
+    "push",
+    "bounce",
+    "hold",
+  ]);
+});
+
+test("buttonsFor: the first leg has nothing to bounce to", () => {
+  assert.deepEqual(buttonsFor(row({ currentLeg: 1, legCount: 5, isWithClient: false })), [
+    "push",
+    "hold",
+  ]);
+});
+
+test("buttonsFor: the last leg offers finish instead of push", () => {
+  assert.deepEqual(buttonsFor(row({ currentLeg: 5, legCount: 5, isWithClient: false })), [
+    "finish",
+    "bounce",
+    "hold",
+  ]);
+});
+
+test("buttonsFor: a single-leg trail on its only leg offers finish alone plus hold", () => {
+  assert.deepEqual(buttonsFor(row({ currentLeg: 1, legCount: 1, isWithClient: false })), [
+    "finish",
+    "hold",
+  ]);
+});
+
+test("buttonsFor: with the client swaps hold for return, order otherwise unchanged", () => {
+  assert.deepEqual(buttonsFor(row({ currentLeg: 3, legCount: 5, isWithClient: true })), [
+    "push",
+    "bounce",
+    "return",
+  ]);
+});
+
+test("BOUNCE_REASONS: the five reasons, in order, in the chat app's words", () => {
+  assert.deepEqual(BOUNCE_REASONS, [
+    { value: "rework", text: "Rework needed" },
+    { value: "missing_info", text: "Missing information" },
+    { value: "wrong_person", text: "Wrong person" },
+    { value: "client_change", text: "Client changed something" },
+    { value: "other", text: "Other" },
+  ]);
+});
+
+test("bounceReasonText: a known value, and the value itself when unknown", () => {
+  assert.equal(bounceReasonText("rework"), "Rework needed");
+  assert.equal(bounceReasonText("client_change"), "Client changed something");
+  assert.equal(bounceReasonText("something-nobody-declared"), "something-nobody-declared");
+});
+
+test("parseButton: a well-formed press", () => {
+  assert.deepEqual(parseButton({ action: "push", chain: "c1", leg: "3" }), {
+    action: "push",
+    chainId: "c1",
+    fromLeg: 3,
+  });
+});
+
+test("parseButton: every declared action parses", () => {
+  for (const action of ["push", "finish", "bounce", "hold", "return"]) {
+    assert.equal(parseButton({ action, chain: "c1", leg: "1" })?.action, action);
+  }
+});
+
+test("parseButton: an action outside the five is refused", () => {
+  assert.equal(parseButton({ action: "hand", chain: "c1", leg: "1" }), null);
+  assert.equal(parseButton({ chain: "c1", leg: "1" }), null);
+});
+
+test("parseButton: a blank chain id is refused", () => {
+  assert.equal(parseButton({ action: "push", chain: "", leg: "1" }), null);
+  assert.equal(parseButton({ action: "push", leg: "1" }), null);
+});
+
+test("parseButton: the leg must be a positive whole number, not zero, negative or text", () => {
+  assert.equal(parseButton({ action: "push", chain: "c1", leg: "0" }), null);
+  assert.equal(parseButton({ action: "push", chain: "c1", leg: "-1" }), null);
+  assert.equal(parseButton({ action: "push", chain: "c1", leg: "1.5" }), null);
+  assert.equal(parseButton({ action: "push", chain: "c1", leg: "three" }), null);
+  assert.equal(parseButton({ action: "push", chain: "c1", leg: "" }), null);
+  assert.equal(parseButton({ action: "push", chain: "c1" }), null);
+});
+
+test("parseBounceForm: a well-formed bounce", () => {
+  assert.deepEqual(
+    parseBounceForm({ toLeg: "1", reason: "rework", note: "Wrong finish colour" }, 3),
+    { ok: true, toLeg: 1, reason: "rework", note: "Wrong finish colour" },
+  );
+});
+
+test("parseBounceForm: no reason, or an unknown one, is refused first", () => {
+  assert.deepEqual(parseBounceForm({ toLeg: "1", reason: null, note: "note" }, 3), {
+    ok: false,
+    error: "Pick a reason — a bounce is never silent.",
+  });
+  assert.deepEqual(parseBounceForm({ toLeg: "1", reason: "not-a-reason", note: "note" }, 3), {
+    ok: false,
+    error: "Pick a reason — a bounce is never silent.",
+  });
+});
+
+test("parseBounceForm: a blank note is refused, checked after the reason", () => {
+  assert.deepEqual(parseBounceForm({ toLeg: "1", reason: "rework", note: null }, 3), {
+    ok: false,
+    error: "Say what needs to change before it comes back.",
+  });
+  assert.deepEqual(parseBounceForm({ toLeg: "1", reason: "rework", note: "   " }, 3), {
+    ok: false,
+    error: "Say what needs to change before it comes back.",
+  });
+});
+
+test("parseBounceForm: the target leg must be behind the current one", () => {
+  assert.deepEqual(parseBounceForm({ toLeg: "3", reason: "rework", note: "note" }, 3), {
+    ok: false,
+    error: "A bounce goes backwards, to a leg the trail has passed.",
+  });
+  assert.deepEqual(parseBounceForm({ toLeg: "4", reason: "rework", note: "note" }, 3), {
+    ok: false,
+    error: "A bounce goes backwards, to a leg the trail has passed.",
+  });
+});
+
+test("parseBounceForm: the target leg must be a real leg number, not zero, text or blank", () => {
+  assert.deepEqual(parseBounceForm({ toLeg: "0", reason: "rework", note: "note" }, 3).ok, false);
+  assert.deepEqual(parseBounceForm({ toLeg: "abc", reason: "rework", note: "note" }, 3).ok, false);
+  assert.deepEqual(parseBounceForm({ toLeg: null, reason: "rework", note: "note" }, 3).ok, false);
+});
+
+test("parseNewTrailForm: unit and set picked, start on", () => {
+  assert.deepEqual(parseNewTrailForm({ unit: "u1", set: "s1", start: "on" }), {
+    ok: true,
+    unitId: "u1",
+    setId: "s1",
+    start: true,
+  });
+});
+
+test("parseNewTrailForm: start is off — the switch was left unset", () => {
+  assert.deepEqual(parseNewTrailForm({ unit: "u1", set: "s1", start: null }), {
+    ok: true,
+    unitId: "u1",
+    setId: "s1",
+    start: false,
+  });
+});
+
+test("parseNewTrailForm: no house is refused before the trail type", () => {
+  assert.deepEqual(parseNewTrailForm({ unit: null, set: "s1", start: null }), {
+    ok: false,
+    error: "Pick a house first.",
+  });
+  assert.deepEqual(parseNewTrailForm({ unit: "", set: "s1", start: null }), {
+    ok: false,
+    error: "Pick a house first.",
+  });
+});
+
+test("parseNewTrailForm: no trail type is refused once a house is picked", () => {
+  assert.deepEqual(parseNewTrailForm({ unit: "u1", set: null, start: null }), {
+    ok: false,
+    error: "Pick a trail type first.",
+  });
 });

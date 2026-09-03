@@ -10,6 +10,7 @@ import { test } from "node:test";
 
 import {
   COMMANDS,
+  buttonParams,
   commandId,
   commandText,
   dialogEventType,
@@ -280,5 +281,48 @@ test("a form value is the first string under its input name, or null", () => {
       "target",
     ),
     null,
+  );
+});
+
+test("a dialog's on/off switch reads through formValue like any other input", () => {
+  // The dialog builder gives the switch the value "on" (cards.ts's
+  // newTrailDialog); Google only sends an input at all when it's set, so
+  // an untouched (off) switch simply isn't in formInputs.
+  const on = {
+    commonEventObject: { formInputs: { start: { stringInputs: { value: ["on"] } } } },
+  };
+  assert.equal(formValue(on, "start"), "on");
+
+  const off = { commonEventObject: { formInputs: {} } };
+  assert.equal(formValue(off, "start"), null);
+  assert.equal(formValue({}, "start"), null);
+});
+
+test("buttonParams: commonEventObject.parameters as a plain record", () => {
+  assert.deepEqual(
+    buttonParams({
+      commonEventObject: { parameters: { action: "push", chain: "c1", leg: "3" } },
+    }),
+    { action: "push", chain: "c1", leg: "3" },
+  );
+});
+
+test("buttonParams: {} when there are no parameters at all", () => {
+  assert.deepEqual(buttonParams({}), {});
+  assert.deepEqual(buttonParams({ commonEventObject: {} }), {});
+});
+
+test("buttonParams: a non-string value is dropped, not coerced", () => {
+  assert.deepEqual(
+    buttonParams({
+      commonEventObject: {
+        parameters: {
+          action: "push",
+          count: 3 as unknown as string,
+          ok: true as unknown as string,
+        },
+      },
+    }),
+    { action: "push" },
   );
 });

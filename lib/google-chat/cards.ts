@@ -1,4 +1,5 @@
-import type { TrailSummary } from "./trail-rules";
+import { BOUNCE_REASONS, buttonsFor } from "./trail-rules";
+import type { ButtonAction, LegOption, TrailSetOption, TrailSummary } from "./trail-rules";
 
 /**
  * The bot's fixed sentences — words only, no I/O. Every refusal the door
@@ -18,6 +19,17 @@ import type { TrailSummary } from "./trail-rules";
  * Both are built from the same one-row widget (a `decoratedText` plus an
  * `openLink` button), so that widget — and the day-and-status sentence
  * every row carries — is written once below and shared by both builders.
+ *
+ * Phase 6/7 grows it a third time: the court card's rows gain the action
+ * buttons trail-rules.ts's `buttonsFor` decides on (still ending in the
+ * same "Open in the toolbox" link, trap (e) means every button here is a
+ * URL, never a name), plus the two dialogs — `/bounce` and `/newtrail`
+ * — and the sentences a write posts to the space or says back privately.
+ * Those sentences are `text`, not a card, so they use *asterisks* for
+ * bold the way Chat's plain messages do, and — being the bot's own
+ * words, not a villa name or a note somebody typed — are not run through
+ * escapeHtml; the trail's own name and note ARE somebody's words and do
+ * go through it wherever they land inside a card widget.
  */
 
 export type RefusalKind = "no-email" | "unknown" | "inactive" | "no-relay" | "failed";
@@ -212,40 +224,83 @@ function trailBottomLabel(row: TrailSummary): string {
  * buttons yet (Phase 6): a callback button with nothing behind it is
  * exactly the "app is not responding" trap (e) from Phase 4's plan.
  */
-function trailWidgets(
+/** Every action button's own label, in the order buttonsFor hands the actions back. */
+const ACTION_BUTTON_TEXT: Record<ButtonAction, string> = {
+  push: "Push",
+  finish: "Finish",
+  bounce: "Bounce",
+  hold: "With client",
+  return: "Back from client",
+};
+
+/**
+ * One row's action buttons — Push/Finish/Bounce/With client/Back from
+ * client, whichever `buttonsFor` says this trail's state offers. Every
+ * one posts to the same `submitUrl` (the door's own registered address —
+ * trap (e), a callback button's `onClick.action.function` must be a URL,
+ * never a name) carrying which action, which trail and which leg it was
+ * pressed from, so `parseButton` in trail-rules.ts can read the press
+ * back with nothing guessed. Bounce alone opens a dialog instead of
+ * acting straight away, because it needs a reason and a note first.
+ */
+function actionButtons(row: TrailSummary, submitUrl: string): Record<string, unknown>[] {
+  if (row.currentLeg === null) return [];
+  const fromLeg = row.currentLeg;
+
+  return buttonsFor(row).map((action) => {
+    const onClick: Record<string, unknown> = {
+      action: {
+        function: submitUrl,
+        parameters: [
+          { key: "action", value: action },
+          { key: "chain", value: row.chainId },
+          { key: "leg", value: String(fromLeg) },
+        ],
+      },
+    };
+    if (action === "bounce") onClick.interaction = "OPEN_DIALOG";
+    return { text: ACTION_BUTTON_TEXT[action], onClick };
+  });
+}
+
+/**
+ * One trail as the widgets every row is made of: the status line, then a
+ * single buttonList — whatever action buttons the caller supplies (none
+ * for /trail's read-only rows) followed by Open in the toolbox, which
+ * always comes last so a row never ends on a button that moves something.
+ */
+function rowWidgets(
   row: TrailSummary,
   origin: string,
   bottomLabel: string,
+  leadingButtons: Record<string, unknown>[] = [],
 ): Record<string, unknown>[] {
   const topLabel = row.unitName
     ? `${escapeHtml(row.projectName)} · ${escapeHtml(row.unitName)}`
     : escapeHtml(row.projectName);
   const activity = `<b>${escapeHtml(row.activityName)}</b>`;
-  const text = row.title ? `${activity}<br>${escapeHtml(row.title)}` : activity;
+  // A trail laid down from a trail type carries the type's name as both
+  // its activity and its title, so "Standard villa" would print twice
+  // (seen on the first staging card, 2026-09-03). The title earns its
+  // line only when it says something the bold line doesn't.
+  const title = row.title?.trim() ?? "";
+  const repeats = title.toLowerCase() === row.activityName.trim().toLowerCase();
+  const text = title && !repeats ? `${activity}<br>${escapeHtml(title)}` : activity;
+
+  const openInToolbox = {
+    text: "Open in the toolbox",
+    onClick: { openLink: { url: `${origin}/relay/trails/${row.chainId}` } },
+  };
 
   return [
     { decoratedText: { topLabel, text, bottomLabel, wrapText: true } },
-    {
-      buttonList: {
-        buttons: [
-          {
-            text: "Open in the toolbox",
-            onClick: { openLink: { url: `${origin}/relay/trails/${row.chainId}` } },
-          },
-        ],
-      },
-    },
+    { buttonList: { buttons: [...leadingButtons, openInToolbox] } },
   ];
 }
 
 /** No words in a DM or an unlinked space: /trail alone has nothing to scope or search by. */
 export function askForWords(): string {
   return "Tell me what to look for — a villa, a project or an activity, e.g. /trail villa 12.";
-}
-
-/** The line /push, /bounce and /finish add to the court card until Phase 6 wires the buttons. */
-export function buttonsComingNote(): string {
-  return "Push, Bounce and Finish buttons arrive with the next release — Open a trail to move it in the toolbox.";
 }
 
 /**
@@ -263,17 +318,20 @@ export function courtCard(input: {
   more: number;
   moreElsewhere: number;
   origin: string;
-  note?: string | null;
+  submitUrl: string;
 }): Record<string, unknown> {
-  const { scopeLabel, rows, more, moreElsewhere, origin, note } = input;
-  const subtitleBase = scopeLabel ?? "everything";
-  const subtitle = note ? `${subtitleBase} · ${note}` : subtitleBase;
+  const { scopeLabel, rows, more, moreElsewhere, origin, submitUrl } = input;
+  const subtitle = scopeLabel ?? "everything";
 
   const widgets: Record<string, unknown>[] = [];
   if (rows.length === 0) {
     widgets.push({ textParagraph: { text: "Court cleared — nothing is waiting on you." } });
   } else {
-    for (const row of rows) widgets.push(...trailWidgets(row, origin, courtBottomLabel(row)));
+    for (const row of rows) {
+      widgets.push(
+        ...rowWidgets(row, origin, courtBottomLabel(row), actionButtons(row, submitUrl)),
+      );
+    }
   }
 
   if (more > 0) {
@@ -325,7 +383,7 @@ export function trailCard(input: {
   if (rows.length === 0) {
     widgets.push({ textParagraph: { text: trailEmptyText(words, origin) } });
   } else {
-    for (const row of rows) widgets.push(...trailWidgets(row, origin, trailBottomLabel(row)));
+    for (const row of rows) widgets.push(...rowWidgets(row, origin, trailBottomLabel(row)));
     if (more > 0) {
       widgets.push({
         textParagraph: {
@@ -339,4 +397,230 @@ export function trailCard(input: {
     cardId: "trails",
     card: { header: { title: "Trails", subtitle }, sections: [{ widgets }] },
   };
+}
+
+// --- Phase 6/7: the two dialogs, and the sentences a write produces ----
+
+/** "Leg 1 · Client sign-off · Anil" — a bounce target row, label omitted when the leg carries none. */
+function legOptionText(leg: LegOption): string {
+  const labelPart = leg.label ? ` · ${escapeHtml(leg.label)}` : "";
+  const assignee = leg.assigneeName ? escapeHtml(leg.assigneeName) : "Unnamed";
+  return `Leg ${leg.legNo}${labelPart} · ${assignee}`;
+}
+
+/**
+ * The /bounce dialog: which leg to send the trail back to, why, and what
+ * needs to change — built even for a trail with no legs behind it to
+ * bounce to (an empty "Send it back to" dropdown), because the button
+ * that opens this is only offered when `buttonsFor` already found a leg
+ * to go back to, and this builder shouldn't have to re-decide that.
+ */
+export function bounceDialog(input: {
+  trail: TrailSummary;
+  legs: LegOption[];
+  submitUrl: string;
+}): Record<string, unknown> {
+  const { trail, legs, submitUrl } = input;
+  const legPart = trail.legLabel ? ` · ${escapeHtml(trail.legLabel)}` : "";
+  const paragraph = `Bounce <b>${escapeHtml(trail.activityName)}</b> back — it is on leg ${trail.currentLeg} of ${trail.legCount}${legPart}.`;
+
+  return {
+    sections: [
+      {
+        widgets: [
+          { textParagraph: { text: paragraph } },
+          {
+            selectionInput: {
+              name: "to_leg",
+              label: "Send it back to",
+              type: "DROPDOWN",
+              items: legs.map((leg, index) => ({
+                text: legOptionText(leg),
+                value: String(leg.legNo),
+                selected: index === legs.length - 1,
+              })),
+            },
+          },
+          {
+            selectionInput: {
+              name: "reason",
+              label: "Reason",
+              type: "DROPDOWN",
+              items: BOUNCE_REASONS.map((r) => ({ text: r.text, value: r.value, selected: false })),
+            },
+          },
+          {
+            textInput: {
+              name: "note",
+              label: "What needs to change",
+              type: "MULTIPLE_LINE",
+              hintText: "A bounce is never silent.",
+            },
+          },
+          {
+            buttonList: {
+              buttons: [
+                {
+                  text: "Save",
+                  onClick: {
+                    action: {
+                      function: submitUrl,
+                      parameters: [
+                        { key: "action", value: "bounce" },
+                        { key: "chain", value: trail.chainId },
+                        { key: "leg", value: String(trail.currentLeg) },
+                      ],
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ],
+  };
+}
+
+/**
+ * The /newtrail dialog: which house, which trail type, and whether the
+ * clock starts today. `units` is space-match.ts's `unitRows` output — a
+ * flat list, unlike /link's dropdown, because a new trail always starts
+ * on one villa, never a whole project. `selectedUnit` pre-fills a linked
+ * space's own villa; a project-linked or unlinked space passes null and
+ * nothing is pre-selected. The switch defaults ON in the widget itself
+ * (`selected: true`) — unlike the app's house queue, which queues by
+ * default, chat's founder-approved default is to start immediately.
+ */
+export function newTrailDialog(input: {
+  units: { value: string; text: string }[];
+  sets: TrailSetOption[];
+  selectedUnit: string | null;
+  submitUrl: string;
+}): Record<string, unknown> {
+  const { units, sets, selectedUnit, submitUrl } = input;
+
+  return {
+    sections: [
+      {
+        widgets: [
+          {
+            selectionInput: {
+              name: "unit",
+              label: "Which house",
+              type: "DROPDOWN",
+              items: units.map((u) => ({
+                text: u.text,
+                value: u.value,
+                selected: u.value === selectedUnit,
+              })),
+            },
+          },
+          {
+            selectionInput: {
+              name: "set",
+              label: "Trail type",
+              type: "DROPDOWN",
+              items: sets.map((s) => ({ text: s.name, value: s.id, selected: false })),
+            },
+          },
+          {
+            decoratedText: {
+              text: "Start now",
+              bottomLabel: "The clock begins today. Off = queued, started later from the toolbox.",
+              switchControl: { name: "start", value: "on", selected: true, controlType: "SWITCH" },
+            },
+          },
+          {
+            buttonList: {
+              buttons: [
+                {
+                  text: "Save",
+                  onClick: {
+                    action: {
+                      function: submitUrl,
+                      parameters: [{ key: "action", value: "newtrail" }],
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ],
+  };
+}
+
+/**
+ * "on Villa 12" — every write sentence below says where a trail lives
+ * the same way: the villa when it has one, the project alone when it
+ * doesn't (a project-level trail, or a unit read that came back bare).
+ */
+function trailWhere(trail: TrailSummary): string {
+  return `on ${trail.unitName ?? trail.projectName}`;
+}
+
+/** " · Client sign-off" — omitted when the leg the sentence is about carries no label. */
+function trailLegPart(trail: TrailSummary): string {
+  return trail.legLabel ? ` · ${trail.legLabel}` : "";
+}
+
+/**
+ * Public confirmations, posted to the space as an ordinary message —
+ * `text`, not a card, so *asterisks* are Chat's own way of saying bold
+ * and nothing here goes through escapeHtml (see the file header). Built
+ * from the fresh TrailSummary a write's own confirmation read returns,
+ * so the leg, the label and the holder are all where the write actually
+ * left them, never the state the button was pressed from.
+ */
+export function pushedText(firstName: string, trail: TrailSummary): string {
+  const holder = trail.holderName ?? "nobody named";
+  return `*${firstName}* pushed *${trail.activityName}* ${trailWhere(trail)} to leg ${trail.currentLeg} of ${trail.legCount}${trailLegPart(trail)} — now with ${holder}.`;
+}
+
+export function finishedText(firstName: string, trail: TrailSummary): string {
+  return `*${firstName}* finished *${trail.activityName}* ${trailWhere(trail)} 🎉`;
+}
+
+export function bouncedText(
+  firstName: string,
+  trail: TrailSummary,
+  reasonText: string,
+  note: string,
+): string {
+  const holder = trail.holderName ?? "nobody named";
+  return `*${firstName}* bounced *${trail.activityName}* ${trailWhere(trail)} back to leg ${trail.currentLeg} of ${trail.legCount}${trailLegPart(trail)} — with ${holder}. ${reasonText}: ${note}`;
+}
+
+export function heldText(firstName: string, trail: TrailSummary): string {
+  return `*${firstName}* marked *${trail.activityName}* ${trailWhere(trail)} as with the client.`;
+}
+
+export function returnedText(firstName: string, trail: TrailSummary): string {
+  return `*${firstName}* took *${trail.activityName}* ${trailWhere(trail)} back from the client.`;
+}
+
+/** currentLeg null means the trail was opened queued, not started; otherwise it says where it landed. */
+export function openedText(firstName: string, trail: TrailSummary): string {
+  if (trail.currentLeg === null) {
+    return `*${firstName}* queued *${trail.activityName}* ${trailWhere(trail)} — not started yet.`;
+  }
+  const holder = trail.holderName ?? "nobody named";
+  return `*${firstName}* opened *${trail.activityName}* ${trailWhere(trail)} — leg ${trail.currentLeg} of ${trail.legCount}${trailLegPart(trail)}, with ${holder}.`;
+}
+
+/** The close navigation's private toast when a dialog write actually succeeded. */
+export function doneText(): string {
+  return "Done.";
+}
+
+/** actAs() failed at any step — the session couldn't be minted, or was lost mid-write. */
+export function cannotActNow(): string {
+  return "I couldn't act as you just now. Please try again in a moment.";
+}
+
+/** /newtrail answered outside a dialog event: the console's dialog tick is missing, same as /link's. */
+export function newTrailNeedsDialog(): string {
+  return "The /newtrail command needs 'Opens a dialog' ticked in the Chat app's configuration — an admin can do that in the Google Cloud console.";
 }

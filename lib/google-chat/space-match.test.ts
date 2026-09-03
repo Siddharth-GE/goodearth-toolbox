@@ -13,6 +13,7 @@ import {
   parseLinkValue,
   projectLabel,
   unitLabel,
+  unitRows,
   type MatchProject,
   type MatchUnit,
 } from "./space-match";
@@ -122,6 +123,39 @@ test("villa numbers sort as numbers", () => {
     rows.slice(3).map((row) => row.text),
     ["Saarang · Villa 2", "Saarang · Villa 12"],
   );
+});
+
+test("unitRows: every villa, value the bare unit id, text the same label the bot always uses", () => {
+  const rows = unitRows(PROJECTS, UNITS);
+  assert.deepEqual(rows, [
+    { value: "u-baveli-1", text: "Baveli · 1" },
+    { value: "u-villa-1", text: "Saarang · Villa 1" },
+    { value: "u-villa-12", text: "Saarang · Villa 12" },
+    { value: "u-villa-13", text: "Saarang · Villa 13" },
+  ]);
+});
+
+test("unitRows: sorted by label, so villa numbers sort as numbers", () => {
+  const rows = unitRows(PROJECTS, [
+    { id: "u-2", name: "Villa 2", code: null, projectId: "p-saarang" },
+    { id: "u-12", name: "Villa 12", code: null, projectId: "p-saarang" },
+  ]);
+  assert.deepEqual(
+    rows.map((row) => row.text),
+    ["Saarang · Villa 2", "Saarang · Villa 12"],
+  );
+});
+
+test("unitRows: a unit with no matching project is skipped, not shown blank", () => {
+  const rows = unitRows(PROJECTS, [
+    ...UNITS,
+    { id: "u-orphan", name: "Orphan villa", code: null, projectId: "p-nowhere" },
+  ]);
+  assert.equal(
+    rows.some((row) => row.value === "u-orphan"),
+    false,
+  );
+  assert.equal(rows.length, UNITS.length);
 });
 
 test("a submitted value is read back, and nonsense is refused", () => {
