@@ -226,8 +226,11 @@ type CardButton = {
   text: string;
   onClick: {
     openLink?: { url: string };
-    action?: { function: string; parameters: { key: string; value: string }[] };
-    interaction?: string;
+    action?: {
+      function: string;
+      parameters: { key: string; value: string }[];
+      interaction?: string;
+    };
   };
 };
 
@@ -720,10 +723,12 @@ test("courtCard: Bounce alone opens a dialog; every other button acts straight a
   });
   const [buttons] = buttonLists(built);
   for (const button of buttons) {
+    // The marker lives INSIDE the action: one level up, Google rejects
+    // the whole card (trap (i)).
     if (button.text === "Bounce") {
-      assert.equal(button.onClick.interaction, "OPEN_DIALOG");
+      assert.equal(button.onClick.action?.interaction, "OPEN_DIALOG");
     } else {
-      assert.equal(button.onClick.interaction, undefined);
+      assert.equal(button.onClick.action?.interaction, undefined);
     }
   }
 });
