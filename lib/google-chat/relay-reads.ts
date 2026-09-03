@@ -1,0 +1,208 @@
+import "server-only";
+
+import { createAdminClient } from "@/lib/supabase/admin";
+import { fetchAll } from "@/lib/supabase/fetch-all";
+import type { Scope, TrailSummary } from "./trail-rules";
+
+/**
+ * The two reads /court and /trail are built from: everything the sender
+ * holds, and everything running in a scope. Both read `pusher_chain_state`
+ * — the same view every relay list reads — through the admin client,
+ * because the door has no browser session and `lib/relay/queries.ts`
+ * opens every function with `requireTool` (one tool never imports
+ * another's code, and that read needs a session this door doesn't have).
+ * Sanctioned the same way identity.ts and spaces.ts already are: the
+ * view is granted to every signed-in person with no gate of its own, and
+ * the identity step already proved the sender holds /relay or is an
+ * admin, so this reveals nothing they couldn't already see at
+ * /relay/court or /relay/trails.
+ *
+ * The column list below is copied from lib/relay/queries.ts's
+ * STATE_COLUMNS, not imported — the columns are the contract row
+ * STATUS.md gains in Phase 8, and copying them here is the whole point
+ * of "one tool never imports another's code".
+ *
+ * Nothing here throws. The door must always answer Google within its
+ * ~30 seconds, so a failed read comes back as null, already logged —
+ * the same shape spaces.ts uses — and never an email or message text in
+ * the log line.
+ */
+
+const STATE_COLUMNS =
+  "chain_id, project_id, project_name, unit_id, unit_name, activity_name, title, leg_count, current_leg, holder_id, days_in_leg, expected_days, is_stuck, is_finished, is_queued, is_with_client, with_client_days";
+
+type StateRow = {
+  chain_id: string | null;
+  project_id: string | null;
+  project_name: string | null;
+  unit_id: string | null;
+  unit_name: string | null;
+  activity_name: string | null;
+  title: string | null;
+  leg_count: number | null;
+  current_leg: number | null;
+  holder_id: string | null;
+  days_in_leg: number | null;
+  expected_days: number | null;
+  is_stuck: boolean | null;
+  is_finished: boolean | null;
+  is_queued: boolean | null;
+  is_with_client: boolean | null;
+  with_client_days: number | null;
+};
+
+/** Same normalisation lib/relay/queries.ts's toRow does: a view's columns all come back nullable. */
+function toSummary(
+  row: StateRow,
+  legLabels: Map<string, string>,
+  holderNames: Map<string, string>,
+): TrailSummary {
+  const chainId = row.chain_id ?? "";
+  return {
+    chainId,
+    projectId: row.project_id ?? "",
+    projectName: row.project_name ?? "—",
+    unitId: row.unit_id,
+    unitName: row.unit_name,
+    activityName: row.activity_name ?? "—",
+    title: row.title,
+    currentLeg: row.current_leg,
+    legCount: row.leg_count ?? 0,
+    legLabel:
+      row.current_leg !== null ? (legLabels.get(`${chainId}:${row.current_leg}`) ?? null) : null,
+    holderName: row.holder_id ? (holderNames.get(row.holder_id) ?? null) : null,
+    daysInLeg: row.days_in_leg ?? 0,
+    expectedDays: row.expected_days ?? 0,
+    isStuck: row.is_stuck ?? false,
+    isWithClient: row.is_with_client ?? false,
+    withClientDays: row.with_client_days ?? 0,
+  };
+}
+
+/**
+ * The current leg's label for a handful of chains, and the holder's
+ * name for a handful of people — the two shared reads both /court and
+ * /trail need, in one place so they stay identical. Skipped entirely
+ * when there is nothing to look up: an empty court costs nothing beyond
+ * the one view read.
+ */
+async function enrich(rows: StateRow[]): Promise<TrailSummary[]> {
+  const chainIds = [...new Set(rows.map((r) => r.chain_id).filter((id): id is string => !!id))];
+  const holderIds = [...new Set(rows.map((r) => r.holder_id).filter((id): id is string => !!id))];
+  // Only the leg each row is currently sitting on is ever shown, so the
+  // read is shrunk to those leg numbers too — a chain can have several
+  // legs, and there is no reason to pull labels for the ones nobody is
+  // asking about.
+  const currentLegs = [
+    ...new Set(rows.map((r) => r.current_leg).filter((leg): leg is number => leg !== null)),
+  ];
+
+  const admin = createAdminClient();
+
+  // Un-ranged, this silently caps at PostgREST's 1,000-row limit (the
+  // fetchAll rule in CLAUDE.md), so it goes through fetchAll like every
+  // other completeness-sensitive read. It gets its own try/catch,
+  // though: a missing leg label is cosmetic — the card still shows the
+  // leg number — and must never turn a whole court or search into
+  // "something went wrong".
+  const legLabels = new Map<string, string>();
+  if (chainIds.length > 0 && currentLegs.length > 0) {
+    try {
+      const legs = await fetchAll<{ chain_id: string; leg_no: number; label: string | null }>(
+        (from, to) =>
+          admin
+            .from("pusher_chain_legs")
+            .select("chain_id, leg_no, label")
+            .in("chain_id", chainIds)
+            .in("leg_no", currentLegs)
+            .order("chain_id")
+            .order("leg_no")
+            .range(from, to),
+      );
+      for (const leg of legs) {
+        if (leg.label) legLabels.set(`${leg.chain_id}:${leg.leg_no}`, leg.label);
+      }
+    } catch (error) {
+      console.error("google-chat relay-reads: leg label read failed", error);
+    }
+  }
+
+  const holderNames = new Map<string, string>();
+  if (holderIds.length > 0) {
+    const { data, error } = await admin
+      .from("profiles")
+      .select("id, full_name")
+      .in("id", holderIds);
+    if (error) {
+      console.error("google-chat relay-reads: holder name read failed", error);
+    } else {
+      for (const profile of data ?? []) {
+        if (profile.full_name) holderNames.set(profile.id, profile.full_name);
+      }
+    }
+  }
+
+  return rows.map((row) => toSummary(row, legLabels, holderNames));
+}
+
+/**
+ * Every unfinished baton this person holds, worst first — the same read
+ * `listMyCourt` does, restated because that function opens with
+ * `requireTool` and this door has no session to give it.
+ *
+ * Deliberately unscoped: the door splits this by scope in Node
+ * (`trail-rules.ts`'s `splitByScope`) so a linked space's card can say
+ * both "yours here" and "and N more elsewhere" from one read, rather
+ * than two.
+ */
+export async function listCourt(userId: string): Promise<TrailSummary[] | null> {
+  try {
+    const admin = createAdminClient();
+    const rows = await fetchAll<StateRow>((from, to) =>
+      admin
+        .from("pusher_chain_state")
+        .select(STATE_COLUMNS)
+        .eq("holder_id", userId)
+        .eq("is_finished", false)
+        .order("is_stuck", { ascending: false })
+        .order("days_in_leg", { ascending: false })
+        .order("chain_id")
+        .range(from, to),
+    );
+    return await enrich(rows);
+  } catch (error) {
+    console.error("google-chat relay-reads: court read failed", error);
+    return null;
+  }
+}
+
+/**
+ * Everything running in a scope — not finished, and not queued, because
+ * a queued trail has no holder and no clock and the app's own running
+ * list excludes it for the same reason. Word matching happens in Node
+ * with `trail-rules.ts`'s `matchesWords`, never a `.or(ilike...)`
+ * filter string here: a bad PostgREST select is invisible to every CI
+ * gate, so the search stays plain TypeScript instead.
+ */
+export async function listRunning(scope: Scope): Promise<TrailSummary[] | null> {
+  try {
+    const admin = createAdminClient();
+    const rows = await fetchAll<StateRow>((from, to) => {
+      let query = admin
+        .from("pusher_chain_state")
+        .select(STATE_COLUMNS)
+        .eq("is_finished", false)
+        .eq("is_queued", false)
+        .order("is_stuck", { ascending: false })
+        .order("days_in_leg", { ascending: false })
+        .order("chain_id");
+      if (scope.kind === "unit") query = query.eq("unit_id", scope.unitId);
+      if (scope.kind === "project") query = query.eq("project_id", scope.projectId);
+      return query.range(from, to);
+    });
+    return await enrich(rows);
+  } catch (error) {
+    console.error("google-chat relay-reads: running trails read failed", error);
+    return null;
+  }
+}

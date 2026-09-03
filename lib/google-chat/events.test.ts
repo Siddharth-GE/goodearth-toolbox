@@ -11,6 +11,7 @@ import { test } from "node:test";
 import {
   COMMANDS,
   commandId,
+  commandText,
   dialogEventType,
   formValue,
   isDirectMessage,
@@ -211,6 +212,50 @@ test("a command that arrived without the dialog tick has no dialog step", () => 
     null,
   );
   assert.equal(dialogEventType({}), null);
+});
+
+test("commandText reads argumentText from an appCommandPayload first", () => {
+  assert.equal(
+    commandText({
+      chat: {
+        appCommandPayload: { message: { argumentText: "villa 12", text: "/trail villa 12" } },
+      },
+    }),
+    "villa 12",
+  );
+});
+
+test("commandText falls back to messagePayload's argumentText", () => {
+  assert.equal(
+    commandText({ chat: { messagePayload: { message: { argumentText: "  villa 12  " } } } }),
+    "villa 12",
+  );
+});
+
+test("commandText falls back to text with the leading /word stripped", () => {
+  assert.equal(
+    commandText({ chat: { appCommandPayload: { message: { text: "/trail villa 12" } } } }),
+    "villa 12",
+  );
+  assert.equal(
+    commandText({ chat: { messagePayload: { message: { text: "/trail   villa 12" } } } }),
+    "villa 12",
+  );
+});
+
+test("commandText is blank when there is nothing after the command", () => {
+  assert.equal(commandText({ chat: { appCommandPayload: { message: { text: "/trail" } } } }), "");
+  assert.equal(commandText({}), "");
+  assert.equal(commandText({ chat: {} }), "");
+});
+
+test("commandText ignores a blank argumentText and falls through to text", () => {
+  assert.equal(
+    commandText({
+      chat: { appCommandPayload: { message: { argumentText: "   ", text: "/trail villa 12" } } },
+    }),
+    "villa 12",
+  );
 });
 
 test("a form value is the first string under its input name, or null", () => {
