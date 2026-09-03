@@ -224,26 +224,191 @@ export function parseBounceForm(
   return { ok: true, toLeg, reason, note };
 }
 
-/**
- * The new-trail dialog's two required pickers, plus the start toggle —
- * the toggle has no wrong answer, so it never produces an error.
- */
-export function parseNewTrailForm(values: {
-  unit: string | null;
-  set: string | null;
-  start: string | null;
-}): { ok: true; unitId: string; setId: string; start: boolean } | { ok: false; error: string } {
-  const unitId = (values.unit ?? "").trim();
-  if (!unitId) return { ok: false, error: "Pick a house first." };
-
-  const setId = (values.set ?? "").trim();
-  if (!setId) return { ok: false, error: "Pick a trail type first." };
-
-  return { ok: true, unitId, setId, start: values.start !== null };
-}
-
 /** One trail type, for the /newtrail dialog's "Trail type" dropdown. */
 export type TrailSetOption = { id: string; name: string };
 
 /** One leg, for the /bounce dialog's "Send it back to" dropdown. */
 export type LegOption = { legNo: number; label: string | null; assigneeName: string | null };
+
+// --- Phase 7b: page 1's new choices, and the steps page they can open --
+
+/**
+ * The dropdown value page 1's "Trail type" picks when the person wants to
+ * lay out the steps themselves rather than use a saved trail type — first
+ * in the list (cards.ts), never a real trail_sets id, so parseNewTrailPage
+ * can tell the two apart without a database round trip.
+ */
+export const CUSTOM_SET = "custom";
+
+/**
+ * The ceiling on a custom trail's steps. A longer trail is a trail type's
+ * job, made once in the toolbox — six rows is plenty for "pick this one
+ * off the cuff" without the dialog growing unusably long.
+ */
+export const MAX_CUSTOM_STEPS = 6;
+
+/** One person, for a step's "Who carries it" dropdown. */
+export type PersonOption = { id: string; name: string };
+
+/** One activity, for a custom step's "activity" dropdown. */
+export type ActivityOption = { id: string; name: string };
+
+/**
+ * A standard trail type's one activity, pre-filled with its usual person
+ * and days — what page 2 shows for each of a set's steps before anyone
+ * changes a thing.
+ */
+export type StepDefault = {
+  activityId: string;
+  activityName: string;
+  assigneeId: string | null;
+  expectedDays: number;
+};
+
+/**
+ * Page 1 of /newtrail, read back: which house, which trail type — or
+ * "custom", meaning there is no trail type and setId comes back null —
+ * whether the person wants to choose who carries each step, and whether
+ * the clock starts today. Neither switch has a wrong answer, so only the
+ * two dropdowns can fail: a switch sends its own value only when it's on,
+ * so "on" vs missing is exactly what parseNewTrailForm read for `start`
+ * before this replaced it.
+ */
+export function parseNewTrailPage(values: {
+  unit: string | null;
+  set: string | null;
+  pickPeople: string | null;
+  start: string | null;
+}):
+  | {
+      ok: true;
+      unitId: string;
+      setId: string | null;
+      custom: boolean;
+      pickPeople: boolean;
+      start: boolean;
+    }
+  | { ok: false; error: string } {
+  const unitId = (values.unit ?? "").trim();
+  if (!unitId) return { ok: false, error: "Pick a house first." };
+
+  const set = (values.set ?? "").trim();
+  if (!set) return { ok: false, error: "Pick a trail type first." };
+
+  const custom = set === CUSTOM_SET;
+  return {
+    ok: true,
+    unitId,
+    setId: custom ? null : set,
+    custom,
+    pickPeople: values.pickPeople !== null,
+    start: values.start !== null,
+  };
+}
+
+/** True when a page-2 form value is missing or nothing but whitespace. */
+function isBlankValue(value: string | null): boolean {
+  return value === null || value.trim() === "";
+}
+
+/** A whole number of days, at least 1 — or null when the text isn't one. */
+function wholeDays(value: string | null): number | null {
+  if (value === null) return null;
+  const trimmed = value.trim();
+  if (!/^\d+$/.test(trimmed)) return null;
+  const n = Number(trimmed);
+  return n >= 1 ? n : null;
+}
+
+/**
+ * Page 2 of /newtrail, read back into the legs open_chain wants — the
+ * app's own openTrail checks (lib/relay/actions.ts), restated in the same
+ * order and the same words: at least one step, every step has an
+ * activity, a person and a whole day count, and no activity repeats.
+ *
+ * Set mode's rows can't leave their activity blank — `opts.activityIds`
+ * names it for every row, in order, because the type itself decided it —
+ * so "Step N needs an activity" can never fire there; if the type shrank
+ * or was deleted since the dialog opened, that row has no id to read at
+ * all, and the whole page is refused at once with "That trail type no
+ * longer exists." rather than one confusing per-step complaint.
+ *
+ * Custom mode's rows are free, and a wholly blank one (no activity, no
+ * person, no days) isn't a step someone meant to fill in — it's dropped
+ * before anything is numbered, so leaving the last three of six rows
+ * empty reports on steps 1-3, never "Step 6".
+ */
+export function parseTrailSteps(
+  values: Record<string, string | null>,
+  opts: { mode: "set" | "custom"; count: number; activityIds?: string[] },
+):
+  | {
+      ok: true;
+      title: string | null;
+      legs: { activityId: string; assigneeId: string; expectedDays: number }[];
+    }
+  | { ok: false; error: string } {
+  const { mode, count, activityIds } = opts;
+
+  type Draft = { activityId: string | null; assigneeId: string | null; days: string | null };
+  const kept: Draft[] = [];
+
+  for (let i = 1; i <= count; i++) {
+    const activityRaw = values[`activity_${i}`] ?? null;
+    const personRaw = values[`person_${i}`] ?? null;
+    const daysRaw = values[`days_${i}`] ?? null;
+
+    if (mode === "set") {
+      const activityId = activityIds?.[i - 1];
+      if (activityId === undefined) {
+        return { ok: false, error: "That trail type no longer exists." };
+      }
+      kept.push({ activityId, assigneeId: personRaw, days: daysRaw });
+    } else {
+      if (isBlankValue(activityRaw) && isBlankValue(personRaw) && isBlankValue(daysRaw)) continue;
+      kept.push({ activityId: activityRaw, assigneeId: personRaw, days: daysRaw });
+    }
+  }
+
+  if (kept.length === 0) {
+    return { ok: false, error: "A trail needs at least one activity." };
+  }
+
+  const legs: { activityId: string; assigneeId: string; expectedDays: number }[] = [];
+  for (let index = 0; index < kept.length; index++) {
+    const stepNo = index + 1;
+    const draft = kept[index];
+
+    if (isBlankValue(draft.activityId)) {
+      return { ok: false, error: `Step ${stepNo} needs an activity.` };
+    }
+    if (isBlankValue(draft.assigneeId)) {
+      return { ok: false, error: `Step ${stepNo} needs someone to carry it.` };
+    }
+    const expectedDays = wholeDays(draft.days);
+    if (expectedDays === null) {
+      return { ok: false, error: `Step ${stepNo} needs a whole number of days, at least 1.` };
+    }
+
+    legs.push({
+      activityId: draft.activityId as string,
+      assigneeId: draft.assigneeId as string,
+      expectedDays,
+    });
+  }
+
+  const seen = new Set<string>();
+  for (const leg of legs) {
+    if (seen.has(leg.activityId)) {
+      return {
+        ok: false,
+        error: "The same activity appears twice — each step should be a different one.",
+      };
+    }
+    seen.add(leg.activityId);
+  }
+
+  const title = (values.title ?? "").trim() || null;
+
+  return { ok: true, title, legs };
+}

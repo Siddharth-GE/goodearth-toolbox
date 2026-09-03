@@ -5,11 +5,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { dbErrorMessage } from "@/lib/db-error";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Database } from "@/lib/supabase/database.types";
-import { fetchAll } from "@/lib/supabase/fetch-all";
+import { readActivityDefaults, readSet } from "./relay-reads";
 
 /**
- * The six writes chat can make, each one the same single insert or RPC
- * the app's own Relay actions make.
+ * The writes chat can make, each one the same single insert or RPC the
+ * app's own Relay actions make.
  *
  * Every function here takes the client — the short-lived one act-as.ts
  * minted for the person who typed — and nothing here calls
@@ -185,115 +185,29 @@ export async function bounceBaton(
 }
 
 // ---------------------------------------------------------------------
-// Opening a trail from a trail type
+// Opening a trail
 // ---------------------------------------------------------------------
 
 /**
- * `applyTrailSet` restated for the door.
+ * `openTrail` and `applyTrailSet` restated for the door.
  *
- * The app's version leans on three functions in lib/relay/queries.ts
- * that each open with `requireTool`; this one asks the same four
- * questions with the minted client instead. The answers must match the
- * app's exactly, or the same trail type laid down from chat would come
- * out with different people on it than the one laid down in the browser
- * — so the ordering, the fallbacks and the refusals below are the app's,
- * word for word where they are said out loud.
+ * The app's versions lean on functions in lib/relay/queries.ts that each
+ * open with `requireTool`; these ask the same questions with the minted
+ * client instead. The answers must match the app's exactly, or the same
+ * trail laid down from chat would come out different from one laid down
+ * in the browser — so the ordering, the fallbacks and the refusals below
+ * are the app's, word for word where they are said out loud.
+ *
+ * There is ONE write path. A trail type with its usual people, a trail
+ * type with people chosen by hand, and a trail built step by step all
+ * end in the same `openTrail` below; `openTrailFromSet` is only the work
+ * of turning a type into legs before calling it. That is the point: the
+ * five refusals, the `open_chain` call and the department tagging cannot
+ * drift apart between the two ways of asking for a trail.
  */
 const NO_TRAIL_TYPE = "That trail type no longer exists.";
 const COULD_NOT_OPEN = "Could not add this trail type.";
-
-type SetActivity = { activityId: string; activityName: string; expectedDays: number };
-
-/** The trail type and its activities, in order — listTrailSets's two reads, narrowed to one set. */
-async function readSet(
-  db: Db,
-  setId: string,
-): Promise<{ name: string; activities: SetActivity[] } | null> {
-  // Deliberately not filtered to active types, exactly as applyTrailSet
-  // is not (it reads the list with includeInactive): the dialog only
-  // ever offers the live ones, and a type switched off in the seconds
-  // between opening that dialog and pressing Save should still lay down
-  // rather than vanish mid-action.
-  const { data: set, error: setError } = await db
-    .from("pusher_trail_sets")
-    .select("id, name")
-    .eq("id", setId)
-    .maybeSingle();
-  if (setError || !set) return null;
-
-  const items = await fetchAll<{
-    id: string;
-    activity_id: string;
-    sort_order: number;
-    expected_days: number;
-  }>((from, to) =>
-    db
-      .from("pusher_trail_set_items")
-      .select("id, activity_id, sort_order, expected_days")
-      .eq("set_id", setId)
-      .order("id")
-      .range(from, to),
-  );
-
-  const { data: activities, error: activityError } = await db
-    .from("pusher_activities")
-    .select("id, name");
-  if (activityError) return null;
-  const nameById = new Map((activities ?? []).map((a) => [a.id, a.name]));
-
-  return {
-    name: set.name,
-    activities: items
-      .sort((a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id))
-      .map((item) => ({
-        activityId: item.activity_id,
-        activityName: nameById.get(item.activity_id) ?? "—",
-        expectedDays: item.expected_days,
-      })),
-  };
-}
-
-/**
- * Who normally carries each activity, and for how many days —
- * `getActivityDefaults` restated. The unit of prefill is the ACTIVITY,
- * not the trail (0043), and the answer is the most recent LEG of that
- * activity anywhere.
- *
- * Someone switched off comes back blank rather than pre-chosen: the
- * guard refuses to land a baton on a deactivated account, so prefilling
- * one only produces a refusal at the last step.
- */
-async function readActivityDefaults(
-  db: Db,
-): Promise<Map<string, { assigneeId: string; expectedDays: number }>> {
-  const [legs, people] = await Promise.all([
-    fetchAll<{
-      activity_id: string;
-      assignee_id: string;
-      expected_days: number;
-      created_at: string;
-    }>((from, to) =>
-      db
-        .from("pusher_chain_legs")
-        .select("activity_id, assignee_id, expected_days, created_at")
-        .order("created_at", { ascending: false })
-        .order("id")
-        .range(from, to),
-    ),
-    db.from("profiles").select("id").eq("is_active", true),
-  ]);
-
-  const active = new Set((people.data ?? []).map((p) => p.id));
-  const byActivity = new Map<string, { assigneeId: string; expectedDays: number }>();
-  for (const leg of legs) {
-    if (byActivity.has(leg.activity_id)) continue;
-    byActivity.set(leg.activity_id, {
-      assigneeId: active.has(leg.assignee_id) ? leg.assignee_id : "",
-      expectedDays: leg.expected_days,
-    });
-  }
-  return byActivity;
-}
+const COULD_NOT_OPEN_TRAIL = "Could not open this trail.";
 
 /**
  * The departments the last trail of this type carried —
@@ -328,10 +242,142 @@ async function readDepartments(setId: string): Promise<string[]> {
 }
 
 /**
- * Lay a trail type down on a house — ONE trail, whose legs are the
- * type's activities in order, each with the person who normally carries
- * it. People are never hand-picked in chat, which is the whole reason
- * this path exists rather than the app's full form.
+ * Open a trail on a house — the app's own `openTrail`, restated.
+ *
+ * Its five refusals are here word for word, in the same order, because
+ * they are the sentences a person reads when they have mistyped
+ * something: a trail with no steps, a step with no activity, a step with
+ * nobody on it, a step with half a day on it, the same activity twice.
+ * They are checked here so the dialog can say which step is wrong; the
+ * database checks them all again anyway (0036).
+ *
+ * `setId` says this trail came from a trail type: it is stamped on the
+ * chain, it fills in the title when the caller hasn't got one, and it is
+ * what the department tags are copied from. A custom trail passes null
+ * for all three, and its confirmation says to add departments by hand.
+ */
+export async function openTrail(
+  db: Db,
+  input: {
+    unitId: string;
+    setId: string | null;
+    title: string | null;
+    legs: { activityId: string; assigneeId: string; expectedDays: number }[];
+    start: boolean;
+  },
+): Promise<WriteResult> {
+  try {
+    if (!input.unitId) return { ok: false, error: "Pick a house first." };
+    if (input.legs.length === 0)
+      return { ok: false, error: "A trail needs at least one activity." };
+
+    for (const [i, leg] of input.legs.entries()) {
+      if (!leg.activityId) return { ok: false, error: `Step ${i + 1} needs an activity.` };
+      if (!leg.assigneeId) return { ok: false, error: `Step ${i + 1} needs someone to carry it.` };
+      if (!Number.isInteger(leg.expectedDays) || leg.expectedDays < 1) {
+        return { ok: false, error: `Step ${i + 1} needs a whole number of days, at least 1.` };
+      }
+    }
+
+    // The same activity twice in one trail would put the baton through
+    // identical steps, which is never what anyone meant and is impossible
+    // to read on the route afterwards.
+    const seen = new Set(input.legs.map((leg) => leg.activityId));
+    if (seen.size !== input.legs.length) {
+      return {
+        ok: false,
+        error: "The same activity appears twice — each step should be a different one.",
+      };
+    }
+
+    // A villa names one id; the chain row must name both, so the project
+    // comes from the unit rather than from the dialog.
+    const { data: unit, error: unitError } = await db
+      .from("units")
+      .select("id, project_id")
+      .eq("id", input.unitId)
+      .maybeSingle();
+    if (unitError || !unit) return { ok: false, error: "That house no longer exists." };
+
+    // A trail laid from a type is titled with the type's name — the
+    // caller usually has it in hand already (openTrailFromSet does), and
+    // when it doesn't, one read here is better than making every caller
+    // fetch it. A custom trail's title is whatever the person typed.
+    let title = input.title;
+    if (!title && input.setId) {
+      const set = await readSet(db, input.setId);
+      title = set?.name ?? null;
+    }
+
+    // The generated RPC arg types are non-null (Postgres cannot say "this
+    // parameter may be null"), but the single activity, the title, the
+    // note and the trail type all legitimately are.
+    //
+    // The single activity is stamped only on a CUSTOM one-step trail.
+    // Since 0043 the activities live on the legs, and a longer trail has
+    // no one answer to "which activity is it" — but a trail laid from a
+    // type always passes null however short it is, exactly as the app's
+    // applyTrailSet does, because the view names a typed trail after its
+    // type and a one-activity type must read the same from chat as it
+    // does from the browser.
+    const { data, error } = await db.rpc("open_chain", {
+      p_project_id: unit.project_id,
+      p_unit_id: input.unitId,
+      p_activity_id: (!input.setId && input.legs.length === 1
+        ? input.legs[0].activityId
+        : null) as unknown as string,
+      p_title: title as unknown as string,
+      p_note: null as unknown as string,
+      p_legs: input.legs.map((leg) => ({
+        activity_id: leg.activityId,
+        assignee_id: leg.assigneeId,
+        expected_days: leg.expectedDays,
+      })),
+      p_trail_set_id: input.setId as unknown as string,
+      p_start: input.start,
+    });
+
+    if (error) {
+      return { ok: false, error: dbErrorMessage(error, COULD_NOT_OPEN_TRAIL, RELAY_GUARD_PHRASES) };
+    }
+
+    const chainId = typeof data === "string" ? data : undefined;
+
+    // Best effort, and deliberately not fatal: the trail exists and is
+    // correct without its department tags, and failing here would tell
+    // the person nothing happened beside a trail that plainly did open.
+    // Only a trail type has departments to copy — a custom trail has no
+    // earlier trail of its kind to copy them from, which is what its
+    // confirmation sentence says out loud.
+    if (chainId && input.setId) {
+      const departmentIds = await readDepartments(input.setId);
+      if (departmentIds.length > 0) {
+        const { error: deptError } = await db.rpc("set_chain_departments", {
+          p_chain_id: chainId,
+          p_department_ids: departmentIds,
+        });
+        if (deptError) {
+          console.error("google-chat relay-writes: departments not tagged", deptError.message);
+        }
+      }
+    }
+
+    refreshRelay();
+    return { ok: true, chainId };
+  } catch (error) {
+    console.error("google-chat relay-writes: open trail broke", error);
+    return { ok: false, error: COULD_NOT_OPEN_TRAIL };
+  }
+}
+
+/**
+ * Lay a trail type down on a house with its usual people — the one-tap
+ * path, and the only one that picks the people for you.
+ *
+ * All it does is turn the type into legs: its activities in order, each
+ * with whoever normally carries it and for however long they normally
+ * take. Then it hands them to `openTrail` like any other trail, so there
+ * is one place where a trail is opened and one set of refusals.
  *
  * The unstaffed refusal is the app's own sentence, because it is the one
  * message here whose entire value is naming which activity has nobody on
@@ -342,17 +388,7 @@ export async function openTrailFromSet(
   input: { unitId: string; setId: string; start: boolean },
 ): Promise<WriteResult> {
   try {
-    if (!input.unitId) return { ok: false, error: "Pick a house first." };
     if (!input.setId) return { ok: false, error: "Pick a trail type first." };
-
-    // A villa names one id; the chain row must name both, so the
-    // project comes from the unit rather than from the dialog.
-    const { data: unit, error: unitError } = await db
-      .from("units")
-      .select("id, project_id")
-      .eq("id", input.unitId)
-      .maybeSingle();
-    if (unitError || !unit) return { ok: false, error: "That house no longer exists." };
 
     const [set, defaults] = await Promise.all([readSet(db, input.setId), readActivityDefaults(db)]);
     if (!set) return { ok: false, error: NO_TRAIL_TYPE };
@@ -370,50 +406,19 @@ export async function openTrailFromSet(
       };
     }
 
-    // The generated RPC arg types are non-null (Postgres cannot say "this
-    // parameter may be null"), but a trail laid from a type has no single
-    // activity and no note — exactly as applyTrailSet passes them.
-    const { data, error } = await db.rpc("open_chain", {
-      p_project_id: unit.project_id,
-      p_unit_id: input.unitId,
-      p_activity_id: null as unknown as string,
-      p_title: set.name,
-      p_note: null as unknown as string,
-      p_legs: set.activities.map((item) => ({
-        activity_id: item.activityId,
-        assignee_id: defaults.get(item.activityId)!.assigneeId,
-        expected_days: item.expectedDays,
+    return await openTrail(db, {
+      unitId: input.unitId,
+      setId: input.setId,
+      title: set.name,
+      legs: set.activities.map((item) => ({
+        activityId: item.activityId,
+        assigneeId: defaults.get(item.activityId)!.assigneeId,
+        expectedDays: item.expectedDays,
       })),
-      p_trail_set_id: input.setId,
-      p_start: input.start,
+      start: input.start,
     });
-
-    if (error) {
-      return { ok: false, error: dbErrorMessage(error, COULD_NOT_OPEN, RELAY_GUARD_PHRASES) };
-    }
-
-    const chainId = typeof data === "string" ? data : undefined;
-
-    // Best effort, and deliberately not fatal: the trail exists and is
-    // correct without its department tags, and failing here would tell
-    // the person nothing happened beside a trail that plainly did open.
-    if (chainId) {
-      const departmentIds = await readDepartments(input.setId);
-      if (departmentIds.length > 0) {
-        const { error: deptError } = await db.rpc("set_chain_departments", {
-          p_chain_id: chainId,
-          p_department_ids: departmentIds,
-        });
-        if (deptError) {
-          console.error("google-chat relay-writes: departments not tagged", deptError.message);
-        }
-      }
-    }
-
-    refreshRelay();
-    return { ok: true, chainId };
   } catch (error) {
-    console.error("google-chat relay-writes: open trail broke", error);
+    console.error("google-chat relay-writes: open trail from set broke", error);
     return { ok: false, error: COULD_NOT_OPEN };
   }
 }

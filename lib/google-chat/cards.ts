@@ -1,5 +1,13 @@
-import { BOUNCE_REASONS, buttonsFor } from "./trail-rules";
-import type { ButtonAction, LegOption, TrailSetOption, TrailSummary } from "./trail-rules";
+import { BOUNCE_REASONS, CUSTOM_SET, MAX_CUSTOM_STEPS, buttonsFor } from "./trail-rules";
+import type {
+  ActivityOption,
+  ButtonAction,
+  LegOption,
+  PersonOption,
+  StepDefault,
+  TrailSetOption,
+  TrailSummary,
+} from "./trail-rules";
 
 /**
  * The bot's fixed sentences — words only, no I/O. Every refusal the door
@@ -485,14 +493,20 @@ export function bounceDialog(input: {
 }
 
 /**
- * The /newtrail dialog: which house, which trail type, and whether the
- * clock starts today. `units` is space-match.ts's `unitRows` output — a
- * flat list, unlike /link's dropdown, because a new trail always starts
- * on one villa, never a whole project. `selectedUnit` pre-fills a linked
- * space's own villa; a project-linked or unlinked space passes null and
- * nothing is pre-selected. The switch defaults ON in the widget itself
- * (`selected: true`) — unlike the app's house queue, which queues by
- * default, chat's founder-approved default is to start immediately.
+ * The /newtrail dialog: which house, which trail type — or "Custom", first
+ * in the list, for when there is no trail type at all and the person lays
+ * out the steps themselves — whether they want to choose who carries each
+ * step, and whether the clock starts today. `units` is space-match.ts's
+ * `unitRows` output — a flat list, unlike /link's dropdown, because a new
+ * trail always starts on one villa, never a whole project. `selectedUnit`
+ * pre-fills a linked space's own villa; a project-linked or unlinked space
+ * passes null and nothing is pre-selected. Neither switch is pre-selected
+ * the way "Custom" isn't: "Choose the people myself" starts off, because
+ * most trails just want the usual person; "Start now" starts on — unlike
+ * the app's house queue, which queues by default, chat's founder-approved
+ * default is to start immediately. Saving here either opens the trail at
+ * once (a standard type, people not chosen) or hands the door what it
+ * needs to build page 2 — this builder knows nothing about that branch.
  */
 export function newTrailDialog(input: {
   units: { value: string; text: string }[];
@@ -523,7 +537,22 @@ export function newTrailDialog(input: {
               name: "set",
               label: "Trail type",
               type: "DROPDOWN",
-              items: sets.map((s) => ({ text: s.name, value: s.id, selected: false })),
+              items: [
+                { text: "Custom — I'll pick the steps", value: CUSTOM_SET, selected: false },
+                ...sets.map((s) => ({ text: s.name, value: s.id, selected: false })),
+              ],
+            },
+          },
+          {
+            decoratedText: {
+              text: "Choose the people myself",
+              bottomLabel: "Off = each step goes to whoever usually carries it.",
+              switchControl: {
+                name: "pick_people",
+                value: "on",
+                selected: false,
+                controlType: "SWITCH",
+              },
             },
           },
           {
@@ -552,6 +581,114 @@ export function newTrailDialog(input: {
       },
     ],
   };
+}
+
+/**
+ * Page 2 of /newtrail — the steps themselves, one section, shown only when
+ * page 1's Save wasn't the one-tap case (a standard type, people left to
+ * their usual person). Set mode's rows are fixed to the trail type's own
+ * activities, in order, each pre-filled with its usual person and days —
+ * choosing the people myself mostly means changing one or two dropdowns,
+ * not filling in every row from scratch. Custom mode has no defaults to
+ * pre-fill from, so every row starts blank; `MAX_CUSTOM_STEPS` rows are
+ * always rendered (a blank one is dropped by `parseTrailSteps`, not by
+ * this builder, which doesn't know which will end up used).
+ *
+ * The Open trail button carries what page 1 already decided — `unit`,
+ * `set`, `start`, and `mode` — plus how many rows to read back (`count`)
+ * and, in set mode, which activity each row is (`activities`, so the door
+ * needs no memory between the two dialog pages: `parseTrailSteps` reads
+ * everything else straight off this page's own form values.
+ */
+export function trailStepsDialog(input: {
+  mode: "set" | "custom";
+  steps: StepDefault[];
+  people: PersonOption[];
+  activities: ActivityOption[];
+  params: { unit: string; set: string; start: boolean };
+  submitUrl: string;
+}): Record<string, unknown> {
+  const { mode, steps, people, activities, params, submitUrl } = input;
+  const widgets: Record<string, unknown>[] = [];
+
+  const personDropdown = (name: string, selectedId: string | null): Record<string, unknown> => ({
+    selectionInput: {
+      name,
+      label: "Who carries it",
+      type: "DROPDOWN",
+      items: people.map((p) => ({ text: p.name, value: p.id, selected: p.id === selectedId })),
+    },
+  });
+
+  if (mode === "set") {
+    steps.forEach((step, index) => {
+      const stepNo = index + 1;
+      widgets.push({
+        decoratedText: {
+          topLabel: `Step ${stepNo}`,
+          text: `<b>${escapeHtml(step.activityName)}</b>`,
+        },
+      });
+      widgets.push(personDropdown(`person_${stepNo}`, step.assigneeId));
+      widgets.push({
+        textInput: { name: `days_${stepNo}`, label: "Days", value: String(step.expectedDays) },
+      });
+    });
+  } else {
+    widgets.push({
+      textInput: { name: "title", label: "What is this trail for", hintText: "Optional" },
+    });
+    for (let stepNo = 1; stepNo <= MAX_CUSTOM_STEPS; stepNo++) {
+      widgets.push({
+        selectionInput: {
+          name: `activity_${stepNo}`,
+          label: `Step ${stepNo} · activity`,
+          type: "DROPDOWN",
+          items: activities.map((a) => ({ text: a.name, value: a.id, selected: false })),
+        },
+      });
+      widgets.push(personDropdown(`person_${stepNo}`, null));
+      widgets.push({
+        textInput: { name: `days_${stepNo}`, label: "Days", hintText: "e.g. 5" },
+      });
+    }
+  }
+
+  widgets.push({
+    buttonList: {
+      buttons: [
+        {
+          text: "Open trail",
+          onClick: {
+            action: {
+              function: submitUrl,
+              parameters: [
+                { key: "action", value: "newtrail-open" },
+                { key: "unit", value: params.unit },
+                { key: "set", value: params.set },
+                { key: "start", value: params.start ? "on" : "" },
+                { key: "mode", value: mode },
+                {
+                  key: "count",
+                  value: mode === "set" ? String(steps.length) : String(MAX_CUSTOM_STEPS),
+                },
+                ...(mode === "set"
+                  ? [{ key: "activities", value: steps.map((s) => s.activityId).join(",") }]
+                  : []),
+              ],
+            },
+          },
+        },
+      ],
+    },
+  });
+
+  return { sections: [{ widgets }] };
+}
+
+/** The public confirmation's extra line for a custom trail — it has no departments yet. */
+export function customDepartmentsNote(): string {
+  return "Add its departments on the trail page if it needs them.";
 }
 
 /**
