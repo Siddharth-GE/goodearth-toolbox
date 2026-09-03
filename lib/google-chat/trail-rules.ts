@@ -242,10 +242,30 @@ export const CUSTOM_SET = "custom";
 
 /**
  * The ceiling on a custom trail's steps. A longer trail is a trail type's
- * job, made once in the toolbox — six rows is plenty for "pick this one
+ * job, made once in the toolbox — ten rows is plenty for "pick this one
  * off the cuff" without the dialog growing unusably long.
+ *
+ * A Chat dialog cannot grow a row on its own once it is open, so the
+ * count is chosen on page 1 (the "Steps" dropdown) and page 2 renders
+ * exactly that many. This is only the ceiling that dropdown offers.
  */
-export const MAX_CUSTOM_STEPS = 6;
+export const MAX_CUSTOM_STEPS = 10;
+
+/** How many custom step rows page 1 offers before anyone changes it. */
+export const DEFAULT_CUSTOM_STEPS = 4;
+
+/**
+ * Page 1's "Steps" answer, turned into a row count page 2 can render.
+ * This never fails: it only matters for a custom trail, and a dialog
+ * that refused to open because a dropdown came back oddly would be a
+ * worse answer than four rows. Anything that isn't a whole number is
+ * the default; a whole number is pinned inside 1..MAX_CUSTOM_STEPS.
+ */
+export function customStepCount(value: string | number | null): number {
+  const text = typeof value === "number" ? String(value) : (value ?? "").trim();
+  if (!/^\d+$/.test(text)) return DEFAULT_CUSTOM_STEPS;
+  return Math.min(Math.max(Number(text), 1), MAX_CUSTOM_STEPS);
+}
 
 /** One person, for a step's "Who carries it" dropdown. */
 export type PersonOption = { id: string; name: string };
@@ -268,15 +288,17 @@ export type StepDefault = {
 /**
  * Page 1 of /newtrail, read back: which house, which trail type — or
  * "custom", meaning there is no trail type and setId comes back null —
- * whether the person wants to choose who carries each step, and whether
- * the clock starts today. Neither switch has a wrong answer, so only the
- * two dropdowns can fail: a switch sends its own value only when it's on,
+ * how many steps a custom trail should offer, whether the person wants to
+ * choose who carries each step, and whether the clock starts today.
+ * Neither switch nor the step count has a wrong answer, so only the two
+ * dropdowns can fail: a switch sends its own value only when it's on,
  * so "on" vs missing is exactly what parseNewTrailForm read for `start`
  * before this replaced it.
  */
 export function parseNewTrailPage(values: {
   unit: string | null;
   set: string | null;
+  steps: string | null;
   pickPeople: string | null;
   start: string | null;
 }):
@@ -285,6 +307,7 @@ export function parseNewTrailPage(values: {
       unitId: string;
       setId: string | null;
       custom: boolean;
+      steps: number;
       pickPeople: boolean;
       start: boolean;
     }
@@ -301,6 +324,7 @@ export function parseNewTrailPage(values: {
     unitId,
     setId: custom ? null : set,
     custom,
+    steps: customStepCount(values.steps),
     pickPeople: values.pickPeople !== null,
     start: values.start !== null,
   };

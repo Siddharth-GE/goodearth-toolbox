@@ -665,16 +665,84 @@ async function openFromSetNow(
 }
 
 /**
+ * Page 2, built from scratch — the lists it needs are read every time,
+ * because the door remembers nothing between pages. Two roads reach here:
+ * page 1's Save, and a page-2 refusal that has to be shown ON page 2
+ * rather than whispered as a toast while the dialog closes (the founder's
+ * vet, 2026-09-03: a toast is not a warning). `error` and `values` are
+ * what the second road adds — the sentence, and every box as the person
+ * left it.
+ *
+ * Failure has two shapes worth telling apart. A read that didn't answer
+ * is ours to apologise for; a trail type with no steps in it is the
+ * one-tap path's own refusal, in the app's own words, so this says which
+ * happened and lets the caller decide.
+ */
+type StepsPage =
+  { ok: true; card: Record<string, unknown> } | { ok: false; reason: "read-failed" | "empty-set" };
+
+async function buildStepsPage(input: {
+  mode: "set" | "custom";
+  unitId: string;
+  setId: string | null;
+  start: boolean;
+  customSteps: number;
+  error?: string | null;
+  values?: Record<string, string | null>;
+}): Promise<StepsPage> {
+  const { mode, unitId, setId, start, customSteps, error, values } = input;
+
+  const people = await listPeople();
+  if (!people) return { ok: false, reason: "read-failed" };
+
+  let steps: StepDefault[] = [];
+  let activities: ActivityOption[] = [];
+
+  if (mode === "custom") {
+    const list = await listActivities();
+    if (!list) return { ok: false, reason: "read-failed" };
+    activities = list;
+  } else {
+    // The type's steps, pre-filled the way the one-tap path would have
+    // filled them: the activity's usual person, and the days the type
+    // itself asks for. A blank person is a step nobody has ever carried
+    // — page 2 simply leaves that dropdown unchosen, which is the whole
+    // answer to the refusal the one-tap path would have given.
+    const set = await readSetSteps(setId as string);
+    if (!set) return { ok: false, reason: "read-failed" };
+    steps = set.steps;
+    if (steps.length === 0) return { ok: false, reason: "empty-set" };
+  }
+
+  return {
+    ok: true,
+    card: trailStepsDialog({
+      mode,
+      steps,
+      people,
+      activities,
+      customSteps,
+      // What page 1 decided, carried on the Open button rather than kept
+      // anywhere: the door remembers nothing between the two pages.
+      params: { unit: unitId, set: setId ?? CUSTOM_SET, start },
+      submitUrl: chatAudience(),
+      error,
+      values,
+    }),
+  };
+}
+
+/**
  * The /newtrail dialog's FIRST page came back: one house, one trail type
- * (or "custom"), whether to choose the people by hand, and whether to
- * start the clock today.
+ * (or "custom"), how many steps a custom trail should get, whether to
+ * choose the people by hand, and whether to start the clock today.
  *
  * Two roads out. A standard type with its usual people is the one-tap
  * path the founder already has, and it opens the trail here and now —
  * nothing about it changed. Anything else needs to know more than page 1
  * asked, so the answer to this Save is page 2 rather than a trail: the
- * type's steps to put people on, or six blank steps to build one from
- * scratch.
+ * type's steps to put people on, or as many blank steps as page 1's
+ * "Steps" dropdown asked for, to build one from scratch.
  *
  * Page 2's lists are read through relay-reads.ts, which holds the admin
  * client as every other read here does — the door itself stays
@@ -689,6 +757,8 @@ async function handleNewTrailSubmit(event: ChatEvent, actor: Actor, privateTo: s
   const page = parseNewTrailPage({
     unit: formValue(event, "unit"),
     set: formValue(event, "set"),
+    // Only a custom trail uses this; a trail type's own steps decide.
+    steps: formValue(event, "steps"),
     // Both switches send their value when on and nothing when off, so
     // "absent" is a real answer here, not a missing one.
     pickPeople: formValue(event, "pick_people"),
@@ -708,54 +778,30 @@ async function handleNewTrailSubmit(event: ChatEvent, actor: Actor, privateTo: s
     );
   }
 
-  // From here on the answer is page 2. Everything below is a read, and
+  // From here on the answer is page 2. Everything it needs is a read, and
   // any of them failing is a notice card in the dialog that is already
   // open — never a message envelope, which a dialog would drop.
-  const mode = page.custom ? "custom" : "set";
-  const people = await listPeople();
-  if (!people) return updateCard(noticeDialog(SOMETHING_WENT_WRONG));
+  const built = await buildStepsPage({
+    mode: page.custom ? "custom" : "set",
+    unitId: page.unitId,
+    setId,
+    start: page.start,
+    customSteps: page.steps,
+  });
 
-  let steps: StepDefault[] = [];
-  let activities: ActivityOption[] = [];
-
-  if (mode === "custom") {
-    const list = await listActivities();
-    if (!list) return updateCard(noticeDialog(SOMETHING_WENT_WRONG));
-    activities = list;
-  } else {
-    // The type's steps, pre-filled the way the one-tap path would have
-    // filled them: the activity's usual person, and the days the type
-    // itself asks for. A blank person is a step nobody has ever carried
-    // — page 2 simply leaves that dropdown unchosen, which is the whole
-    // answer to the refusal the one-tap path would have given.
-    const set = await readSetSteps(setId as string);
-    if (!set) return updateCard(noticeDialog(SOMETHING_WENT_WRONG));
-    steps = set.steps;
-
-    // A trail type with nothing in it has no steps to put people on, so
-    // page 2 would be an empty form with one button. The one-tap path
-    // says why in the app's own words — let it.
-    if (steps.length === 0) {
-      return await openFromSetNow(
-        actor,
-        { unitId: page.unitId, setId: setId as string, start: page.start },
-        privateTo,
-      );
-    }
+  // A trail type with nothing in it has no steps to put people on, so
+  // page 2 would be an empty form with one button. The one-tap path says
+  // why in the app's own words — let it.
+  if (!built.ok && built.reason === "empty-set") {
+    return await openFromSetNow(
+      actor,
+      { unitId: page.unitId, setId: setId as string, start: page.start },
+      privateTo,
+    );
   }
+  if (!built.ok) return updateCard(noticeDialog(SOMETHING_WENT_WRONG));
 
-  return updateCard(
-    trailStepsDialog({
-      mode,
-      steps,
-      people,
-      activities,
-      // What page 1 decided, carried on the Open button rather than kept
-      // anywhere: the door remembers nothing between the two pages.
-      params: { unit: page.unitId, set: setId ?? CUSTOM_SET, start: page.start },
-      submitUrl: chatAudience(),
-    }),
-  );
+  return updateCard(built.card);
 }
 
 /**
@@ -766,6 +812,13 @@ async function handleNewTrailSubmit(event: ChatEvent, actor: Actor, privateTo: s
  * button's own parameters, and the steps are read out of the form by
  * number. The five refusals are the app's own, checked in trail-rules
  * and again by the database.
+ *
+ * Every one of those refusals keeps the dialog OPEN, with the sentence at
+ * the top of the page and every box as it was left. The founder's vet
+ * (2026-09-03) had one arrive as a `notification` toast on the closing
+ * dialog: the dialog shut, nothing was said loudly enough to see, and no
+ * trail appeared. A page-2 failure is now never a toast — only the
+ * confirmation closes this dialog.
  */
 async function handleTrailStepsSubmit(event: ChatEvent, actor: Actor, privateTo: string | null) {
   const params = buttonParams(event);
@@ -792,8 +845,24 @@ async function handleTrailStepsSubmit(event: ChatEvent, actor: Actor, privateTo:
     values[`days_${step}`] = formValue(event, `days_${step}`);
   }
 
+  // Any refusal from here on is shown on this same page, rebuilt around
+  // it: the sentence first, then every box as the person left it.
+  const again = async (error: string) => {
+    const built = await buildStepsPage({
+      mode,
+      unitId,
+      setId: set === CUSTOM_SET ? null : set,
+      start,
+      customSteps: count,
+      error,
+      values,
+    });
+    if (!built.ok) return updateCard(noticeDialog(SOMETHING_WENT_WRONG));
+    return updateCard(built.card);
+  };
+
   const parsed = parseTrailSteps(values, { mode, count, activityIds });
-  if (!parsed.ok) return closeDialog(parsed.error, privateTo);
+  if (!parsed.ok) return await again(parsed.error);
 
   const acted = await actAs({ userId: actor.userId, email: actor.email }, (db) =>
     openTrail(db, {
@@ -806,8 +875,8 @@ async function handleTrailStepsSubmit(event: ChatEvent, actor: Actor, privateTo:
       start,
     }),
   );
-  if (!acted.ok) return closeDialog(cannotActNow(), privateTo);
-  if (!acted.value.ok) return closeDialog(acted.value.error, privateTo);
+  if (!acted.ok) return await again(cannotActNow());
+  if (!acted.value.ok) return await again(acted.value.error);
 
   const chainId = acted.value.chainId;
   const trail = chainId ? await getTrailSummary(chainId) : null;

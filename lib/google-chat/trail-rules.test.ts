@@ -10,6 +10,7 @@ import {
   BOUNCE_REASONS,
   CARD_LIMIT,
   CUSTOM_SET,
+  DEFAULT_CUSTOM_STEPS,
   MAX_CUSTOM_STEPS,
   bounceReasonText,
   buttonsFor,
@@ -348,61 +349,146 @@ test("parseBounceForm: the target leg must be a real leg number, not zero, text 
 // --- Phase 7b: parseNewTrailPage, parseTrailSteps -----------------------
 
 test("parseNewTrailPage: a standard type, people not chosen, start on", () => {
-  assert.deepEqual(parseNewTrailPage({ unit: "u1", set: "s1", pickPeople: null, start: "on" }), {
-    ok: true,
-    unitId: "u1",
-    setId: "s1",
-    custom: false,
-    pickPeople: false,
-    start: true,
-  });
+  assert.deepEqual(
+    parseNewTrailPage({ unit: "u1", set: "s1", steps: "4", pickPeople: null, start: "on" }),
+    {
+      ok: true,
+      unitId: "u1",
+      setId: "s1",
+      custom: false,
+      steps: 4,
+      pickPeople: false,
+      start: true,
+    },
+  );
 });
 
 test("parseNewTrailPage: start is off — the switch was left unset", () => {
-  assert.deepEqual(parseNewTrailPage({ unit: "u1", set: "s1", pickPeople: null, start: null }), {
-    ok: true,
-    unitId: "u1",
-    setId: "s1",
-    custom: false,
-    pickPeople: false,
-    start: false,
-  });
+  assert.deepEqual(
+    parseNewTrailPage({ unit: "u1", set: "s1", steps: "4", pickPeople: null, start: null }),
+    {
+      ok: true,
+      unitId: "u1",
+      setId: "s1",
+      custom: false,
+      steps: 4,
+      pickPeople: false,
+      start: false,
+    },
+  );
 });
 
 test("parseNewTrailPage: choosing the people myself is on when the switch sent its value", () => {
-  assert.deepEqual(parseNewTrailPage({ unit: "u1", set: "s1", pickPeople: "on", start: "on" }), {
-    ok: true,
-    unitId: "u1",
-    setId: "s1",
-    custom: false,
-    pickPeople: true,
-    start: true,
-  });
+  assert.deepEqual(
+    parseNewTrailPage({ unit: "u1", set: "s1", steps: "4", pickPeople: "on", start: "on" }),
+    {
+      ok: true,
+      unitId: "u1",
+      setId: "s1",
+      custom: false,
+      steps: 4,
+      pickPeople: true,
+      start: true,
+    },
+  );
 });
 
 test("parseNewTrailPage: the custom set comes back as custom, with no setId", () => {
   assert.deepEqual(
-    parseNewTrailPage({ unit: "u1", set: CUSTOM_SET, pickPeople: null, start: "on" }),
-    { ok: true, unitId: "u1", setId: null, custom: true, pickPeople: false, start: true },
+    parseNewTrailPage({ unit: "u1", set: CUSTOM_SET, steps: "7", pickPeople: null, start: "on" }),
+    {
+      ok: true,
+      unitId: "u1",
+      setId: null,
+      custom: true,
+      steps: 7,
+      pickPeople: false,
+      start: true,
+    },
   );
 });
 
+test("parseNewTrailPage: no steps answer at all is the default four", () => {
+  const page = parseNewTrailPage({
+    unit: "u1",
+    set: CUSTOM_SET,
+    steps: null,
+    pickPeople: null,
+    start: "on",
+  });
+  assert.equal(page.ok && page.steps, DEFAULT_CUSTOM_STEPS);
+  assert.equal(DEFAULT_CUSTOM_STEPS, 4);
+});
+
+test("parseNewTrailPage: a steps answer that isn't a number is the default, never an error", () => {
+  for (const steps of ["", "  ", "four", "3.5", "-2"]) {
+    const page = parseNewTrailPage({
+      unit: "u1",
+      set: CUSTOM_SET,
+      steps,
+      pickPeople: null,
+      start: null,
+    });
+    assert.equal(page.ok, true, `"${steps}" should still open the page`);
+    assert.equal(page.ok && page.steps, DEFAULT_CUSTOM_STEPS);
+  }
+});
+
+test("parseNewTrailPage: a steps answer outside 1..MAX is pinned to the range", () => {
+  const tooMany = parseNewTrailPage({
+    unit: "u1",
+    set: CUSTOM_SET,
+    steps: "99",
+    pickPeople: null,
+    start: null,
+  });
+  assert.equal(tooMany.ok && tooMany.steps, MAX_CUSTOM_STEPS);
+
+  const none = parseNewTrailPage({
+    unit: "u1",
+    set: CUSTOM_SET,
+    steps: "0",
+    pickPeople: null,
+    start: null,
+  });
+  assert.equal(none.ok && none.steps, 1);
+
+  const ceiling = parseNewTrailPage({
+    unit: "u1",
+    set: CUSTOM_SET,
+    steps: String(MAX_CUSTOM_STEPS),
+    pickPeople: null,
+    start: null,
+  });
+  assert.equal(ceiling.ok && ceiling.steps, MAX_CUSTOM_STEPS);
+  assert.equal(MAX_CUSTOM_STEPS, 10);
+});
+
 test("parseNewTrailPage: no house is refused before the trail type", () => {
-  assert.deepEqual(parseNewTrailPage({ unit: null, set: "s1", pickPeople: null, start: null }), {
-    ok: false,
-    error: "Pick a house first.",
-  });
-  assert.deepEqual(parseNewTrailPage({ unit: "", set: "s1", pickPeople: null, start: null }), {
-    ok: false,
-    error: "Pick a house first.",
-  });
+  assert.deepEqual(
+    parseNewTrailPage({ unit: null, set: "s1", steps: "4", pickPeople: null, start: null }),
+    {
+      ok: false,
+      error: "Pick a house first.",
+    },
+  );
+  assert.deepEqual(
+    parseNewTrailPage({ unit: "", set: "s1", steps: "4", pickPeople: null, start: null }),
+    {
+      ok: false,
+      error: "Pick a house first.",
+    },
+  );
 });
 
 test("parseNewTrailPage: no trail type is refused once a house is picked", () => {
-  assert.deepEqual(parseNewTrailPage({ unit: "u1", set: null, pickPeople: null, start: null }), {
-    ok: false,
-    error: "Pick a trail type first.",
-  });
+  assert.deepEqual(
+    parseNewTrailPage({ unit: "u1", set: null, steps: "4", pickPeople: null, start: null }),
+    {
+      ok: false,
+      error: "Pick a trail type first.",
+    },
+  );
 });
 
 function stepValues(
