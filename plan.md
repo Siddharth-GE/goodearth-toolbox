@@ -61,7 +61,7 @@ Branch `feature/google-chat`; each phase committed and pushed separately with a 
 
 **Invariants to keep:** every reply about one person is private (`privateMessageViewer`); the log line never carries message text or an email; identity `ok` (live account holding `/relay`, or admin) gates every command and button; joining a space needs no identity; `0094` is on **staging only** until Phase 8.
 
-**Google traps, all learned the hard way (with (a)–(d) in the Phase 2 bullet above):**
+**Google traps, all learned the hard way (with (a)–(d) in the Phase 2 bullet above) — the standing record is now BUGCATCHER.md #17, so this file can be deleted without losing them:**
 
 - **(e)** For an HTTP app a card button's `onClick.action.function` is a **URL** — the door's registered endpoint, `chatAudience()` — never a name. With a name there, Google shows "the app is not responding" and never calls the door.
 - **(f)** Once Google has asked for a dialog (`appCommandPayload.dialogEventType: "REQUEST_DIALOG"`, only sent when "Opens a dialog" is ticked on that command in the console), every answer must BE a dialog: `{ action: { navigations: [{ pushCard }] } }`. A message envelope there is "Could not load dialog". A refusal at that moment is a one-paragraph `noticeDialog`.
