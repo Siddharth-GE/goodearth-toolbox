@@ -2,7 +2,7 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchAll } from "@/lib/supabase/fetch-all";
-import type { Scope, TrailSummary } from "./trail-rules";
+import type { LegOption, Scope, TrailSetOption, TrailSummary } from "./trail-rules";
 
 /**
  * The two reads /court and /trail are built from: everything the sender
@@ -203,6 +203,119 @@ export async function listRunning(scope: Scope): Promise<TrailSummary[] | null> 
     return await enrich(rows);
   } catch (error) {
     console.error("google-chat relay-reads: running trails read failed", error);
+    return null;
+  }
+}
+
+/**
+ * One trail, by id — the row a confirmation sentence is built from
+ * after a write has landed. Same view, same enrichment as the two lists,
+ * so "now with Anil, leg 3 of 8" in chat says exactly what the app's own
+ * court would say a second later.
+ *
+ * No `is_finished` filter: this is read straight after a write, and a
+ * trail that has just been finished is precisely the one being talked
+ * about. Null means the read failed or the trail is gone.
+ */
+export async function getTrailSummary(chainId: string): Promise<TrailSummary | null> {
+  if (!chainId) return null;
+
+  try {
+    const admin = createAdminClient();
+    const { data, error } = await admin
+      .from("pusher_chain_state")
+      .select(STATE_COLUMNS)
+      .eq("chain_id", chainId)
+      .maybeSingle();
+
+    if (error) {
+      console.error("google-chat relay-reads: trail read failed", error);
+      return null;
+    }
+    if (!data) return null;
+
+    const [summary] = await enrich([data as StateRow]);
+    return summary ?? null;
+  } catch (error) {
+    console.error("google-chat relay-reads: trail read broke", error);
+    return null;
+  }
+}
+
+/**
+ * The trail types on offer in the /newtrail dialog — the live ones only,
+ * in the order the app lists them. Just the id and the name: the
+ * activities behind a type are read on the write side, as the person,
+ * at the moment the type is laid down.
+ */
+export async function listTrailSets(): Promise<TrailSetOption[] | null> {
+  try {
+    const admin = createAdminClient();
+    const { data, error } = await admin
+      .from("pusher_trail_sets")
+      .select("id, name")
+      .eq("is_active", true)
+      .order("sort_order")
+      .order("name");
+
+    if (error) {
+      console.error("google-chat relay-reads: trail sets read failed", error);
+      return null;
+    }
+    return (data ?? []).map((set) => ({ id: set.id, name: set.name }));
+  } catch (error) {
+    console.error("google-chat relay-reads: trail sets read broke", error);
+    return null;
+  }
+}
+
+/**
+ * Every leg of one trail, in order, with the label snapshot and who is
+ * on it — the bounce dialog's list of places a baton can go back to.
+ * The door filters it to the legs earlier than the current one; this
+ * read simply says what the trail is made of.
+ *
+ * The label is the activity's name as it stood when the trail was laid
+ * (0043's snapshot), which is why it is read rather than joined: a
+ * renamed activity must not rewrite what a leg was called.
+ */
+export async function listLegs(chainId: string): Promise<LegOption[] | null> {
+  if (!chainId) return null;
+
+  try {
+    const admin = createAdminClient();
+    const legs = await fetchAll<{ leg_no: number; label: string | null; assignee_id: string }>(
+      (from, to) =>
+        admin
+          .from("pusher_chain_legs")
+          .select("leg_no, label, assignee_id")
+          .eq("chain_id", chainId)
+          .order("leg_no")
+          .range(from, to),
+    );
+
+    const assigneeIds = [...new Set(legs.map((leg) => leg.assignee_id).filter(Boolean))];
+    const names = new Map<string, string>();
+    if (assigneeIds.length > 0) {
+      const { data, error } = await admin
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", assigneeIds);
+      // A missing name is cosmetic — the dialog still names the leg — so
+      // it is logged and carried on from, never turned into a failure.
+      if (error) console.error("google-chat relay-reads: leg assignee read failed", error);
+      for (const profile of data ?? []) {
+        if (profile.full_name) names.set(profile.id, profile.full_name);
+      }
+    }
+
+    return legs.map((leg) => ({
+      legNo: leg.leg_no,
+      label: leg.label,
+      assigneeName: names.get(leg.assignee_id) ?? null,
+    }));
+  } catch (error) {
+    console.error("google-chat relay-reads: legs read broke", error);
     return null;
   }
 }
