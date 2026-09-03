@@ -47,8 +47,8 @@ Branch `feature/google-chat`; each phase committed and pushed separately with a 
 - **Phase 3 — Identity.** ✅ Done 2026-09-02 (PR #56, vetted on staging). Email→person mapping, refusal cards for unlinked/inactive accounts. _(Short form below; full detail in git.)_
 - **Phase 4 — Space linking.** ✅ Done 2026-09-02 (PRs #57–#59, vetted on staging the same evening). _(Short form below; full detail in git.)_ Migration `google_chat_spaces` (staging first: `npm run db:apply -- --project <ref> --commit`); `ADDED_TO_SPACE` auto-match + announcement; `/link` dialog.
 - **Phase 5 — Reads.** `/trail` and `/court` cards, scope-aware. **Detail written 2026-09-03 (below) — build next.**
-- **Phase 6 — Writes, buttons first.** `act-as.ts` session minting (reuse the row-write inside `markSessionVerified` in `lib/auth/verified-session.ts`; extract a shared helper if it proves cookie-coupled); push / finish / hold / return via `CARD_CLICKED`; public confirmations; revalidation.
-- **Phase 7 — Dialogs.** `/bounce`, then `/newtrail`.
+- **Phase 6 — Writes, buttons first.** _Merged with Phase 7 into one build, detail below (2026-09-03)._ `act-as.ts` session minting (reuse the row-write inside `markSessionVerified` in `lib/auth/verified-session.ts`; extract a shared helper if it proves cookie-coupled); push / finish / hold / return via `CARD_CLICKED`; public confirmations; revalidation.
+- **Phase 7 — Dialogs.** _See the Phases 6 and 7 section below._ `/bounce`, then `/newtrail`.
 - **Phase 8 — Docs & ship.** SECURITY.md: new sanctioned admin-client entry (email lookup, session minting, verified-session write, `google_chat_spaces`) + first webhook rule line; STATUS.md contract table rows (`google-chat` reads `pusher_chain_state`, `pusher_chain_legs`, `units`, `projects`); relay `PLAN.md` seams note. Then: **founder vets the staging bot in the test space** → migration to production, `db:compare` empty → **production** Chat app registered against the live site, env vars set in Vercel → `staging` → `master` → one real command pressed in production.
 
 **Out of scope (later builds):** outbound notifications (bot announcing stuck trails, morning court summaries — relay PLAN.md's seam); other tools' commands; a replay/rate-limit table (Google's JWT `exp` suffices for round one — note the deferral in SECURITY.md).
@@ -144,3 +144,79 @@ Branch `feature/google-chat`; each phase committed and pushed separately with a 
 ### Google traps learned in this phase
 
 - **(h)** **Cards render in the ordinary reply envelope** (proven 2026-09-03, the founder's first `/court` in the linked Saarang space): `hostAppDataAction.chatDataAction.createMessageAction.message.cardsV2 = [{ cardId, card: { header, sections } }]`, with `privateMessageViewer` beside it — the card came back "Only visible to you", the `decoratedText` rows showed top label, bold text and bottom label, and the `openLink` button rendered without any callback. No second envelope shape was needed. One cosmetic finding from the same card: a trail laid down from a trail type has its title equal to its activity name, so the title line is now dropped when it merely repeats the bold line.
+
+## Phases 6 and 7 in detail — writes (written by Fable, 2026-09-03)
+
+Merged into one build at the founder's request ("start a new trail in this space, then push, bounce, court"), ordered the way they will use it: open a trail, then the buttons, then bounce. Phase 5's reads stay exactly as they are; this adds the buttons to the court card and three writes behind them.
+
+**The idea.** Every write in chat is the same one-line insert or RPC the app's own Relay actions do, made **as the person**: the door mints a short-lived real session for the sender, writes through a client bound to it, and throws the session away. The database guard (`pusher_chain_events_guard`, `0036`) stays untouched and keeps enforcing holder-or-admin, leg arithmetic, the mandatory bounce note and the switched-off refusals — chat gains no power the app doesn't have, and every event is attributed to the real person. Confirmations post to the space; refusals stay private (the founder's settled choice).
+
+### The one piece that touches auth — `lib/google-chat/act-as.ts` `[Opus]`, reviewed line by line by `[Fable]`
+
+`actAs(identity, work)`, `server-only`, admin client, never throws to the door:
+
+1. `admin.auth.admin.generateLink({ type: "magiclink", email })` — the sender's verified email, carried on the `ok` identity from this phase. This mints **no email**: the admin API returns the link's `hashed_token` directly (the browser-smoke technique proven 2026-08-19).
+2. A fresh plain client (`@supabase/supabase-js` `createClient` with the anon key, `persistSession: false`, `autoRefreshToken: false`) calls `verifyOtp({ type: "magiclink", token_hash })` → a real session. The token is single-use and consumed within milliseconds; it is never logged, stored or sent anywhere.
+3. The access token's `session_id` claim (decoded from the JWT payload, no verification needed — it came from Supabase over TLS a moment ago) is upserted into `auth_verified_sessions` with `method: "oauth"` — the honest word from the three the `0062` CHECK allows: the person's Google sign-in is what proved them, exactly as the OAuth path does. **No migration.** Without this row `has_app('/relay')` answers false (`0063`) and every write is refused, which is the point of that row.
+4. `work(client)` runs with a client bound to that token (`global.headers.Authorization = Bearer …`, same anon key) — RLS-scoped, `auth.uid()` = the person, `session_is_verified()` true.
+5. **Always**, in `finally`: delete the `auth_verified_sessions` row, then `admin.auth.admin.signOut(accessToken)` to revoke the session. Both best-effort and logged; a leftover row dies in the 30-day sweep anyway.
+
+Failure at any step → `{ ok: false }` and the door's "couldn't act for you just now" sentence. The log line stays as it is: never the email, never a token. **SECURITY.md (Phase 8)** gets this as a new sanctioned admin-client entry with the threat note: the door's JWT check in `verify.ts` is what stands between anyone on the internet and "act as any employee" — which is why the service-agent email check there is load-bearing and stays.
+
+### Files, with owners
+
+1. **`identity-rules.ts` / `identity.ts`** `[Sonnet]` — the `ok` identity carries `email` (the normalised sender email `resolveIdentity` already matched on). Test updated.
+2. **`trail-rules.ts`** `[Sonnet]`, pure, tests:
+   - `type ButtonAction = "push" | "finish" | "bounce" | "hold" | "return"` and `buttonsFor(row): ButtonAction[]` — the app's own `MoveBatonButtons` rules restated: push when `currentLeg < legCount`; finish when `currentLeg === legCount`; bounce when `currentLeg > 1`; hold when not with the client; return when with the client. Nothing when `currentLeg` is null.
+   - `BOUNCE_REASONS`: `rework` "Rework needed" · `missing_info` "Missing information" · `wrong_person` "Wrong person" · `client_change` "Client changed something" · `other` "Other" — the `0036` list, in this order.
+   - `parseButton(params: Record<string, string> | undefined)` → `{ action, chainId, fromLeg }` or null; `parseBounceForm(values)` → `{ toLeg, reason, note }` or a plain-English error (the three checks `bounceBaton` in the app makes: reason picked, note not blank, target earlier than current); `parseNewTrailForm(values)` → `{ unitId, setId, start }` or an error.
+3. **`events.ts`** `[Sonnet]` — `buttonParams(event)`: `commonEventObject.parameters` as a plain record, `{}` when absent. `formValue` already reads dialog inputs; a switch arrives as a `stringInputs` value too (its `value` when on, absent when off) — pin that in the test.
+4. **`relay-reads.ts`** `[Sonnet]` — `getTrailSummary(chainId): TrailSummary | null` (one row of the view, same enrichment — for the confirmation sentence after a write), `listTrailSets()` (active `pusher_trail_sets` with their items, ordered — the dialog's dropdown), `listLegs(chainId)` (leg_no, label, assignee name — the bounce dialog's target list). All admin-client reads of what every signed-in person can see.
+5. **`relay-writes.ts`** `[Opus]`, `server-only`, **every function takes the minted client** and returns `{ ok: true; chainId? } | { ok: false; error: string }`; errors through `dbErrorMessage` from `lib/db-error` with the relay phrase list **copied** (`baton`, `trail`, `leg`, `switched off`, `permanent`, `signed-in`), so the guard's own sentences reach chat intact:
+   - `pushBaton`, `finishTrail`, `holdForClient`, `clientReturned`, `bounceBaton` — the same inserts as `lib/relay/actions.ts`, one each.
+   - `openTrailFromSet(client, { unitId, setId, start })` — `applyTrailSet` restated: the unit's project from `units`; the set's activities; each activity's default person and days from its most recent leg anywhere (the `getActivityDefaults` read, on the minted client so RLS applies), skipping switched-off people; the unstaffed-activity refusal in the app's own words, ending "open it once in the toolbox by hand and this type will fill itself in"; then `open_chain` with `p_start`, then best-effort `set_chain_departments` from the last trail of that type. Not `requireTool` — the minted session's RLS is the gate.
+   - Each success ends with `revalidatePath("/relay", "layout")` so the app is fresh behind chat.
+6. **`cards.ts`** `[Sonnet]`, tests:
+   - The court row's `buttonList` grows the action buttons from `buttonsFor(row)` before "Open in the toolbox": **Push** · **Finish** · **Bounce** · **With client** · **Back from client**. Each `onClick.action = { function: submitUrl, parameters: [{action},{chain},{leg}] }` — the URL rule, trap (e). Bounce alone adds `interaction: "OPEN_DIALOG"`. `courtCard` gains `submitUrl`; the Phase 5 `note` line and `buttonsComingNote()` go.
+   - `bounceDialog({ trail, legs, submitUrl })`: a paragraph naming the trail and its current leg; dropdown `to_leg` of earlier legs ("Leg 1 · Client sign-off · Anil"), default the previous one; dropdown `reason` from `BOUNCE_REASONS`; `textInput` `note`, multi-line, hint "What needs to change — a bounce is never silent"; Save with `action: "bounce"`, chain and leg parameters.
+   - `newTrailDialog({ units, sets, selectedUnit, submitUrl })`: dropdown `unit` of every villa as "Project · Villa" (pre-selected from the space link; a project-linked space pre-selects nothing); dropdown `set` of trail types; a `decoratedText` with a `switchControl` `start` **on by default** — "Start now (the clock begins today)"; Save with `action: "newtrail"`.
+   - Public confirmation sentences, one per write, built from the fresh `TrailSummary`: "**Sid** pushed _Standard villa_ on Villa 12 to leg 3 of 8 · Client sign-off — now with Anil." · "… finished _Standard villa_ on Villa 12 🎉" · "… bounced _…_ back to leg 1 · Client sign-off (Rework needed): <note>" · "… marked _…_ as with the client." · "… took _…_ back from the client." · "… opened _Standard villa_ on Villa 12 — leg 1 of 8 · Client sign-off, with Anil." / "… queued _Standard villa_ on Villa 12 — not started."
+   - Private sentences: `cannotActNow()` "I couldn't act as you just now. Please try again in a moment."; `newTrailNeedsDialog()` (the "Opens a dialog" tick missing on `/newtrail`, same shape as `/link`'s).
+7. **`route.ts`** `[Opus]`:
+   - `buttonClickedPayload` without a dialog step → `parseButton(buttonParams(event))`: `push` / `finish` / `hold` / `return` → `actAs` → the write → `getTrailSummary` → **public** `card(confirmation)`; a refusal → **private** `card(error, privateTo)`. `bounce` never arrives here (it opens a dialog).
+   - `REQUEST_DIALOG` on a button with action `bounce` → `listLegs` + `getTrailSummary` → `pushCard(bounceDialog)`; `SUBMIT_DIALOG` with action `bounce` → `parseBounceForm` → `actAs` → write → `closeDialog(confirmation)` public, or `closeDialog(error, privateTo)` — the three close shapes, trap (g).
+   - `/newtrail` (id 6) → must be `REQUEST_DIALOG` (else `newTrailNeedsDialog()`) → `listLinkTargets` + `listTrailSets` → `pushCard(newTrailDialog)`; `SUBMIT_DIALOG` with action `newtrail` → `parseNewTrailForm` → `actAs` → `openTrailFromSet` → `closeDialog(confirmation)` / `closeDialog(error, privateTo)`.
+   - `handleLinkSubmit` now runs only when the Save's action is `link` — every dialog's Save names its action.
+   - `/push`, `/bounce`, `/finish` → the court card, no note: the buttons are on it.
+
+### Steps, in order
+
+- [ ] **1. Act-as + the first write.** `[Opus]` `act-as.ts`, `relay-writes.ts` (all six writes), the reads in step 4 of the file list. `[Fable]` reviews `act-as.ts` before anything is pushed.
+- [ ] **2. Rules, readers, cards.** `[Sonnet]` items 1, 2, 3, 6 with tests.
+- [ ] **3. Dispatch.** `[Opus]` item 7.
+- [ ] **4. Checks, push, PR, CI green, merge to staging on the founder's word.**
+- [ ] **5. Founder ticks "Opens a dialog" on `/newtrail`** (command 6) in the Google Cloud console — the same tick `/link` needed. **Not** on `/bounce`: it answers with the court card, and the dialog opens from the row's button.
+- [ ] **6. Founder's vet, in this order**, each answer recorded as a trap if Google surprises us: `/newtrail` in the Villa 12 space (dialog pre-filled with Villa 12; pick a type; Save → public "opened … leg 1 of N") · `/court` (the new trail with Push / Bounce / With client buttons) · tap **Push** (public confirmation — **this is trap (i): whether a message-card button click accepts the same reply envelope**) · `/court` again (leg 2) · tap **Bounce** (dialog; pick reason, type a note, Save → public confirmation) · `/court` (back on leg 1) · tap **With client**, then **Back from client** · open `/relay/court` in the browser and confirm the same trail, same leg, and the events named to you.
+
+### What is NOT in this build
+
+- No editing of who is on a leg, no hand-off, no discard of a queued trail, no `/newtrail` without a trail type (the app's hand-built form stays the place for that).
+- No updating of the court card in place after a button press — the confirmation posts, and `/court` again shows the new state. (Editing the original message is a later refinement, if the founder wants it.)
+- No replay or rate-limit table: Google's token `exp` and the single-use magic-link token cover round one (the deferral SECURITY.md notes in Phase 8).
+- No migration. `0094` stays staging-only until Phase 8.
+
+### Acceptance
+
+- Every event chat creates carries the sender's `actor_id` and lands in the app's court, trail page and audit exactly as if pressed there.
+- A person who is not the holder pressing a button they somehow have (a stale card) gets the guard's own sentence privately; nothing moves.
+- A bounce without a note never reaches the database.
+- `auth_verified_sessions` holds no chat rows a minute after any command; `auth.sessions` shows the minted session revoked.
+- The log line still carries no email, token or text.
+
+### Questions for the tier above
+
+_(none yet)_
+
+### Google traps learned in this build
+
+- **(i)** _to be written at the first Push: whether a button on a message card (not a dialog) accepts the `createMessageAction` reply, and what Google does with the original card._
