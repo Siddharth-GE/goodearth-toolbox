@@ -235,3 +235,24 @@ export function commandId(event: ChatEvent): number | null {
   const id = Number(raw);
   return Number.isFinite(id) ? id : null;
 }
+
+/**
+ * The words typed after a slash command — "villa 12" out of "/trail
+ * villa 12". Google's own `argumentText` is what it is meant for, and is
+ * read from wherever the command arrived; a command posted through the
+ * older message shape carries no `argumentText` at all, so the message's
+ * raw `text` is the last resort, with the leading `/word` cut off by
+ * hand. Trimmed; "" when there is nothing after the command.
+ */
+export function commandText(event: ChatEvent): string {
+  const chat = event.chat ?? {};
+
+  const appArgument = chat.appCommandPayload?.message?.argumentText;
+  if (typeof appArgument === "string" && appArgument.trim()) return appArgument.trim();
+
+  const messageArgument = chat.messagePayload?.message?.argumentText;
+  if (typeof messageArgument === "string" && messageArgument.trim()) return messageArgument.trim();
+
+  const text = chat.appCommandPayload?.message?.text ?? chat.messagePayload?.message?.text ?? "";
+  return text.replace(/^\s*\/\S+\s*/, "").trim();
+}

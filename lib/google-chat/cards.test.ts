@@ -6,6 +6,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  askForWords,
+  buttonsComingNote,
+  courtCard,
   dialogNotEnabled,
   dmCannotLink,
   greeting,
@@ -15,9 +18,11 @@ import {
   linkDialog,
   noticeDialog,
   linkSaveFailed,
+  trailCard,
   type LinkTarget,
   type RefusalKind,
 } from "./cards";
+import type { TrailSummary } from "./trail-rules";
 
 test("no-email refusal", () => {
   assert.equal(
@@ -61,10 +66,10 @@ test("greeting names the command when one was typed", () => {
   );
 });
 
-test("greeting without a command says nothing is wired up yet", () => {
+test("greeting without a command points at /court and /trail", () => {
   assert.equal(
     greeting("Siddharth", null),
-    "Hi Siddharth! Slash commands are on their way — nothing to run just yet.",
+    "Hi Siddharth! Try /court to see what's in your hand, or /trail followed by a villa name.",
   );
 });
 
@@ -201,4 +206,366 @@ test("noticeDialog is one paragraph and nothing else", () => {
   assert.equal(dialog.sections.length, 1);
   assert.equal(dialog.sections[0].widgets.length, 1);
   assert.equal(dialog.sections[0].widgets[0].textParagraph.text, "A DM can't be linked.");
+});
+
+// --- Phase 5: /court and /trail cards --------------------------------
+
+type Widget =
+  | { decoratedText: { topLabel: string; text: string; bottomLabel: string; wrapText: boolean } }
+  | { buttonList: { buttons: { text: string; onClick: { openLink: { url: string } } }[] } }
+  | { textParagraph: { text: string } };
+
+type ChatCard = {
+  cardId: string;
+  card: { header: { title: string; subtitle: string }; sections: { widgets: Widget[] }[] };
+};
+
+function widgetsOf(built: Record<string, unknown>): Widget[] {
+  return (built as ChatCard).card.sections[0].widgets;
+}
+
+function decoratedTexts(built: Record<string, unknown>) {
+  return widgetsOf(built)
+    .filter((w): w is Extract<Widget, { decoratedText: unknown }> => "decoratedText" in w)
+    .map((w) => w.decoratedText);
+}
+
+function paragraphs(built: Record<string, unknown>) {
+  return widgetsOf(built)
+    .filter((w): w is Extract<Widget, { textParagraph: unknown }> => "textParagraph" in w)
+    .map((w) => w.textParagraph.text);
+}
+
+function openLinks(built: Record<string, unknown>) {
+  return widgetsOf(built)
+    .filter((w): w is Extract<Widget, { buttonList: unknown }> => "buttonList" in w)
+    .map((w) => w.buttonList.buttons[0].onClick.openLink.url);
+}
+
+function headerOf(built: Record<string, unknown>) {
+  return (built as ChatCard).card.header;
+}
+
+function row(overrides: Partial<TrailSummary> = {}): TrailSummary {
+  return {
+    chainId: "c1",
+    projectId: "p-saarang",
+    projectName: "Saarang",
+    unitId: "u-villa-12",
+    unitName: "Villa 12",
+    activityName: "Structural drawings",
+    title: null,
+    currentLeg: 2,
+    legCount: 5,
+    legLabel: "Structural drawings",
+    holderName: "Anil",
+    daysInLeg: 4,
+    expectedDays: 3,
+    isStuck: true,
+    isWithClient: false,
+    withClientDays: 0,
+    ...overrides,
+  };
+}
+
+const ORIGIN = "https://staging.goodearthkannur.org";
+
+test("askForWords", () => {
+  assert.equal(
+    askForWords(),
+    "Tell me what to look for — a villa, a project or an activity, e.g. /trail villa 12.",
+  );
+});
+
+test("buttonsComingNote", () => {
+  assert.equal(
+    buttonsComingNote(),
+    "Push, Bounce and Finish buttons arrive with the next release — Open a trail to move it in the toolbox.",
+  );
+});
+
+test("courtCard: on time", () => {
+  const built = courtCard({
+    firstName: "Siddharth",
+    scopeLabel: null,
+    rows: [row({ isStuck: false, isWithClient: false, daysInLeg: 2, expectedDays: 3 })],
+    more: 0,
+    moreElsewhere: 0,
+    origin: ORIGIN,
+  });
+  assert.match(decoratedTexts(built)[0].bottomLabel, /day 2 of 3, on time$/);
+});
+
+test("courtCard: cold", () => {
+  const built = courtCard({
+    firstName: "Siddharth",
+    scopeLabel: null,
+    rows: [row({ isStuck: true, isWithClient: false, daysInLeg: 4, expectedDays: 3 })],
+    more: 0,
+    moreElsewhere: 0,
+    origin: ORIGIN,
+  });
+  assert.match(decoratedTexts(built)[0].bottomLabel, /day 4 of 3, cold$/);
+});
+
+test("courtCard: with the client", () => {
+  const built = courtCard({
+    firstName: "Siddharth",
+    scopeLabel: null,
+    rows: [
+      row({ isStuck: false, isWithClient: true, withClientDays: 4, daysInLeg: 6, expectedDays: 3 }),
+    ],
+    more: 0,
+    moreElsewhere: 0,
+    origin: ORIGIN,
+  });
+  assert.match(decoratedTexts(built)[0].bottomLabel, /day 6 of 3, with the client 4 days$/);
+});
+
+test("courtCard: cold and with the client at once", () => {
+  const built = courtCard({
+    firstName: "Siddharth",
+    scopeLabel: null,
+    rows: [
+      row({ isStuck: true, isWithClient: true, withClientDays: 4, daysInLeg: 6, expectedDays: 3 }),
+    ],
+    more: 0,
+    moreElsewhere: 0,
+    origin: ORIGIN,
+  });
+  assert.match(decoratedTexts(built)[0].bottomLabel, /cold, with the client 4 days$/);
+});
+
+test("courtCard: a single with-client day is not pluralised", () => {
+  const built = courtCard({
+    firstName: "Siddharth",
+    scopeLabel: null,
+    rows: [row({ isStuck: false, isWithClient: true, withClientDays: 1 })],
+    more: 0,
+    moreElsewhere: 0,
+    origin: ORIGIN,
+  });
+  assert.match(decoratedTexts(built)[0].bottomLabel, /with the client 1 day$/);
+});
+
+test("courtCard: leg number and label lead the bottom label, label omitted when null", () => {
+  const withLabel = courtCard({
+    firstName: "S",
+    scopeLabel: null,
+    rows: [row({ currentLeg: 2, legCount: 5, legLabel: "Structural drawings" })],
+    more: 0,
+    moreElsewhere: 0,
+    origin: ORIGIN,
+  });
+  assert.match(decoratedTexts(withLabel)[0].bottomLabel, /^Leg 2 of 5 · Structural drawings —/);
+
+  const withoutLabel = courtCard({
+    firstName: "S",
+    scopeLabel: null,
+    rows: [row({ currentLeg: 2, legCount: 5, legLabel: null })],
+    more: 0,
+    moreElsewhere: 0,
+    origin: ORIGIN,
+  });
+  assert.match(decoratedTexts(withoutLabel)[0].bottomLabel, /^Leg 2 of 5 —/);
+});
+
+test("courtCard: an empty court says the app's own sentence", () => {
+  const built = courtCard({
+    firstName: "Siddharth",
+    scopeLabel: null,
+    rows: [],
+    more: 0,
+    moreElsewhere: 0,
+    origin: ORIGIN,
+  });
+  assert.deepEqual(paragraphs(built), ["Court cleared — nothing is waiting on you."]);
+});
+
+test("courtCard: header names the scope, or everything, and the note when given", () => {
+  const everything = courtCard({
+    firstName: "S",
+    scopeLabel: null,
+    rows: [],
+    more: 0,
+    moreElsewhere: 0,
+    origin: ORIGIN,
+  });
+  assert.equal(headerOf(everything).title, "Your court");
+  assert.equal(headerOf(everything).subtitle, "everything");
+
+  const scoped = courtCard({
+    firstName: "S",
+    scopeLabel: "Saarang · Villa 12",
+    rows: [],
+    more: 0,
+    moreElsewhere: 0,
+    origin: ORIGIN,
+  });
+  assert.equal(headerOf(scoped).subtitle, "Saarang · Villa 12");
+
+  const noted = courtCard({
+    firstName: "S",
+    scopeLabel: "Saarang · Villa 12",
+    rows: [],
+    more: 0,
+    moreElsewhere: 0,
+    origin: ORIGIN,
+    note: buttonsComingNote(),
+  });
+  assert.equal(headerOf(noted).subtitle, `Saarang · Villa 12 · ${buttonsComingNote()}`);
+});
+
+test("courtCard: more and moreElsewhere footers, singular and plural", () => {
+  const one = courtCard({
+    firstName: "S",
+    scopeLabel: "Saarang · Villa 12",
+    rows: [row()],
+    more: 3,
+    moreElsewhere: 1,
+    origin: ORIGIN,
+  });
+  const lines = paragraphs(one);
+  assert.ok(lines.some((line) => line.startsWith("and 3 more —") && line.includes(ORIGIN)));
+  assert.ok(lines.includes("You also hold 1 trail outside this space."));
+
+  const many = courtCard({
+    firstName: "S",
+    scopeLabel: "Saarang · Villa 12",
+    rows: [row()],
+    more: 0,
+    moreElsewhere: 5,
+    origin: ORIGIN,
+  });
+  assert.ok(paragraphs(many).includes("You also hold 5 trails outside this space."));
+});
+
+test("courtCard: every row's link lands on that trail, on the given origin", () => {
+  const built = courtCard({
+    firstName: "S",
+    scopeLabel: null,
+    rows: [row({ chainId: "c-42" })],
+    more: 0,
+    moreElsewhere: 0,
+    origin: ORIGIN,
+  });
+  assert.deepEqual(openLinks(built), [`${ORIGIN}/relay/trails/c-42`]);
+});
+
+test("trailCard: the bottom label keeps the leg and adds who holds it, Unnamed when there is none", () => {
+  const withHolder = trailCard({
+    words: ["villa"],
+    scopeLabel: null,
+    rows: [
+      row({
+        currentLeg: 2,
+        legCount: 5,
+        legLabel: "Structural drawings",
+        holderName: "Anil",
+        isStuck: true,
+        daysInLeg: 4,
+        expectedDays: 3,
+      }),
+    ],
+    more: 0,
+    origin: ORIGIN,
+  });
+  assert.equal(
+    decoratedTexts(withHolder)[0].bottomLabel,
+    "Leg 2 of 5 · Structural drawings · with Anil — day 4 of 3, cold",
+  );
+
+  const noHolder = trailCard({
+    words: ["villa"],
+    scopeLabel: null,
+    rows: [row({ holderName: null })],
+    more: 0,
+    origin: ORIGIN,
+  });
+  assert.match(decoratedTexts(noHolder)[0].bottomLabel, /· with Unnamed —/);
+});
+
+test("trailCard: subtitle names the words searched, or the scope", () => {
+  const searched = trailCard({
+    words: ["villa", "12"],
+    scopeLabel: null,
+    rows: [],
+    more: 0,
+    origin: ORIGIN,
+  });
+  assert.equal(headerOf(searched).subtitle, "matching 'villa 12'");
+
+  const scoped = trailCard({
+    words: [],
+    scopeLabel: "Saarang · Villa 12",
+    rows: [],
+    more: 0,
+    origin: ORIGIN,
+  });
+  assert.equal(headerOf(scoped).subtitle, "Saarang · Villa 12");
+
+  const everything = trailCard({ words: [], scopeLabel: null, rows: [], more: 0, origin: ORIGIN });
+  assert.equal(headerOf(everything).subtitle, "everything");
+});
+
+test("trailCard: no words and nothing running says so plainly", () => {
+  const built = trailCard({
+    words: [],
+    scopeLabel: "Saarang · Villa 12",
+    rows: [],
+    more: 0,
+    origin: ORIGIN,
+  });
+  assert.deepEqual(paragraphs(built), ["Nothing is running here right now."]);
+});
+
+test("trailCard: words with no match names them and links the toolbox", () => {
+  const built = trailCard({
+    words: ["villa", "12"],
+    scopeLabel: null,
+    rows: [],
+    more: 0,
+    origin: ORIGIN,
+  });
+  const [text] = paragraphs(built);
+  assert.match(text, /^Nothing running matches 'villa 12'\./);
+  assert.match(text, new RegExp(`href="${ORIGIN}/relay/trails"`));
+});
+
+test("trailCard: more matches link the toolbox too", () => {
+  const built = trailCard({
+    words: ["villa"],
+    scopeLabel: null,
+    rows: [row()],
+    more: 4,
+    origin: ORIGIN,
+  });
+  const lines = paragraphs(built);
+  assert.ok(lines.some((line) => line.startsWith("and 4 more —") && line.includes(ORIGIN)));
+});
+
+test("cards escape a title or search word that carries HTML-special characters", () => {
+  const built = trailCard({
+    words: ["<script>"],
+    scopeLabel: null,
+    rows: [row({ title: "Plan A < Plan B", projectName: "R&D wing" })],
+    more: 0,
+    origin: ORIGIN,
+  });
+
+  const [decorated] = decoratedTexts(built);
+  assert.ok(decorated.text.includes("Plan A &lt; Plan B"));
+  assert.ok(decorated.topLabel.includes("R&amp;D wing"));
+  assert.ok(!decorated.text.includes("Plan A < Plan B"));
+
+  const empty = trailCard({
+    words: ["<script>"],
+    scopeLabel: null,
+    rows: [],
+    more: 0,
+    origin: ORIGIN,
+  });
+  const [text] = paragraphs(empty);
+  assert.ok(text.includes("&lt;script&gt;"));
+  assert.ok(!text.includes("<script>"));
 });

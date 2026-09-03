@@ -175,3 +175,18 @@ export function chatAudience(): string {
   if (!value) throw new Error("GOOGLE_CHAT_AUDIENCE is not set");
   return value;
 }
+
+/**
+ * The host the bot's own links point at. It is derived from the
+ * registered endpoint URL rather than from a site-URL setting, because
+ * that URL is already per-environment and already has to be right for a
+ * single request to get through the door at all: staging's Chat app
+ * names staging, production's names production, so a card built on
+ * staging can only ever link to staging. The alternative — a configured
+ * site URL — is the exact shape of BUGCATCHER #7, where a hardcoded URL
+ * sent the OAuth return leg to production from a preview deploy. No new
+ * env var, and one fewer thing that can be set wrong.
+ */
+export function chatOrigin(): string {
+  return new URL(chatAudience()).origin;
+}
