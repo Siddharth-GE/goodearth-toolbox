@@ -569,3 +569,25 @@ test("cards escape a title or search word that carries HTML-special characters",
   assert.ok(text.includes("&lt;script&gt;"));
   assert.ok(!text.includes("<script>"));
 });
+
+test("row text: a title shows under the activity only when it says something new", () => {
+  const withTitle = courtCard({
+    firstName: "Sid",
+    scopeLabel: null,
+    rows: [row({ title: "Ground floor" })],
+    more: 0,
+    moreElsewhere: 0,
+    origin: ORIGIN,
+  });
+  assert.equal(decoratedTexts(withTitle)[0].text, "<b>Structural drawings</b><br>Ground floor");
+
+  const repeated = courtCard({
+    firstName: "Sid",
+    scopeLabel: null,
+    rows: [row({ activityName: "Standard villa", title: "standard villa " })],
+    more: 0,
+    moreElsewhere: 0,
+    origin: ORIGIN,
+  });
+  assert.equal(decoratedTexts(repeated)[0].text, "<b>Standard villa</b>");
+});

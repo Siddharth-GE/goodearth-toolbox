@@ -221,7 +221,13 @@ function trailWidgets(
     ? `${escapeHtml(row.projectName)} · ${escapeHtml(row.unitName)}`
     : escapeHtml(row.projectName);
   const activity = `<b>${escapeHtml(row.activityName)}</b>`;
-  const text = row.title ? `${activity}<br>${escapeHtml(row.title)}` : activity;
+  // A trail laid down from a trail type carries the type's name as both
+  // its activity and its title, so "Standard villa" would print twice
+  // (seen on the first staging card, 2026-09-03). The title earns its
+  // line only when it says something the bold line doesn't.
+  const title = row.title?.trim() ?? "";
+  const repeats = title.toLowerCase() === row.activityName.trim().toLowerCase();
+  const text = title && !repeats ? `${activity}<br>${escapeHtml(title)}` : activity;
 
   return [
     { decoratedText: { topLabel, text, bottomLabel, wrapText: true } },
