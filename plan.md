@@ -224,4 +224,46 @@ Failure at any step → `{ ok: false }` and the door's "couldn't act for you jus
 
 ### Google traps learned in this build
 
+- _Vet so far (2026-09-03): `/newtrail` with a standard type opened a trail on Villa 12 as the founder — the dialog, the minted session, `open_chain` through the guard and the public confirmation all work. Push not yet pressed._
 - **(i)** _to be written at the first Push: whether a button on a message card (not a dialog) accepts the `createMessageAction` reply, and what Google does with the original card._
+
+## Phase 7b in detail — custom trails and choosing the people (written by Fable, 2026-09-03)
+
+**Why this exists.** The 2026-08-31 plan settled that people are never hand-picked in chat. On the first vet of `/newtrail` (2026-09-03, a standard type opened on Villa 12 as the founder, through the minted session) the founder asked for the rest of the app's form in chat too: a **custom trail** (pick the steps yourself) and **choosing who carries each step**, for both kinds. This phase reverses that settled choice at the founder's request, and does it without touching the standard one-tap path they already have.
+
+**The idea.** `/newtrail` becomes a two-page dialog, and the second page appears only when it is needed:
+
+- **Page 1** (today's dialog, grown): _Which house_ · _Trail type_ — the list now starts with **"Custom — I'll pick the steps"** · a new switch **"Choose the people myself"**, off · _Start now_, on · Save.
+- Save with a standard type and the switch off → opens at once, exactly as today. Nothing changes for the one-tap case.
+- Otherwise the reply to that Save is **page 2**, a fresh dialog card (`action.navigations[].updateCard` in answer to the `SUBMIT_DIALOG` — the documented way to move a dialog to its next page; **trap (j)** records whether Google accepts it):
+  - **Standard type, choosing people:** one row per activity of the type — "Step 1 · Client sign-off" — with a dropdown `person_1` of every active person (the usual person pre-selected) and a text `days_1` pre-filled with the usual days.
+  - **Custom:** a text `title` ("What is this trail for"), then **six** step rows, each a dropdown `activity_n` (active activities, none selected), a dropdown `person_n` (people, none selected) and a text `days_n` (hint "days"). Blank rows are skipped. Six is the ceiling on purpose: a longer trail is a trail type's job, made once in the toolbox.
+  - An **Open trail** button whose parameters carry what page 1 decided (`action: "newtrail-open"`, `unit`, `set` or `custom`, `start`), so the door needs no memory between pages.
+- The write is the app's `openTrail` restated, with its five checks in its own words ("Step 2 needs someone to carry it.", "The same activity appears twice…", at least one step, whole days ≥ 1) — then `open_chain` with the legs typed, `p_trail_set_id` for a type, `p_title` the custom title or the type's name, `p_activity_id` the single activity when there is exactly one step. Department tags: from the type's last trail as today; a custom trail gets none, and the confirmation says "add its departments on the trail page if it needs them".
+
+### Files, with owners
+
+1. **`trail-rules.ts`** `[Sonnet]`, pure, tests: `CUSTOM_SET = "custom"`, `MAX_CUSTOM_STEPS = 6`; `parseNewTrailPage(values)` (page 1: unit, set, `pick_people` switch, `start`); `parseTrailSteps(values, { mode: "set" | "custom"; count })` → `{ ok: true; title: string | null; legs: { activityId; assigneeId; expectedDays }[] }` or the app's own error sentences; `PersonOption = { id; name }`, `ActivityOption = { id; name }`, `StepDefault = { activityId; activityName; assigneeId: string | null; expectedDays: number }`.
+2. **`relay-reads.ts`** `[Opus]`: `listPeople()` (active profiles, by name) and `listActivities()` (active, by sort order) through the admin client; and the two reads `relay-writes.ts` made privately — the set with its activities, and the per-activity defaults — moved here as `readSet(db, setId)` and `readActivityDefaults(db)` taking a client, so the dialog (admin client) and the write (minted client) ask the same question the same way.
+3. **`relay-writes.ts`** `[Opus]`: `openTrail(db, { unitId; setId: string | null; title: string | null; legs; start })` — the app's `openTrail` restated (five checks, `open_chain`, best-effort departments for a type). `openTrailFromSet` becomes "read the set's defaults, then `openTrail`" — one write path, not two.
+4. **`cards.ts`** `[Sonnet]`, tests: page 1 grows the custom row (first, value `custom`) and the `pick_people` switch (off); `trailStepsDialog({ mode, title?, steps: StepDefault[] | null, people, activities, params: { unit, set, start }, submitUrl })` builds page 2; a sentence for the custom confirmation's department note.
+5. **`route.ts`** `[Opus]`: `SUBMIT_DIALOG` action `newtrail` → parse page 1 → standard and no people → today's path; else read what page 2 needs → `Response.json({ action: { navigations: [{ updateCard: <page 2> }] } })`. Action `newtrail-open` → `parseTrailSteps` from `formValue`s (`activity_n`, `person_n`, `days_n`, `title`) with the button's parameters → `actAs` → `openTrail` → `closeDialog(openedText)` public, or the error private.
+
+### Steps
+
+- [ ] **1.** `[Sonnet]` items 1 and 4, with tests. `[Opus]` items 2, 3, 5. Parallel, disjoint files, as before.
+- [ ] **2.** `[Fable]` review; checks; push; PR; CI; merge to staging on the founder's word.
+- [ ] **3.** Founder's vet in the Villa 12 space: `/newtrail` → **Custom** → Save → page 2 (**trap (j)**) → two steps with people and days → Open → public line · `/newtrail` → a standard type + **Choose the people myself** → page 2 pre-filled → change one person → Open → public line · `/court` shows both · the trail pages on staging show the people chosen.
+
+### What is NOT in it
+
+- No changing the people on a trail that already exists (the app's `replaceFutureLegs` is still unwired even there); no hand-off from chat; no department picker for custom trails; no more than six custom steps.
+- No auto-fill of a custom row's person and days when its activity is picked — that needs a dialog that re-renders on change (`onChangeAction`), a further Google surface to prove; the person picks all three.
+
+### Questions for the tier above
+
+_(none yet)_
+
+### Google traps learned in this phase
+
+- **(j)** _to be written at the first page 2: whether `updateCard` in reply to a `SUBMIT_DIALOG` shows the next page, and whether the Open button's parameters come back with page 2's form values._
