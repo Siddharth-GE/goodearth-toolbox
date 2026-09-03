@@ -46,9 +46,9 @@ Branch `feature/google-chat`; each phase committed and pushed separately with a 
 - **Phase 2 — Google-side setup (with the founder; needs Workspace admin).** ✅ Done 2026-09-01. Cloud project `goodearth-relay-staging` (number `172003223574`), Chat API on, staging app registered at the clean endpoint URL, bot live in a test space and DM — greets on join, answers messages and mentions. Hard-won knowledge: **(a)** Vercel's SSO protection also covered the staging custom domain and Google appears to validate the endpoint at save time, so **Vercel Authentication is now switched OFF for the project** (staging's login page is public, production's posture; the bypass-secret detour didn't survive because the secret would sit inside the signed token's audience). **(b)** Google saves after an endpoint change only start delivering after a re-save once the endpoint answers — re-save the config if deliveries seem dead. **(c)** Slash commands are declared (ids 1–7, `/court`…`/link`) and reached the door on 2026-09-02 — message/mention/join delivery took minutes, commands took overnight. **(d)** One command stayed dead while the other six worked: `/court`, whose description contained an em-dash. Google's client half-knew it (the space marked it "Only visible to you", the DM sent it as plain text) and the dispatcher never sent it — silently, with no "not responding" error. Retyping the description in plain ASCII fixed it within a minute. **Rule: plain ASCII in every command name and description.** The door now logs one line per event (`google-chat event {kind, space, commandId}`, never the text) — `npx vercel logs staging.goodearthkannur.org --json` is how "did Google send it?" gets answered.
 - **Phase 3 — Identity.** ✅ Done 2026-09-02 (PR #56, vetted on staging). Email→person mapping, refusal cards for unlinked/inactive accounts. _(Short form below; full detail in git.)_
 - **Phase 4 — Space linking.** ✅ Done 2026-09-02 (PRs #57–#59, vetted on staging the same evening). _(Short form below; full detail in git.)_ Migration `google_chat_spaces` (staging first: `npm run db:apply -- --project <ref> --commit`); `ADDED_TO_SPACE` auto-match + announcement; `/link` dialog.
-- **Phase 5 — Reads.** `/trail` and `/court` cards, scope-aware. **Detail written 2026-09-03 (below) — build next.**
-- **Phase 6 — Writes, buttons first.** _Merged with Phase 7 into one build, detail below (2026-09-03)._ `act-as.ts` session minting (reuse the row-write inside `markSessionVerified` in `lib/auth/verified-session.ts`; extract a shared helper if it proves cookie-coupled); push / finish / hold / return via `CARD_CLICKED`; public confirmations; revalidation.
-- **Phase 7 — Dialogs.** _See the Phases 6 and 7 section below._ `/bounce`, then `/newtrail`.
+- **Phase 5 — Reads.** ✅ Done 2026-09-03 (PRs #60, #61; vetted on staging the same day). Detail below.
+- **Phase 6 — Writes, buttons first.** ✅ Done 2026-09-03 with Phase 7 (PRs #61–#63; vetted on staging: open, push, bounce all as the founder). Detail below. `act-as.ts` session minting (reuse the row-write inside `markSessionVerified` in `lib/auth/verified-session.ts`; extract a shared helper if it proves cookie-coupled); push / finish / hold / return via `CARD_CLICKED`; public confirmations; revalidation.
+- **Phase 7 — Dialogs.** ✅ Done 2026-09-03 (see Phases 6 and 7 below). **Phase 7b** (custom trails, choosing the people) is planned below and waits for the founder's "build". `/bounce`, then `/newtrail`.
 - **Phase 8 — Docs & ship.** SECURITY.md: new sanctioned admin-client entry (email lookup, session minting, verified-session write, `google_chat_spaces`) + first webhook rule line; STATUS.md contract table rows (`google-chat` reads `pusher_chain_state`, `pusher_chain_legs`, `units`, `projects`); relay `PLAN.md` seams note. Then: **founder vets the staging bot in the test space** → migration to production, `db:compare` empty → **production** Chat app registered against the live site, env vars set in Vercel → `staging` → `master` → one real command pressed in production.
 
 **Out of scope (later builds):** outbound notifications (bot announcing stuck trails, morning court summaries — relay PLAN.md's seam); other tools' commands; a replay/rate-limit table (Google's JWT `exp` suffices for round one — note the deferral in SECURITY.md).
@@ -106,7 +106,7 @@ Branch `feature/google-chat`; each phase committed and pushed separately with a 
 - [x] **3. Reads.** `[Sonnet]` `relay-reads.ts`. `[Opus]` vets the two `select` strings against the live view (`select pg_get_viewdef('pusher_chain_state'::regclass, true)` on staging, never an older migration — relay `PLAN.md`'s six-definitions warning) before it is committed.
 - [x] **4. Dispatch.** `[Opus]` Wire the five command ids; keep the log line as it is (kind, space, command id, identity decision — never text, never an email; the search words are message text and are **not** logged).
 - [x] **5. Checks and push.** `npm test`, lint, typecheck, `check:actions`; push; `gh run list` green; PR into `staging`. _Done 2026-09-03: PR #60._
-- [ ] **6. Founder's vet on staging** (the checklist below), then tick the phase and hand to Phase 6.
+- [x] **6. Founder's vet on staging** — done 2026-09-03: the card, the scope, the links and `/trail` all as specified.
 
 ### What is NOT in this phase
 
@@ -191,12 +191,12 @@ Failure at any step → `{ ok: false }` and the door's "couldn't act for you jus
 
 ### Steps, in order
 
-- [ ] **1. Act-as + the first write.** `[Opus]` `act-as.ts`, `relay-writes.ts` (all six writes), the reads in step 4 of the file list. `[Fable]` reviews `act-as.ts` before anything is pushed.
-- [ ] **2. Rules, readers, cards.** `[Sonnet]` items 1, 2, 3, 6 with tests.
-- [ ] **3. Dispatch.** `[Opus]` item 7.
-- [ ] **4. Checks, push, PR, CI green, merge to staging on the founder's word.**
+- [x] **1. Act-as + the first write.** `[Opus]` `act-as.ts`, `relay-writes.ts` (all six writes), the reads in step 4 of the file list. `[Fable]` reviews `act-as.ts` before anything is pushed.
+- [x] **2. Rules, readers, cards.** `[Sonnet]` items 1, 2, 3, 6 with tests.
+- [x] **3. Dispatch.** `[Opus]` item 7.
+- [x] **4. Checks, push, PR, CI green, merge to staging on the founder's word.** _PR #61, then fixes #62 and #63._
 - [x] **5. Founder ticks "Opens a dialog" on `/newtrail`** _(done 2026-09-03, before the build)_ (command 6) in the Google Cloud console — the same tick `/link` needed. **Not** on `/bounce`: it answers with the court card, and the dialog opens from the row's button.
-- [ ] **6. Founder's vet, in this order**, each answer recorded as a trap if Google surprises us: `/newtrail` in the Villa 12 space (dialog pre-filled with Villa 12; pick a type; Save → public "opened … leg 1 of N") · `/court` (the new trail with Push / Bounce / With client buttons) · tap **Push** (public confirmation — **this is trap (i): whether a message-card button click accepts the same reply envelope**) · `/court` again (leg 2) · tap **Bounce** (dialog; pick reason, type a note, Save → public confirmation) · `/court` (back on leg 1) · tap **With client**, then **Back from client** · open `/relay/court` in the browser and confirm the same trail, same leg, and the events named to you.
+- [x] **6. Founder's vet, in this order** _(done 2026-09-03 after two fixes, traps (i) and (k) below — "all working so far")_, each answer recorded as a trap if Google surprises us: `/newtrail` in the Villa 12 space (dialog pre-filled with Villa 12; pick a type; Save → public "opened … leg 1 of N") · `/court` (the new trail with Push / Bounce / With client buttons) · tap **Push** (public confirmation — **this is trap (i): whether a message-card button click accepts the same reply envelope**) · `/court` again (leg 2) · tap **Bounce** (dialog; pick reason, type a note, Save → public confirmation) · `/court` (back on leg 1) · tap **With client**, then **Back from client** · open `/relay/court` in the browser and confirm the same trail, same leg, and the events named to you.
 
 ### What is NOT in this build
 
@@ -226,7 +226,8 @@ Failure at any step → `{ ok: false }` and the door's "couldn't act for you jus
 
 - _Vet so far (2026-09-03): `/newtrail` with a standard type opened a trail on Villa 12 as the founder — the dialog, the minted session, `open_chain` through the guard and the public confirmation all work. Push not yet pressed._
 - **(i), first half (2026-09-03):** a button's `interaction: "OPEN_DIALOG"` belongs INSIDE `onClick.action`, beside `function` and `parameters`. One level up, on `onClick`, Google rejects the whole card silently — the door logs a normal event and answers 200, and the space shows "Relay not responding". The tell: the same card rendered with no rows and broke the moment a row (and its buttons) appeared. Fixed in PR #62.
-- **(i), second half** _to be written at the first Push: whether a button on a message card (not a dialog) accepts the `createMessageAction` reply, and what Google does with the original card._
+- **(i), second half (2026-09-03):** a button on a message card accepts the ordinary `createMessageAction` reply — the confirmation posts to the space; the original card stays as it was (stale until the next `/court`).
+- **(k)** When someone presses a button on the bot's OWN card, Google sends that card as `buttonClickedPayload.message` — whose `sender` is the bot — with the person in `chat.user`. A reader that refuses on any bot in the envelope turns every card button into "Google didn't tell me who you are"; only a bot in `chat.user` is a bot talking to us (fixed in PR #63).
 
 ## Phase 7b in detail — custom trails and choosing the people (written by Fable, 2026-09-03)
 
