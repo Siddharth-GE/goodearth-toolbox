@@ -253,8 +253,8 @@ Failure at any step → `{ ok: false }` and the door's "couldn't act for you jus
 
 ### Steps
 
-- [ ] **1.** `[Sonnet]` items 1 and 4, with tests. `[Opus]` items 2, 3, 5. Parallel, disjoint files, as before.
-- [ ] **2.** `[Fable]` review; checks; push; PR; CI; merge to staging on the founder's word.
+- [x] **1.** `[Sonnet]` items 1 and 4, with tests. `[Opus]` items 2, 3, 5. Parallel, disjoint files, as before. _Built 2026-09-03._
+- [x] **2.** `[Fable]` review; checks; push; PR; CI; merge to staging. _Done 2026-09-03 under the founder's session-wide "merge on your own"._
 - [ ] **3.** Founder's vet in the Villa 12 space: `/newtrail` → **Custom** → Save → page 2 (**trap (j)**) → two steps with people and days → Open → public line · `/newtrail` → a standard type + **Choose the people myself** → page 2 pre-filled → change one person → Open → public line · `/court` shows both · the trail pages on staging show the people chosen.
 
 ### What is NOT in it
@@ -264,7 +264,12 @@ Failure at any step → `{ ok: false }` and the door's "couldn't act for you jus
 
 ### Questions for the tier above
 
-_(none yet)_
+- **[Opus, step 1] The door now makes an admin client of its own.** `route.ts` imports `createAdminClient` to hand to `readSet` / `readActivityDefaults` when it draws page 2, as the file list says. That is the first time the door itself holds an admin client rather than calling a `lib/google-chat/*` function that holds one privately. It reads nothing new — the same trail type and the same activity defaults the one-tap write already reads — but if the rule should stay "only `lib/google-chat/*` touches the admin client", the fix is a one-line wrapper in `relay-reads.ts` (`readSetSteps(setId)`) and the door passes no client at all. Built as the plan says; say the word if the wrapper is preferred.
+- **[Opus, step 1] Page 2's days come from the trail type, not from the last leg.** The brief says a set step's days box is "pre-filled with the usual days", and there are two candidates: the type's own `expected_days` (what `openTrailFromSet` uses when it lays the type down) and the days from the activity's most recent leg anywhere (what `readActivityDefaults` also returns beside the person). I used the **type's** days, so that opening a type with the switch off and opening it with the switch on and changing nothing produce the identical trail. The person's name still comes from the last leg, as the app does. Not blocking; worth a look before the vet.
+- **[Opus, step 1] One write path changes one thing about the one-tap path: a trail type with exactly ONE activity now stamps that activity on the chain.** `openTrail`'s contract is `p_activity_id` = the single activity when there is one step, null otherwise — the app's own `openTrail` rule — and `openTrailFromSet` now goes through it, whereas the app's `applyTrailSet` passes null for every type however short. So a one-step trail type opened from chat gets `activity_id` set where the same type opened in the browser does not; the view then names the trail after the activity rather than falling back to the type's name. Nothing else differs. Built to the contract; if the vetted one-tap behaviour must stay byte-identical, `openTrailFromSet` can pass a flag to force null.
+- **[Opus, step 1] A trail type with no activities, with "choose the people myself" on, falls back to the one-tap path.** Page 2 would otherwise be an empty form with one button, and pressing it would say "Something went wrong". Instead the door opens it the one-tap way, which refuses with the app's own sentence (`"X" has no activities in it yet — add some first.`) privately. Recorded rather than asked: it reuses an existing sentence instead of inventing a new one in `route.ts`, which `cards.ts`'s "every sentence lives here" rule would not have liked.
+
+- **[Fable, 2026-09-03 — answers.]** (1) Yes: the door stays dispatch-only, the page-2 reads live in `relay-reads.ts` as `readSetSteps`. (2) Fine — the app's `applyTrailSet` takes days from the type's own items too, so a type opens identically either way. (3) Keep the vetted path byte-identical: a trail from a type never stamps `activity_id` (the view names it after its type); only a custom trail with one step does. (4) Fine.
 
 ### Google traps learned in this phase
 
