@@ -255,7 +255,7 @@ Failure at any step → `{ ok: false }` and the door's "couldn't act for you jus
 
 - [x] **1.** `[Sonnet]` items 1 and 4, with tests. `[Opus]` items 2, 3, 5. Parallel, disjoint files, as before. _Built 2026-09-03._
 - [x] **2.** `[Fable]` review; checks; push; PR; CI; merge to staging. _Done 2026-09-03 under the founder's session-wide "merge on your own"._
-- [ ] **3.** Founder's vet in the Villa 12 space: `/newtrail` → **Custom** → Save → page 2 (**trap (j)**) → two steps with people and days → Open → public line · `/newtrail` → a standard type + **Choose the people myself** → page 2 pre-filled → change one person → Open → public line · `/court` shows both · the trail pages on staging show the people chosen.
+- [x] **3.** Founder's vet in the Villa 12 space _(2026-09-03: custom page appeared — trap (j) — and opened a trail; two findings fixed the same day: a step-count choice on page 1, and errors that stay in the dialog, trap (l))_: `/newtrail` → **Custom** → Save → page 2 (**trap (j)**) → two steps with people and days → Open → public line · `/newtrail` → a standard type + **Choose the people myself** → page 2 pre-filled → change one person → Open → public line · `/court` shows both · the trail pages on staging show the people chosen.
 
 ### What is NOT in it
 
@@ -273,4 +273,5 @@ Failure at any step → `{ ok: false }` and the door's "couldn't act for you jus
 
 ### Google traps learned in this phase
 
-- **(j)** _to be written at the first page 2: whether `updateCard` in reply to a `SUBMIT_DIALOG` shows the next page, and whether the Open button's parameters come back with page 2's form values._
+- **(j)** Proven 2026-09-03: `action.navigations[].updateCard` in reply to a `SUBMIT_DIALOG` shows the next page, and the Open button's `parameters` come back beside page 2's `formInputs`.
+- **(l)** A `notification` toast on the closing navigation is **not** a visible warning: the founder saved a custom trail with a step missing its person, the dialog closed, and they saw nothing — "it just goes away". An error that the person must act on stays IN the dialog: answer with `updateCard` of the same page, the error paragraph first, every value they typed preserved. Toasts are for nothing more than a pleasantry.

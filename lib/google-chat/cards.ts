@@ -1,4 +1,11 @@
-import { BOUNCE_REASONS, CUSTOM_SET, MAX_CUSTOM_STEPS, buttonsFor } from "./trail-rules";
+import {
+  BOUNCE_REASONS,
+  CUSTOM_SET,
+  DEFAULT_CUSTOM_STEPS,
+  MAX_CUSTOM_STEPS,
+  buttonsFor,
+  customStepCount,
+} from "./trail-rules";
 import type {
   ActivityOption,
   ButtonAction,
@@ -495,8 +502,12 @@ export function bounceDialog(input: {
 /**
  * The /newtrail dialog: which house, which trail type — or "Custom", first
  * in the list, for when there is no trail type at all and the person lays
- * out the steps themselves — whether they want to choose who carries each
- * step, and whether the clock starts today. `units` is space-match.ts's
+ * out the steps themselves — how many steps that custom trail gets,
+ * whether they want to choose who carries each step, and whether the clock
+ * starts today. The step count is asked here, before page 2 exists,
+ * because a Chat dialog cannot grow a row once it is open: page 2 renders
+ * exactly the number chosen, and a trail type ignores it entirely (its own
+ * steps decide). `units` is space-match.ts's
  * `unitRows` output — a flat list, unlike /link's dropdown, because a new
  * trail always starts on one villa, never a whole project. `selectedUnit`
  * pre-fills a linked space's own villa; a project-linked or unlinked space
@@ -541,6 +552,21 @@ export function newTrailDialog(input: {
                 { text: "Custom — I'll pick the steps", value: CUSTOM_SET, selected: false },
                 ...sets.map((s) => ({ text: s.name, value: s.id, selected: false })),
               ],
+            },
+          },
+          {
+            selectionInput: {
+              name: "steps",
+              label: "Steps (custom trails only)",
+              type: "DROPDOWN",
+              items: Array.from({ length: MAX_CUSTOM_STEPS }, (_, index) => {
+                const count = index + 1;
+                return {
+                  text: String(count),
+                  value: String(count),
+                  selected: count === DEFAULT_CUSTOM_STEPS,
+                };
+              }),
             },
           },
           {
@@ -590,9 +616,19 @@ export function newTrailDialog(input: {
  * activities, in order, each pre-filled with its usual person and days —
  * choosing the people myself mostly means changing one or two dropdowns,
  * not filling in every row from scratch. Custom mode has no defaults to
- * pre-fill from, so every row starts blank; `MAX_CUSTOM_STEPS` rows are
- * always rendered (a blank one is dropped by `parseTrailSteps`, not by
- * this builder, which doesn't know which will end up used).
+ * pre-fill from, so every row starts blank; it renders exactly the number
+ * of rows page 1 asked for (`customSteps`, a blank one is dropped by
+ * `parseTrailSteps`, not by this builder, which doesn't know which will
+ * end up used).
+ *
+ * `error` and `values` are what makes a refusal survivable. A page-2
+ * failure used to be a `notification` toast on the closing dialog — the
+ * founder's vet (2026-09-03) saw the dialog shut with nothing said and no
+ * trail opened, because a toast is not a warning. So every page-2 failure
+ * now re-draws this same page with the sentence at the top and every box
+ * exactly as the person left it: `values` wins over the defaults for any
+ * input it has an entry for, so a corrected form is one dropdown away
+ * rather than the whole page typed again.
  *
  * The Open trail button carries what page 1 already decided — `unit`,
  * `set`, `start`, and `mode` — plus how many rows to read back (`count`)
@@ -607,18 +643,38 @@ export function trailStepsDialog(input: {
   activities: ActivityOption[];
   params: { unit: string; set: string; start: boolean };
   submitUrl: string;
+  customSteps?: number;
+  error?: string | null;
+  values?: Record<string, string | null>;
 }): Record<string, unknown> {
-  const { mode, steps, people, activities, params, submitUrl } = input;
+  const { mode, steps, people, activities, params, submitUrl, error, values } = input;
   const widgets: Record<string, unknown>[] = [];
 
-  const personDropdown = (name: string, selectedId: string | null): Record<string, unknown> => ({
-    selectionInput: {
-      name,
-      label: "Who carries it",
-      type: "DROPDOWN",
-      items: people.map((p) => ({ text: p.name, value: p.id, selected: p.id === selectedId })),
-    },
-  });
+  const customRows = customStepCount(input.customSteps ?? null);
+
+  // "The person left this box like that" and "nobody has touched this box
+  // yet" are different answers: a re-drawn page keeps a dropdown someone
+  // cleared cleared, while a first draw falls back to the type's default.
+  const wasSubmitted = (name: string): boolean => values !== undefined && name in values;
+  const submitted = (name: string): string => values?.[name] ?? "";
+
+  const personDropdown = (name: string, defaultId: string | null): Record<string, unknown> => {
+    const selectedId = wasSubmitted(name) ? submitted(name) : (defaultId ?? "");
+    return {
+      selectionInput: {
+        name,
+        label: "Who carries it",
+        type: "DROPDOWN",
+        items: people.map((p) => ({ text: p.name, value: p.id, selected: p.id === selectedId })),
+      },
+    };
+  };
+
+  if (error) {
+    widgets.push({
+      textParagraph: { text: `<font color="#b3261e"><b>${escapeHtml(error)}</b></font>` },
+    });
+  }
 
   if (mode === "set") {
     steps.forEach((step, index) => {
@@ -630,26 +686,48 @@ export function trailStepsDialog(input: {
         },
       });
       widgets.push(personDropdown(`person_${stepNo}`, step.assigneeId));
+      const daysName = `days_${stepNo}`;
       widgets.push({
-        textInput: { name: `days_${stepNo}`, label: "Days", value: String(step.expectedDays) },
+        textInput: {
+          name: daysName,
+          label: "Days",
+          value: wasSubmitted(daysName) ? submitted(daysName) : String(step.expectedDays),
+        },
       });
     });
   } else {
     widgets.push({
-      textInput: { name: "title", label: "What is this trail for", hintText: "Optional" },
+      textInput: {
+        name: "title",
+        label: "What is this trail for",
+        hintText: "Optional",
+        ...(wasSubmitted("title") ? { value: submitted("title") } : {}),
+      },
     });
-    for (let stepNo = 1; stepNo <= MAX_CUSTOM_STEPS; stepNo++) {
+    for (let stepNo = 1; stepNo <= customRows; stepNo++) {
+      const activityName = `activity_${stepNo}`;
+      const activityChosen = wasSubmitted(activityName) ? submitted(activityName) : "";
       widgets.push({
         selectionInput: {
-          name: `activity_${stepNo}`,
+          name: activityName,
           label: `Step ${stepNo} · activity`,
           type: "DROPDOWN",
-          items: activities.map((a) => ({ text: a.name, value: a.id, selected: false })),
+          items: activities.map((a) => ({
+            text: a.name,
+            value: a.id,
+            selected: a.id === activityChosen,
+          })),
         },
       });
       widgets.push(personDropdown(`person_${stepNo}`, null));
+      const daysName = `days_${stepNo}`;
       widgets.push({
-        textInput: { name: `days_${stepNo}`, label: "Days", hintText: "e.g. 5" },
+        textInput: {
+          name: daysName,
+          label: "Days",
+          hintText: "e.g. 5",
+          ...(wasSubmitted(daysName) ? { value: submitted(daysName) } : {}),
+        },
       });
     }
   }
@@ -670,7 +748,7 @@ export function trailStepsDialog(input: {
                 { key: "mode", value: mode },
                 {
                   key: "count",
-                  value: mode === "set" ? String(steps.length) : String(MAX_CUSTOM_STEPS),
+                  value: mode === "set" ? String(steps.length) : String(customRows),
                 },
                 ...(mode === "set"
                   ? [{ key: "activities", value: steps.map((s) => s.activityId).join(",") }]
