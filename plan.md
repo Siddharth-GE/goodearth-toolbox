@@ -46,7 +46,7 @@ Branch `feature/google-chat`; each phase committed and pushed separately with a 
 - **Phase 2 — Google-side setup (with the founder; needs Workspace admin).** ✅ Done 2026-09-01. Cloud project `goodearth-relay-staging` (number `172003223574`), Chat API on, staging app registered at the clean endpoint URL, bot live in a test space and DM — greets on join, answers messages and mentions. Hard-won knowledge: **(a)** Vercel's SSO protection also covered the staging custom domain and Google appears to validate the endpoint at save time, so **Vercel Authentication is now switched OFF for the project** (staging's login page is public, production's posture; the bypass-secret detour didn't survive because the secret would sit inside the signed token's audience). **(b)** Google saves after an endpoint change only start delivering after a re-save once the endpoint answers — re-save the config if deliveries seem dead. **(c)** Slash commands are declared (ids 1–7, `/court`…`/link`) and reached the door on 2026-09-02 — message/mention/join delivery took minutes, commands took overnight. **(d)** One command stayed dead while the other six worked: `/court`, whose description contained an em-dash. Google's client half-knew it (the space marked it "Only visible to you", the DM sent it as plain text) and the dispatcher never sent it — silently, with no "not responding" error. Retyping the description in plain ASCII fixed it within a minute. **Rule: plain ASCII in every command name and description.** The door now logs one line per event (`google-chat event {kind, space, commandId}`, never the text) — `npx vercel logs staging.goodearthkannur.org --json` is how "did Google send it?" gets answered.
 - **Phase 3 — Identity.** ✅ Done 2026-09-02 (PR #56, vetted on staging). Email→person mapping, refusal cards for unlinked/inactive accounts. _(Short form below; full detail in git.)_
 - **Phase 4 — Space linking.** ✅ Done 2026-09-02 (PRs #57–#59, vetted on staging the same evening). _(Short form below; full detail in git.)_ Migration `google_chat_spaces` (staging first: `npm run db:apply -- --project <ref> --commit`); `ADDED_TO_SPACE` auto-match + announcement; `/link` dialog.
-- **Phase 5 — Reads.** `/trail` and `/court` cards, scope-aware.
+- **Phase 5 — Reads.** `/trail` and `/court` cards, scope-aware. **Detail written 2026-09-03 (below) — build next.**
 - **Phase 6 — Writes, buttons first.** `act-as.ts` session minting (reuse the row-write inside `markSessionVerified` in `lib/auth/verified-session.ts`; extract a shared helper if it proves cookie-coupled); push / finish / hold / return via `CARD_CLICKED`; public confirmations; revalidation.
 - **Phase 7 — Dialogs.** `/bounce`, then `/newtrail`.
 - **Phase 8 — Docs & ship.** SECURITY.md: new sanctioned admin-client entry (email lookup, session minting, verified-session write, `google_chat_spaces`) + first webhook rule line; STATUS.md contract table rows (`google-chat` reads `pusher_chain_state`, `pusher_chain_legs`, `units`, `projects`); relay `PLAN.md` seams note. Then: **founder vets the staging bot in the test space** → migration to production, `db:compare` empty → **production** Chat app registered against the live site, env vars set in Vercel → `staging` → `master` → one real command pressed in production.
@@ -68,4 +68,78 @@ Branch `feature/google-chat`; each phase committed and pushed separately with a 
 - **(g)** Answering a `SUBMIT_DIALOG` (`buttonClickedPayload`, values under `commonEventObject.formInputs.<name>.stringInputs.value[0]`): the public confirmation is the `hostAppDataAction`/`createMessageAction` envelope **alone** — it closes the dialog by itself, and `endNavigation` beside it is invalid. A private word on closing is `action.notification.text` (a toast) on the close navigation; a bare close is the navigation alone.
 - Google does send the sender's email on add-on-style events (`chat.user.email`), and `privateMessageViewer` works inside `createMessageAction`.
 
-**Phase 5 starts here.** Fable writes "Phase 5 in detail — reads" below, in the form the done phases used: the idea, files with `[Opus]`/`[Sonnet]` owner tags, what is NOT in it, acceptance, what the founder sees, steps ticked as they land, questions for the tier above. Reads go through the admin client on `pusher_chain_state` (the architecture section's sanctioned pattern); scope comes from `getSpaceLink(spaceId)`.
+## Phase 5 in detail — reads (written by Fable, 2026-09-03)
+
+**The idea.** The bot answers two questions without touching anything: _what is in my hand?_ (`/court`) and _where is that trail?_ (`/trail <words>`). Both are private cards built from `pusher_chain_state` — the same view every relay list reads, so the chat answer and the app's court can never disagree about who holds what or how cold it is. A linked space narrows both answers to its villa or project; a DM or an unlinked space spans everything. The card carries **no action buttons yet**: each trail gets one _Open in the toolbox_ link, and the Push / Bounce / Finish / Hold buttons arrive in Phase 6, which is "buttons first" precisely so this phase can ship a card that cannot show "the app is not responding" (trap (e) — a callback button with nothing behind it is exactly that).
+
+**Why reads go through the admin client, and nothing else does.** The door has no browser session, and `lib/relay/queries.ts` opens every function with `requireTool`, so it cannot be imported (the architecture section's rule, and Client Relations' own reason for reading the view directly). The identity step already proved the person holds `/relay` or is an admin, and the view is granted to every signed-in person with no gate of its own — so an admin-client `select` on it, filtered to that person, reveals nothing the same person couldn't open at `/relay/court`. Two shared reads ride with it and nothing more: `pusher_chain_legs` (the current leg's label) and `profiles.full_name` (holder names on `/trail`). No migration. `0094` stays staging-only.
+
+### Files, with owners
+
+1. **`lib/google-chat/trail-rules.ts`** — pure, may import nothing but types. `[Sonnet]`, tests in `trail-rules.test.ts`.
+   - `TrailSummary`: the one row shape both cards read — `chainId, projectName, unitName, activityName, title, currentLeg, legCount, legLabel, holderName, daysInLeg, expectedDays, isStuck, isWithClient, withClientDays`.
+   - `Scope = { kind: "all" } | { kind: "project"; projectId } | { kind: "unit"; unitId }` and `scopeOf(link: SpaceLink | null): Scope` — unit link → unit, project link → project, null → all. (`SpaceLink` from `spaces.ts` by **type import only**, so the file stays importable by `tsx --test`.)
+   - `searchWords(text: string): string[]` — lower-cased, trimmed, punctuation stripped, empty for blank input. Same idea as `space-match.ts`'s `tokens()` but _not_ a run match: a trail matches when **every word** is a substring of the joined `projectName · unitName · activityName · title` (case-insensitive). "villa 12" finds "Villa 12 — Structural drawings"; "12" alone finds every villa with a 12 in it, which is fine — the card lists up to ten.
+   - `orderColdestFirst(rows)`: `isStuck` desc, then `daysInLeg` desc, then `chainId` — the app's order, restated once in Node because the court is split by scope there.
+   - `CARD_LIMIT = 10` and `takeForCard(rows) → { shown, more }`.
+2. **`lib/google-chat/relay-reads.ts`** — `server-only`, admin client, never throws (null on failure, logged, the `spaces.ts` shape). `[Sonnet]`, vetted by `[Opus]` before commit.
+   - `listCourt(userId): Promise<TrailSummary[] | null>` — `fetchAll` over `pusher_chain_state` where `holder_id = userId` and `is_finished = false`, ordered as `listMyCourt` orders (`is_stuck` desc, `days_in_leg` desc, `chain_id`). **Unscoped on purpose**: the door splits it by scope in Node so the linked-space card can say "and N more elsewhere" from one read.
+   - `listRunning(scope): Promise<TrailSummary[] | null>` — `fetchAll` over the view where `is_finished = false` **and `is_queued = false`** (a queued trail has no holder and no clock, and the app's running list excludes it for the same reason — relay `PLAN.md`), plus `eq("unit_id")` or `eq("project_id")` per scope. Word matching happens in Node with `searchWords` — no `.or(ilike...)` string, because a bad PostgREST filter is invisible to every CI gate (BUGCATCHER: a green build proves nothing about a select string).
+   - Both end in the same enrichment: one `in("chain_id", …)` read of `pusher_chain_legs` for the `leg_no = current_leg` labels, and one `in("id", …)` read of `profiles(id, full_name)` for holder names. The view's column list from `lib/relay/queries.ts` is **copied, not imported** (one tool never imports another's code; the columns are the contract row STATUS.md gains in Phase 8).
+   - No embeds anywhere: the view is flat, and the legs and profiles reads are plain tables by design.
+3. **`lib/google-chat/cards.ts`** — grows two builders and their sentences. `[Sonnet]`, tests in `cards.test.ts`.
+   - `courtCard({ firstName, scopeLabel, rows, moreElsewhere, more, origin })` → one `cardsV2` entry: header _Your court_ (subtitle: the scope label, or _everything_); one `decoratedText` per trail — top label `Project · Villa`, text `<b>activity</b>` (title beneath if set), bottom label **"Leg 2 of 5 · Structural drawings — day 4 of 3, cold"** / **"… with the client 6 days"** / **"… on time"**; a `buttonList` with one `openLink` to `${origin}/relay/trails/${chainId}`. A footer paragraph when `more > 0` ("and N more — open your court in the toolbox", linking `${origin}/relay/court`) and when `moreElsewhere > 0` ("You also hold N outside this space."). An empty court is the app's own sentence: _Court cleared — nothing is waiting on you._
+   - `trailCard({ words, scopeLabel, rows, more, origin })` — the same row widget plus the holder's name in the bottom label ("with Anil, day 4 of 3, cold"); header _Trails_, subtitle `matching 'villa 12'` or the scope label. No match: _Nothing running matches 'villa 12'. Finished and waiting trails are in the toolbox._ with the `/relay/trails` link. No words in a DM or an unlinked space: _Tell me what to look for — a villa, a project or an activity, e.g. /trail villa 12._
+   - Day sentences are pure string work on the row — **no date maths in this phase**: `days_in_leg`, `expected_days` and `with_client_days` come from the view, which is the one IST-day clock (relay `PLAN.md`), so the bot never disagrees with the app by a day.
+   - `origin` is `new URL(chatAudience()).origin` — the registered endpoint's own host, so staging links to staging and production to production with **no new env var** (BUGCATCHER #7's hardcoded-URL lesson).
+4. **`app/api/google-chat/route.ts`** — dispatch only. `[Opus]`.
+   - `/court` (id 1) → `getSpaceLink(spaceId)` → `listCourt(identity.userId)` → split by `scopeOf(link)` → private `courtCard`.
+   - `/trail` (id 5) → words from the message: add a pure `commandText(event)` reader to `events.ts` (`appCommandPayload.message.argumentText`, falling back to `text` with the leading `/trail` stripped; tested) → `listRunning(scope)` → filter by words → private `trailCard`. No words and `scope.kind === "all"` → the "tell me what to look for" sentence, no read.
+   - `/push` (2), `/bounce` (3), `/finish` (4) → the **same court card** with one extra subtitle line: _Push, Bounce and Finish buttons arrive with the next release — Open a trail to move it in the toolbox._ One line of dispatch, and three commands stop saying "isn't wired up yet". `/newtrail` (6) keeps the Phase 3 greeting.
+   - A null from either read → the existing `SOMETHING_WENT_WRONG` sentence, private.
+   - `card()` learns to carry `cardsV2` beside `text`: `createMessageAction.message` takes `{ text?, cardsV2?, privateMessageViewer? }`. **Step 1 proves this envelope before any read exists.**
+
+### Steps, in order
+
+- [ ] **1. Prove the card envelope on staging.** `[Opus]` Hard-code one `cardsV2` card (header, one decoratedText, one openLink button) behind `/court`, push the branch so staging deploys, type `/court` in the DM **and** the test space. What is being proven: that `cardsV2` inside `createMessageAction.message` renders at all, that `privateMessageViewer` still works beside it, and that `openLink` opens without a callback. If Google wants a different envelope for cards, this is where it is learned, on a ten-line change — not after the reads are written. Record the answer as trap **(h)** below, whichever way it goes.
+- [ ] **2. Pure rules + tests.** `[Sonnet]` `trail-rules.ts`, `commandText` in `events.ts`, and the two card builders in `cards.ts`, each with tests: scope from every link shape; words from blank / punctuation / mixed case; every-word matching; the ten-cap; the four bottom-label sentences (on time, cold, with client, with client and cold); the empty and no-words sentences; the origin in every link.
+- [ ] **3. Reads.** `[Sonnet]` `relay-reads.ts`. `[Opus]` vets the two `select` strings against the live view (`select pg_get_viewdef('pusher_chain_state'::regclass, true)` on staging, never an older migration — relay `PLAN.md`'s six-definitions warning) before it is committed.
+- [ ] **4. Dispatch.** `[Opus]` Wire the five command ids; keep the log line as it is (kind, space, command id, identity decision — never text, never an email; the search words are message text and are **not** logged).
+- [ ] **5. Checks and push.** `npm test`, lint, typecheck, `check:actions`; push; `gh run list` green; PR into `staging`.
+- [ ] **6. Founder's vet on staging** (the checklist below), then tick the phase and hand to Phase 6.
+
+### What is NOT in this phase
+
+- No Push / Bounce / Finish / Hold buttons on the card, no `CARD_CLICKED` handling beyond the existing `/link` Save, no session minting — all Phase 6.
+- No pick-list for `/trail` (the command table's "several matches → pick-list" is for acting on one, which is Phase 6): this phase lists up to ten matches as status lines, which answers "where is it?" outright.
+- No finished or queued trails on either card; both say where to find them.
+- No admin view of _someone else's_ court — `/court` is always the sender's. A leader asking about a trail uses `/trail`.
+- No change to the view, no migration, no SECURITY.md edit yet — Phase 8 adds `pusher_chain_state`, `pusher_chain_legs` and `profiles.full_name` to the door's sanctioned admin-client entry and the STATUS.md contract row.
+
+### Acceptance
+
+- `/court` in the DM lists every unfinished baton the sender holds, coldest first, with day X of Y and the cold / with-client wording matching the app's `/relay/court` for the same person at the same moment.
+- `/court` in the linked test space lists only that villa's (or project's) batons and says how many the sender holds elsewhere.
+- `/trail <villa name>` lists that villa's running trails with holder names; `/trail` alone in the linked space lists the same set; `/trail` alone in the DM asks for a word.
+- Every reply is private to the sender; nothing is posted to the space by these commands.
+- The Open link lands on the right trail on **staging**, not production.
+- A person without `/relay` still gets the Phase 3 refusal; the log line still carries no text.
+- `npm test` covers every sentence and every scope path; `gh run list` green.
+
+### What the founder sees (the staging checklist)
+
+1. In the Relay bot DM, type `/court`. Expect a card with your batons, coldest first, each with a day count and an _Open in the toolbox_ link. If you hold nothing: "Court cleared".
+2. Open `/relay/court` on staging in the browser. The trails, order and day counts should match the card exactly.
+3. In the test space (linked to a villa on 2026-09-02), type `/court`. Expect only that villa's batons, and a line saying how many you hold elsewhere.
+4. In the test space, type `/trail` with nothing after it. Expect that villa's running trails with who holds each.
+5. In the DM, type `/trail` followed by a villa or activity name. Expect matches; then type `/trail` alone and expect to be asked for a word.
+6. Tap one _Open in the toolbox_ link: it should open that trail on staging.goodearthkannur.org.
+7. Type `/push`: the court card again, with the line saying the buttons come next.
+
+### Questions for the tier above
+
+_(none yet — a builder who hits one writes it here and stops on that step)_
+
+### Google traps learned in this phase
+
+- **(h)** _to be written at step 1: the card envelope that actually renders, verbatim._
