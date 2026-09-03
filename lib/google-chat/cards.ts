@@ -248,18 +248,20 @@ function actionButtons(row: TrailSummary, submitUrl: string): Record<string, unk
   const fromLeg = row.currentLeg;
 
   return buttonsFor(row).map((action) => {
-    const onClick: Record<string, unknown> = {
-      action: {
-        function: submitUrl,
-        parameters: [
-          { key: "action", value: action },
-          { key: "chain", value: row.chainId },
-          { key: "leg", value: String(fromLeg) },
-        ],
-      },
+    const clickAction: Record<string, unknown> = {
+      function: submitUrl,
+      parameters: [
+        { key: "action", value: action },
+        { key: "chain", value: row.chainId },
+        { key: "leg", value: String(fromLeg) },
+      ],
     };
-    if (action === "bounce") onClick.interaction = "OPEN_DIALOG";
-    return { text: ACTION_BUTTON_TEXT[action], onClick };
+    // `interaction` is a field of the ACTION, not of the click around it.
+    // Placed one level up, Google rejects the whole card silently and
+    // shows "Relay not responding" — the founder's first /court with a
+    // baton in hand, 2026-09-03 (trap (i) in plan.md).
+    if (action === "bounce") clickAction.interaction = "OPEN_DIALOG";
+    return { text: ACTION_BUTTON_TEXT[action], onClick: { action: clickAction } };
   });
 }
 
