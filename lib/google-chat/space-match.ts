@@ -144,6 +144,26 @@ export function linkTargetRows(projects: MatchProject[], units: MatchUnit[]): Li
 }
 
 /**
+ * Every villa, as a plain dropdown row — the /newtrail dialog's "Which
+ * house" picker, which unlike /link's dropdown never offers a whole
+ * project (a new trail always starts on one villa). A unit whose project
+ * went missing from the read that fed this (deleted between the two
+ * queries, in practice never) is left out rather than shown with a blank
+ * project name.
+ */
+export function unitRows(projects: MatchProject[], units: MatchUnit[]): LinkTargetRow[] {
+  const projectNames = new Map(projects.map((project) => [project.id, project.name]));
+
+  return units
+    .filter((unit) => projectNames.has(unit.projectId))
+    .map((unit) => ({
+      value: unit.id,
+      text: unitLabel(projectNames.get(unit.projectId) ?? "", unit.name),
+    }))
+    .sort((a, b) => byLabel(a.text, b.text));
+}
+
+/**
  * The submitted dropdown value, read back. Null for anything the door
  * didn't put in the list — a stale dialog, or a value that arrived
  * mangled — which the door treats as "I couldn't save that".
