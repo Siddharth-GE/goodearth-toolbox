@@ -268,6 +268,20 @@ _Caught 2026-08-22 by a supervisor on staging: Villa 10's freshly submitted esti
 
 ---
 
+### 17. Google Chat answers a bad reply with silence, and CI cannot see a reply at all
+
+_Caught eleven times between 2026-09-01 and 2026-09-03, building the Relay bot (`app/api/google-chat/route.ts`, `lib/google-chat/`). Every one of them was a green build, a green typecheck and 700-odd green tests, followed by "Relay not responding" or a command that simply never arrived._
+
+**What happened.** The door answers Google with JSON it builds by hand, and Google validates that JSON against a schema we do not have in the repo. When the shape is wrong Google does not send an error back: it shows the person "Relay not responding" or "Could not load dialog", or delivers nothing, while the door logs a normal event and a 200. The eleven shapes, each learned the hard way — **(a)** Vercel's SSO protection covered the custom domain too, so the endpoint had to be an unprotected domain; **(b)** a saved endpoint change delivers nothing until the config is re-saved once the endpoint answers; **(c)** slash commands take minutes to hours to start dispatching after they are declared; **(d)** a command whose console _description_ contains an em-dash is never dispatched — plain ASCII in every command name and description; **(e)** for an HTTP app a card button's `onClick.action.function` is the door's URL, never a name; **(f)** once Google has asked for a dialog (`dialogEventType: "REQUEST_DIALOG"`) every answer must be a dialog (`action.navigations[].pushCard`), a message envelope there is "Could not load dialog"; **(g)** a dialog submit is closed by the public `createMessageAction` envelope _alone_, an `endNavigation` beside it is invalid, and a private word is `action.notification.text` on the close; **(h)** a card in an ordinary reply is `createMessageAction.message.cardsV2`, and `privateMessageViewer` still applies to it; **(i)** a button's `interaction: "OPEN_DIALOG"` lives _inside_ `onClick.action`, one level up Google rejects the whole card; **(j)** a button on a message card accepts the same `createMessageAction` reply as a command; **(k)** a press on the bot's own card carries that card as `buttonClickedPayload.message` with the _bot_ as its sender and the person in `chat.user`, so refusing on "a bot in the envelope" refuses every button.
+
+**Why every gate missed it.** The reply is `Record<string, unknown>` all the way down — there is no type for Google's envelope in the repo, so typecheck has nothing to check; the tests pin _our_ shape, which is exactly what was wrong; and the build never talks to Google. The only judge of a reply is Google, at runtime, in a real space, and it does not say why.
+
+**The rule.** **A change to anything the door sends back to Google — a card, a dialog, a button, a close — is not done until someone has typed the command in the test space on staging and seen the answer.** Prove a new envelope shape with a ten-line hard-coded reply before writing the code behind it, and record what Google accepted, verbatim, beside the code that sends it. When a reply fails, read the door's log line first (`npx vercel logs staging.goodearthkannur.org --json`): a logged event with a normal identity decision and no error means Google rejected the JSON, not that the door broke.
+
+**The check.** After any change under `lib/google-chat/cards.ts` or the door's reply helpers: in the linked test space, `/court` with at least one baton in hand (a card with rows _and_ buttons), press one button, open one dialog and save it. An empty court proves nothing — trap (i) rendered perfectly until the first row appeared.
+
+---
+
 ## Adding to this file
 
 When something breaks that a green build said was fine, it belongs here — not in `STATUS.md`, which is what exists, and not in `TODO.md`, which is what to do next. **This file is the only standing record of the failures CI cannot see, so an entry has to explain itself in full rather than cite a finding somewhere else.** Anyone reading it in a year should not need a second document, and there is no longer one to reach for.
