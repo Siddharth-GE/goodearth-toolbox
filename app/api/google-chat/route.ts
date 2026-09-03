@@ -1,6 +1,7 @@
 import {
   COMMANDS,
   commandId,
+  commandText,
   dialogEventType,
   formValue,
   isDirectMessage,
@@ -10,6 +11,9 @@ import {
   type ChatEvent,
 } from "@/lib/google-chat/events";
 import {
+  askForWords,
+  buttonsComingNote,
+  courtCard,
   dialogNotEnabled,
   dmCannotLink,
   greeting,
@@ -19,8 +23,18 @@ import {
   linkDialog,
   linkSaveFailed,
   noticeDialog,
+  trailCard,
 } from "@/lib/google-chat/cards";
 import { resolveIdentity } from "@/lib/google-chat/identity";
+import { listCourt, listRunning } from "@/lib/google-chat/relay-reads";
+import {
+  matchesWords,
+  orderColdestFirst,
+  scopeOf,
+  searchWords,
+  splitByScope,
+  takeForCard,
+} from "@/lib/google-chat/trail-rules";
 import {
   linkTargetRows,
   matchSpaceName,
@@ -32,6 +46,7 @@ import {
 import { getSpaceLink, linkSpace, listLinkTargets, unlinkSpace } from "@/lib/google-chat/spaces";
 import {
   chatAudience,
+  chatOrigin,
   chatServiceAgent,
   getGoogleKeys,
   verifyChatToken,
@@ -54,8 +69,20 @@ import {
  *
  * Phase 4 teaches a space which villa or project it is for: the bot
  * matches the space's name against the villas and projects when it
- * joins, and /link opens a dialog to set or change that. Nothing reads
- * the link yet — scoping the other commands is Phase 5.
+ * joins, and /link opens a dialog to set or change that.
+ *
+ * Phase 5 puts that link to work and answers the two questions that
+ * touch nothing: /court ("what is in my hand?") and /trail <words>
+ * ("where is that trail?"). Both are private cards built from
+ * pusher_chain_state — the same view every relay list reads, so the
+ * chat answer and the app's court can never disagree — narrowed to the
+ * space's villa or project when there is one, spanning everything in a
+ * DM or an unlinked space. /push, /bounce and /finish answer with the
+ * same court card and a line saying their buttons are coming, because
+ * this phase deliberately ships a card with no callback buttons on it:
+ * a button with nothing behind it is exactly what Google shows as "the
+ * app is not responding" (trap (e)). The action buttons, and the
+ * session minting behind them, are Phase 6.
  */
 
 /**
@@ -64,12 +91,30 @@ import {
  * if the envelope is missing, even on a 200.
  *
  * Given a sender's `users/<id>` name, the reply is private to them.
- * Everything that is about one person — a refusal, a greeting, later a
+ * Everything that is about one person — a refusal, a greeting, a
  * lookup — goes back privately; only what the whole space should see
  * (the hello on joining, later the action confirmations) goes public.
+ *
+ * A plain string is a plain text reply, exactly as it has always been.
+ * Phase 5 lets the same envelope carry a card instead — or both — by
+ * passing `{ text, cardsV2 }`: Google's message resource takes the
+ * cards beside the text, and `privateMessageViewer` still applies to
+ * the whole message. That last part is a belief until it is seen: the
+ * first /court typed on staging is what proves a cardsV2 card renders
+ * inside createMessageAction AND stays private (plan.md's step 1 — the
+ * answer, whichever way it goes, becomes trap (h) in plan.md).
  */
-function card(text: string, privateTo?: string | null) {
-  const message: { text: string; privateMessageViewer?: { name: string } } = { text };
+type CardMessage = {
+  text?: string;
+  cardsV2?: Record<string, unknown>[];
+  privateMessageViewer?: { name: string };
+};
+
+function card(
+  body: string | { text?: string; cardsV2?: Record<string, unknown>[] },
+  privateTo?: string | null,
+) {
+  const message: CardMessage = typeof body === "string" ? { text: body } : { ...body };
   if (privateTo) message.privateMessageViewer = { name: privateTo };
   return Response.json({
     hostAppDataAction: {
@@ -117,16 +162,24 @@ function closeDialog(text?: string, privateTo?: string | null) {
 // that can't be built without its list — so it is written once.
 const SOMETHING_WENT_WRONG = "Something went wrong on our side. Please try again in a moment.";
 
-// /link, as declared in the Chat app's configuration (events.ts holds
-// the whole id list). Named here so the dispatch reads as a command
-// rather than a number.
+// The commands this file dispatches on, as declared in the Chat app's
+// configuration (events.ts holds the whole id list, and Google sends
+// only the number). Named here so the dispatch reads as commands rather
+// than as arithmetic.
+const COURT_COMMAND_ID = 1;
+const PUSH_COMMAND_ID = 2;
+const BOUNCE_COMMAND_ID = 3;
+const FINISH_COMMAND_ID = 4;
+const TRAIL_COMMAND_ID = 5;
 const LINK_COMMAND_ID = 7;
 
-// The hello a DM gets on joining: there is nothing to link there, so it
-// stays the plain Phase 1 greeting.
+// The hello a DM gets on joining. There is nothing to link in a DM, so
+// instead of a space's scope it names the two commands that work
+// everywhere — which is the whole of what the bot can do until the
+// action buttons land.
 const DM_HELLO =
-  "Hello! I'm the Relay bot. I can't do anything just yet — " +
-  "slash commands for trails are on their way.";
+  "Hello! I'm the Relay bot. Try /court to see what's in your hand, " +
+  "or /trail followed by a villa name.";
 
 /**
  * The bot has just been added somewhere. In a DM there is nothing to
@@ -271,6 +324,93 @@ async function handleLinkCommand(event: ChatEvent, spaceId: string, privateTo: s
   // exactly what chatAudience() holds.
   return pushCard(
     linkDialog(linkTargetRows(targets.projects, targets.units), selected, chatAudience()),
+  );
+}
+
+/**
+ * /court — what is in this person's hand, coldest first, privately.
+ *
+ * The read is deliberately unscoped: one pass over the person's whole
+ * court, split in Node by the space's scope, so a linked space can say
+ * both "here is this villa's batons" and "you also hold N elsewhere"
+ * without a second query. In a DM or an unlinked space the scope is
+ * "all", nothing is split off, and the card is simply the whole court.
+ *
+ * `note` is the one extra line /push, /bounce and /finish carry: they
+ * answer with this same card until their buttons land in Phase 6.
+ */
+async function handleCourt(
+  spaceId: string,
+  identity: { userId: string; firstName: string },
+  privateTo: string | null,
+  note: string | null,
+) {
+  const link = await getSpaceLink(spaceId);
+  const scope = scopeOf(link);
+
+  const rows = await listCourt(identity.userId);
+  // A read that failed is never an empty court: "nothing is waiting on
+  // you" would be a lie told to someone holding six batons.
+  if (!rows) return card(SOMETHING_WENT_WRONG, privateTo);
+
+  const { inScope, elsewhere } = splitByScope(rows, scope);
+  const { shown, more } = takeForCard(orderColdestFirst(inScope));
+
+  return card(
+    {
+      cardsV2: [
+        courtCard({
+          firstName: identity.firstName,
+          scopeLabel: link?.label ?? null,
+          rows: shown,
+          more,
+          moreElsewhere: elsewhere.length,
+          origin: chatOrigin(),
+          note,
+        }),
+      ],
+    },
+    privateTo,
+  );
+}
+
+/**
+ * /trail <words> — where is that trail, privately.
+ *
+ * The words come from the message the person typed; the space's link
+ * narrows the running trails to its villa or project. With no words at
+ * all and nothing to narrow by, there is no question to answer, so the
+ * bot asks for a word rather than dumping every running trail in the
+ * company. Matching happens in Node, on rows the view already returned:
+ * a PostgREST filter string built from typed words is exactly the thing
+ * no CI gate can see through.
+ */
+async function handleTrail(event: ChatEvent, spaceId: string, privateTo: string | null) {
+  const words = searchWords(commandText(event));
+  const link = await getSpaceLink(spaceId);
+  const scope = scopeOf(link);
+
+  if (words.length === 0 && scope.kind === "all") return card(askForWords(), privateTo);
+
+  const rows = await listRunning(scope);
+  if (!rows) return card(SOMETHING_WENT_WRONG, privateTo);
+
+  const matched = orderColdestFirst(rows.filter((row) => matchesWords(row, words)));
+  const { shown, more } = takeForCard(matched);
+
+  return card(
+    {
+      cardsV2: [
+        trailCard({
+          words,
+          scopeLabel: link?.label ?? null,
+          rows: shown,
+          more,
+          origin: chatOrigin(),
+        }),
+      ],
+    },
+    privateTo,
   );
 }
 
@@ -423,9 +563,29 @@ export async function POST(request: Request) {
       const id = commandId(event);
       if (chat.appCommandPayload || id !== null) {
         const command = (id !== null && COMMANDS[id]) || "that command";
-        // /link is the one command this phase actually runs; the rest
-        // still get the Phase 3 greeting until Phase 5 scopes them.
         if (id === LINK_COMMAND_ID) return await handleLinkCommand(event, spaceId, privateTo);
+
+        // /push, /bounce and /finish are the court card too: the same
+        // question ("which of these do you mean?") with the answer's
+        // buttons still to come, which is a better reply than "that
+        // isn't wired up yet" and costs one line of dispatch.
+        if (
+          id === COURT_COMMAND_ID ||
+          id === PUSH_COMMAND_ID ||
+          id === BOUNCE_COMMAND_ID ||
+          id === FINISH_COMMAND_ID
+        ) {
+          return await handleCourt(
+            spaceId,
+            identity,
+            privateTo,
+            id === COURT_COMMAND_ID ? null : buttonsComingNote(),
+          );
+        }
+        if (id === TRAIL_COMMAND_ID) return await handleTrail(event, spaceId, privateTo);
+
+        // /newtrail is a dialog, and dialogs are Phase 7 — until then it
+        // keeps the Phase 3 greeting, as does anything unrecognised.
         return card(greeting(identity.firstName, command), privateTo);
       }
       return card(greeting(identity.firstName, null), privateTo);
