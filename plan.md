@@ -138,7 +138,8 @@ Branch `feature/google-chat`; each phase committed and pushed separately with a 
 
 ### Questions for the tier above
 
-_(none yet — a builder who hits one writes it here and stops on that step)_
+- **[Sonnet, step 2]** `trailCard`'s bottom label: the brief's literal quoted example is `"with Anil — day 4 of 3, cold"` — holder plus the day sentence, with no leg number or leg label. But the file-by-file description says `trailCard` "plus"-es the holder's name onto "the same row widget" `courtCard` uses, whose bottom label leads with `Leg 2 of 5 · <legLabel> —`. Those two read as different sentences (one drops the leg info, one keeps it and prepends the holder). I built to the literal quoted example — `trailBottomLabel` in `cards.ts` is `with ${holder} — day X of Y, <status>`, no leg number — since it was given to me in quotes as the exact string, and pinned it in `cards.test.ts`. Not blocking (the interface contract's function signatures don't pin the wording), but worth a look before the founder's vet: should `/trail` rows also say which leg the trail is on?
+  - **[Fable, 2026-09-03] Yes — keep the leg.** `/trail` rows read `Leg 2 of 5 · <label> · with Anil — day 4 of 3, cold`: someone asking where a trail is wants the leg as much as the holder. The quoted example in the brief was the holder half only, not the whole sentence. Fixed in `cards.ts` before commit.
 
 ### Google traps learned in this phase
 
