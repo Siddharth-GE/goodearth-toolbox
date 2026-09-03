@@ -225,7 +225,8 @@ Failure at any step → `{ ok: false }` and the door's "couldn't act for you jus
 ### Google traps learned in this build
 
 - _Vet so far (2026-09-03): `/newtrail` with a standard type opened a trail on Villa 12 as the founder — the dialog, the minted session, `open_chain` through the guard and the public confirmation all work. Push not yet pressed._
-- **(i)** _to be written at the first Push: whether a button on a message card (not a dialog) accepts the `createMessageAction` reply, and what Google does with the original card._
+- **(i), first half (2026-09-03):** a button's `interaction: "OPEN_DIALOG"` belongs INSIDE `onClick.action`, beside `function` and `parameters`. One level up, on `onClick`, Google rejects the whole card silently — the door logs a normal event and answers 200, and the space shows "Relay not responding". The tell: the same card rendered with no rows and broke the moment a row (and its buttons) appeared. Fixed in PR #62.
+- **(i), second half** _to be written at the first Push: whether a button on a message card (not a dialog) accepts the `createMessageAction` reply, and what Google does with the original card._
 
 ## Phase 7b in detail — custom trails and choosing the people (written by Fable, 2026-09-03)
 
