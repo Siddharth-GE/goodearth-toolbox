@@ -102,10 +102,10 @@ Branch `feature/google-chat`; each phase committed and pushed separately with a 
 ### Steps, in order
 
 - [ ] **1. Prove the card envelope on staging.** `[Opus]` Hard-code one `cardsV2` card (header, one decoratedText, one openLink button) behind `/court`, push the branch so staging deploys, type `/court` in the DM **and** the test space. What is being proven: that `cardsV2` inside `createMessageAction.message` renders at all, that `privateMessageViewer` still works beside it, and that `openLink` opens without a callback. If Google wants a different envelope for cards, this is where it is learned, on a ten-line change — not after the reads are written. Record the answer as trap **(h)** below, whichever way it goes.
-- [ ] **2. Pure rules + tests.** `[Sonnet]` `trail-rules.ts`, `commandText` in `events.ts`, and the two card builders in `cards.ts`, each with tests: scope from every link shape; words from blank / punctuation / mixed case; every-word matching; the ten-cap; the four bottom-label sentences (on time, cold, with client, with client and cold); the empty and no-words sentences; the origin in every link.
-- [ ] **3. Reads.** `[Sonnet]` `relay-reads.ts`. `[Opus]` vets the two `select` strings against the live view (`select pg_get_viewdef('pusher_chain_state'::regclass, true)` on staging, never an older migration — relay `PLAN.md`'s six-definitions warning) before it is committed.
-- [ ] **4. Dispatch.** `[Opus]` Wire the five command ids; keep the log line as it is (kind, space, command id, identity decision — never text, never an email; the search words are message text and are **not** logged).
-- [ ] **5. Checks and push.** `npm test`, lint, typecheck, `check:actions`; push; `gh run list` green; PR into `staging`.
+- [x] **2. Pure rules + tests.** `[Sonnet]` `trail-rules.ts`, `commandText` in `events.ts`, and the two card builders in `cards.ts`, each with tests: scope from every link shape; words from blank / punctuation / mixed case; every-word matching; the ten-cap; the four bottom-label sentences (on time, cold, with client, with client and cold); the empty and no-words sentences; the origin in every link.
+- [x] **3. Reads.** `[Sonnet]` `relay-reads.ts`. `[Opus]` vets the two `select` strings against the live view (`select pg_get_viewdef('pusher_chain_state'::regclass, true)` on staging, never an older migration — relay `PLAN.md`'s six-definitions warning) before it is committed.
+- [x] **4. Dispatch.** `[Opus]` Wire the five command ids; keep the log line as it is (kind, space, command id, identity decision — never text, never an email; the search words are message text and are **not** logged).
+- [x] **5. Checks and push.** `npm test`, lint, typecheck, `check:actions`; push; `gh run list` green; PR into `staging`. _Done 2026-09-03: PR #60._
 - [ ] **6. Founder's vet on staging** (the checklist below), then tick the phase and hand to Phase 6.
 
 ### What is NOT in this phase
