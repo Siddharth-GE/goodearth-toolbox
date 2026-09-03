@@ -11,6 +11,7 @@ import {
   bouncedText,
   cannotActNow,
   courtCard,
+  customDepartmentsNote,
   dialogNotEnabled,
   dmCannotLink,
   doneText,
@@ -29,10 +30,12 @@ import {
   pushedText,
   returnedText,
   trailCard,
+  trailStepsDialog,
   type LinkTarget,
   type RefusalKind,
 } from "./cards";
-import type { LegOption, TrailSetOption, TrailSummary } from "./trail-rules";
+import { CUSTOM_SET, MAX_CUSTOM_STEPS } from "./trail-rules";
+import type { LegOption, StepDefault, TrailSetOption, TrailSummary } from "./trail-rules";
 
 const SUBMIT_URL = "https://example.test/api/google-chat";
 
@@ -957,6 +960,7 @@ test("newTrailDialog: trail type dropdown lists every set, none pre-selected", (
   assert.deepEqual(
     setInput.items.map((i) => [i.text, i.value]),
     [
+      ["Custom — I'll pick the steps", CUSTOM_SET],
       ["Standard villa", "s1"],
       ["Fast track", "s2"],
     ],
@@ -971,10 +975,11 @@ test("newTrailDialog: the start switch defaults on", () => {
     selectedUnit: "u-1",
     submitUrl: SUBMIT_URL,
   });
-  const [decoratedWidget] = widgetsOf(dialog).filter(
+  const decoratedWidgets = widgetsOf(dialog).filter(
     (w): w is { decoratedText: Record<string, unknown> } => "decoratedText" in w,
   );
-  const decorated = decoratedWidget.decoratedText as {
+  // index 0 is "Choose the people myself" (Phase 7b); "Start now" is second.
+  const decorated = decoratedWidgets[1].decoratedText as {
     text: string;
     bottomLabel: string;
     switchControl: { name: string; value: string; selected: boolean; controlType: string };
@@ -1083,6 +1088,242 @@ test("doneText, cannotActNow and newTrailNeedsDialog", () => {
     newTrailNeedsDialog(),
     "The /newtrail command needs 'Opens a dialog' ticked in the Chat app's configuration — an admin can do that in the Google Cloud console.",
   );
+});
+
+// --- Phase 7b: page 1's custom row and pick_people switch, page 2 ------
+
+test("newTrailDialog: the trail type dropdown starts with Custom, before every saved type", () => {
+  const dialog = newTrailDialog({
+    units: [{ value: "u-1", text: "Saarang · Villa 1" }],
+    sets: [
+      trailSetOption({ id: "s1", name: "Standard villa" }),
+      trailSetOption({ id: "s2", name: "Fast track" }),
+    ],
+    selectedUnit: "u-1",
+    submitUrl: SUBMIT_URL,
+  });
+  const [, setInput] = selectionInputs(dialog) as {
+    items: { text: string; value: string; selected: boolean }[];
+  }[];
+  assert.deepEqual(
+    setInput.items.map((i) => [i.text, i.value, i.selected]),
+    [
+      ["Custom — I'll pick the steps", CUSTOM_SET, false],
+      ["Standard villa", "s1", false],
+      ["Fast track", "s2", false],
+    ],
+  );
+});
+
+test("newTrailDialog: the 'choose the people myself' switch is off by default", () => {
+  const dialog = newTrailDialog({
+    units: [{ value: "u-1", text: "Saarang · Villa 1" }],
+    sets: [trailSetOption()],
+    selectedUnit: "u-1",
+    submitUrl: SUBMIT_URL,
+  });
+  const decoratedWidgets = widgetsOf(dialog).filter(
+    (w): w is { decoratedText: Record<string, unknown> } => "decoratedText" in w,
+  );
+  const pickPeople = decoratedWidgets[0].decoratedText as {
+    text: string;
+    switchControl: { name: string; value: string; selected: boolean; controlType: string };
+  };
+  assert.equal(pickPeople.text, "Choose the people myself");
+  assert.deepEqual(pickPeople.switchControl, {
+    name: "pick_people",
+    value: "on",
+    selected: false,
+    controlType: "SWITCH",
+  });
+
+  // Start now still follows it, unchanged, still on by default.
+  const start = decoratedWidgets[1].decoratedText as {
+    text: string;
+    switchControl: { selected: boolean };
+  };
+  assert.equal(start.text, "Start now");
+  assert.equal(start.switchControl.selected, true);
+});
+
+function stepDefault(overrides: Partial<StepDefault> = {}): StepDefault {
+  return {
+    activityId: "a1",
+    activityName: "Client sign-off",
+    assigneeId: "p1",
+    expectedDays: 3,
+    ...overrides,
+  };
+}
+
+const PEOPLE = [
+  { id: "p1", name: "Anil" },
+  { id: "p2", name: "Priya" },
+];
+const ACTIVITIES = [
+  { id: "a1", name: "Client sign-off" },
+  { id: "a2", name: "Structural drawings" },
+];
+const PAGE1_PARAMS = { unit: "u-12", set: "s1", start: true };
+
+test("trailStepsDialog: set mode, one row per step, pre-filled from the type's defaults", () => {
+  const dialog = trailStepsDialog({
+    mode: "set",
+    steps: [
+      stepDefault({ activityId: "a1", activityName: "Client sign-off", assigneeId: "p1" }),
+      stepDefault({
+        activityId: "a2",
+        activityName: "Structural drawings",
+        assigneeId: null,
+        expectedDays: 5,
+      }),
+    ],
+    people: PEOPLE,
+    activities: ACTIVITIES,
+    params: PAGE1_PARAMS,
+    submitUrl: SUBMIT_URL,
+  });
+
+  const decorated = decoratedTexts(dialog);
+  assert.equal(decorated.length, 2);
+  assert.equal(decorated[0].topLabel, "Step 1");
+  assert.equal(decorated[0].text, "<b>Client sign-off</b>");
+  assert.equal(decorated[1].topLabel, "Step 2");
+  assert.equal(decorated[1].text, "<b>Structural drawings</b>");
+
+  const persons = selectionInputs(dialog) as {
+    name: string;
+    label: string;
+    items: { value: string; selected: boolean }[];
+  }[];
+  assert.equal(persons.length, 2);
+  assert.equal(persons[0].name, "person_1");
+  assert.equal(persons[0].label, "Who carries it");
+  assert.deepEqual(
+    persons[0].items.map((i) => [i.value, i.selected]),
+    [
+      ["p1", true],
+      ["p2", false],
+    ],
+  );
+  assert.equal(persons[1].name, "person_2");
+  assert.ok(persons[1].items.every((i) => i.selected === false)); // no usual person for step 2
+
+  const days = textInputs(dialog) as { name: string; label: string; value: string }[];
+  assert.equal(days.length, 2);
+  assert.deepEqual(
+    days.map((d) => [d.name, d.label, d.value]),
+    [
+      ["days_1", "Days", "3"],
+      ["days_2", "Days", "5"],
+    ],
+  );
+});
+
+test("trailStepsDialog: custom mode, a title field then MAX_CUSTOM_STEPS blank rows", () => {
+  const dialog = trailStepsDialog({
+    mode: "custom",
+    steps: [],
+    people: PEOPLE,
+    activities: ACTIVITIES,
+    params: PAGE1_PARAMS,
+    submitUrl: SUBMIT_URL,
+  });
+
+  const texts = textInputs(dialog) as { name: string; label: string; hintText?: string }[];
+  assert.equal(texts[0].name, "title");
+  assert.equal(texts[0].label, "What is this trail for");
+  assert.equal(texts[0].hintText, "Optional");
+
+  const dayInputs = texts.slice(1);
+  assert.equal(dayInputs.length, MAX_CUSTOM_STEPS);
+  assert.deepEqual(
+    dayInputs.map((d) => [d.name, d.label, d.hintText]),
+    Array.from({ length: MAX_CUSTOM_STEPS }, (_, i) => [`days_${i + 1}`, "Days", "e.g. 5"]),
+  );
+
+  const activityInputs = (
+    selectionInputs(dialog) as {
+      name: string;
+      label: string;
+      items: { selected: boolean }[];
+    }[]
+  ).filter((s) => s.name.startsWith("activity_"));
+  assert.equal(activityInputs.length, MAX_CUSTOM_STEPS);
+  assert.equal(activityInputs[0].label, "Step 1 · activity");
+  assert.equal(activityInputs[5].label, "Step 6 · activity");
+  assert.ok(activityInputs.every((s) => s.items.every((i) => i.selected === false)));
+
+  const personInputs = (
+    selectionInputs(dialog) as {
+      name: string;
+      label: string;
+      items: { selected: boolean }[];
+    }[]
+  ).filter((s) => s.name.startsWith("person_"));
+  assert.equal(personInputs.length, MAX_CUSTOM_STEPS);
+  assert.ok(personInputs.every((s) => s.label === "Who carries it"));
+  assert.ok(personInputs.every((s) => s.items.every((i) => i.selected === false)));
+});
+
+test("trailStepsDialog: an activity name with HTML-special characters is escaped", () => {
+  const dialog = trailStepsDialog({
+    mode: "set",
+    steps: [stepDefault({ activityName: "A < B review" })],
+    people: PEOPLE,
+    activities: ACTIVITIES,
+    params: PAGE1_PARAMS,
+    submitUrl: SUBMIT_URL,
+  });
+  const [decorated] = decoratedTexts(dialog);
+  assert.equal(decorated.text, "<b>A &lt; B review</b>");
+});
+
+test("trailStepsDialog: Open trail carries page 1's choices, the mode, and set mode's activities", () => {
+  const setDialog = trailStepsDialog({
+    mode: "set",
+    steps: [stepDefault({ activityId: "a1" }), stepDefault({ activityId: "a2" })],
+    people: PEOPLE,
+    activities: ACTIVITIES,
+    params: { unit: "u-12", set: "s1", start: true },
+    submitUrl: SUBMIT_URL,
+  });
+  const [setButtons] = buttonLists(setDialog);
+  const [openSet] = setButtons;
+  assert.equal(openSet.text, "Open trail");
+  assert.equal(openSet.onClick.action?.function, SUBMIT_URL);
+  assert.deepEqual(openSet.onClick.action?.parameters, [
+    { key: "action", value: "newtrail-open" },
+    { key: "unit", value: "u-12" },
+    { key: "set", value: "s1" },
+    { key: "start", value: "on" },
+    { key: "mode", value: "set" },
+    { key: "count", value: "2" },
+    { key: "activities", value: "a1,a2" },
+  ]);
+
+  const customDialog = trailStepsDialog({
+    mode: "custom",
+    steps: [],
+    people: PEOPLE,
+    activities: ACTIVITIES,
+    params: { unit: "u-12", set: CUSTOM_SET, start: false },
+    submitUrl: SUBMIT_URL,
+  });
+  const [customButtons] = buttonLists(customDialog);
+  const [openCustom] = customButtons;
+  assert.deepEqual(openCustom.onClick.action?.parameters, [
+    { key: "action", value: "newtrail-open" },
+    { key: "unit", value: "u-12" },
+    { key: "set", value: CUSTOM_SET },
+    { key: "start", value: "" },
+    { key: "mode", value: "custom" },
+    { key: "count", value: String(MAX_CUSTOM_STEPS) },
+  ]);
+});
+
+test("customDepartmentsNote", () => {
+  assert.equal(customDepartmentsNote(), "Add its departments on the trail page if it needs them.");
 });
 
 test("none of the write sentences leak an email", () => {
