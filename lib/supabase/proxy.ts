@@ -13,6 +13,10 @@ const PUBLIC_PATHS = [
   "/forgot-password",
   "/auth/confirm",
   "/auth/callback",
+  // Vercel's weekly cron calls this to keep the free-tier database from
+  // pausing. The real gate is CRON_SECRET, checked inside the route;
+  // this entry only stops the login redirect from swallowing the call.
+  "/api/keep-alive",
 ];
 
 /**
