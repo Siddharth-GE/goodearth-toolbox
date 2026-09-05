@@ -82,7 +82,7 @@ Branch `feature/google-chat`; each phase committed and pushed separately with a 
 
 ## Next build starts here — the founder picks (2026-09-03)
 
-Standing instruction: everything goes to `staging` as it lands; **one merge to `master` after the founder has tested everything**, together with the production setup (Phase 8's checklist above). **Production's Supabase project was found paused on 2026-09-03** — restore it (ask first) before any production step.
+Standing instruction: everything goes to `staging` as it lands; **one merge to `master` after the founder has tested everything**, together with the production setup (Phase 8's checklist above). **Production's Supabase project was found paused on 2026-09-03 and restored on 2026-09-05** — it pauses again after 7 idle days (free tier), so check it is `ACTIVE_HEALTHY` before any production step (SHIPPING.md, _Pausing_).
 
 The candidates, in Fable's recommended order. The founder names one; Fable writes its detail below in the form the done phases used, then Opus and Sonnet build it.
 
