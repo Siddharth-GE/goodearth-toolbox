@@ -1,0 +1,79 @@
+# plan.md — Google Chat round two: the court card refreshes itself after a press
+
+_Written by Fable, 2026-09-07. Candidate #1 from `lib/google-chat/PLAN.md`, with candidate #2 (pressing Finish, With client, Back from client once each) folded into the vet, since every press now exercises the new path. Awaiting the founder's approval before anyone builds._
+
+## What the founder sees today, and after
+
+Today: `/court` posts a private card; pressing Push moves the baton and the space is told ("Sid pushed Structural drawings to Anitha"). The card itself stays exactly as it was: the row is still there, its buttons still pressable, and a second press earns a private refusal from the database ("you are not the holder"). Nobody knows the card is stale until they press it.
+
+After: the same press moves the baton, the space is told exactly as today, **and the pressed card rewrites itself** to the person's current court — the row is gone (or shows its new leg), a one-line note at the top says what just happened, and an empty court says "Court cleared". Finish, With client, Back from client and a Bounce saved from its dialog all refresh the card the same way.
+
+## The constraint the earlier recommendation missed — the founder decides
+
+PLAN.md called this "small: `updateMessage` on the pressed card". Reading Google's reply contract against the door's code, it is not that simple: **Google takes one answer per press**, and the answer's data action is one of _create a message_ or _update the pressed message_, never both. Today's answer is the public confirmation (a created message). Using the answer to update the card instead means **the space no longer hears the confirmation**, which breaks the invariant PLAN.md lists first: "confirmations post to the space".
+
+Two honest ways through:
+
+| Option                                                                    | What changes                                                                                                                                                                                                                                                                                 | Cost                                                                                                                                                                                  |
+| ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A. Answer with the card (no infra)**                                    | The press answers with `updateMessageAction`: the private card refreshes, carrying its own confirmation line. The public confirmation stops.                                                                                                                                                 | Nothing to set up. The space goes quiet; only the presser knows the baton moved unless they open the toolbox.                                                                         |
+| **B. Answer as today, refresh the card by a second call** _(recommended)_ | The press answers with the public confirmation exactly as now. Just before answering, the door rewrites the pressed card through Google's Chat API, authenticated **as the app** with its own service account. If that call fails or the key is unset, the card simply stays as it is today. | One Google Cloud step per environment (a service account key), one new env var per environment, one new server-only file. Lays the exact transport candidate #5 (outbound DMs) needs. |
+
+**Fable recommends B.** It cannot regress anything the founder has vetted: with the key unset the door behaves character-for-character as today, and a failed refresh degrades to today's stale card. Option A is smaller but takes something away. If the founder prefers A, steps 3, 4 and 7 shrink to a single `updateMessageAction` envelope in `card()`'s shape and the Cloud step disappears; everything else in this plan stands.
+
+The rest of this plan is Option B.
+
+## What the founder has to do before step 2 can be seen
+
+In the **staging** Cloud project (the one whose Chat app points at `staging.goodearthkannur.org/api/google-chat`):
+
+1. IAM & Admin → Service Accounts → Create. Name it `relay-outbound`. No roles needed.
+2. On that account: Keys → Add key → JSON. Download it.
+3. Hand the file's contents to the session as a single line in `.env.local` under `GOOGLE_CHAT_SERVICE_ACCOUNT_KEY=` (the whole JSON, one line). Nothing else is needed: the Chat API treats any service account in the Chat app's own project as the app itself, with the `chat.bot` scope.
+
+The session then writes it to Vercel's **Preview** environment through the API (`/v10/projects/<id>/env?upsert=true`, type `encrypted`, never "sensitive", never pasted — BUGCATCHER #18) and redeploys `staging`. Production gets its own account and key in its own Cloud project at ship time, as the ship checklist below says.
+
+## Invariants that must survive
+
+- Every write still goes through `act-as.ts` as the person; the app credential **never writes to the database and never touches a trail**. It edits one thing: a card the app itself posted. `act-as.ts` keeps its one caller.
+- The log line still never carries message text, an email, a token or the key. New fields: `messageName: true|false` (was one on the event) and `refresh: "off" | "done" | "failed:<http status>" | "skipped"`.
+- One answer, always 200, always within 30s. The refresh call has a **5-second timeout** and its failure never changes the answer.
+- The refreshed card is built by the same function as `/court`'s card — one renderer, so the two can never drift.
+- Replies about one person stay private; the refreshed card inherits the original card's `privateMessageViewer` (an update cannot change it, and we do not try).
+- A dialog error still re-renders the dialog with values kept (untouched by this plan).
+
+## Steps
+
+Each step is one commit on `feature/google-chat-round-two`, merged to `staging` for the founder to press (the Chat app delivers only to `staging.goodearthkannur.org` — a feature-branch preview cannot receive a single event, so "open the page" here means "merge to staging and press it"). Tick each step here as it lands; write any deviation as a question at the bottom, not into the code.
+
+- [ ] **1. `[Sonnet]` Read the pressed message's name.** `events.ts`: add `name?: string` to `ChatMessage`; add `messageName(event): string | null` reading `chat.buttonClickedPayload.message.name`, trimmed, only if it starts with `spaces/` and contains `/messages/`. Tests in `events.test.ts`: present, absent, wrong shape, whitespace. `route.ts`: add `messageName: messageName(event) !== null` to the log line's object. Pure change; nothing Google sees changes.
+
+- [ ] **2. `[Opus]` Prove the two beliefs on staging before writing the real code.** Merge step 1 to staging, press Push once, read the log (`npx vercel logs staging.goodearthkannur.org --json`): does a card press carry `messageName: true`? Does a Bounce **Save** (SUBMIT_DIALOG) carry one, and is it the court card's name or the dialog's? Then, with the founder's key in `.env.local`, a **local script** (`scripts/google-chat-patch-card.ts`, dry-run by default, `--commit` to send, takes `--message spaces/…/messages/…`): mint an app token and `PATCH https://chat.googleapis.com/v1/<name>?updateMask=cardsV2` with a hard-coded one-widget card ("Refreshed by hand at <time>"). The message name for the script comes from a temporary extra log field that Opus adds locally and **does not commit**. Record what Google accepted, verbatim, as trap **(m)** in BUGCATCHER #17 and beside the code in step 3. The open question this step answers: **can the app patch a private message it posted?** If Google refuses, stop and write it below; Option A is the fallback and needs no key.
+
+- [ ] **3. `[Opus]` The app's own voice: `lib/google-chat/outbound.ts` (server-only) + `outbound-rules.ts` (pure).**
+  - `outbound-rules.ts`: `parseServiceAccountKey(json): { clientEmail, privateKey } | null` (refuses anything without both fields); `assertionClaims(clientEmail, nowSeconds): { iss, scope: "https://www.googleapis.com/auth/chat.bot", aud: "https://oauth2.googleapis.com/token", iat, exp: iat + 3600 }`; `patchUrl(messageName, updateMask)`; `refreshEnabled(env)`. Tests for each — this is the file `tsx --test` can import.
+  - `outbound.ts`: `getAppToken()` — RS256-sign the assertion with `node:crypto` (`crypto.sign("RSA-SHA256", …)`, the mirror of what `verify.ts` already does), exchange it at the token endpoint (`grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer`), cache the access token in module scope until 60s before its expiry. `updateCardMessage(messageName, cardsV2): Promise<"done" | "failed:<status>" | "off">` — `"off"` when `GOOGLE_CHAT_SERVICE_ACCOUNT_KEY` is unset or unparseable (logged once as a console.warn without the value), otherwise the PATCH with `AbortSignal.timeout(5000)`. Never throws. Never logs the key, the token or the card. No new library: `fetch` and `node:crypto` only.
+  - `.env.local.example`: the variable, with the same "which environment" note the two existing Chat variables carry, and the sentence "unset = the card does not refresh, nothing else changes".
+
+- [ ] **4. `[Sonnet]` One renderer for the court.** `route.ts`: lift the body of `handleCourt` into `buildCourtCards(spaceId, identity, notice?: string): Promise<Record<string, unknown>[] | null>` (null when the read failed) and have `handleCourt` call it. `cards.ts`: `courtCard` takes an optional `notice` — rendered as the first widget, a `decoratedText` with `text: "<b>notice</b>"`, before the rows; delete the stale comment above `ACTION_BUTTON_TEXT` that still says "No Push/Bounce/Finish buttons yet (Phase 6)". Tests in `cards.test.ts`: notice present is the first widget; absent changes nothing; escaped HTML.
+
+- [ ] **5. `[Opus]` Refresh after every successful write.** In `handleButtonPress` and `handleBounceSubmit`, after the write succeeds and `getTrailSummary` has been read: if `messageName(event)` is set, `await` `buildCourtCards(spaceId, actor, confirmationSentence)` then `updateCardMessage(name, cards)`, log the result in the event's log line (`refresh`), and **then** return today's public confirmation unchanged. The two reads (`getTrailSummary`, the court) run in `Promise.all`. A failed court read means `refresh: "skipped"` and the stale card stays — never a failed answer. `spaceId` and `actor` are already in scope; `handleBounceSubmit` uses whichever name step 2 found (the court card's, or none — then Bounce simply doesn't refresh, written below as a known gap).
+
+- [ ] **6. `[Haiku]` Docs.** `lib/google-chat/PLAN.md`: a "Round two" paragraph (what refreshes, the one-answer constraint, why Option B), `outbound.ts` in the code map, the invariant "the app credential edits only cards the app posted", and the ship checklist gains: _a `relay-outbound` service account + JSON key in the production Cloud project → `GOOGLE_CHAT_SERVICE_ACCOUNT_KEY` in Vercel Production through the API_. `SECURITY.md`, _The Google Chat door_: one bullet on the second Google credential — what it is, the only thing it may do, that it never reaches the database, where it lives, and that it is optional (unset = off). `STATUS.md` Relay-bot row: one clause. No contract-table change (no new database read).
+
+- [ ] **7. `[Founder]` Vet on staging, in the linked test space, with at least one baton in hand.** `/court` → press **Push**: the card rewrites (row gone or on its new leg, the note on top), the public confirmation still posts. Then, one each, on real rows: **Finish**, **With client**, **Back from client** (candidate #2 — never pressed before), and a **Bounce** saved from its dialog. Then `/court` again from a **DM** and press one button: the refresh must work outside a linked space too. Then the failure path: the session temporarily blanks the key on Vercel Preview, redeploys, press Push — the baton moves, the space is told, the card stays stale, the log says `refresh: "off"`. Restore the key.
+
+- [ ] **8. `[Fable]` Approval pass.** Full diff against this plan, SECURITY.md and BUGCATCHER.md; confirm trap (m) is recorded; then the plain-language merge overview. Merge to `staging` only — **the master merge stays one merge for the whole bot**, per the standing instruction of 2026-09-03, and the ship checklist runs then.
+
+## What can go wrong, and the answer
+
+- **Google refuses to patch a private message.** Found at step 2, before anything else is written. Fallback: Option A.
+- **A Bounce Save carries the dialog's name, not the card's.** Bounce doesn't refresh; the four direct buttons do. Written here as a gap, not patched around.
+- **The token exchange is slow.** 5s ceiling on the whole refresh; the cache means one exchange an hour. The answer to Google never waits longer than that.
+- **The key ends up in a log.** Grep the diff for `private_key`, `privateKey`, `GOOGLE_CHAT_SERVICE_ACCOUNT_KEY` at step 8: each must appear only in `outbound.ts` / `outbound-rules.ts` / the example file / docs.
+- **Vercel fails the deploy on the key's whitespace.** BUGCATCHER #18: through the API, trimmed, `encrypted`, and check the Production/Preview row says Ready.
+- **The stale card in a busy space.** Google keeps the card's position; the refresh edits in place, it does not repost. Nothing to do.
+
+## Questions for the tier above
+
+_(A lower tier writes here and stops; it does not improvise.)_
