@@ -502,6 +502,91 @@ test("courtCard: every row's link lands on that trail, on the given origin", () 
   assert.deepEqual(openLinks(built), [`${ORIGIN}/relay/trails/c-42`]);
 });
 
+test("courtCard: a notice is the first widget, bold and escaped, rows follow it", () => {
+  const withoutNotice = courtCard({
+    firstName: "S",
+    scopeLabel: null,
+    rows: [row()],
+    more: 0,
+    moreElsewhere: 0,
+    origin: ORIGIN,
+    submitUrl: SUBMIT_URL,
+  });
+  const withNotice = courtCard({
+    firstName: "S",
+    scopeLabel: null,
+    rows: [row()],
+    more: 0,
+    moreElsewhere: 0,
+    origin: ORIGIN,
+    submitUrl: SUBMIT_URL,
+    notice: "Sid pushed Structural drawings to Anitha",
+  });
+
+  const [first, ...rest] = widgetsOf(withNotice);
+  assert.ok("decoratedText" in first);
+  assert.deepEqual((first as { decoratedText: unknown }).decoratedText, {
+    text: "<b>Sid pushed Structural drawings to Anitha</b>",
+    wrapText: true,
+  });
+  assert.deepEqual(rest, widgetsOf(withoutNotice));
+});
+
+test("courtCard: without a notice, the card is unchanged", () => {
+  const args = {
+    firstName: "S",
+    scopeLabel: null,
+    rows: [row()],
+    more: 0,
+    moreElsewhere: 0,
+    origin: ORIGIN,
+    submitUrl: SUBMIT_URL,
+  };
+  assert.deepEqual(courtCard(args), courtCard(args));
+  assert.deepEqual(widgetsOf(courtCard(args)), widgetsOf(courtCard({ ...args, notice: "   " })));
+});
+
+test("courtCard: a notice with HTML-special characters is escaped", () => {
+  const built = courtCard({
+    firstName: "S",
+    scopeLabel: null,
+    rows: [],
+    more: 0,
+    moreElsewhere: 0,
+    origin: ORIGIN,
+    submitUrl: SUBMIT_URL,
+    notice: "Sid <pushed> R&D drawings",
+  });
+  const [first] = widgetsOf(built);
+  assert.deepEqual((first as { decoratedText: { text: string } }).decoratedText, {
+    text: "<b>Sid &lt;pushed&gt; R&amp;D drawings</b>",
+    wrapText: true,
+  });
+});
+
+test("courtCard: a blank notice adds nothing", () => {
+  const withoutNotice = courtCard({
+    firstName: "S",
+    scopeLabel: null,
+    rows: [row()],
+    more: 0,
+    moreElsewhere: 0,
+    origin: ORIGIN,
+    submitUrl: SUBMIT_URL,
+  });
+  const blankNotice = courtCard({
+    firstName: "S",
+    scopeLabel: null,
+    rows: [row()],
+    more: 0,
+    moreElsewhere: 0,
+    origin: ORIGIN,
+    submitUrl: SUBMIT_URL,
+    notice: "   ",
+  });
+  assert.deepEqual(widgetsOf(blankNotice), widgetsOf(withoutNotice));
+});
+
 test("trailCard: the bottom label keeps the leg and adds who holds it, Unnamed when there is none", () => {
   const withHolder = trailCard({
     words: ["villa"],
