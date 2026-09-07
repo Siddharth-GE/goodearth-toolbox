@@ -282,6 +282,16 @@ _Caught twelve times between 2026-09-01 and 2026-09-03, building the Relay bot (
 
 ---
 
+### 18. A green CI and a production deployment that failed before it built
+
+**What happened.** 2026-09-05: the keep-alive merged to `master`, CI green, and Vercel's production deployment failed one second later — three times over. The cause was environmental, not code: `CRON_SECRET`, pasted into Vercel's dashboard, carried invisible whitespace, and had been saved as a _sensitive_ variable, which nobody can read back. Production kept serving the previous build, so nothing looked broken.
+
+**Why every gate missed it.** CI builds without Vercel's production variables, and the PR's preview built fine because previews don't carry them either. Vercel validates the environment at deploy time, before the build, and the only record is that deployment's own log; GitHub shows it only as a commit status nobody reads.
+
+**The rule.** A merge to `master` is done when Vercel's Production row for that SHA says Ready (SHIPPING.md step 7), never when CI is green. A secret Vercel must send as a header is written through the API, never pasted, and never as "sensitive" — unreadable means undebuggable.
+
+**The check.** After every push to `master`: `gh api repos/<owner>/<repo>/commits/<sha>/status --jq '.statuses[0].description'` must say "Deployment has completed", then one call to the changed route on the live domain.
+
 ## Adding to this file
 
 When something breaks that a green build said was fine, it belongs here — not in `STATUS.md`, which is what exists, and not in `TODO.md`, which is what to do next. **This file is the only standing record of the failures CI cannot see, so an entry has to explain itself in full rather than cite a finding somewhere else.** Anyone reading it in a year should not need a second document, and there is no longer one to reach for.
