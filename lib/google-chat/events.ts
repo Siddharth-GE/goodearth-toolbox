@@ -36,6 +36,9 @@ export type ChatMessage = {
   argumentText?: string;
   slashCommand?: { commandId?: number | string };
   sender?: ChatUser;
+  // Google's `spaces/<id>/messages/<id>` resource name — present on the
+  // card a button press rides in on, so a later call can rewrite it.
+  name?: string;
 };
 
 /**
@@ -261,6 +264,20 @@ export function buttonParams(event: ChatEvent): Record<string, string> {
     if (typeof value === "string") result[key] = value;
   }
   return result;
+}
+
+/**
+ * The pressed card's own resource name — the handle the door needs to
+ * rewrite it after a press (plan.md round two). Read only from a button
+ * click: only a press rides in on the card that was pressed, so a
+ * slash-command's message name (which names the person's own typed
+ * message, not a card) is never read here. Null means Google didn't say,
+ * which simply means the card is left as it is.
+ */
+export function messageName(event: ChatEvent): string | null {
+  const raw = event.chat?.buttonClickedPayload?.message?.name;
+  const name = typeof raw === "string" ? raw.trim() : "";
+  return /^spaces\/[^/]+\/messages\/[^/]+$/.test(name) ? name : null;
 }
 
 /**

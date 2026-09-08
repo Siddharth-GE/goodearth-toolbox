@@ -16,6 +16,7 @@ import {
   dialogEventType,
   formValue,
   isDirectMessage,
+  messageName,
   senderEmail,
   senderName,
   spaceDisplayName,
@@ -325,6 +326,42 @@ test("buttonParams: a non-string value is dropped, not coerced", () => {
     }),
     { action: "push" },
   );
+});
+
+test("messageName reads a well-formed name off a button press", () => {
+  assert.equal(
+    messageName({
+      chat: { buttonClickedPayload: { message: { name: "  spaces/AAAA/messages/BBBB  " } } },
+    }),
+    "spaces/AAAA/messages/BBBB",
+  );
+});
+
+test("messageName is null when there is no buttonClickedPayload at all", () => {
+  assert.equal(messageName({}), null);
+  assert.equal(messageName({ chat: {} }), null);
+  assert.equal(messageName({ chat: { buttonClickedPayload: {} } }), null);
+});
+
+test("messageName is null on a messagePayload — only a button press counts", () => {
+  assert.equal(
+    messageName({
+      chat: { messagePayload: { message: { name: "spaces/AAAA/messages/BBBB" } } },
+    }),
+    null,
+  );
+});
+
+test("messageName rejects a malformed name", () => {
+  assert.equal(
+    messageName({ chat: { buttonClickedPayload: { message: { name: "messages/abc" } } } }),
+    null,
+  );
+  assert.equal(
+    messageName({ chat: { buttonClickedPayload: { message: { name: "spaces/x" } } } }),
+    null,
+  );
+  assert.equal(messageName({ chat: { buttonClickedPayload: { message: { name: "" } } } }), null);
 });
 
 test("a press on the bot's own card still names the person in chat.user", () => {

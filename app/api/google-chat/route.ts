@@ -6,6 +6,7 @@ import {
   dialogEventType,
   formValue,
   isDirectMessage,
+  messageName,
   senderName,
   spaceDisplayName,
   spaceName,
@@ -40,6 +41,7 @@ import {
 } from "@/lib/google-chat/cards";
 import { actAs } from "@/lib/google-chat/act-as";
 import { resolveIdentity } from "@/lib/google-chat/identity";
+import { updateCardMessage } from "@/lib/google-chat/outbound";
 import {
   getTrailSummary,
   listActivities,
@@ -407,13 +409,55 @@ async function handleLinkCommand(event: ChatEvent, spaceId: string, privateTo: s
 }
 
 /**
- * /court — what is in this person's hand, coldest first, privately.
+ * The court as cards — the ONE renderer, so /court and a card that
+ * rewrites itself after a press can never drift apart. Round two added
+ * the second caller (refreshPressedCard below); `notice` is the line it
+ * puts on top saying what just happened, and /court passes none.
  *
  * The read is deliberately unscoped: one pass over the person's whole
  * court, split in Node by the space's scope, so a linked space can say
  * both "here is this villa's batons" and "you also hold N elsewhere"
  * without a second query. In a DM or an unlinked space the scope is
  * "all", nothing is split off, and the card is simply the whole court.
+ *
+ * Null is a failed read, never an empty court: "nothing is waiting on
+ * you" would be a lie told to someone holding six batons. What each
+ * caller does about it differs — /court apologises, a refresh leaves the
+ * card as it is — which is exactly why the decision isn't made here.
+ */
+async function buildCourtCards(
+  spaceId: string,
+  identity: { userId: string; firstName: string },
+  notice?: string,
+): Promise<Record<string, unknown>[] | null> {
+  const link = await getSpaceLink(spaceId);
+  const scope = scopeOf(link);
+
+  const rows = await listCourt(identity.userId);
+  if (!rows) return null;
+
+  const { inScope, elsewhere } = splitByScope(rows, scope);
+  const { shown, more } = takeForCard(orderColdestFirst(inScope));
+
+  return [
+    courtCard({
+      firstName: identity.firstName,
+      scopeLabel: link?.label ?? null,
+      rows: shown,
+      more,
+      moreElsewhere: elsewhere.length,
+      origin: chatOrigin(),
+      // Where Google posts a button press back to. For an HTTP app a
+      // button's function is a URL, never a name (trap (e)), and the
+      // registered endpoint URL is exactly what chatAudience() holds.
+      submitUrl: chatAudience(),
+      notice,
+    }),
+  ];
+}
+
+/**
+ * /court — what is in this person's hand, coldest first, privately.
  *
  * /push, /bounce and /finish answer with this same card: the buttons
  * that move a baton live on its rows, so "which of these do you mean?"
@@ -424,36 +468,53 @@ async function handleCourt(
   identity: { userId: string; firstName: string },
   privateTo: string | null,
 ) {
-  const link = await getSpaceLink(spaceId);
-  const scope = scopeOf(link);
+  const cards = await buildCourtCards(spaceId, identity);
+  if (!cards) return card(SOMETHING_WENT_WRONG, privateTo);
+  return card({ cardsV2: cards }, privateTo);
+}
 
-  const rows = await listCourt(identity.userId);
-  // A read that failed is never an empty court: "nothing is waiting on
-  // you" would be a lie told to someone holding six batons.
-  if (!rows) return card(SOMETHING_WENT_WRONG, privateTo);
+/**
+ * Rewrite the card that was just pressed, so it shows the person's court
+ * as it now stands with a line on top saying what they just did.
+ *
+ * This runs BEFORE the answer to Google and can never change it: Google
+ * takes one answer per press and that answer is still the public
+ * confirmation, so the card is rewritten through the Chat REST API as
+ * the app instead (outbound.ts). Every way this can go wrong ends in a
+ * word for the log and a card left exactly as it was — no message name
+ * (a dialog Save may carry none), a failed court read, a refused PATCH,
+ * no key at all, or something nobody thought of, which is what the
+ * catch is for.
+ *
+ * One line per refresh, and the message resource name is in it on
+ * purpose. `spaces/…/messages/…` is an opaque handle — not text, not an
+ * email, not a token — and having it in the log is the difference
+ * between "a refresh failed" and being able to put the card right by
+ * hand with scripts/google-chat-patch-card.ts. (plan.md asked for a
+ * boolean; Fable decided the id is logged.)
+ */
+async function refreshPressedCard(
+  event: ChatEvent,
+  spaceId: string,
+  actor: Actor,
+  notice: string,
+): Promise<void> {
+  const name = messageName(event);
+  if (!name) {
+    console.log("google-chat refresh", JSON.stringify({ space: spaceId, message: null }));
+    return;
+  }
 
-  const { inScope, elsewhere } = splitByScope(rows, scope);
-  const { shown, more } = takeForCard(orderColdestFirst(inScope));
-
-  return card(
-    {
-      cardsV2: [
-        courtCard({
-          firstName: identity.firstName,
-          scopeLabel: link?.label ?? null,
-          rows: shown,
-          more,
-          moreElsewhere: elsewhere.length,
-          origin: chatOrigin(),
-          // Where Google posts a button press back to. For an HTTP app a
-          // button's function is a URL, never a name (trap (e)), and the
-          // registered endpoint URL is exactly what chatAudience() holds.
-          submitUrl: chatAudience(),
-        }),
-      ],
-    },
-    privateTo,
-  );
+  try {
+    const cards = await buildCourtCards(spaceId, actor, notice);
+    const result = cards ? await updateCardMessage(name, cards) : "skipped";
+    console.log("google-chat refresh", JSON.stringify({ space: spaceId, message: name, result }));
+  } catch {
+    console.log(
+      "google-chat refresh",
+      JSON.stringify({ space: spaceId, message: name, result: "failed:threw" }),
+    );
+  }
 }
 
 /**
@@ -549,8 +610,15 @@ async function handleButtonPress(event: ChatEvent, actor: Actor, privateTo: stri
   // read fails the write still happened, and saying nothing would be
   // worse than saying it plainly.
   const trail = await getTrailSummary(press.chainId);
-  if (!trail) return card(doneText());
-  return card(confirmation(press.action, actor.firstName, trail));
+  const sentence = trail ? confirmation(press.action, actor.firstName, trail) : doneText();
+
+  // The pressed card catches up with what just happened, and the space
+  // still hears the same sentence it always did. The refresh is awaited
+  // so it lands before the answer, and its outcome never touches the
+  // answer — a card left stale is yesterday's behaviour, not a failure.
+  await refreshPressedCard(event, spaceName(event), actor, sentence);
+
+  return card(sentence);
 }
 
 /**
@@ -607,8 +675,16 @@ async function handleBounceSubmit(event: ChatEvent, actor: Actor, privateTo: str
   if (!acted.value.ok) return closeDialog(acted.value.error, privateTo);
 
   const trail = await getTrailSummary(press.chainId);
-  if (!trail) return closeDialog(doneText());
-  return closeDialog(bouncedText(actor.firstName, trail, bounceReasonText(form.reason), form.note));
+  const sentence = trail
+    ? bouncedText(actor.firstName, trail, bounceReasonText(form.reason), form.note)
+    : doneText();
+
+  // The same refresh as a direct button press, with one known gap: a
+  // dialog Save may not carry the court card's name at all, in which
+  // case the helper logs `message: null` and the card stays as it is.
+  await refreshPressedCard(event, spaceName(event), actor, sentence);
+
+  return closeDialog(sentence);
 }
 
 /**
@@ -984,6 +1060,11 @@ export async function POST(request: Request) {
           // Which step of a dialog this is, if any: the one fact that
           // says whether "Opens a dialog" is ticked in Google's console.
           dialog: dialogEventType(event),
+          // Whether the press carried the pressed card's own name — the
+          // handle a refresh needs. False on anything that isn't a
+          // button, and the one fact that says whether a dialog Save
+          // can refresh a card at all.
+          messageName: messageName(event) !== null,
           sender,
         }),
       );

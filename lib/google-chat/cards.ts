@@ -233,12 +233,6 @@ function trailBottomLabel(row: TrailSummary): string {
   return `${legAndLabel(row)} · with ${holder} — ${daySentence(row)}`;
 }
 
-/**
- * One trail as the two widgets every row is made of: the status line,
- * and its one action — Open in the toolbox. No Push/Bounce/Finish
- * buttons yet (Phase 6): a callback button with nothing behind it is
- * exactly the "app is not responding" trap (e) from Phase 4's plan.
- */
 /** Every action button's own label, in the order buttonsFor hands the actions back. */
 const ACTION_BUTTON_TEXT: Record<ButtonAction, string> = {
   push: "Push",
@@ -327,6 +321,11 @@ export function askForWords(): string {
  * scope, `more` is how many of those were cut at the ten-cap, and
  * `moreElsewhere` is how many more the sender holds outside this space
  * — all from the one unscoped read `listCourt` did.
+ *
+ * `notice` is round two's line: after a press the same card is rebuilt
+ * with what just happened on top, so the card the person is looking at
+ * says both what moved and what is still with them. Omitted (the plain
+ * `/court` read) the card is byte-for-byte what it always was.
  */
 export function courtCard(input: {
   firstName: string;
@@ -336,11 +335,15 @@ export function courtCard(input: {
   moreElsewhere: number;
   origin: string;
   submitUrl: string;
+  notice?: string;
 }): Record<string, unknown> {
-  const { scopeLabel, rows, more, moreElsewhere, origin, submitUrl } = input;
+  const { scopeLabel, rows, more, moreElsewhere, origin, submitUrl, notice } = input;
   const subtitle = scopeLabel ?? "everything";
 
   const widgets: Record<string, unknown>[] = [];
+  if (notice && notice.trim()) {
+    widgets.push({ decoratedText: { text: `<b>${escapeHtml(notice)}</b>`, wrapText: true } });
+  }
   if (rows.length === 0) {
     widgets.push({ textParagraph: { text: "Court cleared — nothing is waiting on you." } });
   } else {

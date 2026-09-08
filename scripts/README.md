@@ -23,6 +23,7 @@ Six scripts have an npm alias in `package.json`. The rest are run directly with 
 | `clone-data.ts`              | Copies real master data (people, places, clients, the catalogue) from one database to another, ids preserved.              | `npx tsx scripts/clone-data.ts --from <ref> --to <ref> --commit`                 | dry-run / `--commit` |
 | `copy-storage.ts`            | Copies Supabase Storage objects between two projects and rewrites the URLs that point at them.                             | `npx tsx scripts/copy-storage.ts --from <ref> --to <ref> --commit`               | dry-run / `--commit` |
 | `scramble-staging-emails.ts` | Rewrites staff email addresses on staging to unroutable ones (or restores real ones for named people to sign in and test). | `npx tsx scripts/scramble-staging-emails.ts --project <ref> --keep a@b --commit` | dry-run / `--commit` |
+| `vercel-env.ts`              | Writes one environment variable from `.env.local` to Vercel through its API — trimmed, `encrypted`, never pasted.          | `npx tsx scripts/vercel-env.ts --name <VAR> --target preview --commit`           | dry-run / `--commit` |
 
 ## One-off data imports
 
@@ -39,9 +40,10 @@ Six scripts have an npm alias in `package.json`. The rest are run directly with 
 
 ## App checks
 
-| Script                    | What it does                                                                                                                                         | How to run                                                 | Writes?              |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | -------------------- |
-| `check-server-actions.ts` | Guards against a bare `export type` in a `"use server"` file, which builds fine and then kills every action in its chunk. Run after `npm run build`. | `npm run check:actions`                                    | read-only            |
-| `rotate-marathon-pins.ts` | Rotates a Marathon kiosk agent's PIN off a known/published value.                                                                                    | `npm run rotate-marathon-pins -- --project <ref> --commit` | dry-run / `--commit` |
+| Script                      | What it does                                                                                                                                         | How to run                                                                               | Writes?              |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | -------------------- |
+| `check-server-actions.ts`   | Guards against a bare `export type` in a `"use server"` file, which builds fine and then kills every action in its chunk. Run after `npm run build`. | `npm run check:actions`                                                                  | read-only            |
+| `google-chat-patch-card.ts` | Rewrites one Google Chat card as the app — the hand proof that it may, and the repair when a refresh fails.                                          | `npx tsx scripts/google-chat-patch-card.ts --message spaces/<id>/messages/<id> --commit` | dry-run / `--commit` |
+| `rotate-marathon-pins.ts`   | Rotates a Marathon kiosk agent's PIN off a known/published value.                                                                                    | `npm run rotate-marathon-pins -- --project <ref> --commit`                               | dry-run / `--commit` |
 
 The `data/*.csv` files the importers read are gitignored on purpose: they carry real business data, some of it bank account details, and none of it belongs in this public repo.
