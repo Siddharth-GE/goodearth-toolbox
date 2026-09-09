@@ -332,60 +332,85 @@ test("askForWords", () => {
   );
 });
 
-test("courtCard: on time", () => {
+test("courtCard: on time — no mark, no font tag, the plain clock sentence", () => {
   const built = courtCard({
     firstName: "Siddharth",
     scopeLabel: null,
-    rows: [row({ isStuck: false, isWithClient: false, daysInLeg: 2, expectedDays: 3 })],
+    rows: [row({ isStuck: false, isWithClient: false, daysInLeg: 6, expectedDays: 10 })],
     more: 0,
     moreElsewhere: 0,
     origin: ORIGIN,
     submitUrl: SUBMIT_URL,
   });
-  assert.match(decoratedTexts(built)[0].bottomLabel, /day 2 of 3, on time$/);
+  const [decorated] = decoratedTexts(built);
+  assert.ok(!decorated.topLabel.startsWith("🔴"));
+  assert.ok(!decorated.topLabel.startsWith("🟠"));
+  assert.ok(decorated.text.endsWith("Day 6 of 10, on time"));
+  assert.ok(!decorated.text.includes("<font"));
+  assert.ok(!decorated.bottomLabel.includes("day"));
 });
 
-test("courtCard: cold", () => {
+test("courtCard: cold — the top label carries 🔴, the status line is the red font, the bottom label loses the clock", () => {
   const built = courtCard({
     firstName: "Siddharth",
     scopeLabel: null,
-    rows: [row({ isStuck: true, isWithClient: false, daysInLeg: 4, expectedDays: 3 })],
+    rows: [row({ isStuck: true, isWithClient: false, daysInLeg: 30, expectedDays: 5 })],
     more: 0,
     moreElsewhere: 0,
     origin: ORIGIN,
     submitUrl: SUBMIT_URL,
   });
-  assert.match(decoratedTexts(built)[0].bottomLabel, /day 4 of 3, cold$/);
+  const [decorated] = decoratedTexts(built);
+  assert.ok(decorated.topLabel.startsWith("🔴 "));
+  assert.ok(decorated.text.endsWith('<font color="#dc2626">Cold — day 30 of 5</font>'));
+  assert.equal(decorated.bottomLabel, "Leg 2 of 5 · Structural drawings");
 });
 
-test("courtCard: with the client", () => {
+test("courtCard: with the client — 🟠 and the amber font", () => {
   const built = courtCard({
     firstName: "Siddharth",
     scopeLabel: null,
     rows: [
-      row({ isStuck: false, isWithClient: true, withClientDays: 4, daysInLeg: 6, expectedDays: 3 }),
+      row({
+        isStuck: false,
+        isWithClient: true,
+        withClientDays: 4,
+        daysInLeg: 6,
+        expectedDays: 10,
+      }),
     ],
     more: 0,
     moreElsewhere: 0,
     origin: ORIGIN,
     submitUrl: SUBMIT_URL,
   });
-  assert.match(decoratedTexts(built)[0].bottomLabel, /day 6 of 3, with the client 4 days$/);
+  const [decorated] = decoratedTexts(built);
+  assert.ok(decorated.topLabel.startsWith("🟠 "));
+  assert.ok(
+    decorated.text.endsWith('<font color="#d97706">With the client 4 days — day 6 of 10</font>'),
+  );
 });
 
-test("courtCard: cold and with the client at once", () => {
+test("courtCard: cold and with the client at once — 🔴 wins, the red font carries the client days too", () => {
   const built = courtCard({
     firstName: "Siddharth",
     scopeLabel: null,
     rows: [
-      row({ isStuck: true, isWithClient: true, withClientDays: 4, daysInLeg: 6, expectedDays: 3 }),
+      row({ isStuck: true, isWithClient: true, withClientDays: 4, daysInLeg: 30, expectedDays: 5 }),
     ],
     more: 0,
     moreElsewhere: 0,
     origin: ORIGIN,
     submitUrl: SUBMIT_URL,
   });
-  assert.match(decoratedTexts(built)[0].bottomLabel, /cold, with the client 4 days$/);
+  const [decorated] = decoratedTexts(built);
+  assert.ok(decorated.topLabel.startsWith("🔴 "));
+  assert.ok(!decorated.topLabel.startsWith("🟠"));
+  assert.ok(
+    decorated.text.endsWith(
+      '<font color="#dc2626">Cold — day 30 of 5, with the client 4 days</font>',
+    ),
+  );
 });
 
 test("courtCard: a single with-client day is not pluralised", () => {
@@ -398,10 +423,10 @@ test("courtCard: a single with-client day is not pluralised", () => {
     origin: ORIGIN,
     submitUrl: SUBMIT_URL,
   });
-  assert.match(decoratedTexts(built)[0].bottomLabel, /with the client 1 day$/);
+  assert.ok(decoratedTexts(built)[0].text.includes("With the client 1 day —"));
 });
 
-test("courtCard: leg number and label lead the bottom label, label omitted when null", () => {
+test("courtCard: leg number and label lead the bottom label, no clock, label omitted when null", () => {
   const withLabel = courtCard({
     firstName: "S",
     scopeLabel: null,
@@ -411,7 +436,7 @@ test("courtCard: leg number and label lead the bottom label, label omitted when 
     origin: ORIGIN,
     submitUrl: SUBMIT_URL,
   });
-  assert.match(decoratedTexts(withLabel)[0].bottomLabel, /^Leg 2 of 5 · Structural drawings —/);
+  assert.equal(decoratedTexts(withLabel)[0].bottomLabel, "Leg 2 of 5 · Structural drawings");
 
   const withoutLabel = courtCard({
     firstName: "S",
@@ -422,7 +447,48 @@ test("courtCard: leg number and label lead the bottom label, label omitted when 
     origin: ORIGIN,
     submitUrl: SUBMIT_URL,
   });
-  assert.match(decoratedTexts(withoutLabel)[0].bottomLabel, /^Leg 2 of 5 —/);
+  assert.equal(decoratedTexts(withoutLabel)[0].bottomLabel, "Leg 2 of 5");
+});
+
+test("courtCard: header counts cold and with-the-client rows, omitting a zero part", () => {
+  const both = courtCard({
+    firstName: "S",
+    scopeLabel: null,
+    rows: [row()],
+    more: 0,
+    moreElsewhere: 0,
+    origin: ORIGIN,
+    submitUrl: SUBMIT_URL,
+    coldCount: 2,
+    withClientCount: 1,
+  });
+  assert.equal(headerOf(both).subtitle, "everything · 2 cold, 1 with the client");
+
+  const coldOnly = courtCard({
+    firstName: "S",
+    scopeLabel: "Saarang · Villa 12",
+    rows: [row()],
+    more: 0,
+    moreElsewhere: 0,
+    origin: ORIGIN,
+    submitUrl: SUBMIT_URL,
+    coldCount: 1,
+    withClientCount: 0,
+  });
+  assert.equal(headerOf(coldOnly).subtitle, "Saarang · Villa 12 · 1 cold");
+
+  const none = courtCard({
+    firstName: "S",
+    scopeLabel: null,
+    rows: [row()],
+    more: 0,
+    moreElsewhere: 0,
+    origin: ORIGIN,
+    submitUrl: SUBMIT_URL,
+    coldCount: 0,
+    withClientCount: 0,
+  });
+  assert.equal(headerOf(none).subtitle, "everything");
 });
 
 test("courtCard: an empty court says the app's own sentence", () => {
@@ -587,19 +653,16 @@ test("courtCard: a blank notice adds nothing", () => {
   assert.deepEqual(widgetsOf(blankNotice), widgetsOf(withoutNotice));
 });
 
-test("trailCard: the bottom label keeps the leg and adds who holds it, Unnamed when there is none", () => {
+test("trailCard: the bottom label keeps the leg and adds who holds it, no clock, Unnamed when there is none", () => {
   const withHolder = trailCard({
     words: ["villa"],
     scopeLabel: null,
     rows: [
       row({
         currentLeg: 2,
-        legCount: 5,
-        legLabel: "Structural drawings",
-        holderName: "Anil",
-        isStuck: true,
-        daysInLeg: 4,
-        expectedDays: 3,
+        legCount: 8,
+        legLabel: "Client sign-off",
+        holderName: "Siddharth Cyriac",
       }),
     ],
     more: 0,
@@ -607,7 +670,7 @@ test("trailCard: the bottom label keeps the leg and adds who holds it, Unnamed w
   });
   assert.equal(
     decoratedTexts(withHolder)[0].bottomLabel,
-    "Leg 2 of 5 · Structural drawings · with Anil — day 4 of 3, cold",
+    "Leg 2 of 8 · Client sign-off · with Siddharth Cyriac",
   );
 
   const noHolder = trailCard({
@@ -617,7 +680,43 @@ test("trailCard: the bottom label keeps the leg and adds who holds it, Unnamed w
     more: 0,
     origin: ORIGIN,
   });
-  assert.match(decoratedTexts(noHolder)[0].bottomLabel, /· with Unnamed —/);
+  assert.equal(
+    decoratedTexts(noHolder)[0].bottomLabel,
+    "Leg 2 of 5 · Structural drawings · with Unnamed",
+  );
+});
+
+test("trailCard: header counts cold and with-the-client rows after the subtitle text", () => {
+  const searched = trailCard({
+    words: ["villa"],
+    scopeLabel: null,
+    rows: [row()],
+    more: 0,
+    origin: ORIGIN,
+    coldCount: 2,
+    withClientCount: 1,
+  });
+  assert.equal(headerOf(searched).subtitle, "matching 'villa' · 2 cold, 1 with the client");
+
+  const scoped = trailCard({
+    words: [],
+    scopeLabel: "Saarang · Villa 12",
+    rows: [row()],
+    more: 0,
+    origin: ORIGIN,
+    coldCount: 1,
+    withClientCount: 0,
+  });
+  assert.equal(headerOf(scoped).subtitle, "Saarang · Villa 12 · 1 cold");
+
+  const none = trailCard({
+    words: [],
+    scopeLabel: null,
+    rows: [row()],
+    more: 0,
+    origin: ORIGIN,
+  });
+  assert.equal(headerOf(none).subtitle, "everything");
 });
 
 test("trailCard: subtitle names the words searched, or the scope", () => {
@@ -715,7 +814,10 @@ test("row text: a title shows under the activity only when it says something new
     origin: ORIGIN,
     submitUrl: SUBMIT_URL,
   });
-  assert.equal(decoratedTexts(withTitle)[0].text, "<b>Structural drawings</b><br>Ground floor");
+  assert.equal(
+    decoratedTexts(withTitle)[0].text,
+    '<b>Structural drawings</b><br>Ground floor<br><font color="#dc2626">Cold — day 4 of 3</font>',
+  );
 
   const repeated = courtCard({
     firstName: "Sid",
@@ -726,7 +828,10 @@ test("row text: a title shows under the activity only when it says something new
     origin: ORIGIN,
     submitUrl: SUBMIT_URL,
   });
-  assert.equal(decoratedTexts(repeated)[0].text, "<b>Standard villa</b>");
+  assert.equal(
+    decoratedTexts(repeated)[0].text,
+    '<b>Standard villa</b><br><font color="#dc2626">Cold — day 4 of 3</font>',
+  );
 });
 
 // --- Phase 6/7: action buttons, the two dialogs, and every write sentence --
