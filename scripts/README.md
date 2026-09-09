@@ -2,7 +2,7 @@
 
 Everything here is a standalone Node script, not part of the app itself: migration tooling, schema checks, environment moves, one-off data imports and a couple of ops checks. Every data-writing script follows two house rules: `--project <ref>` is required and never defaults to a database, and the script is dry-run by default, printing what it would do until you add `--commit`.
 
-Six scripts have an npm alias in `package.json`. The rest are run directly with `npx tsx scripts/<file>.ts`.
+Seven scripts have an npm alias in `package.json`. The rest are run directly with `npx tsx scripts/<file>.ts`.
 
 ## Migrations and schema
 
@@ -40,10 +40,11 @@ Six scripts have an npm alias in `package.json`. The rest are run directly with 
 
 ## App checks
 
-| Script                      | What it does                                                                                                                                         | How to run                                                                               | Writes?              |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | -------------------- |
-| `check-server-actions.ts`   | Guards against a bare `export type` in a `"use server"` file, which builds fine and then kills every action in its chunk. Run after `npm run build`. | `npm run check:actions`                                                                  | read-only            |
-| `google-chat-patch-card.ts` | Rewrites one Google Chat card as the app — the hand proof that it may, and the repair when a refresh fails.                                          | `npx tsx scripts/google-chat-patch-card.ts --message spaces/<id>/messages/<id> --commit` | dry-run / `--commit` |
-| `rotate-marathon-pins.ts`   | Rotates a Marathon kiosk agent's PIN off a known/published value.                                                                                    | `npm run rotate-marathon-pins -- --project <ref> --commit`                               | dry-run / `--commit` |
+| Script                      | What it does                                                                                                                                                                                                                             | How to run                                                                               | Writes?              |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | -------------------- |
+| `check-server-actions.ts`   | Guards against a bare `export type` in a `"use server"` file, which builds fine and then kills every action in its chunk. Run after `npm run build`.                                                                                     | `npm run check:actions`                                                                  | read-only            |
+| `google-chat-patch-card.ts` | Rewrites one Google Chat card as the app — the hand proof that it may, and the repair when a refresh fails.                                                                                                                              | `npx tsx scripts/google-chat-patch-card.ts --message spaces/<id>/messages/<id> --commit` | dry-run / `--commit` |
+| `google-chat-usage-test.ts` | Drives the Chat door in-process against staging with Google-shaped events: `/court`, `/trail`, `/newtrail`, `/link`, optionally a Bounce dialog or a real press. Needs `google-chat-usage-loader.mjs`, which is why it has an npm alias. | `npm run chat:usage -- --as <email>`                                                     | dry-run / `--commit` |
+| `rotate-marathon-pins.ts`   | Rotates a Marathon kiosk agent's PIN off a known/published value.                                                                                                                                                                        | `npm run rotate-marathon-pins -- --project <ref> --commit`                               | dry-run / `--commit` |
 
 The `data/*.csv` files the importers read are gitignored on purpose: they carry real business data, some of it bank account details, and none of it belongs in this public repo.

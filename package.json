@@ -18,7 +18,8 @@
     "db:check": "tsx scripts/check-migrations.ts",
     "db:check-views": "tsx scripts/check-view-columns.ts",
     "db:compare": "tsx scripts/compare-schema.ts",
-    "rotate-marathon-pins": "tsx scripts/rotate-marathon-pins.ts"
+    "rotate-marathon-pins": "tsx scripts/rotate-marathon-pins.ts",
+    "chat:usage": "node --import tsx --import ./scripts/google-chat-usage-loader.mjs scripts/google-chat-usage-test.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.23",
