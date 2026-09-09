@@ -403,6 +403,12 @@ async function buildCourtCards(
   const { inScope, elsewhere } = splitByScope(rows, scope);
   const { shown, more } = takeForCard(orderColdestFirst(inScope));
 
+  // Counted over every in-scope row, not just what's shown: a cold trail
+  // cut off by the ten-cap must still show up in the header (the
+  // founder's ask, 2026-09-09).
+  const coldCount = inScope.filter((row) => row.isStuck).length;
+  const withClientCount = inScope.filter((row) => row.isWithClient).length;
+
   return [
     courtCard({
       firstName: identity.firstName,
@@ -416,6 +422,8 @@ async function buildCourtCards(
       // registered endpoint URL is exactly what chatAudience() holds.
       submitUrl: chatAudience(),
       notice,
+      coldCount,
+      withClientCount,
     }),
   ];
 }
@@ -505,6 +513,11 @@ async function handleTrail(event: ChatEvent, spaceId: string, privateTo: string 
   const matched = orderColdestFirst(rows.filter((row) => matchesWords(row, words)));
   const { shown, more } = takeForCard(matched);
 
+  // Counted over every matched row, not just what's shown, the same rule
+  // as the court card (the founder's ask, 2026-09-09).
+  const coldCount = matched.filter((row) => row.isStuck).length;
+  const withClientCount = matched.filter((row) => row.isWithClient).length;
+
   return card(
     {
       cardsV2: [
@@ -514,6 +527,8 @@ async function handleTrail(event: ChatEvent, spaceId: string, privateTo: string 
           rows: shown,
           more,
           origin: chatOrigin(),
+          coldCount,
+          withClientCount,
         }),
       ],
     },

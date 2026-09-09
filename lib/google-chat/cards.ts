@@ -197,18 +197,47 @@ function escapeHtml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-/** "cold" / "with the client N days" / "cold, with the client N days" / "on time". */
-function statusPhrase(row: TrailSummary): string {
-  const withClient = `with the client ${row.withClientDays} day${row.withClientDays === 1 ? "" : "s"}`;
-  if (row.isStuck && row.isWithClient) return `cold, ${withClient}`;
-  if (row.isStuck) return "cold";
-  if (row.isWithClient) return withClient;
-  return "on time";
+/**
+ * "Cold — day 30 of 5" — the app's own danger red (`--danger: #dc2626`,
+ * app/globals.css). The client half is appended inside the same red font
+ * when both are true, because cold is the worse state and the sentence
+ * should say both without splitting the colour.
+ */
+function coldStatusLine(row: TrailSummary): string {
+  const clientPart = row.isWithClient
+    ? `, with the client ${row.withClientDays} day${row.withClientDays === 1 ? "" : "s"}`
+    : "";
+  return `<font color="#dc2626">Cold — day ${row.daysInLeg} of ${row.expectedDays}${clientPart}</font>`;
 }
 
-/** "day 4 of 3, cold" — the clock and status half every row's bottom label ends with. */
-function daySentence(row: TrailSummary): string {
-  return `day ${row.daysInLeg} of ${row.expectedDays}, ${statusPhrase(row)}`;
+/** "With the client 4 days — day 6 of 10" — the app's own warning amber (`--warning: #d97706`). */
+function withClientStatusLine(row: TrailSummary): string {
+  const days = `${row.withClientDays} day${row.withClientDays === 1 ? "" : "s"}`;
+  return `<font color="#d97706">With the client ${days} — day ${row.daysInLeg} of ${row.expectedDays}</font>`;
+}
+
+/**
+ * The clock-and-status sentence every row carries — the founder's ask,
+ * 2026-09-09: "can there be something in trails and court that shows
+ * clearly what's red?" It used to be buried at the end of the bottom
+ * label ("Leg 2 of 8 · Client sign-off — day 30 of 5, cold"); it is now
+ * the third line of the row's own text, coloured the same danger red or
+ * warning amber the app's Relay screens badge cold and with-the-client
+ * trails with. On time carries no colour at all.
+ *
+ * Google is documented to accept `<font color="#hex">` inside a
+ * decoratedText's `text` field, but this is the first `<font>` tag the
+ * door has ever sent and nobody has watched Google render it yet — a
+ * belief until the founder's vet on staging, same as every other shape
+ * in this file (BUGCATCHER #17). If Google drops or refuses the tag,
+ * the plain-text 🔴/🟠 mark `rowWidgets` puts on the top label still
+ * carries the meaning on its own — that mark is plain text, so Google
+ * cannot object to it.
+ */
+function statusLine(row: TrailSummary): string {
+  if (row.isStuck) return coldStatusLine(row);
+  if (row.isWithClient) return withClientStatusLine(row);
+  return `Day ${row.daysInLeg} of ${row.expectedDays}, on time`;
 }
 
 /** "Leg 2 of 5 · Structural drawings" — the leg label is omitted when the view has none. */
@@ -218,19 +247,37 @@ function legAndLabel(row: TrailSummary): string {
   return row.legLabel ? `${base} · ${escapeHtml(row.legLabel)}` : base;
 }
 
-/** The court's own bottom label: which leg, and how the clock reads. */
+/**
+ * The court's own bottom label: which leg. The clock and status used to
+ * end this line; they now live at the top of the row instead, in colour
+ * (`statusLine`), so this is just the leg.
+ */
 function courtBottomLabel(row: TrailSummary): string {
-  return `${legAndLabel(row)} — ${daySentence(row)}`;
+  return legAndLabel(row);
 }
 
 /**
  * /trail's bottom label: the same leg-and-label courtCard's rows carry
  * — someone asking "where is villa 12's drawings" wants to know which
- * leg it's on as much as who has it — plus who holds it.
+ * leg it's on as much as who has it — plus who holds it. The clock and
+ * status moved up into `statusLine`, level with every other row's.
  */
 function trailBottomLabel(row: TrailSummary): string {
   const holder = row.holderName ? escapeHtml(row.holderName) : "Unnamed";
-  return `${legAndLabel(row)} · with ${holder} — ${daySentence(row)}`;
+  return `${legAndLabel(row)} · with ${holder}`;
+}
+
+/**
+ * "everything · 2 cold, 1 with the client" — the court and trail headers
+ * counting the red the founder asked to see, so a scanning eye knows how
+ * many rows need attention before reading a single one. A zero part is
+ * omitted; both zero leaves `base` untouched.
+ */
+function subtitleWithCounts(base: string, coldCount?: number, withClientCount?: number): string {
+  const parts: string[] = [];
+  if (coldCount && coldCount > 0) parts.push(`${coldCount} cold`);
+  if (withClientCount && withClientCount > 0) parts.push(`${withClientCount} with the client`);
+  return parts.length > 0 ? `${base} · ${parts.join(", ")}` : base;
 }
 
 /** Every action button's own label, in the order buttonsFor hands the actions back. */
@@ -275,10 +322,14 @@ function actionButtons(row: TrailSummary, submitUrl: string): Record<string, unk
 }
 
 /**
- * One trail as the widgets every row is made of: the status line, then a
- * single buttonList — whatever action buttons the caller supplies (none
- * for /trail's read-only rows) followed by Open in the toolbox, which
- * always comes last so a row never ends on a button that moves something.
+ * One trail as the widgets every row is made of: a plain-text 🔴/🟠 mark
+ * ahead of the project/unit line — cold wins over with-the-client when
+ * both are true, the worse state, the same order the app's own badges
+ * use — the activity and title, a third line carrying `statusLine`'s
+ * clock-and-status sentence in colour, then a single buttonList —
+ * whatever action buttons the caller supplies (none for /trail's
+ * read-only rows) followed by Open in the toolbox, which always comes
+ * last so a row never ends on a button that moves something.
  */
 function rowWidgets(
   row: TrailSummary,
@@ -286,9 +337,11 @@ function rowWidgets(
   bottomLabel: string,
   leadingButtons: Record<string, unknown>[] = [],
 ): Record<string, unknown>[] {
-  const topLabel = row.unitName
+  const mark = row.isStuck ? "🔴 " : row.isWithClient ? "🟠 " : "";
+  const place = row.unitName
     ? `${escapeHtml(row.projectName)} · ${escapeHtml(row.unitName)}`
     : escapeHtml(row.projectName);
+  const topLabel = `${mark}${place}`;
   const activity = `<b>${escapeHtml(row.activityName)}</b>`;
   // A trail laid down from a trail type carries the type's name as both
   // its activity and its title, so "Standard villa" would print twice
@@ -296,7 +349,10 @@ function rowWidgets(
   // line only when it says something the bold line doesn't.
   const title = row.title?.trim() ?? "";
   const repeats = title.toLowerCase() === row.activityName.trim().toLowerCase();
-  const text = title && !repeats ? `${activity}<br>${escapeHtml(title)}` : activity;
+  const lines = [activity];
+  if (title && !repeats) lines.push(escapeHtml(title));
+  lines.push(statusLine(row));
+  const text = lines.join("<br>");
 
   const openInToolbox = {
     text: "Open in the toolbox",
@@ -326,6 +382,11 @@ export function askForWords(): string {
  * with what just happened on top, so the card the person is looking at
  * says both what moved and what is still with them. Omitted (the plain
  * `/court` read) the card is byte-for-byte what it always was.
+ *
+ * `coldCount` and `withClientCount` — the founder's ask, 2026-09-09 —
+ * count the whole in-scope court, not just the rows shown: a cold trail
+ * cut off by the ten-cap must still be counted, so the caller passes
+ * these over `inScope` before `takeForCard` runs, not over `rows` here.
  */
 export function courtCard(input: {
   firstName: string;
@@ -336,9 +397,21 @@ export function courtCard(input: {
   origin: string;
   submitUrl: string;
   notice?: string;
+  coldCount?: number;
+  withClientCount?: number;
 }): Record<string, unknown> {
-  const { scopeLabel, rows, more, moreElsewhere, origin, submitUrl, notice } = input;
-  const subtitle = scopeLabel ?? "everything";
+  const {
+    scopeLabel,
+    rows,
+    more,
+    moreElsewhere,
+    origin,
+    submitUrl,
+    notice,
+    coldCount,
+    withClientCount,
+  } = input;
+  const subtitle = subtitleWithCounts(scopeLabel ?? "everything", coldCount, withClientCount);
 
   const widgets: Record<string, unknown>[] = [];
   if (notice && notice.trim()) {
@@ -386,7 +459,9 @@ function trailEmptyText(words: string[], origin: string): string {
  * The /trail card: every running match, by holder. `words` is what
  * `searchWords` made of what was typed — already used to filter `rows`
  * before this is called, and repeated here only to say what was searched
- * for.
+ * for. `coldCount`/`withClientCount` are the same red-counting the court
+ * card gained (the founder's ask, 2026-09-09), over every matched row
+ * before the ten-cap, appended after the existing subtitle text.
  */
 export function trailCard(input: {
   words: string[];
@@ -394,10 +469,13 @@ export function trailCard(input: {
   rows: TrailSummary[];
   more: number;
   origin: string;
+  coldCount?: number;
+  withClientCount?: number;
 }): Record<string, unknown> {
-  const { words, scopeLabel, rows, more, origin } = input;
-  const subtitle =
+  const { words, scopeLabel, rows, more, origin, coldCount, withClientCount } = input;
+  const base =
     words.length > 0 ? `matching '${escapeHtml(words.join(" "))}'` : (scopeLabel ?? "everything");
+  const subtitle = subtitleWithCounts(base, coldCount, withClientCount);
 
   const widgets: Record<string, unknown>[] = [];
   if (rows.length === 0) {
