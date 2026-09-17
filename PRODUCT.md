@@ -84,9 +84,12 @@ tools, which no spreadsheet stack could truthfully do.
 ## Brand Commitments
 
 - The name is **Goodearth Toolbox**. Visual authority for every screen
-  is `DESIGN.md` (binding): Apple-meets-Google-meets-Notion with
-  editorial quality, Geist Sans, one green accent, quiet motion —
-  warm, not cold; minimal, not bare.
+  is `DESIGN.md` (binding): since 2026-09-17, **Aman meets Apple —
+  stone, air, glass, precision.** Warm stone neutrals in three tones,
+  Geist Sans alone (the founder chose one typeface over a second face
+  for headings), one green accent reserved for actions, hairlines at
+  rest and a shadow only on what floats, a small fixed motion
+  vocabulary. Warm, not cold; minimal, not bare.
 - Voice: plain English throughout — UI copy, error messages, and
   everything shown to the founder. No jargon in user-facing text.
 - Letterhead assets (logo, company address, GST number, PO terms) are

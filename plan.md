@@ -110,7 +110,7 @@ Trivially checkable diffs, applied with a find-and-replace and reviewed by Opus 
 - Run `npm run format` after (the Tailwind class sorter reorders every string).
 - **Open:** `/inventory/receive`, `/relay/court`, `/reporter/run` — nothing moved except label weight.
 
-### [ ] 9. `[Fable]` Review, rulebook, ship
+### [x] 9. `[Fable]` Review, rulebook, ship
 
 - Review the full diff against `DESIGN.md`, `SECURITY.md` (no query, action, policy or public path touched), `BUGCATCHER.md` (#4 dark furniture, #6 static login).
 - **Rewrite `DESIGN.md`** from the built world: direction sentence ("Aman meets Apple — stone, air, glass, precision. Warm, not cold. Minimal, not bare."), the three-tone surface rule, typography table (Page Title `text-2xl font-semibold tracking-tight`; Section Label `text-[11px] font-medium uppercase tracking-[0.14em] text-muted`; figures are sans tabular), "nav is ink, accent is action", "hairlines at rest, float only when floating", the motion vocabulary replacing "one payoff per flow" (Relay's exception and the reduced-motion rule carried forward verbatim), the new tokens, `Card interactive`, the `tailwind-merge` extension rule (a new custom shadow/ease/animate name must be declared in `lib/utils.ts` or callers cannot override it). `PRODUCT.md` brand commitment line updated. Component inventory: ManagementVision → ToolGrid; five home widgets deleted.
