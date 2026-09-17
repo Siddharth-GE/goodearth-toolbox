@@ -94,7 +94,7 @@ Branch `feature/skin` off `staging`. One commit per step, plain-English message,
 - Order: greeting → tool grid → pipeline → people + Marathon.
 - **Open:** as admin and as the probe account. Confirm no panel shows a number the app did not compute.
 
-### [ ] 7. `[Sonnet]` Welcome screens and sign-in — `app/(dashboard)/_components/tool-welcome.tsx`, `app/(auth)/layout.tsx`, `app/(auth)/login/page.tsx`, `login/verify`, `forgot-password`, `reset-password`, `components/login-form.tsx` and siblings
+### [x] 7. `[Sonnet]` Welcome screens and sign-in — `app/(dashboard)/_components/tool-welcome.tsx`, `app/(auth)/layout.tsx`, `app/(auth)/login/page.tsx`, `login/verify`, `forgot-password`, `reset-password`, `components/login-form.tsx` and siblings
 
 - `ToolWelcome`: icon chip `size-12 rounded-2xl bg-accent/10 text-accent`; intro `text-base leading-relaxed text-muted max-w-prose`; buttons `w-full sm:w-auto` so they are thumb-sized on a phone; `FigureBand` under it unchanged in structure. Still counts only, never rupees.
 - Sign-in: **no card**. A centred `max-w-sm` column on the canvas: logo `size-12`, title `text-2xl font-semibold tracking-tight`, muted line, the form, the "or" rule, Google button. Same on verify/forgot/reset. `login/page.tsx` must keep no `searchParams` prop (static prerender — BUGCATCHER #6).

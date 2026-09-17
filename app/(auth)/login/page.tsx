@@ -1,4 +1,3 @@
-import { Card } from "@/components/ui/card";
 import { Logo } from "@/components/ui/logo";
 import { LoginForm } from "@/components/login-form";
 import Link from "next/link";
@@ -11,10 +10,10 @@ import { Suspense } from "react";
 // which is why the form sits in Suspense (useSearchParams needs it).
 export default function LoginPage() {
   return (
-    <Card className="w-full max-w-sm p-8">
+    <div className="w-full max-w-sm">
       <div className="mb-6 flex flex-col items-center text-center">
-        <Logo className="mb-4 size-11" />
-        <h1 className="text-foreground text-2xl font-bold tracking-tight">Goodearth Toolbox</h1>
+        <Logo className="mb-4 size-12" />
+        <h1 className="text-foreground text-2xl font-semibold tracking-tight">Goodearth Toolbox</h1>
         <p className="text-muted mt-1 text-sm">Sign in with your work email</p>
       </div>
       <Suspense>
@@ -28,6 +27,6 @@ export default function LoginPage() {
           Forgot password?
         </Link>
       </p>
-    </Card>
+    </div>
   );
 }
