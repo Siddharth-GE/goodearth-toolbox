@@ -66,7 +66,7 @@ Branch `feature/skin` off `staging`. One commit per step, plain-English message,
 - `pagination.tsx`: no change beyond what Button gives it.
 - **Open:** `/indents/list` (table, tabs, pagination), a Business Planning plan (Section, Figure, ResultPanel), `/reporter/run` (chart card), `/relay/court` (FigureBand, cards — Relay's own motion must be unchanged).
 
-### [ ] 4. `[Opus]` Float layers — `dialog.tsx`, `dropdown-menu.tsx`
+### [x] 4. `[Opus]` Float layers — `dialog.tsx`, `dropdown-menu.tsx`
 
 - Dialog overlay `bg-black/30 backdrop-blur-sm data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out`. Content: `bg-surface-raised border-border/60 rounded-3xl p-6 shadow-float` + `data-[state=open]:animate-pop-in data-[state=closed]:animate-pop-out`; **on phones a bottom sheet**: `max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:max-h-[90dvh] max-sm:overflow-y-auto max-sm:data-[state=open]:animate-sheet-in max-sm:data-[state=closed]:animate-sheet-out`. Title `text-lg font-semibold tracking-tight`.
 - Dropdown content: `bg-surface-raised/95 backdrop-blur-xl border-border/60 rounded-xl p-1 shadow-float animate-menu-in`; items `rounded-lg data-[highlighted]:bg-foreground/[0.05]`.
