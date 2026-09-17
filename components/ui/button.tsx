@@ -6,10 +6,9 @@ type Variant = "primary" | "secondary" | "ghost";
 type Size = "sm" | "md" | "lg";
 
 const variantClasses: Record<Variant, string> = {
-  primary: "bg-accent text-accent-foreground hover:opacity-90",
-  secondary:
-    "bg-surface text-foreground border border-border hover:bg-black/[0.03] dark:hover:bg-white/[0.04]",
-  ghost: "text-foreground hover:bg-black/[0.04] dark:hover:bg-white/[0.06]",
+  primary: "bg-accent text-accent-foreground hover:bg-accent/90",
+  secondary: "bg-surface-raised text-foreground border border-border hover:border-foreground/20",
+  ghost: "text-foreground hover:bg-foreground/[0.05]",
 };
 
 const sizeClasses: Record<Size, string> = {
@@ -24,7 +23,7 @@ const sizeClasses: Record<Size, string> = {
 // to be — every disabled secondary and ghost button in the app looked
 // fully enabled, including the pagination controls at the end of a list.
 const base =
-  "inline-flex items-center justify-center gap-2 rounded-xl font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+  "inline-flex items-center justify-center gap-2 rounded-xl font-medium transition-[transform,background-color,border-color,opacity,box-shadow] duration-150 ease-out-quint active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent/25";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
