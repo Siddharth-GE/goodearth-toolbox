@@ -53,7 +53,7 @@ export function Section({
 
   const heading = (
     <div className="min-w-0">
-      <h2 className="text-foreground flex items-center gap-1.5 text-sm font-semibold">
+      <h2 className="text-foreground flex items-center gap-1.5 text-[15px] font-semibold tracking-tight">
         {collapsible ? (
           <ChevronDown
             className={cn("text-muted size-4 shrink-0 transition-transform", !open && "-rotate-90")}
@@ -67,7 +67,7 @@ export function Section({
   );
 
   return (
-    <Card className={cn("p-4", nested && "bg-background shadow-none", className)}>
+    <Card className={cn("p-5", nested && "bg-background", className)}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         {collapsible ? (
           <button

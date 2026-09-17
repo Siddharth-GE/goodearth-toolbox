@@ -34,14 +34,16 @@ export function TableBody({ className, ...props }: HTMLAttributes<HTMLTableSecti
 }
 
 export function TableRow({ className, ...props }: HTMLAttributes<HTMLTableRowElement>) {
-  return <tr className={cn("", className)} {...props} />;
+  return (
+    <tr className={cn("hover:bg-foreground/[0.025] transition-colors", className)} {...props} />
+  );
 }
 
 export function TableHeaderCell({ className, ...props }: ThHTMLAttributes<HTMLTableCellElement>) {
   return (
     <th
       className={cn(
-        "text-muted px-4 py-3 text-left text-xs font-semibold tracking-widest uppercase",
+        "text-muted px-4 py-3 text-left text-[11px] font-medium tracking-[0.14em] uppercase",
         className,
       )}
       {...props}
@@ -50,5 +52,5 @@ export function TableHeaderCell({ className, ...props }: ThHTMLAttributes<HTMLTa
 }
 
 export function TableCell({ className, ...props }: TdHTMLAttributes<HTMLTableCellElement>) {
-  return <td className={cn("text-foreground px-4 py-3 text-sm", className)} {...props} />;
+  return <td className={cn("text-foreground px-4 py-3.5 text-sm", className)} {...props} />;
 }

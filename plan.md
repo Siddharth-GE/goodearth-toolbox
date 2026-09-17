@@ -52,7 +52,7 @@ Branch `feature/skin` off `staging`. One commit per step, plain-English message,
 - `label`, `form-message`: unchanged.
 - **Open:** `/masters/items` → New item (every control kind); `/settings/people`; `/login` fields.
 
-### [ ] 3. `[Sonnet]` Surfaces and text blocks — `card`, `table`, `figure`, `section`, `empty-state`, `page-title`, `tabs`, `pagination`, `spinner`, `page-loading`, `chart/chart-card`, `chart/meter`
+### [x] 3. `[Sonnet]` Surfaces and text blocks — `card`, `table`, `figure`, `section`, `empty-state`, `page-title`, `tabs`, `pagination`, `spinner`, `page-loading`, `chart/chart-card`, `chart/meter`
 
 - `card.tsx`: `border-border bg-surface rounded-2xl border` — **no `shadow-sm`**. New optional prop `interactive?: boolean` → `transition-[transform,border-color,box-shadow] duration-200 ease-out-quint hover:-translate-y-0.5 hover:border-foreground/15 hover:shadow-float`. `Section`'s `nested` keeps `bg-background` and drops the now-meaningless `shadow-none`.
 - `table.tsx`: header cells take the new label style (`text-[11px] font-medium tracking-[0.14em] uppercase text-muted py-3`); `TableRow` gets `transition-colors hover:bg-foreground/[0.025]`; cells `py-3.5`.
