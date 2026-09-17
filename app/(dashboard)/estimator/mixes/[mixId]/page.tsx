@@ -88,7 +88,9 @@ export default async function MixPage({ params }: { params: Promise<{ mixId: str
 
       <Card className="space-y-4 p-4">
         <div>
-          <p className="text-muted text-xs font-semibold tracking-widest uppercase">What goes in</p>
+          <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
+            What goes in
+          </p>
           <p className="text-muted mt-1 text-sm">
             Quantities are per one {mix.uom} of {mix.name}.
           </p>

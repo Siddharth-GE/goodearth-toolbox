@@ -14,10 +14,12 @@ export function DropdownMenuContent({
 }: ComponentProps<typeof DropdownMenuPrimitive.Content>) {
   return (
     <DropdownMenuPrimitive.Portal>
+      {/* The menu-in keyframe grows the menu from the corner nearest its
+          trigger: it reads Radix's own transform-origin variable. */}
       <DropdownMenuPrimitive.Content
         sideOffset={sideOffset}
         className={cn(
-          "border-border bg-surface-raised z-50 min-w-40 rounded-xl border p-1 shadow-lg focus:outline-none",
+          "border-border/60 bg-surface-raised/95 shadow-float animate-menu-in z-50 min-w-40 rounded-xl border p-1 backdrop-blur-xl focus:outline-none",
           className,
         )}
         {...props}
@@ -33,7 +35,7 @@ export function DropdownMenuItem({
   return (
     <DropdownMenuPrimitive.Item
       className={cn(
-        "text-foreground flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-sm outline-none data-[highlighted]:bg-black/[0.04] dark:data-[highlighted]:bg-white/[0.06]",
+        "text-foreground data-[highlighted]:bg-foreground/[0.05] flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-sm outline-none",
         className,
       )}
       {...props}

@@ -1,4 +1,3 @@
-import { Card } from "@/components/ui/card";
 import { Logo } from "@/components/ui/logo";
 import { ResetPasswordForm } from "@/components/reset-password-form";
 import { createClient } from "@/lib/supabase/server";
@@ -19,15 +18,17 @@ export default async function ResetPasswordPage() {
   if (!user) redirect("/login");
 
   return (
-    <Card className="w-full max-w-sm p-8">
+    <div className="w-full max-w-sm">
       <div className="mb-6 flex flex-col items-center text-center">
         <Logo className="mb-4 size-11" />
-        <h1 className="text-foreground text-2xl font-bold tracking-tight">Set a new password</h1>
+        <h1 className="text-foreground text-2xl font-semibold tracking-tight">
+          Set a new password
+        </h1>
         <p className="text-muted mt-1 text-sm">
           For {user.email}. Changing it signs you out everywhere.
         </p>
       </div>
       <ResetPasswordForm />
-    </Card>
+    </div>
   );
 }

@@ -115,7 +115,9 @@ export default async function TrailPage({ params }: { params: Promise<{ chainId:
           <Card className={cn("p-4", state.isStuck && "border-danger/40")}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-muted text-xs font-semibold tracking-widest uppercase">With</p>
+                <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
+                  With
+                </p>
                 <p className="text-foreground mt-1 text-sm">
                   <b className="font-semibold">{namesById.get(current.assignee_id) ?? "Unnamed"}</b>{" "}
                   — {current.label} · day {state.daysInLeg} of {state.expectedDays}

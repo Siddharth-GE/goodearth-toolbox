@@ -110,7 +110,7 @@ export function LineVariationDialog({
           workUom={workUom}
         />
 
-        <p className="text-muted text-xs font-semibold tracking-widest uppercase">Materials</p>
+        <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Materials</p>
 
         {rows.length === 0 ? (
           <p className="text-muted text-sm">

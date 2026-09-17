@@ -104,7 +104,7 @@ export default async function PersonPage({ params }: { params: Promise<{ personI
       )}
 
       <Card className="space-y-3 p-4">
-        <p className="text-muted text-xs font-semibold tracking-widest uppercase">Name</p>
+        <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Name</p>
         {/* The name feeds every avatar and "approved by" line in the
             toolbox — editable here because account creation never asks
             for one. */}
@@ -113,7 +113,7 @@ export default async function PersonPage({ params }: { params: Promise<{ personI
 
       <Card className="space-y-3 p-4">
         <div>
-          <p className="text-muted text-xs font-semibold tracking-widest uppercase">Account</p>
+          <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Account</p>
           <p className="text-muted mt-1 text-sm">
             Admins can open every app and change everyone&apos;s access. Deactivating stops someone
             signing in without deleting anything they&apos;ve done.
@@ -129,7 +129,7 @@ export default async function PersonPage({ params }: { params: Promise<{ personI
 
       <Card className="space-y-3 p-4">
         <div>
-          <p className="text-muted text-xs font-semibold tracking-widest uppercase">Role</p>
+          <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Role</p>
           <p className="text-muted mt-1 text-sm">
             A role brings a set of apps and approval rights with it. Anything ticked below is on top
             of that — a role only ever adds.
@@ -149,7 +149,7 @@ export default async function PersonPage({ params }: { params: Promise<{ personI
 
       <Card className="space-y-4 p-4">
         <div>
-          <p className="text-muted text-xs font-semibold tracking-widest uppercase">Apps</p>
+          <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Apps</p>
           <p className="text-muted mt-1 text-sm">
             {isAdmin
               ? "Admins can open every app — there is nothing to tick."
@@ -214,7 +214,7 @@ export default async function PersonPage({ params }: { params: Promise<{ personI
 
       <Card className="space-y-4 p-4">
         <div>
-          <p className="text-muted text-xs font-semibold tracking-widest uppercase">
+          <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
             Approval rights
           </p>
           <p className="text-muted mt-1 text-sm">
@@ -302,7 +302,7 @@ export default async function PersonPage({ params }: { params: Promise<{ personI
 
       <Card className="space-y-3 p-4">
         <div>
-          <p className="text-muted text-xs font-semibold tracking-widest uppercase">
+          <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
             Access history
           </p>
           <p className="text-muted mt-1 text-sm">

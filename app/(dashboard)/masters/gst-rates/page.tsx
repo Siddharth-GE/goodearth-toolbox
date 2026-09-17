@@ -19,7 +19,9 @@ export default async function GstRatesPage() {
     <div className="grid gap-4 md:grid-cols-2">
       <Card className="space-y-4 p-4">
         <div>
-          <p className="text-muted text-xs font-semibold tracking-widest uppercase">GST rates</p>
+          <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
+            GST rates
+          </p>
           <p className="text-muted mt-1 text-sm">
             The slabs a purchase order line can pick from. Deactivating a rate stops new picks —
             existing purchase orders keep the percentage they were priced with.

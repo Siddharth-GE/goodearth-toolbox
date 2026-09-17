@@ -27,8 +27,8 @@ export const metadata: Metadata = {
 // runs. Worst case is one strip of chrome not matching.
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#fafaf9" },
-    { media: "(prefers-color-scheme: dark)", color: "#121210" },
+    { media: "(prefers-color-scheme: light)", color: "#f4f2ee" },
+    { media: "(prefers-color-scheme: dark)", color: "#141311" },
   ],
 };
 

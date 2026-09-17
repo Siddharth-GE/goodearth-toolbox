@@ -18,7 +18,7 @@ type Tone = "default" | "danger";
 type Size = "sm" | "md";
 
 const toneClasses: Record<Tone, string> = {
-  default: "text-muted hover:bg-black/[0.04] hover:text-foreground dark:hover:bg-white/[0.06]",
+  default: "text-muted hover:bg-foreground/[0.05] hover:text-foreground",
   danger: "text-muted hover:bg-danger/10 hover:text-danger",
 };
 
@@ -45,7 +45,7 @@ export function IconButton({
     <button
       type={type}
       className={cn(
-        "focus-visible:ring-accent inline-flex items-center justify-center rounded-lg transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-30",
+        "focus-visible:ring-accent inline-flex items-center justify-center rounded-lg transition-[background-color,color,transform] focus-visible:ring-2 focus-visible:outline-none active:scale-95 disabled:pointer-events-none disabled:opacity-30",
         toneClasses[tone],
         sizeClasses[size],
         bordered && "border-border border",

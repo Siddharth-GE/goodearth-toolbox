@@ -114,7 +114,7 @@ export function RoleCard({
       </form>
 
       <div className="space-y-3">
-        <p className="text-muted text-xs font-semibold tracking-widest uppercase">
+        <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
           Apps in this role
         </p>
         {groups.map(({ group, tools }) => (

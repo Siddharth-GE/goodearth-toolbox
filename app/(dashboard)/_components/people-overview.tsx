@@ -35,7 +35,7 @@ export async function PeopleOverview() {
       <div className="grid grid-cols-2 gap-4">
         {stats.map((stat) => (
           <div key={stat.label}>
-            <p className="text-foreground font-mono text-xl font-semibold">{stat.value}</p>
+            <p className="text-foreground text-xl font-semibold tabular-nums">{stat.value}</p>
             <p className="text-muted mt-0.5 text-xs">{stat.label}</p>
           </div>
         ))}

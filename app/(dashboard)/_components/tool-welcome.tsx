@@ -37,23 +37,24 @@ export function ToolWelcome({
 
   return (
     <div className="space-y-4">
-      <Card className="p-5 md:p-6">
-        <div className="bg-accent/10 text-accent flex size-9 items-center justify-center rounded-lg">
-          <Icon className="size-5" />
+      <Card className="p-6 md:p-8">
+        <div className="bg-accent/10 text-accent flex size-12 items-center justify-center rounded-2xl">
+          <Icon className="size-6" />
         </div>
         <div className="mt-3 max-w-prose space-y-2">
           {intro.map((paragraph) => (
-            <p key={paragraph} className="text-muted text-sm">
+            <p key={paragraph} className="text-muted text-base leading-relaxed">
               {paragraph}
             </p>
           ))}
         </div>
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-5 flex flex-wrap gap-2">
           {links.map((link) => (
             <LinkButton
               key={link.href}
               href={link.href}
               variant={link.primary ? "primary" : "secondary"}
+              className="w-full sm:w-auto"
             >
               {link.label}
             </LinkButton>

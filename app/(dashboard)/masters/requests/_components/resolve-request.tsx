@@ -82,7 +82,7 @@ export function ResolveRequest({
         </DialogHeader>
 
         <div>
-          <p className="text-muted mb-2 text-xs font-semibold tracking-widest uppercase">
+          <p className="text-muted mb-2 text-[11px] font-medium tracking-[0.14em] uppercase">
             Is it already in the catalogue?
           </p>
           <div className="relative">

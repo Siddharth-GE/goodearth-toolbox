@@ -18,7 +18,7 @@ export default async function StagesPage() {
     <div className="grid gap-4 md:grid-cols-2">
       <Card className="space-y-4 p-4">
         <div>
-          <p className="text-muted text-xs font-semibold tracking-widest uppercase">
+          <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
             Construction stages
           </p>
           <p className="text-muted mt-1 text-sm">

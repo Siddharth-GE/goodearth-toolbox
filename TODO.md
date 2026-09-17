@@ -16,6 +16,15 @@ The bot is built and vetted on staging through Phase 7b (2026-09-03). Its plan, 
 6. **Indents' pull-from-estimate is blind to post-`0086` estimates** (BUGCATCHER #16): `getEstimatePull` (`lib/indents/queries.ts`) is keyed on `material_id`, which post-`0086` rows don't have. Re-key on the item; needs its own small plan.
 7. **Supabase Pro plan** — the founder's call. The weekly keep-alive stops the free tier pausing production; only Pro brings backups.
 
+## After the skin — the options the founder did not pick on 2026-09-17
+
+The new skin (stone and glass, `plan.md`) restyled every shared part and the home page. Three deeper changes were offered and set aside for now; each is its own small plan when wanted:
+
+- **Phone-first lists and forms.** Tables that turn into stacked cards on a phone (a `priority` on `TableCell`, or a card fallback), sticky Save buttons, bigger tap targets — Indents, Inventory, Supervisors and Directory first. Today a wide table on a phone scrolls sideways; only Relay and Directory's roster are card grids.
+- **A real search in the sidebar.** The decorative box was removed with the skin; a quick jump to any tool or screen (⌘K on a laptop, a tap on a phone) over `lib/tools.ts` would replace it, using the existing Radix dialog.
+- **The structure underneath.** One heading style (35 raw `<h2>`s in 28 files still carry two hand-typed class strings; `Section` exists with one consumer), one page rhythm (`space-y-4`/`5`/`6` all in use), a shared filter toolbar and a shared notice banner (the `rounded-xl border px-4 py-3` strip is re-typed per detail page), `loading.tsx` on the 43 route segments still missing one (mostly Masters and Marathon admin), and `PageTitle` in either the layout or the page, not both conventions.
+- **A cheap guard rail.** An ESLint `no-restricted-syntax` rule against raw palette classes (`text-red-600`, `bg-amber-100`, …) in `className` literals under `app/(dashboard)/**` and `components/**`, with `app/marathon/**` excused. Nothing in CI catches one today.
+
 ## Open questions for the founder
 
 - Should a supervisor see only their own plots? Today every supervisor sees every villa (2026-08-20 decision). The same answer now decides who sees which villa's **drawings**.

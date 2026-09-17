@@ -90,7 +90,7 @@ export function IssueDialog({
               </p>
             ) : (
               <>
-                <p className="text-muted mt-3 text-xs font-semibold tracking-widest uppercase">
+                <p className="text-muted mt-3 text-[11px] font-medium tracking-[0.14em] uppercase">
                   Since R{previousRevisionNo}
                 </p>
                 <ul className="mt-2 space-y-1.5 text-sm">

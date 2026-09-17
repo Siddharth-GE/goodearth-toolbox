@@ -36,13 +36,13 @@ export function Figure({
 }) {
   return (
     <div className={cn("min-w-0", className)}>
-      <p className="text-muted text-xs font-semibold tracking-widest uppercase">{label}</p>
+      <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">{label}</p>
       <p
         className={cn(
-          "truncate font-mono tabular-nums",
+          "truncate tabular-nums",
           size === "sm" && "text-sm font-semibold",
-          size === "lg" && "text-base font-semibold",
-          size === "hero" && "text-xl font-bold tracking-tight",
+          size === "lg" && "text-xl font-semibold tracking-tight",
+          size === "hero" && "text-3xl font-semibold tracking-tight",
           tone === "good" && "text-success",
           tone === "warn" && "text-warning",
           tone === "bad" && "text-danger",
@@ -71,7 +71,7 @@ export function FigureBand({ className, children }: { className?: string; childr
       // divide-x would only rule the columns and leave a wrapped row
       // touching the one above it.
       className={cn(
-        "border-border bg-border grid gap-px overflow-hidden rounded-xl border",
+        "border-border bg-border grid gap-px overflow-hidden rounded-2xl border",
         "sm:grid-cols-2 lg:grid-cols-4",
         className,
       )}
@@ -134,7 +134,9 @@ export function ResultPanel({
       {title || aside ? (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           {title ? (
-            <p className="text-muted text-xs font-semibold tracking-widest uppercase">{title}</p>
+            <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
+              {title}
+            </p>
           ) : (
             <span />
           )}

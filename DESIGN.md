@@ -1,9 +1,16 @@
 # Goodearth Toolbox — design system
 
-The shared visual language every tool is built from. Direction: **Apple
-meets Google meets Notion, with the editorial quality of kaadal.co.in**
-— confident headlines, card-based sections, generous whitespace, quiet
-motion. Warm, not cold. Minimal, not bare.
+The shared visual language every tool is built from. Direction, since
+the 2026-09-17 skin: **Aman meets Apple — stone, air, glass,
+precision.** Warm, not cold. Minimal, not bare. Aman is the calm: warm
+stone neutrals, hairlines, whitespace, spaced small capitals. Apple is
+the precision: clear hierarchy, frosted bars, one confident title, and
+motion that behaves like a physical thing — a press, a lift, a pop —
+and then stops.
+
+The mode is _operate_: someone is here to finish a task. Expression
+never obscures the task, the state or a familiar control; the brand
+lives in the details, not on top of them.
 
 Every screen is built from `components/ui/*`. Never hand-roll a button,
 input, card, or badge — extend the shared component instead. If a
@@ -15,6 +22,37 @@ Defined as CSS variables in `app/globals.css`, registered in
 `@theme inline` so every one is a Tailwind utility
 (`bg-accent`, `text-danger`, `border-border`, etc.) — never hardcode a
 hex value in a component.
+
+### Three tones, not two
+
+The neutrals are warm stone. In light mode the page is **linen**
+(`background`), a card is **paper** (`surface`) and anything that floats
+or takes typing is **white** (`surface-raised`). Dark mode is the same
+idea in warm charcoal. Three tones is what lets a card read as a card
+with only a hairline around it — no shadow at rest (see _Material_).
+
+| Token                                                       | Light              | Dark      | Meaning                                                                   |
+| ----------------------------------------------------------- | ------------------ | --------- | ------------------------------------------------------------------------- |
+| `background`                                                | `#f4f2ee`          | `#141311` | Page canvas, and the sidebar rail (one material)                          |
+| `surface`                                                   | `#fcfbf9`          | `#1a1a17` | Cards, tables, the figure band                                            |
+| `surface-raised`                                            | `#ffffff`          | `#232220` | Inputs, secondary buttons, menus, dialogs — what floats or takes typing   |
+| `border`                                                    | `#e5e1da`          | `#2b2a26` | Hairlines. Floating layers use `border-border/60`, the rail `/60` too     |
+| `foreground`                                                | `#1d1c19`          | `#efede8` | Primary text — and the "ink" of the active nav pill                       |
+| `muted`                                                     | `#726f69`          | `#9b978f` | Secondary text, captions, labels, placeholders (`/70`)                    |
+| `accent` / `accent-foreground`                              | unchanged          | unchanged | The one brand action colour (green). Primary buttons, links, active icons |
+| `success` / `warning` / `danger` / `info` (+ `-foreground`) | unchanged          | unchanged | Fixed-meaning status colours — pills, inline messages, alerts             |
+| `shadow-float`                                              | soft ambient, warm | deeper    | The one shadow. Means "this is floating" and nothing else                 |
+
+**Nav is ink, accent is action.** Tabs, nav pills and the sidebar's
+active row are foreground-on-surface, never green. Green is reserved for
+the primary button, links, the active nav _icon_ and the focus halo, so
+the eye always finds the one thing to press. Hover and highlight tints
+are `bg-foreground/[0.05]` (rows `/[0.025]`, chips `/[0.04]`) — a
+foreground alpha is right in both modes by construction, which is why
+the old `hover:bg-black/… dark:hover:bg-white/…` pairs are gone.
+
+`--surface` in dark mode is deliberately still `#1a1a17`: the chart
+palette below was measured against it.
 
 ### Light and dark
 
@@ -35,7 +73,8 @@ Three things follow from that, and each has bitten already:
   and ignore the switch — a dark page with light badges on it.
 - **The dark token block is written out twice**, once per selector,
   because CSS cannot share a declaration block across a media query.
-  Change a value in one and change it in the other.
+  Change a value in one and change it in the other — including
+  `--shadow-float`.
 - **`color-scheme` is declared next to the tokens, not as an
   afterthought.** It is what makes the browser's own furniture follow —
   date pickers, number steppers, select menus, scrollbars. The app
@@ -51,22 +90,16 @@ in a theme they cannot read cannot find the switch either.
 costs the app static rendering: calling `cookies()` there turns `/login`,
 `/_not-found` and `/_global-error` from prerendered into
 server-rendered-on-demand — measured, not guessed — and cold starts are
-the app's one measured performance problem: warm time-to-first-byte is ~0.2s and a cold start is ~1.0s.
+the app's one measured performance problem: warm time-to-first-byte is
+~0.2s and a cold start is ~1.0s.
+
+The `themeColor` values in `app/layout.tsx` are quoted from
+`--background` and must move with it, or a phone's address bar stops
+matching the page.
 
 Two things deliberately do **not** follow the theme: PDFs
 (`lib/pdf/theme.ts` is a separate print palette) and the logo
 (`components/ui/logo.tsx` is brand artwork).
-
-| Token                                                       | Meaning                                                                   |
-| ----------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `background`                                                | Page canvas                                                               |
-| `surface`                                                   | Cards, inputs, anything sitting on the canvas                             |
-| `surface-raised`                                            | One layer above `surface` — modals, popovers, dropdown panels             |
-| `border`                                                    | Hairlines, card/input borders                                             |
-| `foreground`                                                | Primary text                                                              |
-| `muted`                                                     | Secondary text, captions, placeholders                                    |
-| `accent` / `accent-foreground`                              | The one brand action color (green). Primary buttons, active states, links |
-| `success` / `warning` / `danger` / `info` (+ `-foreground`) | Fixed-meaning status colors — pills, inline messages, alerts              |
 
 `lib/color-hash.ts`'s 7-color palette (used for avatar initials, the
 item thumbnails in `components/masters/item-thumb.tsx`, and the
@@ -120,57 +153,109 @@ value alone.
 
 ## Typography
 
-Geist Sans throughout (already loaded in the root layout). No new font.
-A named scale — use these combinations, not arbitrary sizes:
+Geist Sans throughout (already loaded in the root layout). **One
+typeface, used with more range** — the founder's choice over a second
+face for headings (2026-09-17). The calm comes from weight, tracking
+and air. A named scale — use these combinations, not arbitrary sizes:
 
-| Purpose                               | Classes                                                      |
-| ------------------------------------- | ------------------------------------------------------------ |
-| Display (hero numbers, big greetings) | `text-4xl md:text-5xl font-extrabold tracking-tight`         |
-| Page Title                            | `text-lg font-bold tracking-tight text-foreground`           |
-| Section Label                         | `text-xs font-semibold uppercase tracking-widest text-muted` |
-| Body                                  | `text-sm text-foreground`                                    |
-| Body Muted                            | `text-sm text-muted`                                         |
-| Caption                               | `text-xs text-muted`                                         |
+| Purpose                        | Classes                                                          |
+| ------------------------------ | ---------------------------------------------------------------- |
+| Display (big greetings)        | `text-4xl md:text-5xl font-semibold tracking-tight text-balance` |
+| Page Title (`PageTitle`)       | `text-2xl font-semibold tracking-tight text-balance`             |
+| Dialog Title / Section heading | `text-lg font-semibold tracking-tight` / `text-[15px] …`         |
+| Section Label                  | `text-[11px] font-medium uppercase tracking-[0.14em] text-muted` |
+| Body                           | `text-sm text-foreground`                                        |
+| Body Muted                     | `text-sm text-muted`                                             |
+| Caption                        | `text-xs text-muted`                                             |
+
+The Section Label is the one label style in the app — sidebar groups,
+table headers, `Figure` labels, `ResultPanel` and `ChartCard` titles all
+use it. It is lighter and wider than it used to be (medium, not
+semibold; `0.14em`, not `widest`) — that is the Aman note, do not
+re-embolden it locally.
+
+**Numbers.** A standalone figure (`Figure`, the pipeline counts, the
+chart meter) is Geist Sans with `tabular-nums` — digits line up, and it
+reads as a headline, not a printout. Amount **columns in tables** keep
+`font-mono` — a ledger convention that is worth keeping: a column of
+money in monospace reads as a column of money. Both are right; do not
+"fix" one into the other. References (`IND-0001`, item codes) are mono.
 
 ## Spacing & radius
 
 - Controls (buttons, inputs, selects): `rounded-xl`, `h-11` for
-  full-size fields, `h-10`/`h-12` for button sizes.
-- Cards and anything larger: `rounded-2xl`.
-- Page padding: `px-5`. Section rhythm: `space-y-4` inside forms,
-  `space-y-2` / `space-y-2.5` between list rows.
+  full-size fields, `h-8`/`h-10`/`h-12` for button sizes.
+- Cards, tables, the figure band, empty states: `rounded-2xl`.
+- Floating layers (dialogs, the phone drawer): `rounded-3xl`; menus
+  `rounded-xl`; icon chips `rounded-lg`/`rounded-xl`; pills and
+  avatars `rounded-full`.
+- Page padding: the dashboard container is
+  `mx-auto max-w-6xl px-5 py-6 md:px-10 md:py-10`
+  (`app/(dashboard)/layout.tsx`). Section rhythm: `space-y-4` inside
+  forms and on most screens, `space-y-8` between the home page's
+  blocks, `space-y-2` / `space-y-2.5` between list rows.
+- Card padding: `p-5` (Section, cards), `p-6 md:p-8` for the welcome
+  card, `p-10` for an empty state.
 - Kiosk-width screens (Marathon's whole layout is one): `max-w-[480px]`
   on the outer shell (`app/marathon/layout.tsx`), `max-w-[220px]` for a
   centered PIN pad (`pin-pad.tsx`). These are deliberate — a phone-width
   kiosk column, not arbitrary numbers — carry them forward for any other
   tool that's genuinely a single-device kiosk rather than a desktop
-  dashboard screen (most future tools won't be; the `(dashboard)` shell's
-  wider `max-w-6xl` is the default for anything not kiosk-style — see
-  `app/(dashboard)/layout.tsx`).
+  dashboard screen.
 
-## Motion
+## Material — hairlines at rest, float only when floating
 
-Sparing, on purpose. Two reusable patterns, both currently used only by
-the Marathon kiosk and so living in `app/marathon/_components/` (they
-move back to `components/ui/` only if a second kiosk-style tool
-appears):
+Depth is carried by hairlines and the three tones, not by elevation. A
+card at rest has `border-border` and no shadow. The only shadow in the
+system is `shadow-float`, and it appears on exactly the things that
+float: dropdown menus, dialogs, the phone drawer, and a linked card
+while it is lifted under the cursor. Do not add `shadow-sm`/`shadow-lg`
+anywhere; if something needs to look raised, it is either floating
+(`shadow-float`) or it is on `surface-raised`.
 
-- **`PageHeader`** — the sticky `bg-background/95 backdrop-blur` +
-  hairline-border treatment for a screen's title/tabs + primary action
-  (Exit, Back). Use on any screen with real scroll length. Short screens
-  (PIN entry, login) don't need it.
-- **`AnimatedReveal`** — wraps content that appears/disappears based on
-  state (a live preview, a validation warning) so it animates in via a
-  height transition instead of popping and shoving the rest of the page
-  around. Always give it a `min-w-0` content wrapper internally (already
-  handled) — an unconstrained CSS grid item will happily blow out the
-  page's width rather than wrap text, a real bug this project hit once.
+Sticky bars are frosted glass: `bg-background/80 backdrop-blur-xl` with
+a `border-border/60` hairline (the phone top bar; Marathon's
+`PageHeader` is the kiosk version). A browser without backdrop-filter
+just shows the translucent bar, which still reads.
 
-One `@keyframes card-in` (fade + scale, ~200ms) exists in
-`globals.css` for a single "payoff" moment per flow — the one point in a
-screen that deserves delight (a successful save, a completed action).
-Don't add a second one to the same flow, and don't add motion anywhere
-else "to make it feel nice" — restraint is the point.
+Inputs sit on `surface-raised` (white on linen) and focus with a soft
+halo — `focus:border-accent focus:ring-4 focus:ring-accent/15` — rather
+than a hard 2px ring. Buttons focus with `ring-4 ring-accent/25` and no
+offset. Badges wear a hairline of their own colour
+(`ring-1 ring-inset ring-current/10`) so a tint never floats loose.
+
+## Motion — a vocabulary, not a licence
+
+Motion is a small fixed vocabulary, defined once in `app/globals.css`
+and used through the primitives. Nothing else moves. The words:
+
+- **Press** — every `Button` and `IconButton` scales to 0.98 / 0.95 on
+  `:active`, over 150ms. A transition on the element, not a keyframe.
+- **Lift** — a linked card (`<Card interactive>`) rises 2px, its hairline
+  darkens and it picks up `shadow-float`, over 200ms.
+- **Pop** — dialogs and menus enter with `pop-in` / `menu-in` (fade +
+  scale from 0.96, 200ms) and leave with `pop-out` (160ms). Radix keeps
+  the closing element mounted for the exit, so the primitives only need
+  `data-[state=open]:animate-pop-in data-[state=closed]:animate-pop-out`.
+- **Sheet** — on a phone (`max-sm:`) a dialog is a bottom sheet:
+  `sheet-in` / `sheet-out`, `max-h-[90dvh]`, scrolls inside, footer
+  reachable.
+- **Slide** — the phone drawer: `slide-in-left` / `slide-out-left`.
+- **Wait** — `Spinner` fades in after 160ms so a fast page never flashes
+  a spinner (the fade is on a wrapper, not the ring — see _Loading_).
+- **Crossfade** — the theme switch, 220ms via the View Transitions API.
+
+Two easings carry all of it: `ease-out-quint` (everything above) and
+`ease-spring` (reserved, unused so far — for a future moment that wants
+a hint of overshoot). Durations are 150–280ms; nothing in the shell is
+slower than 300ms. Every keyframe is a `--animate-*` entry in
+`@theme inline`, so it is a utility, and **every custom shadow, ease
+and animate name is also listed in `lib/utils.ts`** — `tailwind-merge`
+does not know them otherwise, and `cn("shadow-float", "shadow-none")`
+would keep both. `lib/utils.test.ts` pins that.
+
+Don't add motion outside this vocabulary "to make it feel nice". A new
+word needs the argument written here first.
 
 **Relay is the one stated exception, and it stays one.** In that tool
 moving a baton _is_ the product, and the reward for moving it is the
@@ -182,15 +267,18 @@ all confined to `app/(dashboard)/relay/`. The one worth copying is
 the signal has to be unmissable _and_ calm — an alarm that fires on a
 third of the board every morning is an alarm everyone learns to ignore.
 Don't extend this licence to another tool without the same argument.
+Marathon keeps `card-in` (the bib card's entrance) and its
+`AnimatedReveal` for the same reason on its own kiosk.
 
 **`prefers-reduced-motion` is honoured globally** (bottom of
-`globals.css`), and it covers every tool, not just Relay: someone who
-has asked their operating system for stillness gets it. Confetti, the
-banner and the points float are skipped outright rather than merely
-shortened; the toast still appears, because they should still learn the
-push worked. The one opt-out is `Spinner`, via the
-`spinner-keeps-turning` class — a spinner that stops looks like a broken
-page, and it is a functional signal rather than decoration.
+`globals.css`), and it covers every word above and every tool: someone
+who has asked their operating system for stillness gets it. Dialogs,
+menus and the drawer simply appear; confetti, the banner and the points
+float are skipped outright rather than merely shortened; the toast still
+appears, because they should still learn the push worked. The one
+opt-out is `Spinner`, via the `spinner-keeps-turning` class — a spinner
+that stops looks like a broken page, and it is a functional signal
+rather than decoration.
 
 **The light/dark switch crossfades** (220ms) rather than snapping, via
 the View Transitions API — one call in `theme-toggle.tsx`, paced by two
@@ -202,36 +290,42 @@ change instantly, which is a working switch either way.
 Two traps live here. **Don't reach for a `transition` on colours
 instead** — it would fade every other colour change in the app, every
 hover and every focus ring, and make the whole interface feel soggy.
-And **the global reduced-motion block does not cover this**: it selects
-`*`, and `::view-transition-*` are pseudo-elements outside the document
-tree that `*` never matches. They are named again in that block, and the
-switch also checks reduced-motion in JavaScript before asking for a
-transition at all.
+The press and lift transitions are on transform, border and shadow for
+exactly that reason. And **the global reduced-motion block does not
+cover this**: it selects `*`, and `::view-transition-*` are
+pseudo-elements outside the document tree that `*` never matches. They
+are named again in that block, and the switch also checks
+reduced-motion in JavaScript before asking for a transition at all.
 
 ## Loading states
 
-`Spinner` (`components/ui/spinner.tsx`) — a large spinning ring in the
-accent color — is the one loading indicator in the app. This is a
-functional signal, not decorative motion, so it isn't subject to the
-"one moment of delight" restraint above: every tool's route segment
-gets a `loading.tsx` that renders `PageLoading`
-(`components/ui/page-loading.tsx` — the one centered-spinner layout;
-`tall` for kiosk routes), and any individual widget that fetches its own
-data inside an
-otherwise-fast page wraps in `<Suspense fallback={<Spinner />}>`
-(see `MarathonLiveCard` on the Overview page) rather than blocking the
-whole screen. Add both as a matter of course for every new tool, the
-same way every tool already reuses `components/ui/*` — don't leave a
-tool without a `loading.tsx`. For a small inline spinner (inside a
-button, a search result list), override the size/border with
-`className`, e.g. `<Spinner className="size-4 border-2" />`, rather
-than reaching for a different icon.
+`Spinner` (`components/ui/spinner.tsx`) — a thin spinning ring in the
+accent colour — is the one loading indicator in the app. It waits 160ms
+before fading in, so a page that answers quickly never flashes one. The
+fade lives on a wrapper `<div>` and the spin on the ring, on purpose:
+the reduced-motion rule for `.spinner-keeps-turning` forces a single
+`animation-duration`/`iteration-count`, and two animations on one
+element would have made the fade loop forever.
+
+This is a functional signal, not decorative motion, so it isn't subject
+to the vocabulary above: every tool's route segment gets a `loading.tsx`
+that renders `PageLoading` (`components/ui/page-loading.tsx` — the one
+centered-spinner layout; `tall` for kiosk routes), and any individual
+widget that fetches its own data inside an otherwise-fast page wraps in
+`<Suspense fallback={<Spinner />}>` (see the home page) rather than
+blocking the whole screen. Add both as a matter of course for every new
+tool — don't leave a tool without a `loading.tsx`. For a small inline
+spinner (inside a button, a search result list), override the size and
+border with `className`, e.g. `<Spinner className="size-4 border-2" />`,
+rather than reaching for a different icon.
 
 ## Icons
 
 `lucide-react`. Small, tree-shakeable, line-icon style that matches the
 rest of the system. Size icons to match the text they sit next to
-(`className="size-4"` inline with text-sm, `size-5` for buttons).
+(`className="size-4"` inline with text-sm, `size-5` for buttons, `size-6`
+in the welcome card's chip). A tool's icon chip is `bg-accent/10
+text-accent` — the one place green appears that is not an action.
 
 ## Interactive primitives
 
@@ -239,34 +333,49 @@ rest of the system. Size icons to match the text they sit next to
 Tailwind-styled wrappers around Radix UI's headless primitives
 (`@radix-ui/react-*`) — same visual language as everything else, but
 correct focus-trapping/ESC/ARIA behavior for free instead of hand-rolled.
+`Dialog` is a centred `rounded-3xl` card on a laptop and a bottom sheet
+on a phone (the `max-sm:` overrides in `dialog.tsx`); every Masters
+form already benefits. The sidebar's phone drawer uses the raw Radix
+dialog with its own slide, not `DialogContent`.
 
 `Tabs` is for switching between content panels on the _same page_ —
 no navigation, no URL change. It is **not** what Marathon's admin nav
 needs, since Entries/Members/Groups are separate routes, not panels of
 one page. For pill-style _route_ navigation, use `NavTabs` (same file,
-same visual pill styling, built from `next/link` instead of Radix) —
+same ink-pill styling, built from `next/link` instead of Radix) —
 Marathon's admin nav is the reference implementation.
 
 ## Component inventory
 
-Built: `avatar`, `badge` (+ status variants), `button`, `card`,
-`checkbox`, `dialog`, `dropdown-menu`, `empty-state`, `form-message`,
-`icon-button`, `input`, `label`, `page-loading`, `page-title`,
-`pagination`, `select`, `spinner`, `table`, `tabs` (+ `NavTabs`),
-`textarea`, and the `chart/` family (`chart-card`, `chart-theme`,
-`bar-chart`, `line-chart`, `stacked-bar`, `meter`) — thin themed
-wrappers over Recharts (the meter is a CSS bar, deliberately not
+Built: `avatar`, `badge` (+ status variants), `button`, `card`
+(+ `interactive`), `checkbox`, `dialog`, `dropdown-menu`, `empty-state`,
+`form-message`, `icon-button`, `input`, `label`, `page-loading`,
+`page-title`, `pagination`, `select`, `spinner`, `table`, `tabs`
+(+ `NavTabs`), `textarea`, and the `chart/` family (`chart-card`,
+`chart-theme`, `bar-chart`, `line-chart`, `stacked-bar`, `meter`) — thin
+themed wrappers over Recharts (the meter is a CSS bar, deliberately not
 Recharts); see "The chart palette" above for the rules they carry.
 
 `PageTitle` vs `PageHeader`: `PageTitle` is the static h1/description/
-back-link block every dashboard screen starts with; `PageHeader`
+back-link block every dashboard screen starts with (the back link is an
+`ArrowLeft` icon plus label); `PageHeader`
 (`app/marathon/_components/page-header.tsx`) is the sticky,
 backdrop-blurred bar for kiosk screens with real scroll length
 (Marathon). Don't hand-roll either.
 
 Shared domain components live in `components/masters/`: `item-thumb`,
-`project-picker`, and `record-form-dialog` — the create/edit shell every
-Masters record uses.
+`project-picker`, `site-picker`, `catalogue-picker` and
+`record-form-dialog` — the create/edit shell every Masters record uses.
+
+Cross-tool screen compositions live in `app/(dashboard)/_components/`:
+`tool-welcome` (the screen every Operations and Management tool opens
+on), `tool-grid` (the home page's grouped grid of every tool the person
+can open — the same `visibleTools` rule as the sidebar, so a card and a
+nav row never disagree), `operations-pipeline`, `people-overview`,
+`marathon-live-card`, `coming-soon`. **The home page shows only what is
+real** (founder, 2026-09-17): five panels of invented numbers were
+deleted rather than restyled. A panel returns when a tool can feed it
+truthfully, through a money-free read in `lib/overview/queries.ts`.
 
 **`Figure` and `Section` were the rule working.** A label-over-a-number
 block had been hand-written thirteen times across the app and a
@@ -280,10 +389,8 @@ four different label styles. Both are now in `components/ui`:
   `ResultPanel` for the block a form uses to show what it worked out.
 - `Section` — `{ title, note?, aside?, collapsible?, defaultOpen?,
 nested? }`, plus `FieldRow` for a group of fields at a column count
-  that suits how many there are. `nested` recesses it for use inside
-  another `Card`, because `surface` and `surface-raised` are the same
-  white in light mode and a card on a card would be told apart by
-  nothing but its border.
+  that suits how many there are. `nested` recesses it onto `background`
+  for use inside another `Card`.
 
 Only Business Planning uses them so far. The copies in the other tools
 are fine where they are; convert one when you are next in it for another
@@ -295,7 +402,10 @@ Never write `new Intl.NumberFormat` in a screen; that's how the same
 price ended up rendering three different ways.
 
 Deliberately not built yet — add only when a real tool needs it, not
-speculatively: toast/notification, radio, popover, combobox.
+speculatively: toast/notification, radio, popover, combobox, a
+responsive table (cards on a phone), a shared filter toolbar, a notice
+banner, a real sidebar search. The last four are in `TODO.md` as the
+options the founder did not pick for the 2026-09-17 skin.
 
 Four were **deleted** once the audit found them with zero importers:
 `tooltip`, `item-picker`, `unit-picker`, `vendor-combobox`. Speculative
@@ -309,4 +419,6 @@ Use `success`/`warning`/`danger`/`info` for anything with fixed meaning
 (a Pending/Approved/Rejected pill, a validation error, an over-budget
 warning) — never reach for a raw Tailwind color class
 (`text-red-600`, `bg-amber-100`) in a screen; that's exactly what these
-tokens replace.
+tokens replace. Nothing in CI catches a stray one — `prettier` sorts
+the classes and `eslint` has no colour rule — so the review reads for
+it; a lint rule is on `TODO.md`'s list.

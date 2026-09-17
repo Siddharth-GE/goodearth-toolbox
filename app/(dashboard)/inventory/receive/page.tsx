@@ -47,7 +47,7 @@ export default async function InventoryPage({
       <InventoryNav active="receive" />
 
       <section className="space-y-2">
-        <h2 className="text-muted text-xs font-semibold tracking-widest uppercase">
+        <h2 className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
           Awaiting delivery
         </h2>
 
@@ -109,7 +109,7 @@ export default async function InventoryPage({
 
       {receipts.length > 0 && (
         <section className="space-y-2">
-          <h2 className="text-muted text-xs font-semibold tracking-widest uppercase">
+          <h2 className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
             Recent deliveries
           </h2>
           <Table>

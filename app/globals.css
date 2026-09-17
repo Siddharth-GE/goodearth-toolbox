@@ -41,14 +41,22 @@
 :root {
   color-scheme: light;
 
-  --background: #fafaf9;
-  --foreground: #1c1c1a;
-  --surface: #ffffff;
+  /* Warm stone neutrals. Three tones, not two: the page is linen, a card
+     is paper, and anything floating above it is white — so a card reads
+     as a card without needing a shadow to say so. */
+  --background: #f4f2ee;
+  --foreground: #1d1c19;
+  --surface: #fcfbf9;
   --surface-raised: #ffffff;
-  --border: #e7e5e2;
+  --border: #e5e1da;
   --accent: #1f7a5c;
   --accent-foreground: #ffffff;
-  --muted: #6b6b66;
+  --muted: #726f69;
+
+  /* The one shadow in the system, and it means "this is floating" —
+     menus, dialogs, the phone drawer, a card being hovered. Soft and
+     ambient rather than a hard drop; resting surfaces use a hairline. */
+  --shadow-float: 0 12px 40px -12px rgb(29 28 25 / 0.18), 0 1px 2px rgb(29 28 25 / 0.06);
 
   /* Semantic status — the only fixed-meaning colors in the system.
      Distinct from lib/color-hash.ts's 7-color identity palette (used
@@ -121,20 +129,48 @@
   --color-chart-8: var(--chart-8);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* Registered here so each one becomes a utility: `shadow-float`,
+     `ease-out-quint`, `animate-pop-in` and the rest. Tailwind's own
+     scales (node_modules/tailwindcss/theme.css) work the same way, which
+     is why a custom name sits beside `shadow-sm` and `ease-out` rather
+     than in an arbitrary class of its own.
+
+     A name added here must also be declared in lib/utils.ts, or
+     tailwind-merge will not know it is a shadow/easing/animation and a
+     caller's `shadow-none` will sit next to it instead of replacing it. */
+  --shadow-float: var(--shadow-float);
+
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.2, 0.9, 0.3, 1.08);
+
+  --animate-pop-in: pop-in 200ms var(--ease-out-quint) both;
+  --animate-pop-out: pop-out 160ms var(--ease-out-quint) both;
+  --animate-fade-in: fade-in 160ms var(--ease-out-quint) both;
+  --animate-fade-out: fade-out 160ms var(--ease-out-quint) both;
+  --animate-menu-in: menu-in 200ms var(--ease-out-quint) both;
+  --animate-sheet-in: sheet-in 280ms var(--ease-out-quint) both;
+  --animate-sheet-out: sheet-out 160ms var(--ease-out-quint) both;
+  --animate-slide-in-left: slide-in-left 280ms var(--ease-out-quint) both;
+  --animate-slide-out-left: slide-out-left 160ms var(--ease-out-quint) both;
 }
 
 /* Dark, asked for. */
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --background: #121210;
-  --foreground: #f2f2ef;
+  /* The same three tones in warm charcoal. --surface stays #1a1a17: the
+     chart palette was measured on it. */
+  --background: #141311;
+  --foreground: #efede8;
   --surface: #1a1a17;
-  --surface-raised: #242420;
-  --border: #2c2c28;
+  --surface-raised: #232220;
+  --border: #2b2a26;
   --accent: #34a37a;
   --accent-foreground: #0a0a09;
-  --muted: #9a9a92;
+  --muted: #9b978f;
+
+  --shadow-float: 0 16px 48px -12px rgb(0 0 0 / 0.6), 0 1px 0 rgb(255 255 255 / 0.04);
 
   --success: #22c55e;
   --success-foreground: #0a0a09;
@@ -163,14 +199,18 @@
   :root:not([data-theme="light"]) {
     color-scheme: dark;
 
-    --background: #121210;
-    --foreground: #f2f2ef;
+    /* The same three tones in warm charcoal. --surface stays #1a1a17: the
+       chart palette was measured on it. */
+    --background: #141311;
+    --foreground: #efede8;
     --surface: #1a1a17;
-    --surface-raised: #242420;
-    --border: #2c2c28;
+    --surface-raised: #232220;
+    --border: #2b2a26;
     --accent: #34a37a;
     --accent-foreground: #0a0a09;
-    --muted: #9a9a92;
+    --muted: #9b978f;
+
+    --shadow-float: 0 16px 48px -12px rgb(0 0 0 / 0.6), 0 1px 0 rgb(255 255 255 / 0.04);
 
     --success: #22c55e;
     --success-foreground: #0a0a09;
@@ -223,6 +263,126 @@ body {
   to {
     opacity: 1;
     transform: scale(1);
+  }
+}
+
+/* ---------------------------------------------------------------------
+   The motion vocabulary — six words, and nothing outside them.
+
+   Motion here is physical, not decorative: a thing moves because it is
+   being pressed, or because it is arriving from somewhere. Six words
+   cover every case the app has, and a seventh should be argued for
+   rather than invented.
+
+   - press — a button scales to 0.98 under the finger. A transition on
+     the button itself, not an animation; no keyframes needed.
+   - lift — a card you can click rises 2px and picks up --shadow-float.
+     Also a transition.
+   - pop — dialogs and menus arrive: `pop-in` / `pop-out` for a dialog,
+     `menu-in` for a dropdown, which grows from the corner Radix says it
+     was opened from. `fade-in` / `fade-out` carry the backdrop.
+   - sheet — the same dialog on a phone, rising from the bottom edge
+     instead of the middle of the screen.
+   - slide — the phone drawer coming in from the left and going back.
+   - the delayed spinner — `fade-in` again, held back 160ms, so a page
+     that answers quickly never flashes a spinner on its way.
+
+   Every one of these is a CSS animation or transition, which means the
+   reduced-motion block at the bottom of this file already switches all
+   of them off — there is nothing to add there for a new one. Timing
+   comes from --ease-out-quint (everything above) and --ease-spring (a
+   little overshoot, for the rare thing that should feel springy).
+   --------------------------------------------------------------------- */
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pop-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Radix hands us the corner the menu was opened from; without it a menu
+   pinned to the right edge would grow out of its own middle. An unset
+   variable falls back to the initial 50% 50%, which is still fine. */
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+    transform-origin: var(--radix-dropdown-menu-content-transform-origin);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+    transform-origin: var(--radix-dropdown-menu-content-transform-origin);
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes sheet-out {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes slide-in-left {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-out-left {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
   }
 }
 

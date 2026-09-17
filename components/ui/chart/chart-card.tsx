@@ -30,7 +30,9 @@ export function ChartCard({
       {(title || (series && series.length >= 2)) && (
         <div className="flex flex-wrap items-center justify-between gap-2">
           {title ? (
-            <p className="text-muted text-xs font-semibold tracking-widest uppercase">{title}</p>
+            <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
+              {title}
+            </p>
           ) : (
             <span />
           )}

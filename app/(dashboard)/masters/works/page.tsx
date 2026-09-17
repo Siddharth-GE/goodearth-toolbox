@@ -33,7 +33,7 @@ export default async function WorksPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div className="max-w-2xl">
-          <p className="text-muted text-xs font-semibold tracking-widest uppercase">Works</p>
+          <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Works</p>
           <p className="text-muted mt-1 text-sm">
             The labour works the Estimator will price and schedule, in the site team&apos;s own
             codes. This is a separate list from Construction stages, which indents and budgets pick

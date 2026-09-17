@@ -21,18 +21,18 @@ export function ChartMeter({ model }: { model: MeterModel }) {
     <Card className="space-y-3 p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
-          <p className="text-muted text-xs font-semibold tracking-widest uppercase">
+          <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
             {model.valueLabel}
           </p>
-          <p className="text-foreground font-mono text-xl font-bold tracking-tight tabular-nums">
+          <p className="text-foreground text-xl font-bold tracking-tight tabular-nums">
             {format(model.value)}
           </p>
         </div>
         <div className="text-right">
-          <p className="text-muted text-xs font-semibold tracking-widest uppercase">
+          <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
             {model.limitLabel}
           </p>
-          <p className="text-foreground font-mono text-base font-semibold tabular-nums">
+          <p className="text-foreground text-base font-semibold tabular-nums">
             {format(model.limit)}
           </p>
         </div>

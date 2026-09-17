@@ -47,7 +47,7 @@ export default async function DesignVillasPage() {
       {header}
       {projects.map((projectName) => (
         <div key={projectName} className="space-y-2">
-          <p className="text-muted text-xs font-semibold tracking-widest uppercase">
+          <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
             {projectName}
           </p>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

@@ -12,9 +12,9 @@ export const Tabs = TabsPrimitive.Root;
 export const TabsContent = TabsPrimitive.Content;
 
 const pillClasses =
-  "rounded-full border px-3.5 py-1.5 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-accent";
-const pillActive = "border-accent bg-accent text-accent-foreground";
-const pillInactive = "border-border text-foreground";
+  "rounded-full px-3.5 py-1.5 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent";
+const pillActive = "bg-foreground text-background";
+const pillInactive = "text-muted hover:text-foreground hover:bg-foreground/[0.05]";
 
 export function TabsList({ className, ...props }: ComponentProps<typeof TabsPrimitive.List>) {
   return <TabsPrimitive.List className={cn("flex gap-2", className)} {...props} />;
@@ -26,7 +26,7 @@ export function TabsTrigger({ className, ...props }: ComponentProps<typeof TabsP
       className={cn(
         pillClasses,
         pillInactive,
-        "data-[state=active]:border-accent data-[state=active]:bg-accent data-[state=active]:text-accent-foreground",
+        "data-[state=active]:bg-foreground data-[state=active]:text-background",
         className,
       )}
       {...props}

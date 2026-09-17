@@ -63,7 +63,7 @@ export default async function ItemHistoryPage({
               className="w-10"
             />
             <div className="text-right">
-              <p className="text-muted text-xs font-semibold tracking-widest uppercase">
+              <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
                 {isStore ? "On hand" : "Delivered here"}
               </p>
               <p className="text-foreground text-lg font-bold tracking-tight">

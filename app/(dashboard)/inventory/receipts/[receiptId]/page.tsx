@@ -42,7 +42,9 @@ export default async function ReceiptPage({ params }: { params: Promise<{ receip
           />
         )}
         <div className="min-w-0">
-          <p className="text-muted text-xs font-semibold tracking-widest uppercase">Received by</p>
+          <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
+            Received by
+          </p>
           <div className="mt-1 flex items-center gap-2">
             <Attribution name={receipt.received_by_name} label="Received by" />
             <span className="text-foreground truncate text-sm">
@@ -52,7 +54,7 @@ export default async function ReceiptPage({ params }: { params: Promise<{ receip
         </div>
         {receipt.note && (
           <div className="sm:col-span-4">
-            <p className="text-muted text-xs font-semibold tracking-widest uppercase">Note</p>
+            <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Note</p>
             <p className="text-foreground mt-1 text-sm">{receipt.note}</p>
           </div>
         )}
@@ -118,7 +120,7 @@ export default async function ReceiptPage({ params }: { params: Promise<{ receip
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <p className="text-muted text-xs font-semibold tracking-widest uppercase">{label}</p>
+      <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">{label}</p>
       <p className="text-foreground mt-1 truncate text-sm">{value}</p>
     </div>
   );

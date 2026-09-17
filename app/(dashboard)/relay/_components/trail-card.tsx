@@ -43,7 +43,7 @@ export function TrailCard({
     >
       <Link
         href={`/relay/trails/${row.chainId}`}
-        className="flex h-full items-start gap-3 p-4 hover:bg-black/[0.02] dark:hover:bg-white/[0.04]"
+        className="hover:bg-foreground/[0.05] flex h-full items-start gap-3 p-4"
       >
         <div className="min-w-0 flex-1">
           <p className="text-foreground text-sm font-semibold">

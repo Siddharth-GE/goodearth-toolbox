@@ -56,7 +56,7 @@ export default async function WorkSetupPage({
 
       <Card className="space-y-3 p-4">
         <div>
-          <p className="text-muted text-xs font-semibold tracking-widest uppercase">
+          <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
             Unit and labour
           </p>
           <p className="text-muted mt-1 text-sm">
@@ -77,7 +77,7 @@ export default async function WorkSetupPage({
         <Card className="space-y-4 p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-muted text-xs font-semibold tracking-widest uppercase">
+              <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
                 What one {work.uom} consumes
               </p>
               <p className="text-muted mt-1 text-sm">
@@ -85,7 +85,7 @@ export default async function WorkSetupPage({
               </p>
             </div>
             <div className="text-right">
-              <p className="text-muted text-xs font-semibold tracking-widest uppercase">
+              <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
                 Cost per {work.uom}
               </p>
               <p className="text-foreground text-lg font-semibold">
