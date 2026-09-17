@@ -27,19 +27,19 @@ export async function MarathonLiveCard() {
         </span>
       </div>
       <div className="p-5">
-        <p className="font-mono text-4xl font-semibold tracking-tight">
+        <p className="text-4xl font-semibold tracking-tight tabular-nums">
           {formatCount(totalEntries)}
         </p>
         <p className="text-accent-foreground/80 mt-1 text-xs">total registrations</p>
         <div className="mt-4 flex gap-2">
           {runCounts.map((run) => (
             <div key={run.runId} className="bg-accent-foreground/10 flex-1 rounded-xl px-3 py-2">
-              <p className="font-mono text-base">{formatCount(run.count)}</p>
+              <p className="text-base tabular-nums">{formatCount(run.count)}</p>
               <p className="text-accent-foreground/80 mt-0.5 text-[11px]">{run.name}</p>
             </div>
           ))}
           <div className="bg-accent-foreground/10 flex-1 rounded-xl px-3 py-2">
-            <p className="font-mono text-base">{formatCount(groupCount)}</p>
+            <p className="text-base tabular-nums">{formatCount(groupCount)}</p>
             <p className="text-accent-foreground/80 mt-0.5 text-[11px]">schools / clubs</p>
           </div>
         </div>

@@ -84,7 +84,7 @@ Branch `feature/skin` off `staging`. One commit per step, plain-English message,
 - Layout container: `mx-auto max-w-6xl px-5 py-6 md:px-10 md:py-10`.
 - **Open:** every breakpoint (resize from 1400 → 390), dark, drawer open/close/navigate, admin and probe account (probe sees one tool; "No tools assigned yet" if none).
 
-### [ ] 6. `[Sonnet]` Home shows only what is real — `app/(dashboard)/page.tsx`, `app/(dashboard)/_components/*`
+### [x] 6. `[Sonnet]` Home shows only what is real — `app/(dashboard)/page.tsx`, `app/(dashboard)/_components/*`
 
 - **Delete** `kpi-row.tsx`, `budget-vs-actual.tsx`, `pending-approvals.tsx`, `recent-purchase-orders.tsx`, `activity-feed.tsx` (all static invented data). Remove the "Toolbox / Overview" breadcrumb.
 - Rename `management-vision.tsx` → `tool-grid.tsx`: renders **every group** the person can see (`visibleTools`, same rule as the sidebar, in the sidebar's group order), group label above each grid, `Card interactive` per tool (icon chip `size-10 rounded-xl bg-accent/10 text-accent`, name `text-sm font-semibold`, description muted, unbuilt = `Badge neutral` "Coming soon" and a plain card). Grid `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3`. Keep the rule that a built tool links only when the person holds it.
