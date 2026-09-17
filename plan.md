@@ -30,7 +30,7 @@ Why this is cheap for the size of the change: the primitives in `components/ui/*
 
 Branch `feature/skin` off `staging`. One commit per step, plain-English message, the committing model's own co-author line, pushed. Every step ends with "open the page" in light and dark, at desktop and 390px. Nothing here touches a query, an action, a policy or a migration. Run `npm run format && npm run lint && npm run typecheck && npm test` before every commit; `npm run build` before the commit of steps 1, 5 and 7.
 
-### [ ] 1. `[Opus]` Tokens and motion vocabulary — `app/globals.css`, `app/layout.tsx`, `lib/utils.ts`
+### [x] 1. `[Opus]` Tokens and motion vocabulary — `app/globals.css`, `app/layout.tsx`, `lib/utils.ts`
 
 - Light block (`:root`): `--background #f4f2ee` (linen), `--surface #fcfbf9` (paper), `--surface-raised #ffffff`, `--border #e5e1da`, `--foreground #1d1c19`, `--muted #726f69`. `--accent`, status and chart tokens unchanged.
 - Both dark blocks (`[data-theme="dark"]` and the media-query copy — **keep them identical**): `--background #141311`, `--surface #1a1a17` (unchanged — the chart palette was measured on it), `--surface-raised #232220`, `--border #2b2a26`, `--foreground #efede8`, `--muted #9b978f`.
