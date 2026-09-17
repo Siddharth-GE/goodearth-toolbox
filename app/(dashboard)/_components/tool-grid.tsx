@@ -23,15 +23,10 @@ export function ToolGrid({ tools }: { tools: Tool[] }) {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {groupTools.map((tool) => {
               const Icon = TOOL_ICONS[tool.icon];
-              // An unbuilt tool always links — its route is the Coming Soon
-              // stub, which is ungated. A built one links only for someone
-              // who actually holds it, otherwise the click would bounce off
-              // requireTool and land back here with no explanation. `tools`
-              // is now visibleTools()'s own output, so every built tool
-              // here already passed that check — this is always true, kept
-              // so the rule travels with the code rather than living only
-              // in a comment.
-              const linked = !tool.built || true;
+              // Every card links. `tools` is visibleTools()'s own output —
+              // the same rule the sidebar uses — so a built tool here is one
+              // the person holds (the click cannot bounce off requireTool),
+              // and an unbuilt one leads to its ungated Coming Soon stub.
               const card = (
                 <Card interactive className="h-full p-5">
                   <div className="flex items-start justify-between">
@@ -44,12 +39,10 @@ export function ToolGrid({ tools }: { tools: Tool[] }) {
                   <p className="text-muted mt-1 text-sm">{tool.description}</p>
                 </Card>
               );
-              return linked ? (
+              return (
                 <Link key={tool.href} href={tool.href}>
                   {card}
                 </Link>
-              ) : (
-                <div key={tool.href}>{card}</div>
               );
             })}
           </div>
