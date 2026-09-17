@@ -72,7 +72,7 @@ Branch `feature/skin` off `staging`. One commit per step, plain-English message,
 - Dropdown content: `bg-surface-raised/95 backdrop-blur-xl border-border/60 rounded-xl p-1 shadow-float animate-menu-in`; items `rounded-lg data-[highlighted]:bg-foreground/[0.05]`.
 - **Open at 390px and desktop:** `/masters/vendors` → New vendor (a long form in the sheet scrolls, Cancel and Save reachable), the sidebar user menu, ESC and backdrop-click still close, OS reduced-motion → everything appears instantly.
 
-### [ ] 5. `[Opus]` The shell — `components/layout/sidebar.tsx`, `app/(dashboard)/layout.tsx`
+### [x] 5. `[Opus]` The shell — `components/layout/sidebar.tsx`, `app/(dashboard)/layout.tsx`
 
 - Rail: `w-60 bg-background border-r border-border/60` (tonal, page-coloured — the content canvas and rail are one material, cards are the second).
 - Brand block: logo + `Goodearth` in `text-sm font-semibold tracking-tight`, `Toolbox` in `text-muted`.
