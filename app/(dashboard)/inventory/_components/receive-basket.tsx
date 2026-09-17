@@ -119,7 +119,7 @@ export function ReceiveBasket({ pool, works }: { pool: ReceivePool; works: WorkO
   return (
     <div className="space-y-6 pb-28">
       <section className="border-border bg-surface space-y-4 rounded-2xl border p-4">
-        <h2 className="text-muted text-xs font-semibold tracking-widest uppercase">
+        <h2 className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
           Where did it go?
         </h2>
 
@@ -233,7 +233,7 @@ export function ReceiveBasket({ pool, works }: { pool: ReceivePool; works: WorkO
 
       <section className="space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-muted text-xs font-semibold tracking-widest uppercase">
+          <h2 className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
             What arrived
           </h2>
           <Button

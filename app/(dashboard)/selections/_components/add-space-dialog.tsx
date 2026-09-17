@@ -132,7 +132,7 @@ export function AddSpaceDialog({
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
           <div>
-            <p className="text-muted mb-2 text-xs font-semibold tracking-widest uppercase">
+            <p className="text-muted mb-2 text-[11px] font-medium tracking-[0.14em] uppercase">
               How many of each
             </p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -189,7 +189,7 @@ export function AddSpaceDialog({
 
           {total > 0 && (
             <div>
-              <p className="text-muted mb-2 text-xs font-semibold tracking-widest uppercase">
+              <p className="text-muted mb-2 text-[11px] font-medium tracking-[0.14em] uppercase">
                 Names — edit any of these
               </p>
               <div className="space-y-2">

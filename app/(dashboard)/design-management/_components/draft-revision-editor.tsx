@@ -59,7 +59,7 @@ function NoteField({ revisionId, note }: { revisionId: string; note: string | nu
 
   return (
     <div className="space-y-1.5">
-      <label className="text-muted text-xs font-semibold tracking-widest uppercase">Note</label>
+      <label className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Note</label>
       <Textarea
         rows={2}
         value={value}
@@ -122,7 +122,7 @@ function FilesEditor({
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-muted text-xs font-semibold tracking-widest uppercase">Files</p>
+        <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Files</p>
         <input
           ref={inputRef}
           type="file"
@@ -235,7 +235,7 @@ function WorksEditor({
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-muted text-xs font-semibold tracking-widest uppercase">
+        <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
           Works this revision serves
         </p>
         <Badge variant="neutral">{checked.size} picked</Badge>

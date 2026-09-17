@@ -399,7 +399,7 @@ export default async function EstimatePage({
 
       <Card className="space-y-4 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-muted text-xs font-semibold tracking-widest uppercase">Works</p>
+          <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Works</p>
           {isDraft && <AddLineDialog estimateId={estimate.id} works={setUpWorks} />}
         </div>
 
@@ -506,7 +506,7 @@ export default async function EstimatePage({
       {takeoffRows.length > 0 && (
         <Card className="space-y-3 p-4">
           <div>
-            <p className="text-muted text-xs font-semibold tracking-widest uppercase">
+            <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
               Materials needed
             </p>
             <p className="text-muted mt-1 text-sm">
@@ -562,7 +562,7 @@ export default async function EstimatePage({
       {comparison && (
         <Card className="space-y-3 p-4">
           <div>
-            <p className="text-muted text-xs font-semibold tracking-widest uppercase">
+            <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
               Reached the site
             </p>
             <p className="text-muted mt-1 text-sm">
@@ -618,7 +618,7 @@ export default async function EstimatePage({
           )}
           {comparison.unmatched.length > 0 && issuedData && (
             <div className="border-border space-y-2 border-t pt-3">
-              <p className="text-muted text-xs font-semibold tracking-widest uppercase">
+              <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
                 Outside the estimate
               </p>
               <p className="text-muted text-sm">

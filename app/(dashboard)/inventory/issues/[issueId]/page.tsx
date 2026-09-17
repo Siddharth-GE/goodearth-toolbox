@@ -82,7 +82,7 @@ export default async function IssuePage({ params }: { params: Promise<{ issueId:
         <Field label="To" value={issue.destination} />
         {!issue.is_transfer && (
           <div className="min-w-0 sm:col-span-2">
-            <p className="text-muted text-xs font-semibold tracking-widest uppercase">
+            <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
               For the work{issue.work_category ? ` · ${issue.work_category}` : ""}
             </p>
             <div className="mt-1">
@@ -92,7 +92,9 @@ export default async function IssuePage({ params }: { params: Promise<{ issueId:
         )}
         <Field label="Issued on" value={formatDate(issue.issued_at)} />
         <div className="min-w-0">
-          <p className="text-muted text-xs font-semibold tracking-widest uppercase">Issued by</p>
+          <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
+            Issued by
+          </p>
           <div className="mt-1 flex items-center gap-2">
             <Attribution name={issue.issued_by_name} label="Issued by" />
             <span className="text-foreground truncate text-sm">{issue.issued_by_name ?? "—"}</span>
@@ -100,7 +102,7 @@ export default async function IssuePage({ params }: { params: Promise<{ issueId:
         </div>
         {issue.note && (
           <div className="sm:col-span-4">
-            <p className="text-muted text-xs font-semibold tracking-widest uppercase">Note</p>
+            <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Note</p>
             <p className="text-foreground mt-1 text-sm">{issue.note}</p>
           </div>
         )}
@@ -165,7 +167,7 @@ export default async function IssuePage({ params }: { params: Promise<{ issueId:
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <p className="text-muted text-xs font-semibold tracking-widest uppercase">{label}</p>
+      <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">{label}</p>
       <p className="text-foreground mt-1 truncate text-sm">{value}</p>
     </div>
   );

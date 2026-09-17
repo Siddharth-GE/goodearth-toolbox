@@ -64,7 +64,7 @@ export default async function VendorDetailPage({
       />
 
       <Card className="space-y-2 p-4">
-        <p className="text-muted text-xs font-semibold tracking-widest uppercase">Details</p>
+        <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Details</p>
         <dl className="grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
           <div>
             <dt className="text-muted">Contact person</dt>
@@ -114,7 +114,7 @@ export default async function VendorDetailPage({
       {canSeeBank && (
         <Card className="space-y-2 p-4">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-muted text-xs font-semibold tracking-widest uppercase">
+            <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
               Bank details
             </p>
             {canEditMasters && (
@@ -147,7 +147,7 @@ export default async function VendorDetailPage({
       )}
 
       <Card className="space-y-3 p-4">
-        <p className="text-muted text-xs font-semibold tracking-widest uppercase">
+        <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
           Purchase orders{poTotal > 0 && ` — ${pos.length} of ${poTotal}`}
         </p>
         {pos.length === 0 ? (
@@ -195,7 +195,7 @@ export default async function VendorDetailPage({
       </Card>
 
       <Card className="space-y-3 p-4">
-        <p className="text-muted text-xs font-semibold tracking-widest uppercase">
+        <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
           Bills{billTotal > 0 && ` — ${bills.length} of ${billTotal}`}
         </p>
         {bills.length === 0 ? (

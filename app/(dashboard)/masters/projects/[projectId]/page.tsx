@@ -69,23 +69,23 @@ export default async function ProjectDetailPage({
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Card className="p-4">
-          <p className="text-muted text-xs font-semibold tracking-widest uppercase">Indents</p>
+          <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Indents</p>
           <p className="text-foreground mt-1 text-2xl font-bold">{formatCount(counts.indents)}</p>
         </Card>
         <Card className="p-4">
-          <p className="text-muted text-xs font-semibold tracking-widest uppercase">
+          <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
             Purchase orders
           </p>
           <p className="text-foreground mt-1 text-2xl font-bold">{formatCount(counts.pos)}</p>
         </Card>
         <Card className="p-4">
-          <p className="text-muted text-xs font-semibold tracking-widest uppercase">Bills</p>
+          <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Bills</p>
           <p className="text-foreground mt-1 text-2xl font-bold">{formatCount(counts.bills)}</p>
         </Card>
       </div>
 
       <Card className="space-y-3 p-4">
-        <p className="text-muted text-xs font-semibold tracking-widest uppercase">
+        <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
           Units{unitTotal > 0 && ` — ${units.length} of ${unitTotal}`}
         </p>
         {units.length === 0 ? (
@@ -146,7 +146,7 @@ export default async function ProjectDetailPage({
       </Card>
 
       <Card className="space-y-3 p-4">
-        <p className="text-muted text-xs font-semibold tracking-widest uppercase">
+        <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
           Plots{plotTotal > 0 && ` — ${plots.length} of ${plotTotal}`}
         </p>
         {plots.length === 0 ? (

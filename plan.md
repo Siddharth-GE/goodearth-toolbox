@@ -100,7 +100,7 @@ Branch `feature/skin` off `staging`. One commit per step, plain-English message,
 - Sign-in: **no card**. A centred `max-w-sm` column on the canvas: logo `size-12`, title `text-2xl font-semibold tracking-tight`, muted line, the form, the "or" rule, Google button. Same on verify/forgot/reset. `login/page.tsx` must keep no `searchParams` prop (static prerender — BUGCATCHER #6).
 - **Open:** `/login` light and dark and at 390px; after `npm run build`, `.next/prerender-manifest.json` still lists `/login`.
 
-### [ ] 8. `[Haiku]` Mechanical sweep — exact-string replacements only, no component conversions
+### [x] 8. `[Haiku]` Mechanical sweep — exact-string replacements only, no component conversions
 
 Trivially checkable diffs, applied with a find-and-replace and reviewed by Opus before commit:
 

@@ -52,10 +52,7 @@ function VillaWaveRow({ name, href, wave }: { name: string; href: string; wave: 
           : "text-muted";
 
   return (
-    <Link
-      href={href}
-      className="block px-4 py-3 transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.04]"
-    >
+    <Link href={href} className="hover:bg-foreground/[0.05] block px-4 py-3 transition-colors">
       <div className="flex items-baseline justify-between gap-3">
         <h3 className="text-foreground min-w-0 truncate text-sm font-semibold">{name}</h3>
         <span className={cn("shrink-0 text-xs font-medium", toneClass)}>{wave.label}</span>

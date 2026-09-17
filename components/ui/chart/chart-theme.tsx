@@ -75,7 +75,7 @@ export function HouseTooltip({
             <span className="text-muted text-xs">
               {seriesLabels[String(entry.dataKey)] ?? String(entry.name ?? "")}
             </span>
-            <span className="text-foreground ml-auto pl-3 font-mono text-xs tabular-nums">
+            <span className="text-foreground ml-auto pl-3 text-xs tabular-nums">
               {tooltipValue(typeof entry.value === "number" ? entry.value : null, money)}
             </span>
           </div>

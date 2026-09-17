@@ -86,7 +86,7 @@ export function StageGrid({
         <div className="min-w-[220px] flex-1 space-y-1.5">
           <label
             htmlFor="new-stage"
-            className="text-muted text-xs font-semibold tracking-widest uppercase"
+            className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase"
           >
             {stages.length === 0 ? "First stage" : "Add a stage"}
           </label>

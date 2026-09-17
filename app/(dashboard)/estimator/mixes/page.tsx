@@ -23,7 +23,7 @@ export default async function MixesPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div className="max-w-2xl">
-          <p className="text-muted text-xs font-semibold tracking-widest uppercase">Mixes</p>
+          <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Mixes</p>
           <p className="text-muted mt-1 text-sm">
             A recipe several works share — M20 concrete, cement mortar. Set what goes into one unit
             of it once, and every work using it follows. Change the mix later and every estimate

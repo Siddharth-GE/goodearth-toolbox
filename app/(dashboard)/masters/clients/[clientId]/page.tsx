@@ -56,7 +56,7 @@ export default async function ClientDetailPage({
       />
 
       <Card className="space-y-2 p-4">
-        <p className="text-muted text-xs font-semibold tracking-widest uppercase">Details</p>
+        <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Details</p>
         <dl className="grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
           <div>
             <dt className="text-muted">Mobile</dt>
@@ -84,7 +84,7 @@ export default async function ClientDetailPage({
       </Card>
 
       <Card className="space-y-3 p-4">
-        <p className="text-muted text-xs font-semibold tracking-widest uppercase">
+        <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
           Units{units.length > 0 && ` — ${units.length}`}
         </p>
         {units.length === 0 ? (

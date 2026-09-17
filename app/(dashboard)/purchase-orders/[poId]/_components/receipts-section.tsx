@@ -21,7 +21,7 @@ export function ReceiptsSection({ receipts }: { receipts: PoReceiptRow[] }) {
 
   return (
     <section className="space-y-2">
-      <h2 className="text-muted text-xs font-semibold tracking-widest uppercase">Deliveries</h2>
+      <h2 className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Deliveries</h2>
       <Table>
         <TableHead>
           <TableRow>

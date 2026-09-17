@@ -94,7 +94,7 @@ export function CataloguePicker({
              came from; tick more to specify four identical bathrooms at
              once. */
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-muted text-xs font-semibold tracking-widest uppercase">
+            <span className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
               Add to
             </span>
             {spaces.map((space) => {

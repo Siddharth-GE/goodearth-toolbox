@@ -199,7 +199,7 @@ export default async function SelectionEditorPage({
                     "flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-sm transition-colors",
                     active
                       ? "bg-accent text-accent-foreground font-medium"
-                      : "text-foreground hover:bg-black/[0.04] dark:hover:bg-white/[0.06]",
+                      : "text-foreground hover:bg-foreground/[0.05]",
                   ].join(" ")}
                 >
                   <span className="min-w-0 truncate">{s.label}</span>

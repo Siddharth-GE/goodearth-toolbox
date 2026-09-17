@@ -120,7 +120,7 @@ export function SpaceViews({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-muted text-xs font-semibold tracking-widest uppercase">
+        <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
           Views {views.length > 0 && `(${views.length})`}
         </p>
         {editable && (

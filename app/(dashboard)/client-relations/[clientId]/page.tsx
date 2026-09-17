@@ -56,7 +56,9 @@ export default async function ClientDetailPage({
           <Detail label="Became a client" value={formatDate(client.convertedOn)} />
           {client.notes && (
             <div className="sm:col-span-2 lg:col-span-4">
-              <p className="text-muted text-xs font-semibold tracking-widest uppercase">Notes</p>
+              <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
+                Notes
+              </p>
               <p className="text-foreground mt-1 text-sm whitespace-pre-line">{client.notes}</p>
             </div>
           )}
@@ -124,7 +126,7 @@ export default async function ClientDetailPage({
 function Detail({ label, value }: { label: string; value: string | null }) {
   return (
     <div>
-      <p className="text-muted text-xs font-semibold tracking-widest uppercase">{label}</p>
+      <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">{label}</p>
       <p className="text-foreground mt-1 text-sm">{value || "—"}</p>
     </div>
   );

@@ -205,7 +205,7 @@ export function ReportBuilder({
     );
   };
 
-  const sectionLabel = "text-muted text-xs font-semibold tracking-widest uppercase";
+  const sectionLabel = "text-muted text-[11px] font-medium tracking-[0.14em] uppercase";
   const compactSelect = "h-9 w-auto min-w-32 text-xs";
 
   return (

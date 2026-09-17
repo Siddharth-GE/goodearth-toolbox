@@ -21,7 +21,9 @@ export default async function CategoriesPage() {
     <div className="grid gap-4 md:grid-cols-2">
       <Card className="space-y-4 p-4">
         <div>
-          <p className="text-muted text-xs font-semibold tracking-widest uppercase">Categories</p>
+          <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
+            Categories
+          </p>
         </div>
         <CategoryForm />
         {categories.length > 0 && (
@@ -56,7 +58,7 @@ export default async function CategoriesPage() {
 
       <Card className="space-y-4 p-4">
         <div>
-          <p className="text-muted text-xs font-semibold tracking-widest uppercase">Brands</p>
+          <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Brands</p>
         </div>
         <BrandForm />
         {brands.length > 0 && (

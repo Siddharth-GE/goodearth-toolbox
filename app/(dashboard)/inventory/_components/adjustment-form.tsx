@@ -90,7 +90,7 @@ export function AdjustmentForm({
 
   return (
     <section className="border-border bg-surface space-y-4 rounded-2xl border p-4">
-      <h2 className="text-muted text-xs font-semibold tracking-widest uppercase">
+      <h2 className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
         Correct a count
       </h2>
 

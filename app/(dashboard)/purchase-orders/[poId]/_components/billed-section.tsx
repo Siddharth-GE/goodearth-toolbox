@@ -14,23 +14,25 @@ export function BilledSection({ totals }: { totals: PoBilledTotals }) {
 
   return (
     <section className="space-y-2">
-      <h2 className="text-muted text-xs font-semibold tracking-widest uppercase">Billing</h2>
+      <h2 className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Billing</h2>
       <div className="border-border bg-surface rounded-2xl border p-4">
         <div className="grid gap-4 sm:grid-cols-3">
           <div>
-            <p className="text-muted text-xs font-semibold tracking-widest uppercase">Ordered</p>
+            <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
+              Ordered
+            </p>
             <p className="text-foreground mt-1 font-mono text-sm">
               {formatMoney(totals.ordered_total)}
             </p>
           </div>
           <div>
-            <p className="text-muted text-xs font-semibold tracking-widest uppercase">Billed</p>
+            <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Billed</p>
             <p className="text-foreground mt-1 font-mono text-sm">
               {formatMoney(totals.billed_total)}
             </p>
           </div>
           <div>
-            <p className="text-muted text-xs font-semibold tracking-widest uppercase">Bills</p>
+            <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Bills</p>
             <p className="text-foreground mt-1 font-mono text-sm">
               {formatCount(totals.bill_count)}
             </p>

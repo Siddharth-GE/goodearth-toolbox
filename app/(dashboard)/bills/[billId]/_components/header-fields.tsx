@@ -178,7 +178,7 @@ export function HeaderFields({
 function ReadOnlyField({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-muted text-xs font-semibold tracking-widest uppercase">{label}</p>
+      <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">{label}</p>
       <p className="text-foreground mt-1 text-sm">{value}</p>
     </div>
   );

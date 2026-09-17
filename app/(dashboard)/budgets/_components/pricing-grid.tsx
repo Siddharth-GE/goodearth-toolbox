@@ -199,7 +199,7 @@ function SummaryBar({ totals, action }: { totals: ReturnType<typeof rollUp>; act
 function Figure({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div>
-      <p className="text-muted text-xs font-semibold tracking-widest uppercase">{label}</p>
+      <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">{label}</p>
       <p className="text-foreground text-sm font-semibold">
         {value}
         {hint && <span className="text-muted ml-1.5 text-xs font-normal">{hint}</span>}

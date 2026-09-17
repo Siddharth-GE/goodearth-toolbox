@@ -38,7 +38,9 @@ export default async function EstimatesPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div className="max-w-2xl">
-          <p className="text-muted text-xs font-semibold tracking-widest uppercase">Estimates</p>
+          <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
+            Estimates
+          </p>
           <p className="text-muted mt-1 text-sm">
             A villa and the works it needs. Templates are the standard villa — copy one onto a real
             villa and adjust the quantities, rather than starting from nothing 43 times.

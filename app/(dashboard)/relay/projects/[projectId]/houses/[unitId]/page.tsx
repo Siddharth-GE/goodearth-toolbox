@@ -78,7 +78,7 @@ export default async function HousePage({
       {wave && (
         <Card className="p-4">
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-            <h2 className="text-muted text-xs font-semibold tracking-widest uppercase">
+            <h2 className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
               Where the work is
             </h2>
             <span
@@ -134,7 +134,9 @@ export default async function HousePage({
       </FigureBand>
 
       <div>
-        <h2 className="text-muted mb-2 text-xs font-semibold tracking-widest uppercase">Running</h2>
+        <h2 className="text-muted mb-2 text-[11px] font-medium tracking-[0.14em] uppercase">
+          Running
+        </h2>
         {house.running.length === 0 ? (
           <Card className="p-4">
             <p className="text-muted text-sm">
@@ -159,7 +161,9 @@ export default async function HousePage({
 
       {house.finished.length > 0 && (
         <div>
-          <h2 className="text-muted mb-2 text-xs font-semibold tracking-widest uppercase">Done</h2>
+          <h2 className="text-muted mb-2 text-[11px] font-medium tracking-[0.14em] uppercase">
+            Done
+          </h2>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {house.finished.map((trail) => (
               <TrailCard key={trail.chainId} row={trail} showUnit={false} />

@@ -174,7 +174,7 @@ function Section({
 
   return (
     <div className="space-y-2">
-      <h2 className="text-muted text-xs font-semibold tracking-widest uppercase">
+      <h2 className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
         {title} ({entries.length})
       </h2>
       <Table>

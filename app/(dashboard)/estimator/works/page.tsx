@@ -43,7 +43,7 @@ export default async function WorksPage({
   return (
     <div className="space-y-4">
       <div className="max-w-2xl">
-        <p className="text-muted text-xs font-semibold tracking-widest uppercase">Works</p>
+        <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Works</p>
         <p className="text-muted mt-1 text-sm">
           Every work from the Masters list. Set each one up once — what it is measured in, what
           labour costs, and what it consumes — and it can then be used on any estimate. The works
