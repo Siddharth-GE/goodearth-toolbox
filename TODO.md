@@ -16,6 +16,10 @@ The bot is built and vetted on staging through Phase 7b (2026-09-03). Its plan, 
 6. **Indents' pull-from-estimate is blind to post-`0086` estimates** (BUGCATCHER #16): `getEstimatePull` (`lib/indents/queries.ts`) is keyed on `material_id`, which post-`0086` rows don't have. Re-key on the item; needs its own small plan.
 7. **Supabase Pro plan** — the founder's call. The weekly keep-alive stops the free tier pausing production; only Pro brings backups.
 
+## The skin waits on `staging` (founder, 2026-09-19)
+
+The new skin is merged to `staging` (PR #73) and **does not go to `master` yet**: the founder will add more features first and ship it all together. Two things the ship day must know. **`staging` cannot be merged to `master` as it stands** — it is 121 commits ahead and carries the whole Google Chat bot (migration `0094` is not on production; the bot's own ship checklist is in `lib/google-chat/PLAN.md`) plus unshipped Estimator, Reporter, Selections and Design Management changes, so either that checklist runs first or the skin travels alone on a release branch cut from `master` (cherry-pick the ten skin commits `a096e58`…`3fe4c95`, skip the sweep `f8a9e5c` and re-run it on `master`'s files). **Nobody has yet looked at the signed-in screens in the new skin** — no model session can sign in; the browser checklist at the end of `plan.md` is still the founder's to walk through on staging.goodearthkannur.org.
+
 ## After the skin — the options the founder did not pick on 2026-09-17
 
 The new skin (stone and glass, `plan.md`) restyled every shared part and the home page. Three deeper changes were offered and set aside for now; each is its own small plan when wanted:
