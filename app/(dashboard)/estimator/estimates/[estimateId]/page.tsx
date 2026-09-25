@@ -27,6 +27,7 @@ import {
 import { compareIssuesToEstimate } from "@/lib/estimator/compare";
 import {
   getEstimate,
+  getEstimateMeasurements,
   getEstimateVariations,
   getIssuedAgainstEstimate,
   getReconciliationApprovals,
@@ -41,6 +42,7 @@ import { notFound } from "next/navigation";
 import { Fragment } from "react";
 import { EstimateFormDialog, DeleteEstimateButton } from "../_components/estimate-forms";
 import { AddLineDialog, LineQtyField, RemoveLineButton } from "./_components/line-forms";
+import { MeasurementSheetDialog } from "./_components/measurement-forms";
 import {
   ItemRateField,
   LineVariationDialog,
@@ -67,7 +69,7 @@ export default async function EstimatePage({
   params: Promise<{ estimateId: string }>;
 }) {
   const { estimateId } = await params;
-  const [estimate, book, works, projects, units, variations, materialItems, mixRows] =
+  const [estimate, book, works, projects, units, variations, materialItems, mixRows, measurements] =
     await Promise.all([
       getEstimate(estimateId),
       getRecipeBook(),
@@ -79,10 +81,16 @@ export default async function EstimatePage({
       getEstimateVariations(estimateId),
       listMaterialItems(),
       listMixes(),
+      // The measurement sheets (0096): a line present here is MEASURED —
+      // its quantity is the sheet's total, kept on the line by the actions.
+      getEstimateMeasurements(estimateId),
     ]);
   if (!estimate) notFound();
 
   const isDraft = estimate.status === "draft";
+  // After submit the sheets stay openable, read-only, as the record of
+  // where each quantity came from — one extra column, only if any exist.
+  const showSheetColumn = !isDraft && measurements.size > 0;
 
   // Issued-vs-estimated, for the villa's OFFICIAL estimate only: what
   // the store has issued to its plot, per work, lined up against the
@@ -413,7 +421,7 @@ export default async function EstimatePage({
                 <TableHeaderCell>Quantity</TableHeaderCell>
                 <TableHeaderCell className="text-right">Rate</TableHeaderCell>
                 <TableHeaderCell className="text-right">Amount</TableHeaderCell>
-                {isDraft && <TableHeaderCell></TableHeaderCell>}
+                {(isDraft || showSheetColumn) && <TableHeaderCell></TableHeaderCell>}
               </TableRow>
             </TableHead>
             <TableBody>
@@ -426,12 +434,13 @@ export default async function EstimatePage({
                     <TableCell className="text-foreground pt-4 text-right text-sm font-semibold">
                       {formatMoney(group.totals.grand)}
                     </TableCell>
-                    {isDraft && <TableCell></TableCell>}
+                    {(isDraft || showSheetColumn) && <TableCell></TableCell>}
                   </TableRow>
                   {group.lineCosts.map((cost) => {
                     const line = lineByWork.get(cost.workItemId);
                     if (!line) return null;
                     const uom = uomByWork.get(line.workItemId) ?? null;
+                    const sheet = measurements.get(line.id);
                     return (
                       <TableRow key={line.id}>
                         <TableCell className="text-foreground text-sm">
@@ -452,11 +461,20 @@ export default async function EstimatePage({
                           )}
                         </TableCell>
                         <TableCell>
-                          {isDraft ? (
+                          {isDraft && !sheet ? (
                             <div className="flex items-center gap-2">
                               <LineQtyField id={line.id} qty={line.qty} label={line.name} />
                               <span className="text-muted text-sm">{uom ?? ""}</span>
                             </div>
+                          ) : sheet ? (
+                            <span className="text-foreground text-sm">
+                              {formatQuantity(cost.qty)}{" "}
+                              <span className="text-muted">{uom ?? ""}</span>
+                              <span className="text-muted block text-xs">
+                                From {sheet.length}{" "}
+                                {sheet.length === 1 ? "measurement" : "measurements"}
+                              </span>
+                            </span>
                           ) : (
                             <span className="text-foreground text-sm">
                               {formatQuantity(cost.qty)}{" "}
@@ -474,6 +492,13 @@ export default async function EstimatePage({
                         {isDraft && (
                           <TableCell>
                             <div className="flex items-center justify-end gap-1">
+                              <MeasurementSheetDialog
+                                lineId={line.id}
+                                workName={line.name}
+                                workUom={uom}
+                                rows={sheet ?? []}
+                                readOnly={false}
+                              />
                               {cost.isSetUp && (
                                 <LineVariationDialog
                                   lineId={line.id}
@@ -491,6 +516,19 @@ export default async function EstimatePage({
                               )}
                               <RemoveLineButton id={line.id} label={line.name} />
                             </div>
+                          </TableCell>
+                        )}
+                        {showSheetColumn && (
+                          <TableCell className="text-right">
+                            {sheet && (
+                              <MeasurementSheetDialog
+                                lineId={line.id}
+                                workName={line.name}
+                                workUom={uom}
+                                rows={sheet}
+                                readOnly
+                              />
+                            )}
                           </TableCell>
                         )}
                       </TableRow>

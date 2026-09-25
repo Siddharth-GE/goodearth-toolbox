@@ -335,6 +335,83 @@ export async function getEstimateVariations(estimateId: string): Promise<Estimat
 }
 
 // ---------------------------------------------------------------------
+// The measurement sheet (0096) — the QS layer under a line
+// ---------------------------------------------------------------------
+
+/** One measurement row, raw — the screen works out its quantity through
+ * calc.ts (measurementQuantity), never here. A blank box is null. */
+export type MeasurementRow = {
+  id: string;
+  description: string | null;
+  nos: number | null;
+  length: number | null;
+  breadth: number | null;
+  depth: number | null;
+  sortOrder: number;
+};
+
+/**
+ * line_id → its measurement rows, in sheet order. A line present here
+ * is MEASURED: its quantity is the sheet's total, kept on the line by
+ * the actions after every change. A line absent here keeps the quantity
+ * that was typed for it.
+ */
+export async function getEstimateMeasurements(
+  estimateId: string,
+): Promise<Map<string, MeasurementRow[]>> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+
+  const lines = await fetchAll<{ id: string }>((from, to) =>
+    supabase
+      .from("estimator_estimate_lines")
+      .select("id")
+      .eq("estimate_id", estimateId)
+      .order("id")
+      .range(from, to),
+  );
+  if (lines.length === 0) return new Map();
+
+  const rows = await fetchAll<{
+    id: string;
+    line_id: string;
+    description: string | null;
+    nos: number | null;
+    length: number | null;
+    breadth: number | null;
+    depth: number | null;
+    sort_order: number;
+  }>((from, to) =>
+    supabase
+      .from("estimator_estimate_line_measurements")
+      .select("id, line_id, description, nos, length, breadth, depth, sort_order")
+      .in(
+        "line_id",
+        lines.map((line) => line.id),
+      )
+      .order("sort_order")
+      .order("id")
+      .range(from, to),
+  );
+
+  const byLine = new Map<string, MeasurementRow[]>();
+  for (const row of rows) {
+    const bucket = byLine.get(row.line_id) ?? [];
+    bucket.push({
+      id: row.id,
+      description: row.description,
+      nos: row.nos,
+      length: row.length,
+      breadth: row.breadth,
+      depth: row.depth,
+      sortOrder: row.sort_order,
+    });
+    byLine.set(row.line_id, bucket);
+  }
+  return byLine;
+}
+
+// ---------------------------------------------------------------------
 // Estimates
 // ---------------------------------------------------------------------
 
