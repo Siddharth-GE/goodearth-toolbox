@@ -1930,6 +1930,73 @@ export type Database = {
           },
         ]
       }
+      estimator_estimate_line_measurements: {
+        Row: {
+          breadth: number | null
+          created_at: string
+          created_by: string | null
+          depth: number | null
+          description: string | null
+          id: string
+          length: number | null
+          line_id: string
+          nos: number | null
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          breadth?: number | null
+          created_at?: string
+          created_by?: string | null
+          depth?: number | null
+          description?: string | null
+          id?: string
+          length?: number | null
+          line_id: string
+          nos?: number | null
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          breadth?: number | null
+          created_at?: string
+          created_by?: string | null
+          depth?: number | null
+          description?: string | null
+          id?: string
+          length?: number | null
+          line_id?: string
+          nos?: number | null
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estimator_estimate_line_measurements_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimator_estimate_line_measurements_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "estimator_estimate_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimator_estimate_line_measurements_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       estimator_estimate_lines: {
         Row: {
           created_at: string

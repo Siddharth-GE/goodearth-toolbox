@@ -11,6 +11,8 @@ import {
   aggregateFrozenTakeoff,
   expandRecipe,
   groupLineCosts,
+  measurementQuantity,
+  sheetTotal,
   type MaterialDef,
   type MixDef,
   type WorkRecipe,
@@ -554,4 +556,57 @@ test("an overridden price reaches the line's material cost", () => {
     new Map(materials.map((m) => [m.id, m])),
   );
   assert.equal(cost.materialCost, 8 * 2 * 500);
+});
+
+// ---------------------------------------------------------------------
+// The measurement sheet (0096)
+// ---------------------------------------------------------------------
+
+const row = (
+  nos: number | null,
+  length: number | null,
+  breadth: number | null,
+  depth: number | null,
+) => ({ nos, length, breadth, depth });
+
+test("measurementQuantity counts a row with only nos", () => {
+  assert.equal(measurementQuantity(row(12, null, null, null)), 12);
+});
+
+test("measurementQuantity multiplies nos by length", () => {
+  assert.equal(measurementQuantity(row(12, 3, null, null)), 36);
+});
+
+test("measurementQuantity multiplies all four boxes", () => {
+  assert.equal(measurementQuantity(row(1, 12, 0.23, 3)), 8.28);
+});
+
+test("measurementQuantity skips a blank box in the middle", () => {
+  // Length and depth, no nos and no breadth: a plastered wall face.
+  assert.equal(measurementQuantity(row(null, 4, null, 3)), 12);
+});
+
+test("measurementQuantity of an empty row is 0", () => {
+  assert.equal(measurementQuantity(row(null, null, null, null)), 0);
+});
+
+test("measurementQuantity rounds away floating-point dust", () => {
+  // 4 × 3 × 0.15 is 1.7999999999999998 in raw floating point.
+  assert.equal(measurementQuantity(row(1, 4, 3, 0.15)), 1.8);
+});
+
+test("sheetTotal adds the rows", () => {
+  assert.equal(
+    sheetTotal([row(1, 4, 3, 0.15), row(2, 3, null, null), row(5, null, null, null)]),
+    12.8,
+  );
+});
+
+test("sheetTotal of an empty sheet is 0", () => {
+  assert.equal(sheetTotal([]), 0);
+});
+
+test("sheetTotal rounds the sum, not only each row", () => {
+  // 0.1 + 0.2 is 0.30000000000000004 in raw floating point.
+  assert.equal(sheetTotal([row(0.1, null, null, null), row(0.2, null, null, null)]), 0.3);
 });

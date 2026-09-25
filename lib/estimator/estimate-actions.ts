@@ -14,6 +14,7 @@ import {
   applyRateOverrides,
   computeLine,
   computeWorkTakeoff,
+  sheetTotal,
 } from "./calc";
 import { getEstimateVariations, getRecipeBook } from "./estimate-queries";
 import { revalidatePath } from "next/cache";
@@ -163,6 +164,18 @@ export async function deleteEstimate(id: string): Promise<ActionState> {
       console.error("deleteEstimate (variations) failed:", variationError);
       return { error: "Could not delete the estimate. Try again." };
     }
+    // Measurement sheets (0096) too — RESTRICT, not cascade.
+    const { error: measurementError } = await supabase
+      .from("estimator_estimate_line_measurements")
+      .delete()
+      .in(
+        "line_id",
+        lineIds.map((line) => line.id),
+      );
+    if (measurementError) {
+      console.error("deleteEstimate (measurements) failed:", measurementError);
+      return { error: "Could not delete the estimate. Try again." };
+    }
   }
 
   const { error: lineError } = await supabase
@@ -226,6 +239,23 @@ export async function updateEstimateLineQty(id: string, qty: number): Promise<Ac
   if (!Number.isFinite(qty) || qty <= 0) return { error: "The quantity must be more than zero." };
 
   const supabase = await createClient();
+
+  // A measured line's quantity IS its sheet's total (0096) — typing over
+  // it would leave the rows saying one thing and the BOQ another.
+  const { count, error: countError } = await supabase
+    .from("estimator_estimate_line_measurements")
+    .select("id", { count: "exact", head: true })
+    .eq("line_id", id);
+  if (countError) {
+    console.error("updateEstimateLineQty (measurements) failed:", countError);
+    return { error: "Could not save the quantity. Try again." };
+  }
+  if (count) {
+    return {
+      error: "This quantity comes from its measurement sheet — change the rows there instead.",
+    };
+  }
+
   const { error } = await supabase
     .from("estimator_estimate_lines")
     .update({ qty, updated_by: user.id })
@@ -243,7 +273,18 @@ export async function removeEstimateLine(id: string): Promise<ActionState> {
   await requireTool(GRANT);
   const supabase = await createClient();
 
-  // The line's variation (0087) goes with it — RESTRICT, not cascade.
+  // The line's measurement sheet (0096) and variation (0087) go with
+  // it — RESTRICT, not cascade.
+  const { error: measurementError } = await supabase
+    .from("estimator_estimate_line_measurements")
+    .delete()
+    .eq("line_id", id);
+  if (measurementError) {
+    if (measurementError.code === "P0001") return { error: measurementError.message };
+    console.error("removeEstimateLine (measurements) failed:", measurementError);
+    return { error: "Could not remove the work. Try again." };
+  }
+
   const { error: variationError } = await supabase
     .from("estimator_estimate_line_components")
     .delete()
@@ -261,6 +302,188 @@ export async function removeEstimateLine(id: string): Promise<ActionState> {
 
   revalidatePath("/estimator", "layout");
   return undefined;
+}
+
+/* ------------------------------------------------------------------ *
+ * The measurement sheet (0096) — the QS layer under a line
+ *
+ * One row per wall, slab or footing: Nos × Length × Breadth × Depth,
+ * a blank box not used (founder, 2026-09-25). The line's qty stays the
+ * one figure everything downstream reads; after every row change the
+ * action re-sums the sheet through calc.ts and writes it there. The
+ * draft-only trigger is the boundary; these actions speak plainly.
+ * ------------------------------------------------------------------ */
+
+export type MeasurementFields = {
+  description: string | null;
+  nos: number | null;
+  length: number | null;
+  breadth: number | null;
+  depth: number | null;
+};
+
+/** The same rules for a new row and an edited one: blank is "not used",
+ * anything typed must be a number above zero, and a row must measure
+ * something. Returns the message, or undefined when the row is fine. */
+function checkMeasurement(fields: MeasurementFields): string | undefined {
+  const boxes = [
+    ["number", fields.nos],
+    ["length", fields.length],
+    ["breadth", fields.breadth],
+    ["depth", fields.depth],
+  ] as const;
+  for (const [label, value] of boxes) {
+    if (value !== null && (!Number.isFinite(value) || value <= 0)) {
+      return `The ${label} must be a number more than zero, or left blank.`;
+    }
+  }
+  if (boxes.every(([, value]) => value === null)) {
+    return "Enter at least one of number, length, breadth or depth.";
+  }
+  if (fields.description && fields.description.length > TEXT_LIMIT) {
+    return "That description is too long.";
+  }
+  return undefined;
+}
+
+/** Re-sum a line's sheet and write the total onto the line. With no rows
+ * left the line keeps its last quantity, typed from then on. */
+async function syncLineQty(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  lineId: string,
+  userId: string,
+): Promise<string | undefined> {
+  const { data: rows, error: readError } = await supabase
+    .from("estimator_estimate_line_measurements")
+    .select("nos, length, breadth, depth")
+    .eq("line_id", lineId);
+  if (readError) {
+    console.error("syncLineQty (read) failed:", readError);
+    return "The row was saved, but the work's quantity could not be updated. Change any row to retry.";
+  }
+  if (!rows || rows.length === 0) return undefined;
+
+  const total = sheetTotal(rows);
+  if (!(total > 0)) {
+    return "The measurements add up to nothing — check the rows.";
+  }
+
+  const { error } = await supabase
+    .from("estimator_estimate_lines")
+    .update({ qty: total, updated_by: userId })
+    .eq("id", lineId);
+  if (error) {
+    if (error.code === "P0001") return error.message;
+    console.error("syncLineQty (write) failed:", error);
+    return "The row was saved, but the work's quantity could not be updated. Change any row to retry.";
+  }
+  return undefined;
+}
+
+export async function addLineMeasurement(
+  lineId: string,
+  _state: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+  if (!lineId) return { error: "Which work?" };
+
+  const fields: MeasurementFields = {
+    description: text(formData, "description") || null,
+    nos: parseNumber(formData.get("nos")),
+    length: parseNumber(formData.get("length")),
+    breadth: parseNumber(formData.get("breadth")),
+    depth: parseNumber(formData.get("depth")),
+  };
+  const problem = checkMeasurement(fields);
+  if (problem) return { error: problem };
+
+  const supabase = await createClient();
+
+  // New rows go to the bottom of the sheet.
+  const { data: last, error: lastError } = await supabase
+    .from("estimator_estimate_line_measurements")
+    .select("sort_order")
+    .eq("line_id", lineId)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (lastError) {
+    console.error("addLineMeasurement (order) failed:", lastError);
+    return { error: "Could not add the row. Try again." };
+  }
+
+  const { error } = await supabase.from("estimator_estimate_line_measurements").insert({
+    line_id: lineId,
+    ...fields,
+    sort_order: (last?.sort_order ?? 0) + 1,
+    created_by: user.id,
+    updated_by: user.id,
+  });
+  if (error) {
+    if (error.code === "P0001") return { error: error.message };
+    console.error("addLineMeasurement failed:", error);
+    return { error: "Could not add the row. Try again." };
+  }
+
+  const syncError = await syncLineQty(supabase, lineId, user.id);
+  revalidatePath("/estimator", "layout");
+  return syncError ? { error: syncError } : undefined;
+}
+
+export async function updateLineMeasurement(
+  id: string,
+  fields: MeasurementFields,
+): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+  if (!id) return { error: "Which row?" };
+
+  const cleaned: MeasurementFields = {
+    ...fields,
+    description: fields.description?.trim() || null,
+  };
+  const problem = checkMeasurement(cleaned);
+  if (problem) return { error: problem };
+
+  const supabase = await createClient();
+  const { data: row, error } = await supabase
+    .from("estimator_estimate_line_measurements")
+    .update({ ...cleaned, updated_by: user.id })
+    .eq("id", id)
+    .select("line_id")
+    .maybeSingle();
+  if (error) {
+    if (error.code === "P0001") return { error: error.message };
+    console.error("updateLineMeasurement failed:", error);
+    return { error: "Could not save the row. Try again." };
+  }
+  if (!row) return { error: "That row is no longer on the sheet — reload the page." };
+
+  const syncError = await syncLineQty(supabase, row.line_id, user.id);
+  revalidatePath("/estimator", "layout");
+  return syncError ? { error: syncError } : undefined;
+}
+
+export async function removeLineMeasurement(id: string): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+  if (!id) return { error: "Which row?" };
+  const supabase = await createClient();
+
+  const { data: row, error } = await supabase
+    .from("estimator_estimate_line_measurements")
+    .delete()
+    .eq("id", id)
+    .select("line_id")
+    .maybeSingle();
+  if (error) {
+    if (error.code === "P0001") return { error: error.message };
+    console.error("removeLineMeasurement failed:", error);
+    return { error: "Could not remove the row. Try again." };
+  }
+
+  const syncError = row ? await syncLineQty(supabase, row.line_id, user.id) : undefined;
+  revalidatePath("/estimator", "layout");
+  return syncError ? { error: syncError } : undefined;
 }
 
 /* ------------------------------------------------------------------ *
@@ -612,6 +835,84 @@ async function copyLineVariations(
   return undefined;
 }
 
+/**
+ * Copy every line's measurement sheet (0096) from one estimate to
+ * another, by work — the copyLineVariations contract: a message, or
+ * undefined, and the caller owns the cleanup. The copied line's qty
+ * already equals its sheet's total (the source was kept in sync), so
+ * nothing needs re-syncing afterwards.
+ */
+async function copyLineMeasurements(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  sourceEstimateId: string,
+  targetEstimateId: string,
+  userId: string,
+): Promise<string | undefined> {
+  const { data: sourceLines, error: sourceError } = await supabase
+    .from("estimator_estimate_lines")
+    .select("id, work_item_id")
+    .eq("estimate_id", sourceEstimateId);
+  if (sourceError) {
+    console.error("copyLineMeasurements (source lines) failed:", sourceError);
+    return "Could not read the works' measurements.";
+  }
+  if (!sourceLines || sourceLines.length === 0) return undefined;
+
+  const { data: rows, error: rowsError } = await supabase
+    .from("estimator_estimate_line_measurements")
+    .select("line_id, description, nos, length, breadth, depth, sort_order")
+    .in(
+      "line_id",
+      sourceLines.map((line) => line.id),
+    );
+  if (rowsError) {
+    console.error("copyLineMeasurements (rows) failed:", rowsError);
+    return "Could not read the works' measurements.";
+  }
+  if (!rows || rows.length === 0) return undefined;
+
+  const { data: targetLines, error: targetError } = await supabase
+    .from("estimator_estimate_lines")
+    .select("id, work_item_id")
+    .eq("estimate_id", targetEstimateId);
+  if (targetError) {
+    console.error("copyLineMeasurements (target lines) failed:", targetError);
+    return "Could not copy the works' measurements.";
+  }
+
+  const sourceWorkByLine = new Map(sourceLines.map((line) => [line.id, line.work_item_id]));
+  const targetLineByWork = new Map((targetLines ?? []).map((line) => [line.work_item_id, line.id]));
+
+  const inserts = rows.flatMap((row) => {
+    const workItemId = sourceWorkByLine.get(row.line_id);
+    const targetLineId = workItemId ? targetLineByWork.get(workItemId) : undefined;
+    if (!targetLineId) return [];
+    return [
+      {
+        line_id: targetLineId,
+        description: row.description,
+        nos: row.nos,
+        length: row.length,
+        breadth: row.breadth,
+        depth: row.depth,
+        sort_order: row.sort_order,
+        created_by: userId,
+        updated_by: userId,
+      },
+    ];
+  });
+  if (inserts.length === 0) return undefined;
+
+  const { error: insertError } = await supabase
+    .from("estimator_estimate_line_measurements")
+    .insert(inserts);
+  if (insertError) {
+    console.error("copyLineMeasurements (insert) failed:", insertError);
+    return "Could not copy the works' measurements.";
+  }
+  return undefined;
+}
+
 /** Undo a half-made copy, in the order the foreign keys demand. */
 async function discardCopiedEstimate(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -623,13 +924,9 @@ async function discardCopiedEstimate(
     .select("id")
     .eq("estimate_id", estimateId);
   if (lines && lines.length > 0) {
-    await supabase
-      .from("estimator_estimate_line_components")
-      .delete()
-      .in(
-        "line_id",
-        lines.map((line) => line.id),
-      );
+    const lineIds = lines.map((line) => line.id);
+    await supabase.from("estimator_estimate_line_components").delete().in("line_id", lineIds);
+    await supabase.from("estimator_estimate_line_measurements").delete().in("line_id", lineIds);
   }
   await supabase.from("estimator_estimate_lines").delete().eq("estimate_id", estimateId);
   await supabase.from("estimator_estimates").delete().eq("id", estimateId);
@@ -773,6 +1070,7 @@ export async function copyTemplateToUnit(
 
     const variationError =
       (await copyLineVariations(supabase, template.id, created.id, user.id)) ??
+      (await copyLineMeasurements(supabase, template.id, created.id, user.id)) ??
       (await copyItemRates(supabase, template.id, created.id, user.id));
     if (variationError) {
       await discardCopiedEstimate(supabase, created.id);
@@ -1022,6 +1320,7 @@ export async function reviseEstimate(estimateId: string): Promise<ActionState> {
     // silently returned every work to standard would rewrite the house.
     const variationError =
       (await copyLineVariations(supabase, source.id, created.id, user.id)) ??
+      (await copyLineMeasurements(supabase, source.id, created.id, user.id)) ??
       (await copyItemRates(supabase, source.id, created.id, user.id));
     if (variationError) {
       await discardCopiedEstimate(supabase, created.id);

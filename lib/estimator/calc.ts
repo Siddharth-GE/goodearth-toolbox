@@ -466,3 +466,45 @@ export function groupLineCosts(
     )
     .map((group) => ({ ...group, totals: computeEstimateTotals(group.lineCosts) }));
 }
+
+// ---------------------------------------------------------------------
+// The measurement sheet (0096) — the QS layer under a line
+// ---------------------------------------------------------------------
+
+/** One measurement row: a blank box is null and means "not used". */
+export type MeasurementInput = {
+  nos: number | null;
+  length: number | null;
+  breadth: number | null;
+  depth: number | null;
+};
+
+/**
+ * Nos × Length × Breadth × Depth, with every blank box skipped — the
+ * founder's standard sheet (2026-09-25): "12 nos" is 12, "12 × 3.0" is
+ * 36, "1 × 4 × 3 × 0.15" is 1.8. A row with nothing in it measures 0
+ * (the database refuses such a row; this only keeps the maths total).
+ * No unit conversion ever happens here — the boxes are in whatever the
+ * work is measured in, and the screen says so.
+ */
+export function measurementQuantity(row: MeasurementInput): number {
+  const boxes = [row.nos, row.length, row.breadth, row.depth].filter(
+    (value): value is number => value !== null,
+  );
+  if (boxes.length === 0) return 0;
+  return roundQuantity(boxes.reduce((product, value) => product * value, 1));
+}
+
+/**
+ * The sheet's total — what the line's quantity becomes. Rounded to six
+ * decimals so floating-point dust (4 × 3 × 0.15 = 1.7999999999999998)
+ * never reaches the database or the screen; six is far past anything a
+ * site measurement carries (formatQuantity shows three).
+ */
+export function sheetTotal(rows: MeasurementInput[]): number {
+  return roundQuantity(rows.reduce((sum, row) => sum + measurementQuantity(row), 0));
+}
+
+function roundQuantity(value: number): number {
+  return Math.round(value * 1e6) / 1e6;
+}
