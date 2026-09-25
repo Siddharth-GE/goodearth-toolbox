@@ -24,6 +24,16 @@ const PUBLIC_PATHS = [
   "/api/keep-alive",
 ];
 
+// THE ONE PREFIX. Dexter's public deck viewer (app/deck/[token]/…) serves
+// an uploaded presentation and its assets to a client with no account:
+// the HTML at /deck/<token>/index.html loads `assets/a.css` relative to
+// itself, so the whole folder under the token has to be reachable, and
+// an exact list cannot name paths it has never seen. The real gate is
+// the 22-character random token, matched inside the route before a row
+// is read (SECURITY.md, _Dexter's public door_). Nothing else goes here:
+// a second prefix needs the same argument written down first.
+const PUBLIC_PREFIXES = ["/deck/"];
+
 /**
  * The request's headers with any client-supplied identity removed.
  *
@@ -84,9 +94,12 @@ export async function updateSession(request: NextRequest) {
   const claims = data?.claims ?? null;
 
   // Exact match, not startsWith — a prefix match would make any future
-  // /login-adjacent route silently public.
+  // /login-adjacent route silently public. PUBLIC_PREFIXES is the single
+  // argued exception, and it is a prefix ending in "/" so that "/deck"
+  // itself, or "/decks-of-anything", is not swept in with it.
   const path = request.nextUrl.pathname;
-  const isPublicPath = PUBLIC_PATHS.includes(path);
+  const isPublicPath =
+    PUBLIC_PATHS.includes(path) || PUBLIC_PREFIXES.some((prefix) => path.startsWith(prefix));
 
   if (!claims && !isPublicPath) {
     const url = request.nextUrl.clone();
