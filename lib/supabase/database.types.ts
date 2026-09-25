@@ -1252,6 +1252,128 @@ export type Database = {
           },
         ]
       }
+      dexter_decks: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          entry_path: string
+          file_count: number
+          id: string
+          project_id: string
+          share_enabled: boolean
+          share_token: string
+          title: string
+          total_bytes: number
+          updated_at: string
+          updated_by: string | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          entry_path: string
+          file_count: number
+          id?: string
+          project_id: string
+          share_enabled?: boolean
+          share_token: string
+          title: string
+          total_bytes: number
+          updated_at?: string
+          updated_by?: string | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          entry_path?: string
+          file_count?: number
+          id?: string
+          project_id?: string
+          share_enabled?: boolean
+          share_token?: string
+          title?: string
+          total_bytes?: number
+          updated_at?: string
+          updated_by?: string | null
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dexter_decks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dexter_decks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "dexter_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dexter_decks_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dexter_decks_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dexter_projects: {
+        Row: {
+          client_name: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          client_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          client_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dexter_projects_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dexter_projects_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       drawing_revision_files: {
         Row: {
           content_type: string
