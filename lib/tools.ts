@@ -224,8 +224,7 @@ export const TOOLS: Tool[] = [
   },
   {
     name: "Dexter",
-    description:
-      "Client presentations as shareable links — upload an HTML deck, send the link.",
+    description: "Client presentations as shareable links — upload an HTML deck, send the link.",
     href: "/dexter",
     icon: "Presentation",
     group: "Management",
