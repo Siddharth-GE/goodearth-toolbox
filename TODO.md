@@ -8,7 +8,7 @@ The bot is built and vetted on staging through Phase 7b (2026-09-03). Its plan, 
 
 ## Next, in order
 
-- **The Estimator's measurement sheet (`feature/estimator-measurements`, 2026-09-25) waits on Fable.** The code is built and green; migration `0096` is written but not applied. A Fable session reviews it, applies it to staging, and runs the approval pass in the root `plan.md`; then the founder tries it on the preview.
+- **The Estimator's measurement sheet is on staging for the founder's vet** (PR #75, 2026-09-25). `0096` is applied to staging only; the review was Opus's on the founder's instruction (root `plan.md`). The founder's comments come next; production waits, with `0094` and `0095`.
 
 0. **Production is paused — restore it, then find out why the keep-alive did not keep it alive.** Found `INACTIVE` on 2026-09-25, twenty days after the weekly cron went in. Restore in the Supabase dashboard (or `POST /v1/projects/pajfrgnkapicdgangjey/restore` — a model session is refused this, rightly), then read the cron's runs under Vercel → Settings → Cron Jobs: a red run means `CRON_SECRET` (BUGCATCHER #18), no run at all means the cron never fired. Until it is fixed, item 7 is the only real answer. The founder's call, 2026-09-25: "production later".
 1. **Grant `/design-management` to the design team** in Settings. Legal in both CHECKs since `0030`; invisible until granted. Nobody holds it today.

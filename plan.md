@@ -5,17 +5,17 @@ _Planned by Fable, 2026-09-25. Branch `feature/estimator-measurements` off `stag
 ## Progress — the live board
 
 - [x] 0. Branch and plan (Opus, 2026-09-25)
-- [ ] 1. Migration `0096` — **written, not applied.** Waiting for the Fable review MODELS.md requires before any RLS migration reaches `db:apply`. After that: apply to staging, then `npm run db:types:staging`. The new table's types were added to `lib/supabase/database.types.ts` by hand in the generator's exact shape so the code typechecks now; the regeneration should produce no diff there.
+- [x] 1. Migration `0096` — **applied to staging** 2026-09-25 (Opus). Its prove-it block passed; the regenerated staging types matched the hand-written ones with no diff. Production does not have it yet.
 - [x] 2. `calc.ts` arithmetic + 9 tests
 - [x] 3. Read — `getEstimateMeasurements`
 - [x] 4. Writes — add / update / remove a row, the quantity sync, the typed-quantity refusal, deletes, and copies on template and Revise
 - [x] 5. Screen — `measurement-forms.tsx` and the estimate page
 - [x] 6. Docs — Estimator `PLAN.md` decision 9 and its warning, `STATUS.md`
-- [ ] 7. Fable's approval pass
-
-### Questions for the tier above
-
-- **For Fable:** the migration adds `revoke execute on function estimator_line_measurements_draft_only() from public, anon, authenticated`, following SECURITY.md's "every new function" rule. The 0087 sibling function has no such revoke. Postgres checks EXECUTE on a trigger function only at `create trigger`, which the migration does as the owner before the revoke, so firing is unaffected — but it differs from its sibling, so worth a look.
+- [x] 7. Approval pass — **done by Opus, not Fable, on the founder's instruction** (2026-09-25: "do whats next finish the review get to the merge"). MODELS.md gives this step and the migration review to Fable; the founder chose otherwise for this feature, after being told the rule. What the pass covered:
+  - **One fix.** `updateLineMeasurement` spread the caller's object into the update, so a crafted call could carry `line_id` or `created_by` and move a row onto another work. It now builds the update from exactly the five named fields and type-checks each box.
+  - **The trigger fired, in statements that ended in an exception** (BUGCATCHER's "fire the trigger" check), on staging: a draft line accepted a row; a superseded estimate's line refused with the plain message; an all-blank row was refused by the CHECK; and as the `authenticated` role — which `0096` revokes EXECUTE from — the trigger still fired with its own message, not "permission denied". Zero rows were left behind.
+  - **SECURITY.md:** one new table, RLS on, four `/estimator` policies, no view, no money column, no cross-tool read or write, every query and action behind `requireTool("/estimator")`. The trigger function carries its execute revokes (the 0087 sibling does not; the firing test above shows the revoke is harmless).
+  - **Still owed, and only the founder can do it:** opening the page and pressing the write buttons (BUGCATCHER's first three checks), in light and dark mode, and on a phone. No model session can sign in.
 
 ## Context
 
