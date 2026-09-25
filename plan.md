@@ -127,7 +127,7 @@ _Done — layout, welcome page, `projects/` list + New project dialog, `projects
 4. `[Sonnet]` Screens. _(done)_
 5. `[Opus]` Proxy prefix and the public viewer route. _(done — written in the Fable session, reviewed and driven by Opus)_
 6. `[Opus]` Probe smoke through the verification list on the preview; fix what it finds. _(public half done, 2026-09-25 — see Opus review below; the signed-in half needs a person, because no model session can sign in)_
-7. `[Fable]` Diff review against SECURITY.md and BUGCATCHER.md; docs; merge to `staging` for the founder's vet. Production waits for their word, with `0095` applied there first and `db:compare` empty. _(docs done. **Merged to `staging` 2026-09-25 (PR #74) on the founder's word** — "works, merge it to staging", after trying it on the preview. **The Fable diff review has not run yet**, and it is owed before `master`.)_
+7. `[Fable]` Diff review against SECURITY.md and BUGCATCHER.md; docs; merge to `staging` for the founder's vet. Production waits for their word, with `0095` applied there first and `db:compare` empty. _(docs done. **Merged to `staging` 2026-09-25 (PR #74) on the founder's word** — "works, merge it to staging", after trying it on the preview. The Fable review ran the same day — see below. **Founder, after it: "everything good on staging?" — yes, confirmed, and "production later."** Staging is where this stops until then.)_
 
 ## Opus review, 2026-09-25
 
