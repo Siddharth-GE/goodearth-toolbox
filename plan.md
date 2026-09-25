@@ -1,167 +1,126 @@
-# plan.md — the new skin: "stone and glass"
+# plan.md — Dexter: shareable HTML decks
 
-_Written by Fable, 2026-09-17; approved by the founder the same day. Built on `feature/skin`. Tick each step here as it lands; a lower tier writes any deviation as a question at the bottom, never into the code. The Google Chat round-two plan this file replaces is in git history (commit d26a263 and before); its two open steps are the founder's and are recorded in `lib/google-chat/PLAN.md`._
+_Written by Fable, 2026-09-25. Built on `feature/dexter` off `staging`; one migration (`0095`). Tick each step here as it lands; a lower tier writes any deviation as a question at the bottom, never into the code. Founder decisions taken 2026-09-25: uploads capped at 4 MB (the drawings path, no direct-to-storage machinery); a Dexter project is a named folder, not a Masters link._
 
 ## Context
 
-The founder wants the toolbox's look and feel reimagined: **minimal yet responsive, subtle expression and effects — Aman meets Apple.** Aman is quiet warm luxury: stone and linen neutrals, air, hairlines, calm. Apple is precision: clarity, frosted materials, big confident headlines, gentle physical motion (press, lift, pop), rounded continuous corners.
+Design makes client presentations as standalone HTML (a single file, or a zip of `index.html` plus assets). Today they travel as attachments. Dexter is a small Management tool where someone with the grant creates a **project** (a folder with a name), uploads a deck into it, and gets a **standalone link** a client can open without signing in. The link is the whole gate: it carries a random token, can be switched off, and can be re-issued. Nothing else in the toolbox reads Dexter and Dexter reads nothing but `profiles` for names.
 
-Three founder decisions set the scope (2026-09-17):
+Two things in this build are new to the toolbox and must be done deliberately:
 
-1. **A new skin everywhere** — colours, type, spacing, every shared primitive, the shell, login, welcome screens and home. Layouts stay where they are. Not chosen: phone-first restructuring of lists, a real sidebar search, the structural tidy-up (heading sweep, filter bar, notice banner, missing `loading.tsx`). Those go to `TODO.md` as later options.
-2. **The home page shows only what is real.** The five panels with invented numbers are removed, not restyled.
-3. **One typeface.** Geist stays; the Aman calm comes from lighter weights, spaced small capitals and whitespace, not a second font.
+1. **A public route with a dynamic path.** `PUBLIC_PATHS` is exact strings by rule. A deck's assets must resolve relatively (`assets/a.css` next to `index.html`), so the viewer needs a path prefix. `/deck/` becomes the one named prefix beside Marathon's, and the rule text in `SECURITY.md` and `lib/supabase/proxy.ts` says so.
+2. **Untrusted HTML served from the app's own origin.** An uploaded page runs its own scripts. Served plainly it could make credentialed requests to the toolbox as whoever is viewing it. Every deck response carries `Content-Security-Policy: sandbox allow-scripts allow-popups allow-forms allow-modals` — no `allow-same-origin` — so the page runs with an opaque origin: scripts and relative assets work, cookies and same-origin fetches do not. This is the standard answer for same-origin user HTML without a second domain.
 
-Why this is cheap for the size of the change: the primitives in `components/ui/*` have near-100% adoption (zero raw palette classes outside the documented Marathon exception, zero raw `<select>`, one raw `<table>`), and every colour is a token in `app/globals.css`. Restyling ~25 files changes every screen. The mode is **Operate** — expression never obscures the task; brand lives in precise details.
+The public reader has no session, so it looks the token up through the **admin client** — the same shape as `/api/keep-alive` and the Google Chat door. It is one file, it reads two things (the deck row by token, one object by path), it never writes, and `SECURITY.md` lists it. The alternative (an anon-callable definer function plus an anon storage policy) opens more surface, not less.
 
-## The direction, committed
+## Scope
 
-**Palette — restrained.** Warm stone neutrals and the one Goodearth green for actions. In light mode the page is linen, cards are paper, and the raised layer is white — three tones, so a card reads as a card without a shadow. Dark mode is the same idea in warm charcoal. Status colours and the measured chart palette do not change.
+**In:** projects (create, rename, delete when empty) · decks (upload `.html` or `.zip`, rename, replace the file keeping the same link, stop/resume sharing, issue a new link, delete) · a public viewer at `/deck/<token>/<entry>` · welcome screen with counts · `/dexter` grant.
 
-**Type — one face, more range.** Page titles grow from `text-lg` to `text-2xl`, semibold, tight. Small-capital labels get lighter and wider (`text-[11px] font-medium tracking-[0.14em]`). Figures move from monospace to Geist Sans with tabular numerals, as Apple does — and the hero step gets bigger.
+**Out, deliberately:** view counts, passwords on links, expiry dates, a Goodearth frame around the deck, uploads above 4 MB, linking to Masters projects or clients. Each is a later small plan if wanted.
 
-**Material — hairlines at rest, float only when floating.** Cards lose their shadow; a hairline border and the tonal step do the work. Shadow appears only on things that actually float (menus, dialogs, the phone drawer), and it is soft and ambient. Sticky bars are frosted glass.
+## Data — `supabase/migrations/0095_dexter.sql` `[Fable]` (drafted in the planning session)
 
-**Nav is ink, accent is action.** Tabs and nav pills stop being green; the active one is ink on paper. Green is reserved for the primary button, links and the active icon — so the eye always finds the one thing to press.
+Header and shape as `0084`/`0091`: re-runnable throughout, numbered sections, a closing `do $$` block that proves it landed.
 
-**Motion — a small defined vocabulary, nothing else.** Press (buttons scale to 0.98), lift (linked cards rise 2px with the float shadow), pop (dialogs and menus scale from 0.96 with a fade; on a phone a dialog rises as a bottom sheet), slide (the phone drawer), and a spinner that waits 160ms before appearing so fast pages never flash. All timed by two easing tokens. The global reduced-motion block already covers every one of these because they are CSS animations and transitions. Relay's licence stays exactly as it is.
+1. **`/dexter` becomes a grantable app** — restate both `user_apps_app_known` and `role_apps_app_known` in full (0084's list plus `/dexter`), identically.
+2. **`dexter_projects`** — `id uuid pk`, `name text not null check (length(trim(name)) > 0)`, `client_name text` (nullable, free text), `created_by uuid references profiles(id)`, `updated_by`, `created_at`, `updated_at`. Unique on `lower(name)`.
+3. **`dexter_decks`** — `id uuid pk`, `project_id uuid not null references dexter_projects(id)` (RESTRICT — a project with decks refuses deletion), `title text not null check (…)`, `entry_path text not null` (e.g. `index.html`), `share_token text not null unique` (22 chars base64url from 16 random bytes, generated in the action), `share_enabled boolean not null default true`, `file_count int not null`, `total_bytes bigint not null`, `uploaded_by uuid references profiles(id)`, `created_by`, `updated_by`, `created_at`, `updated_at`. Index on `project_id`. Objects live at `decks/<deck_id>/<relative path>`; no file table — Storage is the file list.
+4. **Triggers** — `audit_<table>` via `audit_row()` and `set_updated_at` on both, in the same `do $$` loop 0091 uses; `enable row level security` on both.
+5. **Policies** — one SELECT per table `using (has_app('/dexter'))`; INSERT/UPDATE/DELETE `has_app('/dexter')`. Nothing for `anon`, ever — the public reader uses the admin client.
+6. **Bucket `dexter`** — private, `file_size_limit` 10 MB per object (one uncompressed asset can be larger than the 4 MB zip it came from), `allowed_mime_types` null (a deck carries fonts, video, JSON). Three `storage.objects` policies (select / insert / delete) on `bucket_id = 'dexter' and public.has_app('/dexter')` — `public.` qualified, as 0091 explains. No update policy: a replacement is a new set of objects.
+7. **Prove it** — both CHECKs admit `/dexter`; both tables have RLS and exactly one SELECT policy; the bucket is private at 10 MB; exactly three `dexter %` storage policies.
 
-## Steps
+Then `npm run db:apply -- --project ipstebqawrvhkyntctrv --commit` and `npm run db:types:staging`; commit types with the migration.
 
-Branch `feature/skin` off `staging`. One commit per step, plain-English message, the committing model's own co-author line, pushed. Every step ends with "open the page" in light and dark, at desktop and 390px. Nothing here touches a query, an action, a policy or a migration. Run `npm run format && npm run lint && npm run typecheck && npm test` before every commit; `npm run build` before the commit of steps 1, 5 and 7.
+## Files
 
-### [x] 1. `[Opus]` Tokens and motion vocabulary — `app/globals.css`, `app/layout.tsx`, `lib/utils.ts`
+### Registry and shell `[Haiku]`
 
-- Light block (`:root`): `--background #f4f2ee` (linen), `--surface #fcfbf9` (paper), `--surface-raised #ffffff`, `--border #e5e1da`, `--foreground #1d1c19`, `--muted #726f69`. `--accent`, status and chart tokens unchanged.
-- Both dark blocks (`[data-theme="dark"]` and the media-query copy — **keep them identical**): `--background #141311`, `--surface #1a1a17` (unchanged — the chart palette was measured on it), `--surface-raised #232220`, `--border #2b2a26`, `--foreground #efede8`, `--muted #9b978f`.
-- New token in `:root` and both dark blocks: `--shadow-float` (light: `0 12px 40px -12px rgb(29 28 25 / 0.18), 0 1px 2px rgb(29 28 25 / 0.06)`; dark: `0 16px 48px -12px rgb(0 0 0 / 0.6), 0 1px 0 rgb(255 255 255 / 0.04)`).
-- New entries in `@theme inline` so they become utilities: `--shadow-float: var(--shadow-float)`, `--ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1)`, `--ease-spring: cubic-bezier(0.2, 0.9, 0.3, 1.08)`, and `--animate-pop-in`, `--animate-pop-out`, `--animate-fade-in`, `--animate-fade-out`, `--animate-menu-in`, `--animate-sheet-in`, `--animate-sheet-out`, `--animate-slide-in-left`, `--animate-slide-out-left`, each `name 200–280ms var(--ease-out-quint) both` (pop/menu 200ms, fade 160ms, sheet/slide 280ms; the `-out` variants 160ms).
-- Keyframes, next to `card-in`: `pop-in` (opacity 0→1, `scale(0.96) translateY(6px)`→none), `pop-out` (reverse), `fade-in/out`, `menu-in` (opacity + `scale(0.96)` with `transform-origin: var(--radix-dropdown-menu-content-transform-origin)`), `sheet-in/out` (translateY 100%→0), `slide-in-left/out-left` (translateX -100%→0). Relay's four keyframes and `card-in` untouched.
-- Reduced motion: no change needed — the existing `*` rule zeroes every animation and transition above. Verify by toggling the OS setting.
-- `app/layout.tsx` viewport `themeColor`: `#f4f2ee` light, `#141311` dark (they are quoted from globals.css and must match — the phone's address bar is the check).
-- **`lib/utils.ts`: `tailwind-merge` does not know the custom names** — measured: `twMerge("shadow-float shadow-none")` keeps both, so a caller's `shadow-none` could never override. Replace `twMerge` with `extendTailwindMerge({ extend: { theme: { shadow: ["float"], ease: ["out-quint", "spring"], animate: ["pop-in", "pop-out", "fade-in", "fade-out", "menu-in", "sheet-in", "sheet-out", "slide-in-left", "slide-out-left"] } } })`. Add `lib/utils.test.ts` (pure logic) asserting `cn("shadow-float", "shadow-none") === "shadow-none"`, `cn("ease-out-quint", "ease-linear") === "ease-linear"`, `cn("animate-pop-in", "animate-none") === "animate-none"`, and that `cn("px-2", "px-4")` still gives `px-4`.
-- **Open:** every page still reads; nothing but colour has moved. Dark: open a date field (BUGCATCHER #4).
+- `lib/tools.ts` — import `Presentation` from lucide, add to `TOOL_ICONS`; entry `{ name: "Dexter", description: "Client presentations as shareable links — upload an HTML deck, send the link.", href: "/dexter", icon: "Presentation", group: "Management", built: true }`.
+- `app/(dashboard)/dexter/loading.tsx`, `projects/loading.tsx`, `projects/[projectId]/loading.tsx` — `PageLoading`.
 
-### [x] 2. `[Sonnet]` Controls — `button`, `input`, `select`, `textarea`, `checkbox`, `label`, `icon-button`, `badge`, `form-message`
+### Proxy `[Opus]`
 
-- `button.tsx` base: `rounded-xl font-medium transition-[transform,background-color,border-color,opacity,box-shadow] duration-150 ease-out-quint active:scale-[0.98] focus-visible:ring-4 focus-visible:ring-accent/25` (drop the ring offset). Primary `bg-accent text-accent-foreground hover:bg-accent/90`; secondary `bg-surface-raised text-foreground border border-border hover:border-foreground/20`; ghost `text-foreground hover:bg-foreground/[0.05]`. Sizes unchanged.
-- `input`/`select`/`textarea`: `bg-surface-raised border-border h-11 rounded-xl px-3.5 transition-[border-color,box-shadow] duration-150 focus:border-accent focus:ring-4 focus:ring-accent/15 focus:outline-none placeholder:text-muted/70`. Select keeps no placeholder rule; textarea keeps `py-2.5` and no height.
-- `checkbox`: `rounded-md border-border accent-accent focus-visible:ring-4 focus-visible:ring-accent/25`.
-- `icon-button`: hover `bg-foreground/[0.05]`, `transition-[background-color,color,transform] active:scale-95`.
-- `badge`: `font-medium tracking-wide ring-1 ring-inset ring-current/10`; tints unchanged.
-- `label`, `form-message`: unchanged.
-- **Open:** `/masters/items` → New item (every control kind); `/settings/people`; `/login` fields.
+- `lib/supabase/proxy.ts` — add `const PUBLIC_PREFIXES = ["/deck/"]` under `PUBLIC_PATHS` with a comment stating why this one is a prefix (relative asset resolution) and what its gate is (the token inside the route); `isPublicPath = PUBLIC_PATHS.includes(path) || PUBLIC_PREFIXES.some(p => path.startsWith(p))`. Identity headers are still stripped on the way through (the existing flow already does). Update the "Exact match, not startsWith" comment to name the exception.
 
-### [x] 3. `[Sonnet]` Surfaces and text blocks — `card`, `table`, `figure`, `section`, `empty-state`, `page-title`, `tabs`, `pagination`, `spinner`, `page-loading`, `chart/chart-card`, `chart/meter`
+### Pure logic `[Sonnet]` — `lib/dexter/unpack.ts` + `unpack.test.ts`, no imports from the app
 
-- `card.tsx`: `border-border bg-surface rounded-2xl border` — **no `shadow-sm`**. New optional prop `interactive?: boolean` → `transition-[transform,border-color,box-shadow] duration-200 ease-out-quint hover:-translate-y-0.5 hover:border-foreground/15 hover:shadow-float`. `Section`'s `nested` keeps `bg-background` and drops the now-meaningless `shadow-none`.
-- `table.tsx`: header cells take the new label style (`text-[11px] font-medium tracking-[0.14em] uppercase text-muted py-3`); `TableRow` gets `transition-colors hover:bg-foreground/[0.025]`; cells `py-3.5`.
-- `figure.tsx`: label = new label style; value `tabular-nums` (drop `font-mono`), sm `text-sm font-semibold`, lg `text-xl font-semibold tracking-tight`, hero `text-3xl font-semibold tracking-tight`. `FigureBand` → `rounded-2xl`. `ResultPanel` title = new label style.
-- `page-title.tsx`: h1 `text-2xl font-semibold tracking-tight text-balance`; description `mt-1 max-w-prose`; back link uses lucide `ArrowLeft` (`size-3.5`) instead of the "←" character, `inline-flex items-center gap-1 text-xs text-muted hover:text-foreground transition-colors`.
-- `tabs.tsx`: pill base `rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors`; inactive `text-muted hover:text-foreground hover:bg-foreground/[0.05]` (no border); active `bg-foreground text-background`. Same for `TabsTrigger` via `data-[state=active]`.
-- `empty-state.tsx`: `p-10`, icon in a `size-10 rounded-full bg-foreground/[0.04]` chip.
-- `spinner.tsx`: `size-8 border-2`, plus `animate-fade-in [animation-delay:160ms] opacity-0 [animation-fill-mode:forwards]` so it never flashes on a fast load; `.spinner-keeps-turning` stays (the spin and the fade are two animations on one element — write both in one `animation` shorthand via arbitrary `[animation:...]` if the utilities fight, and keep the reduced-motion opt-out working). Inline uses (`size-4 border-2`) still override.
-- `chart-card.tsx`, `meter.tsx`: title label = new label style. Nothing else in `chart/`.
-- `section.tsx`: card padding `p-5`; heading `text-[15px] font-semibold tracking-tight`.
-- `pagination.tsx`: no change beyond what Button gives it.
-- **Open:** `/indents/list` (table, tabs, pagination), a Business Planning plan (Section, Figure, ResultPanel), `/reporter/run` (chart card), `/relay/court` (FigureBand, cards — Relay's own motion must be unchanged).
+- `contentTypeFor(path)` — extension map: html, htm, css, js, mjs, json, map, png, jpg, jpeg, gif, svg, webp, avif, ico, woff, woff2, ttf, otf, mp4, webm, mp3, ogg, wav, pdf, txt, md, xml, wasm; default `application/octet-stream`.
+- `safeDeckPath(segments: string[])` — joins and rejects `..`, empty, leading `/`, backslashes, `%`-encoded traversal, and anything over 200 chars; returns `null` when unsafe.
+- `planZip(entries: { name: string; size: number; isDirectory: boolean }[])` — drops directories, `__MACOSX/`, `.DS_Store`, dotfiles, unsafe paths; if every file shares one top-level folder, strips it; picks the entry: `index.html` at root, else the single `.html` at root, else fails with a plain reason. Refuses more than 500 files or more than 40 MB unpacked (zip-bomb guard). Returns `{ entry, files: [{ zipName, deckPath, size }] } | { error }`.
+- `newShareToken()` — `crypto.randomBytes(16)` base64url (lives in `lib/dexter/share.ts`, Node `crypto`); `shareUrl(origin, token, entry)` pure.
 
-### [x] 4. `[Opus]` Float layers — `dialog.tsx`, `dropdown-menu.tsx`
+### Reads `[Sonnet]` — `lib/dexter/queries.ts` (`import "server-only"`)
 
-- Dialog overlay `bg-black/30 backdrop-blur-sm data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out`. Content: `bg-surface-raised border-border/60 rounded-3xl p-6 shadow-float` + `data-[state=open]:animate-pop-in data-[state=closed]:animate-pop-out`; **on phones a bottom sheet**: `max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:max-h-[90dvh] max-sm:overflow-y-auto max-sm:data-[state=open]:animate-sheet-in max-sm:data-[state=closed]:animate-sheet-out`. Title `text-lg font-semibold tracking-tight`.
-- Dropdown content: `bg-surface-raised/95 backdrop-blur-xl border-border/60 rounded-xl p-1 shadow-float animate-menu-in`; items `rounded-lg data-[highlighted]:bg-foreground/[0.05]`.
-- **Open at 390px and desktop:** `/masters/vendors` → New vendor (a long form in the sheet scrolls, Cancel and Save reachable), the sidebar user menu, ESC and backdrop-click still close, OS reduced-motion → everything appears instantly.
+Every function: `await requireTool(GRANT)` then `createClient()`; failures through `readFailed("dexter", …)`. `GRANT` in `lib/dexter/shared.ts`; `DEXTER_BUCKET` in `lib/dexter/storage.ts` (both importable by a route and a `"use server"` file).
 
-### [x] 5. `[Opus]` The shell — `components/layout/sidebar.tsx`, `app/(dashboard)/layout.tsx`
+- `getWelcomeCounts()` — projects, decks, decks with sharing on (three `head: true` counts in `Promise.all`).
+- `listProjects()` — with deck counts (a second query grouped in a `Map`, no embed).
+- `getProject(id)` — project + decks ordered by `created_at desc`, uploader names merged from `profiles` through a `Map` (BUGCATCHER #2 — no embed).
 
-- Rail: `w-60 bg-background border-r border-border/60` (tonal, page-coloured — the content canvas and rail are one material, cards are the second).
-- Brand block: logo + `Goodearth` in `text-sm font-semibold tracking-tight`, `Toolbox` in `text-muted`.
-- **Remove the decorative search box.** It is a control that does nothing; the founder did not choose real search. (Recorded in `TODO.md` as a later option.)
-- Nav rows: `h-9 rounded-lg px-2.5 text-[13px] font-medium text-muted transition-colors hover:text-foreground hover:bg-foreground/[0.05]`; active `bg-foreground/[0.06] text-foreground` with the icon in `text-accent`. Group labels = new label style.
-- User footer: same hover idiom; avatar 28.
-- Phone bar: `bg-background/80 backdrop-blur-xl border-b border-border/60`.
-- Drawer: overlay fade, content `rounded-r-3xl shadow-float` with `data-[state=open]:animate-slide-in-left data-[state=closed]:animate-slide-out-left`.
-- Layout container: `mx-auto max-w-6xl px-5 py-6 md:px-10 md:py-10`.
-- **Open:** every breakpoint (resize from 1400 → 390), dark, drawer open/close/navigate, admin and probe account (probe sees one tool; "No tools assigned yet" if none).
+### Writes `[Sonnet]` — `lib/dexter/actions.ts` (`"use server"`, `ActionState`, `requireTool(GRANT)` first, `revalidatePath("/dexter", "layout")`)
 
-### [x] 6. `[Sonnet]` Home shows only what is real — `app/(dashboard)/page.tsx`, `app/(dashboard)/_components/*`
+- `createProject`, `renameProject`, `deleteProject` (refuse with a plain message when decks exist — the FK also refuses).
+- `uploadDeck(projectId, formData)` — the drawings pattern step for step (`lib/design-management/files-actions.ts`): `File` instance, size ≤ 4 MB, type `text/html` or a `.zip` (`application/zip`, `application/x-zip-compressed`, or name ends `.zip` — browsers disagree). HTML: one object at `decks/<id>/index.html`, entry `index.html`. Zip: `fflate.unzipSync` (new dependency — pure JS, no native binary, so BUGCATCHER #15 cannot happen), `planZip`, upload each file as a `Blob` (never a `Buffer`, BUGCATCHER #1) with `contentTypeFor`, six at a time. Row is written first with the id generated in the action (`crypto.randomUUID()`), then objects; on any upload failure remove what landed and delete the row. Read back one object's size (the entry) and compare, as drawings does.
+- `replaceDeckFile(deckId, formData)` — same validation; uploads into `decks/<id>/` after removing existing objects (`list` paginated, then `remove`); keeps the token. Updates `entry_path`, `file_count`, `total_bytes`.
+- `renameDeck`, `setDeckSharing(deckId, enabled)`, `reissueDeckLink(deckId)` (new token; old link dies), `deleteDeck` (row first, then objects — the reverse of upload).
 
-- **Delete** `kpi-row.tsx`, `budget-vs-actual.tsx`, `pending-approvals.tsx`, `recent-purchase-orders.tsx`, `activity-feed.tsx` (all static invented data). Remove the "Toolbox / Overview" breadcrumb.
-- Rename `management-vision.tsx` → `tool-grid.tsx`: renders **every group** the person can see (`visibleTools`, same rule as the sidebar, in the sidebar's group order), group label above each grid, `Card interactive` per tool (icon chip `size-10 rounded-xl bg-accent/10 text-accent`, name `text-sm font-semibold`, description muted, unbuilt = `Badge neutral` "Coming soon" and a plain card). Grid `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3`. Keep the rule that a built tool links only when the person holds it.
-- Greeting: `text-4xl md:text-5xl font-semibold tracking-tight text-balance`, date muted below.
-- `operations-pipeline.tsx`: keep every number and comment; the five stages become `grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6` (no horizontal scroll on a phone), stage number `text-[11px] tabular-nums text-muted`, value `text-2xl font-semibold tracking-tight tabular-nums`, sub-line loses `font-mono`.
-- `people-overview.tsx` and `marathon-live-card.tsx`: restyle values to `tabular-nums` sans; sit side by side in `grid md:grid-cols-2 gap-5` under the pipeline. `Suspense` fallbacks keep their heights.
-- Order: greeting → tool grid → pipeline → people + Marathon.
-- **Open:** as admin and as the probe account. Confirm no panel shows a number the app did not compute.
+### Screens `[Sonnet]` — `app/(dashboard)/dexter/`
 
-### [x] 7. `[Sonnet]` Welcome screens and sign-in — `app/(dashboard)/_components/tool-welcome.tsx`, `app/(auth)/layout.tsx`, `app/(auth)/login/page.tsx`, `login/verify`, `forgot-password`, `reset-password`, `components/login-form.tsx` and siblings
+- `layout.tsx` — `requireUser` + `requireApp(user, "/dexter")`, `PageTitle` "Dexter".
+- `page.tsx` — `ToolWelcome` (icon `Presentation`; three plain paragraphs; counts; links → Projects primary).
+- `projects/page.tsx` — `Card` list of projects (name, client, deck count, updated), "New project" `Dialog` with the `record-form-dialog` shape if it fits, else `Dialog` + `Input` + `FormMessage`.
+- `projects/[projectId]/page.tsx` — project header with rename and delete; deck list as `Table` on a laptop; each row: title, entry, size, uploaded by/when, sharing pill (`Badge` success "Link on" / muted "Link off"), actions in a `DropdownMenu`: Open (new tab), Copy link, Rename, Replace file, Link off/on, New link, Delete. "Upload a deck" `Dialog`: title + file input (`accept=".html,.zip"`) + note "HTML file or a zip with index.html at its root, up to 4 MB". `_components/`: `upload-deck-dialog.tsx`, `deck-actions.tsx` (client; `useActionState`; copy uses `navigator.clipboard` with a plain fallback showing the URL in an `Input`). The share URL is built from `SITE_URL`-free request origin: pass `origin` from the page (`headers()` host — but only inside this route, never the root layout, BUGCATCHER #6) or simply render a relative `/deck/…` and let the client component build `location.origin + path` on copy.
+- `PLAN.md` — "Dexter — the rules": the two decisions, the sandbox header, the prefix exception, the admin-client reader, what is deliberately not built.
 
-- `ToolWelcome`: icon chip `size-12 rounded-2xl bg-accent/10 text-accent`; intro `text-base leading-relaxed text-muted max-w-prose`; buttons `w-full sm:w-auto` so they are thumb-sized on a phone; `FigureBand` under it unchanged in structure. Still counts only, never rupees.
-- Sign-in: **no card**. A centred `max-w-sm` column on the canvas: logo `size-12`, title `text-2xl font-semibold tracking-tight`, muted line, the form, the "or" rule, Google button. Same on verify/forgot/reset. `login/page.tsx` must keep no `searchParams` prop (static prerender — BUGCATCHER #6).
-- **Open:** `/login` light and dark and at 390px; after `npm run build`, `.next/prerender-manifest.json` still lists `/login`.
+### Public viewer `[Opus]` — `app/deck/[token]/[[...path]]/route.ts`
 
-### [x] 8. `[Haiku]` Mechanical sweep — exact-string replacements only, no component conversions
+- `GET` only. `token` must match `^[A-Za-z0-9_-]{22}$` or 404. Look the deck up with `createAdminClient()`: `id, entry_path, share_enabled` by `share_token`; 404 when missing or sharing is off (identical response either way — no oracle).
+- No path → `redirect` (302) to `/deck/<token>/<entry_path>`.
+- `safeDeckPath(path)` or 404. Download `decks/<id>/<path>` from `dexter`; 404 on error.
+- Headers: `Content-Type` from `contentTypeFor(path)` (not from Storage's guess), `X-Content-Type-Options: nosniff`, `Cache-Control: private, max-age=300`, `Referrer-Policy: no-referrer`, and on `text/html` **`Content-Security-Policy: sandbox allow-scripts allow-popups allow-forms allow-modals`**. Body streamed (`object.stream()`).
+- Log nothing but the status; never the token.
 
-Trivially checkable diffs, applied with a find-and-replace and reviewed by Opus before commit:
+## Docs `[Fable]`, last
 
-- `text-muted text-xs font-semibold tracking-widest uppercase` → `text-muted text-[11px] font-medium tracking-[0.14em] uppercase` (the raw copies in `inventory/`, `purchase-orders/`, `relay/`, `selections/`, and any left in `app/(dashboard)/_components/` and `components/`).
-- `hover:bg-black/[0.04] dark:hover:bg-white/[0.06]` and the `0.03/0.04`, `0.02/0.03` cousins → `hover:bg-foreground/[0.05]` (one idiom; foreground-alpha is right in both modes automatically). Same for `data-[highlighted]:` variants. Files: `relay-nav.tsx`, `report-builder.tsx`, and whatever `grep -rn "bg-black/\[0.0" app components` still finds after steps 2–5.
-- `font-mono` on a displayed number (not a code or reference) → `tabular-nums`: Relay's `baton-card`/`timer-dial` labels and any left in `app/(dashboard)/_components/` — **check each is a number, leave references like `IND-0001` and the reporter's column codes alone**.
-- Run `npm run format` after (the Tailwind class sorter reorders every string).
-- **Open:** `/inventory/receive`, `/relay/court`, `/reporter/run` — nothing moved except label weight.
-
-### [x] 9. `[Fable]` Review, rulebook, ship
-
-- Review the full diff against `DESIGN.md`, `SECURITY.md` (no query, action, policy or public path touched), `BUGCATCHER.md` (#4 dark furniture, #6 static login).
-- **Rewrite `DESIGN.md`** from the built world: direction sentence ("Aman meets Apple — stone, air, glass, precision. Warm, not cold. Minimal, not bare."), the three-tone surface rule, typography table (Page Title `text-2xl font-semibold tracking-tight`; Section Label `text-[11px] font-medium uppercase tracking-[0.14em] text-muted`; figures are sans tabular), "nav is ink, accent is action", "hairlines at rest, float only when floating", the motion vocabulary replacing "one payoff per flow" (Relay's exception and the reduced-motion rule carried forward verbatim), the new tokens, `Card interactive`, the `tailwind-merge` extension rule (a new custom shadow/ease/animate name must be declared in `lib/utils.ts` or callers cannot override it). `PRODUCT.md` brand commitment line updated. Component inventory: ManagementVision → ToolGrid; five home widgets deleted.
-- `TODO.md`: add the three unpicked options (phone-first lists, real search, structural tidy) and a cheap guard rail (an ESLint `no-restricted-syntax` rule against raw palette classes) as later items.
-- `STATUS.md`: one line under Platform — the skin, date, "home shows real counts only".
-- Merge `feature/skin` → `staging`; the founder vets on staging.goodearthkannur.org; **then** `master`, confirm the Vercel Production row matches `git rev-parse --short origin/master`, press one real write button.
-
-## What is deliberately untouched
-
-- **Marathon** (`app/marathon/`): the kiosk shell, `PageHeader`, `AnimatedReveal`, `card-in`, the category-badge colours. It inherits the new tokens and nothing else. Founder did not pick the edges wave.
-- **Relay's motion** (`relay-*` keyframes, `celebrate.tsx`, `baton-card`, `timer-dial`): untouched except the label-string sweep.
-- **PDFs** (`lib/pdf/theme.ts`): a separate print palette.
-- **Chart palette, `lib/color-hash.ts`, `--gradient-hero-*`**: the four colour systems stay four; nothing reordered.
-- **Every query, action, policy, view, route and `PUBLIC_PATHS`.**
-- **Theme mechanics**: the blocking inline script, the cookie, `lib/theme.ts`, the 220ms view-transition crossfade.
+- `STATUS.md` — Dexter row (Staging) and a contract row ("shared `profiles` for names; nothing else. Its public door reads its own two tables through the admin client, sanctioned in SECURITY.md").
+- `SECURITY.md` — the `PUBLIC_PATHS` rule gains its one prefix (`/deck/`, why, and that the gate is the token inside the route); the admin-client exception list gains the deck reader; a short paragraph on the sandbox header and why it must never gain `allow-same-origin`.
+- `CLAUDE.md` red line "Every unauthenticated route goes in `PUBLIC_PATHS` as an exact string" → "…as an exact string (`/deck/` is the one prefix, SECURITY.md)".
+- `app/(dashboard)/dexter/PLAN.md` as above. `TODO.md`: nothing new unless a question below stays open.
 
 ## Risks and how each is handled
 
-| Risk                                                                                                                                                               | Handling                                                                                                                                      |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tailwind-merge` does not know `shadow-float`, `ease-out-quint`, `animate-*` custom names (measured 2026-09-17: `twMerge("shadow-float shadow-none")` keeps both). | Step 1 extends it in `lib/utils.ts` and pins the behaviour in `lib/utils.test.ts`.                                                            |
-| The chart palette was measured on `#ffffff` light surface.                                                                                                         | New light `--surface` is `#fcfbf9` (ΔE under 1); dark surface unchanged. Charts render on `bg-surface` cards — open `/reporter/run` and look. |
-| `prettier-plugin-tailwindcss` reorders every edited class string; CI fails on `format:check` first.                                                                | `npm run format` before every commit.                                                                                                         |
-| Frosted bars (`backdrop-blur`) on older site phones.                                                                                                               | Solid `bg-background/80` fallback is the same class — a browser without backdrop-filter shows a slightly translucent bar, still readable.     |
-| Bottom-sheet dialogs: a long Masters form must scroll inside the sheet and keep its footer reachable.                                                              | `max-h-[90dvh] overflow-y-auto` on content; check `/masters/vendors` New vendor at 390px.                                                     |
-| Dropping `shadow-sm` from `Card` makes `Section nested`'s `shadow-none` a no-op and may flatten `marathon-live-card` (it carried its own `shadow-sm`).             | Leave Marathon's card alone; remove the dead class in Section.                                                                                |
-| The theme crossfade snapshots the whole page; new transitions run on transform/opacity, not colour.                                                                | No `transition-colors` added to anything that did not already have it; the crossfade stays the only colour fade.                              |
-| Figures switch from mono to sans: column alignment in tables.                                                                                                      | `tabular-nums` keeps digit widths equal; compare `/reporter/run` table before and after.                                                      |
-| Static prerender of `/login`.                                                                                                                                      | No `cookies()`/`headers()`/`searchParams` added; check `.next/prerender-manifest.json` after `npm run build`.                                 |
+- **Uploaded HTML attacking a signed-in viewer** — CSP sandbox without `allow-same-origin`; verified by the check below.
+- **Path traversal on `/deck/`** — `safeDeckPath`, unit-tested; storage paths are always `decks/<uuid>/…`.
+- **Zip bomb / huge zips** — 4 MB request cap, 500 files, 40 MB unpacked, 10 MB per object at the bucket.
+- **Unpacking time on Vercel** — ~100 uploads at six-wide fits comfortably in the function budget; if a real zip times out, add `export const maxDuration = 60` to the project page segment (question below for the tier above, do not guess).
+- **A dead link after "New link"** — by design; the row shows "Link off"/"Link on" and the copy button always copies the current one.
+- **Relative assets** — the share link ends in the entry file; a bare `/deck/<token>` redirects there so the address bar always has a real file name beside which `assets/…` resolves.
+- **Decks that need `localStorage` or cookies** — an opaque origin throws on `localStorage`; reveal.js and plain HTML decks do not need it. Recorded in PLAN.md as a known limit.
 
-## Verification
+## Verification (browser and probe, on the preview then on staging)
 
-CI: `npm run format:check && npm run lint && npm run typecheck && npm test && npm run build && npm run check:actions`, then `gh run list` after the push — a successful push is not a green build.
+1. Grant `/dexter` to the probe account only; sign in as the probe.
+2. Create a project; rename it; try to delete a project holding a deck — refused with a sentence.
+3. Upload a single `.html` — opens at `/deck/<token>/index.html` in a private window (no session). Upload a zip with `index.html` + `assets/style.css` + an image; a zip nested in one folder; a zip with no `index.html` (refused with the reason); a 5 MB file (refused). Look at what landed in Storage: sizes match, `Content-Type` right.
+4. In the private window: images and CSS load; the page's own script runs; open DevTools → `document.cookie` is empty and `fetch('/api/catalogue?q=x')` answers 401 with no cookie sent; `localStorage` throws. The response headers carry the `sandbox` CSP on the HTML and `nosniff` on everything.
+5. Link off → the private window gets 404; Link on → back. New link → old URL 404, new one works. Replace file → same URL, new content. Delete → 404 and no objects left in `decks/<id>/`.
+6. Traversal: `/deck/<token>/../../x`, `/deck/<token>/%2e%2e/x`, a wrong-length token, a made-up token — all 404, none 500. `app_errors` stays empty.
+7. Signed out entirely, `/dexter` still redirects to login; `/deck/…` does not.
+8. Dark mode on every Dexter screen; a phone width on the project page.
+9. `npm test`, `npm run check:actions`, `gh run list` green; `npm run db:check -- --project ipstebqawrvhkyntctrv` clean.
 
-Browser checklist for the founder, on staging, **light then dark, laptop then phone**:
+## Order of work
 
-1. `/login` — sign in; the page has no box around it, the fields glow green softly when tapped.
-2. Home — your name, your tools grouped, the pipeline counts; nothing with a sample number.
-3. The sidebar — no search box; the current tool is ink, its icon green; on the phone the menu slides in from the left and closes when you tap a tool.
-4. `/indents` welcome, then "All indents" — table rows tint on hover, tabs are ink pills, the page title is bigger.
-5. `/masters/items` → New item — the dialog pops in; on the phone it rises from the bottom and scrolls.
-6. `/reporter/run` a saved report — the chart and its table look right on both themes.
-7. `/relay/court` — a cold trail still breathes; nothing else about Relay has changed.
-8. Dark mode: open a date field and a dropdown — both dark (BUGCATCHER #4).
-9. Turn on "reduce motion" in the phone's settings — everything appears instantly; the spinner still turns.
-10. Sign in as the probe account — only Inventory shows, home and sidebar agree.
-
-## Resolved before the build
-
-- The Google Chat round-two plan gave up the `plan.md` slot on 2026-09-17: it was built and merged to staging (PRs #70–#72); its two open steps — the founder's service-account key and the staging vet — are written into `lib/google-chat/PLAN.md`. Both pieces of work remain separate merges to `master`.
+1. `[Fable]` Migration drafted, applied to staging, types committed.
+2. `[Haiku]` Registry entry, loading files, `shared.ts`/`storage.ts` constants.
+3. `[Sonnet]` `unpack.ts` + tests; queries; actions (add `fflate`).
+4. `[Sonnet]` Screens.
+5. `[Opus]` Proxy prefix and the public viewer route.
+6. `[Opus]` Probe smoke through the verification list on the preview; fix what it finds.
+7. `[Fable]` Diff review against SECURITY.md and BUGCATCHER.md; docs; merge to `staging` for the founder's vet. Production waits for their word, with `0095` applied there first and `db:compare` empty.
 
 ## Questions for the tier above
 
-_(A lower tier writes here and stops; it does not improvise.)_
+_(none yet — a lower tier adds here rather than improvising)_
