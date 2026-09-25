@@ -327,14 +327,14 @@ export type MeasurementFields = {
  * something. Returns the message, or undefined when the row is fine. */
 function checkMeasurement(fields: MeasurementFields): string | undefined {
   const boxes = [
-    ["number", fields.nos],
-    ["length", fields.length],
-    ["breadth", fields.breadth],
-    ["depth", fields.depth],
+    ["Nos", fields.nos],
+    ["Length", fields.length],
+    ["Breadth", fields.breadth],
+    ["Depth", fields.depth],
   ] as const;
   for (const [label, value] of boxes) {
     if (value !== null && (!Number.isFinite(value) || value <= 0)) {
-      return `The ${label} must be a number more than zero, or left blank.`;
+      return `${label} must be a number more than zero, or left blank.`;
     }
   }
   if (boxes.every(([, value]) => value === null)) {
@@ -438,9 +438,19 @@ export async function updateLineMeasurement(
   const user = await requireTool(GRANT);
   if (!id) return { error: "Which row?" };
 
+  // A server action's argument is whatever the caller sent, not what the
+  // type says. Build the update from exactly these five fields — never a
+  // spread — so extra keys (line_id, created_by, …) can't ride along
+  // and move a row onto another work. A box that isn't a number or null
+  // becomes NaN, which checkMeasurement refuses.
+  const box = (value: unknown): number | null =>
+    value === null ? null : typeof value === "number" ? value : Number.NaN;
   const cleaned: MeasurementFields = {
-    ...fields,
-    description: fields.description?.trim() || null,
+    description: typeof fields?.description === "string" ? fields.description.trim() || null : null,
+    nos: box(fields?.nos),
+    length: box(fields?.length),
+    breadth: box(fields?.breadth),
+    depth: box(fields?.depth),
   };
   const problem = checkMeasurement(cleaned);
   if (problem) return { error: problem };
