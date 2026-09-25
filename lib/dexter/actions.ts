@@ -300,7 +300,14 @@ async function verifyEntrySize(
   const { data: stored } = await supabase.storage
     .from(DEXTER_BUCKET)
     .list(folder, { search: entryPath });
-  const storedSize = stored?.[0]?.metadata?.size as number | undefined;
+  // `search` is a substring match, and the entry always sits at the top
+  // of the folder beside every other root file — a zip carrying both
+  // `index.html` and `print-index.html` would otherwise have its size
+  // compared against whichever came back first, and a good upload rolled
+  // back for it. Match the exact name; the drawings precedent could take
+  // `[0]` because it searched for a UUID.
+  const storedSize = stored?.find((object) => object.name === entryPath)?.metadata?.size as
+    number | undefined;
 
   if (storedSize !== undefined && storedSize !== expectedBytes) {
     return { error: "The deck did not save correctly. Try again." };

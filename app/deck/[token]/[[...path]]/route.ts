@@ -26,7 +26,15 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * word must never be added to the header.
  */
 
-const SANDBOX = "sandbox allow-scripts allow-popups allow-forms allow-modals";
+// `allow-popups-to-escape-sandbox` is there for the "visit our website"
+// link a client deck usually carries: without it the new tab inherits
+// the sandbox and the site it opens runs with an opaque origin — no
+// storage, no sign-in — and looks broken. It changes nothing about what
+// the DECK can do: the popup is another origin the deck cannot read, and
+// the deck's own document stays sandboxed. `allow-same-origin` is the
+// word that must never appear here.
+const SANDBOX =
+  "sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals";
 
 function notFound() {
   return new Response("Not found", {

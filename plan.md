@@ -156,6 +156,19 @@ Headless Chrome opened the page and the page's own script wrote its verdict into
 
 **Still for a person, signed in on the preview or staging (verification steps 1–3, 5 and 8):** grant `/dexter` to the probe, create and rename a project, upload a single HTML and a zip through the dialog, look at what landed in Storage, replace a file, "New link", delete, and check both themes and a phone width.
 
+## Fable review, 2026-09-25 — step 7
+
+Read against `SECURITY.md`, `BUGCATCHER.md` and this plan: the migration as applied, the proxy, the public route, every query, action and screen, and the documents. Every exported query and action opens with `requireTool`; every read checks `error`; uploads hand Storage a `Blob`; no embed, no raw colour class, no native module, no `cookies()` in the root layout, no type re-export from a `"use server"` file; `0095` has one SELECT policy per table and nothing for `anon`, and staging's ledger is level with the branch. Opus's two fixes (the two-pass unzip, the client-side size check) are right.
+
+**Two things changed in this pass:**
+
+- **The entry-size read-back matched by substring.** Storage's `search` is a contains-match and the entry sits beside every other root file, so a zip holding both `index.html` and `print-index.html` could have compared the wrong size and rolled a good upload back. Now matched on the exact name. The drawings precedent could take the first hit because it searched for a UUID.
+- **Links out of a deck opened a broken tab.** A popup from a sandboxed page inherits the sandbox, so a deck's "visit our website" link opened the site with no storage and no sign-in. `allow-popups-to-escape-sandbox` added: the popup is another origin the deck cannot read, so the deck's own sandbox is unchanged and `allow-same-origin` is still absent. `SECURITY.md` quotes the new header.
+
+**Known limits accepted, not fixed:** a file whose name carries a literal `%` is dropped from a zip (the path helper refuses what it cannot decode); a failed _replace_ leaves the link answering 404 until the next attempt, and the error says so; every asset is one row lookup plus one download.
+
+**Approved for `staging`, where it already is. Not yet shippable to `master`** — see TODO.md: `0095` is not on production, and `staging` carries the Google Chat bot and the skin ahead of this, so the ship is either the bot's checklist first or a release branch. That is the founder's call, and this review is not the ship word.
+
 ## Questions for the tier above
 
 _(added by Sonnet, after steps 3–4)_
