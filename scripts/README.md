@@ -1,51 +1,39 @@
 # scripts/
 
-Everything here is a standalone Node script, not part of the app itself: migration tooling, schema checks, environment moves, one-off data imports and a couple of ops checks. Every data-writing script follows two house rules: `--project <ref>` is required and never defaults to a database, and the script is dry-run by default, printing what it would do until you add `--commit`.
+Standalone Node scripts, not part of the app: migration tooling, schema checks, environment moves, data imports and a few ops checks. Run with `npx tsx scripts/<file>.ts` unless an npm alias is given.
 
-Seven scripts have an npm alias in `package.json`. The rest are run directly with `npx tsx scripts/<file>.ts`.
+**House rules for anything that writes:** `--project <ref>` (or `--from`/`--to`) is required and never defaults; dry run by default, `--commit` to write; match on a natural key so a re-run writes nothing. Three early one-offs predate the rule — `import-catalogue.ts`, `import-saarang.ts`, `import-staff.ts` — and write to whatever `.env.local` points at (staging); they have been run and are kept as the record.
+
+The `data/` files importers read are gitignored: real business data, some of it bank details.
 
 ## Migrations and schema
 
-| Script                   | What it does                                                                                                                         | How to run                                                  | Writes?              |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------- | -------------------- |
-| `apply-migrations.ts`    | Applies `supabase/migrations/*.sql` to one named database and records what it applied.                                               | `npm run db:apply -- --project <ref> --commit`              | dry-run / `--commit` |
-| `check-migrations.ts`    | Asks a database whether it has every migration in this branch and fails if not.                                                      | `npm run db:check -- --project <ref>`                       | read-only            |
-| `check-view-columns.ts`  | Checks every view in `public` against `view-manifest.ts` (columns, WHERE clause, grants).                                            | `npm run db:check-views -- --project <ref>`                 | read-only            |
-| `compare-schema.ts`      | Compares the schema of two databases (columns, RLS, policies, privileges) and reports every difference.                              | `npm run db:compare -- --project <ref-a> --against <ref-b>` | read-only            |
-| `migration-ledger.ts`    | Shared reader for the migration folder and the `applied_migrations` ledger, used by `apply-migrations.ts` and `check-migrations.ts`. | library, not run directly                                   | n/a                  |
-| `view-manifest.ts`       | The list of what every `public` view is allowed to be; what `check-view-columns.ts` checks against.                                  | library, not run directly                                   | n/a                  |
-| `supabase-management.ts` | The Supabase management API in one place, used by every script above. Never defaults a project ref.                                  | library, not run directly                                   | n/a                  |
+- `apply-migrations.ts` — applies pending migrations to one database and records them. `npm run db:apply -- --project <ref> --commit`
+- `check-migrations.ts` — fails if a database lacks a migration in this branch or an applied file was edited. `npm run db:check -- --project <ref>` (read-only; CI runs it)
+- `check-view-columns.ts` — checks every view against `view-manifest.ts`: columns, guards, flags, no write grants. `npm run db:check-views -- --project <ref>` (read-only)
+- `compare-schema.ts` — every difference between two databases, schema and auth settings. `npm run db:compare -- --project <a> --against <b>` (read-only)
+- `migration-ledger.ts`, `view-manifest.ts`, `supabase-management.ts` — libraries: the ledger reader, the list of what each view may be, and the management API in one place (never defaults a ref; throws on a failed query answered with 200; `serviceRoleKey()` for Storage).
 
 ## Environments
 
-| Script                       | What it does                                                                                                               | How to run                                                                       | Writes?              |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | -------------------- |
-| `clone-data.ts`              | Copies real master data (people, places, clients, the catalogue) from one database to another, ids preserved.              | `npx tsx scripts/clone-data.ts --from <ref> --to <ref> --commit`                 | dry-run / `--commit` |
-| `copy-storage.ts`            | Copies Supabase Storage objects between two projects and rewrites the URLs that point at them.                             | `npx tsx scripts/copy-storage.ts --from <ref> --to <ref> --commit`               | dry-run / `--commit` |
-| `scramble-staging-emails.ts` | Rewrites staff email addresses on staging to unroutable ones (or restores real ones for named people to sign in and test). | `npx tsx scripts/scramble-staging-emails.ts --project <ref> --keep a@b --commit` | dry-run / `--commit` |
-| `vercel-env.ts`              | Writes one environment variable from `.env.local` to Vercel through its API — trimmed, `encrypted`, never pasted.          | `npx tsx scripts/vercel-env.ts --name <VAR> --target preview --commit`           | dry-run / `--commit` |
+- `clone-data.ts` — copies master data between databases, ids preserved. `--from <ref> --to <ref>`
+- `copy-storage.ts` — copies Storage objects between projects and rewrites the URLs pointing at them. `--from <ref> --to <ref>`
+- `scramble-staging-emails.ts` — makes staging's staff emails unroutable, or restores named ones to sign in. `--project <ref> --keep a@b`
+- `vercel-env.ts` — writes one variable from `.env.local` to Vercel through its API, trimmed and never pasted. `--name <VAR> --target preview|production`
 
-## One-off data imports
+## Data imports
 
-| Script                      | What it does                                                                                                                                                                                                          | How to run                                                                         | Writes?              |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | -------------------- |
-| `import-catalogue.ts`       | One-off importer for the Goodearth catalogue (~2,631 items) from `data/*.csv`.                                                                                                                                        | `npx tsx scripts/import-catalogue.ts --commit`                                     | dry-run / `--commit` |
-| `import-catalogue-sheet.ts` | Brings the design team's catalogue workbook in: its pasted pictures and product links onto the items already there (matched by content, never by the sheet's code), and the rows not there as new items. Re-runnable. | `npx tsx scripts/import-catalogue-sheet.ts --project <ref> --xlsx <path> --commit` | dry-run / `--commit` |
-| `fetch-catalogue-images.ts` | Finds the vendor's product photo for items with a product link and no picture, then makes thumbnails in Storage for every item with a picture and no thumbnail. Re-runnable.                                          | `npx tsx scripts/fetch-catalogue-images.ts --project <ref> --commit`               | dry-run / `--commit` |
-| `import-contractors.ts`     | Marks the site team's contractors in the vendors master, from the estimation workbook.                                                                                                                                | `npx tsx scripts/import-contractors.ts --project <ref> --commit`                   | dry-run / `--commit` |
-| `import-material-master.ts` | One-off importer for the construction material master into `items` (kind='material').                                                                                                                                 | `npx tsx scripts/import-material-master.ts --project <ref> --commit`               | dry-run / `--commit` |
-| `import-saarang.ts`         | One-off importer for the Saarang plot/villa/client register, transcribed by hand from the working sheet.                                                                                                              | `npx tsx scripts/import-saarang.ts --commit`                                       | dry-run / `--commit` |
-| `import-staff.ts`           | One-off importer for the company staff list: creates logins, sets names, department and designation, grants `/directory`.                                                                                             | `npx tsx scripts/import-staff.ts --commit`                                         | dry-run / `--commit` |
-| `import-vendors.ts`         | One-off importer for the supplier vendors, including bank details into the gated `vendor_payment_details` table.                                                                                                      | `npx tsx scripts/import-vendors.ts --project <ref> --commit`                       | dry-run / `--commit` |
-| `import-works.ts`           | Loads the works vocabulary into `work_groups` and `work_items` from the estimation workbook.                                                                                                                          | `npx tsx scripts/import-works.ts --project <ref> --commit`                         | dry-run / `--commit` |
+- `import-catalogue-sheet.ts` — the design team's catalogue workbook: pasted pictures and product links onto existing items (matched by content, never by the sheet's code — `lib/masters/catalogue-sheet.ts`), rows not there as new items. `--project <ref> --xlsx <path>`
+- `fetch-catalogue-images.ts` — finds the vendor's photo for items with only a link, then thumbnails every item with a picture into Storage. `--project <ref>` (`--limit 10` to try a few)
+- `import-material-master.ts` — the construction material master into `items`. `--project <ref>`
+- `import-vendors.ts` — supplier vendors, with bank details into the gated `vendor_payment_details`. `--project <ref>`
+- `import-contractors.ts` — marks the site team's contractors among vendors. `--project <ref>`
+- `import-works.ts` — the works vocabulary from the estimation workbook. `--project <ref>`
+- `import-catalogue.ts`, `import-saarang.ts`, `import-staff.ts` — the early one-offs above.
 
 ## App checks
 
-| Script                      | What it does                                                                                                                                                                                                                             | How to run                                                                               | Writes?              |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | -------------------- |
-| `check-server-actions.ts`   | Guards against a bare `export type` in a `"use server"` file, which builds fine and then kills every action in its chunk. Run after `npm run build`.                                                                                     | `npm run check:actions`                                                                  | read-only            |
-| `google-chat-patch-card.ts` | Rewrites one Google Chat card as the app — the hand proof that it may, and the repair when a refresh fails.                                                                                                                              | `npx tsx scripts/google-chat-patch-card.ts --message spaces/<id>/messages/<id> --commit` | dry-run / `--commit` |
-| `google-chat-usage-test.ts` | Drives the Chat door in-process against staging with Google-shaped events: `/court`, `/trail`, `/newtrail`, `/link`, optionally a Bounce dialog or a real press. Needs `google-chat-usage-loader.mjs`, which is why it has an npm alias. | `npm run chat:usage -- --as <email>`                                                     | dry-run / `--commit` |
-| `rotate-marathon-pins.ts`   | Rotates a Marathon kiosk agent's PIN off a known/published value.                                                                                                                                                                        | `npm run rotate-marathon-pins -- --project <ref> --commit`                               | dry-run / `--commit` |
-
-The `data/*.csv` files the importers read are gitignored on purpose: they carry real business data, some of it bank account details, and none of it belongs in this public repo.
+- `check-server-actions.ts` — refuses a type re-export in a `"use server"` file (BUGCATCHER #5). `npm run check:actions`, after a build.
+- `rotate-marathon-pins.ts` — moves any kiosk agent off a published PIN. `npm run rotate-marathon-pins -- --project <ref>`
+- `google-chat-usage-test.ts` (+ `google-chat-usage-loader.mjs`) — drives the Chat door in-process against staging with Google-shaped events. `npm run chat:usage -- --as <email>`
+- `google-chat-patch-card.ts` — rewrites one Chat card as the app; the repair when a refresh fails. `--message spaces/<id>/messages/<id>`
