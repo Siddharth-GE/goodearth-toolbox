@@ -53,8 +53,22 @@ const HEADERS = {
 
 type Client = ReturnType<typeof createClient<Database>>;
 
-function get(url: string): Promise<Response> {
-  return fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+/**
+ * A polite GET: when a store answers 429 ("slow down") — Whispering Homes
+ * did for ~60 of 1,339 lookups on 2026-09-26 — wait as long as it asks
+ * (or a few seconds) and try again, twice at most.
+ */
+async function get(url: string): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    const response = await fetch(url, {
+      headers: HEADERS,
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    if (response.status !== 429 || attempt === 2) return response;
+    const asked = Number(response.headers.get("retry-after"));
+    const seconds = Number.isFinite(asked) && asked > 0 ? Math.min(asked, 30) : 5 * (attempt + 1);
+    await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
+  }
 }
 
 /** A collection or category page shows a banner, not the product. */

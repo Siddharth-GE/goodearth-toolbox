@@ -25,6 +25,15 @@ The picker was rebuilt once after it felt slow. Both causes are easy to reintrod
 - **Catalogue search is a Route Handler** (`app/api/catalogue/route.ts`), not a Server Action. Actions dispatch one at a time per client, so keystrokes queue behind each other, and a revalidating action re-renders the whole route server-side.
 - **The basket is local.** Pressing + costs nothing; the whole lot is written in one `addLines` call. Twelve items used to be twelve round trips, each re-running every query on the page.
 
+## Choosing by picture (2026-09-26)
+
+The founder: "it's impossible for a designer to make a choice without the image and just a name." Hundreds of items share a name ("Bench", "Hanging Light"), so the name was never enough.
+
+- **Every tile and every line carries the picture, the description and a View product link** to the vendor's page (`components/masters/product-link.tsx`, shared with the picker's other callers). The link renders only for an `http(s)` address — `source_url` comes from vendor spreadsheets, and anything else in an `href` is a script waiting for a click.
+- **Search reads the description too**, because "teak" or "ashwood" is how a designer looks.
+- **A line's thumbnail opens `image_url`**: our own full-size WebP when the picture came pasted in the design team's sheet (no vendor page holds those), the vendor's photo otherwise. Where the pictures come from, and how the sheet's rows were matched to items, is Masters' (`masters/PLAN.md`, _The catalogue_).
+- **Not done:** the design PDF still prints without pictures.
+
 ## Things that will bite
 
 - **`getDownstreamImpact` reads indents and POs directly** — open reads of `indent_lines`/`indents` plus the money-free `po_line_facts`. **No Indents code is imported**, and none may be.
