@@ -59,7 +59,7 @@ The chain runs end to end: design → price → indent → PO → goods in / sto
 | Tool                 | Reads from outside itself                                                                                                                                          |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Bills                | `po_facts`, `po_billing_totals`                                                                                                                                    |
-| Budgets              | `selections`, `selection_lines`, `spaces`, `indent_lines` (refusing to delete a construction line an indent uses)                                                  |
+| Budgets              | `selections`, `selection_lines`, `spaces`, `indent_lines`, `indents` (refusing to delete a construction line an indent uses)                                       |
 | Indents              | `approved_budgets(_lines)`, `selections`, `selection_lines`, `po_line_facts`, `estimate_takeoff_facts`                                                             |
 | Purchase Orders      | `indents`, `indent_lines`, `goods_receipts(_lines)`, `po_billing_totals`                                                                                           |
 | Inventory            | `po_facts`, `po_line_facts`, `estimate_takeoff_facts`, `issue_requests`                                                                                            |

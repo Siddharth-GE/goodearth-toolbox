@@ -1,40 +1,34 @@
 # Directory — the rules
 
-Everyone who works here, with a card. Read this before touching the tool.
+Everyone who works here, with a card. Grant `/directory` (held by everyone). Migrations `0060`, `0061` (photos). The staff sheet was loaded once by `scripts/import-staff.ts`.
 
-Migration `0060` (tables, guard, RLS, `directory_emails()`); `0061` adds the photo bucket. The staff sheet was loaded once by `scripts/import-staff.ts`.
+## The model
 
-## The model, in one paragraph
+**One person = one account = one card.** `staff_details.id` is `profiles.id` — the primary key is the rule, so no second card and no card for nobody. The `profiles_seed_staff_details` trigger gives every account a blank card as it is created; the app only ever updates cards. Departments are Directory's own list (`staff_departments`), not Relay's.
 
-**One person = one account = one card.** `staff_details` has `id uuid primary key references profiles (id)` — the primary key _is_ that rule, so the schema cannot represent a second card for one person or a card for nobody. A `profiles_seed_staff_details` trigger gives every account a blank card the moment it is created, so a card is never inserted by the app, only updated. Departments are Directory's own list (`staff_departments`), not Relay's.
+## The rules everything follows from
 
-## The three rules everything else follows from
+1. **The column split lives in the database.** The person's own: `phone`, `date_of_birth`, `blood_group`, the emergency contact, `photo_path`. The company's: `department_id`, `designation`, `reports_to_id`, `joined_on`. RLS cannot restrict an UPDATE by column, so `staff_details_guard()` does (the twin of `profiles_guard()`). **A new company column goes into both branches of the guard in the same migration** — forgotten, it is silently self-editable.
+2. **`has_app('/directory')` is not a boundary** — everyone holds it. Everything genuinely restricted here says **`is_admin()`**. The grant protects one thing: `directory_emails()`, against an account without the tool. Hide nothing sensitive behind it.
+3. **No PostgREST embeds, ever.** `staff_details` has four FKs to `profiles` and `staff_departments` two; reads are flat and merge through a `Map` (BUGCATCHER #2).
 
-1. **The column split is the point, and it lives in the database.** Five columns belong to the person (`phone`, `date_of_birth`, `blood_group`, `emergency_contact_name`, `emergency_contact_phone`, plus `photo_path`); four belong to the company (`department_id`, `designation`, `reports_to_id`, `joined_on`). RLS cannot restrict an UPDATE to particular _columns_ — that is why `profiles_guard()` exists and why `staff_details_guard()` is its twin. **Adding a column means deciding which group it joins, and a company column must go into both branches of the guard in the same migration.** A company column forgotten in the guard is silently self-editable and nothing on screen says so.
+## Emails
 
-2. **`has_app('/directory')` is not a boundary here.** Every account in the company holds it, so it is `true` with extra steps. Everything genuinely restricted in this tool says **`is_admin()`** — department writes, the posting fields, the departments screen. The one thing the grant does protect is `directory_emails()`, against an account that has _not_ been granted the tool. **Do not hide anything sensitive behind `/directory` believing it is narrow.**
-
-3. **No PostgREST embeds in this tool. Ever.** `staff_details` has **four** foreign keys to `profiles` (`id`, `reports_to_id`, `created_by`, `updated_by`) and `staff_departments` has two. A `profiles(...)` embed from either answers HTTP 300 `PGRST201` at runtime and is invisible to lint, types, tests and `next build` — Client Relations shipped four dead screens exactly this way. `lib/directory/queries.ts` reads flat and merges through a `Map`, which at fifty rows is faster than the join anyway. Naming the key would also work; not embedding at all cannot be got wrong.
-
-## Where the email comes from
-
-Email lives only in `auth.users`. Before this tool the sole read path was `admin_list_users()`, gated `where is_admin()` — a member of staff could not see a colleague's address at all. `directory_emails()` is that function with a different gate, and **its `where has_app('/directory')` is the entire permission boundary**: it is `security definer`, so it bypasses RLS, and deleting that line hands every address in the company to any signed-in account.
-
-A function rather than a view on purpose: one established shape for reading `auth.users`, one place to audit, and nothing new in `database.types.ts` for the next person to join without thinking. It returns inactive people too — the screens filter, and blanking the email on a deactivated card is exactly wrong for the one person who needs it.
+Email lives only in `auth.users`. `directory_emails()` (`security definer`) reads it, and **its `where has_app('/directory')` is its entire boundary** — delete that line and every address goes to any signed-in account. It returns inactive people too; the screens filter. It is one of two definer functions reading `auth.users` (with Settings' `admin_list_users()`); neither may grow a column without deciding who it is for.
 
 ## Things that will bite
 
-- **The importer depends on `auth.uid() is not null` in the guard.** Service-role writes have no `auth.uid()`, which is what lets `scripts/import-staff.ts` set the whole company's departments. That condition came from `0014` so Studio stays a break-glass path. Remove it to "tighten" the guard and both break — the import _silently_, on the one run that matters.
-- **`profiles_seed_staff_details` is a trigger on a shared table, firing inside Settings' `inviteUser`.** Declared in Directory's migration so the coupling points the right way, and named in `CLAUDE.md`. The concrete misfire: if `staff_details` ever grows a `not null` column with no default, **`inviteUser` starts failing** and surfaces as "Could not create the account", nowhere near the cause.
-- **"Date of birth not in the future" cannot be a CHECK.** `current_date` is `STABLE`, not `IMMUTABLE`, and Postgres refuses it. It lives in the guard. Tidying it into a constraint produces a migration that fails at apply time.
-- **A reporting line pointing at someone deactivated must not vanish.** Render it "(inactive)", and keep the current value in the admin's reports-to dropdown even when inactive — otherwise saving any _other_ field on that person silently clears their reporting line.
-- **Age is never displayed.** The birth year is stored because it is the fact; the birthday list shows day and month only. That is a decision, not an oversight.
-- **Search cannot be a database filter.** It spans `profiles.full_name`, `staff_details.designation` and an email that only exists behind an RPC, so it is a Node filter over a complete `fetchAll` read. Honest at fifty people, fine at 200. Past ~1,000 this needs rethinking; it does not scale and does not pretend to.
-- **The roster is a phone screen.** Site engineers open this to get a colleague's number while standing on site. A card grid, not a table, and `tel:`/`mailto:` as full-width tap targets. A ten-column table of fifty people is unusable at 390px and there is no honest way to make it one.
+- **The guard's `auth.uid() is not null` is what lets service-role scripts write** (and Studio stay a break-glass path). Remove it to "tighten" the guard and the importer breaks silently.
+- **The seed trigger fires inside Settings' `inviteUser`** — a `not null` column without a default on `staff_details` makes account creation fail as "Could not create the account", far from the cause.
+- **"Date of birth not in the future" cannot be a CHECK** (`current_date` isn't immutable); it lives in the guard.
+- **A reporting line to someone deactivated must not vanish** — render "(inactive)" and keep them in the admin's dropdown, or saving any other field clears it.
+- **Age is never displayed**; the birthday list shows day and month.
+- **Search is a Node filter over a complete read** — it spans name, designation and an email behind an RPC. Fine at 200 people, not at 1,000.
+- **The roster is a phone screen**: a card grid with full-width `tel:`/`mailto:` targets, never a wide table.
 
 ## Accepted gaps
 
-- **A reporting cycle (A → B → A) is representable.** `0060` refuses only self-reporting; a full cycle check in a trigger is a recursive CTE, which is over-engineering for fifty people. The loop is broken in `lib/directory/org.ts` with a `seen` set and a depth cap of 12, in pure code where a test proves it.
-- **Three shared mailboxes are people.** `admin@`, `designer@` and `team@` have cards and logins, by founder decision. The cost, recorded once: anything they approve, indent, bill or record names an inbox rather than a person. Reversible by deactivating them.
-- **Personal data lives here that has not been in this app before** — blood group and emergency contact are health and next-of-kin data, date of birth is identity data, and all of it is visible to every colleague. That is the tool's purpose, but "My details" says in plain English who can see each field rather than leaving people to assume. No `grantWarning` in `lib/tools.ts`: that field is for grants whose consequence is easy to under-imagine, and "the staff directory shows staff details" is not one.
-- **`profiles.team` stays dead.** Repointing it at `staff_departments` is a rename on a shared table, which the additive-only rule forbids.
+- **A reporting cycle (A → B → A) is representable**; `lib/directory/org.ts` breaks loops with a `seen` set and a depth cap, under test.
+- **Three shared mailboxes are people** (`admin@`, `designer@`, `team@`) by founder decision — what they approve names an inbox, not a person.
+- **Health, next-of-kin and identity data is visible to every colleague** — the tool's purpose; "My details" says in plain English who sees each field.
+- **`profiles.team` stays dead** — repointing a shared column is a rename, which additive-only forbids.
