@@ -7,9 +7,13 @@ export type CatalogueItem = {
   id: string;
   code: string | null;
   name: string;
+  /** What tells twenty tiles called "Bench" apart — size, wood, finish. */
+  description: string | null;
   /** Flattened from the brands embed by the route handler. */
   brand_name: string | null;
   thumb_url: string | null;
+  /** The vendor's product page, opened from the tile. */
+  source_url: string | null;
   indicative_price: number | null;
   default_uom: string;
   is_provisional: boolean;
@@ -51,7 +55,9 @@ export function catalogueSearchFilter(search: string, brandIds: string[] = []): 
   // `%` stays outside nothing — it is inside the quotes, where ilike still
   // reads it as a wildcard. It is the quoting that is doing the work.
   const quoted = `"%${search.replace(/[\\"]/g, "\\$&")}%"`;
-  const clauses = [`name.ilike.${quoted}`, `code.ilike.${quoted}`];
+  // The description too (2026-09-26): hundreds of items share a name like
+  // "Bench", and "ashwood" or "teak" is how a designer actually looks.
+  const clauses = [`name.ilike.${quoted}`, `code.ilike.${quoted}`, `description.ilike.${quoted}`];
   // Brand ids come from the database, not the request, and are uuids — but
   // they are quoted on the same principle rather than on trust.
   if (brandIds.length > 0) {
