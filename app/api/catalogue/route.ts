@@ -34,9 +34,10 @@ export async function GET(request: Request) {
   // hasApp rather than requireApp because a redirect is meaningless in a
   // fetch response.
   //
-  // Note what this returns: name, code, brand, thumbnail and the
-  // indicative price. No cost and no margin — those live in tables only
-  // /budgets can read, and this endpoint never touches them.
+  // Note what this returns: name, code, description, brand, thumbnail,
+  // the vendor's product link and the indicative price. No cost and no
+  // margin — those live in tables only /budgets can read, and this
+  // endpoint never touches them.
   const grants = await Promise.all(CATALOGUE_TOOLS.map((href) => hasApp(user, href)));
   const allowed = grants.some(Boolean);
   if (!allowed) return new Response("Forbidden", { status: 403 });
@@ -72,7 +73,7 @@ export async function GET(request: Request) {
   let query = supabase
     .from("items")
     .select(
-      "id, code, name, thumb_url, indicative_price, default_uom, is_provisional, brands(name)",
+      "id, code, name, description, thumb_url, source_url, indicative_price, default_uom, is_provisional, brands(name)",
       {
         count: "exact",
       },

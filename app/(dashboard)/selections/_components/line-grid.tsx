@@ -1,6 +1,7 @@
 "use client";
 
 import { ItemThumb } from "@/components/masters/item-thumb";
+import { isWebLink, ProductLink } from "@/components/masters/product-link";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FormMessage } from "@/components/ui/form-message";
@@ -51,8 +52,8 @@ export function LineGrid({
     <Table>
       <TableHead>
         <TableRow>
-          <TableHeaderCell className="w-14"></TableHeaderCell>
-          <TableHeaderCell>Item</TableHeaderCell>
+          <TableHeaderCell className="w-20"></TableHeaderCell>
+          <TableHeaderCell className="min-w-60">Item</TableHeaderCell>
           <TableHeaderCell className="w-28">Qty</TableHeaderCell>
           <TableHeaderCell className="w-20">Unit</TableHeaderCell>
           <TableHeaderCell>Note</TableHeaderCell>
@@ -103,35 +104,61 @@ function LineRow({
     flush({ quantity: parsed, note });
   };
 
+  const thumb = (
+    <ItemThumb
+      code={line.item_code}
+      name={line.item_name}
+      thumbUrl={line.item_thumb_url}
+      sizes="64px"
+      className="w-16"
+    />
+  );
+
   // Deliberately no pending/dimmed state on save: the input already shows
   // what the designer typed, and flashing the row on every tab-out makes a
   // fast edit feel slow. Only a failure is worth interrupting for.
   return (
     <TableRow className={removing ? "opacity-50" : undefined}>
       <TableCell>
-        <ItemThumb
-          code={line.item_code}
-          name={line.item_name}
-          thumbUrl={line.item_thumb_url}
-          sizes="48px"
-          className="w-10"
-        />
+        {/* Big enough to choose by, and a tap opens the full picture. */}
+        {isWebLink(line.item_image_url) ? (
+          <a
+            href={line.item_image_url}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={`Open the picture of ${line.item_name}`}
+            className="focus-visible:ring-accent block rounded-xl focus-visible:ring-2 focus-visible:outline-none"
+          >
+            {thumb}
+          </a>
+        ) : (
+          thumb
+        )}
       </TableCell>
       <TableCell>
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-foreground font-medium">{line.item_name}</span>
           {line.item_is_provisional && <Badge variant="warning">Provisional</Badge>}
         </div>
-        <div className="text-muted text-xs">
-          {line.item_code ?? "—"}
+        {line.item_description && (
+          <p className="text-muted line-clamp-2 max-w-md text-xs" title={line.item_description}>
+            {line.item_description}
+          </p>
+        )}
+        {/* Each piece keeps to one line, so a narrow column wraps between
+            them rather than through "Whispering Homes". */}
+        <div className="text-muted mt-0.5 flex flex-wrap gap-x-2 text-xs whitespace-nowrap">
+          {line.item_brand && <span>{line.item_brand}</span>}
+          <span className="font-mono">{line.item_code ?? "—"}</span>
           {/* The snapshot is shown, never editable: what it cost when it was
               specified is Budgets' input, not a designer's decision. */}
           {line.indicative_rate_snapshot != null && (
-            <span className="ml-2 opacity-60">
+            <span className="opacity-60">
               indicative {formatMoney(line.indicative_rate_snapshot)}
             </span>
           )}
         </div>
+        <ProductLink href={line.item_source_url} itemName={line.item_name} className="mt-0.5" />
       </TableCell>
       <TableCell>
         {editable ? (

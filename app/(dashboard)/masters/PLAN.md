@@ -37,7 +37,20 @@ Client Relations also writes `clients` (extra INSERT/UPDATE policies — permiss
 
 2,631 real items, imported by `scripts/import-catalogue.ts` (dry run by default, re-runnable, skips codes already present). It was pulled forward ahead of Selections deliberately: building the picker against real items beats designing it around five samples and discovering the truth later.
 
-Only ~900 items carry an image URL, all on other companies' Shopify CDNs. **Thumbnails are copied into Supabase Storage** (~14 MB, ours, can't rot); full images stay pointing at the source (~360 MB not worth storing for a rarely-opened detail view). Items with no image get a `lib/color-hash.ts` placeholder tile rather than a broken-image icon.
+At first only ~900 items carried an image URL, all on other companies' Shopify CDNs. **Thumbnails are copied into Supabase Storage** (~14 MB, ours, can't rot); full images stay pointing at the source (~360 MB not worth storing for a rarely-opened detail view). Items with no image get a `lib/color-hash.ts` placeholder tile rather than a broken-image icon.
+
+### The design team's workbook (2026-09-26)
+
+The founder asked for a picture on every item a designer picks from, the product links visible, and the sheet's missing items added — "dont make duplicates, if there are small variations in some data they are probably not a duplicate". `scripts/import-catalogue-sheet.ts` reads the workbook (sheet MAIN CATALOGUE) and `scripts/fetch-catalogue-images.ts` fills in from the links. On staging: 450 pictures from the sheet, 140 new items, and a vendor photo for 1,304 items that had only a link — **2,660 of 2,772 catalogue items now have a picture** (897 before). The rest: the 55 Specta quartz surfaces (no picture or link in the sheet), 6 installation charges, and 29 whose link is dead (the vendor removed the product) or opens a collection page. The settled trade-offs:
+
+- **The sheet's code is not an identity.** It is a formula — `UPPER(LEFT(item,3)&LEFT(type,1))` plus a running COUNTIFS — so inserting a row renumbers every row below it; about 1,000 of 2,759 codes named a different product than the toolbox's same code. Rows match by content (`lib/masters/catalogue-sheet.ts`, tested): the same link, description and brand; else the same description and brand; else the same link, brand and price. Look-alikes pair by price, then order. New items get the next free number on the sheet's own prefix.
+- **Anything that differs is a new item**, by the founder's rule — a "3" added to a sofa's description, the same lamp at another price. A wrong merge would put one product's picture on another; a wrong "new" is one row to switch off. The dry run lists the close calls under "worth a glance".
+- **A row repeating an earlier row's product is skipped**: identical in every field, or the same product page, brand and price (a block of 26 consoles was pasted twice, six with corrected descriptions).
+- **Nothing existing is overwritten** — no picture, link, name, description, price, code or category. The sheet is the design team's working copy; prices are Masters' to edit.
+- **Pictures pasted in the sheet are stored whole** (`items/<id>-full.webp`, ≤1200px) as well as thumbnailed, because no vendor page holds them. Excel shrinks pasted pictures, so many are only ~170–300px wide: fine on a tile, soft when opened.
+- **Photos from links**: Shopify's `/products/<handle>.js` (~6 KB) names the main photo; otherwise the page's `og:image`; collection pages are skipped (their picture is a banner). A 429 is waited out and retried. A 404 is a product the vendor removed — the item keeps its coloured tile.
+- The workbook is not in the repo (real prices); pass its path. Both scripts are re-runnable and write nothing the second time.
+- The 40 older Specta quartz items carry unit `each` though the sheet prices them per square foot; the 15 new ones are `sqft`. Not changed — a Masters decision.
 
 ## Shared pickers: build the third use, not the first
 

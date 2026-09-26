@@ -56,7 +56,12 @@ export type SelectionLineRow = {
   item_name: string;
   item_code: string | null;
   item_brand: string | null;
+  item_description: string | null;
   item_thumb_url: string | null;
+  /** The larger picture, opened from the thumbnail. */
+  item_image_url: string | null;
+  /** The vendor's product page. */
+  item_source_url: string | null;
   item_is_provisional: boolean;
   quantity: number;
   uom: string;
@@ -247,7 +252,7 @@ export const listSelectionLines = cache(async function listSelectionLines(
     supabase
       .from("selection_lines")
       .select(
-        "id, line_key, unit_space_id, item_id, quantity, uom, indicative_rate_snapshot, designer_note, sort_order, created_at, items(name, code, thumb_url, is_provisional, brands(name))",
+        "id, line_key, unit_space_id, item_id, quantity, uom, indicative_rate_snapshot, designer_note, sort_order, created_at, items(name, code, description, thumb_url, image_url, source_url, is_provisional, brands(name))",
       )
       .eq("selection_id", selectionId)
       .order("sort_order")
@@ -260,7 +265,10 @@ export const listSelectionLines = cache(async function listSelectionLines(
     const item = line.items as {
       name: string;
       code: string | null;
+      description: string | null;
       thumb_url: string | null;
+      image_url: string | null;
+      source_url: string | null;
       is_provisional: boolean;
       brands: { name: string } | null;
     } | null;
@@ -272,7 +280,10 @@ export const listSelectionLines = cache(async function listSelectionLines(
       item_name: item?.name ?? "(deleted item)",
       item_code: item?.code ?? null,
       item_brand: item?.brands?.name ?? null,
+      item_description: item?.description ?? null,
       item_thumb_url: item?.thumb_url ?? null,
+      item_image_url: item?.image_url ?? null,
+      item_source_url: item?.source_url ?? null,
       item_is_provisional: item?.is_provisional ?? false,
       quantity: Number(line.quantity),
       uom: line.uom,

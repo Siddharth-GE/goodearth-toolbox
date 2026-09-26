@@ -150,6 +150,24 @@ export async function sql<T extends QueryRow = QueryRow>(ref: string, query: str
   return body as T[];
 }
 
+/**
+ * The project's service-role key, read through the management API — for
+ * the scripts that write Storage, which the SQL endpoint cannot reach.
+ * Held in memory only: never printed, never written to a file.
+ */
+export async function serviceRoleKey(ref: string): Promise<string> {
+  const response = await fetch(`${API}/v1/projects/${ref}/api-keys`, {
+    headers: { Authorization: `Bearer ${managementToken()}` },
+  });
+  if (!response.ok) {
+    throw new Error(`${ref}: could not read API keys (HTTP ${response.status})`);
+  }
+  const keys = (await response.json()) as { name: string; api_key: string }[];
+  const key = keys.find((entry) => entry.name === "service_role")?.api_key;
+  if (!key) throw new Error(`${ref}: no service_role key returned`);
+  return key;
+}
+
 /** A single scalar from a one-row, one-column query. */
 export async function scalar<T>(ref: string, query: string): Promise<T | undefined> {
   const rows = await sql(ref, query);

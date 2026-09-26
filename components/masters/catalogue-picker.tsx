@@ -1,6 +1,7 @@
 "use client";
 
 import { ItemThumb } from "@/components/masters/item-thumb";
+import { ProductLink } from "@/components/masters/product-link";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FormMessage } from "@/components/ui/form-message";
@@ -160,7 +161,7 @@ export function CataloguePickerDialog({
             <Input
               value={search}
               onChange={(event) => applyFilter(() => setSearch(event.target.value))}
-              placeholder="Search name, code or brand…"
+              placeholder="Search name, description, code or brand…"
               autoComplete="off"
               autoFocus
               className="pl-9"
@@ -313,7 +314,15 @@ function ItemCard({
         {item.brand_name && (
           <p className="text-muted mt-0.5 truncate text-[11px] font-medium">{item.brand_name}</p>
         )}
-        <p className="text-muted mt-0.5 text-[11px]">
+        {/* The name alone ("Bench") cannot tell the tiles apart; the
+            description can. Clamped to keep the grid even — the full text
+            is the tooltip, and the product page is one tap below. */}
+        {item.description && (
+          <p className="text-muted mt-1 line-clamp-3 text-[11px]" title={item.description}>
+            {item.description}
+          </p>
+        )}
+        <p className="text-muted mt-1 text-[11px]">
           {item.code ?? "—"}
           {item.indicative_price != null && (
             <span className="ml-1 opacity-70">{formatMoney(item.indicative_price)}</span>
@@ -321,7 +330,11 @@ function ItemCard({
         </p>
       </button>
 
-      <div className="mt-2 flex items-center justify-between gap-1">
+      {/* Outside the button: a link inside it would be a control inside a
+          control, and a tap meant for the page would add the item. */}
+      <ProductLink href={item.source_url} itemName={item.name} className="mt-1 self-start py-0.5" />
+
+      <div className="mt-auto flex items-center justify-between gap-1 pt-2">
         <Stepper
           direction="down"
           disabled={!selected}
