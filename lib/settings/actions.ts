@@ -48,7 +48,7 @@ export async function setFullName(userId: string, fullName: string): Promise<Act
     return { error: "Could not save the name. Try again." };
   }
 
-  revalidatePath("/settings");
+  revalidatePath("/settings", "layout");
   return undefined;
 }
 
@@ -103,7 +103,7 @@ export async function inviteUser(_state: ActionState, formData: FormData): Promi
     return { error: "Could not create the account. Try again." };
   }
 
-  revalidatePath("/settings");
+  revalidatePath("/settings", "layout");
   return undefined;
 }
 
@@ -145,7 +145,7 @@ export async function setActive(userId: string, active: boolean): Promise<Action
     return { error: "Could not change the account. Try again." };
   }
 
-  revalidatePath("/settings");
+  revalidatePath("/settings", "layout");
   revalidatePath(`/settings/people/${userId}`);
   return undefined;
 }
@@ -194,7 +194,7 @@ export async function setAdmin(userId: string, isAdmin: boolean): Promise<Action
     return { error: "Could not change admin access. Try again." };
   }
 
-  revalidatePath("/settings");
+  revalidatePath("/settings", "layout");
   revalidatePath(`/settings/people/${userId}`);
   return undefined;
 }
@@ -213,7 +213,7 @@ export async function grantApp(userId: string, app: string): Promise<ActionState
     return { error: "Could not grant access. Try again." };
   }
 
-  revalidatePath("/settings");
+  revalidatePath("/settings", "layout");
   return undefined;
 }
 
@@ -228,7 +228,7 @@ export async function revokeApp(userId: string, app: string): Promise<ActionStat
     return { error: "Could not revoke access. Try again." };
   }
 
-  revalidatePath("/settings");
+  revalidatePath("/settings", "layout");
   return undefined;
 }
 
@@ -259,7 +259,7 @@ export async function setIndentApprover(userId: string, canApprove: boolean): Pr
     }
   }
 
-  revalidatePath("/settings");
+  revalidatePath("/settings", "layout");
   return undefined;
 }
 
@@ -296,7 +296,7 @@ export async function setBillApprovalLimit(userId: string, rawLimit: string): Pr
     return { error: "Could not save the limit. Try again." };
   }
 
-  revalidatePath("/settings");
+  revalidatePath("/settings", "layout");
   revalidatePath(`/settings/people/${userId}`);
   return undefined;
 }
@@ -327,6 +327,6 @@ export async function setBillApprover(userId: string, canApprove: boolean): Prom
     }
   }
 
-  revalidatePath("/settings");
+  revalidatePath("/settings", "layout");
   return undefined;
 }
