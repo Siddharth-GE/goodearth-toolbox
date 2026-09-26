@@ -16,9 +16,11 @@ Every conversation starts the same way: the founder says **"read CLAUDE.md"**, a
 6. **Before touching auth, permissions, RLS, a view, money, the line chain, or any cross-tool read/write** — `SECURITY.md`.
 7. **Before a migration, a merge, a deploy, or anything environmental** — `SHIPPING.md`: the two databases, the staging protocol, the gates.
 8. **Before merging** anything touching a database read, a file upload, a permission or a colour — `BUGCATCHER.md`, what a green build does not prove. When something breaks that CI said was fine, add it there.
-9. **`plan.md`** at the repo root is the currently approved build plan, when one is running.
+9. **`plan.md`** at the repo root is the currently approved build plan, when one is running. When the build is done, what lasts moves into the tool's `PLAN.md` and `plan.md` goes.
 
 **"Do an audit" means: re-derive the findings from the code, the migrations and the live databases — not read a list.** There is deliberately no standing findings file. Green-build blind spots go to `BUGCATCHER.md`, work still to do goes to `TODO.md`, settled trade-offs go to the owning tool's `PLAN.md` — three places, each already read for other reasons.
+
+**Every fact lives in one file; the others point to it.** Docs say what is true now — history is git. When a fact changes, change it in its home; when a doc starts telling the story of how something came to be, cut the story and keep the rule.
 
 ## The one principle
 
@@ -28,7 +30,7 @@ Every conversation starts the same way: the founder says **"read CLAUDE.md"**, a
 
 ## Structure
 
-- A tool = `app/(dashboard)/<tool>/` (screens) + `lib/<tool>/` (`queries.ts` reads, `actions.ts` writes). `lib/masters/` uses `<entity>.ts` / `<entity>-actions.ts` pairs instead — sanctioned drift across nine entities.
+- A tool = `app/(dashboard)/<tool>/` (screens) + `lib/<tool>/` (`queries.ts` reads, `actions.ts` writes). `lib/masters/` uses `<entity>.ts` / `<entity>-actions.ts` pairs instead — sanctioned drift across its entities.
 - Every Operations and Management tool **opens on a welcome screen** (`_components/tool-welcome.tsx`): plain English, live counts, never rupees. The real first screen sits one click in, so actions must `revalidatePath("/<tool>", "layout")` — an exact-path call refreshes only the welcome and leaves the moved list stale.
 - Kiosk tools with their own auth live top-level. `app/marathon/` is the only one and **not the pattern to copy**.
 - New tool → register in `lib/tools.ts`, add its row to STATUS.md's contract table, and extend **both** `user_apps_app_known` and `role_apps_app_known` CHECKs in the same migration, or granting fails at the database. A stub ships by flipping `built: true` and replacing its `page.tsx`.
@@ -50,7 +52,7 @@ Every conversation starts the same way: the founder says **"read CLAUDE.md"**, a
 
 ## UI
 
-Every screen from `components/ui/*` (+ `components/masters/*`) — no one-off styles, no raw colour classes. Formatting through `lib/format.ts`. Every route gets a `loading.tsx` with the shared `Spinner`. Charts are `recharts`, imported ONLY by `components/ui/chart/*` wrappers; `lib/charts/series.ts` stays types-only. Site engineers and store-keepers use this on phones at site — Indents, Inventory and site-facing flows must genuinely work on a phone. Plain English in all copy and error messages; English-only UI is confirmed sufficient. Using the catalogue picker? Add the grant to the allow-list in `app/api/catalogue/route.ts` or it silently 403s. Read `DESIGN.md` before styling.
+Every screen from `components/ui/*` (+ `components/masters/*`) — no one-off styles, no raw colour classes. Formatting through `lib/format.ts`. Every route gets a `loading.tsx` with the shared `Spinner`. Charts are `recharts`, imported ONLY by `components/ui/chart/*` wrappers; `lib/charts/series.ts` stays types-only. Site engineers and store-keepers use this on phones at site — Indents, Inventory and site-facing flows must genuinely work on a phone. Plain English in all copy and error messages; English-only UI is confirmed sufficient. Using the catalogue picker? Flag the tool `catalogue: true` in `lib/tools.ts` — `/api/catalogue` admits exactly those grants, and anything else fails inside the dialog. Read `DESIGN.md` before styling.
 
 ## Tests, CI and git
 
