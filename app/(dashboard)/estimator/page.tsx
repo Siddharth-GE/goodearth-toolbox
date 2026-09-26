@@ -25,13 +25,14 @@ export default async function EstimatorPage() {
         {
           label: "Over estimate",
           value: overEstimate,
-          hint: "villas drawing past their official estimate — open that estimate to see what",
+          hint: "villas drawing past their official estimate — see Site check",
         },
       ]}
       links={[
         { label: "Estimates", href: "/estimator/estimates", primary: true },
         { label: "Rate book", href: "/estimator/works" },
         { label: "Mixes", href: "/estimator/mixes" },
+        { label: "Site check", href: "/estimator/site-check" },
       ]}
     />
   );

@@ -5,7 +5,7 @@ import { listWorkCategories, listWorkItems } from "@/lib/masters/works";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import type { FrozenLineRow, FrozenTakeoffRow, MaterialDef, MixDef, WorkRecipe } from "./calc";
-import { compareIssuesToEstimate } from "./compare";
+import { compareIssuesToEstimate, type Comparison } from "./compare";
 import { fail, GRANT, itemDefsByIds } from "./shared";
 
 /**
@@ -854,30 +854,41 @@ export async function getReconciliationApprovals(
 }
 
 /* ------------------------------------------------------------------ *
- * Overruns on the welcome (Phase 2 Step I)
+ * Every official estimate against what reached its villa — the Site
+ * check list and the welcome's over-estimate count (Phase 2 Step I).
  *
- * How many villas have drawn past their official estimate — derived
- * fresh from the frozen takeoffs and the plots' movements, never
+ * Derived fresh from the frozen takeoffs and the plots' movements, never
  * stored (the 0083 principle), so a revision that now covers the
- * material clears the count by itself. Batched: a handful of reads for
+ * material clears an entry by itself. Batched: a handful of reads for
  * ALL officials, not several per villa — the welcome renders on every
  * visit.
  * ------------------------------------------------------------------ */
 
-export async function countVillasOverEstimate(): Promise<number> {
+export type OfficialComparison = {
+  estimateId: string;
+  unitId: string;
+  reference: string | null;
+  comparison: Comparison;
+};
+
+export async function getOfficialComparisons(): Promise<OfficialComparison[]> {
   await requireTool(GRANT);
   const supabase = await createClient();
 
-  const officials = await fetchAll<{ id: string; unit_id: string | null }>((from, to) =>
+  const officials = await fetchAll<{
+    id: string;
+    unit_id: string | null;
+    reference: string | null;
+  }>((from, to) =>
     supabase
       .from("estimator_estimates")
-      .select("id, unit_id")
+      .select("id, unit_id, reference")
       .eq("status", "submitted")
       .order("id")
       .range(from, to),
   );
   const unitIds = officials.flatMap((estimate) => (estimate.unit_id ? [estimate.unit_id] : []));
-  if (unitIds.length === 0) return 0;
+  if (unitIds.length === 0) return [];
 
   const [unitsResult, takeoff] = await Promise.all([
     supabase.from("units").select("id, plot_id").in("id", unitIds),
@@ -1005,10 +1016,10 @@ export async function countVillasOverEstimate(): Promise<number> {
     push(receiptTarget.get(line.receipt_id), line.item_id, line.quantity);
   }
 
-  let over = 0;
+  const results: OfficialComparison[] = [];
   for (const estimate of officials) {
+    if (!estimate.unit_id) continue;
     const issued = linesByEstimate.get(estimate.id) ?? [];
-    if (issued.length === 0) continue;
     const rows = takeoff
       .filter((row) => row.estimate_id === estimate.id)
       .map((row) => ({
@@ -1018,8 +1029,79 @@ export async function countVillasOverEstimate(): Promise<number> {
         uom: row.uom,
         quantity: row.quantity,
       }));
-    const comparison = compareIssuesToEstimate(rows, issued);
-    if (comparison.rows.some((row) => row.over)) over++;
+    results.push({
+      estimateId: estimate.id,
+      unitId: estimate.unit_id,
+      reference: estimate.reference,
+      comparison: compareIssuesToEstimate(rows, issued),
+    });
   }
-  return over;
+  return results;
+}
+
+/** How many villas have drawn past their official estimate. */
+export async function countVillasOverEstimate(): Promise<number> {
+  const comparisons = await getOfficialComparisons();
+  return comparisons.filter((official) => official.comparison.rows.some((row) => row.over)).length;
+}
+
+/**
+ * Every approval of an outside-the-estimate entry on the given official
+ * estimates, keyed "estimateId work item" — the Site check list's
+ * Approved column. Approvals belong to one estimate (0083): a new
+ * official estimate asks its estimator again.
+ */
+export async function getApprovalsFor(
+  estimateIds: string[],
+): Promise<Map<string, ReconciliationApproval>> {
+  await requireTool(GRANT);
+  if (estimateIds.length === 0) return new Map();
+  const supabase = await createClient();
+
+  const rows = await fetchAll<{
+    estimate_id: string;
+    work_item_id: string | null;
+    item_id: string;
+    note: string | null;
+    created_by: string | null;
+    created_at: string;
+  }>((from, to) =>
+    supabase
+      .from("estimator_reconciliation_approvals")
+      .select("estimate_id, work_item_id, item_id, note, created_by, created_at")
+      .in("estimate_id", estimateIds)
+      .order("id")
+      .range(from, to),
+  );
+  const approverIds = [...new Set(rows.map((row) => row.created_by).filter((id) => id !== null))];
+  const { data: approvers, error } = approverIds.length
+    ? await supabase.from("profiles").select("id, full_name").in("id", approverIds)
+    : { data: [], error: null };
+  if (error) fail("the approvers' names", error);
+  const nameById = new Map((approvers ?? []).map((profile) => [profile.id, profile.full_name]));
+
+  return new Map(
+    rows.map((row) => [
+      `${row.estimate_id} ${row.work_item_id ?? ""} ${row.item_id}`,
+      {
+        workItemId: row.work_item_id,
+        itemId: row.item_id,
+        note: row.note,
+        approvedByName: (row.created_by ? nameById.get(row.created_by) : null) ?? "a colleague",
+        approvedAt: row.created_at,
+      },
+    ]),
+  );
+}
+
+/** Names and units of the given items — for material that reached a
+ * villa outside any estimate, which carries only its item id. */
+export async function getItemLabels(
+  ids: string[],
+): Promise<Map<string, { name: string; uom: string }>> {
+  await requireTool(GRANT);
+  if (ids.length === 0) return new Map();
+  const supabase = await createClient();
+  const defs = await itemDefsByIds(supabase, [...new Set(ids)]);
+  return new Map([...defs].map(([id, def]) => [id, { name: def.name, uom: def.uom }]));
 }

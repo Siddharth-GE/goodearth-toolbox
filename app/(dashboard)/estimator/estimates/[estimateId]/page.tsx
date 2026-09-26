@@ -662,7 +662,11 @@ export default async function EstimatePage({
             <p className="text-muted mt-1 text-sm">
               What has actually reached this villa — store issues and direct-to-site deliveries —
               per work, against what the estimate froze. Both name their work when they are
-              recorded; that is what lines these up.
+              recorded; that is what lines these up. Every villa at once is in{" "}
+              <Link className="underline underline-offset-2" href="/estimator/site-check">
+                Site check
+              </Link>
+              .
             </p>
           </div>
           {comparison.rows.every((row) => row.issued === 0) && comparison.unmatched.length === 0 ? (

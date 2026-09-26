@@ -10,7 +10,7 @@ _Planned 2026-09-25/26 by Opus on the founder's instruction ("step out, have a l
 - [x] 3. The row explains itself; Works becomes the Rate book `[Opus]` — no migration
 - [ ] 4. Measure first `[Opus drafts M1, Fable reviews before db:apply]`
 - [ ] 5. One estimate per villa `[Opus drafts M2, Fable reviews before db:apply]` — **founder confirms the lifecycle first**
-- [ ] 6. Site check and the villa comparison `[Opus]` — no migration
+- [x] 6. Site check `[Opus]` — no migration (the villa comparison grid waits for step 4: until a quantity can be measured first it has little to compare)
 - [ ] 7. Approval pass `[Fable]` — diff against this plan, SECURITY.md, BUGCATCHER.md
 
 Each step is committed and pushed on its own; the branch merges to `staging` only after the founder has looked at the preview.
@@ -79,7 +79,8 @@ Selections and Budgets are interiors and stay out of this (founder, 2026-09-26).
 
 ### 6. Site check and the villa comparison `[Opus]`
 
-- One cross-villa list of over-estimate and outside-the-estimate rows, Approve on the row, phone cards; % drawn per work; "where does all the cement go". An approval stays approved on the villa's later officials (read across the villa's estimates; no migration).
+- One cross-villa list of over-estimate and outside-the-estimate rows, Approve on the row, laid out as a list rather than a wide table so it reads on a phone; "where the material goes" — every material, estimated against reached, with a villa-by-villa view per material. Built as `getOfficialComparisons` (the welcome's count now shares it) and the pure `site-check.ts`.
+- **Approvals still belong to one official estimate** (the founder's `0083` rule: a new official asks its estimator again). Carrying an approval forward to the villa's later officials is a founder decision, not taken yet.
 - A comparison grid, villas down and works across, to catch a mistyped measurement.
 
 ## Later doors, not built
