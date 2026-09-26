@@ -496,6 +496,81 @@ export async function removeLineMeasurement(id: string): Promise<ActionState> {
   return syncError ? { error: syncError } : undefined;
 }
 
+/**
+ * Copy one work's measurement rows onto another work of the same
+ * estimate — a wall measured once for brickwork is the same wall for its
+ * plaster and its paint. The rows land at the bottom of the other sheet
+ * as they are; the person then adjusts what differs (plaster has no
+ * thickness), because the app never converts units.
+ */
+export async function copyMeasurementRows(
+  fromLineId: string,
+  toLineId: string,
+): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+  if (!fromLineId || !toLineId || fromLineId === toLineId) {
+    return { error: "Pick the other work to copy the rows to." };
+  }
+  const supabase = await createClient();
+
+  const { data: lines, error: linesError } = await supabase
+    .from("estimator_estimate_lines")
+    .select("id, estimate_id")
+    .in("id", [fromLineId, toLineId]);
+  if (linesError) {
+    console.error("copyMeasurementRows (lines) failed:", linesError);
+    return { error: "Could not copy the rows. Try again." };
+  }
+  if (!lines || lines.length !== 2 || lines[0].estimate_id !== lines[1].estimate_id) {
+    return { error: "Both works must be on this estimate — reload the page." };
+  }
+
+  const [source, last] = await Promise.all([
+    supabase
+      .from("estimator_estimate_line_measurements")
+      .select("description, nos, length, breadth, depth")
+      .eq("line_id", fromLineId)
+      .order("sort_order")
+      .order("id"),
+    supabase
+      .from("estimator_estimate_line_measurements")
+      .select("sort_order")
+      .eq("line_id", toLineId)
+      .order("sort_order", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  if (source.error || last.error) {
+    console.error("copyMeasurementRows (rows) failed:", source.error ?? last.error);
+    return { error: "Could not copy the rows. Try again." };
+  }
+  if (!source.data || source.data.length === 0) return { error: "There are no rows to copy." };
+
+  const start = last.data?.sort_order ?? 0;
+  const { error } = await supabase.from("estimator_estimate_line_measurements").insert(
+    source.data.map((row, index) => ({
+      line_id: toLineId,
+      description: row.description,
+      nos: row.nos,
+      length: row.length,
+      breadth: row.breadth,
+      depth: row.depth,
+      sort_order: start + index + 1,
+      created_by: user.id,
+      updated_by: user.id,
+    })),
+  );
+  if (error) {
+    if (error.code === "P0001") return { error: error.message };
+    console.error("copyMeasurementRows failed:", error);
+    return { error: "Could not copy the rows. Try again." };
+  }
+
+  const syncError = await syncLineQty(supabase, toLineId, user.id);
+  revalidatePath("/estimator", "layout");
+  return syncError ? { error: syncError } : undefined;
+}
+
 /* ------------------------------------------------------------------ *
  * This villa's materials for a work (0087) — "every house is different"
  *

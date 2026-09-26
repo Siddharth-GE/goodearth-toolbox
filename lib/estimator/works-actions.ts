@@ -20,9 +20,9 @@ import { GRANT, UOM_LIMIT } from "./shared";
  * The work's unit and labour rate. One row per work; saving again
  * updates it, so the form is the same either way.
  *
- * Changing the unit after estimate lines exist silently changes what
- * every one of those quantities MEANS — the screen warns before letting
- * it through, and the count comes from getWorkSetup.
+ * Changing the unit after estimate lines exist would silently change
+ * what every one of those quantities MEANS, so it is refused while any
+ * line uses the work (2026-09-26 — it used to be a warning).
  */
 export async function saveWorkInfo(
   workItemId: string,
@@ -40,6 +40,27 @@ export async function saveWorkInfo(
   }
 
   const supabase = await createClient();
+
+  // A work's unit is what every quantity on it means: 40 cum becoming
+  // 40 sqm is the same number describing a different building. While any
+  // estimate line uses the work, the unit stays as it is.
+  const [current, used] = await Promise.all([
+    supabase.from("estimator_work_info").select("uom").eq("work_item_id", workItemId).maybeSingle(),
+    supabase
+      .from("estimator_estimate_lines")
+      .select("id", { count: "exact", head: true })
+      .eq("work_item_id", workItemId),
+  ]);
+  if (current.error || used.error) {
+    console.error("saveWorkInfo (read) failed:", current.error ?? used.error);
+    return { error: "Could not save the work setup. Try again." };
+  }
+  if (current.data && current.data.uom !== uom && (used.count ?? 0) > 0) {
+    return {
+      error: `This work is on ${used.count} estimate ${used.count === 1 ? "line" : "lines"} measured in ${current.data.uom}, so its unit can't change — that would change what those quantities mean.`,
+    };
+  }
+
   const { error } = await supabase.from("estimator_work_info").upsert(
     {
       work_item_id: workItemId,

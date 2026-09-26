@@ -570,6 +570,13 @@ export default async function EstimatePage({
                                 workUom={uom}
                                 rows={sheet ?? []}
                                 readOnly={false}
+                                otherLines={estimate.lines
+                                  .filter((other) => other.id !== line.id)
+                                  .map((other) => ({
+                                    id: other.id,
+                                    name: other.name,
+                                    uom: uomByWork.get(other.workItemId) ?? null,
+                                  }))}
                               />
                               <RemoveLineButton id={line.id} label={line.name} />
                             </div>

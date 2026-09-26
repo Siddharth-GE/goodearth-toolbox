@@ -17,10 +17,10 @@ import { useActionState, useEffect, useMemo, useRef, useState, useTransition } f
 /**
  * The work's unit and labour rate.
  *
- * Changing the unit once estimate lines exist silently changes what
+ * Changing the unit once estimate lines exist would silently change what
  * every one of those quantities means — 40 "cum" becoming 40 "sqm" is
- * the same number describing a different building. The form says so
- * before it lets the change through.
+ * the same number describing a different building — so the unit is
+ * locked while any estimate uses the work (saveWorkInfo refuses it too).
  */
 export function WorkInfoForm({ work, uoms }: { work: WorkSetup; uoms: string[] }) {
   const [state, formAction, pending] = useActionState(
@@ -28,8 +28,7 @@ export function WorkInfoForm({ work, uoms }: { work: WorkSetup; uoms: string[] }
     undefined,
   );
   const [uom, setUom] = useState(work.uom ?? "");
-  const unitChanged = work.uom !== null && uom.trim() !== work.uom;
-  const risky = unitChanged && work.lineCount > 0;
+  const locked = work.uom !== null && work.lineCount > 0;
 
   return (
     <form action={formAction} className="space-y-3">
@@ -38,13 +37,16 @@ export function WorkInfoForm({ work, uoms }: { work: WorkSetup; uoms: string[] }
           <Label htmlFor="uom">Measured in</Label>
           <UomSelect
             id="uom"
-            name="uom"
+            name={locked ? undefined : "uom"}
             uoms={uoms}
             current={work.uom}
             value={uom}
             onChange={(event) => setUom(event.target.value)}
+            disabled={locked}
             required
           />
+          {/* A disabled select sends nothing; the locked unit still goes. */}
+          {locked && <input type="hidden" name="uom" value={work.uom ?? ""} />}
         </div>
         <div className="w-44 space-y-1.5">
           <Label htmlFor="labour_rate">Labour rate</Label>
@@ -65,11 +67,11 @@ export function WorkInfoForm({ work, uoms }: { work: WorkSetup; uoms: string[] }
         The labour rate is per {uom.trim() || "unit"}. Leave it blank if it isn&apos;t priced yet —
         estimates will say the cost is unknown rather than counting the labour as free.
       </p>
-      {risky && (
-        <p className="text-warning text-sm">
-          This work is on {work.lineCount} estimate {work.lineCount === 1 ? "line" : "lines"}.
-          Changing the unit from {work.uom} to {uom.trim()} changes what those quantities mean —
-          check them afterwards.
+      {locked && (
+        <p className="text-muted text-sm">
+          Measured in {work.uom} on {work.lineCount} estimate{" "}
+          {work.lineCount === 1 ? "line" : "lines"}, so the unit stays — changing it would change
+          what those quantities mean.
         </p>
       )}
       <FormMessage error={state?.error} />
