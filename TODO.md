@@ -12,12 +12,12 @@ Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, histor
 
 Everything below is on `staging.goodearthkannur.org`. Each ships only after the founder says they have tried it there.
 
-- **Catalogue pictures** (no migration). Then on production: `scripts/import-catalogue-sheet.ts --project pajfrgnkapicdgangjey --xlsx <workbook>` and `scripts/fetch-catalogue-images.ts --project pajfrgnkapicdgangjey`, dry run first. In Masters, look at the four new items close to an existing one (Teak wood 3 sofa vs SOFS016; the Tao console at two prices; Orbicular vs Globo rattan lamp; the Philips deco lamp at two prices) and the 29 items whose vendor page is gone.
+- **Catalogue pictures** — **vetted by the founder 2026-09-26**, and the close calls sorted in Masters. On ship day, on production: `scripts/import-catalogue-sheet.ts --project pajfrgnkapicdgangjey --xlsx <workbook>` and `scripts/fetch-catalogue-images.ts --project pajfrgnkapicdgangjey`, dry run first.
 - **The Estimator rework** (`0096`–`0098`). Its approval pass by Fable was deferred by the founder and is due before production.
 - **Relay × Google Chat round two** — the founder's steps and the checks are in `lib/google-chat/PLAN.md`; production has its own checklist there.
 - **The skin** — nobody has looked at the signed-in screens in it yet; the browser checklist is `git show 42463f8:plan.md`.
 - **Dexter** (`0095`) — tried and confirmed good; production needs `0095` first.
-- **Settings refreshes every page after a change** (the 2026-09-26 audit's one code fix): rename someone on their own Settings page and the page should show the new name without a reload.
+- **Settings refreshes every page after a change** — **vetted by the founder 2026-09-26**.
 
 **Getting it to `master`.** `staging` is ~150 commits ahead and carries `0094`–`0098`. Either the Chat door's ship checklist runs first and everything goes together, or a piece travels alone on a release branch cut from `master` (the skin: cherry-pick `a096e58`…`3fe4c95`, skip the sweep `f8a9e5c` and re-run it on `master`). Every route needs production restored first, then the migrations applied there and `db:compare` empty.
 
