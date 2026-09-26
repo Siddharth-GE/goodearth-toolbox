@@ -1,12 +1,10 @@
 # Bills — the rules
 
-**Shipped 2026-08-04.** Migrations `0025` + `0026`.
+Grant `/bills`. Migrations `0025`, `0026`.
 
 The accounts-facing record of what Goodearth owes and has paid. A bill is one of **three kinds** — against an issued purchase order, against an **approved** labour contract, or **NMR (daily wages)** with no anchor at all — numbered `BILL/<project>/<plot-or-unit-or-GEN>/NNN`, moving recorded → approved → paid, with send-back carrying a mandatory note.
 
 **A bill has no line items, by founder decision.** The paper invoice's figures are the record.
-
-_Trimmed 2026-08-14: the milestone log lives in git._
 
 ## The rules everything rests on
 

@@ -1,60 +1,17 @@
-# Supervisors — plan and settled decisions
+# Supervisors — the rules
 
-Phase 2 of the estimator-as-backbone rewiring (approved 2026-08-20; the
-running plan is `plan.md` at the repo root while the build is in
-flight). A phone-first app for site supervisors: log the day's labour,
-see what material each work has drawn, request store issues.
+A phone-first app for site supervisors: log the day's labour, see what material each work has drawn against the official estimate, see the released drawings, and request store issues. Grant `/supervisors`. Migration `0084`.
 
 ## What it is
 
-- **Villa picker** — every supervisor sees every villa (founder,
-  2026-08-20: no plot assignment; that is a possible later feature, not
-  a missing one). Villas are units; the working anchor is the PLOT,
-  like stock issues — the unit is found through the 0029 1:1 when the
-  estimate is needed.
-- **Labour logs** — one row per plot + work + contractor + date,
-  counted by trade (masons / helpers / others — founder's pick over a
-  single headcount). Edited, not accumulated: the unique key turns a
-  second entry for the same day into "edit the existing one". Heads,
-  never wages — nothing in this tool prices labour.
-- **Requests for issue** — plot, work, item, quantity in the item's
-  unit (how stock moves, the 0076 D5 rule), status `requested →
-fulfilled / declined`. The supervisor may edit or withdraw an OPEN
-  request; the store-keeper (Inventory, Step H) resolves it, and a
-  resolved request is immutable history. The request form quick-picks
-  from the official estimate's materials for the chosen work, with the
-  whole catalogue as fallback.
+- **Villa picker** — every supervisor sees every villa (founder, 2026-08-20; per-supervisor plots is a possible later feature, and it would also decide who sees which villa's drawings). The working anchor is the **plot**, like stock issues; the unit is found through the 1:1 when the estimate is needed.
+- **Labour logs** — one row per plot + work + contractor + date, counted by trade (masons / helpers / others). Edited, not accumulated: a second entry for the same day edits the first. **Heads, never wages.**
+- **Requests for issue** — plot, work, item and quantity in the item's unit; `requested → fulfilled / declined`. The supervisor edits or withdraws an open request; the store-keeper resolves it (`inventory/PLAN.md`); a resolved request is history. The form quick-picks from the official estimate's materials for the work, with the whole catalogue as fallback.
+- **Drawings** — released revisions per work, through the shared `lib/drawings/` (`design-management/PLAN.md`).
 
 ## Settled decisions
 
-- **`issue_requests` is Supervisors-owned; Inventory's fulfil/decline
-  is a documented cross-tool write exception** (STATUS.md list, with
-  Step H). RLS admits both apps on SELECT and UPDATE — one policy per
-  verb — and `issue_requests_guard()` holds the fine grain: identity
-  permanent, content edits only while `requested` and only by
-  `/supervisors`, transitions only by `/inventory`, `fulfilled` needs
-  its issue id, `declined` needs a reason.
-- **The materials view derives, never stores** — `groupSiteMaterials`
-  (`lib/supervisors/site-materials.ts`, pure, tested) lines drawn
-  quantities up against `estimate_takeoff_facts` per work. It restates
-  the house conversion rule verbatim (factor ÷, matching labels 1:1,
-  otherwise raw-and-labelled) because pure modules import nothing; the
-  Estimator's `compare.ts` is the sibling, not an import — one tool
-  never imports another tool's code.
-- **Contractors are vendors** with `is_contractor` (0073). The picker
-  filters to active contractors; a DB trigger
-  (`labour_logs_contractor_only`) refuses any other vendor id, so the
-  API cannot sneak one past the form.
-- **No money, SELECT included, on labour** — `labour_logs` is
-  `/supervisors` on every verb. `estimate_takeoff_facts` gained
-  `/supervisors` in its WHERE (0084) and still carries no rate column,
-  ever; the view manifest pins that.
-
-## Open
-
-- Plot assignment per supervisor — only if the founder asks.
-
-Steps H (the store-keeper's queue, `/inventory/requests`) and I
-(over-issue banner on the issue note + the Estimator welcome's overrun
-count) shipped 2026-08-20 with this tool — their mechanics live in
-Inventory's and the Estimator's PLAN.md files.
+- **`issue_requests` is Supervisors-owned; Inventory's fulfil/decline is a documented cross-tool write** (`SECURITY.md`). RLS admits both apps on SELECT and UPDATE, one policy per verb, and `issue_requests_guard()` holds the fine grain: identity permanent, content edits only while `requested` and only by `/supervisors`, transitions only by `/inventory`, `fulfilled` needs its issue id, `declined` needs a reason.
+- **The materials view derives, never stores** — `groupSiteMaterials` (`lib/supervisors/site-materials.ts`, pure, tested) sets drawn quantities against `estimate_takeoff_facts` per work. It restates the house conversion rule (factor, matching labels 1:1, else raw and labelled) rather than importing the Estimator's `compare.ts` — one tool never imports another's code. Narrowing filters over that view must follow its schema (BUGCATCHER #16).
+- **Contractors are vendors** with `is_contractor`; `labour_logs_contractor_only` refuses any other vendor id at the database.
+- **No money anywhere** — `labour_logs` is `/supervisors` on every verb, and `estimate_takeoff_facts` admits `/supervisors` with no rate column, ever (pinned in the view manifest).
