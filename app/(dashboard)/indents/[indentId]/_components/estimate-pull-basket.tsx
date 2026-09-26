@@ -21,11 +21,11 @@ import { useMemo, useState, useTransition } from "react";
 
 /**
  * The estimate pull: the official estimate's material takeoff, one row
- * per material, a local basket and one commit — the PullBasket idea,
- * reshaped for rows that carry their own conversion story. A ready row
- * prefills the converted figure; a needs-quantity row shows the
- * estimate figure and asks a person for the procurement quantity; an
- * unlinked row cannot be picked and says where the fix lives.
+ * per catalogue item, a local basket and one commit — the PullBasket
+ * idea. A ready row prefills the estimate's figure; a needs-quantity row
+ * (an estimate from before materials were items) shows the estimate's
+ * figure and asks a person for the procurement quantity; an unlinked row
+ * cannot be picked and says why.
  */
 export function EstimatePullBasket({
   indentId,
@@ -51,22 +51,23 @@ export function EstimatePullBasket({
   const toggle = (row: EstimatePullRow, on: boolean) =>
     setPicked((current) => {
       const next = { ...current };
-      if (on) next[row.material_id] = row.prefill_qty ?? "";
-      else delete next[row.material_id];
+      if (!row.item_id) return current;
+      if (on) next[row.item_id] = row.prefill_qty ?? "";
+      else delete next[row.item_id];
       return next;
     });
 
-  const setQuantity = (materialId: string, raw: string) =>
+  const setQuantity = (itemId: string, raw: string) =>
     setPicked((current) => ({
       ...current,
-      [materialId]: raw === "" ? "" : Number(raw),
+      [itemId]: raw === "" ? "" : Number(raw),
     }));
 
   const commit = () =>
     startSaving(async () => {
       const lines = pickedEntries
         .filter((entry): entry is [string, number] => entry[1] !== "" && entry[1] > 0)
-        .map(([materialId, quantity]) => ({ materialId, quantity }));
+        .map(([itemId, quantity]) => ({ itemId, quantity }));
       const result = await addEstimatePullLines(indentId, estimateId, lines);
       if (result?.error) {
         setError(result.error);
@@ -89,16 +90,18 @@ export function EstimatePullBasket({
         </TableHead>
         <TableBody>
           {rows.map((row) => {
-            const on = row.material_id in picked;
-            const disabled = row.state === "unlinked" || row.on_this_indent;
+            const on = row.item_id !== null && row.item_id in picked;
+            const disabled = row.item_id === null || row.on_this_indent;
+            const name = row.item_name ?? row.estimate_name;
+            const itemId = row.item_id;
             return (
-              <TableRow key={row.material_id}>
+              <TableRow key={row.key}>
                 <TableCell>
                   <Checkbox
                     checked={on}
                     disabled={disabled}
                     onChange={(event) => toggle(row, event.target.checked)}
-                    aria-label={`Pick ${row.material_name}`}
+                    aria-label={`Pick ${name}`}
                   />
                 </TableCell>
                 <TableCell>
@@ -106,26 +109,23 @@ export function EstimatePullBasket({
                     {row.item_id && (
                       <ItemThumb
                         code={row.item_code}
-                        name={row.item_name ?? row.material_name}
+                        name={name}
                         thumbUrl={row.item_thumb_url}
                         sizes="48px"
                         className="w-10 shrink-0"
                       />
                     )}
                     <div className="min-w-0">
-                      <p className="text-foreground truncate text-sm font-medium">
-                        {row.item_name ?? row.material_name}
-                      </p>
+                      <p className="text-foreground truncate text-sm font-medium">{name}</p>
                       <p className="text-muted truncate text-xs">
                         {row.item_code ? `${row.item_code} · ` : ""}
-                        {row.material_name}
-                        {" · "}
+                        {row.estimate_name !== name && `${row.estimate_name} · `}
                         {row.work_count === 1 ? "1 work" : `${row.work_count} works`}
                       </p>
                       {row.state === "unlinked" && (
                         <p className="text-warning text-xs">
-                          Not linked to a catalogue item — link it on the Estimator&apos;s Materials
-                          screen first.
+                          Not linked to a catalogue item — this estimate is from before materials
+                          were items. A newer official estimate will list it properly.
                         </p>
                       )}
                       {row.on_this_indent && (
@@ -135,11 +135,13 @@ export function EstimatePullBasket({
                   </div>
                 </TableCell>
                 <TableCell className="text-sm whitespace-nowrap">
-                  {formatQuantity(row.estimate_quantity)} {row.material_uom}
+                  {row.estimate_parts
+                    .map((part) => `${formatQuantity(part.quantity)} ${part.uom}`)
+                    .join(" + ")}
                   {row.state === "ready" &&
                     row.prefill_qty !== null &&
                     row.item_default_uom &&
-                    row.prefill_qty !== row.estimate_quantity && (
+                    !isAsBought(row) && (
                       <span className="text-muted">
                         {" "}
                         ≈ {formatQuantity(row.prefill_qty)} {row.item_default_uom}
@@ -161,17 +163,17 @@ export function EstimatePullBasket({
                   )}
                 </TableCell>
                 <TableCell>
-                  {on ? (
+                  {on && itemId ? (
                     <div className="flex items-center gap-2">
                       <Input
                         type="number"
                         inputMode="decimal"
                         min={0}
                         step="any"
-                        value={picked[row.material_id]}
-                        onChange={(event) => setQuantity(row.material_id, event.target.value)}
+                        value={picked[itemId]}
+                        onChange={(event) => setQuantity(itemId, event.target.value)}
                         className="w-24"
-                        aria-label={`Quantity of ${row.material_name}`}
+                        aria-label={`Quantity of ${name}`}
                       />
                       <span className="text-muted text-sm">{row.item_default_uom}</span>
                     </div>
@@ -202,5 +204,17 @@ export function EstimatePullBasket({
         </div>
       </div>
     </div>
+  );
+}
+
+/** True when the estimate's figure is already the item's own unit and
+ * quantity — nothing to convert, so no "≈" hint beside it. */
+function isAsBought(row: EstimatePullRow): boolean {
+  const [only, ...rest] = row.estimate_parts;
+  return (
+    rest.length === 0 &&
+    only !== undefined &&
+    only.uom.trim().toLowerCase() === row.item_default_uom?.trim().toLowerCase() &&
+    only.quantity === row.prefill_qty
   );
 }

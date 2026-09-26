@@ -8,16 +8,15 @@ The bot is built and vetted on staging through Phase 7b (2026-09-03). Its plan, 
 
 ## Next, in order
 
-- **The Estimator's measurement sheet is on staging for the founder's vet** (PR #75, 2026-09-25). `0096` is applied to staging only; the review was Opus's on the founder's instruction (root `plan.md`). The founder's comments come next; production waits, with `0094` and `0095`.
+- **The Estimator rework is being built** on `feature/estimator-rework` (founder, 2026-09-26: "go ahead and execute your plan") — the rate book, villas measured on their own, one site-check list. Root `plan.md` is the live board. It builds on the measurement sheet (PR #75, `0096`, staging only), whose vet folds into this one; production waits, with `0094` and `0095`.
 
-0. **Production is paused — restore it, then find out why the keep-alive did not keep it alive.** Found `INACTIVE` on 2026-09-25, twenty days after the weekly cron went in. Restore in the Supabase dashboard (or `POST /v1/projects/pajfrgnkapicdgangjey/restore` — a model session is refused this, rightly), then read the cron's runs under Vercel → Settings → Cron Jobs: a red run means `CRON_SECRET` (BUGCATCHER #18), no run at all means the cron never fired. Until it is fixed, item 7 is the only real answer. The founder's call, 2026-09-25: "production later".
+0. **Production is paused — restore it, then find out why the keep-alive did not keep it alive.** Found `INACTIVE` on 2026-09-25, twenty days after the weekly cron went in. Restore in the Supabase dashboard (or `POST /v1/projects/pajfrgnkapicdgangjey/restore` — a model session is refused this, rightly), then read the cron's runs under Vercel → Settings → Cron Jobs: a red run means `CRON_SECRET` (BUGCATCHER #18), no run at all means the cron never fired. Until it is fixed, item 6 is the only real answer. The founder's call, 2026-09-25: "production later".
 1. **Grant `/design-management` to the design team** in Settings. Legal in both CHECKs since `0030`; invisible until granted. Nobody holds it today.
 2. **Press one real write button on production** — the last step of the ship protocol, still not done since the Phase 2 / masters releases. Editing one of the 74 price-less materials (item 4) is the natural candidate.
 3. **Grant `/supervisors` to the actual site supervisors.** Nothing is visible to staff today, and Design Management's drawings reach site through this grant.
 4. **Re-enter 74 material rates in Masters.** The source sheets disagreed about those units, so the import left prices blank. `npx tsx scripts/import-material-master.ts --project <ref>` prints the list. "Hose Coller PVC 32mm" also needs a code (`PLD/836` named two products).
 5. **Set up the works** on the Estimator's Works tab: each work's unit, labour rate and recipe. Until then an estimate prices labour only.
-6. **Indents' pull-from-estimate is blind to post-`0086` estimates** (BUGCATCHER #16): `getEstimatePull` (`lib/indents/queries.ts`) is keyed on `material_id`, which post-`0086` rows don't have. Re-key on the item; needs its own small plan.
-7. **Supabase Pro plan** — the founder's call. The weekly keep-alive was meant to stop the free tier pausing production and has not (item 0); only Pro brings backups.
+6. **Supabase Pro plan** — the founder's call. The weekly keep-alive was meant to stop the free tier pausing production and has not (item 0); only Pro brings backups.
 
 ## The skin waits on `staging` (founder, 2026-09-19)
 

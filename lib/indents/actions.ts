@@ -551,8 +551,8 @@ export async function deleteIndent(indentId: string): Promise<ActionState> {
 }
 
 export type EstimatePullInput = {
-  /** estimator material id — the stable row of the takeoff. */
-  materialId: string;
+  /** The catalogue item — the row of the pull. */
+  itemId: string;
   /** Typed (or prefilled) by the operator, in the ITEM's unit. */
   quantity: number;
 };
@@ -560,13 +560,11 @@ export type EstimatePullInput = {
 /**
  * Pulls materials from the villa's official estimate — pull path 3.
  *
- * Only which materials and how much comes from the client; the item and
- * its unit are re-read server-side from estimate_takeoff_facts and the
- * catalogue. An unlinked material is refused by name — the fix lives on
- * the Estimator's materials screen, and the message says so. Materials
- * already on this indent are skipped rather than merged, the same rule
- * as the other two pull paths (the unique (indent, estimate, item)
- * anchor backstops it).
+ * Only which items and how much comes from the client; that each item is
+ * on the official estimate, and its unit, are re-read server-side from
+ * estimate_takeoff_facts and the catalogue. Items already on this indent
+ * are skipped rather than merged, the same rule as the other two pull
+ * paths (the unique (indent, estimate, item) anchor backstops it).
  */
 export async function addEstimatePullLines(
   indentId: string,
@@ -581,15 +579,15 @@ export async function addEstimatePullLines(
   }
 
   const supabase = await createClient();
-  const materialIds = [...new Set(lines.map((line) => line.materialId))];
+  const itemIds = [...new Set(lines.map((line) => line.itemId))];
 
   const [{ data: facts, error: factsError }, { data: existing, error: existingError }] =
     await Promise.all([
       supabase
         .from("estimate_takeoff_facts")
-        .select("material_id, material_name, item_id")
+        .select("item_id")
         .eq("estimate_id", estimateId)
-        .in("material_id", materialIds),
+        .in("item_id", itemIds),
       supabase
         .from("indent_lines")
         .select("item_id")
@@ -600,35 +598,13 @@ export async function addEstimatePullLines(
     console.error("addEstimatePullLines lookup failed:", factsError ?? existingError);
     return { error: "Could not add those materials. Try again." };
   }
-  if (!facts || facts.length === 0) {
+  // The view reads official estimates only, so an item missing here means
+  // the estimate was superseded while the screen was open.
+  const onEstimate = new Set((facts ?? []).map((fact) => fact.item_id));
+  if (itemIds.some((id) => !onEstimate.has(id))) {
     return { error: "That estimate is no longer the official one — reload and look again." };
   }
 
-  const itemByMaterial = new Map<string, string | null>();
-  const nameByMaterial = new Map<string, string>();
-  for (const fact of facts) {
-    if (!fact.material_id) continue;
-    itemByMaterial.set(fact.material_id, fact.item_id);
-    if (fact.material_name) nameByMaterial.set(fact.material_id, fact.material_name);
-  }
-
-  const unlinked = materialIds.filter(
-    (id) => itemByMaterial.has(id) && itemByMaterial.get(id) === null,
-  );
-  if (unlinked.length > 0) {
-    const name = nameByMaterial.get(unlinked[0]) ?? "that material";
-    return {
-      error: `Link ${name} to a catalogue item in the Estimator first — a request line has to name what the store buys.`,
-    };
-  }
-
-  const itemIds = [
-    ...new Set(
-      materialIds
-        .map((id) => itemByMaterial.get(id))
-        .filter((id): id is string => typeof id === "string"),
-    ),
-  ];
   const { data: items, error: itemsError } = await supabase
     .from("items")
     .select("id, default_uom")
@@ -642,8 +618,8 @@ export async function addEstimatePullLines(
 
   const inserts = [];
   for (const line of lines) {
-    const itemId = itemByMaterial.get(line.materialId);
-    if (!itemId || already.has(itemId)) continue;
+    const itemId = line.itemId;
+    if (already.has(itemId)) continue;
     const uom = uomByItem.get(itemId);
     if (!uom) continue;
     inserts.push({
