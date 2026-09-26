@@ -11,26 +11,36 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { FormMessage } from "@/components/ui/form-message";
-import { reviseEstimate, submitEstimate } from "@/lib/estimator/estimate-actions";
+import { makeOfficial } from "@/lib/estimator/estimate-actions";
 import { useState, useTransition } from "react";
 
 /**
- * Submit, behind a confirm that says exactly what freezes — pressing it
- * is the moment the estimate stops being a calculator and becomes the
- * villa's official document, so the button must not be casual.
+ * Make official (0098), behind a confirm that says exactly what happens —
+ * a numbered copy is frozen and becomes what the stores and site check
+ * against, while this working estimate stays open for the next change.
  */
-export function SubmitEstimateButton({
+export function MakeOfficialButton({
   estimateId,
   villaName,
-  hasLines,
+  lineCount,
+  toMeasureCount,
+  hasOfficial,
 }: {
   estimateId: string;
   villaName: string;
-  hasLines: boolean;
+  lineCount: number;
+  toMeasureCount: number;
+  hasOfficial: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string>();
+  const blocked =
+    lineCount === 0
+      ? "Add a work first"
+      : toMeasureCount > 0
+        ? `${toMeasureCount} ${toMeasureCount === 1 ? "work is" : "works are"} still to measure`
+        : undefined;
 
   return (
     <Dialog
@@ -41,27 +51,24 @@ export function SubmitEstimateButton({
       }}
     >
       <DialogTrigger asChild>
-        <Button disabled={!hasLines} title={hasLines ? undefined : "Add a work first"}>
-          Submit
+        <Button disabled={!!blocked} title={blocked}>
+          Make official
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Make this the official estimate?</DialogTitle>
+          <DialogTitle>Make this {villaName}&apos;s official estimate?</DialogTitle>
         </DialogHeader>
         <div className="space-y-3 text-sm">
           <p className="text-foreground">
-            Submitting freezes this estimate at today&apos;s rates and makes it the official
-            estimate for {villaName} — the one material requests and site issues are checked
-            against.
+            A copy of this estimate is frozen at today&apos;s rates and becomes {villaName}&apos;s
+            official estimate — the one material requests and site deliveries are checked against.
           </p>
           <ul className="text-muted list-disc space-y-1 pl-5">
-            <li>It gets a reference number and records you as its submitter.</li>
-            <li>Its works, quantities and costs stop moving when rates change.</li>
-            <li>
-              It can no longer be edited — a change means revising it, which starts a fresh draft.
-            </li>
-            <li>If {villaName} already has an official estimate, this one replaces it.</li>
+            <li>The copy gets a reference number and records you as the one who made it.</li>
+            <li>Its works, quantities, measurements and costs stop moving when rates change.</li>
+            <li>This working estimate stays open — change it and make it official again later.</li>
+            {hasOfficial && <li>The current official estimate is kept as history.</li>}
           </ul>
           <FormMessage error={error} />
         </div>
@@ -73,40 +80,16 @@ export function SubmitEstimateButton({
             disabled={pending}
             onClick={() =>
               startTransition(async () => {
-                const result = await submitEstimate(estimateId);
+                const result = await makeOfficial(estimateId);
                 if (result?.error) setError(result.error);
                 else setOpen(false);
               })
             }
           >
-            {pending ? "Submitting…" : "Submit estimate"}
+            {pending ? "Making it official…" : "Make official"}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-/** Start a fresh draft from a submitted estimate's works. */
-export function ReviseEstimateButton({ estimateId }: { estimateId: string }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
-
-  return (
-    <div className="flex items-center gap-2">
-      <FormMessage error={error} />
-      <Button
-        type="button"
-        disabled={pending}
-        onClick={() =>
-          startTransition(async () => {
-            const result = await reviseEstimate(estimateId);
-            setError(result?.error);
-          })
-        }
-      >
-        {pending ? "Starting revision…" : "Revise"}
-      </Button>
-    </div>
   );
 }

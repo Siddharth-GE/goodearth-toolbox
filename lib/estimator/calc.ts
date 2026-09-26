@@ -41,7 +41,8 @@ export type WorkRecipe = {
   components: { materialId: string | null; mixId: string | null; qtyPerUnit: number }[];
 };
 
-export type LineInput = { workItemId: string; qty: number };
+/** A line of an estimate. qty null = listed but not yet measured (0097). */
+export type LineInput = { workItemId: string; qty: number | null };
 
 /**
  * A work's material needs per ONE unit of the work, with mixes expanded
@@ -122,7 +123,9 @@ export function expandRecipe(
 
 export type LineCost = {
   workItemId: string;
-  qty: number;
+  qty: number | null;
+  /** Listed but not yet measured — no quantity, so no cost yet. */
+  toMeasure: boolean;
   /** false = no estimator_work_info row: no unit, no labour rate, nothing. */
   isSetUp: boolean;
   /** false = set up, but nobody has said what it consumes. Labour only. */
@@ -146,6 +149,7 @@ export function computeLine(
     return {
       workItemId: line.workItemId,
       qty: line.qty,
+      toMeasure: line.qty === null,
       isSetUp: false,
       hasRecipe: false,
       labourCost: null,
@@ -156,7 +160,22 @@ export function computeLine(
   }
 
   const needs = expandRecipe(recipe, mixesById);
-  const labourCost = recipe.labourRate === null ? null : recipe.labourRate * line.qty;
+  // Not measured yet: nothing can be costed — unknown, never zero.
+  if (line.qty === null) {
+    return {
+      workItemId: line.workItemId,
+      qty: null,
+      toMeasure: true,
+      isSetUp: true,
+      hasRecipe: needs.length > 0,
+      labourCost: null,
+      materialCost: null,
+      totalCost: null,
+      missingRateMaterialIds: [],
+    };
+  }
+  const qty = line.qty;
+  const labourCost = recipe.labourRate === null ? null : recipe.labourRate * qty;
 
   let materialCost: number | null = 0;
   const missingRateMaterialIds: string[] = [];
@@ -169,12 +188,13 @@ export function computeLine(
       materialCost = null;
       continue;
     }
-    if (materialCost !== null) materialCost += material.rate * need.qtyPerWorkUnit * line.qty;
+    if (materialCost !== null) materialCost += material.rate * need.qtyPerWorkUnit * qty;
   }
 
   return {
     workItemId: line.workItemId,
-    qty: line.qty,
+    qty,
+    toMeasure: false,
     isSetUp: true,
     hasRecipe: needs.length > 0,
     labourCost,
@@ -292,11 +312,12 @@ export function computeTakeoff(
 
   for (const line of lines) {
     const recipe = recipesByWork.get(line.workItemId);
-    if (!recipe || recipe.uom === null) continue;
+    if (!recipe || recipe.uom === null || line.qty === null) continue;
+    const qty = line.qty;
     for (const need of expandRecipe(recipe, mixesById)) {
       quantities.set(
         need.materialId,
-        (quantities.get(need.materialId) ?? 0) + need.qtyPerWorkUnit * line.qty,
+        (quantities.get(need.materialId) ?? 0) + need.qtyPerWorkUnit * qty,
       );
     }
   }
@@ -338,7 +359,8 @@ export function computeWorkTakeoff(
 
   for (const line of lines) {
     const recipe = recipesByWork.get(line.workItemId);
-    if (!recipe || recipe.uom === null) continue;
+    if (!recipe || recipe.uom === null || line.qty === null) continue;
+    const qty = line.qty;
     for (const need of expandRecipe(recipe, mixesById)) {
       const key = `${line.workItemId} ${need.materialId}`;
       const row = quantities.get(key) ?? {
@@ -346,7 +368,7 @@ export function computeWorkTakeoff(
         materialId: need.materialId,
         quantity: 0,
       };
-      row.quantity += need.qtyPerWorkUnit * line.qty;
+      row.quantity += need.qtyPerWorkUnit * qty;
       quantities.set(key, row);
     }
   }
@@ -373,6 +395,8 @@ export type EstimateTotals = {
   missingLabourCount: number;
   missingMaterialRateCount: number;
   notSetUpCount: number;
+  /** Listed but not yet measured. */
+  toMeasureCount: number;
 };
 
 export function computeEstimateTotals(lineCosts: LineCost[]): EstimateTotals {
@@ -381,8 +405,13 @@ export function computeEstimateTotals(lineCosts: LineCost[]): EstimateTotals {
   let missingLabourCount = 0;
   let missingMaterialRateCount = 0;
   let notSetUpCount = 0;
+  let toMeasureCount = 0;
 
   for (const line of lineCosts) {
+    if (line.toMeasure) {
+      toMeasureCount += 1;
+      continue;
+    }
     if (!line.isSetUp) {
       notSetUpCount += 1;
       continue;
@@ -400,7 +429,10 @@ export function computeEstimateTotals(lineCosts: LineCost[]): EstimateTotals {
   // BOTH sides, which is why it can't be judged by the two missing-rate
   // counters alone (they only see lines that got as far as being set up).
   const nothingUnknown =
-    missingLabourCount === 0 && missingMaterialRateCount === 0 && notSetUpCount === 0;
+    missingLabourCount === 0 &&
+    missingMaterialRateCount === 0 &&
+    notSetUpCount === 0 &&
+    toMeasureCount === 0;
   const labourKnown = nothingUnknown || labour > 0;
   const materialKnown = nothingUnknown || material > 0;
 
@@ -408,10 +440,11 @@ export function computeEstimateTotals(lineCosts: LineCost[]): EstimateTotals {
     labour: labourKnown ? labour : null,
     material: materialKnown ? material : null,
     grand: labourKnown || materialKnown ? labour + material : null,
-    isComplete: missingLabourCount === 0 && missingMaterialRateCount === 0 && notSetUpCount === 0,
+    isComplete: nothingUnknown,
     missingLabourCount,
     missingMaterialRateCount,
     notSetUpCount,
+    toMeasureCount,
   };
 }
 
@@ -466,6 +499,7 @@ export function frozenLineCosts(lines: FrozenLineRow[], takeoff: FrozenTakeoffRo
     return {
       workItemId: line.workItemId,
       qty: line.qty,
+      toMeasure: false,
       isSetUp: line.uom !== null,
       hasRecipe: rows.length > 0,
       labourCost: line.labourCost,

@@ -708,3 +708,29 @@ test("mixUnitCost is unknown, never zero, when empty or anything is unpriced", (
     4100,
   );
 });
+
+test("a work still to measure costs nothing known, takes off nothing, and keeps the total open", () => {
+  const recipe: WorkRecipe = {
+    workItemId: "slab",
+    uom: "cum",
+    labourRate: 900,
+    components: [mix("m20", 1)],
+  };
+  const recipes = new Map([["slab", recipe]]);
+  const line = computeLine({ workItemId: "slab", qty: null }, recipe, mixes, materials);
+  assert.equal(line.toMeasure, true);
+  assert.equal(line.totalCost, null);
+  assert.equal(line.labourCost, null);
+  assert.deepEqual(
+    computeTakeoff([{ workItemId: "slab", qty: null }], recipes, mixes, materials),
+    [],
+  );
+  assert.deepEqual(computeWorkTakeoff([{ workItemId: "slab", qty: null }], recipes, mixes), []);
+
+  const measured = computeLine({ workItemId: "slab", qty: 2 }, recipe, mixes, materials);
+  const totals = computeEstimateTotals([measured, line]);
+  assert.equal(totals.toMeasureCount, 1);
+  assert.equal(totals.isComplete, false);
+  // What is measured still counts: a floor, not an answer.
+  assert.equal(totals.grand, measured.totalCost);
+});

@@ -8,10 +8,10 @@ _Planned 2026-09-25/26 by Opus on the founder's instruction ("step out, have a l
 - [x] 1. Indents pulls from any official estimate `[Opus]` — no migration
 - [x] 2. Clear the ground `[Opus]` — no migration
 - [x] 3. The row explains itself; Works becomes the Rate book `[Opus]` — no migration
-- [ ] 4. Measure first `[Opus drafts M1, Fable reviews before db:apply]`
-- [ ] 5. One estimate per villa `[Opus drafts M2, Fable reviews before db:apply]` — **founder confirms the lifecycle first**
+- [x] 4. Measure first `[Opus]` — `0097`, applied to staging 2026-09-26 (Opus review, founder's word)
+- [x] 5. One estimate per villa `[Opus]` — `0098`, applied to staging 2026-09-26 (Opus review, founder's word)
 - [x] 6. Site check `[Opus]` — no migration (the villa comparison grid waits for step 4: until a quantity can be measured first it has little to compare)
-- [ ] 7. Approval pass `[Fable]` — diff against this plan, SECURITY.md, BUGCATCHER.md
+- [ ] 7. Approval pass `[Fable]` — **deferred by the founder** (2026-09-26: "merge to staging, no need a review right now"); due before production
 
 Each step is committed and pushed on its own; the branch merges to `staging` only after the founder has looked at the preview.
 
@@ -84,7 +84,9 @@ Selections and Budgets are interiors and stay out of this (founder, 2026-09-26).
 - **Approvals still belong to one official estimate** (the founder's `0083` rule: a new official asks its estimator again). Carrying an approval forward to the villa's later officials is a founder decision, not taken yet.
 - A comparison grid, villas down and works across, to catch a mistyped measurement.
 
-## Questions for the founder (2026-09-26) — steps 4 and 5 wait on these
+## Questions for the founder (2026-09-26) — answered the same day
+
+**Answers:** (1) Opus checks and applies them to staging and merges; Fable's review is deferred until before production. (2) One estimate per villa — yes. (3) Approvals carry to the villa's later officials (the recommendation).
 
 1. **Who reviews the two database changes before they go on staging?** MODELS.md gives migrations that add functions and grants to Fable. M1 is one relaxed NOT NULL; M2 adds three invoker functions (make official, start from another villa, delete a draft) and a marker for "the villa's working estimate". Options: a short Fable session reviews both (the rule), or Opus reviews and applies them to staging as for `0096` (the founder's call then).
 2. **The villa lifecycle (step 5).** One always-open estimate per villa, with **Make official** taking a numbered frozen copy — so Revise, "Copy to villa" and templates go, and a new villa starts from another villa's list. Yes, or keep today's draft → submit → revise?

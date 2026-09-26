@@ -15,7 +15,7 @@ The bot is built and vetted on staging through Phase 7b (2026-09-03). Its plan, 
 2. **Press one real write button on production** — the last step of the ship protocol, still not done since the Phase 2 / masters releases. Editing one of the 74 price-less materials (item 4) is the natural candidate.
 3. **Grant `/supervisors` to the actual site supervisors.** Nothing is visible to staff today, and Design Management's drawings reach site through this grant.
 4. **Re-enter 74 material rates in Masters.** The source sheets disagreed about those units, so the import left prices blank. `npx tsx scripts/import-material-master.ts --project <ref>` prints the list. "Hose Coller PVC 32mm" also needs a code (`PLD/836` named two products).
-5. **Set up the works** on the Estimator's Works tab: each work's unit, labour rate and recipe. Until then an estimate prices labour only.
+5. **Price the works an estimate uses** — the Estimator's Rate book lists them under "Used but not priced". The 25–40 works that carry bulk material first (concrete, steel, blocks, plaster, screed, tiles, roofing); the rest can wait until an estimate needs them.
 6. **Supabase Pro plan** — the founder's call. The weekly keep-alive was meant to stop the free tier pausing production and has not (item 0); only Pro brings backups.
 
 ## The skin waits on `staging` (founder, 2026-09-19)

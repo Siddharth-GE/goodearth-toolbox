@@ -56,7 +56,7 @@ export async function getWelcomeCounts(): Promise<{
     supabase
       .from("estimator_estimates")
       .select("id", { count: "exact", head: true })
-      .eq("is_template", false),
+      .eq("is_working", true),
     supabase
       .from("estimator_estimates")
       .select("id", { count: "exact", head: true })
@@ -391,27 +391,31 @@ export async function getEstimateMeasurements(
 // Estimates
 // ---------------------------------------------------------------------
 
-export type EstimateRow = {
-  id: string;
-  name: string;
-  note: string | null;
-  isTemplate: boolean;
+/** One villa, as the estimates screen lists it (0098): its working
+ * estimate, its official one, and any older drafts left from before a
+ * villa had exactly one working estimate. */
+export type VillaEstimates = {
+  unitId: string;
+  unitName: string;
   projectId: string;
   projectName: string;
-  unitId: string | null;
-  unitName: string | null;
-  lineCount: number;
-  createdAt: string;
-  status: "draft" | "submitted" | "superseded";
-  /** EST/<code>/NNN once submitted; null while a working draft. */
-  reference: string | null;
+  working: { id: string; lineCount: number; toMeasureCount: number } | null;
+  official: {
+    id: string;
+    reference: string | null;
+    submittedAt: string | null;
+    /** The frozen total; null when anything was unpriced on the day. */
+    total: number | null;
+  } | null;
+  olderDrafts: { id: string; name: string }[];
 };
 
 /**
- * Every estimate and template, with project and villa names merged in
- * through Maps rather than embedded — see the module note.
+ * Every villa of every project with what the Estimator holds for it.
+ * Names are merged through Maps rather than embedded — see the module
+ * note (units has two paths to plots).
  */
-export async function listEstimates(): Promise<EstimateRow[]> {
+export async function listVillas(): Promise<VillaEstimates[]> {
   await requireTool(GRANT);
   const supabase = await createClient();
 
@@ -419,53 +423,99 @@ export async function listEstimates(): Promise<EstimateRow[]> {
     fetchAll<{
       id: string;
       name: string;
-      note: string | null;
-      is_template: boolean;
-      project_id: string;
       unit_id: string | null;
-      created_at: string;
+      is_working: boolean;
       status: string;
       reference: string | null;
+      submitted_at: string | null;
     }>((from, to) =>
       supabase
         .from("estimator_estimates")
-        .select("id, name, note, is_template, project_id, unit_id, created_at, status, reference")
+        .select("id, name, unit_id, is_working, status, reference, submitted_at")
+        .not("unit_id", "is", null)
         .order("created_at", { ascending: false })
         .order("id")
         .range(from, to),
     ),
-    fetchAll<{ estimate_id: string }>((from, to) =>
-      supabase.from("estimator_estimate_lines").select("estimate_id").order("id").range(from, to),
+    fetchAll<{ estimate_id: string; qty: number | null }>((from, to) =>
+      supabase
+        .from("estimator_estimate_lines")
+        .select("estimate_id, qty")
+        .order("id")
+        .range(from, to),
     ),
     fetchAll<{ id: string; name: string }>((from, to) =>
       supabase.from("projects").select("id, name").order("id").range(from, to),
     ),
-    fetchAll<{ id: string; name: string }>((from, to) =>
-      supabase.from("units").select("id, name").order("id").range(from, to),
+    fetchAll<{ id: string; name: string; project_id: string }>((from, to) =>
+      supabase.from("units").select("id, name, project_id").order("id").range(from, to),
     ),
   ]);
 
-  const lineCounts = new Map<string, number>();
-  for (const row of lines) {
-    lineCounts.set(row.estimate_id, (lineCounts.get(row.estimate_id) ?? 0) + 1);
+  const officialIds = estimates.filter((e) => e.status === "submitted").map((e) => e.id);
+  const costs = officialIds.length
+    ? await fetchAll<{ estimate_id: string; total_cost: number | null }>((from, to) =>
+        supabase
+          .from("estimator_estimate_line_costs")
+          .select("estimate_id, total_cost")
+          .in("estimate_id", officialIds)
+          .order("id")
+          .range(from, to),
+      )
+    : [];
+  const totals = new Map<string, number | null>();
+  for (const row of costs) {
+    const sofar = totals.has(row.estimate_id) ? totals.get(row.estimate_id)! : 0;
+    totals.set(
+      row.estimate_id,
+      sofar === null || row.total_cost === null ? null : sofar + row.total_cost,
+    );
+  }
+
+  const lineCounts = new Map<string, { lines: number; toMeasure: number }>();
+  for (const line of lines) {
+    const count = lineCounts.get(line.estimate_id) ?? { lines: 0, toMeasure: 0 };
+    count.lines += 1;
+    if (line.qty === null) count.toMeasure += 1;
+    lineCounts.set(line.estimate_id, count);
   }
   const projectById = new Map(projects.map((p) => [p.id, p.name]));
-  const unitById = new Map(units.map((u) => [u.id, u.name]));
 
-  return estimates.map((estimate) => ({
-    id: estimate.id,
-    name: estimate.name,
-    note: estimate.note,
-    isTemplate: estimate.is_template,
-    projectId: estimate.project_id,
-    projectName: projectById.get(estimate.project_id) ?? "Unknown project",
-    unitId: estimate.unit_id,
-    unitName: estimate.unit_id ? (unitById.get(estimate.unit_id) ?? null) : null,
-    lineCount: lineCounts.get(estimate.id) ?? 0,
-    createdAt: estimate.created_at,
-    status: estimate.status as EstimateRow["status"],
-    reference: estimate.reference,
-  }));
+  return units
+    .map((unit) => {
+      const mine = estimates.filter((estimate) => estimate.unit_id === unit.id);
+      const working = mine.find((estimate) => estimate.is_working);
+      const official = mine.find((estimate) => estimate.status === "submitted");
+      return {
+        unitId: unit.id,
+        unitName: unit.name,
+        projectId: unit.project_id,
+        projectName: projectById.get(unit.project_id) ?? "Unknown project",
+        working: working
+          ? {
+              id: working.id,
+              lineCount: lineCounts.get(working.id)?.lines ?? 0,
+              toMeasureCount: lineCounts.get(working.id)?.toMeasure ?? 0,
+            }
+          : null,
+        official: official
+          ? {
+              id: official.id,
+              reference: official.reference,
+              submittedAt: official.submitted_at,
+              total: totals.has(official.id) ? totals.get(official.id)! : null,
+            }
+          : null,
+        olderDrafts: mine
+          .filter((estimate) => estimate.status === "draft" && !estimate.is_working)
+          .map((estimate) => ({ id: estimate.id, name: estimate.name })),
+      };
+    })
+    .sort(
+      (a, b) =>
+        a.projectName.localeCompare(b.projectName) ||
+        a.unitName.localeCompare(b.unitName, undefined, { numeric: true }),
+    );
 }
 
 export type EstimateLineRow = {
@@ -474,7 +524,8 @@ export type EstimateLineRow = {
   code: string;
   name: string;
   categoryCode: string;
-  qty: number;
+  /** Null = listed but not yet measured (0097). */
+  qty: number | null;
   note: string | null;
   /** This villa's labour rate (0088); null = the work's standard. */
   labourRate: number | null;
@@ -485,6 +536,8 @@ export type EstimateDetail = {
   name: string;
   note: string | null;
   isTemplate: boolean;
+  /** The villa's working estimate (0098). */
+  isWorking: boolean;
   projectId: string;
   projectName: string;
   unitId: string | null;
@@ -496,8 +549,10 @@ export type EstimateDetail = {
   submittedByName: string | null;
   submittedAt: string | null;
   supersededAt: string | null;
-  /** The revision that replaced (or is replacing) this one, if any. */
-  successor: { id: string; name: string; status: string } | null;
+  /** The same villa's working estimate, when this is not it. */
+  villaWorkingId: string | null;
+  /** The same villa's current official estimate, when this is not it. */
+  villaOfficial: { id: string; reference: string | null } | null;
   /**
    * The 0077 snapshot, present whenever the estimate is no longer a
    * draft. The screen renders THIS — costs frozen on the day of submit
@@ -516,7 +571,7 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
   const { data: estimate, error } = await supabase
     .from("estimator_estimates")
     .select(
-      "id, name, note, is_template, project_id, unit_id, source_estimate_id, status, reference, submitted_by, submitted_at, superseded_at",
+      "id, name, note, is_template, is_working, project_id, unit_id, source_estimate_id, status, reference, submitted_by, submitted_at, superseded_at",
     )
     .eq("id", estimateId)
     .maybeSingle();
@@ -527,7 +582,7 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
     fetchAll<{
       id: string;
       work_item_id: string;
-      qty: number;
+      qty: number | null;
       note: string | null;
       labour_rate: number | null;
     }>((from, to) =>
@@ -559,25 +614,20 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
   const itemById = new Map(items.map((item) => [item.id, item]));
   const categoryById = new Map(categories.map((c) => [c.id, c]));
 
-  // The lifecycle extras: who submitted, what replaced this, and the
-  // frozen snapshot for anything past draft. Fetched after the header
-  // because all three hang off its fields.
-  const [submitter, successor, frozenCosts, frozenTakeoff] = await Promise.all([
+  // The lifecycle extras: who submitted, where the villa's working and
+  // official estimates are, and the frozen snapshot for anything past
+  // draft. Fetched after the header because all three hang off it.
+  const [submitter, siblings, frozenCosts, frozenTakeoff] = await Promise.all([
     estimate.submitted_by
       ? supabase.from("profiles").select("full_name").eq("id", estimate.submitted_by).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
-    // What revises this one. A template's villa copies also point back
-    // at it through source_estimate_id, and they are not its successors —
-    // so a template never has one.
-    estimate.is_template
-      ? Promise.resolve({ data: null, error: null })
-      : supabase
+    estimate.unit_id
+      ? supabase
           .from("estimator_estimates")
-          .select("id, name, status")
-          .eq("source_estimate_id", estimate.id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
+          .select("id, is_working, status, reference")
+          .eq("unit_id", estimate.unit_id)
+          .or("is_working.eq.true,status.eq.submitted")
+      : Promise.resolve({ data: [], error: null }),
     estimate.status !== "draft"
       ? fetchAll<{
           work_item_id: string;
@@ -614,13 +664,20 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
         )
       : Promise.resolve([]),
   ]);
-  if (successor.error) fail("the estimate's revision", successor.error);
+  if (siblings.error) fail("the villa's other estimates", siblings.error);
+  const villaWorking = (siblings.data ?? []).find(
+    (row) => row.is_working && row.id !== estimate.id,
+  );
+  const villaOfficial = (siblings.data ?? []).find(
+    (row) => row.status === "submitted" && row.id !== estimate.id,
+  );
 
   return {
     id: estimate.id,
     name: estimate.name,
     note: estimate.note,
     isTemplate: estimate.is_template,
+    isWorking: estimate.is_working,
     projectId: estimate.project_id,
     projectName: project.data?.name ?? "Unknown project",
     unitId: estimate.unit_id,
@@ -631,7 +688,10 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
     submittedByName: submitter.data?.full_name ?? null,
     submittedAt: estimate.submitted_at,
     supersededAt: estimate.superseded_at,
-    successor: successor.data ?? null,
+    villaWorkingId: villaWorking?.id ?? null,
+    villaOfficial: villaOfficial
+      ? { id: villaOfficial.id, reference: villaOfficial.reference }
+      : null,
     frozen:
       estimate.status === "draft"
         ? null
@@ -809,7 +869,10 @@ export type ReconciliationApproval = {
 
 /**
  * The estimator's acknowledgements of material that reached the villa
- * outside the official estimate's plan. The PENDING side is never
+ * outside the official estimate's plan — from ANY of the villa's official
+ * estimates (founder, 2026-09-26: once Make official is routine, an
+ * approved arrival stays approved; re-asking on every new official would
+ * bury the list). Matched by (work, item), the same as before. The PENDING side is never
  * stored — compare.ts derives it from what actually arrived — so this
  * reads only the approvals and the page lines the two up by
  * (work, item). The flag itself is permanent either way; an approval
@@ -821,6 +884,17 @@ export async function getReconciliationApprovals(
   await requireTool(GRANT);
   const supabase = await createClient();
 
+  const { data: estimate, error: estimateError } = await supabase
+    .from("estimator_estimates")
+    .select("unit_id")
+    .eq("id", estimateId)
+    .maybeSingle();
+  if (estimateError) fail("the estimate", estimateError);
+  const { data: villaEstimates, error: villaError } = estimate?.unit_id
+    ? await supabase.from("estimator_estimates").select("id").eq("unit_id", estimate.unit_id)
+    : { data: [{ id: estimateId }], error: null };
+  if (villaError) fail("the villa's estimates", villaError);
+
   const rows = await fetchAll<{
     work_item_id: string | null;
     item_id: string;
@@ -831,8 +905,12 @@ export async function getReconciliationApprovals(
     supabase
       .from("estimator_reconciliation_approvals")
       .select("work_item_id, item_id, note, created_by, created_at")
-      .eq("estimate_id", estimateId)
+      .in(
+        "estimate_id",
+        (villaEstimates ?? []).map((row) => row.id),
+      )
       .order("created_at")
+      .order("id")
       .range(from, to),
   );
   if (rows.length === 0) return [];
@@ -1046,17 +1124,29 @@ export async function countVillasOverEstimate(): Promise<number> {
 }
 
 /**
- * Every approval of an outside-the-estimate entry on the given official
- * estimates, keyed "estimateId work item" — the Site check list's
- * Approved column. Approvals belong to one estimate (0083): a new
- * official estimate asks its estimator again.
+ * Every approval of an outside-the-estimate entry on the given villas'
+ * estimates, keyed "unitId work item" — the Site check list's Approved
+ * column. An approval given on any of a villa's official estimates
+ * counts for its later ones too (founder, 2026-09-26).
  */
 export async function getApprovalsFor(
-  estimateIds: string[],
+  unitIds: string[],
 ): Promise<Map<string, ReconciliationApproval>> {
   await requireTool(GRANT);
-  if (estimateIds.length === 0) return new Map();
+  if (unitIds.length === 0) return new Map();
   const supabase = await createClient();
+
+  const villaEstimates = await fetchAll<{ id: string; unit_id: string | null }>((from, to) =>
+    supabase
+      .from("estimator_estimates")
+      .select("id, unit_id")
+      .in("unit_id", unitIds)
+      .order("id")
+      .range(from, to),
+  );
+  const unitByEstimate = new Map(villaEstimates.map((row) => [row.id, row.unit_id]));
+  const estimateIds = [...unitByEstimate.keys()];
+  if (estimateIds.length === 0) return new Map();
 
   const rows = await fetchAll<{
     estimate_id: string;
@@ -1082,7 +1172,7 @@ export async function getApprovalsFor(
 
   return new Map(
     rows.map((row) => [
-      `${row.estimate_id} ${row.work_item_id ?? ""} ${row.item_id}`,
+      `${unitByEstimate.get(row.estimate_id) ?? ""} ${row.work_item_id ?? ""} ${row.item_id}`,
       {
         workItemId: row.work_item_id,
         itemId: row.item_id,

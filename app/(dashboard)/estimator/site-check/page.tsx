@@ -51,7 +51,7 @@ export default async function SiteCheckPage({
   const entries = siteCheckEntries(officials);
   const totals = materialTotals(officials);
   const [approvals, labels] = await Promise.all([
-    getApprovalsFor(officials.map((official) => official.estimateId)),
+    getApprovalsFor(officials.map((official) => official.unitId)),
     getItemLabels([...entries.map((entry) => entry.itemId), ...totals.map((t) => t.itemId)]),
   ]);
 
@@ -61,7 +61,7 @@ export default async function SiteCheckPage({
     officials.map((official) => [official.estimateId, official.reference]),
   );
   const approvalFor = (entry: (typeof entries)[number]) =>
-    approvals.get(`${entry.estimateId} ${entry.workItemId ?? ""} ${entry.itemId}`);
+    approvals.get(`${entry.unitId} ${entry.workItemId ?? ""} ${entry.itemId}`);
 
   // Waiting for an approval first, then over-runs, then what has been
   // looked at — each group in villa order.
