@@ -19,10 +19,11 @@ const TILE_TINT =
 const TILE_TEXT = "text-[var(--thumb)] dark:text-[color-mix(in_srgb,var(--thumb)_70%,#fff)]";
 
 /**
- * An item's picture — or, far more often, its stand-in.
+ * An item's picture — or its stand-in.
  *
- * Only ~900 of the 2,633 catalogue items have a thumbnail, so the
- * no-image case is the majority, not the exception. It gets a tinted tile
+ * Most catalogue items have a thumbnail (2,660 of 2,772 since the design
+ * team's workbook came in, 2026-09-26); the construction materials have
+ * none, so the no-image case is still common. It gets a tinted tile
  * carrying the item's code rather than a broken-image icon: same shape,
  * same weight, zero network requests, and it reads as a design decision
  * instead of something that failed to load.
