@@ -1,43 +1,35 @@
 # Indents — the rules
 
-**Shipped 2026-08-03.** Migration `0019`, revision safety in `0028`.
+Site teams request materials, numbered per project, approved before purchase. Grant `/indents`. Migrations `0019`, `0028`, `0078`. **No money anywhere in this tool** — items, quantities and units, never cost, margin or rate.
 
-Site teams request materials, numbered per project, approved before purchase. **No money anywhere in this tool** — an indent carries items, quantities and units, never cost, margin or rate.
+## The idea
 
-_Trimmed 2026-08-14: the milestone log lives in git._
-
-## The idea in one paragraph
-
-Anyone with `/indents` raises an indent on a project (plot/unit/stage optional), gets a permanent number (`IND/<code>/001`, minted in the database at creation — deleted drafts leave gaps, accepted), fills it with lines from up to three sources, and submits it. A named approver or an admin approves it; a rejection sends it back to draft with a note. Approved indents are what Purchase Orders consume.
+Anyone with `/indents` raises an indent on a project (plot, unit and the **work** it serves optional), gets a permanent number (`IND/<code>/001`, minted in the database — deleted drafts leave gaps, accepted), fills it from up to three sources, and submits it. A named approver or an admin approves it; a rejection sends it back to draft with a note. Approved indents are what Purchase Orders consume.
 
 ## The rules everything rests on
 
-1. **The status machine lives in the database** (`indents_guard` + `indent_lines_draft_only`): draft → submitted → approved, lines and header editable only in draft, approver checked DB-side. `lib/indents/workflow.ts` mirrors it **for buttons only**.
-2. **Three line sources, one item master** (four until 2026-08-20): an approved interiors budget line (composite FK `(budget_id, line_key)`), **the villa's official estimate** (`0078` — anchor C, below), or a direct pick through the shared catalogue picker. The construction-plan pull retired with Step F of the backbone (founder: the Estimator IS the construction line): its screen is a pointer to the estimate pull, `getConstructionPull`/`addConstructionPullLines` are deleted, and the `"construction"` source label, `indent_lines.construction_line_id`, its FK and every saved row stay forever as history — retirement is UI-only, never schema. Every line carries its own item/qty/uom — **provenance anchors are just provenance.**
-   - **Anchor C** (`0078`): `estimate_id` → `estimator_estimates` plus the line's own `item_id`; `unique (indent_id, estimate_id, item_id)` is the double-buy rule, and the named CHECK `indent_lines_one_anchor` keeps the three anchors mutually exclusive (the two 0019 CHECKs are unnamed and stay — additive only). The pull reads `estimate_takeoff_facts` (frozen quantities + the item each is bought as, never a rate) and aggregates **per item** across works (`groupEstimatePull`, 2026-09-26 — it keyed on `material_id` until then, which is null on every row since `0086`, so it saw nothing; BUGCATCHER #16). "Already requested" counts every estimate-anchored line on **any of the villa's indents**, not just lines on the current official estimate — otherwise every re-issue reopens the double-buy (`requestedByItem`). Since `0086` a row is already in the item's unit; for estimates submitted before it, a person-entered `item_uom_factor` converts fact by fact, matching unit labels convert 1:1 ('nos' = 'each'), anything else asks the operator, and a row with no item cannot be picked — `classifyEstimatePull` in `pull-rules.ts` is that rule, pinned by tests. An indent may also name the work it serves (`indents.work_item_id`, optional, works masters). **The construction-stage picker is retired** (founder, 2026-08-20: one vocabulary): new indents carry a work, never a stage; `indents.stage`, its 0053 FK and saved values stay as read-only history, and nothing stamps it any more — Step F (2026-08-20) removed the last writer with the construction pull.
-3. **The interiors pull sees money-free views only.** `approved_budgets` / `approved_budget_lines` expose no cost, margin or rate; `lib/indents/queries.ts` physically cannot select them.
-4. **Numbers are permanent.** `reference` is stored at mint, `delete_draft_indent()` is the only sanctioned delete, and the counter never rewinds.
+1. **The status machine lives in the database** (`indents_guard` + `indent_lines_draft_only`): draft → submitted → approved, editable only in draft, approver checked there. `lib/indents/workflow.ts` mirrors it for buttons only.
+2. **Three line sources, one item master**, and every line carries its own item, quantity and unit — anchors are provenance only:
+   - an **approved interiors budget** line — composite FK `(budget_id, line_key)`;
+   - **the villa's official estimate** (`0078`) — `estimate_id` plus the line's `item_id`; `unique (indent_id, estimate_id, item_id)` is the double-buy rule;
+   - a **direct pick** through the shared catalogue picker.
+     `indent_lines_one_anchor` keeps the anchors exclusive. The retired construction-plan source, `construction_line_id`, `indents.stage` and their saved rows stay forever as read-only history — retirement is UI-only, never schema.
+3. **The estimate pull** reads `estimate_takeoff_facts` (frozen quantities and the item each is bought as, never a rate) and groups **per item** across works (`groupEstimatePull`, keyed on `item_id` — `material_id` is null on every row since `0086`, BUGCATCHER #16). "Already requested" counts estimate-anchored lines on **every indent of the villa** (`requestedByItem`), so a re-issued official never reopens double-buying. Estimates from before `0086` convert fact by fact (`classifyEstimatePull`, tested); a row with no item cannot be picked.
+4. **The interiors pull sees money-free views only** — `approved_budgets(_lines)`; `lib/indents/queries.ts` cannot select a cost.
+5. **Numbers are permanent.** `delete_draft_indent()` is the only delete, and the counter never rewinds. `lib/indents/reference.ts` mirrors the SQL mint under test.
 
 ## Revision safety — the double-buy bug
 
-A unit's design is revised over time and every issued revision gets its own approved budget; **`line_key` is the same line across all of them.** The original pull screen offered every approved budget and scoped "already asked" to one `budget_id` — so the same line could be pulled from R1's budget and again from R2's, **and bought twice.**
+Every issued revision of a unit's design gets its own budget, and **`line_key` is the same line across all of them** — so one line could once be pulled from R1's budget and again from R2's, and bought twice. Four parts close it, and all four matter:
 
-The fix has four parts, and all four matter:
-
-- The pull chooser offers only each unit's **issued** revision's budget (`classifyBudgetChooser` in `pull-rules.ts` — pure and tested). A unit whose new revision awaits budget approval shows a greyed pending row.
-- **"Already asked" and the add-action dedupe span _all_ of the unit's budgets by `line_key`**, not just the one on screen. Both sides read `approved_budgets` for the sibling list — and **that read must be error-checked**, because an empty result reads as "nothing has ever been ordered" and reopens the double-buy bug through a single database blip. It was doing exactly that until 2026-08-14; it throws now.
-- `getBudgetPull` and `addBudgetPullLines` refuse superseded-revision budgets and cross-unit pulls; the `indent_lines_budget_current` trigger (`0028`, security definer) is the boundary that holds against stale tabs and pasted URLs.
-- Lines anchored to a revision superseded AFTER they were pulled get a warning badge via `classifyDesignDrift`. Selections' diff page shows the mirror warning with the affected IND/PO references.
+- The chooser offers only each unit's **issued** revision's budget (`classifyBudgetChooser`, tested); a revision awaiting its budget shows greyed.
+- **"Already asked" spans all of the unit's budgets by `line_key`** — and that read is error-checked, because an empty result reads as "nothing ordered" and reopens the bug through one database blip.
+- `getBudgetPull`/`addBudgetPullLines` refuse superseded budgets and cross-unit pulls; the `indent_lines_budget_current` trigger (`0028`) holds against stale tabs and pasted URLs.
+- Lines whose revision was superseded after the pull get a warning badge (`classifyDesignDrift`); Selections' diff page shows the mirror warning.
 
 ## Things that will bite
 
-- **The drift reads must throw, not fall through.** Every lookup feeding `classifyDesignDrift` has the property that an empty result looks like good news — "nothing changed", "nothing superseded", "nothing already ordered". A failed read that returns `[]` tells the site team an indent is safe to order when the design under it has moved. All of them now throw to the error boundary; keep it that way if you add another.
-- **Reads cross-tool tables directly — never another tool's gated queries module.** `lib/indents/queries.ts` reads `approved_budgets`, `selections`, `selection_lines`, `po_line_facts` itself.
-- **Line pulls insert row-by-row, deliberately — and this is a settled decision, not an open one.** `addDirectLines`, `addBudgetPullLines`, `addEstimatePullLines`, `addConstructionLines` (Budgets' plan editor) and `addPoolLines` (plus the receipt and issue loops in Inventory) insert one line at a time with no transaction, so a failure part-way leaves some lines added and some not.
-
-  Why it is that way: the quantity guard raises **per line**, with that item's own remaining figure in the message, and a batch insert would fail wholesale on the first refusal — one over-ordered line would silently discard nine good ones and say nothing useful about which. Each pull therefore reports partial success honestly ("Added 3, then stopped: …") and the person fixes the one line and pulls again.
-
-  What the atomic version would look like, if it is ever worth building: one database function that loops server-side and returns a per-row summary — atomic, one round trip, and still able to say which line was refused and why. Marathon's `marathon_create_entry` is that shape already. **Reviewed and accepted as-is on 2026-08-17**: the trade is a real one, every site says so in its own comment, and rewriting four money-adjacent write paths to buy atomicity nobody has yet been hurt by is not a good use of a day. Revisit it if a partial pull ever confuses somebody in practice.
-
-- **Approvers are a named list** (`indent_approvers`), managed from **Settings**, not here; admins always may. The approver tick doesn't grant the app.
-- `lib/indents/reference.ts` mirrors the SQL mint (`lpad` vs `padStart`, pinned by test). If one changes, both change.
+- **Drift reads must throw, not fall through** — every lookup feeding `classifyDesignDrift` returns good news when empty.
+- **It reads other tools' tables directly, never their query modules** (the STATUS.md contract row).
+- **Line pulls insert row by row, deliberately** (settled 2026-08-17) — `addDirectLines`, `addBudgetPullLines`, `addEstimatePullLines` and Purchase Orders' `addPoolLines`. The quantity guard refuses per line with that item's own figure; a batch would discard nine good lines for one bad one. Each reports partial success honestly ("Added 3, then stopped: …"). If atomicity is ever needed, the shape is one database function returning a per-row summary (Marathon's `marathon_create_entry`).
+- **Approvers are a named list** (`indent_approvers`) managed from Settings; admins always may; the tick doesn't grant the app.
