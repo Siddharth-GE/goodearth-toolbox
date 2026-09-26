@@ -1,39 +1,43 @@
 # TODO — what's next
 
-Only the next build lives here. What exists is `STATUS.md`, the rules are `CLAUDE.md`, history is git.
+Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, history is git.
 
-## The next build: Relay × Google Chat, round two
+## Production
 
-The bot is built and vetted on staging through Phase 7b (2026-09-03). Its plan, code map, invariants, production ship checklist and the five candidates for the next round live in **`lib/google-chat/PLAN.md`** — read it before touching anything there. **The founder picks a candidate** (Fable's recommendation is #1, the card updating itself after a press); Fable plans it in that file, then Opus and Sonnet build it. Standing instruction: everything lands on `staging`; one merge to `master` after the founder has tested everything, together with the ship checklist.
+0. **Restore production, then find out why the keep-alive did not keep it awake.** Found `INACTIVE` 2026-09-25, twenty days after the weekly cron went in. Restore in the Supabase dashboard (a model session is refused the API call, rightly), then read the cron's runs under Vercel → Settings → Cron Jobs: a red run means `CRON_SECRET` (BUGCATCHER #18), no run means it never fired. The founder's call: "production later".
+1. **Supabase Pro** — the founder's call. The only real answer to pausing, and the only way to get backups.
+2. **Press one real write button on production** — the ship protocol's last step, still not done since the masters releases. Editing one of the 74 price-less materials (item 6) is the natural one.
 
-## Next, in order
+## Waiting on staging for the founder's vet
 
-- **The Estimator rework is being built** on `feature/estimator-rework` (founder, 2026-09-26: "go ahead and execute your plan") — the rate book, villas measured on their own, one site-check list. Root `plan.md` is the live board. It builds on the measurement sheet (PR #75, `0096`, staging only), whose vet folds into this one; production waits, with `0094` and `0095`.
+Everything below is on `staging.goodearthkannur.org`. Each ships only after the founder says they have tried it there.
 
-- **Catalogue pictures are on staging for the founder's vet** (`feature/catalogue-pictures`, 2026-09-26): the design team's catalogue workbook brought pictures, product links and 140 new items, and Selections shows each item's picture, description and a View product link. No migration. **Production** waits for the vet and for item 0: then run `scripts/import-catalogue-sheet.ts --project pajfrgnkapicdgangjey --xlsx <workbook>` and `scripts/fetch-catalogue-images.ts --project pajfrgnkapicdgangjey`, dry run first — production's catalogue is the same 2,632 items, so the matching behaves the same. **For a person to look at in Masters:** four new items that are close to an existing one (the dry run lists them under "worth a glance": Teak wood 3 sofa vs SOFS016, the Tao console at two prices, Orbicular vs Globo rattan lamp, the Philips deco lamp at two prices), and the items whose vendor page is gone (the picture script's 404s).
+- **Catalogue pictures** (no migration). Then on production: `scripts/import-catalogue-sheet.ts --project pajfrgnkapicdgangjey --xlsx <workbook>` and `scripts/fetch-catalogue-images.ts --project pajfrgnkapicdgangjey`, dry run first. In Masters, look at the four new items close to an existing one (Teak wood 3 sofa vs SOFS016; the Tao console at two prices; Orbicular vs Globo rattan lamp; the Philips deco lamp at two prices) and the 29 items whose vendor page is gone.
+- **The Estimator rework** (`0096`–`0098`). Its approval pass by Fable was deferred by the founder and is due before production.
+- **Relay × Google Chat round two** — the founder's steps and the checks are in `lib/google-chat/PLAN.md`; production has its own checklist there.
+- **The skin** — nobody has looked at the signed-in screens in it yet; the browser checklist is `git show 42463f8:plan.md`.
+- **Dexter** (`0095`) — tried and confirmed good; production needs `0095` first.
+- **Settings refreshes every page after a change** (the 2026-09-26 audit's one code fix): rename someone on their own Settings page and the page should show the new name without a reload.
 
-0. **Production is paused — restore it, then find out why the keep-alive did not keep it alive.** Found `INACTIVE` on 2026-09-25, twenty days after the weekly cron went in. Restore in the Supabase dashboard (or `POST /v1/projects/pajfrgnkapicdgangjey/restore` — a model session is refused this, rightly), then read the cron's runs under Vercel → Settings → Cron Jobs: a red run means `CRON_SECRET` (BUGCATCHER #18), no run at all means the cron never fired. Until it is fixed, item 6 is the only real answer. The founder's call, 2026-09-25: "production later".
-1. **Grant `/design-management` to the design team** in Settings. Legal in both CHECKs since `0030`; invisible until granted. Nobody holds it today.
-2. **Press one real write button on production** — the last step of the ship protocol, still not done since the Phase 2 / masters releases. Editing one of the 74 price-less materials (item 4) is the natural candidate.
-3. **Grant `/supervisors` to the actual site supervisors.** Nothing is visible to staff today, and Design Management's drawings reach site through this grant.
-4. **Re-enter 74 material rates in Masters.** The source sheets disagreed about those units, so the import left prices blank. `npx tsx scripts/import-material-master.ts --project <ref>` prints the list. "Hose Coller PVC 32mm" also needs a code (`PLD/836` named two products).
-5. **Price the works an estimate uses** — the Estimator's Rate book lists them under "Used but not priced". The 25–40 works that carry bulk material first (concrete, steel, blocks, plaster, screed, tiles, roofing); the rest can wait until an estimate needs them.
-6. **Supabase Pro plan** — the founder's call. The weekly keep-alive was meant to stop the free tier pausing production and has not (item 0); only Pro brings backups.
+**Getting it to `master`.** `staging` is ~150 commits ahead and carries `0094`–`0098`. Either the Chat door's ship checklist runs first and everything goes together, or a piece travels alone on a release branch cut from `master` (the skin: cherry-pick `a096e58`…`3fe4c95`, skip the sweep `f8a9e5c` and re-run it on `master`). Every route needs production restored first, then the migrations applied there and `db:compare` empty.
 
-## The skin waits on `staging` (founder, 2026-09-19)
+## Setup the tools are waiting on
 
-The new skin is merged to `staging` (PR #73) and **does not go to `master` yet**: the founder will add more features first and ship it all together. Two things the ship day must know. **`staging` cannot be merged to `master` as it stands** — it is 121 commits ahead and carries the whole Google Chat bot (migration `0094` is not on production; the bot's own ship checklist is in `lib/google-chat/PLAN.md`) plus unshipped Estimator, Reporter, Selections and Design Management changes, so either that checklist runs first or the skin travels alone on a release branch cut from `master` (cherry-pick the ten skin commits `a096e58`…`3fe4c95`, skip the sweep `f8a9e5c` and re-run it on `master`'s files). **Nobody has yet looked at the signed-in screens in the new skin** — no model session can sign in; the browser checklist at the end of the skin's plan (`git show 42463f8:plan.md` — the root `plan.md` now carries Dexter, 2026-09-25) is still the founder's to walk through on staging.goodearthkannur.org. **Dexter is merged to `staging` (PR #74, 2026-09-25) and confirmed good there** — the founder tried it on the preview, the Fable review ran the same day (two fixes, `plan.md`), and the founder's word is "production later". When that day comes: restore production (item 0), apply `0095` there, `db:compare` empty, then merge. `0095` joins `0094` in the list of migrations production does not have yet, and the route to `master` is the same choice as the skin's above — the bot's checklist first, or a release branch.
+3. **Grant `/design-management` to the design team** — nobody holds it.
+4. **Grant `/supervisors` to the site supervisors** — nothing is visible to staff, and drawings reach site through it.
+5. **Price the works an estimate uses** — the Rate book's "Used but not priced" list; the 25–40 bulk-material works first.
+6. **Re-enter 74 material rates in Masters** — the source sheets disagreed about their units. `npx tsx scripts/import-material-master.ts --project <ref>` prints the list; "Hose Coller PVC 32mm" also needs a code (`PLD/836` named two products).
 
-## After the skin — the options the founder did not pick on 2026-09-17
+## Next builds — the founder picks
 
-The new skin (stone and glass, `plan.md`) restyled every shared part and the home page. Three deeper changes were offered and set aside for now; each is its own small plan when wanted:
-
-- **Phone-first lists and forms.** Tables that turn into stacked cards on a phone (a `priority` on `TableCell`, or a card fallback), sticky Save buttons, bigger tap targets — Indents, Inventory, Supervisors and Directory first. Today a wide table on a phone scrolls sideways; only Relay and Directory's roster are card grids.
-- **A real search in the sidebar.** The decorative box was removed with the skin; a quick jump to any tool or screen (⌘K on a laptop, a tap on a phone) over `lib/tools.ts` would replace it, using the existing Radix dialog.
-- **The structure underneath.** One heading style (35 raw `<h2>`s in 28 files still carry two hand-typed class strings; `Section` exists with one consumer), one page rhythm (`space-y-4`/`5`/`6` all in use), a shared filter toolbar and a shared notice banner (the `rounded-xl border px-4 py-3` strip is re-typed per detail page), `loading.tsx` on the 43 route segments still missing one (mostly Masters and Marathon admin), and `PageTitle` in either the layout or the page, not both conventions.
-- **A cheap guard rail.** An ESLint `no-restricted-syntax` rule against raw palette classes (`text-red-600`, `bg-amber-100`, …) in `className` literals under `app/(dashboard)/**` and `components/**`, with `app/marathon/**` excused. Nothing in CI catches one today.
+- **The Google Chat door, round three** — three candidates in `lib/google-chat/PLAN.md`.
+- **Phone-first lists and forms** — tables that become stacked cards on a phone, sticky Save, bigger tap targets; Indents, Inventory, Supervisors and Directory first.
+- **A real sidebar search** — jump to any tool or screen over `lib/tools.ts`.
+- **The structure underneath** — one heading style (35 raw `<h2>`s in 28 files), one page rhythm, a shared filter toolbar and notice banner, `PageTitle` in one place.
+- **A lint rule against raw palette classes** (`text-red-600`, …) in `app/(dashboard)/**` and `components/**`; nothing in CI catches one today.
+- **Check `error` on every single-row read** (found by the 2026-09-26 audit). About 30 reads take `data` and ignore `error`, so a failed read shows "not found" instead of an error screen — the red line in CLAUDE.md. Most are fetch-one-by-id: `lib/masters/{client,project,vendor}-detail.ts`, `lib/bills/queries.ts`, `lib/budgets/{actions,queries}.ts`, `lib/purchase-orders/queries.ts`, `lib/inventory/{issues,receipts}-queries.ts`, `lib/design-management/actions.ts`, `lib/relay/actions.ts`, `lib/selections/views-actions.ts`, and the three file routes under `app/(dashboard)/`. Storage downloads and `getClaims()` are fine as they are.
 
 ## Open questions for the founder
 
-- Should a supervisor see only their own plots? Today every supervisor sees every villa (2026-08-20 decision). The same answer now decides who sees which villa's **drawings**.
-- The construction budget screens still exist and no longer feed Indents. Retire them, or leave as history?
+- Should a supervisor see only their own plots? Today every supervisor sees every villa, and the same answer decides who sees which villa's drawings.
+- The construction budget screens no longer feed Indents. Retire them, or keep them as history?
