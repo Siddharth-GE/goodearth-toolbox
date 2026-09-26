@@ -7,7 +7,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { SearchSelect } from "@/components/ui/search-select";
+import { componentOptions } from "../../_components/component-options";
 import {
   addMixComponent,
   createMix,
@@ -19,7 +20,7 @@ import {
 import type { MixDetail, MixRow } from "@/lib/estimator/mixes-queries";
 import type { MaterialItemRow } from "@/lib/estimator/shared";
 import { removeWorkComponent, updateWorkComponentQty } from "@/lib/estimator/works-actions";
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 export function MixFormDialog({
   mix,
@@ -107,30 +108,28 @@ export function AddMixComponentForm({
   }, [pending, state]);
 
   const chosen = materials.find((material) => material.id === materialId);
+  const materialOptions = useMemo(
+    () =>
+      componentOptions(
+        materials.filter((material) => material.isActive),
+        [],
+      ).map((option) => ({ ...option, value: option.value.slice("material:".length) })),
+    [materials],
+  );
 
   return (
     <form ref={formRef} action={formAction} className="space-y-2">
       <div className="flex flex-wrap items-end gap-2">
         <div className="min-w-56 flex-1 space-y-1.5">
           <Label htmlFor="item_id">Material (from Masters)</Label>
-          <Select
+          <SearchSelect
             id="item_id"
             name="item_id"
             value={materialId}
-            onChange={(event) => setMaterialId(event.target.value)}
-            required
-          >
-            <option value="" disabled>
-              Choose a material
-            </option>
-            {materials
-              .filter((material) => material.isActive)
-              .map((material) => (
-                <option key={material.id} value={material.id}>
-                  {material.name} ({material.uom})
-                </option>
-              ))}
-          </Select>
+            onChange={setMaterialId}
+            options={materialOptions}
+            placeholder="Type to find a material…"
+          />
         </div>
         <div className="w-40 space-y-1.5">
           <Label htmlFor="qty_per_unit">Quantity</Label>

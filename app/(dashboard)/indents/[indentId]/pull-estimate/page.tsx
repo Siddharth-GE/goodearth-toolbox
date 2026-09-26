@@ -10,8 +10,9 @@ import { EstimatePullBasket } from "../_components/estimate-pull-basket";
 /**
  * Pull path 3: request materials off the villa's OFFICIAL estimate —
  * the 0077 submit snapshot, read through the money-free
- * estimate_takeoff_facts window. Quantities come from the estimate and
- * stay editable; nothing is added until Add is pressed.
+ * estimate_takeoff_facts window, one row per catalogue item. Quantities
+ * come from the estimate and stay editable; nothing is added until Add
+ * is pressed.
  */
 export default async function EstimatePullPage({
   params,
@@ -59,8 +60,8 @@ export default async function EstimatePullPage({
               {pull.unlinked_count === 1
                 ? "1 material of the estimate is not linked to a catalogue item"
                 : `${pull.unlinked_count} materials of the estimate are not linked to catalogue items`}{" "}
-              — those can&apos;t be requested until the link is set on the Estimator&apos;s
-              Materials screen.
+              — this estimate is from before materials were items, so those can&apos;t be requested
+              here. A newer official estimate from the Estimator will list them.
             </p>
           )}
           <EstimatePullBasket

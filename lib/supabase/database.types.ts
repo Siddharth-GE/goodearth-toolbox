@@ -2005,7 +2005,7 @@ export type Database = {
           id: string
           labour_rate: number | null
           note: string | null
-          qty: number
+          qty: number | null
           updated_at: string
           updated_by: string | null
           work_item_id: string
@@ -2017,7 +2017,7 @@ export type Database = {
           id?: string
           labour_rate?: number | null
           note?: string | null
-          qty: number
+          qty?: number | null
           updated_at?: string
           updated_by?: string | null
           work_item_id: string
@@ -2029,7 +2029,7 @@ export type Database = {
           id?: string
           labour_rate?: number | null
           note?: string | null
-          qty?: number
+          qty?: number | null
           updated_at?: string
           updated_by?: string | null
           work_item_id?: string
@@ -2177,6 +2177,7 @@ export type Database = {
           est_no: number | null
           id: string
           is_template: boolean
+          is_working: boolean
           name: string
           note: string | null
           project_id: string
@@ -2196,6 +2197,7 @@ export type Database = {
           est_no?: number | null
           id?: string
           is_template?: boolean
+          is_working?: boolean
           name: string
           note?: string | null
           project_id: string
@@ -2215,6 +2217,7 @@ export type Database = {
           est_no?: number | null
           id?: string
           is_template?: boolean
+          is_working?: boolean
           name?: string
           note?: string | null
           project_id?: string
@@ -7832,6 +7835,10 @@ export type Database = {
         Returns: undefined
       }
       crm_release_unit: { Args: { p_unit_id: string }; Returns: undefined }
+      delete_draft_estimate: {
+        Args: { p_estimate: string }
+        Returns: undefined
+      }
       delete_draft_indent: { Args: { p_indent_id: string }; Returns: undefined }
       delete_draft_purchase_order: {
         Args: { p_po_id: string }
@@ -7857,6 +7864,10 @@ export type Database = {
         }[]
       }
       discard_chain: { Args: { p_chain_id: string }; Returns: undefined }
+      estimator_copy_estimate_contents: {
+        Args: { p_everything: boolean; p_from: string; p_to: string }
+        Returns: undefined
+      }
       hand_baton: {
         Args: { p_chain_id: string; p_note: string; p_to_user: string }
         Returns: undefined
@@ -7865,6 +7876,10 @@ export type Database = {
       is_admin: { Args: never; Returns: boolean }
       issue_selection: { Args: { p_selection_id: string }; Returns: undefined }
       issue_transmittal: { Args: { p_transmittal_id: string }; Returns: string }
+      make_estimate_official: {
+        Args: { p_costs: Json; p_takeoff: Json; p_working: string }
+        Returns: string
+      }
       marathon_create_entry: {
         Args: {
           p_age: number
@@ -7949,6 +7964,15 @@ export type Database = {
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       start_chain: { Args: { p_chain_id: string }; Returns: undefined }
+      start_villa_estimate: {
+        Args: {
+          p_everything: boolean
+          p_name: string
+          p_source: string
+          p_unit: string
+        }
+        Returns: string
+      }
       stock_qty_on_hand: {
         Args: { p_item_id: string; p_store_id: string }
         Returns: number

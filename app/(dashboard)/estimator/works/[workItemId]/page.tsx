@@ -9,15 +9,16 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/components/ui/table";
-import { computeLine, type MaterialDef, type MixDef } from "@/lib/estimator/calc";
+import { computeLine, rateBuildUp, type MaterialDef, type MixDef } from "@/lib/estimator/calc";
 import { getRecipeBook } from "@/lib/estimator/estimate-queries";
 import { listMixes } from "@/lib/estimator/mixes-queries";
 import { listMaterialItems, listUomNames } from "@/lib/estimator/shared";
-import { getWorkSetup } from "@/lib/estimator/works-queries";
+import { getWorkSetup, listWorkStatus } from "@/lib/estimator/works-queries";
+import { floorTwins } from "@/lib/estimator/works-rules";
 import { formatMoney, formatQuantity } from "@/lib/format";
 import { notFound } from "next/navigation";
 import { ComponentQtyField, RemoveComponentButton } from "../../mixes/_components/mix-forms";
-import { AddWorkComponentForm, WorkInfoForm } from "../_components/work-setup-forms";
+import { AddWorkComponentForm, CopyRateForm, WorkInfoForm } from "../_components/work-setup-forms";
 
 export default async function WorkSetupPage({
   params,
@@ -25,24 +26,33 @@ export default async function WorkSetupPage({
   params: Promise<{ workItemId: string }>;
 }) {
   const { workItemId } = await params;
-  const [work, materials, mixes, uoms, book] = await Promise.all([
+  const [work, materials, mixes, uoms, book, allWorks] = await Promise.all([
     getWorkSetup(workItemId),
     listMaterialItems(),
     listMixes(),
     listUomNames(),
     getRecipeBook(),
+    listWorkStatus(),
   ]);
   if (!work) notFound();
 
   // What one unit of this work costs, through the same calculator the
   // estimates use — one implementation, so the two can never disagree.
   const recipe = book.recipes.find((row) => row.workItemId === workItemId);
-  const perUnit = computeLine(
-    { workItemId, qty: 1 },
-    recipe,
-    new Map<string, MixDef>(book.mixes.map((mix) => [mix.id, mix])),
-    new Map<string, MaterialDef>(book.materials.map((material) => [material.id, material])),
+  const mixesById = new Map<string, MixDef>(book.mixes.map((mix) => [mix.id, mix]));
+  const materialsById = new Map<string, MaterialDef>(
+    book.materials.map((material) => [material.id, material]),
   );
+  const perUnit = computeLine({ workItemId, qty: 1 }, recipe, mixesById, materialsById);
+  // Where each unit's money goes — every material, mixes expanded.
+  const buildUp = rateBuildUp(recipe, mixesById, materialsById);
+
+  // The same work on other floors, offered ticked for "copy this rate".
+  const activeWorks = allWorks
+    .filter((row) => row.isActive)
+    .map((row) => ({ id: row.workItemId, code: row.code, name: row.name, group: row.groupName }));
+  const self = activeWorks.find((row) => row.id === workItemId);
+  const twins = self ? floorTwins(self, activeWorks) : [];
 
   return (
     <div className="space-y-4">
@@ -50,7 +60,7 @@ export default async function WorkSetupPage({
         title={`${work.code} — ${work.name}`}
         description={[work.categoryName, work.groupName].filter(Boolean).join(" · ")}
         backHref="/estimator/works"
-        backLabel="Works"
+        backLabel="Rate book"
         actions={work.uom === null ? <Badge variant="neutral">Not set up</Badge> : undefined}
       />
 
@@ -161,13 +171,73 @@ export default async function WorkSetupPage({
             </p>
           )}
 
+          {buildUp && buildUp.materials.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
+                Where each {work.uom} goes
+              </p>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableHeaderCell>Material</TableHeaderCell>
+                    <TableHeaderCell>Per {work.uom}</TableHeaderCell>
+                    <TableHeaderCell className="text-right">Masters price</TableHeaderCell>
+                    <TableHeaderCell className="text-right">Cost</TableHeaderCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {buildUp.materials.map((row) => {
+                    const def = materialsById.get(row.materialId);
+                    return (
+                      <TableRow key={row.materialId}>
+                        <TableCell className="text-foreground text-sm">
+                          {def?.name ?? "Unknown material"}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {formatQuantity(row.qtyPerUnit)} {def?.uom ?? ""}
+                        </TableCell>
+                        <TableCell className="text-right text-sm">
+                          {row.price === null ? (
+                            <Badge variant="warning">Not priced</Badge>
+                          ) : (
+                            formatMoney(row.price)
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right text-sm">
+                          {formatMoney(row.cost)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
           {work.lineCount > 0 && (
             <p className="text-muted text-sm">
               Used on {formatQuantity(work.lineCount)}{" "}
-              {work.lineCount === 1 ? "estimate line" : "estimate lines"} — changes here update
-              every one of them.
+              {work.lineCount === 1 ? "estimate line" : "estimate lines"}. Draft estimates follow
+              changes here; a villa with its own version of this work keeps its own, and a submitted
+              estimate keeps what it froze.
             </p>
           )}
+        </Card>
+      )}
+
+      {work.uom !== null && (
+        <Card className="space-y-3 p-4">
+          <div>
+            <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
+              Copy this rate to other works
+            </p>
+            <p className="text-muted mt-1 text-sm">
+              {twins.length > 0
+                ? `The same work on ${twins.length === 1 ? "another floor is" : "other floors are"} ticked below.`
+                : "The same unit, labour rate and materials, onto any other work."}
+            </p>
+          </div>
+          <CopyRateForm workItemId={work.workItemId} twins={twins} allWorks={activeWorks} />
         </Card>
       )}
     </div>

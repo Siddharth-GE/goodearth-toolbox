@@ -98,19 +98,12 @@ export async function itemDefsByIds(
   );
 }
 
-export type RawMaterial = { id: string; name: string; uom: string; rate: number | null };
-
-/** The retired estimator_materials list — kept only to resolve pre-0086
- * rows in mixes, work recipes and the global recipe book. */
-export async function listMaterialsRaw(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-): Promise<RawMaterial[]> {
-  return fetchAll<RawMaterial>((from, to) =>
-    supabase
-      .from("estimator_materials")
-      .select("id, name, uom, rate")
-      .order("name")
-      .order("id")
-      .range(from, to),
-  );
-}
+/**
+ * A recipe row from before 0086 names a retired estimator_materials row
+ * and no item. The table stays (additive only) but nothing reads it any
+ * more: such a row counts for nothing and shows under this label, with a
+ * Remove button, so it can be cleared and re-added from Masters. Only
+ * staging's practice data ever had one — production had no estimator
+ * rows when 0086 landed.
+ */
+export const OLDER_ROW_LABEL = "An older material row — no longer counted";

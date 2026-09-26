@@ -11,8 +11,11 @@ import {
   classifyBudgetChooser,
   classifyDesignDrift,
   classifyEstimatePull,
+  groupEstimatePull,
+  requestedByItem,
   type BudgetCandidate,
   type DriftLine,
+  type EstimateFact,
   type IssuedRevision,
 } from "./pull-rules";
 
@@ -162,6 +165,84 @@ test("estimate pull: a factor converts into the item's unit", () => {
     }),
     { state: "ready", prefillQty: 70.62 },
   );
+});
+
+const fact = (
+  work: string,
+  item: string | null,
+  quantity: number,
+  uom: string,
+  factor: number | null = null,
+  name = "cement",
+): EstimateFact => ({
+  work_item_id: work,
+  material_name: name,
+  uom,
+  quantity,
+  item_id: item,
+  item_uom_factor: factor,
+});
+
+test("estimate pull groups by ITEM, so rows with no material id are seen (BUGCATCHER #16)", () => {
+  // Since 0086 every takeoff row names its item and carries no material
+  // id — the old pull keyed on material_id and saw an empty estimate.
+  const groups = groupEstimatePull(
+    [fact("slab", "cement", 40, "bag"), fact("footing", "cement", 10.5, "bag")],
+    new Map([["cement", "bag"]]),
+  );
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].key, "cement");
+  assert.equal(groups[0].work_count, 2);
+  assert.deepEqual(groups[0].estimate_parts, [{ quantity: 50.5, uom: "bag" }]);
+  assert.deepEqual(groups[0].verdict, { state: "ready", prefillQty: 50.5 });
+});
+
+test("estimate pull: an older row converts through its own factor before adding up", () => {
+  const groups = groupEstimatePull(
+    [
+      fact("slab", "sand", 2, "cum", 35.31, "sand"),
+      fact("plaster", "sand", 10, "cft", null, "sand"),
+    ],
+    new Map([["sand", "cft"]]),
+  );
+  assert.deepEqual(groups[0].verdict, { state: "ready", prefillQty: 80.62 });
+  assert.deepEqual(groups[0].estimate_parts, [
+    { quantity: 2, uom: "cum" },
+    { quantity: 10, uom: "cft" },
+  ]);
+});
+
+test("estimate pull: one unconvertible row makes the whole item ask a person", () => {
+  const groups = groupEstimatePull(
+    [fact("slab", "cement", 8, "cft"), fact("footing", "cement", 2, "bag")],
+    new Map([["cement", "bag"]]),
+  );
+  assert.deepEqual(groups[0].verdict, { state: "needs_qty" });
+});
+
+test("estimate pull: an older row with no item stays its own unpickable row", () => {
+  const groups = groupEstimatePull(
+    [fact("slab", null, 3, "cum", null, "old sand"), fact("slab", "cement", 5, "bag")],
+    new Map([["cement", "bag"]]),
+  );
+  const unlinked = groups.find((group) => group.item_id === null);
+  assert.equal(unlinked?.key, "unlinked:old sand");
+  assert.deepEqual(unlinked?.verdict, { state: "unlinked" });
+});
+
+test("already requested counts every estimate the villa has had, and marks this indent", () => {
+  // 5 bags pulled against the superseded EST/…/001 are still cement on its
+  // way to the same villa — the staging case that exposed the gap.
+  const { requested, onThisIndent } = requestedByItem(
+    [
+      { item_id: "cement", quantity: 5, indent_id: "ind-25" },
+      { item_id: "cement", quantity: 10, indent_id: "ind-26" },
+      { item_id: "steel", quantity: 100, indent_id: "ind-27" },
+    ],
+    "ind-27",
+  );
+  assert.equal(requested.get("cement"), 15);
+  assert.deepEqual([...onThisIndent], ["steel"]);
 });
 
 test("estimate pull: differing units with no factor ask a person instead of guessing", () => {

@@ -8,8 +8,7 @@
  * factor × item-uom). Store issues and direct-to-site deliveries move
  * in the ITEM's unit. Lining them up follows the house conversion rule,
  * restated verbatim because pure modules import nothing (the same rule
- * as lib/estimator/link.ts, lib/estimator/compare.ts and
- * lib/indents/pull-rules.ts): divide by the factor when one is entered,
+ * as lib/indents/pull-rules.ts): divide by the factor when one is entered,
  * convert 1:1 when the unit labels match ('nos' and 'each' are one
  * unit), and otherwise report the raw figure rather than guess — a
  * wrong number is worse than a labelled one.

@@ -8,8 +8,11 @@ import {
   computeTakeoff,
   computeWorkTakeoff,
   frozenLineCosts,
+  frozenRateBuildUp,
   aggregateFrozenTakeoff,
   expandRecipe,
+  mixUnitCost,
+  rateBuildUp,
   groupLineCosts,
   measurementQuantity,
   sheetTotal,
@@ -609,4 +612,125 @@ test("sheetTotal of an empty sheet is 0", () => {
 test("sheetTotal rounds the sum, not only each row", () => {
   // 0.1 + 0.2 is 0.30000000000000004 in raw floating point.
   assert.equal(sheetTotal([row(0.1, null, null, null), row(0.2, null, null, null)]), 0.3);
+});
+
+test("rateBuildUp shows how one unit is priced: labour plus each material", () => {
+  const recipe: WorkRecipe = {
+    workItemId: "slab",
+    uom: "cum",
+    labourRate: 900,
+    components: [mix("m20", 1), direct("cement", 0.5)],
+  };
+  const buildUp = rateBuildUp(recipe, mixes, materials);
+  assert.ok(buildUp);
+  const cementRow = buildUp.materials.find((row) => row.materialId === "cement");
+  // 8 bags through the mix + 0.5 direct, merged into one row.
+  assert.equal(cementRow?.qtyPerUnit, 8.5);
+  assert.equal(cementRow?.cost, 3400);
+  // 900 + 8.5×400 + 0.45×2000 + 0.9×1500
+  assert.equal(buildUp.rate, 900 + 3400 + 900 + 1350);
+});
+
+test("rateBuildUp keeps every known part but leaves the rate unknown when anything is unpriced", () => {
+  const recipe: WorkRecipe = {
+    workItemId: "rcc",
+    uom: "cum",
+    labourRate: 900,
+    components: [direct("cement", 8), direct("steel", 80)],
+  };
+  const buildUp = rateBuildUp(recipe, mixes, materials);
+  assert.equal(buildUp?.rate, null);
+  assert.equal(buildUp?.materials.find((row) => row.materialId === "cement")?.cost, 3200);
+  assert.equal(buildUp?.materials.find((row) => row.materialId === "steel")?.cost, null);
+});
+
+test("rateBuildUp: no labour rate means no rate, and no setup means no build-up", () => {
+  const noLabour: WorkRecipe = {
+    workItemId: "w",
+    uom: "sqm",
+    labourRate: null,
+    components: [direct("cement", 1)],
+  };
+  assert.equal(rateBuildUp(noLabour, mixes, materials)?.rate, null);
+  assert.equal(rateBuildUp(undefined, mixes, materials), null);
+});
+
+test("frozenRateBuildUp divides the frozen figures back to one unit", () => {
+  const buildUp = frozenRateBuildUp(
+    {
+      workItemId: "slab",
+      qty: 10,
+      uom: "cum",
+      labourCost: 9000,
+      materialCost: 32000,
+      totalCost: 41000,
+    },
+    [
+      {
+        workItemId: "slab",
+        materialId: "cement",
+        materialName: "Cement",
+        uom: "bag",
+        quantity: 80,
+        rate: 400,
+      },
+      {
+        workItemId: "other",
+        materialId: "sand",
+        materialName: "Sand",
+        uom: "cft",
+        quantity: 5,
+        rate: 60,
+      },
+    ],
+  );
+  assert.equal(buildUp.labourRate, 900);
+  assert.equal(buildUp.rate, 4100);
+  assert.deepEqual(buildUp.materials, [
+    { materialId: "cement", qtyPerUnit: 8, price: 400, cost: 3200 },
+  ]);
+});
+
+test("mixUnitCost is unknown, never zero, when empty or anything is unpriced", () => {
+  assert.equal(mixUnitCost([]), null);
+  assert.equal(
+    mixUnitCost([
+      { rate: 400, qtyPerUnit: 8 },
+      { rate: null, qtyPerUnit: 1 },
+    ]),
+    null,
+  );
+  assert.equal(
+    mixUnitCost([
+      { rate: 400, qtyPerUnit: 8 },
+      { rate: 2000, qtyPerUnit: 0.45 },
+    ]),
+    4100,
+  );
+});
+
+test("a work still to measure costs nothing known, takes off nothing, and keeps the total open", () => {
+  const recipe: WorkRecipe = {
+    workItemId: "slab",
+    uom: "cum",
+    labourRate: 900,
+    components: [mix("m20", 1)],
+  };
+  const recipes = new Map([["slab", recipe]]);
+  const line = computeLine({ workItemId: "slab", qty: null }, recipe, mixes, materials);
+  assert.equal(line.toMeasure, true);
+  assert.equal(line.totalCost, null);
+  assert.equal(line.labourCost, null);
+  assert.deepEqual(
+    computeTakeoff([{ workItemId: "slab", qty: null }], recipes, mixes, materials),
+    [],
+  );
+  assert.deepEqual(computeWorkTakeoff([{ workItemId: "slab", qty: null }], recipes, mixes), []);
+
+  const measured = computeLine({ workItemId: "slab", qty: 2 }, recipe, mixes, materials);
+  const totals = computeEstimateTotals([measured, line]);
+  assert.equal(totals.toMeasureCount, 1);
+  assert.equal(totals.isComplete, false);
+  // What is measured still counts: a floor, not an answer.
+  assert.equal(totals.grand, measured.totalCost);
 });

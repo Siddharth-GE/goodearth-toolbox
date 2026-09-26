@@ -1,122 +1,212 @@
 "use client";
 
-import { RecordFormDialog } from "@/components/masters/record-form-dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
 import {
-  addEstimateLine,
+  addEstimateLines,
   removeEstimateLine,
   updateEstimateLineQty,
 } from "@/lib/estimator/estimate-actions";
-import type { WorkStatusRow } from "@/lib/estimator/works-queries";
-import { useState, useTransition } from "react";
+import { formatCount } from "@/lib/format";
+import { useMemo, useState, useTransition } from "react";
+
+export type PickableWork = {
+  workItemId: string;
+  code: string;
+  name: string;
+  groupName: string | null;
+  categoryCode: string;
+  categoryName: string;
+  /** Null = not in the rate book yet; it can still be listed. */
+  uom: string | null;
+};
 
 /**
- * Add a work to the estimate — behind a button, not squatting in the
- * middle of the BOQ (the founder's "isnt simple"). The picker is a
- * native select with an optgroup per category: it gets the phone's own
- * wheel picker, and the works vocabulary is already ordered the way the
- * site team reads it.
+ * Put works on the estimate — any of them, all at once, ticked from a
+ * searchable list (0097). They arrive "to measure": no throwaway number
+ * to get past the form, and a work not yet in the rate book can be listed
+ * and priced later. Works already on the estimate show ticked and fixed.
  */
-export function AddLineDialog({
+export function AddWorksDialog({
   estimateId,
   works,
+  onEstimate,
 }: {
   estimateId: string;
-  /** Only works that are set up: a work with no unit has nothing to measure. */
-  works: WorkStatusRow[];
+  works: PickableWork[];
+  /** Work ids already on this estimate. */
+  onEstimate: string[];
 }) {
-  const [workItemId, setWorkItemId] = useState("");
-  const categories = [...new Set(works.map((work) => work.categoryCode))];
-  const chosen = works.find((work) => work.workItemId === workItemId);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [picked, setPicked] = useState<string[]>([]);
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string>();
+  const already = useMemo(() => new Set(onEstimate), [onEstimate]);
 
-  if (works.length === 0) {
-    return (
-      <p className="text-muted text-sm">
-        No works are set up yet — give a work a unit on the Works tab before adding it here.
-      </p>
+  const groups = useMemo(() => {
+    const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const byGroup = new Map<string, PickableWork[]>();
+    for (const work of works) {
+      const haystack =
+        `${work.code} ${work.name} ${work.groupName ?? ""} ${work.categoryName}`.toLowerCase();
+      if (!words.every((word) => haystack.includes(word))) continue;
+      const key = work.groupName
+        ? `${work.categoryCode} — ${work.groupName}`
+        : `${work.categoryCode} — ${work.categoryName}`;
+      byGroup.set(key, [...(byGroup.get(key) ?? []), work]);
+    }
+    return [...byGroup];
+  }, [works, query]);
+
+  const toggle = (ids: string[], on: boolean) =>
+    setPicked((current) =>
+      on ? [...new Set([...current, ...ids])] : current.filter((id) => !ids.includes(id)),
     );
-  }
 
   return (
-    <RecordFormDialog
-      label="Work"
-      isEdit={false}
-      action={addEstimateLine.bind(null, estimateId)}
-      trigger={<Button>Add work</Button>}
-      onOpen={() => setWorkItemId("")}
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) {
+          setPicked([]);
+          setQuery("");
+          setError(undefined);
+        }
+      }}
     >
-      <div className="space-y-1.5">
-        <Label htmlFor="work_item_id">Work</Label>
-        <Select
-          id="work_item_id"
-          name="work_item_id"
-          value={workItemId}
-          onChange={(event) => setWorkItemId(event.target.value)}
-          required
-        >
-          <option value="" disabled>
-            Choose a work
-          </option>
-          {categories.map((code) => (
-            <optgroup
-              key={code}
-              label={`${code} — ${works.find((w) => w.categoryCode === code)?.categoryName ?? ""}`}
-            >
-              {works
-                .filter((work) => work.categoryCode === code)
-                .map((work) => (
-                  <option key={work.workItemId} value={work.workItemId}>
-                    {work.code} — {work.name} ({work.uom})
-                  </option>
-                ))}
-            </optgroup>
-          ))}
-        </Select>
-      </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="qty">Quantity{chosen ? ` (${chosen.uom})` : ""}</Label>
+      <DialogTrigger asChild>
+        <Button>Add works</Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-h-[90dvh] sm:overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Add works</DialogTitle>
+        </DialogHeader>
         <Input
-          id="qty"
-          name="qty"
-          required
-          autoComplete="off"
-          inputMode="decimal"
-          placeholder={chosen ? `in ${chosen.uom}` : "e.g. 40"}
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Find a work — lintel, plaster, FD.…"
+          aria-label="Find a work"
         />
-        {chosen && (
-          <p className="text-muted text-xs">
-            How many {chosen.uom} of {chosen.name} this villa needs.
-          </p>
-        )}
-      </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="note">Note (optional)</Label>
-        <Input id="note" name="note" autoComplete="off" />
-      </div>
-    </RecordFormDialog>
+        <div className="max-h-[50dvh] space-y-3 overflow-y-auto">
+          {groups.length === 0 ? (
+            <p className="text-muted text-sm">Nothing matches “{query.trim()}”.</p>
+          ) : (
+            groups.map(([group, rows]) => {
+              const open = rows.filter((row) => !already.has(row.workItemId));
+              const allPicked =
+                open.length > 0 && open.every((row) => picked.includes(row.workItemId));
+              return (
+                <div key={group} className="space-y-1">
+                  <label className="text-foreground flex items-center gap-2 text-sm font-semibold">
+                    <Checkbox
+                      checked={allPicked}
+                      disabled={open.length === 0}
+                      onChange={(event) =>
+                        toggle(
+                          open.map((row) => row.workItemId),
+                          event.target.checked,
+                        )
+                      }
+                    />
+                    {group}
+                  </label>
+                  <ul className="space-y-1 pl-6">
+                    {rows.map((work) => {
+                      const on = already.has(work.workItemId);
+                      return (
+                        <li key={work.workItemId}>
+                          <label className="flex items-center gap-2 text-sm">
+                            <Checkbox
+                              checked={on || picked.includes(work.workItemId)}
+                              disabled={on}
+                              onChange={(event) => toggle([work.workItemId], event.target.checked)}
+                            />
+                            <span className={on ? "text-muted" : "text-foreground"}>
+                              {work.code} — {work.name}
+                            </span>
+                            <span className="text-muted text-xs">
+                              {on ? "on the estimate" : (work.uom ?? "not in the rate book yet")}
+                            </span>
+                          </label>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              );
+            })
+          )}
+        </div>
+        <FormMessage error={error} />
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="secondary">Cancel</Button>
+          </DialogClose>
+          <Button
+            disabled={pending || picked.length === 0}
+            onClick={() =>
+              startTransition(async () => {
+                const result = await addEstimateLines(estimateId, picked);
+                if (result?.error) setError(result.error);
+                else setOpen(false);
+              })
+            }
+          >
+            {pending
+              ? "Adding…"
+              : `Add ${formatCount(picked.length)} ${picked.length === 1 ? "work" : "works"}`}
+          </Button>
+        </DialogFooter>
+        <p className="text-muted text-xs">
+          They come in to measure — open each one&apos;s sheet, or type its quantity, on the
+          estimate.
+        </p>
+      </DialogContent>
+    </Dialog>
   );
 }
 
-export function LineQtyField({ id, qty, label }: { id: string; qty: number; label: string }) {
-  const [value, setValue] = useState(String(qty));
+/** A typed quantity, saved on blur — blank means "to measure". */
+export function LineQtyField({
+  id,
+  qty,
+  label,
+}: {
+  id: string;
+  qty: number | null;
+  label: string;
+}) {
+  const shown = qty === null ? "" : String(qty);
+  const [value, setValue] = useState(shown);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string>();
 
   const save = () => {
-    const next = Number(value);
-    if (!Number.isFinite(next) || next <= 0 || next === qty) {
-      setValue(String(qty));
+    const cleaned = value.replace(/[,\s]/g, "");
+    const next = cleaned === "" ? null : Number(cleaned);
+    if (next === qty) return;
+    if (next !== null && (!Number.isFinite(next) || next <= 0)) {
+      setValue(shown);
       return;
     }
     startTransition(async () => {
       const result = await updateEstimateLineQty(id, next);
       if (result?.error) {
         setError(result.error);
-        setValue(String(qty));
+        setValue(shown);
       } else {
         setError(undefined);
       }
@@ -129,11 +219,12 @@ export function LineQtyField({ id, qty, label }: { id: string; qty: number; labe
         aria-label={`Quantity of ${label}`}
         value={value}
         inputMode="decimal"
+        placeholder="to measure"
         onChange={(event) => setValue(event.target.value)}
         onBlur={save}
         onKeyDown={(event) => {
           if (event.key === "Enter") (event.target as HTMLInputElement).blur();
-          if (event.key === "Escape") setValue(String(qty));
+          if (event.key === "Escape") setValue(shown);
         }}
         disabled={pending}
         className="h-9 max-w-28 text-sm"

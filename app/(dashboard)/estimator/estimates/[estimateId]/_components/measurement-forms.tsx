@@ -24,8 +24,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { measurementQuantity, sheetTotal } from "@/lib/estimator/calc";
+import { Select } from "@/components/ui/select";
 import {
   addLineMeasurement,
+  copyMeasurementRows,
   removeLineMeasurement,
   updateLineMeasurement,
   type MeasurementFields,
@@ -62,12 +64,15 @@ export function MeasurementSheetDialog({
   workUom,
   rows,
   readOnly,
+  otherLines = [],
 }: {
   lineId: string;
   workName: string;
   workUom: string | null;
   rows: MeasurementRow[];
   readOnly: boolean;
+  /** The estimate's other works, for "copy these rows to…". */
+  otherLines?: { id: string; name: string; uom: string | null }[];
 }) {
   const measured = rows.length > 0;
   const total = sheetTotal(rows);
@@ -91,7 +96,13 @@ export function MeasurementSheetDialog({
           <DialogTitle>{workName} — measurements</DialogTitle>
         </DialogHeader>
 
-        {measured ? (
+        {measured && !readOnly ? (
+          <ul className="divide-border divide-y">
+            {rows.map((row) => (
+              <EditableMeasurementRow key={row.id} row={row} workUom={workUom} />
+            ))}
+          </ul>
+        ) : measured ? (
           <Table>
             <TableHead>
               <TableRow>
@@ -102,29 +113,24 @@ export function MeasurementSheetDialog({
                   </TableHeaderCell>
                 ))}
                 <TableHeaderCell className="text-right">Quantity</TableHeaderCell>
-                {!readOnly && <TableHeaderCell></TableHeaderCell>}
               </TableRow>
             </TableHead>
             <TableBody>
-              {rows.map((row) =>
-                readOnly ? (
-                  <TableRow key={row.id}>
-                    <TableCell className="text-foreground text-sm">
-                      {row.description ?? "—"}
+              {rows.map((row) => (
+                <TableRow key={row.id}>
+                  <TableCell className="text-foreground text-sm">
+                    {row.description ?? "—"}
+                  </TableCell>
+                  {BOXES.map((box) => (
+                    <TableCell key={box.key} className="text-right font-mono text-sm">
+                      {row[box.key] === null ? "" : formatQuantity(row[box.key])}
                     </TableCell>
-                    {BOXES.map((box) => (
-                      <TableCell key={box.key} className="text-right font-mono text-sm">
-                        {row[box.key] === null ? "" : formatQuantity(row[box.key])}
-                      </TableCell>
-                    ))}
-                    <TableCell className="text-foreground text-right font-mono text-sm">
-                      {formatQuantity(measurementQuantity(row))}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  <EditableMeasurementRow key={row.id} row={row} />
-                ),
-              )}
+                  ))}
+                  <TableCell className="text-foreground text-right font-mono text-sm">
+                    {formatQuantity(measurementQuantity(row))}
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         ) : (
@@ -144,6 +150,10 @@ export function MeasurementSheetDialog({
         )}
 
         {!readOnly && <AddMeasurementForm lineId={lineId} />}
+
+        {!readOnly && measured && otherLines.length > 0 && (
+          <CopyRowsForm fromLineId={lineId} otherLines={otherLines} />
+        )}
 
         <p className="text-muted text-xs">
           Blank means not used: 12 in Nos alone is 12; 1 × 4 × 3 × 0.15 is 1.8.
@@ -175,7 +185,7 @@ const show = (value: number | null) => (value === null ? "" : String(value));
  * shape, with blank allowed because blank means "not used". A refused
  * save puts the row back as it was and says why.
  */
-function EditableMeasurementRow({ row }: { row: MeasurementRow }) {
+function EditableMeasurementRow({ row, workUom }: { row: MeasurementRow; workUom: string | null }) {
   const initial = {
     description: row.description ?? "",
     nos: show(row.nos),
@@ -224,40 +234,45 @@ function EditableMeasurementRow({ row }: { row: MeasurementRow }) {
   });
 
   return (
-    <TableRow>
-      <TableCell>
+    <li className="space-y-2 py-3">
+      <div className="flex items-center gap-2">
         <Input
           aria-label="Description"
+          placeholder="What it is — front wall, footing F1…"
           value={values.description}
           onChange={(event) => setValues({ ...values, description: event.target.value })}
           onBlur={save}
           onKeyDown={onKeyDown}
           disabled={pending}
-          className="h-9 min-w-32 text-sm"
+          className="h-9 flex-1 text-sm"
         />
-        <FormMessage error={error} size="xs" />
-      </TableCell>
-      {BOXES.map((box) => (
-        <TableCell key={box.key}>
-          <Input
-            aria-label={box.label}
-            value={values[box.key]}
-            inputMode="decimal"
-            onChange={(event) => setValues({ ...values, [box.key]: event.target.value })}
-            onBlur={save}
-            onKeyDown={onKeyDown}
-            disabled={pending}
-            className="h-9 w-20 text-right text-sm"
-          />
-        </TableCell>
-      ))}
-      <TableCell className="text-foreground text-right font-mono text-sm">
-        {Number.isFinite(live) ? formatQuantity(live) : "—"}
-      </TableCell>
-      <TableCell>
         <RemoveMeasurementButton id={row.id} />
-      </TableCell>
-    </TableRow>
+      </div>
+      <div className="grid grid-cols-4 gap-2">
+        {BOXES.map((box) => (
+          <label key={box.key} className="space-y-1">
+            <span className="text-muted text-xs">{box.label}</span>
+            <Input
+              value={values[box.key]}
+              inputMode="decimal"
+              onChange={(event) => setValues({ ...values, [box.key]: event.target.value })}
+              onBlur={save}
+              onKeyDown={onKeyDown}
+              disabled={pending}
+              className="h-9 text-right text-sm"
+            />
+          </label>
+        ))}
+      </div>
+      <p className="text-muted text-right text-sm">
+        ={" "}
+        <span className="text-foreground font-mono">
+          {Number.isFinite(live) ? formatQuantity(live) : "—"}
+        </span>
+        {workUom ? ` ${workUom}` : ""}
+      </p>
+      <FormMessage error={error} size="xs" />
+    </li>
   );
 }
 
@@ -332,5 +347,69 @@ function AddMeasurementForm({ lineId }: { lineId: string }) {
         </Button>
       </div>
     </form>
+  );
+}
+
+/**
+ * Copy this sheet's rows onto another work of the estimate — measure a
+ * wall once, and its plaster and paint start from the same rows. They
+ * land at the bottom of the other sheet as they are, to be adjusted.
+ */
+function CopyRowsForm({
+  fromLineId,
+  otherLines,
+}: {
+  fromLineId: string;
+  otherLines: { id: string; name: string; uom: string | null }[];
+}) {
+  const [target, setTarget] = useState("");
+  const [pending, startTransition] = useTransition();
+  const [result, setResult] = useState<{ error?: string; done?: string }>();
+
+  return (
+    <div className="border-border space-y-2 border-t pt-3">
+      <Label htmlFor={`copy-rows-${fromLineId}`}>Copy these rows to another work</Label>
+      <div className="flex flex-wrap items-center gap-2">
+        <Select
+          id={`copy-rows-${fromLineId}`}
+          value={target}
+          onChange={(event) => setTarget(event.target.value)}
+          className="min-w-56 flex-1"
+        >
+          <option value="" disabled>
+            Choose a work on this estimate
+          </option>
+          {otherLines.map((line) => (
+            <option key={line.id} value={line.id}>
+              {line.name}
+              {line.uom ? ` (${line.uom})` : ""}
+            </option>
+          ))}
+        </Select>
+        <Button
+          type="button"
+          variant="secondary"
+          disabled={pending || !target}
+          onClick={() =>
+            startTransition(async () => {
+              const outcome = await copyMeasurementRows(fromLineId, target);
+              setResult(
+                outcome?.error
+                  ? { error: outcome.error }
+                  : { done: "Copied — open that work's sheet to adjust the sizes." },
+              );
+            })
+          }
+        >
+          {pending ? "Copying…" : "Copy rows"}
+        </Button>
+      </div>
+      {result?.done && <p className="text-success text-sm">{result.done}</p>}
+      <FormMessage error={result?.error} />
+      <p className="text-muted text-xs">
+        The sizes go across exactly as they are — plaster has no thickness, paint may count both
+        faces — so check them there.
+      </p>
+    </div>
   );
 }

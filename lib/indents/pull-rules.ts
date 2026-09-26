@@ -139,8 +139,8 @@ export type EstimatePullState =
 /**
  * What the pull screen may do with one material of the takeoff.
  *
- * The conversion rule is lib/estimator/link.ts's, restated here because
- * pure modules import nothing (the todayInIndia() arrangement): a
+ * Since 0086 a takeoff row is already in the item's own unit, so it is
+ * ready as it stands. The rest serves estimates submitted before that: a
  * person-entered factor converts; matching unit labels (case-insensitive,
  * with procurement's 'each' and the estimator's 'nos' being one unit)
  * convert 1:1; anything else asks a person for the quantity rather than
@@ -159,4 +159,122 @@ export function classifyEstimatePull(row: EstimatePullCandidate): EstimatePullSt
     return { state: "ready", prefillQty: row.quantity };
   }
   return { state: "needs_qty" };
+}
+
+/** One row of estimate_takeoff_facts — one (work, material) of the official estimate. */
+export type EstimateFact = {
+  work_item_id: string | null;
+  /** The frozen name and unit the estimate was submitted with. */
+  material_name: string;
+  uom: string;
+  quantity: number;
+  /** The catalogue item. Always set since 0086; null only on an older
+   * estimate whose material was never linked to one. */
+  item_id: string | null;
+  item_uom_factor: number | null;
+};
+
+export type EstimatePullGroup = {
+  /** The item, or "unlinked:<name>" for an older row that names none. */
+  key: string;
+  item_id: string | null;
+  /** The frozen estimate name(s), for when the item has been renamed since. */
+  estimate_name: string;
+  /** What the estimate says, in its own unit(s) — one part per unit, so
+   * "8 cft + 2 bag" when two older works disagreed. */
+  estimate_parts: { quantity: number; uom: string }[];
+  work_count: number;
+  verdict: EstimatePullState;
+};
+
+/**
+ * The official estimate, one row per catalogue item — what a person
+ * requests, whatever work it was estimated under.
+ *
+ * Keyed on the ITEM (BUGCATCHER #16): since 0086 every takeoff row names
+ * its item and has no material id, so a pull keyed on the material saw
+ * nothing. An older row still converts through its own factor, fact by
+ * fact, before anything is added up — two works that estimated the same
+ * item in different units are only ready when every one of them converts.
+ * `itemUom` is the item's unit today, read from the catalogue.
+ */
+export function groupEstimatePull(
+  facts: EstimateFact[],
+  itemUom: Map<string, string>,
+): EstimatePullGroup[] {
+  type Acc = {
+    item_id: string | null;
+    names: Set<string>;
+    byUom: Map<string, number>;
+    works: Set<string>;
+    prefill: number;
+    state: EstimatePullState["state"];
+  };
+  const groups = new Map<string, Acc>();
+
+  for (const fact of facts) {
+    const key = fact.item_id ?? `unlinked:${fact.material_name}`;
+    const acc = groups.get(key) ?? {
+      item_id: fact.item_id,
+      names: new Set<string>(),
+      byUom: new Map<string, number>(),
+      works: new Set<string>(),
+      prefill: 0,
+      state: "ready",
+    };
+    acc.names.add(fact.material_name);
+    acc.byUom.set(fact.uom, (acc.byUom.get(fact.uom) ?? 0) + fact.quantity);
+    if (fact.work_item_id) acc.works.add(fact.work_item_id);
+
+    const verdict = classifyEstimatePull({
+      quantity: fact.quantity,
+      material_uom: fact.uom,
+      item_id: fact.item_id,
+      item_default_uom: fact.item_id ? (itemUom.get(fact.item_id) ?? null) : null,
+      item_uom_factor: fact.item_uom_factor,
+    });
+    if (verdict.state === "unlinked") acc.state = "unlinked";
+    else if (verdict.state === "needs_qty" && acc.state === "ready") acc.state = "needs_qty";
+    else if (verdict.state === "ready") acc.prefill += verdict.prefillQty;
+    groups.set(key, acc);
+  }
+
+  return [...groups.entries()].map(([key, acc]) => ({
+    key,
+    item_id: acc.item_id,
+    estimate_name: [...acc.names].join(" / "),
+    estimate_parts: [...acc.byUom.entries()].map(([uom, quantity]) => ({
+      quantity: roundQty(quantity),
+      uom,
+    })),
+    work_count: acc.works.size,
+    verdict:
+      acc.state === "ready"
+        ? { state: "ready", prefillQty: roundQty(acc.prefill) }
+        : { state: acc.state },
+  }));
+}
+
+/**
+ * Everything already requested against ANY of the villa's estimates, per
+ * item. Counting only the current official estimate reopened the
+ * double-buy every time the villa was re-estimated: lines pulled against
+ * EST/…/001 counted for nothing once EST/…/002 superseded it.
+ */
+export function requestedByItem(
+  lines: { item_id: string; quantity: number; indent_id: string }[],
+  indentId: string,
+): { requested: Map<string, number>; onThisIndent: Set<string> } {
+  const requested = new Map<string, number>();
+  const onThisIndent = new Set<string>();
+  for (const line of lines) {
+    requested.set(line.item_id, (requested.get(line.item_id) ?? 0) + line.quantity);
+    if (line.indent_id === indentId) onThisIndent.add(line.item_id);
+  }
+  return { requested, onThisIndent };
+}
+
+/** Six places, the estimator's rounding — sums of decimals drift otherwise. */
+function roundQty(value: number): number {
+  return Math.round(value * 1e6) / 1e6;
 }

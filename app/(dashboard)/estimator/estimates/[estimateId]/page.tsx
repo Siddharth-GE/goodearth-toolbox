@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { Button, LinkButton } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Figure } from "@/components/ui/figure";
 import { PageTitle } from "@/components/ui/page-title";
@@ -18,7 +19,9 @@ import {
   computeLine,
   computeTakeoff,
   frozenLineCosts,
+  frozenRateBuildUp,
   groupLineCosts,
+  rateBuildUp,
   type LineCost,
   type MaterialDef,
   type MixDef,
@@ -40,18 +43,24 @@ import { formatDate, formatMoney, formatQuantity } from "@/lib/format";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Fragment } from "react";
-import { EstimateFormDialog, DeleteEstimateButton } from "../_components/estimate-forms";
-import { AddLineDialog, LineQtyField, RemoveLineButton } from "./_components/line-forms";
+import {
+  DeleteEstimateButton,
+  EstimateFormDialog,
+  StartVillaDialog,
+} from "../_components/estimate-forms";
+import { AddWorksDialog, LineQtyField, RemoveLineButton } from "./_components/line-forms";
 import { MeasurementSheetDialog } from "./_components/measurement-forms";
 import {
-  ItemRateField,
-  LineVariationDialog,
-  type VariationRowView,
-} from "./_components/variation-forms";
+  FrozenRateDialog,
+  LineRateDialog,
+  VillaPriceField,
+  type LineRateView,
+  type RateComponentView,
+} from "./_components/rate-forms";
 import { ApproveReconciliationButton } from "./_components/reconciliation-forms";
-import { ReviseEstimateButton, SubmitEstimateButton } from "./_components/submit-forms";
-import { listProjects } from "@/lib/masters/projects";
-import { listUnits } from "@/lib/masters/units";
+import { MakeOfficialButton } from "./_components/submit-forms";
+import { hasApp } from "@/lib/auth/access";
+import { requireUser } from "@/lib/auth/dal";
 
 // The estimate reads as a BOQ, because that is the document an
 // estimator already knows: works gathered under their categories, one
@@ -59,23 +68,23 @@ import { listUnits } from "@/lib/masters/units";
 // future PDF export prints groupLineCosts' output — the same structure
 // this page renders, never a second grouping.
 //
-// Since 0077 the page has two lives. A DRAFT is the calculator: costs
-// computed live from today's rates. A SUBMITTED (or superseded)
-// estimate renders from its frozen snapshot instead — same grouping,
-// same totals arithmetic, numbers that no longer move.
+// The page has two lives. The villa's WORKING estimate (0098) is the
+// calculator: costs computed live from today's rates, always editable.
+// An OFFICIAL (or superseded) one — the numbered copy Make official froze
+// — renders from its snapshot instead: same grouping, same totals
+// arithmetic, numbers that no longer move.
 export default async function EstimatePage({
   params,
 }: {
   params: Promise<{ estimateId: string }>;
 }) {
   const { estimateId } = await params;
-  const [estimate, book, works, projects, units, variations, materialItems, mixRows, measurements] =
+  const [user, estimate, book, works, variations, materialItems, mixRows, measurements] =
     await Promise.all([
+      requireUser(),
       getEstimate(estimateId),
       getRecipeBook(),
       listWorkStatus(),
-      listProjects(),
-      listUnits(),
       // Per-villa variations (0087) — replace the standard recipe whole
       // for customised lines, so this page's live costs mean THIS house.
       getEstimateVariations(estimateId),
@@ -86,6 +95,9 @@ export default async function EstimatePage({
       getEstimateMeasurements(estimateId),
     ]);
   if (!estimate) notFound();
+  // Whoever holds Masters can set a missing Masters price from the rate
+  // panel; everyone else sets this villa's price only.
+  const canEditMasters = await hasApp(user, "/masters");
 
   const isDraft = estimate.status === "draft";
   // After submit the sheets stay openable, read-only, as the record of
@@ -103,20 +115,13 @@ export default async function EstimatePage({
   const comparison =
     issuedData && estimate.frozen
       ? compareIssuesToEstimate(
-          estimate.frozen.takeoff,
-          [
-            ...issuedData.links,
-            // An item-keyed takeoff row (0086) is its own link: the
-            // frozen quantity is already in the item's unit.
-            ...estimate.frozen.takeoff
-              .filter((row) => row.itemId)
-              .map((row) => ({
-                materialId: row.itemId as string,
-                itemId: row.itemId as string,
-                itemUom: row.uom,
-                factor: null,
-              })),
-          ],
+          estimate.frozen.takeoff.map((row) => ({
+            workItemId: row.workItemId,
+            itemId: row.itemId ?? null,
+            materialName: row.materialName,
+            uom: row.uom,
+            quantity: row.quantity,
+          })),
           issuedData.lines,
         )
       : null;
@@ -188,12 +193,7 @@ export default async function EstimatePage({
     for (const line of estimate.lines) {
       unitRateByWork.set(
         line.workItemId,
-        computeLine(
-          { workItemId: line.workItemId, qty: 1 },
-          recipesByWork.get(line.workItemId),
-          mixesById,
-          materialsById,
-        ).totalCost,
+        rateBuildUp(recipesByWork.get(line.workItemId), mixesById, materialsById)?.rate ?? null,
       );
     }
   } else {
@@ -227,70 +227,102 @@ export default async function EstimatePage({
     [...book.materials, ...variations.extraMaterials].map((m) => [m.id, m.rate]),
   );
 
-  // Per-villa variations (0087): what each line's dialog shows — the
-  // line's own list when customised, the standard read-only otherwise.
-  const variationOptions = {
+  // The rate panel (tap a rate): what the pickers offer, and each line's
+  // build-up — labour, what one unit uses, what each material costs —
+  // with where every figure comes from.
+  const rateOptions = {
     materials: materialItems
       .filter((material) => material.isActive)
-      .map(({ id, name, uom }) => ({ id, name, uom })),
+      .map(({ id, name, uom, rate }) => ({ id, name, uom, rate })),
     mixes: mixRows.filter((mix) => mix.isActive).map(({ id, name, uom }) => ({ id, name, uom })),
   };
-  const variationRowsForLine = (lineId: string, workItemId: string): VariationRowView[] => {
-    const custom = variations.byLine.get(lineId);
-    if (custom) {
-      return custom.map((row) => {
-        if (row.mixId) {
-          const mix = mixesById.get(row.mixId);
-          return {
-            id: row.id,
-            kind: "mix" as const,
-            refId: row.mixId,
-            name: mix?.name ?? "Unknown mix",
-            uom: mix?.uom ?? "",
-            qtyPerUnit: row.qtyPerUnit,
-          };
-        }
-        const refId = row.itemId ?? row.materialId ?? "";
-        const def = materialsById.get(refId);
+  const componentView = (component: {
+    materialId: string | null;
+    mixId: string | null;
+    qtyPerUnit: number;
+  }): RateComponentView => {
+    if (component.mixId) {
+      const mix = mixesById.get(component.mixId);
+      return {
+        ref: `mix:${component.mixId}`,
+        kind: "mix",
+        name: mix?.name ?? "Unknown mix",
+        uom: mix?.uom ?? "",
+        qtyPerUnit: component.qtyPerUnit,
+      };
+    }
+    const def = component.materialId ? materialsById.get(component.materialId) : undefined;
+    return {
+      ref: `material:${component.materialId ?? ""}`,
+      kind: "material",
+      name: def?.name ?? "Unknown material",
+      uom: def?.uom ?? "",
+      qtyPerUnit: component.qtyPerUnit,
+    };
+  };
+  const rateViewFor = (line: (typeof estimate.lines)[number], uom: string | null): LineRateView => {
+    const standard = book.recipes.find((recipe) => recipe.workItemId === line.workItemId);
+    const own = variations.byLine.get(line.id);
+    const buildUp = rateBuildUp(recipesByWork.get(line.workItemId), mixesById, materialsById);
+    return {
+      lineId: line.id,
+      workItemId: line.workItemId,
+      workName: line.name,
+      workUom: uom,
+      own: own !== undefined,
+      labour: {
+        villa: line.labourRate,
+        rateBook: standard?.labourRate ?? null,
+        inUse: buildUp?.labourRate ?? null,
+      },
+      components: own
+        ? own.map((row) =>
+            componentView({ materialId: row.itemId, mixId: row.mixId, qtyPerUnit: row.qtyPerUnit }),
+          )
+        : (standard?.components ?? []).map(componentView),
+      prices: (buildUp?.materials ?? []).map((row) => {
+        const def = materialsById.get(row.materialId);
         return {
-          id: row.id,
-          kind: "material" as const,
-          refId,
+          itemId: row.materialId,
           name: def?.name ?? "Unknown material",
           uom: def?.uom ?? "",
           qtyPerUnit: row.qtyPerUnit,
+          mastersPrice: standardRateById.get(row.materialId) ?? null,
+          villaPrice: variations.rateByMaterialId.get(row.materialId) ?? null,
+          cost: row.cost,
         };
-      });
-    }
-    const standard = book.recipes.find((r) => r.workItemId === workItemId)?.components ?? [];
-    return standard.map((component) => {
-      if (component.mixId) {
-        const mix = mixesById.get(component.mixId);
-        return {
-          id: null,
-          kind: "mix" as const,
-          refId: component.mixId,
-          name: mix?.name ?? "Unknown mix",
-          uom: mix?.uom ?? "",
-          qtyPerUnit: component.qtyPerUnit,
-        };
-      }
-      const def = component.materialId ? materialsById.get(component.materialId) : undefined;
-      return {
-        id: null,
-        kind: "material" as const,
-        refId: component.materialId ?? "",
-        name: def?.name ?? "Unknown material",
-        uom: def?.uom ?? "",
-        qtyPerUnit: component.qtyPerUnit,
-      };
-    });
+      }),
+      rate: buildUp?.rate ?? null,
+    };
   };
-  const setUpWorks = works.filter((work) => work.uom !== null && work.isActive);
+  const frozenLineByWork = new Map(
+    (estimate.frozen?.lineCosts ?? []).map((row) => [row.workItemId, row]),
+  );
+  const frozenNameById = new Map(
+    (estimate.frozen?.takeoff ?? []).map((row) => [
+      row.materialId,
+      { name: row.materialName, uom: row.uom },
+    ]),
+  );
+  const pickableWorks = works
+    .filter((work) => work.isActive)
+    .map((work) => ({
+      workItemId: work.workItemId,
+      code: work.code,
+      name: work.name,
+      groupName: work.groupName,
+      categoryCode: work.categoryCode,
+      categoryName: work.categoryName,
+      uom: work.uom,
+    }));
+  const villaName = estimate.unitName ?? "this villa";
+  const olderDraft = isDraft && !estimate.isWorking;
 
   const part = (label: string, value: number | null) =>
     `${label} ${value === null ? "not priced yet" : formatMoney(value)}`;
   const missingBits = [
+    totals.toMeasureCount > 0 &&
+      `${totals.toMeasureCount} ${totals.toMeasureCount === 1 ? "work is" : "works are"} still to measure`,
     totals.notSetUpCount > 0 &&
       `${totals.notSetUpCount} ${totals.notSetUpCount === 1 ? "work has" : "works have"} no setup`,
     totals.missingLabourCount > 0 &&
@@ -302,77 +334,129 @@ export default async function EstimatePage({
   return (
     <div className="space-y-4">
       <PageTitle
-        title={estimate.reference ? `${estimate.name} · ${estimate.reference}` : estimate.name}
+        title={
+          estimate.reference
+            ? `${villaName} · ${estimate.reference}`
+            : estimate.isWorking
+              ? `${villaName} — working estimate`
+              : estimate.name
+        }
         description={
-          estimate.isTemplate
-            ? `Template · ${estimate.projectName}`
-            : `${estimate.unitName ?? "No villa"} · ${estimate.projectName}`
+          estimate.isWorking
+            ? `${estimate.projectName}${estimate.name !== villaName ? ` · ${estimate.name}` : ""}`
+            : `${villaName} · ${estimate.projectName}`
         }
         backHref="/estimator/estimates"
-        backLabel="Estimates"
+        backLabel="Villas"
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            {estimate.isTemplate && <Badge variant="info">Template</Badge>}
             {estimate.status === "submitted" && <Badge variant="success">Official</Badge>}
             {estimate.status === "superseded" && <Badge variant="neutral">Superseded</Badge>}
-            {isDraft && !estimate.isTemplate && <Badge variant="warning">Draft</Badge>}
+            {olderDraft && <Badge variant="neutral">Older draft</Badge>}
             {isDraft && (
               <>
-                <EstimateFormDialog projects={projects} units={units} estimate={estimate} />
-                <DeleteEstimateButton estimateId={estimate.id} />
-                {estimate.unitId && (
-                  <SubmitEstimateButton
-                    estimateId={estimate.id}
-                    villaName={estimate.unitName ?? "this villa"}
-                    hasLines={estimate.lines.length > 0}
-                  />
-                )}
+                <EstimateFormDialog estimate={estimate} />
+                <DeleteEstimateButton
+                  estimateId={estimate.id}
+                  label={estimate.isWorking ? "Discard" : "Delete"}
+                  description={
+                    estimate.isWorking
+                      ? `This deletes ${villaName}'s working estimate — its works, measurement sheets and its own rates. ${estimate.villaOfficial ? "The official estimate stays as it is, and a new working estimate can start from it." : "Nothing of it is kept."}`
+                      : "This deletes an older draft with its works, measurement sheets and rates. The villa's working and official estimates stay as they are."
+                  }
+                />
               </>
             )}
-            {estimate.status === "submitted" && <ReviseEstimateButton estimateId={estimate.id} />}
+            {estimate.isWorking && (
+              <MakeOfficialButton
+                estimateId={estimate.id}
+                villaName={villaName}
+                lineCount={estimate.lines.length}
+                toMeasureCount={totals.toMeasureCount}
+                hasOfficial={!!estimate.villaOfficial}
+              />
+            )}
+            {estimate.status === "submitted" &&
+              (estimate.villaWorkingId ? (
+                <LinkButton href={`/estimator/estimates/${estimate.villaWorkingId}`}>
+                  Open the working estimate
+                </LinkButton>
+              ) : (
+                estimate.unitId && (
+                  <StartVillaDialog
+                    unitId={estimate.unitId}
+                    villaName={villaName}
+                    sources={[
+                      {
+                        id: estimate.id,
+                        label: `This official estimate, ${estimate.reference ?? ""}`,
+                      },
+                    ]}
+                    preferredSourceId={estimate.id}
+                    trigger={<Button>Carry on from this</Button>}
+                  />
+                )
+              ))}
           </div>
         }
       />
 
       {estimate.status === "submitted" && (
         <p className="text-muted text-sm">
-          The official estimate for {estimate.unitName} — submitted
+          {villaName}&apos;s official estimate — made official
           {estimate.submittedByName ? ` by ${estimate.submittedByName}` : ""} on{" "}
           {formatDate(estimate.submittedAt)}. Its numbers are frozen at that day&apos;s rates.
+          Changes happen in the working estimate, and Make official there replaces this one.
         </p>
       )}
       {estimate.status === "superseded" && (
         <p className="text-warning text-sm">
-          Superseded on {formatDate(estimate.supersededAt)} — kept as history.
-          {estimate.successor && (
+          Replaced on {formatDate(estimate.supersededAt)} — kept as history.
+          {estimate.villaOfficial && (
             <>
               {" "}
               <Link
                 className="underline underline-offset-2"
-                href={`/estimator/estimates/${estimate.successor.id}`}
+                href={`/estimator/estimates/${estimate.villaOfficial.id}`}
               >
-                See what replaced it
+                See the current official estimate
               </Link>
               .
             </>
           )}
         </p>
       )}
-      {isDraft && estimate.successor && (
-        <p className="text-warning text-sm">
-          A newer draft already revises this estimate —{" "}
+      {estimate.isWorking && estimate.villaOfficial && (
+        <p className="text-muted text-sm">
+          {villaName}&apos;s official estimate is{" "}
           <Link
             className="underline underline-offset-2"
-            href={`/estimator/estimates/${estimate.successor.id}`}
+            href={`/estimator/estimates/${estimate.villaOfficial.id}`}
           >
-            open it
+            {estimate.villaOfficial.reference}
           </Link>
-          .
+          . What you change here reaches it only when you make this official again.
         </p>
       )}
-
-      {estimate.sourceName && (
-        <p className="text-muted text-sm">Copied from {estimate.sourceName}.</p>
+      {olderDraft && (
+        <p className="text-warning text-sm">
+          An older draft, from before each villa had one working estimate. It can&apos;t be made
+          official —{" "}
+          {estimate.villaWorkingId ? (
+            <Link
+              className="underline underline-offset-2"
+              href={`/estimator/estimates/${estimate.villaWorkingId}`}
+            >
+              {villaName}&apos;s working estimate
+            </Link>
+          ) : (
+            `${villaName}'s working estimate`
+          )}{" "}
+          is where changes go. Delete it when you no longer need it.
+        </p>
+      )}
+      {estimate.isWorking && estimate.sourceName && (
+        <p className="text-muted text-sm">Started from {estimate.sourceName}.</p>
       )}
 
       <Card className="space-y-2 p-5">
@@ -408,11 +492,19 @@ export default async function EstimatePage({
       <Card className="space-y-4 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Works</p>
-          {isDraft && <AddLineDialog estimateId={estimate.id} works={setUpWorks} />}
+          {isDraft && (
+            <AddWorksDialog
+              estimateId={estimate.id}
+              works={pickableWorks}
+              onEstimate={estimate.lines.map((line) => line.workItemId)}
+            />
+          )}
         </div>
 
         {estimate.lines.length === 0 ? (
-          <p className="text-muted text-sm">Nothing on it yet — add the first work.</p>
+          <p className="text-muted text-sm">
+            Nothing on it yet — Add works to list what this villa needs, then measure each one.
+          </p>
         ) : (
           <Table>
             <TableHead>
@@ -459,6 +551,12 @@ export default async function EstimatePage({
                               Labour only
                             </Badge>
                           )}
+                          {isDraft &&
+                            (variations.byLine.has(line.id) || line.labourRate !== null) && (
+                              <Badge variant="info" className="mt-1 ml-1">
+                                This villa&apos;s own rate
+                              </Badge>
+                            )}
                         </TableCell>
                         <TableCell>
                           {isDraft && !sheet ? (
@@ -483,8 +581,48 @@ export default async function EstimatePage({
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          {formatMoney(unitRateByWork.get(line.workItemId) ?? null)}
-                          {uom && <span className="text-muted text-xs"> / {uom}</span>}
+                          {!cost.isSetUp ? (
+                            <Link
+                              href={`/estimator/works/${line.workItemId}`}
+                              className="text-warning underline underline-offset-4"
+                            >
+                              Set up in the rate book
+                            </Link>
+                          ) : isDraft ? (
+                            <LineRateDialog
+                              estimateId={estimate.id}
+                              view={rateViewFor(line, uom)}
+                              options={rateOptions}
+                              canEditMasters={canEditMasters}
+                            />
+                          ) : frozenLineByWork.has(line.workItemId) ? (
+                            (() => {
+                              const frozen = frozenRateBuildUp(
+                                frozenLineByWork.get(line.workItemId)!,
+                                estimate.frozen?.takeoff ?? [],
+                              );
+                              return (
+                                <FrozenRateDialog
+                                  workName={line.name}
+                                  workUom={uom}
+                                  labourRate={frozen.labourRate}
+                                  rate={frozen.rate}
+                                  prices={frozen.materials.map((row) => ({
+                                    name: frozenNameById.get(row.materialId)?.name ?? "Material",
+                                    uom: frozenNameById.get(row.materialId)?.uom ?? "",
+                                    qtyPerUnit: row.qtyPerUnit,
+                                    price: row.price,
+                                    cost: row.cost,
+                                  }))}
+                                />
+                              );
+                            })()
+                          ) : (
+                            <>
+                              {formatMoney(unitRateByWork.get(line.workItemId) ?? null)}
+                              {uom && <span className="text-muted text-xs"> / {uom}</span>}
+                            </>
+                          )}
                         </TableCell>
                         <TableCell className="text-foreground text-right font-medium">
                           {formatMoney(cost.totalCost)}
@@ -498,22 +636,14 @@ export default async function EstimatePage({
                                 workUom={uom}
                                 rows={sheet ?? []}
                                 readOnly={false}
+                                otherLines={estimate.lines
+                                  .filter((other) => other.id !== line.id)
+                                  .map((other) => ({
+                                    id: other.id,
+                                    name: other.name,
+                                    uom: uomByWork.get(other.workItemId) ?? null,
+                                  }))}
                               />
-                              {cost.isSetUp && (
-                                <LineVariationDialog
-                                  lineId={line.id}
-                                  workName={line.name}
-                                  workUom={uom}
-                                  customised={variations.byLine.has(line.id)}
-                                  rows={variationRowsForLine(line.id, line.workItemId)}
-                                  options={variationOptions}
-                                  labourRate={line.labourRate}
-                                  standardLabourRate={
-                                    book.recipes.find((r) => r.workItemId === line.workItemId)
-                                      ?.labourRate ?? null
-                                  }
-                                />
-                              )}
                               <RemoveLineButton id={line.id} label={line.name} />
                             </div>
                           </TableCell>
@@ -571,12 +701,11 @@ export default async function EstimatePage({
                   </TableCell>
                   <TableCell className="text-right">
                     {isDraft ? (
-                      <ItemRateField
+                      <VillaPriceField
                         estimateId={estimate.id}
-                        itemId={book.itemIds.includes(row.materialId) ? row.materialId : null}
-                        materialId={book.itemIds.includes(row.materialId) ? null : row.materialId}
-                        rate={variations.rateByMaterialId.get(row.materialId) ?? null}
-                        standardRate={standardRateById.get(row.materialId) ?? null}
+                        itemId={row.materialId}
+                        villaPrice={variations.rateByMaterialId.get(row.materialId) ?? null}
+                        mastersPrice={standardRateById.get(row.materialId) ?? null}
                         label={row.name}
                       />
                     ) : row.missingRate ? (
@@ -606,7 +735,11 @@ export default async function EstimatePage({
             <p className="text-muted mt-1 text-sm">
               What has actually reached this villa — store issues and direct-to-site deliveries —
               per work, against what the estimate froze. Both name their work when they are
-              recorded; that is what lines these up.
+              recorded; that is what lines these up. Every villa at once is in{" "}
+              <Link className="underline underline-offset-2" href="/estimator/site-check">
+                Site check
+              </Link>
+              .
             </p>
           </div>
           {comparison.rows.every((row) => row.issued === 0) && comparison.unmatched.length === 0 ? (
@@ -628,7 +761,7 @@ export default async function EstimatePage({
                   .map((row) => {
                     const work = works.find((w) => w.workItemId === row.workItemId);
                     return (
-                      <TableRow key={`${row.workItemId}-${row.materialId}`}>
+                      <TableRow key={`${row.workItemId}-${row.itemId ?? row.materialName}`}>
                         <TableCell className="text-sm">
                           {work ? `${work.code} — ${work.name}` : "—"}
                         </TableCell>
@@ -639,11 +772,13 @@ export default async function EstimatePage({
                           {formatQuantity(row.estimated)} {row.uom}
                         </TableCell>
                         <TableCell className="text-right text-sm whitespace-nowrap">
-                          {row.issued !== null
-                            ? `${formatQuantity(row.issued)} ${row.uom}`
-                            : row.issuedRaw
-                              ? `${formatQuantity(row.issuedRaw.quantity)} ${row.issuedRaw.uom} (no conversion set)`
-                              : "—"}
+                          {row.issued !== null ? (
+                            `${formatQuantity(row.issued)} ${row.uom}`
+                          ) : (
+                            <span className="text-muted">
+                              Not compared — from before materials were items
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell>
                           {row.over && <Badge variant="warning">Past the estimate</Badge>}
@@ -690,7 +825,8 @@ export default async function EstimatePage({
                         </TableCell>
                         <TableCell className="text-foreground text-sm">{itemName}</TableCell>
                         <TableCell className="text-right text-sm whitespace-nowrap">
-                          {formatQuantity(row.quantity)}
+                          {formatQuantity(row.quantity)}{" "}
+                          {issuedData.itemUomById.get(row.itemId) ?? ""}
                         </TableCell>
                         <TableCell>
                           <Badge variant="warning">Outside the estimate</Badge>

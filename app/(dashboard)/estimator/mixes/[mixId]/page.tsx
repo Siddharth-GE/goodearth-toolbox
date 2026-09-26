@@ -10,6 +10,7 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/components/ui/table";
+import { mixUnitCost } from "@/lib/estimator/calc";
 import { getMix } from "@/lib/estimator/mixes-queries";
 import { listMaterialItems, listUomNames } from "@/lib/estimator/shared";
 import { formatMoney } from "@/lib/format";
@@ -31,18 +32,17 @@ export default async function MixPage({ params }: { params: Promise<{ mixId: str
   ]);
   if (!mix) notFound();
 
-  // What one unit of the mix costs, if everything in it is priced. An
-  // unpriced material makes the whole figure unknown rather than low —
-  // and so does an empty mix: "₹0 from today's rates" on a mix with
-  // nothing in it yet is the same lying zero as BUGCATCHER #13.
-  const unpriced = mix.components.filter((component) => component.materialRate === null);
-  const costPerUnit =
-    unpriced.length > 0 || mix.components.length === 0
-      ? null
-      : mix.components.reduce(
-          (total, component) => total + (component.materialRate ?? 0) * component.qtyPerUnit,
-          0,
-        );
+  // What one unit of the mix costs — calc.ts's rule: unknown, never low,
+  // when anything is unpriced or the mix is empty. A row from before
+  // materials were items counts for nothing, here as in every estimate.
+  const counted = mix.components.filter((component) => !component.legacy);
+  const unpriced = counted.filter((component) => component.materialRate === null);
+  const costPerUnit = mixUnitCost(
+    counted.map((component) => ({
+      rate: component.materialRate,
+      qtyPerUnit: component.qtyPerUnit,
+    })),
+  );
 
   return (
     <div className="space-y-4">
@@ -119,9 +119,9 @@ export default async function MixPage({ params }: { params: Promise<{ mixId: str
                   <TableCell className="text-foreground font-medium">
                     {component.materialName}
                     {component.legacy && (
-                      <Badge variant="neutral" className="ml-2">
-                        Old list — re-add from Masters
-                      </Badge>
+                      <span className="text-muted block text-xs">
+                        Remove it, and add the material again from Masters.
+                      </span>
                     )}
                   </TableCell>
                   <TableCell>
