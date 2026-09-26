@@ -67,7 +67,8 @@ Selections and Budgets are interiors and stay out of this (founder, 2026-09-26).
 ### 4. Measure first `[Opus drafts M1, Fable reviews]`
 
 - **M1:** `estimator_estimate_lines.qty` drops NOT NULL (`check (qty > 0)` already passes null). Null = "to measure".
-- Add works in bulk (search, tick single works or whole groups). The sheet is where a quantity comes from, computed from its rows on read (no second write). Rows can be copied to another work (a wall's length and height feed masonry, plaster and paint). Phone cards for the sheet. A work's unit locks once any quantity uses it. Submit refuses while anything is "to measure", naming it.
+- **Done without the migration (2026-09-26):** measurement rows copy to another work of the estimate (`copyMeasurementRows` — a wall's rows feed masonry, plaster and paint); the sheet's rows are blocks with the four boxes side by side, so it reads on a phone; a work's unit is **refused**, not just warned, while any estimate line uses it (`saveWorkInfo`, and the picker is disabled).
+- **Waits for M1:** add works in bulk (search, tick single works or whole groups — any work, set up or not, so the rate book never has to come first); a work listed as "to measure" with no throwaway number; submit refusing while anything is "to measure", naming it.
 
 ### 5. One estimate per villa `[Opus drafts M2, Fable reviews]` — founder confirms first
 
@@ -82,6 +83,12 @@ Selections and Budgets are interiors and stay out of this (founder, 2026-09-26).
 - One cross-villa list of over-estimate and outside-the-estimate rows, Approve on the row, laid out as a list rather than a wide table so it reads on a phone; "where the material goes" — every material, estimated against reached, with a villa-by-villa view per material. Built as `getOfficialComparisons` (the welcome's count now shares it) and the pure `site-check.ts`.
 - **Approvals still belong to one official estimate** (the founder's `0083` rule: a new official asks its estimator again). Carrying an approval forward to the villa's later officials is a founder decision, not taken yet.
 - A comparison grid, villas down and works across, to catch a mistyped measurement.
+
+## Questions for the founder (2026-09-26) — steps 4 and 5 wait on these
+
+1. **Who reviews the two database changes before they go on staging?** MODELS.md gives migrations that add functions and grants to Fable. M1 is one relaxed NOT NULL; M2 adds three invoker functions (make official, start from another villa, delete a draft) and a marker for "the villa's working estimate". Options: a short Fable session reviews both (the rule), or Opus reviews and applies them to staging as for `0096` (the founder's call then).
+2. **The villa lifecycle (step 5).** One always-open estimate per villa, with **Make official** taking a numbered frozen copy — so Revise, "Copy to villa" and templates go, and a new villa starts from another villa's list. Yes, or keep today's draft → submit → revise?
+3. **Approvals across officials.** Today an outside-the-estimate approval belongs to one official estimate, so a re-issued estimate asks again (the `0083` rule). Once Make official is routine, keep that, or let an approval carry to the villa's later officials?
 
 ## Later doors, not built
 
