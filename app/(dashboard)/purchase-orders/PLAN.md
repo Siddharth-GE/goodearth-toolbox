@@ -1,10 +1,8 @@
 # Purchase Orders — the rules
 
-**Shipped 2026-08-03.** Migrations `0020` (audit prerequisite) + `0021` (schema) + `0022` (money-free fact views).
+Grant `/purchase-orders`. Migrations `0020`–`0022`, `0079`.
 
-POs are raised from **approved indent lines only**, one vendor and one plot/unit (or "General") per PO — the scope is part of the number: `PO/<project>/<plot-or-unit>/NNN`, numbers running per scope. **Money enters the system here**: a line's rate is the vendor-agreed purchase price plus a GST % picked from the `gst_rates` master. **Nothing from Budgets — cost, margin, client rate — appears on a PO, ever.**
-
-_Trimmed 2026-08-14: the milestone log lives in git._
+POs are raised from **approved indent lines**, or **directly** for bulk and urgent buys (`0079`, founder 2026-08-19 — never directly from a budget). One vendor and one plot/unit (or "General") per PO — the scope is part of the number: `PO/<project>/<plot-or-unit>/NNN`, numbers running per scope. **Money enters the system here**: a line's rate is the vendor-agreed purchase price plus a GST % picked from the `gst_rates` master. **Nothing from Budgets — cost, margin, client rate — appears on a PO, ever.**
 
 ## The rules everything rests on
 
@@ -17,7 +15,7 @@ _Trimmed 2026-08-14: the milestone log lives in git._
 ## Things that will bite
 
 - **The Issue button must not gate on the server's `fullyPriced` snapshot.** Rate saves don't revalidate, so that prop goes stale and the button plays dead. It checks priced-at-click instead. This was a founder-found bug and the obvious "fix" reintroduces it.
-- **Line pulls insert row-by-row, deliberately.** The qty guard raises per line with the item's remaining figure, and a batch insert would fail wholesale on the first refusal. Each reports partial success honestly.
+- **Line pulls insert row by row, deliberately** — the reasoning is in `indents/PLAN.md`.
 - **Reads go to indents and masters tables directly** — never another tool's gated queries module.
 - **Consumers read `po_facts` / `po_line_facts`**, which are money-free by column list and open to all authenticated. That is deliberate and documented in `0022`: what exists and how much was ordered is operational fact, not commercial secret. **Never add a money column to either.**
 - **`po_billing_totals` carries money** (ordered and billed) and is WHERE-gated to `/purchase-orders` OR `/bills`. It is not in the money-free family despite sitting beside it.

@@ -1,8 +1,6 @@
 # Dexter — the rules
 
-Client presentations as shareable links. Read this before touching the tool.
-
-Built 2026-09-25 against the repo-root `plan.md` (`0095`, one migration). Design makes pitches and presentations as standalone HTML; until now they travelled as attachments. Here someone with the grant makes a **project** (a folder), uploads a **deck** into it, and sends the **link**.
+Client presentations as shareable links. Grant `/dexter`. Migration `0095` (staging only). Design makes pitches as standalone HTML; here someone with the grant makes a **project** (a folder), uploads a **deck** into it, and sends the **link**.
 
 ## The three founder decisions, 2026-09-25
 

@@ -1,6 +1,6 @@
 # The Google Chat door — plan and record
 
-Relay's slash commands and card buttons inside the company's Google Chat spaces. Approved 2026-08-31; Phases 1–7b built and vetted on staging by 2026-09-03. Plain deterministic code, no AI, no new running cost. Shell code, not a tool: `app/api/google-chat/route.ts` (the door) + this folder. It never imports `lib/relay/`; its writes are the same event inserts and RPCs Relay's own actions use, made **as the person**.
+Relay's slash commands and card buttons inside the company's Google Chat spaces, on staging (production: the checklist below). Plain deterministic code, no AI, no new running cost. Shell code, not a tool: `app/api/google-chat/route.ts` (the door) + this folder. It never imports `lib/relay/`; its writes are the same event inserts and RPCs Relay's own actions use, made **as the person**.
 
 ## Four trust steps on every event
 
@@ -19,9 +19,9 @@ Relay's slash commands and card buttons inside the company's Google Chat spaces.
 
 Google takes **one answer per button press**, and its data action is _create a message_ or _update the pressed message_, never both. The answer stays what it was — the public confirmation — and just before sending it the door rewrites the pressed card through the Chat REST API (`PATCH spaces/…/messages/…?updateMask=cardsV2`) authenticated **as the app**: a service account in the Chat app's own Cloud project, scope `chat.bot`, its JSON key in `GOOGLE_CHAT_SERVICE_ACCOUNT_KEY`. The rebuilt card is the person's current court from the same renderer `/court` uses (`buildCourtCards` in dispatch.ts), with what just happened on top. Five-second ceiling, never blocks or changes the answer; **key unset = the card stays as it was and nothing else changes**, which is how production runs until its own key exists. The log line gains `messageName` (true/false) and `refresh` (`off` / `done` / `skipped` / `failed:<status>`). Option A — answering with `updateMessageAction` and dropping the public confirmation — was the no-setup alternative the founder declined.
 
-### The usage test (2026-09-08)
+### The usage test
 
-`npm run chat:usage -- --as <email>` drives the door from a laptop. The dispatch now lives in `dispatch.ts` — a Next.js route file may export nothing but its handlers, so `route.ts` keeps only the lock (token verification) and hands over — and `scripts/google-chat-usage-test.ts` calls `handleChatRequest` in-process with envelopes shaped exactly as Google sends them: `/court`, `/trail villa`, `/newtrail` and `/link` as dialog requests, `--bounce` to open the Bounce dialog, `--press push|finish|hold|return` (with `--commit`) to move a real baton as that person, and `--dm` for the direct-message shape. It refuses any database but staging, classifies every answer (message / dialog / close / empty / unexpected), prints the rows and buttons a person would see, and fails on a throw, a non-200, a shape nobody expected or the door's own apology. What it proves is **our** side — no crash, the right envelope kind, the right rows, the log lines. **Google is still the only judge of the card JSON** (BUGCATCHER #17), so the vet in a real space stays exactly as required as it was.
+`npm run chat:usage -- --as <email>` drives the door in-process against staging with envelopes shaped as Google sends them (`/court`, `/trail`, `/newtrail`, `/link`; `--bounce`; `--press push|finish|hold|return` with `--commit` moves a real baton; `--dm`). It refuses any database but staging and fails on a throw, a non-200, an unexpected envelope or the door's own apology. It proves **our** side only — **Google is still the only judge of the card JSON** (BUGCATCHER #17), so the vet in a real space stays required.
 
 ## Invariants
 
@@ -48,5 +48,3 @@ Vetted on staging 2026-09-03: `/court`, `/trail`, `/newtrail` (standard, custom,
 3. Outbound messages — morning "your court" DMs, cold-trail alerts. The transport exists since round two (`outbound.ts`, the app token); what is missing is a schedule (a Vercel cron, the keep-alive's pattern), the DM lookup (`spaces.findDirectMessage`) and the words. Fire-and-forget, never block a write on them.
 
 Out of scope until asked: other tools' commands; a replay table (Google's JWT `exp` suffices).
-
-Full phase-by-phase history: `git show 2a37489:plan.md`.
