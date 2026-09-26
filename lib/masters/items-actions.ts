@@ -71,3 +71,31 @@ export async function updateItem(
   revalidatePath("/masters/items");
   return undefined;
 }
+
+/**
+ * One item's price, and nothing else — for screens outside Masters that
+ * show a price beside where it is used (the Estimator's rate panel), so
+ * pricing a material doesn't mean opening the whole item form. The same
+ * gate as every Masters write: `/masters`. Blank clears it — "not priced"
+ * is a real answer and never ₹0. The caller refreshes its own screen.
+ */
+export async function setItemPrice(itemId: string, price: number | null): Promise<ActionState> {
+  const user = await requireTool("/masters");
+  if (!itemId) return { error: "Which item?" };
+  if (price !== null && (typeof price !== "number" || !Number.isFinite(price) || price < 0)) {
+    return { error: "The price must be a number, or left blank." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("items")
+    .update({ indicative_price: price, updated_by: user.id })
+    .eq("id", itemId);
+  if (error) {
+    console.error("setItemPrice failed:", error);
+    return { error: "Could not save the price. Try again." };
+  }
+
+  revalidatePath("/masters/items");
+  return undefined;
+}

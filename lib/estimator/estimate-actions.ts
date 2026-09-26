@@ -497,146 +497,166 @@ export async function removeLineMeasurement(id: string): Promise<ActionState> {
 }
 
 /* ------------------------------------------------------------------ *
- * Per-villa variations (0087) — "every house is different"
+ * This villa's materials for a work (0087) — "every house is different"
  *
- * The Works tab stays the standard. Customise copies the standard's
- * components onto the line; from then on that list — whole, not a
- * delta — is what the line means, and it no longer follows the
- * standard. Reset deletes it. The draft-only trigger is the boundary;
- * these actions just speak plainly.
+ * The rate book (the Works tab) is the standard. A villa line follows it
+ * until something about its materials is changed: the FIRST change
+ * copies the rate book's list onto the line (copy-on-write — there is no
+ * separate "Customise" step any more), and from then on that list —
+ * whole, not a delta — is what the line means. Back to the rate book
+ * deletes it. Removing the last material does the same: an empty own
+ * list is not something the database can tell from "follow the rate
+ * book". The draft-only trigger is the boundary; these actions just
+ * speak plainly.
  * ------------------------------------------------------------------ */
 
-export async function customiseEstimateLine(lineId: string): Promise<ActionState> {
-  const user = await requireTool(GRANT);
-  if (!lineId) return { error: "Which work?" };
-  const supabase = await createClient();
+/** What can change in a villa's list, addressed by what a row names —
+ * "material:<item id>" or "mix:<mix id>" — because a row that still
+ * follows the rate book has no id of its own on this line. */
+export type RecipeChange =
+  | { op: "add"; ref: string; qty: number }
+  | { op: "qty"; ref: string; qty: number }
+  | { op: "swap"; ref: string; to: string }
+  | { op: "remove"; ref: string };
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function parseRef(ref: unknown): { item_id: string | null; mix_id: string | null } | null {
+  if (typeof ref !== "string") return null;
+  const [kind, id] = ref.split(":");
+  if (!id || !UUID.test(id)) return null;
+  if (kind === "material") return { item_id: id, mix_id: null };
+  if (kind === "mix") return { item_id: null, mix_id: id };
+  return null;
+}
+
+/** Copy the rate book's list onto the line if it has none of its own
+ * yet. A message on failure, undefined when the line now owns its list. */
+async function ensureOwnRecipe(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  lineId: string,
+  userId: string,
+): Promise<string | undefined> {
   const { data: line, error: lineError } = await supabase
     .from("estimator_estimate_lines")
     .select("id, work_item_id")
     .eq("id", lineId)
     .maybeSingle();
-  if (lineError || !line) {
-    console.error("customiseEstimateLine (line) failed:", lineError);
-    return { error: "That work is no longer on the estimate." };
+  if (lineError) {
+    console.error("ensureOwnRecipe (line) failed:", lineError);
+    return "Could not read this work. Try again.";
   }
+  if (!line) return "That work is no longer on the estimate — reload the page.";
 
-  const { count } = await supabase
+  const { count, error: countError } = await supabase
     .from("estimator_estimate_line_components")
     .select("id", { count: "exact", head: true })
     .eq("line_id", lineId);
-  if (count) return undefined; // already customised — nothing to copy
+  if (countError) {
+    console.error("ensureOwnRecipe (count) failed:", countError);
+    return "Could not read this villa's materials. Try again.";
+  }
+  if (count) return undefined;
 
-  const { data: standardRows, error: standardError } = await supabase
+  const { data: standard, error: standardError } = await supabase
     .from("estimator_work_components")
     .select("item_id, mix_id, qty_per_unit")
     .eq("work_item_id", line.work_item_id);
-  // A row from before 0086 names neither an item nor a mix; it counts for
-  // nothing in the standard, so it is not carried into the villa's copy.
-  const standard = (standardRows ?? []).filter((row) => row.item_id || row.mix_id);
   if (standardError) {
-    console.error("customiseEstimateLine (standard) failed:", standardError);
-    return { error: "Could not read the standard recipe. Try again." };
+    console.error("ensureOwnRecipe (rate book) failed:", standardError);
+    return "Could not read the rate book. Try again.";
   }
-  if (standard.length === 0) {
-    // A labour-only work has nothing to copy. Saying so beats writing
-    // nothing and letting the button look broken — the screen offers
-    // the add form directly in this case, and the first material added
-    // becomes this villa's version.
-    return {
-      error:
-        "This work is labour only — there is no standard recipe to copy. Add the material you need and it applies to this villa alone.",
-    };
-  }
+  // A row from before 0086 names neither an item nor a mix; it counts for
+  // nothing in the rate book, so it is not carried into the villa's copy.
+  const rows = (standard ?? []).filter((row) => row.item_id || row.mix_id);
+  if (rows.length === 0) return undefined; // labour only: the first add starts the list
 
   const { error } = await supabase.from("estimator_estimate_line_components").insert(
-    standard.map((component) => ({
+    rows.map((row) => ({
       line_id: lineId,
-      item_id: component.item_id,
-      mix_id: component.mix_id,
-      qty_per_unit: component.qty_per_unit,
-      created_by: user.id,
-      updated_by: user.id,
+      item_id: row.item_id,
+      mix_id: row.mix_id,
+      qty_per_unit: row.qty_per_unit,
+      created_by: userId,
+      updated_by: userId,
     })),
   );
   if (error) {
-    if (error.code === "P0001") return { error: error.message };
-    console.error("customiseEstimateLine failed:", error);
-    return { error: "Could not customise this work. Try again." };
+    if (error.code === "P0001") return error.message;
+    console.error("ensureOwnRecipe (copy) failed:", error);
+    return "Could not start this villa's own list. Try again.";
   }
-
-  revalidatePath("/estimator", "layout");
   return undefined;
 }
 
-export async function addLineComponent(
-  lineId: string,
-  _state: ActionState,
-  formData: FormData,
-): Promise<ActionState> {
+export async function changeLineRecipe(lineId: string, change: RecipeChange): Promise<ActionState> {
   const user = await requireTool(GRANT);
-  const choice = text(formData, "component");
-  const qty = parseNumber(formData.get("qty_per_unit"));
+  if (!lineId) return { error: "Which work?" };
 
-  const [kind, refId] = choice.split(":");
-  if (!refId || (kind !== "material" && kind !== "mix")) {
-    return { error: "Pick a material or a mix." };
-  }
-  if (qty === null || Number.isNaN(qty) || qty <= 0) {
+  // The argument is whatever the caller sent, not what the type says.
+  const op = change?.op;
+  const target = parseRef(change?.ref);
+  if (!target) return { error: "Pick a material or a mix." };
+  const replacement = op === "swap" ? parseRef((change as { to?: unknown }).to) : null;
+  if (op === "swap" && !replacement) return { error: "Pick what to use instead." };
+  const qty = op === "add" || op === "qty" ? (change as { qty?: unknown }).qty : null;
+  if (
+    (op === "add" || op === "qty") &&
+    (typeof qty !== "number" || !Number.isFinite(qty) || qty <= 0)
+  ) {
     return { error: "Enter how much of it one unit of the work needs." };
   }
+  if (op !== "add" && op !== "qty" && op !== "swap" && op !== "remove") {
+    return { error: "That change isn't one this screen makes." };
+  }
 
   const supabase = await createClient();
-  // "material" means a master ITEM (0086).
-  const { error } = await supabase.from("estimator_estimate_line_components").insert({
-    line_id: lineId,
-    item_id: kind === "material" ? refId : null,
-    mix_id: kind === "mix" ? refId : null,
-    qty_per_unit: qty,
-    created_by: user.id,
-    updated_by: user.id,
-  });
+  const ownError = await ensureOwnRecipe(supabase, lineId, user.id);
+  if (ownError) return { error: ownError };
+
+  const column = target.item_id ? "item_id" : "mix_id";
+  const value = (target.item_id ?? target.mix_id) as string;
+  const table = () => supabase.from("estimator_estimate_line_components");
+
+  let error: { code?: string; message: string } | null = null;
+  let touched = 1;
+  if (op === "add") {
+    ({ error } = await table().insert({
+      line_id: lineId,
+      ...target,
+      qty_per_unit: qty as number,
+      created_by: user.id,
+      updated_by: user.id,
+    }));
+  } else if (op === "qty") {
+    const result = await table()
+      .update({ qty_per_unit: qty as number, updated_by: user.id }, { count: "exact" })
+      .eq("line_id", lineId)
+      .eq(column, value);
+    error = result.error;
+    touched = result.count ?? 0;
+  } else if (op === "swap") {
+    const result = await table()
+      .update({ ...replacement, updated_by: user.id }, { count: "exact" })
+      .eq("line_id", lineId)
+      .eq(column, value);
+    error = result.error;
+    touched = result.count ?? 0;
+  } else {
+    const result = await table().delete({ count: "exact" }).eq("line_id", lineId).eq(column, value);
+    error = result.error;
+    touched = result.count ?? 0;
+  }
+
   if (error) {
     if (error.code === "23505") {
-      return { error: "That is already in this villa's version — edit its quantity instead." };
+      return { error: "That is already in this villa's list — change its quantity instead." };
     }
     if (error.code === "P0001") return { error: error.message };
-    console.error("addLineComponent failed:", error);
-    return { error: "Could not add it. Try again." };
+    console.error(`changeLineRecipe (${op}) failed:`, error);
+    return { error: "Could not save that change. Try again." };
   }
-
-  revalidatePath("/estimator", "layout");
-  return undefined;
-}
-
-export async function updateLineComponentQty(id: string, qty: number): Promise<ActionState> {
-  const user = await requireTool(GRANT);
-  if (!Number.isFinite(qty) || qty <= 0) return { error: "The quantity must be more than zero." };
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("estimator_estimate_line_components")
-    .update({ qty_per_unit: qty, updated_by: user.id })
-    .eq("id", id);
-  if (error) {
-    if (error.code === "P0001") return { error: error.message };
-    console.error("updateLineComponentQty failed:", error);
-    return { error: "Could not save the quantity. Try again." };
-  }
-
-  revalidatePath("/estimator", "layout");
-  return undefined;
-}
-
-export async function removeLineComponent(id: string): Promise<ActionState> {
-  await requireTool(GRANT);
-  const supabase = await createClient();
-  const { error } = await supabase.from("estimator_estimate_line_components").delete().eq("id", id);
-  if (error) {
-    if (error.code === "P0001") return { error: error.message };
-    console.error("removeLineComponent failed:", error);
-    return { error: "Could not remove it. Try again." };
-  }
+  if (touched === 0) return { error: "That is no longer in the list — reload the page." };
 
   revalidatePath("/estimator", "layout");
   return undefined;

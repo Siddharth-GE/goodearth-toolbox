@@ -18,7 +18,9 @@ import {
   computeLine,
   computeTakeoff,
   frozenLineCosts,
+  frozenRateBuildUp,
   groupLineCosts,
+  rateBuildUp,
   type LineCost,
   type MaterialDef,
   type MixDef,
@@ -44,14 +46,18 @@ import { EstimateFormDialog, DeleteEstimateButton } from "../_components/estimat
 import { AddLineDialog, LineQtyField, RemoveLineButton } from "./_components/line-forms";
 import { MeasurementSheetDialog } from "./_components/measurement-forms";
 import {
-  ItemRateField,
-  LineVariationDialog,
-  type VariationRowView,
-} from "./_components/variation-forms";
+  FrozenRateDialog,
+  LineRateDialog,
+  VillaPriceField,
+  type LineRateView,
+  type RateComponentView,
+} from "./_components/rate-forms";
 import { ApproveReconciliationButton } from "./_components/reconciliation-forms";
 import { ReviseEstimateButton, SubmitEstimateButton } from "./_components/submit-forms";
 import { listProjects } from "@/lib/masters/projects";
 import { listUnits } from "@/lib/masters/units";
+import { hasApp } from "@/lib/auth/access";
+import { requireUser } from "@/lib/auth/dal";
 
 // The estimate reads as a BOQ, because that is the document an
 // estimator already knows: works gathered under their categories, one
@@ -69,23 +75,37 @@ export default async function EstimatePage({
   params: Promise<{ estimateId: string }>;
 }) {
   const { estimateId } = await params;
-  const [estimate, book, works, projects, units, variations, materialItems, mixRows, measurements] =
-    await Promise.all([
-      getEstimate(estimateId),
-      getRecipeBook(),
-      listWorkStatus(),
-      listProjects(),
-      listUnits(),
-      // Per-villa variations (0087) — replace the standard recipe whole
-      // for customised lines, so this page's live costs mean THIS house.
-      getEstimateVariations(estimateId),
-      listMaterialItems(),
-      listMixes(),
-      // The measurement sheets (0096): a line present here is MEASURED —
-      // its quantity is the sheet's total, kept on the line by the actions.
-      getEstimateMeasurements(estimateId),
-    ]);
+  const [
+    user,
+    estimate,
+    book,
+    works,
+    projects,
+    units,
+    variations,
+    materialItems,
+    mixRows,
+    measurements,
+  ] = await Promise.all([
+    requireUser(),
+    getEstimate(estimateId),
+    getRecipeBook(),
+    listWorkStatus(),
+    listProjects(),
+    listUnits(),
+    // Per-villa variations (0087) — replace the standard recipe whole
+    // for customised lines, so this page's live costs mean THIS house.
+    getEstimateVariations(estimateId),
+    listMaterialItems(),
+    listMixes(),
+    // The measurement sheets (0096): a line present here is MEASURED —
+    // its quantity is the sheet's total, kept on the line by the actions.
+    getEstimateMeasurements(estimateId),
+  ]);
   if (!estimate) notFound();
+  // Whoever holds Masters can set a missing Masters price from the rate
+  // panel; everyone else sets this villa's price only.
+  const canEditMasters = await hasApp(user, "/masters");
 
   const isDraft = estimate.status === "draft";
   // After submit the sheets stay openable, read-only, as the record of
@@ -181,12 +201,7 @@ export default async function EstimatePage({
     for (const line of estimate.lines) {
       unitRateByWork.set(
         line.workItemId,
-        computeLine(
-          { workItemId: line.workItemId, qty: 1 },
-          recipesByWork.get(line.workItemId),
-          mixesById,
-          materialsById,
-        ).totalCost,
+        rateBuildUp(recipesByWork.get(line.workItemId), mixesById, materialsById)?.rate ?? null,
       );
     }
   } else {
@@ -220,65 +235,83 @@ export default async function EstimatePage({
     [...book.materials, ...variations.extraMaterials].map((m) => [m.id, m.rate]),
   );
 
-  // Per-villa variations (0087): what each line's dialog shows — the
-  // line's own list when customised, the standard read-only otherwise.
-  const variationOptions = {
+  // The rate panel (tap a rate): what the pickers offer, and each line's
+  // build-up — labour, what one unit uses, what each material costs —
+  // with where every figure comes from.
+  const rateOptions = {
     materials: materialItems
       .filter((material) => material.isActive)
       .map(({ id, name, uom, rate }) => ({ id, name, uom, rate })),
     mixes: mixRows.filter((mix) => mix.isActive).map(({ id, name, uom }) => ({ id, name, uom })),
   };
-  const variationRowsForLine = (lineId: string, workItemId: string): VariationRowView[] => {
-    const custom = variations.byLine.get(lineId);
-    if (custom) {
-      return custom.map((row) => {
-        if (row.mixId) {
-          const mix = mixesById.get(row.mixId);
-          return {
-            id: row.id,
-            kind: "mix" as const,
-            refId: row.mixId,
-            name: mix?.name ?? "Unknown mix",
-            uom: mix?.uom ?? "",
-            qtyPerUnit: row.qtyPerUnit,
-          };
-        }
-        const refId = row.itemId ?? "";
-        const def = materialsById.get(refId);
+  const componentView = (component: {
+    materialId: string | null;
+    mixId: string | null;
+    qtyPerUnit: number;
+  }): RateComponentView => {
+    if (component.mixId) {
+      const mix = mixesById.get(component.mixId);
+      return {
+        ref: `mix:${component.mixId}`,
+        kind: "mix",
+        name: mix?.name ?? "Unknown mix",
+        uom: mix?.uom ?? "",
+        qtyPerUnit: component.qtyPerUnit,
+      };
+    }
+    const def = component.materialId ? materialsById.get(component.materialId) : undefined;
+    return {
+      ref: `material:${component.materialId ?? ""}`,
+      kind: "material",
+      name: def?.name ?? "Unknown material",
+      uom: def?.uom ?? "",
+      qtyPerUnit: component.qtyPerUnit,
+    };
+  };
+  const rateViewFor = (line: (typeof estimate.lines)[number], uom: string | null): LineRateView => {
+    const standard = book.recipes.find((recipe) => recipe.workItemId === line.workItemId);
+    const own = variations.byLine.get(line.id);
+    const buildUp = rateBuildUp(recipesByWork.get(line.workItemId), mixesById, materialsById);
+    return {
+      lineId: line.id,
+      workItemId: line.workItemId,
+      workName: line.name,
+      workUom: uom,
+      own: own !== undefined,
+      labour: {
+        villa: line.labourRate,
+        rateBook: standard?.labourRate ?? null,
+        inUse: buildUp?.labourRate ?? null,
+      },
+      components: own
+        ? own.map((row) =>
+            componentView({ materialId: row.itemId, mixId: row.mixId, qtyPerUnit: row.qtyPerUnit }),
+          )
+        : (standard?.components ?? []).map(componentView),
+      prices: (buildUp?.materials ?? []).map((row) => {
+        const def = materialsById.get(row.materialId);
         return {
-          id: row.id,
-          kind: "material" as const,
-          refId,
+          itemId: row.materialId,
           name: def?.name ?? "Unknown material",
           uom: def?.uom ?? "",
           qtyPerUnit: row.qtyPerUnit,
+          mastersPrice: standardRateById.get(row.materialId) ?? null,
+          villaPrice: variations.rateByMaterialId.get(row.materialId) ?? null,
+          cost: row.cost,
         };
-      });
-    }
-    const standard = book.recipes.find((r) => r.workItemId === workItemId)?.components ?? [];
-    return standard.map((component) => {
-      if (component.mixId) {
-        const mix = mixesById.get(component.mixId);
-        return {
-          id: null,
-          kind: "mix" as const,
-          refId: component.mixId,
-          name: mix?.name ?? "Unknown mix",
-          uom: mix?.uom ?? "",
-          qtyPerUnit: component.qtyPerUnit,
-        };
-      }
-      const def = component.materialId ? materialsById.get(component.materialId) : undefined;
-      return {
-        id: null,
-        kind: "material" as const,
-        refId: component.materialId ?? "",
-        name: def?.name ?? "Unknown material",
-        uom: def?.uom ?? "",
-        qtyPerUnit: component.qtyPerUnit,
-      };
-    });
+      }),
+      rate: buildUp?.rate ?? null,
+    };
   };
+  const frozenLineByWork = new Map(
+    (estimate.frozen?.lineCosts ?? []).map((row) => [row.workItemId, row]),
+  );
+  const frozenNameById = new Map(
+    (estimate.frozen?.takeoff ?? []).map((row) => [
+      row.materialId,
+      { name: row.materialName, uom: row.uom },
+    ]),
+  );
   const setUpWorks = works.filter((work) => work.uom !== null && work.isActive);
 
   const part = (label: string, value: number | null) =>
@@ -452,6 +485,12 @@ export default async function EstimatePage({
                               Labour only
                             </Badge>
                           )}
+                          {isDraft &&
+                            (variations.byLine.has(line.id) || line.labourRate !== null) && (
+                              <Badge variant="info" className="mt-1 ml-1">
+                                This villa&apos;s own rate
+                              </Badge>
+                            )}
                         </TableCell>
                         <TableCell>
                           {isDraft && !sheet ? (
@@ -476,8 +515,48 @@ export default async function EstimatePage({
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          {formatMoney(unitRateByWork.get(line.workItemId) ?? null)}
-                          {uom && <span className="text-muted text-xs"> / {uom}</span>}
+                          {!cost.isSetUp ? (
+                            <Link
+                              href={`/estimator/works/${line.workItemId}`}
+                              className="text-warning underline underline-offset-4"
+                            >
+                              Set up in the rate book
+                            </Link>
+                          ) : isDraft ? (
+                            <LineRateDialog
+                              estimateId={estimate.id}
+                              view={rateViewFor(line, uom)}
+                              options={rateOptions}
+                              canEditMasters={canEditMasters}
+                            />
+                          ) : frozenLineByWork.has(line.workItemId) ? (
+                            (() => {
+                              const frozen = frozenRateBuildUp(
+                                frozenLineByWork.get(line.workItemId)!,
+                                estimate.frozen?.takeoff ?? [],
+                              );
+                              return (
+                                <FrozenRateDialog
+                                  workName={line.name}
+                                  workUom={uom}
+                                  labourRate={frozen.labourRate}
+                                  rate={frozen.rate}
+                                  prices={frozen.materials.map((row) => ({
+                                    name: frozenNameById.get(row.materialId)?.name ?? "Material",
+                                    uom: frozenNameById.get(row.materialId)?.uom ?? "",
+                                    qtyPerUnit: row.qtyPerUnit,
+                                    price: row.price,
+                                    cost: row.cost,
+                                  }))}
+                                />
+                              );
+                            })()
+                          ) : (
+                            <>
+                              {formatMoney(unitRateByWork.get(line.workItemId) ?? null)}
+                              {uom && <span className="text-muted text-xs"> / {uom}</span>}
+                            </>
+                          )}
                         </TableCell>
                         <TableCell className="text-foreground text-right font-medium">
                           {formatMoney(cost.totalCost)}
@@ -492,21 +571,6 @@ export default async function EstimatePage({
                                 rows={sheet ?? []}
                                 readOnly={false}
                               />
-                              {cost.isSetUp && (
-                                <LineVariationDialog
-                                  lineId={line.id}
-                                  workName={line.name}
-                                  workUom={uom}
-                                  customised={variations.byLine.has(line.id)}
-                                  rows={variationRowsForLine(line.id, line.workItemId)}
-                                  options={variationOptions}
-                                  labourRate={line.labourRate}
-                                  standardLabourRate={
-                                    book.recipes.find((r) => r.workItemId === line.workItemId)
-                                      ?.labourRate ?? null
-                                  }
-                                />
-                              )}
                               <RemoveLineButton id={line.id} label={line.name} />
                             </div>
                           </TableCell>
@@ -564,11 +628,11 @@ export default async function EstimatePage({
                   </TableCell>
                   <TableCell className="text-right">
                     {isDraft ? (
-                      <ItemRateField
+                      <VillaPriceField
                         estimateId={estimate.id}
                         itemId={row.materialId}
-                        rate={variations.rateByMaterialId.get(row.materialId) ?? null}
-                        standardRate={standardRateById.get(row.materialId) ?? null}
+                        villaPrice={variations.rateByMaterialId.get(row.materialId) ?? null}
+                        mastersPrice={standardRateById.get(row.materialId) ?? null}
                         label={row.name}
                       />
                     ) : row.missingRate ? (

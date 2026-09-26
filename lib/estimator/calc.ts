@@ -184,6 +184,95 @@ export function computeLine(
   };
 }
 
+/**
+ * How ONE unit of a work is priced — the answer to "why is this rate
+ * what it is?": the labour rate, then every material it consumes (mixes
+ * expanded) at its price, each one's share of the rate, and the rate
+ * itself. Same null rule as everywhere: an unpriced material, or no
+ * labour rate, makes the rate unknown — each known part still shows.
+ * Null when the work has no setup at all.
+ */
+export type RateBuildUp = {
+  labourRate: number | null;
+  materials: {
+    materialId: string;
+    qtyPerUnit: number;
+    /** The price this estimate uses — the villa's own, else Masters'. */
+    price: number | null;
+    /** qtyPerUnit × price; null when unpriced. */
+    cost: number | null;
+  }[];
+  /** Labour + every material, per one unit. */
+  rate: number | null;
+};
+
+export function rateBuildUp(
+  recipe: WorkRecipe | undefined,
+  mixesById: Map<string, MixDef>,
+  materialsById: Map<string, MaterialDef>,
+): RateBuildUp | null {
+  if (!recipe || recipe.uom === null) return null;
+  const materials = expandRecipe(recipe, mixesById).map((need) => {
+    const price = materialsById.get(need.materialId)?.rate ?? null;
+    return {
+      materialId: need.materialId,
+      qtyPerUnit: need.qtyPerWorkUnit,
+      price,
+      cost: price === null ? null : price * need.qtyPerWorkUnit,
+    };
+  });
+  const known = recipe.labourRate !== null && materials.every((row) => row.cost !== null);
+  return {
+    labourRate: recipe.labourRate,
+    materials,
+    rate: known
+      ? (recipe.labourRate as number) +
+        materials.reduce((sum, row) => sum + (row.cost as number), 0)
+      : null,
+  };
+}
+
+/**
+ * The same build-up read back from a submitted estimate's snapshot: the
+ * frozen labour cost and takeoff rows of one work, divided back to one
+ * unit (the arithmetic is linear, so that is exactly what it was).
+ */
+export function frozenRateBuildUp(line: FrozenLineRow, takeoff: FrozenTakeoffRow[]): RateBuildUp {
+  const perUnit = (value: number) => (line.qty > 0 ? value / line.qty : 0);
+  const materials = takeoff
+    .filter((row) => row.workItemId === line.workItemId)
+    .map((row) => {
+      const qtyPerUnit = perUnit(row.quantity);
+      return {
+        materialId: row.materialId,
+        qtyPerUnit,
+        price: row.rate,
+        cost: row.rate === null ? null : row.rate * qtyPerUnit,
+      };
+    });
+  return {
+    labourRate: line.labourCost === null ? null : perUnit(line.labourCost),
+    materials,
+    rate: line.totalCost === null ? null : perUnit(line.totalCost),
+  };
+}
+
+/**
+ * What one unit of a mix costs: every material at its price. Unknown —
+ * never low — when anything in it is unpriced, and when it is empty: a
+ * mix with nothing in it costing ₹0 is the lying zero of BUGCATCHER #13.
+ */
+export function mixUnitCost(
+  components: { rate: number | null; qtyPerUnit: number }[],
+): number | null {
+  if (components.length === 0) return null;
+  if (components.some((component) => component.rate === null)) return null;
+  return components.reduce(
+    (sum, component) => sum + (component.rate as number) * component.qtyPerUnit,
+    0,
+  );
+}
+
 export type TakeoffRow = {
   materialId: string;
   quantity: number;
