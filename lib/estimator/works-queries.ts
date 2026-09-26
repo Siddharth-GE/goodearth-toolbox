@@ -5,7 +5,7 @@ import { listWorkCategories, listWorkGroups, listWorkItems } from "@/lib/masters
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { listMixes } from "./mixes-queries";
-import { fail, GRANT, itemDefsByIds, listMaterialsRaw } from "./shared";
+import { fail, GRANT, itemDefsByIds, OLDER_ROW_LABEL } from "./shared";
 
 // ---------------------------------------------------------------------
 // Works — the masters vocabulary joined with this tool's setup
@@ -111,7 +111,7 @@ export async function getWorkSetup(workItemId: string): Promise<WorkSetup | null
   const item = items.find((row) => row.id === workItemId);
   if (!item) return null;
 
-  const [info, components, materials, mixes, lines] = await Promise.all([
+  const [info, components, mixes, lines] = await Promise.all([
     supabase
       .from("estimator_work_info")
       .select("uom, labour_rate")
@@ -131,7 +131,6 @@ export async function getWorkSetup(workItemId: string): Promise<WorkSetup | null
         .order("id")
         .range(from, to),
     ),
-    listMaterialsRaw(supabase),
     listMixes(),
     supabase
       .from("estimator_estimate_lines")
@@ -141,7 +140,6 @@ export async function getWorkSetup(workItemId: string): Promise<WorkSetup | null
 
   if (info.error) fail("the work setup", info.error);
 
-  const materialsById = new Map(materials.map((m) => [m.id, m]));
   const mixesById = new Map(mixes.map((m) => [m.id, m]));
   const itemDefs = await itemDefsByIds(supabase, [
     ...new Set(components.flatMap((c) => (c.item_id ? [c.item_id] : []))),
@@ -158,15 +156,12 @@ export async function getWorkSetup(workItemId: string): Promise<WorkSetup | null
     lineCount: lines.count ?? 0,
     components: components.map((component) => {
       if (component.item_id || component.material_id) {
-        // An item since 0086; a legacy material row before it.
-        const def = component.item_id
-          ? itemDefs.get(component.item_id)
-          : materialsById.get(component.material_id ?? "");
+        const def = component.item_id ? itemDefs.get(component.item_id) : undefined;
         return {
           id: component.id,
           kind: "material" as const,
-          refId: component.item_id ?? component.material_id ?? "",
-          name: def?.name ?? "Unknown material",
+          refId: component.item_id ?? "",
+          name: component.item_id ? (def?.name ?? "Unknown material") : OLDER_ROW_LABEL,
           uom: def?.uom ?? "",
           qtyPerUnit: component.qty_per_unit,
           mixComponentCount: null,

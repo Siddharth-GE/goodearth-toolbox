@@ -158,8 +158,10 @@ export function CopyTemplateDialog({
         />
       </div>
       <p className="text-muted text-xs">
-        Copies the {template.lineCount} {template.lineCount === 1 ? "work" : "works"} and their
-        quantities. Costs come from today&apos;s rates, so there is nothing else to copy.
+        Copies the {template.lineCount} {template.lineCount === 1 ? "work" : "works"} with their
+        quantities and measurement sheets, and any labour rates, materials and prices the template
+        sets for itself. Costs then come from today&apos;s rates. The copy is the villa&apos;s own
+        from then on — later changes to the template don&apos;t reach it.
       </p>
     </RecordFormDialog>
   );

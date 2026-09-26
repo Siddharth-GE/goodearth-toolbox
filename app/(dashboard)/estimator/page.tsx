@@ -18,20 +18,20 @@ export default async function EstimatorPage() {
         "When a villa's estimate is ready, Submit it: it gets a number, freezes at that day's prices, and becomes the villa's official estimate — the one material requests and site issues will be checked against.",
       ]}
       stats={[
-        { label: "Estimates", value: counts.estimates, hint: "villas costed" },
+        { label: "Estimates", value: counts.estimates, hint: "for villas, drafts included" },
         { label: "Official", value: counts.official, hint: "submitted, one per villa" },
-        { label: "Works set up", value: counts.worksSetUp, hint: "have a unit and a recipe" },
+        { label: "Works set up", value: counts.worksSetUp, hint: "have a unit to be priced in" },
         { label: "Materials", value: counts.materials, hint: "items in Masters, priced there" },
         {
           label: "Over estimate",
           value: overEstimate,
-          hint: "villas drawing past the plan — see the comparison tab",
+          hint: "villas drawing past their official estimate — open that estimate to see what",
         },
       ]}
       links={[
-        { label: "1 · Mixes", href: "/estimator/mixes" },
-        { label: "2 · Works", href: "/estimator/works" },
-        { label: "3 · Estimates", href: "/estimator/estimates", primary: true },
+        { label: "Estimates", href: "/estimator/estimates", primary: true },
+        { label: "Works", href: "/estimator/works" },
+        { label: "Mixes", href: "/estimator/mixes" },
       ]}
     />
   );

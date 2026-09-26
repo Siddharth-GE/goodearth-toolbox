@@ -164,8 +164,9 @@ export default async function WorkSetupPage({
           {work.lineCount > 0 && (
             <p className="text-muted text-sm">
               Used on {formatQuantity(work.lineCount)}{" "}
-              {work.lineCount === 1 ? "estimate line" : "estimate lines"} — changes here update
-              every one of them.
+              {work.lineCount === 1 ? "estimate line" : "estimate lines"}. Draft estimates follow
+              changes here; a villa with its own version of this work keeps its own, and a submitted
+              estimate keeps what it froze.
             </p>
           )}
         </Card>

@@ -35,11 +35,14 @@ export default async function MixPage({ params }: { params: Promise<{ mixId: str
   // unpriced material makes the whole figure unknown rather than low —
   // and so does an empty mix: "₹0 from today's rates" on a mix with
   // nothing in it yet is the same lying zero as BUGCATCHER #13.
-  const unpriced = mix.components.filter((component) => component.materialRate === null);
+  // A row from before materials were items counts for nothing, here as
+  // in every estimate.
+  const counted = mix.components.filter((component) => !component.legacy);
+  const unpriced = counted.filter((component) => component.materialRate === null);
   const costPerUnit =
-    unpriced.length > 0 || mix.components.length === 0
+    unpriced.length > 0 || counted.length === 0
       ? null
-      : mix.components.reduce(
+      : counted.reduce(
           (total, component) => total + (component.materialRate ?? 0) * component.qtyPerUnit,
           0,
         );
@@ -119,9 +122,9 @@ export default async function MixPage({ params }: { params: Promise<{ mixId: str
                   <TableCell className="text-foreground font-medium">
                     {component.materialName}
                     {component.legacy && (
-                      <Badge variant="neutral" className="ml-2">
-                        Old list — re-add from Masters
-                      </Badge>
+                      <span className="text-muted block text-xs">
+                        Remove it, and add the material again from Masters.
+                      </span>
                     )}
                   </TableCell>
                   <TableCell>

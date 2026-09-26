@@ -4,13 +4,14 @@ import { Button } from "@/components/ui/button";
 import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { SearchSelect } from "@/components/ui/search-select";
+import { chosenUom, componentOptions } from "../../_components/component-options";
 import { addWorkComponent, saveWorkInfo } from "@/lib/estimator/works-actions";
 import { UomSelect } from "../../_components/uom-select";
 import type { MixRow } from "@/lib/estimator/mixes-queries";
 import type { MaterialItemRow } from "@/lib/estimator/shared";
 import type { WorkSetup } from "@/lib/estimator/works-queries";
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 
 /**
  * The work's unit and labour rate.
@@ -103,46 +104,29 @@ export function AddWorkComponentForm({
     wasPending.current = pending;
   }, [pending, state]);
 
-  const [kind, refId] = choice.split(":");
-  const chosenUom =
-    kind === "material"
-      ? materials.find((material) => material.id === refId)?.uom
-      : mixes.find((mix) => mix.id === refId)?.uom;
+  const options = useMemo(
+    () =>
+      componentOptions(
+        materials.filter((material) => material.isActive),
+        mixes.filter((mix) => mix.isActive),
+      ),
+    [materials, mixes],
+  );
+  const uomOfChoice = chosenUom(choice, materials, mixes);
 
   return (
     <form ref={formRef} action={formAction} className="space-y-2">
       <div className="flex flex-wrap items-end gap-2">
         <div className="min-w-56 flex-1 space-y-1.5">
           <Label htmlFor="component">Material or mix</Label>
-          <Select
+          <SearchSelect
             id="component"
             name="component"
             value={choice}
-            onChange={(event) => setChoice(event.target.value)}
-            required
-          >
-            <option value="" disabled>
-              Choose what this work consumes
-            </option>
-            <optgroup label="Mixes">
-              {mixes
-                .filter((mix) => mix.isActive)
-                .map((mix) => (
-                  <option key={mix.id} value={`mix:${mix.id}`}>
-                    {mix.name} ({mix.uom})
-                  </option>
-                ))}
-            </optgroup>
-            <optgroup label="Materials">
-              {materials
-                .filter((material) => material.isActive)
-                .map((material) => (
-                  <option key={material.id} value={`material:${material.id}`}>
-                    {material.name} ({material.uom})
-                  </option>
-                ))}
-            </optgroup>
-          </Select>
+            onChange={setChoice}
+            options={options}
+            placeholder="Type to find a mix or material…"
+          />
         </div>
         <div className="w-40 space-y-1.5">
           <Label htmlFor="qty_per_unit">Quantity</Label>
@@ -160,8 +144,8 @@ export function AddWorkComponentForm({
         </Button>
       </div>
       <p className="text-muted text-xs">
-        {chosenUom
-          ? `How many ${chosenUom} are needed for one ${workUom} of this work.`
+        {uomOfChoice
+          ? `How many ${uomOfChoice} are needed for one ${workUom} of this work.`
           : `Quantities are per one ${workUom} of this work.`}
       </p>
       <FormMessage error={state?.error} />

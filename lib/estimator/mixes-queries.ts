@@ -3,7 +3,7 @@ import "server-only";
 import { requireTool } from "@/lib/auth/access";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
-import { fail, GRANT, itemDefsByIds, listMaterialsRaw } from "./shared";
+import { fail, GRANT, itemDefsByIds, OLDER_ROW_LABEL } from "./shared";
 
 // ---------------------------------------------------------------------
 // Mixes
@@ -72,13 +72,13 @@ export async function listMixes(): Promise<MixRow[]> {
 
 export type MixComponentRow = {
   id: string;
-  /** The item id since 0086; a legacy estimator_materials id before. */
+  /** The item id; "" on a row from before 0086, which names none. */
   materialId: string;
   materialName: string;
   materialUom: string;
   materialRate: number | null;
   qtyPerUnit: number;
-  /** true = a pre-0086 row still priced off the retired materials list. */
+  /** true = a pre-0086 row: it counts for nothing and should be removed. */
   legacy: boolean;
 };
 
@@ -103,26 +103,21 @@ export async function getMix(mixId: string): Promise<MixDetail | null> {
   if (error) fail("the mix", error);
   if (!mix) return null;
 
-  const [components, legacyMaterials] = await Promise.all([
-    fetchAll<{
-      id: string;
-      material_id: string | null;
-      item_id: string | null;
-      qty_per_unit: number;
-    }>((from, to) =>
-      supabase
-        .from("estimator_mix_components")
-        .select("id, material_id, item_id, qty_per_unit")
-        .eq("mix_id", mixId)
-        .order("id")
-        .range(from, to),
-    ),
-    listMaterialsRaw(supabase),
-  ]);
+  const components = await fetchAll<{
+    id: string;
+    item_id: string | null;
+    qty_per_unit: number;
+  }>((from, to) =>
+    supabase
+      .from("estimator_mix_components")
+      .select("id, item_id, qty_per_unit")
+      .eq("mix_id", mixId)
+      .order("id")
+      .range(from, to),
+  );
   const itemDefs = await itemDefsByIds(supabase, [
     ...new Set(components.flatMap((c) => (c.item_id ? [c.item_id] : []))),
   ]);
-  const legacyById = new Map(legacyMaterials.map((m) => [m.id, m]));
 
   return {
     id: mix.id,
@@ -132,13 +127,11 @@ export async function getMix(mixId: string): Promise<MixDetail | null> {
     isActive: mix.is_active,
     components: components
       .map((component) => {
-        const def = component.item_id
-          ? itemDefs.get(component.item_id)
-          : legacyById.get(component.material_id ?? "");
+        const def = component.item_id ? itemDefs.get(component.item_id) : undefined;
         return {
           id: component.id,
-          materialId: component.item_id ?? component.material_id ?? "",
-          materialName: def?.name ?? "Unknown material",
+          materialId: component.item_id ?? "",
+          materialName: component.item_id ? (def?.name ?? "Unknown material") : OLDER_ROW_LABEL,
           materialUom: def?.uom ?? "",
           materialRate: def?.rate ?? null,
           qtyPerUnit: component.qty_per_unit,

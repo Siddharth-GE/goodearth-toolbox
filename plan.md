@@ -6,7 +6,7 @@ _Planned 2026-09-25/26 by Opus on the founder's instruction ("step out, have a l
 
 - [x] 0. Branch and plan (Opus, 2026-09-26)
 - [x] 1. Indents pulls from any official estimate `[Opus]` — no migration
-- [ ] 2. Clear the ground `[Opus]` — no migration
+- [x] 2. Clear the ground `[Opus]` — no migration
 - [ ] 3. The row explains itself; Works becomes the Rate book `[Opus]` — no migration
 - [ ] 4. Measure first `[Opus drafts M1, Fable reviews before db:apply]`
 - [ ] 5. One estimate per villa `[Opus drafts M2, Fable reviews before db:apply]` — **founder confirms the lifecycle first**
@@ -50,11 +50,11 @@ Selections and Budgets are interiors and stay out of this (founder, 2026-09-26).
 
 ### 2. Clear the ground `[Opus]`
 
-- Remove the pre-`0086` material paths from the Estimator's code: `listMaterialsRaw`, `materialLinks`, the hand-built identity links, the item-or-legacy id sets (`itemIds`/`extraItemIds` — also fixes the villa-only material whose price would not save), `link.ts`, `reference.ts`. Old frozen rows still display by their frozen name. Tables and columns stay (additive only).
+- Remove the pre-`0086` material paths from the Estimator's code: `listMaterialsRaw`, `materialLinks`, the hand-built identity links, the item-or-legacy id sets (`itemIds`/`extraItemIds` — also fixes the villa-only material whose price would not save), `link.ts`. (`reference.ts` stays: every tool keeps a tested TS mirror of its database numbering.) Old frozen rows still display by their frozen name. Tables and columns stay (additive only).
 - Fix the wording that lies: the Copy dialog ("nothing else to copy"), the welcome's "unit and a recipe" and "comparison tab", the Works page's "changes here update every one of them", the successor banner on copied templates, the price box's `/[,s₹]/`.
 - A searchable material picker in place of the 2,058-option dropdowns.
 - `submitEstimate` returns `ActionState` instead of throwing when a read fails.
-- The estimate page loads only what its state shows.
+- (Moved to step 3, which rebuilds the page: the estimate page loads only what its state shows.)
 
 ### 3. The row explains itself; Works becomes the Rate book `[Opus]`
 

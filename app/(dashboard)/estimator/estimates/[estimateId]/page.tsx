@@ -103,20 +103,13 @@ export default async function EstimatePage({
   const comparison =
     issuedData && estimate.frozen
       ? compareIssuesToEstimate(
-          estimate.frozen.takeoff,
-          [
-            ...issuedData.links,
-            // An item-keyed takeoff row (0086) is its own link: the
-            // frozen quantity is already in the item's unit.
-            ...estimate.frozen.takeoff
-              .filter((row) => row.itemId)
-              .map((row) => ({
-                materialId: row.itemId as string,
-                itemId: row.itemId as string,
-                itemUom: row.uom,
-                factor: null,
-              })),
-          ],
+          estimate.frozen.takeoff.map((row) => ({
+            workItemId: row.workItemId,
+            itemId: row.itemId ?? null,
+            materialName: row.materialName,
+            uom: row.uom,
+            quantity: row.quantity,
+          })),
           issuedData.lines,
         )
       : null;
@@ -232,7 +225,7 @@ export default async function EstimatePage({
   const variationOptions = {
     materials: materialItems
       .filter((material) => material.isActive)
-      .map(({ id, name, uom }) => ({ id, name, uom })),
+      .map(({ id, name, uom, rate }) => ({ id, name, uom, rate })),
     mixes: mixRows.filter((mix) => mix.isActive).map(({ id, name, uom }) => ({ id, name, uom })),
   };
   const variationRowsForLine = (lineId: string, workItemId: string): VariationRowView[] => {
@@ -250,7 +243,7 @@ export default async function EstimatePage({
             qtyPerUnit: row.qtyPerUnit,
           };
         }
-        const refId = row.itemId ?? row.materialId ?? "";
+        const refId = row.itemId ?? "";
         const def = materialsById.get(refId);
         return {
           id: row.id,
@@ -358,9 +351,9 @@ export default async function EstimatePage({
           )}
         </p>
       )}
-      {isDraft && estimate.successor && (
-        <p className="text-warning text-sm">
-          A newer draft already revises this estimate —{" "}
+      {estimate.status === "submitted" && estimate.successor && (
+        <p className="text-muted text-sm">
+          A revision of this estimate is being drafted —{" "}
           <Link
             className="underline underline-offset-2"
             href={`/estimator/estimates/${estimate.successor.id}`}
@@ -573,8 +566,7 @@ export default async function EstimatePage({
                     {isDraft ? (
                       <ItemRateField
                         estimateId={estimate.id}
-                        itemId={book.itemIds.includes(row.materialId) ? row.materialId : null}
-                        materialId={book.itemIds.includes(row.materialId) ? null : row.materialId}
+                        itemId={row.materialId}
                         rate={variations.rateByMaterialId.get(row.materialId) ?? null}
                         standardRate={standardRateById.get(row.materialId) ?? null}
                         label={row.name}
@@ -628,7 +620,7 @@ export default async function EstimatePage({
                   .map((row) => {
                     const work = works.find((w) => w.workItemId === row.workItemId);
                     return (
-                      <TableRow key={`${row.workItemId}-${row.materialId}`}>
+                      <TableRow key={`${row.workItemId}-${row.itemId ?? row.materialName}`}>
                         <TableCell className="text-sm">
                           {work ? `${work.code} — ${work.name}` : "—"}
                         </TableCell>
@@ -639,11 +631,13 @@ export default async function EstimatePage({
                           {formatQuantity(row.estimated)} {row.uom}
                         </TableCell>
                         <TableCell className="text-right text-sm whitespace-nowrap">
-                          {row.issued !== null
-                            ? `${formatQuantity(row.issued)} ${row.uom}`
-                            : row.issuedRaw
-                              ? `${formatQuantity(row.issuedRaw.quantity)} ${row.issuedRaw.uom} (no conversion set)`
-                              : "—"}
+                          {row.issued !== null ? (
+                            `${formatQuantity(row.issued)} ${row.uom}`
+                          ) : (
+                            <span className="text-muted">
+                              Not compared — from before materials were items
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell>
                           {row.over && <Badge variant="warning">Past the estimate</Badge>}
@@ -690,7 +684,8 @@ export default async function EstimatePage({
                         </TableCell>
                         <TableCell className="text-foreground text-sm">{itemName}</TableCell>
                         <TableCell className="text-right text-sm whitespace-nowrap">
-                          {formatQuantity(row.quantity)}
+                          {formatQuantity(row.quantity)}{" "}
+                          {issuedData.itemUomById.get(row.itemId) ?? ""}
                         </TableCell>
                         <TableCell>
                           <Badge variant="warning">Outside the estimate</Badge>

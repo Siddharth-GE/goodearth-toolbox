@@ -6,7 +6,7 @@ import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import type { FrozenLineRow, FrozenTakeoffRow, MaterialDef, MixDef, WorkRecipe } from "./calc";
 import { compareIssuesToEstimate } from "./compare";
-import { fail, GRANT, itemDefsByIds, listMaterialsRaw } from "./shared";
+import { fail, GRANT, itemDefsByIds } from "./shared";
 
 /**
  * Reads for the Estimator — the welcome counts, the recipe book, per-villa
@@ -20,9 +20,11 @@ import { fail, GRANT, itemDefsByIds, listMaterialsRaw } from "./shared";
  * set up yet" instead of "not for you". The explicit check redirects
  * them instead of lying (the Financial Management reasoning, kept).
  *
- * The only thing read from outside this tool is the works vocabulary in
- * Masters (`lib/masters/works.ts`) — a shared surface, money-free, and
- * ungated by design. Nothing here reads another tool's tables.
+ * From outside this tool it reads the shared surfaces — the works
+ * vocabulary (`lib/masters/works.ts`), items, projects, units, profiles —
+ * and, for issued-against-estimate, Inventory's open quantity tables
+ * (stock issues and direct-to-site receipts: no money in either).
+ * Inventory never reads the Estimator's tables.
  *
  * No embeds: the estimates list needs villa names, and `units` has had
  * two foreign keys to `plots` since 0029, so a bare embed answers HTTP
@@ -31,9 +33,10 @@ import { fail, GRANT, itemDefsByIds, listMaterialsRaw } from "./shared";
  *
  * Since 0086 the material vocabulary IS the items master (founder:
  * "materials are exactly the same as in the items master") — the rate
- * is `items.indicative_price`, the unit is `items.default_uom`, and
- * `estimator_materials` survives only to resolve components and frozen
- * takeoff rows from before that day.
+ * is `items.indicative_price` and the unit is `items.default_uom`.
+ * The retired `estimator_materials` list is no longer read at all: a
+ * recipe row from before that day counts for nothing, and a frozen
+ * takeoff row from before it shows by its frozen name, uncompared.
  */
 
 // ---------------------------------------------------------------------
@@ -80,32 +83,28 @@ export async function getWelcomeCounts(): Promise<{
 // ---------------------------------------------------------------------
 
 export type RecipeBook = {
+  /** Every material a recipe or mix names — master items, since 0086. */
   materials: MaterialDef[];
   mixes: MixDef[];
   recipes: WorkRecipe[];
-  /** Which MaterialDef ids are master ITEMS (0086) — the snapshot
-   * writer needs to know which column a takeoff row anchors on. */
-  itemIds: string[];
 };
 
 export async function getRecipeBook(): Promise<RecipeBook> {
   await requireTool(GRANT);
   const supabase = await createClient();
 
-  const [legacyMaterials, mixes, mixComponents, info, workComponents] = await Promise.all([
-    listMaterialsRaw(supabase),
+  const [mixes, mixComponents, info, workComponents] = await Promise.all([
     fetchAll<{ id: string; name: string; uom: string }>((from, to) =>
       supabase.from("estimator_mixes").select("id, name, uom").order("id").range(from, to),
     ),
     fetchAll<{
       mix_id: string;
-      material_id: string | null;
       item_id: string | null;
       qty_per_unit: number;
     }>((from, to) =>
       supabase
         .from("estimator_mix_components")
-        .select("mix_id, material_id, item_id, qty_per_unit")
+        .select("mix_id, item_id, qty_per_unit")
         .order("id")
         .range(from, to),
     ),
@@ -118,22 +117,20 @@ export async function getRecipeBook(): Promise<RecipeBook> {
     ),
     fetchAll<{
       work_item_id: string;
-      material_id: string | null;
       item_id: string | null;
       mix_id: string | null;
       qty_per_unit: number;
     }>((from, to) =>
       supabase
         .from("estimator_work_components")
-        .select("work_item_id, material_id, item_id, mix_id, qty_per_unit")
+        .select("work_item_id, item_id, mix_id, qty_per_unit")
         .order("id")
         .range(from, to),
     ),
   ]);
 
-  // Since 0086 a component's material IS a master item; rows from
-  // before that resolve through the retired estimator_materials list.
-  // calc.ts never knows the difference — a MaterialDef is a MaterialDef.
+  // A row from before 0086 names neither an item nor a mix — it counts
+  // for nothing (the screens label it so it can be removed).
   const itemDefs = await itemDefsByIds(supabase, [
     ...new Set(
       [...mixComponents, ...workComponents].flatMap((row) => (row.item_id ? [row.item_id] : [])),
@@ -142,10 +139,9 @@ export async function getRecipeBook(): Promise<RecipeBook> {
 
   const componentsByMix = new Map<string, { materialId: string; qtyPerUnit: number }[]>();
   for (const row of mixComponents) {
-    const sourceId = row.item_id ?? row.material_id;
-    if (!sourceId) continue;
+    if (!row.item_id) continue;
     const list = componentsByMix.get(row.mix_id) ?? [];
-    list.push({ materialId: sourceId, qtyPerUnit: row.qty_per_unit });
+    list.push({ materialId: row.item_id, qtyPerUnit: row.qty_per_unit });
     componentsByMix.set(row.mix_id, list);
   }
 
@@ -154,9 +150,10 @@ export async function getRecipeBook(): Promise<RecipeBook> {
     { materialId: string | null; mixId: string | null; qtyPerUnit: number }[]
   >();
   for (const row of workComponents) {
+    if (!row.item_id && !row.mix_id) continue;
     const list = componentsByWork.get(row.work_item_id) ?? [];
     list.push({
-      materialId: row.item_id ?? row.material_id,
+      materialId: row.item_id,
       mixId: row.mix_id,
       qtyPerUnit: row.qty_per_unit,
     });
@@ -164,10 +161,7 @@ export async function getRecipeBook(): Promise<RecipeBook> {
   }
 
   return {
-    materials: [
-      ...itemDefs.values(),
-      ...legacyMaterials.map((m) => ({ id: m.id, name: m.name, uom: m.uom, rate: m.rate })),
-    ],
+    materials: [...itemDefs.values()],
     mixes: mixes.map((mix) => ({
       id: mix.id,
       name: mix.name,
@@ -180,7 +174,6 @@ export async function getRecipeBook(): Promise<RecipeBook> {
       labourRate: row.labour_rate,
       components: componentsByWork.get(row.work_item_id) ?? [],
     })),
-    itemIds: [...itemDefs.keys()],
   };
 }
 
@@ -194,7 +187,6 @@ export type LineVariationRow = {
   id: string;
   itemId: string | null;
   mixId: string | null;
-  materialId: string | null;
   qtyPerUnit: number;
 };
 
@@ -206,14 +198,10 @@ export type EstimateVariations = {
   byWork: Map<string, WorkRecipe["components"]>;
   /** work_item_id → this villa's labour rate (0088). Absent = standard. */
   labourRateByWork: Map<string, number>;
-  /** material/item id → this villa's price (0088). Absent = Masters'. */
+  /** item id → this villa's price (0088). Absent = Masters'. */
   rateByMaterialId: Map<string, number>;
-  /** The price overrides as rows, for the screen to render and clear. */
-  itemRates: { id: string; itemId: string | null; materialId: string | null; rate: number }[];
   /** Defs for variation items the global book may not know. */
   extraMaterials: MaterialDef[];
-  /** Which of those defs are master items (snapshot anchoring). */
-  extraItemIds: string[];
 };
 
 const NO_VARIATIONS: EstimateVariations = {
@@ -221,9 +209,7 @@ const NO_VARIATIONS: EstimateVariations = {
   byWork: new Map(),
   labourRateByWork: new Map(),
   rateByMaterialId: new Map(),
-  itemRates: [],
   extraMaterials: [],
-  extraItemIds: [],
 };
 
 export async function getEstimateVariations(estimateId: string): Promise<EstimateVariations> {
@@ -239,14 +225,13 @@ export async function getEstimateVariations(estimateId: string): Promise<Estimat
         .order("id")
         .range(from, to),
     ),
-    fetchAll<{ id: string; item_id: string | null; material_id: string | null; rate: number }>(
-      (from, to) =>
-        supabase
-          .from("estimator_estimate_item_rates")
-          .select("id, item_id, material_id, rate")
-          .eq("estimate_id", estimateId)
-          .order("id")
-          .range(from, to),
+    fetchAll<{ item_id: string | null; rate: number }>((from, to) =>
+      supabase
+        .from("estimator_estimate_item_rates")
+        .select("item_id, rate")
+        .eq("estimate_id", estimateId)
+        .order("id")
+        .range(from, to),
     ),
   ]);
 
@@ -254,22 +239,15 @@ export async function getEstimateVariations(estimateId: string): Promise<Estimat
   // even on an estimate whose works carry no recipe variation.
   const rateByMaterialId = new Map<string, number>();
   for (const row of itemRates) {
-    const id = row.item_id ?? row.material_id;
-    if (id) rateByMaterialId.set(id, row.rate);
+    if (row.item_id) rateByMaterialId.set(row.item_id, row.rate);
   }
-  const shapedRates = itemRates.map((row) => ({
-    id: row.id,
-    itemId: row.item_id,
-    materialId: row.material_id,
-    rate: row.rate,
-  }));
   const labourRateByWork = new Map<string, number>();
   for (const line of lines) {
     if (line.labour_rate !== null) labourRateByWork.set(line.work_item_id, line.labour_rate);
   }
 
   if (lines.length === 0) {
-    return { ...NO_VARIATIONS, rateByMaterialId, itemRates: shapedRates };
+    return { ...NO_VARIATIONS, rateByMaterialId };
   }
 
   const components = await fetchAll<{
@@ -277,12 +255,11 @@ export async function getEstimateVariations(estimateId: string): Promise<Estimat
     line_id: string;
     item_id: string | null;
     mix_id: string | null;
-    material_id: string | null;
     qty_per_unit: number;
   }>((from, to) =>
     supabase
       .from("estimator_estimate_line_components")
-      .select("id, line_id, item_id, mix_id, material_id, qty_per_unit")
+      .select("id, line_id, item_id, mix_id, qty_per_unit")
       .in(
         "line_id",
         lines.map((line) => line.id),
@@ -297,12 +274,13 @@ export async function getEstimateVariations(estimateId: string): Promise<Estimat
 
   const byLine = new Map<string, LineVariationRow[]>();
   for (const row of components) {
+    // A row from before 0086 names neither — it counts for nothing.
+    if (!row.item_id && !row.mix_id) continue;
     const bucket = byLine.get(row.line_id) ?? [];
     bucket.push({
       id: row.id,
       itemId: row.item_id,
       mixId: row.mix_id,
-      materialId: row.material_id,
       qtyPerUnit: row.qty_per_unit,
     });
     byLine.set(row.line_id, bucket);
@@ -316,7 +294,7 @@ export async function getEstimateVariations(estimateId: string): Promise<Estimat
     byWork.set(
       workItemId,
       rows.map((row) => ({
-        materialId: row.itemId ?? row.materialId,
+        materialId: row.itemId,
         mixId: row.mixId,
         qtyPerUnit: row.qtyPerUnit,
       })),
@@ -328,9 +306,7 @@ export async function getEstimateVariations(estimateId: string): Promise<Estimat
     byWork,
     labourRateByWork,
     rateByMaterialId,
-    itemRates: shapedRates,
     extraMaterials: [...itemDefs.values()],
-    extraItemIds: [...itemDefs.keys()],
   };
 }
 
@@ -590,13 +566,18 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
     estimate.submitted_by
       ? supabase.from("profiles").select("full_name").eq("id", estimate.submitted_by).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
-    supabase
-      .from("estimator_estimates")
-      .select("id, name, status")
-      .eq("source_estimate_id", estimate.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+    // What revises this one. A template's villa copies also point back
+    // at it through source_estimate_id, and they are not its successors —
+    // so a template never has one.
+    estimate.is_template
+      ? Promise.resolve({ data: null, error: null })
+      : supabase
+          .from("estimator_estimates")
+          .select("id, name, status")
+          .eq("source_estimate_id", estimate.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
     estimate.status !== "draft"
       ? fetchAll<{
           work_item_id: string;
@@ -665,7 +646,9 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
             })),
             takeoff: frozenTakeoff.map((row) => ({
               workItemId: row.work_item_id,
-              materialId: row.item_id ?? row.material_id ?? "",
+              // A row frozen before 0086 names no item; it groups by its
+              // own retired id and shows by its frozen name.
+              materialId: row.item_id ?? `older:${row.material_id ?? ""}`,
               itemId: row.item_id,
               materialName: row.material_name,
               uom: row.uom,
@@ -700,10 +683,9 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
 export type IssuedAgainstEstimate = {
   /** One line per issue line to the villa's plot, work included. */
   lines: { workItemId: string | null; itemId: string; quantity: number }[];
-  /** The material→item bridge, for compare.ts. */
-  links: { materialId: string; itemId: string; itemUom: string; factor: number | null }[];
-  /** Item names for the unmatched footnote. */
+  /** Item names and units for the outside-the-estimate list. */
   itemNamesById: Map<string, string>;
+  itemUomById: Map<string, string>;
 };
 
 /**
@@ -753,7 +735,7 @@ export async function getIssuedAgainstEstimate(
     ),
   ]);
   if (issues.length === 0 && receipts.length === 0) {
-    return { lines: [], links: await materialLinks(supabase), itemNamesById: new Map() };
+    return { lines: [], itemNamesById: new Map(), itemUomById: new Map() };
   }
 
   const workByIssue = new Map(issues.map((issue) => [issue.id, issue.work_item_id]));
@@ -802,42 +784,15 @@ export async function getIssuedAgainstEstimate(
 
   const itemIds = [...new Set(lines.map((line) => line.itemId))];
   const { data: items, error: itemsError } = itemIds.length
-    ? await supabase.from("items").select("id, name").in("id", itemIds)
+    ? await supabase.from("items").select("id, name, default_uom").in("id", itemIds)
     : { data: [], error: null };
   if (itemsError) fail("the issued items", itemsError);
 
   return {
     lines,
-    links: await materialLinks(supabase),
     itemNamesById: new Map((items ?? []).map((item) => [item.id, item.name])),
+    itemUomById: new Map((items ?? []).map((item) => [item.id, item.default_uom])),
   };
-}
-
-async function materialLinks(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-): Promise<{ materialId: string; itemId: string; itemUom: string; factor: number | null }[]> {
-  const rows = await fetchAll<{
-    id: string;
-    uom: string;
-    item_id: string | null;
-    item_uom_factor: number | null;
-    items: { default_uom: string } | null;
-  }>((from, to) =>
-    supabase
-      .from("estimator_materials")
-      .select("id, uom, item_id, item_uom_factor, items(default_uom)")
-      .not("item_id", "is", null)
-      .order("id")
-      .range(from, to),
-  );
-  return rows
-    .filter((row) => row.item_id !== null)
-    .map((row) => ({
-      materialId: row.id,
-      itemId: row.item_id!,
-      itemUom: row.items?.default_uom ?? "",
-      factor: row.item_uom_factor,
-    }));
 }
 
 // ---------------------------------------------------------------------
@@ -904,8 +859,9 @@ export async function getReconciliationApprovals(
  * How many villas have drawn past their official estimate — derived
  * fresh from the frozen takeoffs and the plots' movements, never
  * stored (the 0083 principle), so a revision that now covers the
- * material clears the count by itself. Batched: six reads for ALL
- * officials, not four per villa — the welcome renders on every visit.
+ * material clears the count by itself. Batched: a handful of reads for
+ * ALL officials, not several per villa — the welcome renders on every
+ * visit.
  * ------------------------------------------------------------------ */
 
 export async function countVillasOverEstimate(): Promise<number> {
@@ -923,12 +879,11 @@ export async function countVillasOverEstimate(): Promise<number> {
   const unitIds = officials.flatMap((estimate) => (estimate.unit_id ? [estimate.unit_id] : []));
   if (unitIds.length === 0) return 0;
 
-  const [unitsResult, takeoff, links] = await Promise.all([
+  const [unitsResult, takeoff] = await Promise.all([
     supabase.from("units").select("id, plot_id").in("id", unitIds),
     fetchAll<{
       estimate_id: string;
       work_item_id: string;
-      material_id: string | null;
       item_id: string | null;
       material_name: string;
       uom: string;
@@ -936,7 +891,7 @@ export async function countVillasOverEstimate(): Promise<number> {
     }>((from, to) =>
       supabase
         .from("estimator_estimate_takeoff")
-        .select("estimate_id, work_item_id, material_id, item_id, material_name, uom, quantity")
+        .select("estimate_id, work_item_id, item_id, material_name, uom, quantity")
         .in(
           "estimate_id",
           officials.map((estimate) => estimate.id),
@@ -944,26 +899,7 @@ export async function countVillasOverEstimate(): Promise<number> {
         .order("id")
         .range(from, to),
     ),
-    materialLinks(supabase),
   ]);
-  // An item-keyed row (0086) is its own link: the frozen quantity is
-  // already in the item's unit, so the identity link converts 1:1.
-  const identityLinks = [
-    ...new Map(
-      takeoff
-        .filter((row) => row.item_id !== null)
-        .map((row) => [
-          row.item_id as string,
-          {
-            materialId: row.item_id as string,
-            itemId: row.item_id as string,
-            itemUom: row.uom,
-            factor: null,
-          },
-        ]),
-    ).values(),
-  ];
-  const allLinks = [...links, ...identityLinks];
   if (unitsResult.error) fail("the villas", unitsResult.error);
   const plotByUnit = new Map(
     (unitsResult.data ?? []).map((unit) => [unit.id, unit.plot_id as string]),
@@ -1077,12 +1013,12 @@ export async function countVillasOverEstimate(): Promise<number> {
       .filter((row) => row.estimate_id === estimate.id)
       .map((row) => ({
         workItemId: row.work_item_id,
-        materialId: row.item_id ?? row.material_id ?? "",
+        itemId: row.item_id,
         materialName: row.material_name,
         uom: row.uom,
         quantity: row.quantity,
       }));
-    const comparison = compareIssuesToEstimate(rows, allLinks, issued);
+    const comparison = compareIssuesToEstimate(rows, issued);
     if (comparison.rows.some((row) => row.over)) over++;
   }
   return over;

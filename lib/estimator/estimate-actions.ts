@@ -527,15 +527,18 @@ export async function customiseEstimateLine(lineId: string): Promise<ActionState
     .eq("line_id", lineId);
   if (count) return undefined; // already customised — nothing to copy
 
-  const { data: standard, error: standardError } = await supabase
+  const { data: standardRows, error: standardError } = await supabase
     .from("estimator_work_components")
-    .select("item_id, mix_id, material_id, qty_per_unit")
+    .select("item_id, mix_id, qty_per_unit")
     .eq("work_item_id", line.work_item_id);
+  // A row from before 0086 names neither an item nor a mix; it counts for
+  // nothing in the standard, so it is not carried into the villa's copy.
+  const standard = (standardRows ?? []).filter((row) => row.item_id || row.mix_id);
   if (standardError) {
     console.error("customiseEstimateLine (standard) failed:", standardError);
     return { error: "Could not read the standard recipe. Try again." };
   }
-  if (!standard || standard.length === 0) {
+  if (standard.length === 0) {
     // A labour-only work has nothing to copy. Saying so beats writing
     // nothing and letting the button look broken — the screen offers
     // the add form directly in this case, and the first material added
@@ -551,7 +554,6 @@ export async function customiseEstimateLine(lineId: string): Promise<ActionState
       line_id: lineId,
       item_id: component.item_id,
       mix_id: component.mix_id,
-      material_id: component.material_id,
       qty_per_unit: component.qty_per_unit,
       created_by: user.id,
       updated_by: user.id,
@@ -679,27 +681,22 @@ export async function updateEstimateLineLabourRate(
  */
 export async function setEstimateItemRate(
   estimateId: string,
-  source: { itemId: string | null; materialId: string | null },
+  itemId: string,
   rate: number | null,
 ): Promise<ActionState> {
   const user = await requireTool(GRANT);
   if (!estimateId) return { error: "Which estimate?" };
-  if ((source.itemId === null) === (source.materialId === null)) {
-    return { error: "Pick one material." };
-  }
+  if (!itemId) return { error: "Pick one material." };
 
   const supabase = await createClient();
 
   // Blank clears the override — back to the price in Masters.
   if (rate === null) {
-    let query = supabase
+    const { error } = await supabase
       .from("estimator_estimate_item_rates")
       .delete()
-      .eq("estimate_id", estimateId);
-    query = source.itemId
-      ? query.eq("item_id", source.itemId)
-      : query.eq("material_id", source.materialId as string);
-    const { error } = await query;
+      .eq("estimate_id", estimateId)
+      .eq("item_id", itemId);
     if (error) {
       if (error.code === "P0001") return { error: error.message };
       console.error("setEstimateItemRate (clear) failed:", error);
@@ -718,14 +715,11 @@ export async function setEstimateItemRate(
   // columns allows duplicates), and PostgREST cannot infer a conflict
   // target from a partial index. This order also never leaves the
   // material momentarily unpriced, which delete-then-insert would.
-  let updateQuery = supabase
+  const { error: updateError, count } = await supabase
     .from("estimator_estimate_item_rates")
     .update({ rate, updated_by: user.id }, { count: "exact" })
-    .eq("estimate_id", estimateId);
-  updateQuery = source.itemId
-    ? updateQuery.eq("item_id", source.itemId)
-    : updateQuery.eq("material_id", source.materialId as string);
-  const { error: updateError, count } = await updateQuery;
+    .eq("estimate_id", estimateId)
+    .eq("item_id", itemId);
   if (updateError) {
     if (updateError.code === "P0001") return { error: updateError.message };
     console.error("setEstimateItemRate (update) failed:", updateError);
@@ -735,8 +729,7 @@ export async function setEstimateItemRate(
   if (!count) {
     const { error } = await supabase.from("estimator_estimate_item_rates").insert({
       estimate_id: estimateId,
-      item_id: source.itemId,
-      material_id: source.materialId,
+      item_id: itemId,
       rate,
       created_by: user.id,
       updated_by: user.id,
@@ -794,7 +787,7 @@ async function copyLineVariations(
 
   const { data: components, error: componentsError } = await supabase
     .from("estimator_estimate_line_components")
-    .select("line_id, item_id, mix_id, material_id, qty_per_unit")
+    .select("line_id, item_id, mix_id, qty_per_unit")
     .in(
       "line_id",
       sourceLines.map((line) => line.id),
@@ -818,6 +811,9 @@ async function copyLineVariations(
   const targetLineByWork = new Map((targetLines ?? []).map((line) => [line.work_item_id, line.id]));
 
   const rows = components.flatMap((component) => {
+    // A row from before 0086 names neither — it counted for nothing, so
+    // it is not copied.
+    if (!component.item_id && !component.mix_id) return [];
     const workItemId = sourceWorkByLine.get(component.line_id);
     const targetLineId = workItemId ? targetLineByWork.get(workItemId) : undefined;
     if (!targetLineId) return [];
@@ -826,7 +822,6 @@ async function copyLineVariations(
         line_id: targetLineId,
         item_id: component.item_id,
         mix_id: component.mix_id,
-        material_id: component.material_id,
         qty_per_unit: component.qty_per_unit,
         created_by: userId,
         updated_by: userId,
@@ -952,8 +947,9 @@ async function copyItemRates(
 ): Promise<string | undefined> {
   const { data: rates, error: readError } = await supabase
     .from("estimator_estimate_item_rates")
-    .select("item_id, material_id, rate, note")
-    .eq("estimate_id", sourceEstimateId);
+    .select("item_id, rate, note")
+    .eq("estimate_id", sourceEstimateId)
+    .not("item_id", "is", null);
   if (readError) {
     console.error("copyItemRates (read) failed:", readError);
     return "Could not read this villa's material prices.";
@@ -964,7 +960,6 @@ async function copyItemRates(
     rates.map((rate) => ({
       estimate_id: targetEstimateId,
       item_id: rate.item_id,
-      material_id: rate.material_id,
       rate: rate.rate,
       note: rate.note,
       created_by: userId,
@@ -981,14 +976,14 @@ async function copyItemRates(
 /**
  * Copy a template onto a villa — the way every villa estimate starts.
  *
- * The lines come across — quantities, notes, and any per-villa
- * variations (0087) the template's works carry. Costs are computed
- * live from today's rates, so there is nothing else to copy.
+ * Everything the template holds comes across: its works with their
+ * quantities and notes, its labour rates, its own recipes (0087), its
+ * measurement sheets (0096) and its material prices (0088). Costs are
+ * then computed live from today's rates.
  *
- * Two writes with no transaction between them (PostgREST gives us no
- * way to wrap them), so a failure part-way would leave an empty
- * estimate behind pretending to be a copy. The header is deleted again
- * if the lines don't land — an honest failure beats a half-copy.
+ * Several writes with no transaction between them, so a failure part-way
+ * would leave a half-copy behind; the copy is discarded again if any of
+ * them fails — an honest failure beats a half-copy.
  */
 export async function copyTemplateToUnit(
   _state: ActionState,
@@ -1125,14 +1120,20 @@ export async function submitEstimate(estimateId: string): Promise<ActionState> {
     return { error: "A template cannot be submitted — copy it onto a villa first." };
   }
 
-  const [book, variations, lines] = await Promise.all([
-    getRecipeBook(),
-    getEstimateVariations(estimateId),
-    supabase
-      .from("estimator_estimate_lines")
-      .select("id, work_item_id, qty")
-      .eq("estimate_id", estimateId),
-  ]);
+  // The recipe book and the variations read to completion and throw on
+  // a failed page (fetchAll); an action answers with ActionState instead.
+  let book: Awaited<ReturnType<typeof getRecipeBook>>;
+  let variations: Awaited<ReturnType<typeof getEstimateVariations>>;
+  try {
+    [book, variations] = await Promise.all([getRecipeBook(), getEstimateVariations(estimateId)]);
+  } catch (error) {
+    console.error("submitEstimate (recipes) failed:", error);
+    return { error: "Could not read the recipes. Try again." };
+  }
+  const lines = await supabase
+    .from("estimator_estimate_lines")
+    .select("id, work_item_id, qty")
+    .eq("estimate_id", estimateId);
   if (lines.error) {
     console.error("submitEstimate (lines) failed:", lines.error);
     return { error: "Could not read the estimate's works. Try again." };
@@ -1203,18 +1204,15 @@ export async function submitEstimate(estimateId: string): Promise<ActionState> {
   }
 
   if (takeoff.length > 0) {
-    // A takeoff id is a master item since 0086, a legacy material
-    // before — the snapshot anchors on whichever column it really is.
-    const itemIds = new Set([...book.itemIds, ...variations.extraItemIds]);
+    // Every material a recipe can name is a master item (0086), so the
+    // snapshot anchors on item_id and leaves the retired column null.
     const { error: takeoffError } = await supabase.from("estimator_estimate_takeoff").insert(
       takeoff.map((row) => {
         const material = materialsById.get(row.materialId);
-        const isItem = itemIds.has(row.materialId);
         return {
           estimate_id: estimateId,
           work_item_id: row.workItemId,
-          material_id: isItem ? null : row.materialId,
-          item_id: isItem ? row.materialId : null,
+          item_id: row.materialId,
           material_name: material?.name ?? "Unknown material",
           uom: material?.uom ?? "",
           quantity: row.quantity,

@@ -14,7 +14,8 @@ import {
 import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { SearchSelect } from "@/components/ui/search-select";
+import { chosenUom, componentOptions } from "../../../_components/component-options";
 import {
   addLineComponent,
   customiseEstimateLine,
@@ -25,7 +26,7 @@ import {
   updateLineComponentQty,
 } from "@/lib/estimator/estimate-actions";
 import { formatQuantity } from "@/lib/format";
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 /** One row of the recipe as the dialog shows it. `id` is null for a
  * standard (read-only) row — only a customised line's rows have their
@@ -40,7 +41,7 @@ export type VariationRowView = {
 };
 
 export type VariationOptions = {
-  materials: { id: string; name: string; uom: string }[];
+  materials: { id: string; name: string; uom: string; rate: number | null }[];
   mixes: { id: string; name: string; uom: string }[];
 };
 
@@ -369,44 +370,25 @@ function AddComponentForm({
     wasPending.current = pending;
   }, [pending, state]);
 
-  const [kind, refId] = choice.split(":");
-  const chosenUom =
-    kind === "material"
-      ? options.materials.find((material) => material.id === refId)?.uom
-      : options.mixes.find((mix) => mix.id === refId)?.uom;
+  const searchOptions = useMemo(
+    () => componentOptions(options.materials, options.mixes),
+    [options],
+  );
+  const uomOfChoice = chosenUom(choice, options.materials, options.mixes);
 
   return (
     <form ref={formRef} action={formAction} className="space-y-2">
       <div className="flex flex-wrap items-end gap-2">
         <div className="min-w-48 flex-1 space-y-1.5">
           <Label htmlFor={`component-${lineId}`}>Add for this villa</Label>
-          <Select
+          <SearchSelect
             id={`component-${lineId}`}
             name="component"
             value={choice}
-            onChange={(event) => setChoice(event.target.value)}
-            required
-          >
-            <option value="" disabled>
-              Material or mix…
-            </option>
-            <optgroup label="Materials (from Masters)">
-              {options.materials.map((material) => (
-                <option key={material.id} value={`material:${material.id}`}>
-                  {material.name} ({material.uom})
-                </option>
-              ))}
-            </optgroup>
-            {options.mixes.length > 0 && (
-              <optgroup label="Mixes">
-                {options.mixes.map((mix) => (
-                  <option key={mix.id} value={`mix:${mix.id}`}>
-                    {mix.name} ({mix.uom})
-                  </option>
-                ))}
-              </optgroup>
-            )}
-          </Select>
+            onChange={setChoice}
+            options={searchOptions}
+            placeholder="Type to find a mix or material…"
+          />
         </div>
         <div className="w-28 space-y-1.5">
           <Label htmlFor={`qty-${lineId}`}>Quantity</Label>
@@ -423,9 +405,9 @@ function AddComponentForm({
           {pending ? "Adding…" : "Add"}
         </Button>
       </div>
-      {chosenUom && workUom && (
+      {uomOfChoice && workUom && (
         <p className="text-muted text-xs">
-          How many {chosenUom} one {workUom} of this work needs, for this villa.
+          How many {uomOfChoice} one {workUom} of this work needs, for this villa.
         </p>
       )}
       <FormMessage error={state?.error} />
@@ -443,14 +425,12 @@ function AddComponentForm({
 export function ItemRateField({
   estimateId,
   itemId,
-  materialId,
   rate,
   standardRate,
   label,
 }: {
   estimateId: string;
-  itemId: string | null;
-  materialId: string | null;
+  itemId: string;
   rate: number | null;
   standardRate: number | null;
   label: string;
@@ -460,7 +440,7 @@ export function ItemRateField({
   const [error, setError] = useState<string>();
 
   const save = () => {
-    const cleaned = value.replace(/[,s₹]/g, "");
+    const cleaned = value.replace(/[,\s₹]/g, "");
     const next = cleaned === "" ? null : Number(cleaned);
     if (next !== null && (!Number.isFinite(next) || next < 0)) {
       setValue(rate === null ? "" : String(rate));
@@ -469,7 +449,7 @@ export function ItemRateField({
     }
     if (next === rate) return;
     startTransition(async () => {
-      const result = await setEstimateItemRate(estimateId, { itemId, materialId }, next);
+      const result = await setEstimateItemRate(estimateId, itemId, next);
       if (result?.error) {
         setError(result.error);
         setValue(rate === null ? "" : String(rate));
