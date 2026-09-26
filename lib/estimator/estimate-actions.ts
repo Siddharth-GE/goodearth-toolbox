@@ -432,6 +432,62 @@ export async function removeLineMeasurement(id: string): Promise<ActionState> {
 }
 
 /**
+ * Duplicate one row onto the bottom of its own sheet — the second
+ * identical wall or footing is one tap, then the person changes what
+ * differs. Read from the database, not the browser, so only a row
+ * already on the sheet can be copied, and only onto its own line.
+ */
+export async function duplicateLineMeasurement(id: string): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+  if (!id) return { error: "Which row?" };
+  const supabase = await createClient();
+
+  const { data: row, error: rowError } = await supabase
+    .from("estimator_estimate_line_measurements")
+    .select("line_id, description, nos, length, breadth, depth")
+    .eq("id", id)
+    .maybeSingle();
+  if (rowError) {
+    console.error("duplicateLineMeasurement (row) failed:", rowError);
+    return { error: "Could not duplicate the row. Try again." };
+  }
+  if (!row) return { error: "That row is no longer on the sheet — reload the page." };
+
+  const { data: last, error: lastError } = await supabase
+    .from("estimator_estimate_line_measurements")
+    .select("sort_order")
+    .eq("line_id", row.line_id)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (lastError) {
+    console.error("duplicateLineMeasurement (order) failed:", lastError);
+    return { error: "Could not duplicate the row. Try again." };
+  }
+
+  const { error } = await supabase.from("estimator_estimate_line_measurements").insert({
+    line_id: row.line_id,
+    description: row.description,
+    nos: row.nos,
+    length: row.length,
+    breadth: row.breadth,
+    depth: row.depth,
+    sort_order: (last?.sort_order ?? 0) + 1,
+    created_by: user.id,
+    updated_by: user.id,
+  });
+  if (error) {
+    if (error.code === "P0001") return { error: error.message };
+    console.error("duplicateLineMeasurement failed:", error);
+    return { error: "Could not duplicate the row. Try again." };
+  }
+
+  const syncError = await syncLineQty(supabase, row.line_id, user.id);
+  revalidatePath("/estimator", "layout");
+  return syncError ? { error: syncError } : undefined;
+}
+
+/**
  * Copy one work's measurement rows onto another work of the same
  * estimate — a wall measured once for brickwork is the same wall for its
  * plaster and its paint. The rows land at the bottom of the other sheet

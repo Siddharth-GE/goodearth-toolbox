@@ -28,6 +28,7 @@ import { Select } from "@/components/ui/select";
 import {
   addLineMeasurement,
   copyMeasurementRows,
+  duplicateLineMeasurement,
   removeLineMeasurement,
   updateLineMeasurement,
   type MeasurementFields,
@@ -235,7 +236,7 @@ function EditableMeasurementRow({ row, workUom }: { row: MeasurementRow; workUom
 
   return (
     <li className="space-y-2 py-3">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <Input
           aria-label="Description"
           placeholder="What it is — front wall, footing F1…"
@@ -244,9 +245,18 @@ function EditableMeasurementRow({ row, workUom }: { row: MeasurementRow; workUom
           onBlur={save}
           onKeyDown={onKeyDown}
           disabled={pending}
-          className="h-9 flex-1 text-sm"
+          className="h-9 min-w-48 flex-1 text-sm"
         />
-        <RemoveMeasurementButton id={row.id} />
+        <RowActionButton
+          label="Duplicate"
+          pendingLabel="Duplicating…"
+          run={() => duplicateLineMeasurement(row.id)}
+        />
+        <RowActionButton
+          label="Remove"
+          pendingLabel="Removing…"
+          run={() => removeLineMeasurement(row.id)}
+        />
       </div>
       <div className="grid grid-cols-4 gap-2">
         {BOXES.map((box) => (
@@ -276,7 +286,17 @@ function EditableMeasurementRow({ row, workUom }: { row: MeasurementRow; workUom
   );
 }
 
-function RemoveMeasurementButton({ id }: { id: string }) {
+/** A one-tap action on a row — Duplicate or Remove — that says why when
+ * it is refused. */
+function RowActionButton({
+  label,
+  pendingLabel,
+  run,
+}: {
+  label: string;
+  pendingLabel: string;
+  run: () => Promise<{ error?: string } | undefined>;
+}) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string>();
 
@@ -290,12 +310,12 @@ function RemoveMeasurementButton({ id }: { id: string }) {
         disabled={pending}
         onClick={() =>
           startTransition(async () => {
-            const result = await removeLineMeasurement(id);
+            const result = await run();
             setError(result?.error);
           })
         }
       >
-        Remove
+        {pending ? pendingLabel : label}
       </Button>
     </span>
   );
