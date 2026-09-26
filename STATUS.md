@@ -77,4 +77,4 @@ The chain runs end to end: design → price → indent → PO → goods in / sto
 | Business Planning    | `projects` (its one optional link)                                                                                                                                 |
 | Directory, Dexter    | nothing outside the shared surfaces                                                                                                                                |
 
-**Nothing reads** Financial Management, Dexter or the Estimator's own tables — only its rate-free view `estimate_takeoff_facts`. A redefinition of `pusher_chain_state` must check Client Relations and Reporter (`SECURITY.md`).
+**Nothing reads** Financial Management, Dexter or the Estimator's own tables — only its rate-free view `estimate_takeoff_facts`. A redefinition of `pusher_chain_state` must check Client Relations, Reporter and the Google Chat door (`relay/PLAN.md`).

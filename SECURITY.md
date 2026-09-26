@@ -76,7 +76,7 @@ STATUS.md's contract table lists every read a tool makes outside itself; it IS t
 
 **A cross-tool trigger or definer function not listed here is what nobody finds until it misfires.**
 
-`pusher_chain_state` has been redefined six times and has two readers outside Relay: a seventh definition must check Client Relations and Reporter, carry the `entry` lateral's clock-anchor exclusions forward, and re-issue the revokes.
+`pusher_chain_state` has been redefined six times and has three readers outside Relay's screens: a seventh definition must check Client Relations, Reporter and the Google Chat door, carry the `entry` lateral's clock-anchor exclusions forward, and re-issue the revokes.
 
 ## Reads
 
