@@ -1,68 +1,89 @@
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Figure, FigureBand, FigureBandCell } from "@/components/ui/figure";
 import { LinkButton } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeaderCell,
-  TableRow,
-} from "@/components/ui/table";
-import { listWorkStatus, type WorkStatusRow } from "@/lib/estimator/works-queries";
-import { formatMoney } from "@/lib/format";
+import { rateBuildUp, type MaterialDef, type MixDef } from "@/lib/estimator/calc";
+import { getRecipeBook } from "@/lib/estimator/estimate-queries";
+import { countLinesByWork, listWorkStatus } from "@/lib/estimator/works-queries";
+import { formatCount } from "@/lib/format";
 import { Hammer } from "lucide-react";
+import { RateBookList, type RateBookRow } from "./_components/rate-book-list";
 
-export default async function WorksPage({
+/**
+ * The rate book: what one unit of every work costs — its unit, labour
+ * rate and the materials it uses, priced at Masters' prices. Every villa
+ * estimate starts from these; a villa can have its own figures for any
+ * of them (tap a rate on the estimate).
+ *
+ * The first list worth working through is "used but not priced": the
+ * works some estimate already uses whose rate is still unknown. The other
+ * hundred-odd works can wait until an estimate needs them.
+ */
+export default async function RateBookPage({
   searchParams,
 }: {
   searchParams: Promise<{ show?: string }>;
 }) {
   const { show } = await searchParams;
-  const works = await listWorkStatus();
-  const active = works.filter((work) => work.isActive);
-  const setUp = active.filter((work) => work.uom !== null);
-  const withRecipe = setUp.filter((work) => work.componentCount > 0);
+  const [works, book, lineCounts] = await Promise.all([
+    listWorkStatus(),
+    getRecipeBook(),
+    countLinesByWork(),
+  ]);
 
-  const shown =
-    show === "todo"
-      ? active.filter((work) => work.uom === null)
-      : show === "set-up"
-        ? setUp
-        : active;
+  const mixesById = new Map<string, MixDef>(book.mixes.map((mix) => [mix.id, mix]));
+  const materialsById = new Map<string, MaterialDef>(
+    book.materials.map((material) => [material.id, material]),
+  );
+  const recipeByWork = new Map(book.recipes.map((recipe) => [recipe.workItemId, recipe]));
 
-  // Grouped by category, in the works vocabulary's own order.
-  const byCategory = new Map<string, WorkStatusRow[]>();
-  for (const work of shown) {
-    const key = `${work.categoryCode} — ${work.categoryName}`;
-    byCategory.set(key, [...(byCategory.get(key) ?? []), work]);
-  }
+  const rows: RateBookRow[] = works
+    .filter((work) => work.isActive)
+    .map((work) => ({
+      workItemId: work.workItemId,
+      code: work.code,
+      name: work.name,
+      groupName: work.groupName,
+      category: `${work.categoryCode} — ${work.categoryName}`,
+      uom: work.uom,
+      labourRate: work.labourRate,
+      componentCount: work.componentCount,
+      rate: rateBuildUp(recipeByWork.get(work.workItemId), mixesById, materialsById)?.rate ?? null,
+      lineCount: lineCounts.get(work.workItemId) ?? 0,
+    }));
+
+  const priced = rows.filter((row) => row.rate !== null);
+  const todo = rows.filter((row) => row.lineCount > 0 && row.rate === null);
+  const shown = show === "todo" ? todo : show === "priced" ? priced : rows;
 
   return (
     <div className="space-y-4">
       <div className="max-w-2xl">
-        <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Works</p>
+        <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Rate book</p>
         <p className="text-muted mt-1 text-sm">
-          Every work from the Masters list. Set each one up once — what it is measured in, what
-          labour costs, and what it consumes — and it can then be used on any estimate. The works
-          themselves are edited in Masters; this is only their costing.
+          What one unit of each work costs — what it is measured in, the labour rate, and the
+          materials it uses at Masters&apos; prices. Every villa starts from these, and any villa
+          can have its own figure for a work. The works themselves are listed in Masters.
         </p>
       </div>
 
       <FigureBand className="sm:grid-cols-3 lg:grid-cols-3">
         <FigureBandCell>
-          <Figure label="Works" value={String(active.length)} hint="active in Masters" size="lg" />
-        </FigureBandCell>
-        <FigureBandCell>
-          <Figure label="Set up" value={String(setUp.length)} hint="have a unit" size="lg" />
+          <Figure label="Works" value={formatCount(rows.length)} hint="in Masters" size="lg" />
         </FigureBandCell>
         <FigureBandCell>
           <Figure
-            label="With a recipe"
-            value={String(withRecipe.length)}
-            hint="consume materials"
+            label="Priced"
+            value={formatCount(priced.length)}
+            hint="labour and every material"
+            size="lg"
+          />
+        </FigureBandCell>
+        <FigureBandCell>
+          <Figure
+            label="Used but not priced"
+            value={formatCount(todo.length)}
+            hint="an estimate needs these"
+            tone={todo.length > 0 ? "warn" : undefined}
             size="lg"
           />
         </FigureBandCell>
@@ -73,86 +94,31 @@ export default async function WorksPage({
           All
         </LinkButton>
         <LinkButton
-          href="/estimator/works?show=set-up"
-          variant={show === "set-up" ? "primary" : "secondary"}
-        >
-          Set up
-        </LinkButton>
-        <LinkButton
           href="/estimator/works?show=todo"
           variant={show === "todo" ? "primary" : "secondary"}
         >
-          Still to set up ({active.length - setUp.length})
+          Used but not priced ({formatCount(todo.length)})
+        </LinkButton>
+        <LinkButton
+          href="/estimator/works?show=priced"
+          variant={show === "priced" ? "primary" : "secondary"}
+        >
+          Priced
         </LinkButton>
       </div>
 
       {shown.length === 0 ? (
         <EmptyState
           icon={Hammer}
-          title={show === "todo" ? "Every work is set up" : "No works yet"}
+          title={show === "todo" ? "Nothing waiting" : "No works yet"}
           description={
             show === "todo"
-              ? "Nothing is waiting — every active work has a unit."
+              ? "Every work an estimate uses has a rate."
               : "Works come from the Masters list. Add them there first."
           }
         />
       ) : (
-        [...byCategory].map(([category, rows]) => (
-          <Card key={category} className="space-y-3 p-4">
-            <p className="text-foreground text-sm font-semibold">{category}</p>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableHeaderCell className="w-24">Code</TableHeaderCell>
-                  <TableHeaderCell>Work</TableHeaderCell>
-                  <TableHeaderCell>Measured in</TableHeaderCell>
-                  <TableHeaderCell>Labour rate</TableHeaderCell>
-                  <TableHeaderCell>Recipe</TableHeaderCell>
-                  <TableHeaderCell></TableHeaderCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {rows.map((work) => (
-                  <TableRow key={work.workItemId}>
-                    <TableCell className="text-muted text-sm">{work.code}</TableCell>
-                    <TableCell className="text-foreground text-sm">
-                      {work.name}
-                      {work.groupName && (
-                        <span className="text-muted block text-xs">{work.groupName}</span>
-                      )}
-                    </TableCell>
-                    <TableCell>{work.uom ?? <Badge variant="neutral">Not set up</Badge>}</TableCell>
-                    <TableCell>
-                      {work.uom === null ? (
-                        "—"
-                      ) : work.labourRate === null ? (
-                        <Badge variant="warning">Not priced</Badge>
-                      ) : (
-                        `${formatMoney(work.labourRate)} / ${work.uom}`
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {work.componentCount === 0
-                        ? "—"
-                        : `${work.componentCount} ${work.componentCount === 1 ? "item" : "items"}`}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex justify-end">
-                        <LinkButton
-                          href={`/estimator/works/${work.workItemId}`}
-                          variant="ghost"
-                          size="sm"
-                        >
-                          {work.uom === null ? "Set up" : "Edit"}
-                        </LinkButton>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Card>
-        ))
+        <RateBookList rows={shown} />
       )}
     </div>
   );

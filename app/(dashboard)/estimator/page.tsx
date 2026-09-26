@@ -13,9 +13,9 @@ export default async function EstimatorPage() {
     <ToolWelcome
       icon="Calculator"
       intro={[
-        "Materials live in Masters — every construction item and its price, entered once for the whole toolbox. Here you build the mixes (M20 concrete — so many bags of cement, so much sand and jelly per cum) and give each work its unit, labour rate and recipe on the Works tab.",
-        "After that, estimating a villa is picking works and typing quantities. The tool prices it at Masters' prices of the day, groups it the way a BOQ reads, and lists every material needed. Change an item's price and every draft follows.",
-        "When a villa's estimate is ready, Submit it: it gets a number, freezes at that day's prices, and becomes the villa's official estimate — the one material requests and site issues will be checked against.",
+        "An estimate is a villa's list of works and how much of each. Every rate on it can be tapped to see how it is built — the labour, what one unit of the work uses, and what each material costs — and changed for that villa alone: a dearer tile, a different labour rate.",
+        "What every villa starts from is the rate book: each work's unit, labour rate and materials, priced at Masters' prices. Price the works an estimate actually uses first — the rate book lists them — and the rest can wait until something needs them.",
+        "When a villa's estimate is ready, Submit it: it gets a number, freezes at that day's prices, and becomes the villa's official estimate — the one material requests and site issues are checked against.",
       ]}
       stats={[
         { label: "Estimates", value: counts.estimates, hint: "for villas, drafts included" },
@@ -30,7 +30,7 @@ export default async function EstimatorPage() {
       ]}
       links={[
         { label: "Estimates", href: "/estimator/estimates", primary: true },
-        { label: "Works", href: "/estimator/works" },
+        { label: "Rate book", href: "/estimator/works" },
         { label: "Mixes", href: "/estimator/mixes" },
       ]}
     />

@@ -75,6 +75,24 @@ export async function listWorkStatus(): Promise<WorkStatusRow[]> {
   });
 }
 
+/**
+ * How many estimate lines use each work — the rate book's "used on an
+ * estimate but not priced" list is the setup to-do that matters: a work
+ * nobody has put on an estimate can wait.
+ */
+export async function countLinesByWork(): Promise<Map<string, number>> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+  const lines = await fetchAll<{ work_item_id: string }>((from, to) =>
+    supabase.from("estimator_estimate_lines").select("work_item_id").order("id").range(from, to),
+  );
+  const counts = new Map<string, number>();
+  for (const line of lines) {
+    counts.set(line.work_item_id, (counts.get(line.work_item_id) ?? 0) + 1);
+  }
+  return counts;
+}
+
 export type WorkComponentRow = {
   id: string;
   kind: "material" | "mix";

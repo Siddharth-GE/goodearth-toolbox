@@ -6,12 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchSelect } from "@/components/ui/search-select";
 import { chosenUom, componentOptions } from "../../_components/component-options";
-import { addWorkComponent, saveWorkInfo } from "@/lib/estimator/works-actions";
+import { Checkbox } from "@/components/ui/checkbox";
+import { addWorkComponent, copyWorkSetup, saveWorkInfo } from "@/lib/estimator/works-actions";
 import { UomSelect } from "../../_components/uom-select";
 import type { MixRow } from "@/lib/estimator/mixes-queries";
 import type { MaterialItemRow } from "@/lib/estimator/shared";
 import type { WorkSetup } from "@/lib/estimator/works-queries";
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 /**
  * The work's unit and labour rate.
@@ -150,5 +151,107 @@ export function AddWorkComponentForm({
       </p>
       <FormMessage error={state?.error} />
     </form>
+  );
+}
+
+/**
+ * Copy this work's rate — unit, labour and materials — onto other works.
+ * Its floor twins (the same work on another floor) come ticked; any other
+ * work can be added by name.
+ */
+export function CopyRateForm({
+  workItemId,
+  twins,
+  allWorks,
+}: {
+  workItemId: string;
+  twins: { id: string; code: string; name: string; group: string | null }[];
+  allWorks: { id: string; code: string; name: string; group: string | null }[];
+}) {
+  const [picked, setPicked] = useState<string[]>(twins.map((twin) => twin.id));
+  const [extra, setExtra] = useState<typeof allWorks>([]);
+  const [adding, setAdding] = useState("");
+  const [pending, startTransition] = useTransition();
+  const [result, setResult] = useState<{ error?: string; done?: string }>();
+
+  const listed = useMemo(() => [...twins, ...extra], [twins, extra]);
+  const options = useMemo(
+    () =>
+      allWorks
+        .filter((work) => work.id !== workItemId && !listed.some((row) => row.id === work.id))
+        .map((work) => ({
+          value: work.id,
+          label: `${work.code} — ${work.name}`,
+          hint: work.group ?? undefined,
+        })),
+    [allWorks, listed, workItemId],
+  );
+
+  const toggle = (id: string, on: boolean) =>
+    setPicked((current) => (on ? [...current, id] : current.filter((row) => row !== id)));
+
+  return (
+    <div className="space-y-3">
+      {listed.length > 0 && (
+        <ul className="space-y-1.5">
+          {listed.map((work) => (
+            <li key={work.id}>
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={picked.includes(work.id)}
+                  onChange={(event) => toggle(work.id, event.target.checked)}
+                />
+                <span className="text-foreground">
+                  {work.code} — {work.name}
+                </span>
+                {work.group && <span className="text-muted text-xs">{work.group}</span>}
+              </label>
+            </li>
+          ))}
+        </ul>
+      )}
+      <SearchSelect
+        value={adding}
+        onChange={(id) => {
+          const work = allWorks.find((row) => row.id === id);
+          if (work) {
+            setExtra((current) => [...current, work]);
+            setPicked((current) => [...current, work.id]);
+          }
+          setAdding("");
+        }}
+        options={options}
+        placeholder="Add another work…"
+        className="max-w-md"
+      />
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          disabled={pending || picked.length === 0}
+          onClick={() =>
+            startTransition(async () => {
+              const outcome = await copyWorkSetup(workItemId, picked);
+              setResult(
+                outcome?.error
+                  ? { error: outcome.error }
+                  : {
+                      done: `Copied to ${picked.length} ${picked.length === 1 ? "work" : "works"}.`,
+                    },
+              );
+            })
+          }
+        >
+          {pending
+            ? "Copying…"
+            : `Copy to ${picked.length} ${picked.length === 1 ? "work" : "works"}`}
+        </Button>
+        {result?.done && <span className="text-success text-sm">{result.done}</span>}
+      </div>
+      <p className="text-muted text-xs">
+        Each ticked work gets this unit, labour rate and materials — its own materials are replaced,
+        not added to.
+      </p>
+      <FormMessage error={result?.error} />
+    </div>
   );
 }

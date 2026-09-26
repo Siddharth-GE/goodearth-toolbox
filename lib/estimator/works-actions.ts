@@ -129,3 +129,101 @@ export async function removeWorkComponent(id: string): Promise<ActionState> {
   revalidatePath("/estimator", "layout");
   return undefined;
 }
+
+/**
+ * Copy one work's rate — its unit, labour rate and materials — onto
+ * other works: the same plastering priced for the ground floor is priced
+ * the same way on the first and the attic. Each target's own materials
+ * are REPLACED by the source's (a copy, not a merge), and its unit set to
+ * the source's.
+ *
+ * A target already on an estimate in a DIFFERENT unit is refused by name:
+ * changing its unit would silently change what those quantities mean.
+ * Several writes per target and no transaction — a failure part-way says
+ * which works were done, and running it again finishes the rest.
+ */
+export async function copyWorkSetup(
+  fromWorkItemId: string,
+  toWorkItemIds: string[],
+): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+  const targets = [...new Set(Array.isArray(toWorkItemIds) ? toWorkItemIds : [])].filter(
+    (id) => typeof id === "string" && id && id !== fromWorkItemId,
+  );
+  if (!fromWorkItemId || targets.length === 0) return { error: "Tick the works to copy it to." };
+
+  const supabase = await createClient();
+  const [info, components, targetInfo, targetLines] = await Promise.all([
+    supabase
+      .from("estimator_work_info")
+      .select("uom, labour_rate")
+      .eq("work_item_id", fromWorkItemId)
+      .maybeSingle(),
+    supabase
+      .from("estimator_work_components")
+      .select("item_id, mix_id, qty_per_unit")
+      .eq("work_item_id", fromWorkItemId),
+    supabase.from("estimator_work_info").select("work_item_id, uom").in("work_item_id", targets),
+    supabase.from("estimator_estimate_lines").select("work_item_id").in("work_item_id", targets),
+  ]);
+  const readError = info.error ?? components.error ?? targetInfo.error ?? targetLines.error;
+  if (readError) {
+    console.error("copyWorkSetup (read) failed:", readError);
+    return { error: "Could not read the rate book. Try again." };
+  }
+  if (!info.data) return { error: "Set this work up first — there is nothing to copy yet." };
+  const source = info.data;
+
+  const used = new Set((targetLines.data ?? []).map((line) => line.work_item_id));
+  const unitClash = (targetInfo.data ?? []).filter(
+    (row) => row.uom !== source.uom && used.has(row.work_item_id),
+  );
+  if (unitClash.length > 0) {
+    return {
+      error: `${unitClash.length === 1 ? "One of those works is" : `${unitClash.length} of those works are`} already on an estimate measured in a different unit — changing it would change what those quantities mean. Untick it, or change it on its own page.`,
+    };
+  }
+
+  // Rows from before 0086 name neither an item nor a mix; not copied.
+  const recipe = (components.data ?? []).filter((row) => row.item_id || row.mix_id);
+  let done = 0;
+  for (const target of targets) {
+    const { error: infoError } = await supabase.from("estimator_work_info").upsert(
+      {
+        work_item_id: target,
+        uom: source.uom,
+        labour_rate: source.labour_rate,
+        created_by: user.id,
+        updated_by: user.id,
+      },
+      { onConflict: "work_item_id" },
+    );
+    const { error: clearError } = infoError
+      ? { error: infoError }
+      : await supabase.from("estimator_work_components").delete().eq("work_item_id", target);
+    const { error: insertError } =
+      clearError || recipe.length === 0
+        ? { error: clearError }
+        : await supabase.from("estimator_work_components").insert(
+            recipe.map((row) => ({
+              work_item_id: target,
+              item_id: row.item_id,
+              mix_id: row.mix_id,
+              qty_per_unit: row.qty_per_unit,
+              created_by: user.id,
+              updated_by: user.id,
+            })),
+          );
+    if (insertError) {
+      console.error("copyWorkSetup (write) failed:", insertError);
+      revalidatePath("/estimator", "layout");
+      return {
+        error: `Copied to ${done} of ${targets.length} works, then something failed. Try again to finish the rest.`,
+      };
+    }
+    done++;
+  }
+
+  revalidatePath("/estimator", "layout");
+  return undefined;
+}

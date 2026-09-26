@@ -36,7 +36,7 @@ export function AddLineDialog({
   if (works.length === 0) {
     return (
       <p className="text-muted text-sm">
-        No works are set up yet — give a work a unit on the Works tab before adding it here.
+        No works are set up yet — give a work a unit in the Rate book before adding it here.
       </p>
     );
   }

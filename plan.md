@@ -7,7 +7,7 @@ _Planned 2026-09-25/26 by Opus on the founder's instruction ("step out, have a l
 - [x] 0. Branch and plan (Opus, 2026-09-26)
 - [x] 1. Indents pulls from any official estimate `[Opus]` — no migration
 - [x] 2. Clear the ground `[Opus]` — no migration
-- [ ] 3. The row explains itself; Works becomes the Rate book `[Opus]` — no migration
+- [x] 3. The row explains itself; Works becomes the Rate book `[Opus]` — no migration
 - [ ] 4. Measure first `[Opus drafts M1, Fable reviews before db:apply]`
 - [ ] 5. One estimate per villa `[Opus drafts M2, Fable reviews before db:apply]` — **founder confirms the lifecycle first**
 - [ ] 6. Site check and the villa comparison `[Opus]` — no migration
@@ -54,15 +54,15 @@ Selections and Budgets are interiors and stay out of this (founder, 2026-09-26).
 - Fix the wording that lies: the Copy dialog ("nothing else to copy"), the welcome's "unit and a recipe" and "comparison tab", the Works page's "changes here update every one of them", the successor banner on copied templates, the price box's `/[,s₹]/`.
 - A searchable material picker in place of the 2,058-option dropdowns.
 - `submitEstimate` returns `ActionState` instead of throwing when a read fails.
-- (Moved to step 3, which rebuilds the page: the estimate page loads only what its state shows.)
+- (Dropped: loading less for a submitted estimate would cost every draft an extra round trip per edit, since the page cannot know the status before it reads the estimate. Drafts are where people work.)
 
 ### 3. The row explains itself; Works becomes the Rate book `[Opus]`
 
 - Tap a row → its rate build-up inline: labour + each material × price = rate, each figure tagged Rate book / This villa, with ↺.
 - Labour typed there; **Swap** a material for this villa; a Masters price edited in place when the person holds `/masters`.
-- Works and Mixes become one **Rate book** tab with search, a "used but not priced" list as the only setup to-do, and "copy this rate to…" for the ground / first / attic twins.
-- Quantity and rate cells save without re-running the page (the Budgets `saveLine` precedent).
+- Works becomes the **Rate book** tab with search, a rate per unit on every row, a "used but not priced" list as the setup to-do, and "copy this rate to…" with the ground / first / attic twins ticked. **Mixes stay a tab of their own** — folded into a page of 172 works they would be lost.
 - The welcome stops numbering a setup path.
+- **Deferred:** cells still refresh the page on save. Skipping the refresh (the Budgets `saveLine` precedent) needs the whole BOQ computed in the browser; worth doing once the shape has settled on staging.
 
 ### 4. Measure first `[Opus drafts M1, Fable reviews]`
 

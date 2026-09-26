@@ -7,7 +7,7 @@ import { ToolNav } from "@/components/ui/tool-nav";
  */
 const TABS = [
   { key: "estimates", href: "/estimator/estimates", label: "Estimates" },
-  { key: "works", href: "/estimator/works", label: "Works" },
+  { key: "works", href: "/estimator/works", label: "Rate book" },
   { key: "mixes", href: "/estimator/mixes", label: "Mixes" },
 ] as const;
 
