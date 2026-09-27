@@ -1206,6 +1206,7 @@ export type Database = {
       }
       design_stages: {
         Row: {
+          code: string | null
           created_at: string
           created_by: string | null
           id: string
@@ -1216,6 +1217,7 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          code?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -1226,6 +1228,7 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          code?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -1381,6 +1384,7 @@ export type Database = {
           drawing_revision_id: string
           file_name: string
           id: string
+          sheet_code: string | null
           sort_order: number
           storage_path: string
           uploaded_by: string | null
@@ -1391,6 +1395,7 @@ export type Database = {
           drawing_revision_id: string
           file_name: string
           id?: string
+          sheet_code?: string | null
           sort_order?: number
           storage_path: string
           uploaded_by?: string | null
@@ -1401,6 +1406,7 @@ export type Database = {
           drawing_revision_id?: string
           file_name?: string
           id?: string
+          sheet_code?: string | null
           sort_order?: number
           storage_path?: string
           uploaded_by?: string | null
@@ -1601,6 +1607,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           description: string | null
+          design_stage_id: string | null
           id: string
           is_active: boolean
           name: string
@@ -1613,6 +1620,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          design_stage_id?: string | null
           id?: string
           is_active?: boolean
           name: string
@@ -1625,6 +1633,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          design_stage_id?: string | null
           id?: string
           is_active?: boolean
           name?: string
@@ -1633,6 +1642,13 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "drawing_sets_design_stage_id_fkey"
+            columns: ["design_stage_id"]
+            isOneToOne: false
+            referencedRelation: "design_stages"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "drawing_sets_created_by_fkey"
             columns: ["created_by"]
