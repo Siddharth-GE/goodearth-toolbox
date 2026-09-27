@@ -17,7 +17,7 @@ Branch `feature/design-management-sets` off `staging`. Built by Opus on 2026-09-
 4. `[Opus]` The file route, Supervisors' Drawings list and the transmittal page name sheets through it. — done
 5. `[Opus]` `startTransmittal` replaces create/add/re-send/remove; upload requires a sheet code; stage codes editable. — done
 6. `[Opus]` Screens: New transmittal window (stage, then that stage's sets or a new one), one-set workspace, sheets by code, sets listed by stage. — done
-7. `[Founder]` Run the wipe on staging:
+7. `[Founder]` Run the wipe on staging — done 2026-09-27, every count 0 afterwards:
    ```
    npx tsx scripts/wipe-drawings.ts --project ipstebqawrvhkyntctrv
    npx tsx scripts/wipe-drawings.ts --project ipstebqawrvhkyntctrv --commit
