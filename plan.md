@@ -122,7 +122,7 @@ Each step is one commit with a plain-English message. Owner tags per `MODELS.md`
 - Header while draft: `Badge` Draft + Issue only. **Cover sheet (PDF)** shows only once issued (the PDF route is unchanged and still answers for a draft if someone has the URL).
 - Keep `?issued=` success message.
 
-### 7. `[Sonnet]` The villa page's sets list goes somewhere
+### 7. `[Sonnet]` The villa page's sets list goes somewhere — done (Opus)
 
 - `listVillaDrawingSetStates`: `released` gains `transmittalId: string | null` — the issued transmittal with the earliest `issued_at` among lines carrying that revision (the same `transmittal_lines` → `transmittals` reads as step 3, widened to released ids; read `status, issued_at`).
 - Villa page rows become `Link`s to `/design-management/transmittals/{id}` (draft → its draft transmittal; released → the issuing one); a row with neither stays plain text. Note reads "Each set at its latest revision. Open one to see its sheets."
