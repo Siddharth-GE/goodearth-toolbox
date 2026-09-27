@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { LinkButton } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { FormMessage } from "@/components/ui/form-message";
 import { PageTitle } from "@/components/ui/page-title";
 import { Section } from "@/components/ui/section";
@@ -12,6 +13,7 @@ import {
   type DrawingRevisionRow,
   type VillaDrawingSetState,
 } from "@/lib/design-management/queries";
+import { transmittalReadiness } from "@/lib/design-management/readiness";
 import { formatDate } from "@/lib/format";
 import { getWorksTree, type WorksTreeCategory } from "@/lib/masters/works";
 import { FileText } from "lucide-react";
@@ -19,14 +21,12 @@ import { notFound } from "next/navigation";
 
 import { DraftRevisionEditor } from "../../_components/draft-revision-editor";
 import { RevisionLog } from "../../_components/revision-log";
+import { AddDrawingDialog } from "./_components/add-drawing-dialog";
 import {
-  AddDrawingsBoard,
   DeleteDraftTransmittalButton,
-  DraftDetailsForm,
-  IssueTransmittalButton,
-  NewDrawingSetForm,
+  DraftDetails,
+  IssueBar,
   RemoveLineButton,
-  ResendReleasedPicker,
 } from "./_components/transmittal-forms";
 
 const revisionStatusVariant = {
@@ -40,9 +40,9 @@ const revisionStatusVariant = {
  *
  * Founder, 2026-08-22, redirecting the flow on the staging vet: "press
  * new transmittal, upload the docs and issue to site". So a draft
- * carries the stage and note, the drawings going out, the upload and
- * work-link editor for each drawing still in draft, and the board that
- * starts or revises a set. An issued one is a record: the same facts
+ * carries, top to bottom in the order the work happens, the stage and
+ * note, the drawings going out (each draft with its sheets), one Add
+ * drawing dialog, and Issue at the top. An issued one is a record: the same facts
  * with nothing to press but the cover sheet, because that is what "what
  * did site have on the 22nd" means.
  */
@@ -74,19 +74,23 @@ export default async function TransmittalDetailPage({
     .map((stage) => ({ id: stage.id, name: stage.name }));
 
   const setIdsOnTransmittal = transmittal.lines.map((line) => line.setId);
-  const onTransmittal = new Set(setIdsOnTransmittal);
-
-  // A set already on this transmittal is offered neither path: one line
-  // per set keeps "what went out" readable, and the database is happy
-  // either way, so the screen picks the version a person can follow.
-  const resendOptions = setStates
-    .filter((set) => set.released !== null && !onTransmittal.has(set.setId))
-    .map((set) => ({
-      revisionId: set.released!.revisionId,
-      label: `${set.setCode ? `${set.setCode} — ${set.setName}` : set.setName} — R${
-        set.released!.revisionNo
-      } (released) · ${set.released!.fileCount} ${set.released!.fileCount === 1 ? "file" : "files"}`,
-    }));
+  const readiness = transmittalReadiness(
+    transmittal.lines.map((line) => ({
+      setName: line.setName,
+      revisionNo: line.revisionNo,
+      revisionStatus: line.revisionStatus,
+      fileCount: line.files.length,
+      note: line.revisionNote,
+    })),
+  );
+  const addDrawing = (variant: "primary" | "secondary") => (
+    <AddDrawingDialog
+      transmittalId={transmittal.id}
+      sets={setStates}
+      setIdsOnTransmittal={setIdsOnTransmittal}
+      variant={variant}
+    />
+  );
 
   return (
     <div className="space-y-4">
@@ -98,17 +102,28 @@ export default async function TransmittalDetailPage({
         actions={
           <>
             <Badge variant={isDraft ? "warning" : "success"}>{isDraft ? "Draft" : "Issued"}</Badge>
-            <LinkButton
-              href={`/design-management/transmittals/${transmittal.id}/pdf`}
-              variant="secondary"
-              plain
-            >
-              Cover sheet (PDF)
-            </LinkButton>
-            {isDraft && <IssueTransmittalButton transmittalId={transmittal.id} />}
+            {/* The cover sheet is what goes out beside the drawings, so it
+                is offered once there is something that went out. */}
+            {!isDraft && (
+              <LinkButton
+                href={`/design-management/transmittals/${transmittal.id}/pdf`}
+                variant="secondary"
+                plain
+              >
+                Cover sheet (PDF)
+              </LinkButton>
+            )}
           </>
         }
       />
+
+      {isDraft && (
+        <IssueBar
+          transmittalId={transmittal.id}
+          problem={readiness.problem}
+          drawingCount={transmittal.lines.length}
+        />
+      )}
 
       {issued && (
         <FormMessage
@@ -117,17 +132,16 @@ export default async function TransmittalDetailPage({
       )}
 
       {isDraft ? (
-        <Section
-          title="Details"
-          note="A draft can still be changed. Issuing it gives it a number and releases its drawings."
-        >
-          <DraftDetailsForm
+        // No heading and no Save button: two fields that save themselves,
+        // at the top because they are the first thing to check.
+        <Card className="p-4">
+          <DraftDetails
             transmittalId={transmittal.id}
             stages={stageOptions}
             stageId={transmittal.stageId}
             note={transmittal.note}
           />
-        </Section>
+        </Card>
       ) : (
         // Said as a sentence rather than a grid of labels: it is one
         // fact — this went out, for this stage, on this day, from this
@@ -143,17 +157,21 @@ export default async function TransmittalDetailPage({
       )}
 
       <Section
-        title="Drawings on this transmittal"
+        title="Drawings"
         note={
-          transmittal.lines.length === 0
-            ? undefined
+          isDraft
+            ? "Each drawing here goes to site when you press Issue to site."
             : `${transmittal.lines.length} ${transmittal.lines.length === 1 ? "drawing" : "drawings"}, in sheet order.`
         }
+        aside={isDraft && transmittal.lines.length > 0 ? addDrawing("secondary") : undefined}
       >
         {transmittal.lines.length === 0 ? (
-          <p className="text-danger text-sm font-medium">
-            No drawings on this transmittal yet — add one below before issuing it.
-          </p>
+          <EmptyState
+            icon={FileText}
+            title="No drawings yet"
+            description="Add a new drawing set, or revise one this villa already has."
+            action={isDraft ? addDrawing("primary") : undefined}
+          />
         ) : (
           <ul className="divide-border divide-y">
             {transmittal.lines.map((line) => {
@@ -212,7 +230,9 @@ export default async function TransmittalDetailPage({
                       <RemoveLineButton
                         lineId={line.lineId}
                         label={setLabel}
+                        revisionNo={line.revisionNo}
                         isDraft={lineIsDraft}
+                        fileCount={line.files.length}
                       />
                     )}
                   </div>
@@ -230,32 +250,14 @@ export default async function TransmittalDetailPage({
         )}
       </Section>
 
-      {isDraft && (
-        <Section
-          title="Add drawings"
-          note="Revise a set this villa already has, name a new one, or send a released drawing again."
-        >
-          <AddDrawingsBoard
-            transmittalId={transmittal.id}
-            sets={setStates}
-            setIdsOnTransmittal={setIdsOnTransmittal}
-          />
-          <div className="border-border mt-3 border-t pt-3">
-            <NewDrawingSetForm transmittalId={transmittal.id} />
-          </div>
-          {resendOptions.length > 0 && (
-            <div className="border-border mt-3 border-t pt-3">
-              <ResendReleasedPicker transmittalId={transmittal.id} options={resendOptions} />
-            </div>
-          )}
-        </Section>
-      )}
-
       {/* One way back and one way out. The link to the villa is the back
           link at the top — repeating it here was part of the clutter. */}
       {isDraft && (
         <div className="flex justify-end">
-          <DeleteDraftTransmittalButton transmittalId={transmittal.id} />
+          <DeleteDraftTransmittalButton
+            transmittalId={transmittal.id}
+            draftCount={transmittal.lines.filter((line) => line.revisionStatus === "draft").length}
+          />
         </div>
       )}
     </div>

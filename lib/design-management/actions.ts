@@ -8,6 +8,7 @@ import { dbErrorMessage } from "@/lib/db-error";
 import { GRANT } from "@/lib/design-management/shared";
 import { DRAWINGS_BUCKET } from "@/lib/design-management/storage";
 import { text } from "@/lib/form-data";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -371,44 +372,72 @@ export async function setDrawingRevisionWorks(
 // ---------------------------------------------------------------------
 
 /**
- * Raises an EMPTY draft transmittal and opens it.
+ * Raises an EMPTY draft transmittal and opens it — one press, no questions.
  *
- * The founder redirected the flow on the staging vet (2026-08-22):
- * "press new transmittal, upload the docs and issue to site". So this
- * asks only what a transmittal is _for_ — the villa it belongs to, the
- * design stage it goes out at, and an optional note — and the drawings
- * are assembled on the transmittal itself, which is now the workspace.
+ * The stage is `not null` (0091), so it is guessed rather than asked:
+ * the stage of this villa's most recent transmittal if still active,
+ * else the first active stage on the list. The workspace shows it at the
+ * top and saves a change the moment it is made, so a wrong guess costs
+ * one pick. Asking in a pop-up and then again on the page was the first
+ * thing a designer hit (2026-09-27 audit).
  *
  * The header carries no number: 0091's CHECK ties `number`, `issued_at`
- * and `issued_by` to the issued status both ways, so a draft holding a
- * number is refused by the database. The number is minted on Issue and
- * nowhere else, which is why an abandoned draft cannot burn TR-0003.
- *
- * "At least one drawing" is not checked here any more — it is enforced
- * where it belongs, at Issue, by `issue_transmittal` itself.
+ * and `issued_by` to the issued status both ways, so the number is
+ * minted on Issue and an abandoned draft cannot burn TR-0003. "At least
+ * one drawing" is enforced at Issue by `issue_transmittal` itself.
  */
-export async function createTransmittal(
-  unitId: string,
-  _prev: ActionState,
-  formData: FormData,
-): Promise<ActionState> {
+export async function createTransmittal(unitId: string): Promise<ActionState> {
   const user = await requireTool(GRANT);
-
-  const stageId = text(formData, "design_stage_id");
-  if (!stageId) return { error: "Pick the design stage this goes out at." };
-
-  const note = text(formData, "note");
-  if (note.length > NOTE_LIMIT) return { error: `Keep the note under ${NOTE_LIMIT} characters.` };
-
   const supabase = await createClient();
+
+  const { data: previous, error: previousError } = await supabase
+    .from("transmittals")
+    .select("design_stage_id")
+    .eq("unit_id", unitId)
+    .order("created_at", { ascending: false })
+    .order("id")
+    .limit(1)
+    .maybeSingle();
+  if (previousError) {
+    console.error("createTransmittal previous stage read failed:", previousError);
+    return { error: "Could not start the transmittal. Try again." };
+  }
+
+  let stageId: string | null = previous?.design_stage_id ?? null;
+  if (stageId) {
+    // The last stage may since have been retired; a new draft should not
+    // start on a stage nobody can pick any more.
+    const { data: stage, error: stageError } = await supabase
+      .from("design_stages")
+      .select("is_active")
+      .eq("id", stageId)
+      .maybeSingle();
+    if (stageError) {
+      console.error("createTransmittal stage read failed:", stageError);
+      return { error: "Could not start the transmittal. Try again." };
+    }
+    if (!stage?.is_active) stageId = null;
+  }
+  if (!stageId) {
+    const { data: first, error: firstError } = await supabase
+      .from("design_stages")
+      .select("id")
+      .eq("is_active", true)
+      .order("sort_order")
+      .order("id")
+      .limit(1)
+      .maybeSingle();
+    if (firstError) {
+      console.error("createTransmittal first stage read failed:", firstError);
+      return { error: "Could not start the transmittal. Try again." };
+    }
+    if (!first) return { error: "Add a design stage first, under Design stages." };
+    stageId = first.id;
+  }
+
   const { data: transmittal, error } = await supabase
     .from("transmittals")
-    .insert({
-      unit_id: unitId,
-      design_stage_id: stageId,
-      note: note || null,
-      created_by: user.id,
-    })
+    .insert({ unit_id: unitId, design_stage_id: stageId, created_by: user.id })
     .select("id")
     .single();
   if (error) {
@@ -444,12 +473,11 @@ export async function createTransmittal(
  */
 export async function createSetOnTransmittal(
   transmittalId: string,
-  _prev: ActionState,
-  formData: FormData,
+  rawName: string,
 ): Promise<ActionState> {
   const user = await requireTool(GRANT);
 
-  const name = text(formData, "name");
+  const name = rawName.trim();
   if (!name) return { error: "Give the drawing set a name." };
   if (name.length > NAME_LIMIT) return { error: `Keep the name under ${NAME_LIMIT} characters.` };
 
@@ -511,6 +539,9 @@ export async function createSetOnTransmittal(
     transmittal.unit_id,
     started.revisionId,
   );
+  // No line, no way to open the draft — take it back out rather than
+  // leave it behind. The set with nothing on it is invisible either way.
+  if (lineError) await discardDraftRevision(supabase, started.revisionId);
 
   revalidatePath("/design-management", "layout");
   return lineError ? { error: lineError } : undefined;
@@ -520,7 +551,7 @@ export async function createSetOnTransmittal(
  * Puts a drawing set on this transmittal, starting a draft revision for
  * it if one isn't already open.
  *
- * This is the "Add drawings" board's one action, and it covers all three
+ * This is the Add drawing dialog's main action, and it covers all three
  * of the founder's cases with the same press:
  *
  *   - the set has a draft open on this villa → that draft goes on the
@@ -571,13 +602,38 @@ export async function createRevisionOnTransmittal(
     return { error: "Could not add that drawing. Try again." };
   }
 
+  // A draft lives on exactly one draft transmittal. One already sitting
+  // on another is that transmittal's to finish — putting it on two would
+  // mean removing it from either deletes it from both.
+  if (openDraft) {
+    const { data: elsewhere, error: elsewhereError } = await supabase
+      .from("transmittal_lines")
+      .select("transmittal_id")
+      .eq("drawing_revision_id", openDraft.id)
+      .neq("transmittal_id", transmittalId)
+      .limit(1)
+      .maybeSingle();
+    if (elsewhereError) {
+      console.error("createRevisionOnTransmittal line read failed:", elsewhereError);
+      return { error: "Could not add that drawing. Try again." };
+    }
+    if (elsewhere) {
+      return {
+        error:
+          "This set's draft is already on another transmittal. Open that one to finish it, or remove it there first.",
+      };
+    }
+  }
+
   let revisionId = openDraft?.id;
   let seedFailed = false;
+  let startedHere = false;
   if (!revisionId) {
     const started = await startDraftRevision(supabase, user.id, transmittal.unit_id, setId);
     if ("error" in started) return started;
     revisionId = started.revisionId;
     seedFailed = started.seedFailed;
+    startedHere = true;
   }
 
   const lineError = await appendTransmittalLine(
@@ -587,6 +643,9 @@ export async function createRevisionOnTransmittal(
     transmittal.unit_id,
     revisionId,
   );
+  // A revision started for this line and left on no transmittal would be
+  // a draft nobody can open — take it back out.
+  if (lineError && startedHere) await discardDraftRevision(supabase, revisionId);
 
   revalidatePath("/design-management", "layout");
   // Both partials are said out loud rather than shown as a plain
@@ -639,30 +698,52 @@ async function appendTransmittalLine(
   return dbErrorMessage(error, "Could not add that drawing. Try again.");
 }
 
-/** Note and stage, editable only while the transmittal is a draft — the
- *  guard trigger refuses both once it has been issued, and that refusal
- *  is shown rather than swallowed. */
-export async function updateDraftTransmittal(
+/**
+ * Stage and note, each saved the moment it changes — editable only while
+ * the transmittal is a draft. The guard trigger refuses both once it has
+ * been issued, and that refusal is shown rather than swallowed. Two
+ * actions, not one form, because the screen saves each field on its own
+ * and a Save button for two fields was one more thing to forget.
+ */
+export async function setDraftTransmittalStage(
   transmittalId: string,
-  _prev: ActionState,
-  formData: FormData,
+  stageId: string,
 ): Promise<ActionState> {
   await requireTool(GRANT);
-
-  const stageId = text(formData, "design_stage_id");
   if (!stageId) return { error: "Pick the design stage this goes out at." };
-
-  const note = text(formData, "note");
-  if (note.length > NOTE_LIMIT) return { error: `Keep the note under ${NOTE_LIMIT} characters.` };
 
   const supabase = await createClient();
   const { error } = await supabase
     .from("transmittals")
-    .update({ design_stage_id: stageId, note: note || null })
+    .update({ design_stage_id: stageId })
     .eq("id", transmittalId);
   if (error) {
-    console.error("updateDraftTransmittal failed:", error);
-    return { error: dbErrorMessage(error, "Could not save this transmittal. Try again.") };
+    console.error("setDraftTransmittalStage failed:", error);
+    return { error: dbErrorMessage(error, "Could not change the stage. Try again.") };
+  }
+
+  revalidatePath("/design-management", "layout");
+  return undefined;
+}
+
+export async function setDraftTransmittalNote(
+  transmittalId: string,
+  note: string,
+): Promise<ActionState> {
+  await requireTool(GRANT);
+  const trimmed = note.trim();
+  if (trimmed.length > NOTE_LIMIT) {
+    return { error: `Keep the note under ${NOTE_LIMIT} characters.` };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("transmittals")
+    .update({ note: trimmed || null })
+    .eq("id", transmittalId);
+  if (error) {
+    console.error("setDraftTransmittalNote failed:", error);
+    return { error: dbErrorMessage(error, "Could not save the note. Try again.") };
   }
 
   revalidatePath("/design-management", "layout");
@@ -713,10 +794,11 @@ export async function addTransmittalLine(
 /**
  * Takes a drawing off a draft transmittal.
  *
- * `discardDraft` is the second half of the choice the screen offers on a
- * draft line: taking it off this transmittal is not the same act as
- * throwing the drawing away, and guessing between them would either
- * strand a draft nobody can find or destroy work nobody meant to lose.
+ * The screen always passes `discardDraft = true` for a draft line, after
+ * a confirmation that says the sheets go too: a draft lives on exactly
+ * one draft transmittal, and one left on none is a draft nobody can
+ * open (2026-09-27 audit). A released line being re-sent passes false —
+ * nothing is lost by taking it off.
  *
  * The ORDER is the whole point when both are asked for. The line goes
  * first, because `delete_draft_revision` refuses while the revision is
@@ -800,9 +882,16 @@ export async function issueTransmittal(transmittalId: string): Promise<ActionSta
 }
 
 /**
- * A draft raised by mistake, gone entirely — header and lines in one
- * transaction (`delete_draft_transmittal`, 0091 §10), because two
- * requests can fail in between and strand a header with its lines gone.
+ * A draft raised by mistake, gone entirely — and its draft drawings with
+ * it. The screen says so before the press.
+ *
+ * The header and lines go in one transaction (`delete_draft_transmittal`,
+ * 0091 §10), because two requests can fail in between and strand a
+ * header with its lines gone. THEN each draft revision that was on it,
+ * rows before files (`discardDraftRevision`) — a draft left on no
+ * transmittal is one nobody can open (2026-09-27 audit). Released
+ * drawings that were being re-sent are untouched.
+ *
  * An issued transmittal is refused by the function and by the guard: it
  * is the answer to "what did site have on the 22nd".
  */
@@ -810,14 +899,48 @@ export async function deleteDraftTransmittal(transmittalId: string): Promise<Act
   await requireTool(GRANT);
   const supabase = await createClient();
 
-  // Read the villa BEFORE the row goes: there is no company-wide
-  // transmittals list to land on any more, and one step back from a
-  // transmittal is its plot.
-  const { data: transmittal } = await supabase
+  // Read the villa and the drafts BEFORE the rows go: afterwards there is
+  // nothing left pointing at either.
+  const { data: header, error: headerError } = await supabase
     .from("transmittals")
     .select("unit_id")
     .eq("id", transmittalId)
     .maybeSingle();
+  if (headerError) {
+    console.error("deleteDraftTransmittal read failed:", headerError);
+    return { error: "Could not delete this draft. Try again." };
+  }
+
+  // Complete, not capped: a draft missed here is a draft left behind.
+  // fetchAll throws on a failed read; an action answers with a sentence.
+  let draftIds: string[];
+  try {
+    const lines = await fetchAll<{ drawing_revision_id: string }>((from, to) =>
+      supabase
+        .from("transmittal_lines")
+        .select("drawing_revision_id")
+        .eq("transmittal_id", transmittalId)
+        .order("id")
+        .range(from, to),
+    );
+    const revisionIds = lines.map((line) => line.drawing_revision_id);
+    const drafts =
+      revisionIds.length > 0
+        ? await fetchAll<{ id: string }>((from, to) =>
+            supabase
+              .from("drawing_revisions")
+              .select("id")
+              .in("id", revisionIds)
+              .eq("status", "draft")
+              .order("id")
+              .range(from, to),
+          )
+        : [];
+    draftIds = drafts.map((draft) => draft.id);
+  } catch (readError) {
+    console.error("deleteDraftTransmittal drafts read failed:", readError);
+    return { error: "Could not delete this draft. Try again." };
+  }
 
   const { error } = await supabase.rpc("delete_draft_transmittal", {
     p_transmittal_id: transmittalId,
@@ -827,8 +950,16 @@ export async function deleteDraftTransmittal(transmittalId: string): Promise<Act
     return { error: dbErrorMessage(error, "Could not delete this draft. Try again.") };
   }
 
+  // The transmittal is already gone, so there is no page to stay on and
+  // report from. A draft that would not delete stays on the villa, where
+  // the Add drawing dialog offers "Continue draft" for it.
+  for (const draftId of draftIds) {
+    const discarded = await discardDraftRevision(supabase, draftId);
+    if (discarded.error) {
+      console.error("deleteDraftTransmittal left a draft behind:", draftId, discarded.error);
+    }
+  }
+
   revalidatePath("/design-management", "layout");
-  redirect(
-    transmittal ? `/design-management/villas/${transmittal.unit_id}` : "/design-management/villas",
-  );
+  redirect(header ? `/design-management/villas/${header.unit_id}` : "/design-management/villas");
 }

@@ -1,11 +1,9 @@
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageTitle } from "@/components/ui/page-title";
 import { listVillas } from "@/lib/design-management/queries";
-import { formatDate } from "@/lib/format";
 import { HardHat } from "lucide-react";
-import Link from "next/link";
+
+import { VillaGrid } from "./_components/villa-grid";
 
 /**
  * Every villa as a card, labelled by project.
@@ -40,52 +38,10 @@ export default async function DesignVillasPage() {
     );
   }
 
-  const projects = [...new Set(villas.map((villa) => villa.projectName))].sort();
-
   return (
     <div className="space-y-5">
       {header}
-      {projects.map((projectName) => (
-        <div key={projectName} className="space-y-2">
-          <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
-            {projectName}
-          </p>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {villas
-              .filter((villa) => villa.projectName === projectName)
-              .map((villa) => (
-                <Link
-                  key={villa.unitId}
-                  href={`/design-management/villas/${villa.unitId}`}
-                  className="focus-visible:ring-accent rounded-2xl focus-visible:ring-2 focus-visible:outline-none"
-                >
-                  <Card className="hover:border-accent h-full space-y-2 p-4 transition-colors">
-                    <div>
-                      <p className="text-foreground text-sm font-semibold">{villa.villaName}</p>
-                      <p className="text-muted text-xs">Plot {villa.plotName}</p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <Badge variant={villa.transmittalsIssued > 0 ? "success" : "neutral"}>
-                        {villa.transmittalsIssued} issued
-                      </Badge>
-                      {villa.draftTransmittals > 0 && (
-                        <Badge variant="warning">
-                          {villa.draftTransmittals} draft
-                          {villa.draftTransmittals === 1 ? "" : "s"}
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-muted text-xs">
-                      {villa.lastIssuedAt
-                        ? `Last issued ${formatDate(villa.lastIssuedAt)}`
-                        : "Nothing issued yet"}
-                    </p>
-                  </Card>
-                </Link>
-              ))}
-          </div>
-        </div>
-      ))}
+      <VillaGrid villas={villas} />
     </div>
   );
 }

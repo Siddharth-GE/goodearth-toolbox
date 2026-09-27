@@ -16,9 +16,8 @@ export default async function DesignManagementPage() {
     <ToolWelcome
       icon="DraftingCompass"
       intro={[
-        "This is where a villa's drawings live: what has been sent to site, what revision each drawing set is on, and what is still being put together.",
-        "Everything happens on a villa. Open one to see its transmittals, then start a new transmittal to upload drawings, revise a set and issue it to site.",
-        "A transmittal is the formal record of what was issued, at which design stage, and when. Relay still tracks who is holding each task; this tool holds the drawings themselves.",
+        "This is where a villa's drawings live: what has gone to site, what revision each set is on, and what is still being prepared.",
+        "Open a villa, press New transmittal, add the drawings and issue them. Relay tracks who holds each task; this tool holds the drawings.",
       ]}
       stats={[
         {

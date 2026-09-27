@@ -7,10 +7,11 @@ import {
   listDesignStages,
   listVillaDrawingSetStates,
 } from "@/lib/design-management/queries";
-import { Send } from "lucide-react";
+import { ChevronRight, Send } from "lucide-react";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { CreateTransmittalDialog } from "./_components/create-transmittal-dialog";
+import { NewTransmittalButton } from "./_components/new-transmittal-button";
 import { TransmittalList } from "./_components/transmittal-list";
 
 /**
@@ -36,9 +37,7 @@ export default async function VillaDesignPage({ params }: { params: Promise<{ un
   ]);
   if (!villa) notFound();
 
-  const activeStages = stages
-    .filter((stage) => stage.isActive)
-    .map((stage) => ({ id: stage.id, name: stage.name }));
+  const hasStages = stages.some((stage) => stage.isActive);
 
   return (
     <div className="space-y-4">
@@ -47,14 +46,14 @@ export default async function VillaDesignPage({ params }: { params: Promise<{ un
         description={`Plot ${villa.plotName} · ${villa.projectName}`}
         backHref="/design-management/villas"
         backLabel="Villas"
-        actions={<CreateTransmittalDialog unitId={villa.unitId} stages={activeStages} />}
+        actions={<NewTransmittalButton unitId={villa.unitId} hasStages={hasStages} />}
       />
 
       {villa.transmittals.length === 0 ? (
         <EmptyState
           icon={Send}
           title="Nothing has been sent to site for this villa yet"
-          description="Press New transmittal to start one, upload its drawings, and issue them."
+          description="Press New transmittal to start one, add its drawings, and issue them."
         />
       ) : (
         <Section title="Transmittals" note="Newest first. Open one to see what went out on it.">
@@ -65,28 +64,47 @@ export default async function VillaDesignPage({ params }: { params: Promise<{ un
       {sets.length > 0 && (
         <Section
           title="Drawing sets on this plot"
-          note="Each set at its latest revision. Open the transmittal that carried it to see the sheets."
+          note="Each set at its latest revision. Open one to see its sheets."
         >
           <ul className="divide-border divide-y">
             {sets.map((set) => {
               const latest = set.draft ?? set.released;
-              return (
-                <li
-                  key={set.setId}
-                  className="flex flex-wrap items-center justify-between gap-2 py-2"
-                >
+              // A draft opens on the transmittal it is being prepared on;
+              // a released set on the transmittal that sent it.
+              const href = latest?.transmittalId
+                ? `/design-management/transmittals/${latest.transmittalId}`
+                : null;
+              const body = (
+                <>
                   <span className="text-foreground min-w-0 text-sm">
                     {set.setCode ? `${set.setCode} — ${set.setName}` : set.setName}
                   </span>
                   <span className="flex items-center gap-2">
                     <span className="text-muted text-xs">
                       R{latest?.revisionNo ?? 0} · {latest?.fileCount ?? 0}{" "}
-                      {latest?.fileCount === 1 ? "file" : "files"}
+                      {latest?.fileCount === 1 ? "sheet" : "sheets"}
                     </span>
                     <Badge variant={set.draft ? "warning" : "success"}>
                       {set.draft ? "Draft" : "Released"}
                     </Badge>
+                    {href && <ChevronRight className="text-muted size-4 shrink-0" />}
                   </span>
+                </>
+              );
+              return (
+                <li key={set.setId}>
+                  {href ? (
+                    <Link
+                      href={href}
+                      className="hover:bg-foreground/[0.025] -mx-2 flex flex-wrap items-center justify-between gap-2 rounded-lg px-2 py-2"
+                    >
+                      {body}
+                    </Link>
+                  ) : (
+                    <div className="flex flex-wrap items-center justify-between gap-2 py-2">
+                      {body}
+                    </div>
+                  )}
                 </li>
               );
             })}
