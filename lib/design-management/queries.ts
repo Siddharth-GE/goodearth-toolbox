@@ -381,6 +381,13 @@ export type VillaRevisionSummary = {
   revisionNo: number;
   note: string | null;
   fileCount: number;
+  /**
+   * Where to open it. For a draft: the draft transmittal it sits on, or
+   * null for a draft on none (an orphan from before drafts were deleted
+   * with their line). For a released revision: the transmittal that
+   * issued it — the earliest issued one carrying it.
+   */
+  transmittalId: string | null;
 };
 
 export type VillaDrawingSetState = {
@@ -412,10 +419,10 @@ export type VillaDrawingSetState = {
  * Two villas that both make a "Working Drawings" are two rows, which is
  * intended.
  *
- * It feeds two screens: the villa page's read-only "Drawing sets on this
- * plot", and the transmittal's Add-drawings board (Continue draft /
- * Revise). A set that has never been drawn here cannot be reached from
- * either — that is what the transmittal's "New drawing set" control is
+ * It feeds two screens: the villa page's "Drawing sets on this
+ * plot" (each row opening its transmittal), and the transmittal's Add
+ * drawing dialog. A set that has never been drawn here cannot be reached from
+ * either — that is what the dialog's "New drawing set" field is
  * for.
  *
  * A retired set still appears if it carries history here, so a villa
@@ -484,6 +491,57 @@ export async function listVillaDrawingSetStates(unitId: string): Promise<VillaDr
     fileCounts.set(file.drawing_revision_id, (fileCounts.get(file.drawing_revision_id) ?? 0) + 1);
   }
 
+  // Which transmittal to open for each current revision: the lines that
+  // carry it, then those transmittals' status and date. Two flat reads
+  // merged through Maps, never an embed (BUGCATCHER #2).
+  const lines =
+    countableIds.length > 0
+      ? await fetchAll<{ drawing_revision_id: string; transmittal_id: string }>((from, to) =>
+          supabase
+            .from("transmittal_lines")
+            .select("drawing_revision_id, transmittal_id")
+            .in("drawing_revision_id", countableIds)
+            .order("id")
+            .range(from, to),
+        )
+      : [];
+  const lineTransmittalIds = [...new Set(lines.map((line) => line.transmittal_id))];
+  const lineTransmittals =
+    lineTransmittalIds.length > 0
+      ? await fetchAll<{ id: string; status: string; issued_at: string | null }>((from, to) =>
+          supabase
+            .from("transmittals")
+            .select("id, status, issued_at")
+            .in("id", lineTransmittalIds)
+            .order("id")
+            .range(from, to),
+        )
+      : [];
+  const transmittalsById = new Map(lineTransmittals.map((row) => [row.id, row]));
+
+  // A draft opens on its draft transmittal; a released revision on the
+  // first issued transmittal that carried it (a later re-send is not
+  // where it went out).
+  const draftHome = new Map<string, string>();
+  const releasedHome = new Map<string, { id: string; issuedAt: string }>();
+  for (const line of lines) {
+    const transmittal = transmittalsById.get(line.transmittal_id);
+    if (!transmittal) continue;
+    if (transmittal.status === "draft") {
+      if (!draftHome.has(line.drawing_revision_id)) {
+        draftHome.set(line.drawing_revision_id, transmittal.id);
+      }
+    } else if (transmittal.issued_at) {
+      const held = releasedHome.get(line.drawing_revision_id);
+      if (!held || transmittal.issued_at < held.issuedAt) {
+        releasedHome.set(line.drawing_revision_id, {
+          id: transmittal.id,
+          issuedAt: transmittal.issued_at,
+        });
+      }
+    }
+  }
+
   const bySet = new Map<
     string,
     { draft: VillaRevisionSummary | null; released: VillaRevisionSummary | null; highest: number }
@@ -497,6 +555,10 @@ export async function listVillaDrawingSetStates(unitId: string): Promise<VillaDr
       revisionNo: revision.revision_no,
       note: revision.note,
       fileCount: fileCounts.get(revision.id) ?? 0,
+      transmittalId:
+        revision.status === "draft"
+          ? (draftHome.get(revision.id) ?? null)
+          : (releasedHome.get(revision.id)?.id ?? null),
     };
     if (revision.status === "draft") {
       // The partial unique index allows only one, so this never fights.

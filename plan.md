@@ -86,7 +86,7 @@ Each step is one commit with a plain-English message. Owner tags per `MODELS.md`
 - `DraftDetailsForm` → `DraftDetails`: stage `Select` saves on `onChange`; note `Textarea` through `useSaveOnBlur` (`lib/hooks/use-save-on-blur.ts`), showing its `saved` flash as a small "Saved" `FormMessage success`. No Save button. Retired-stage handling (`stageOptions`) stays.
 - Layout: `Section` with no title, or a `Card p-4` with the two fields in a `sm:grid-cols-[minmax(12rem,1fr)_2fr]` row — DESIGN.md sizes, nothing new.
 
-### 3. `[Opus]` One Add-drawing dialog replaces three forms
+### 3. `[Opus]` One Add-drawing dialog replaces three forms — done (Opus)
 
 - New `transmittals/[transmittalId]/_components/add-drawing-dialog.tsx` (client) on `components/ui/dialog`. Trigger: `Button` "Add drawing" in the Drawings `Section`'s `aside`, and the same button as the `EmptyState`'s `action` when there are no lines. Content:
   - "New drawing set": `Input` + `Button` "Add" → `createSetOnTransmittal` (give it a non-form signature `(transmittalId, name)` to match).

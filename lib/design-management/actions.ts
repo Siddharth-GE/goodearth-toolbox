@@ -472,12 +472,11 @@ export async function createTransmittal(unitId: string): Promise<ActionState> {
  */
 export async function createSetOnTransmittal(
   transmittalId: string,
-  _prev: ActionState,
-  formData: FormData,
+  rawName: string,
 ): Promise<ActionState> {
   const user = await requireTool(GRANT);
 
-  const name = text(formData, "name");
+  const name = rawName.trim();
   if (!name) return { error: "Give the drawing set a name." };
   if (name.length > NAME_LIMIT) return { error: `Keep the name under ${NAME_LIMIT} characters.` };
 
@@ -548,7 +547,7 @@ export async function createSetOnTransmittal(
  * Puts a drawing set on this transmittal, starting a draft revision for
  * it if one isn't already open.
  *
- * This is the "Add drawings" board's one action, and it covers all three
+ * This is the Add drawing dialog's main action, and it covers all three
  * of the founder's cases with the same press:
  *
  *   - the set has a draft open on this villa → that draft goes on the

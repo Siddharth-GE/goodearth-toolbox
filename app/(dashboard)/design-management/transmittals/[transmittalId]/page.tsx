@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { LinkButton } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { FormMessage } from "@/components/ui/form-message";
 import { PageTitle } from "@/components/ui/page-title";
 import { Section } from "@/components/ui/section";
@@ -19,14 +20,12 @@ import { notFound } from "next/navigation";
 
 import { DraftRevisionEditor } from "../../_components/draft-revision-editor";
 import { RevisionLog } from "../../_components/revision-log";
+import { AddDrawingDialog } from "./_components/add-drawing-dialog";
 import {
-  AddDrawingsBoard,
   DeleteDraftTransmittalButton,
   DraftDetails,
   IssueTransmittalButton,
-  NewDrawingSetForm,
   RemoveLineButton,
-  ResendReleasedPicker,
 } from "./_components/transmittal-forms";
 
 const revisionStatusVariant = {
@@ -40,9 +39,9 @@ const revisionStatusVariant = {
  *
  * Founder, 2026-08-22, redirecting the flow on the staging vet: "press
  * new transmittal, upload the docs and issue to site". So a draft
- * carries the stage and note, the drawings going out, the upload and
- * work-link editor for each drawing still in draft, and the board that
- * starts or revises a set. An issued one is a record: the same facts
+ * carries, top to bottom in the order the work happens, the stage and
+ * note, the drawings going out (each draft with its sheets), one Add
+ * drawing dialog, and Issue at the top. An issued one is a record: the same facts
  * with nothing to press but the cover sheet, because that is what "what
  * did site have on the 22nd" means.
  */
@@ -74,19 +73,14 @@ export default async function TransmittalDetailPage({
     .map((stage) => ({ id: stage.id, name: stage.name }));
 
   const setIdsOnTransmittal = transmittal.lines.map((line) => line.setId);
-  const onTransmittal = new Set(setIdsOnTransmittal);
-
-  // A set already on this transmittal is offered neither path: one line
-  // per set keeps "what went out" readable, and the database is happy
-  // either way, so the screen picks the version a person can follow.
-  const resendOptions = setStates
-    .filter((set) => set.released !== null && !onTransmittal.has(set.setId))
-    .map((set) => ({
-      revisionId: set.released!.revisionId,
-      label: `${set.setCode ? `${set.setCode} — ${set.setName}` : set.setName} — R${
-        set.released!.revisionNo
-      } (released) · ${set.released!.fileCount} ${set.released!.fileCount === 1 ? "file" : "files"}`,
-    }));
+  const addDrawing = (variant: "primary" | "secondary") => (
+    <AddDrawingDialog
+      transmittalId={transmittal.id}
+      sets={setStates}
+      setIdsOnTransmittal={setIdsOnTransmittal}
+      variant={variant}
+    />
+  );
 
   return (
     <div className="space-y-4">
@@ -142,17 +136,21 @@ export default async function TransmittalDetailPage({
       )}
 
       <Section
-        title="Drawings on this transmittal"
+        title="Drawings"
         note={
-          transmittal.lines.length === 0
-            ? undefined
+          isDraft
+            ? "Each drawing here goes to site when you press Issue."
             : `${transmittal.lines.length} ${transmittal.lines.length === 1 ? "drawing" : "drawings"}, in sheet order.`
         }
+        aside={isDraft && transmittal.lines.length > 0 ? addDrawing("secondary") : undefined}
       >
         {transmittal.lines.length === 0 ? (
-          <p className="text-danger text-sm font-medium">
-            No drawings on this transmittal yet — add one below before issuing it.
-          </p>
+          <EmptyState
+            icon={FileText}
+            title="No drawings yet"
+            description="Add a new drawing set, or revise one this villa already has."
+            action={isDraft ? addDrawing("primary") : undefined}
+          />
         ) : (
           <ul className="divide-border divide-y">
             {transmittal.lines.map((line) => {
@@ -228,27 +226,6 @@ export default async function TransmittalDetailPage({
           </ul>
         )}
       </Section>
-
-      {isDraft && (
-        <Section
-          title="Add drawings"
-          note="Revise a set this villa already has, name a new one, or send a released drawing again."
-        >
-          <AddDrawingsBoard
-            transmittalId={transmittal.id}
-            sets={setStates}
-            setIdsOnTransmittal={setIdsOnTransmittal}
-          />
-          <div className="border-border mt-3 border-t pt-3">
-            <NewDrawingSetForm transmittalId={transmittal.id} />
-          </div>
-          {resendOptions.length > 0 && (
-            <div className="border-border mt-3 border-t pt-3">
-              <ResendReleasedPicker transmittalId={transmittal.id} options={resendOptions} />
-            </div>
-          )}
-        </Section>
-      )}
 
       {/* One way back and one way out. The link to the villa is the back
           link at the top — repeating it here was part of the clutter. */}
