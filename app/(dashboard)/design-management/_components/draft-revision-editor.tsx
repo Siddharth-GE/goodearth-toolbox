@@ -1,6 +1,5 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FormMessage } from "@/components/ui/form-message";
 import { IconButton } from "@/components/ui/icon-button";
@@ -14,7 +13,7 @@ import {
 import type { DrawingRevisionRow } from "@/lib/design-management/queries";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
 import type { WorksTreeCategory } from "@/lib/masters/works";
-import { FileText, Trash2, UploadCloud } from "lucide-react";
+import { ChevronDown, ChevronUp, FileText, Trash2, UploadCloud } from "lucide-react";
 import { useMemo, useRef, useState, useTransition } from "react";
 
 import { WorksCheckboxTree } from "./works-checkbox-tree";
@@ -42,15 +41,25 @@ export function DraftRevisionEditor({
   tree: WorksTreeCategory[];
 }) {
   return (
-    <div className="border-warning/30 bg-warning/5 space-y-3 rounded-xl border p-3">
-      <NoteField revisionId={revision.id} note={revision.note} />
+    // No warning tint: the line's own Draft badge says what it is, and a
+    // status colour that only decorates stops meaning anything.
+    <div className="border-border space-y-3 rounded-xl border p-3">
+      <NoteField revisionId={revision.id} revisionNo={revision.revisionNo} note={revision.note} />
       <FilesEditor revisionId={revision.id} files={revision.files} />
       <WorksEditor revisionId={revision.id} tree={tree} workItemIds={revision.workItemIds ?? []} />
     </div>
   );
 }
 
-function NoteField({ revisionId, note }: { revisionId: string; note: string | null }) {
+function NoteField({
+  revisionId,
+  revisionNo,
+  note,
+}: {
+  revisionId: string;
+  revisionNo: number;
+  note: string | null;
+}) {
   const [value, setValue] = useState(note ?? "");
   const noteSave = useSaveOnBlur<string>({
     initial: note ?? "",
@@ -59,15 +68,27 @@ function NoteField({ revisionId, note }: { revisionId: string; note: string | nu
 
   return (
     <div className="space-y-1.5">
-      <label className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Note</label>
+      <label
+        htmlFor={`revision-note-${revisionId}`}
+        className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase"
+      >
+        {revisionNo === 0 ? "Note" : "What changed"}
+      </label>
       <Textarea
+        id={`revision-note-${revisionId}`}
         rows={2}
         value={value}
         onChange={(event) => setValue(event.target.value)}
         onBlur={() => noteSave.flush(value)}
-        placeholder="What changed in this revision — required before it can go to site…"
+        placeholder={
+          // 0093: R0 is the first issue, so there is no change to explain
+          // yet; from R1 the note is what the database asks for at Issue.
+          revisionNo === 0
+            ? "Optional — anything site should know about this first issue"
+            : "What changed in this revision — needed before it can go to site"
+        }
       />
-      <FormMessage error={noteSave.error} size="xs" />
+      <FormMessage error={noteSave.error} success={noteSave.saved ? "Saved" : null} size="xs" />
     </div>
   );
 }
@@ -122,7 +143,7 @@ function FilesEditor({
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Files</p>
+        <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Sheets</p>
         <input
           ref={inputRef}
           type="file"
@@ -139,14 +160,14 @@ function FilesEditor({
           onClick={() => inputRef.current?.click()}
         >
           {uploading ? <Spinner className="size-4 border-2" /> : <UploadCloud className="size-4" />}
-          {uploading ? "Uploading…" : "Add file"}
+          {uploading ? "Uploading…" : "Add sheet"}
         </Button>
       </div>
       <FormMessage error={uploadError} size="xs" />
 
       {files.length === 0 ? (
         <p className="text-muted text-xs">
-          No files yet — a PDF or a photo of the sheet, up to 4 MB each.
+          Add the sheet — a PDF or a photo, up to 4 MB each. It can&apos;t go to site without one.
         </p>
       ) : (
         <ul className="divide-border divide-y">
@@ -161,6 +182,8 @@ function FilesEditor({
                 <FileText className="text-muted size-3.5 shrink-0" />
                 <span className="truncate">{file.fileName}</span>
               </a>
+              {/* No confirmation: one sheet, on a draft, put back with one
+                  upload. Everything that loses more than that asks first. */}
               <IconButton
                 aria-label={`Remove ${file.fileName}`}
                 tone="danger"
@@ -191,6 +214,7 @@ function WorksEditor({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string>();
   const [justSaved, setJustSaved] = useState(false);
+  const [open, setOpen] = useState(false);
 
   const dirty = useMemo(() => {
     const original = new Set(workItemIds);
@@ -232,30 +256,44 @@ function WorksEditor({
     });
   };
 
+  // Folded until asked for (2026-09-27 audit: the whole works vocabulary,
+  // open under every draft line, buried the note and the sheets). Unsaved
+  // ticks keep it open, so a change is never hidden behind the fold.
+  const shown = open || dirty;
+
   return (
     <div className="space-y-1.5">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
-          Works this revision serves
-        </p>
-        <Badge variant="neutral">{checked.size} picked</Badge>
-      </div>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        aria-expanded={shown}
+        onClick={() => setOpen((value) => !value)}
+        disabled={dirty}
+      >
+        {shown ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+        Works this drawing serves ({checked.size})
+      </Button>
 
-      <WorksCheckboxTree
-        tree={tree}
-        checked={checked}
-        onToggle={toggle}
-        onSetMany={setMany}
-        disabled={pending}
-      />
+      {shown && (
+        <>
+          <WorksCheckboxTree
+            tree={tree}
+            checked={checked}
+            onToggle={toggle}
+            onSetMany={setMany}
+            disabled={pending}
+          />
 
-      <div className="flex items-center gap-3">
-        <Button type="button" size="sm" disabled={!dirty || pending} onClick={save}>
-          {pending ? "Saving…" : "Save work links"}
-        </Button>
-        {justSaved && !dirty && <FormMessage success="Saved." size="xs" />}
-        <FormMessage error={error} size="xs" />
-      </div>
+          <div className="flex items-center gap-3">
+            <Button type="button" size="sm" disabled={!dirty || pending} onClick={save}>
+              {pending ? "Saving…" : "Save work links"}
+            </Button>
+            {justSaved && !dirty && <FormMessage success="Saved." size="xs" />}
+          </div>
+        </>
+      )}
+      <FormMessage error={error} size="xs" />
     </div>
   );
 }

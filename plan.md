@@ -99,7 +99,7 @@ Each step is one commit with a plain-English message. Owner tags per `MODELS.md`
 - `lib/design-management/queries.ts` → `listVillaDrawingSetStates`: `draft` gains `transmittalId: string | null` — after the revisions read, one `fetchAll` of `transmittal_lines (drawing_revision_id, transmittal_id)` for the draft revision ids, then `transmittals (id, status)` for those; keep the one whose status is `draft` (a draft revision can sit on at most one draft transmittal after step 5; if data disagrees, take the first). Map merge, no embed (BUGCATCHER #2).
 - Remove `AddDrawingsBoard`, `NewDrawingSetForm`, `ResendReleasedPicker` and the `resendOptions` computation from the page. `createRevisionOnTransmittal`'s "Continue draft" branch stays for the legacy case.
 
-### 4. `[Sonnet]` The draft line editor gets out of the way
+### 4. `[Sonnet]` The draft line editor gets out of the way — done (Opus)
 
 - `_components/draft-revision-editor.tsx`: `WorksEditor` folds behind a `ghost sm` toggle "Works this drawing serves ({n})" (the `RevisionLog` chevron pattern), closed by default; open it automatically when `dirty`. Tree and Save unchanged.
 - Note placeholder by revision: R0 "Optional — anything site should know about this first issue"; R≥1 "What changed in this revision — needed before it can go to site". The editor already has `revision.revisionNo`.
