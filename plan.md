@@ -127,7 +127,7 @@ Each step is one commit with a plain-English message. Owner tags per `MODELS.md`
 - `listVillaDrawingSetStates`: `released` gains `transmittalId: string | null` — the issued transmittal with the earliest `issued_at` among lines carrying that revision (the same `transmittal_lines` → `transmittals` reads as step 3, widened to released ids; read `status, issued_at`).
 - Villa page rows become `Link`s to `/design-management/transmittals/{id}` (draft → its draft transmittal; released → the issuing one); a row with neither stays plain text. Note reads "Each set at its latest revision. Open one to see its sheets."
 
-### 8. `[Haiku]` Copy
+### 8. `[Haiku]` Copy — done (Opus)
 
 - Welcome intro to two paragraphs: "This is where a villa's drawings live: what has gone to site, what revision each set is on, and what is still being prepared." / "Open a villa, press New transmittal, add the drawings and issue them. Relay tracks who holds each task; this tool holds the drawings."
 - Workspace `Section` note: "Each drawing here goes to site when you press Issue."

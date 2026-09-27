@@ -160,7 +160,7 @@ export default async function TransmittalDetailPage({
         title="Drawings"
         note={
           isDraft
-            ? "Each drawing here goes to site when you press Issue."
+            ? "Each drawing here goes to site when you press Issue to site."
             : `${transmittal.lines.length} ${transmittal.lines.length === 1 ? "drawing" : "drawings"}, in sheet order.`
         }
         aside={isDraft && transmittal.lines.length > 0 ? addDrawing("secondary") : undefined}
