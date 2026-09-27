@@ -12,6 +12,7 @@ import { PageTitle } from "@/components/ui/page-title";
 import { listDesignStages } from "@/lib/design-management/queries";
 
 import {
+  DesignStageCodeField,
   DesignStageForm,
   DesignStageMoveButtons,
   DesignStageNameField,
@@ -34,7 +35,8 @@ export default async function DesignStagesPage() {
             <p className="text-muted mt-1 text-sm">
               The stages a transmittal is issued against — its own list, separate from Relay&apos;s
               trail stages. Renaming a stage renames it on every transmittal that carries it;
-              retiring stops new picks without touching history.
+              retiring stops new picks without touching history. The code goes into every
+              sheet&apos;s file name, like WD in SAA-Saarang-Villa12-WD-TR0003-GFP.pdf.
             </p>
           </div>
           <DesignStageForm />
@@ -43,6 +45,7 @@ export default async function DesignStagesPage() {
               <TableHead>
                 <TableRow>
                   <TableHeaderCell>Stage</TableHeaderCell>
+                  <TableHeaderCell>Code</TableHeaderCell>
                   <TableHeaderCell>Status</TableHeaderCell>
                   <TableHeaderCell></TableHeaderCell>
                 </TableRow>
@@ -52,6 +55,9 @@ export default async function DesignStagesPage() {
                   <TableRow key={stage.id}>
                     <TableCell>
                       <DesignStageNameField id={stage.id} name={stage.name} />
+                    </TableCell>
+                    <TableCell>
+                      <DesignStageCodeField id={stage.id} code={stage.code} />
                     </TableCell>
                     <TableCell>
                       <Badge variant={stage.isActive ? "success" : "warning"}>

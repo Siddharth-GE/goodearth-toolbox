@@ -72,7 +72,7 @@ function TransmittalRows({ rows }: { rows: VillaTransmittalRow[] }) {
                 <span className="text-muted text-sm">{row.stageName}</span>
               </span>
               <span className="text-muted mt-0.5 block text-xs">
-                {row.lineCount} {row.lineCount === 1 ? "drawing" : "drawings"}
+                {row.setName ? `${row.setName} · R${row.revisionNo}` : "No drawing set"}
                 {row.issuedAt ? ` · issued ${formatDate(row.issuedAt)}` : " · not issued yet"}
                 {row.issuedByName ? ` by ${row.issuedByName}` : ""}
               </span>

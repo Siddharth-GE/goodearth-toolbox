@@ -5,14 +5,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { FormMessage } from "@/components/ui/form-message";
 import { PageTitle } from "@/components/ui/page-title";
 import { Section } from "@/components/ui/section";
-import {
-  getTransmittalDetail,
-  listDesignStages,
-  listVillaDrawingSetStates,
-  type DesignStageRow,
-  type DrawingRevisionRow,
-  type VillaDrawingSetState,
-} from "@/lib/design-management/queries";
+import { getTransmittalDetail, type DrawingRevisionRow } from "@/lib/design-management/queries";
 import { transmittalReadiness } from "@/lib/design-management/readiness";
 import { formatDate } from "@/lib/format";
 import { getWorksTree, type WorksTreeCategory } from "@/lib/masters/works";
@@ -21,30 +14,22 @@ import { notFound } from "next/navigation";
 
 import { DraftRevisionEditor } from "../../_components/draft-revision-editor";
 import { RevisionLog } from "../../_components/revision-log";
-import { AddDrawingDialog } from "./_components/add-drawing-dialog";
 import {
   DeleteDraftTransmittalButton,
-  DraftDetails,
   IssueBar,
-  RemoveLineButton,
+  TransmittalNote,
 } from "./_components/transmittal-forms";
 
-const revisionStatusVariant = {
-  draft: "warning",
-  released: "success",
-  superseded: "neutral",
-} as const;
-
 /**
- * One transmittal — and, while it is a draft, the whole workspace.
+ * One transmittal: one stage, one drawing set, and that set's sheets.
  *
- * Founder, 2026-08-22, redirecting the flow on the staging vet: "press
- * new transmittal, upload the docs and issue to site". So a draft
- * carries, top to bottom in the order the work happens, the stage and
- * note, the drawings going out (each draft with its sheets), one Add
- * drawing dialog, and Issue at the top. An issued one is a record: the same facts
- * with nothing to press but the cover sheet, because that is what "what
- * did site have on the 22nd" means.
+ * Founder, 2026-09-27: "one transmittal contains only one stage and you
+ * upload a drawing set and inside that sheets … so each time a full set
+ * gets to site to avoid confusion". The stage and the set are chosen when
+ * the transmittal starts and never change here (0099 holds both), so a
+ * draft is only: the note for site, what changed, the sheets, and Issue.
+ * An issued one is the record — what went out, when and by whom, with
+ * nothing to press but the cover sheet.
  */
 export default async function TransmittalDetailPage({
   params,
@@ -58,38 +43,24 @@ export default async function TransmittalDetailPage({
   if (!transmittal) notFound();
 
   const isDraft = transmittal.status === "draft";
-  const [stages, setStates, tree] = await Promise.all([
-    isDraft ? listDesignStages() : Promise.resolve([] as DesignStageRow[]),
-    isDraft
-      ? listVillaDrawingSetStates(transmittal.unitId)
-      : Promise.resolve([] as VillaDrawingSetState[]),
-    isDraft ? getWorksTree() : Promise.resolve([] as WorksTreeCategory[]),
-  ]);
+  const tree: WorksTreeCategory[] = isDraft ? await getWorksTree() : [];
 
-  // Active stages, plus the one this draft already sits on even if it
-  // has since been retired — a select whose value isn't in its own list
-  // silently changes the answer on the next save.
-  const stageOptions = stages
-    .filter((stage) => stage.isActive || stage.id === transmittal.stageId)
-    .map((stage) => ({ id: stage.id, name: stage.name }));
-
-  const setIdsOnTransmittal = transmittal.lines.map((line) => line.setId);
+  // 0099: at most one line. A draft with none is one started before that
+  // rule; it can only be deleted and started again.
+  const line = transmittal.lines[0] ?? null;
+  const setLabel = line
+    ? line.setCode
+      ? `${line.setCode} — ${line.setName}`
+      : line.setName
+    : null;
   const readiness = transmittalReadiness(
-    transmittal.lines.map((line) => ({
-      setName: line.setName,
-      revisionNo: line.revisionNo,
-      revisionStatus: line.revisionStatus,
-      fileCount: line.files.length,
-      note: line.revisionNote,
+    transmittal.lines.map((row) => ({
+      setName: row.setName,
+      revisionNo: row.revisionNo,
+      revisionStatus: row.revisionStatus,
+      fileCount: row.files.length,
+      note: row.revisionNote,
     })),
-  );
-  const addDrawing = (variant: "primary" | "secondary") => (
-    <AddDrawingDialog
-      transmittalId={transmittal.id}
-      sets={setStates}
-      setIdsOnTransmittal={setIdsOnTransmittal}
-      variant={variant}
-    />
   );
 
   return (
@@ -117,138 +88,90 @@ export default async function TransmittalDetailPage({
         }
       />
 
-      {isDraft && (
+      {isDraft && line && (
         <IssueBar
           transmittalId={transmittal.id}
           problem={readiness.problem}
-          drawingCount={transmittal.lines.length}
+          sheetCount={line.files.length}
         />
       )}
 
       {issued && (
-        <FormMessage
-          success={`Issued as ${issued}. The drawings on it are now released to site.`}
-        />
+        <FormMessage success={`Issued as ${issued}. Its drawings are now released to site.`} />
       )}
 
-      {isDraft ? (
-        // No heading and no Save button: two fields that save themselves,
-        // at the top because they are the first thing to check.
-        <Card className="p-4">
-          <DraftDetails
-            transmittalId={transmittal.id}
-            stages={stageOptions}
-            stageId={transmittal.stageId}
-            note={transmittal.note}
-          />
-        </Card>
-      ) : (
-        // Said as a sentence rather than a grid of labels: it is one
-        // fact — this went out, for this stage, on this day, from this
-        // person — and it reads the way somebody would say it aloud.
-        <Card className="space-y-1 p-4">
+      {/* What is going out, said as one line a person would say aloud. */}
+      <Card className="space-y-3 p-4">
+        <div className="space-y-0.5">
           <p className="text-foreground text-sm">
-            Issued for <span className="font-medium">{transmittal.stageName}</span>
-            {transmittal.issuedAt ? ` on ${formatDate(transmittal.issuedAt)}` : ""}
-            {transmittal.issuedByName ? ` by ${transmittal.issuedByName}` : ""}.
+            <span className="font-medium">{transmittal.stageName}</span>
+            {setLabel && (
+              <>
+                {" · "}
+                <span className="font-medium">{setLabel}</span>
+                <span className="text-muted"> · R{line!.revisionNo}</span>
+              </>
+            )}
           </p>
-          {transmittal.note && <p className="text-muted text-sm">{transmittal.note}</p>}
-        </Card>
-      )}
-
-      <Section
-        title="Drawings"
-        note={
-          isDraft
-            ? "Each drawing here goes to site when you press Issue to site."
-            : `${transmittal.lines.length} ${transmittal.lines.length === 1 ? "drawing" : "drawings"}, in sheet order.`
-        }
-        aside={isDraft && transmittal.lines.length > 0 ? addDrawing("secondary") : undefined}
-      >
-        {transmittal.lines.length === 0 ? (
-          <EmptyState
-            icon={FileText}
-            title="No drawings yet"
-            description="Add a new drawing set, or revise one this villa already has."
-            action={isDraft ? addDrawing("primary") : undefined}
-          />
+          {!isDraft && (
+            <p className="text-muted text-sm">
+              Issued
+              {transmittal.issuedAt ? ` on ${formatDate(transmittal.issuedAt)}` : ""}
+              {transmittal.issuedByName ? ` by ${transmittal.issuedByName}` : ""}.
+            </p>
+          )}
+        </div>
+        {isDraft ? (
+          <TransmittalNote transmittalId={transmittal.id} note={transmittal.note} />
         ) : (
-          <ul className="divide-border divide-y">
-            {transmittal.lines.map((line) => {
-              const setLabel = line.setCode ? `${line.setCode} — ${line.setName}` : line.setName;
-              const lineIsDraft = line.revisionStatus === "draft";
-              // The editor takes a revision; a draft line carries every
-              // part of one, so it is assembled here rather than fetched
-              // a second time.
-              const revision: DrawingRevisionRow = {
-                id: line.revisionId,
-                revisionNo: line.revisionNo,
-                status: "draft",
-                note: line.revisionNote,
-                releasedAt: null,
-                files: line.files,
-                workItemIds: line.draftWorkItemIds ?? [],
-              };
-
-              return (
-                <li key={line.lineId} className="space-y-2 py-2.5">
-                  <div className="flex flex-wrap items-start gap-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-foreground flex flex-wrap items-center gap-2 text-sm font-medium">
-                        {setLabel}
-                        <span className="text-muted font-normal">R{line.revisionNo}</span>
-                        <Badge variant={revisionStatusVariant[line.revisionStatus]}>
-                          {line.revisionStatus === "draft"
-                            ? "Draft"
-                            : line.revisionStatus === "released"
-                              ? "Released"
-                              : "Superseded"}
-                        </Badge>
-                      </p>
-                      {!lineIsDraft && <RevisionLog entries={line.revisionLog} />}
-                      {!lineIsDraft &&
-                        (line.files.length === 0 ? (
-                          <p className="text-muted mt-1 text-xs">No files on this revision.</p>
-                        ) : (
-                          <div className="mt-1.5 flex flex-wrap gap-2">
-                            {line.files.map((file) => (
-                              <a
-                                key={file.id}
-                                href={`/design-management/files/${file.id}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-foreground border-border hover:border-accent hover:text-accent flex items-center gap-1 rounded-lg border px-2 py-1 text-xs"
-                              >
-                                <FileText className="size-3 shrink-0" />
-                                {file.fileName}
-                              </a>
-                            ))}
-                          </div>
-                        ))}
-                    </div>
-                    {isDraft && (
-                      <RemoveLineButton
-                        lineId={line.lineId}
-                        label={setLabel}
-                        revisionNo={line.revisionNo}
-                        isDraft={lineIsDraft}
-                        fileCount={line.files.length}
-                      />
-                    )}
-                  </div>
-
-                  {/* A drawing still in draft is edited right here: its
-                      note, its sheets and the works it serves. Once
-                      issued it is frozen and the editor is gone. */}
-                  {isDraft && lineIsDraft && (
-                    <DraftRevisionEditor revision={revision} tree={tree} />
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+          transmittal.note && <p className="text-muted text-sm">{transmittal.note}</p>
         )}
-      </Section>
+      </Card>
+
+      {!line ? (
+        <EmptyState
+          icon={FileText}
+          title="No drawing set on this transmittal"
+          description={
+            isDraft
+              ? "It was started before a transmittal carried one set. Delete this draft and press New transmittal on the villa."
+              : "Nothing was recorded on it."
+          }
+        />
+      ) : isDraft && line.revisionStatus === "draft" ? (
+        <Section
+          title="Sheets"
+          note="Upload every sheet of the set — the whole set goes to site together when you issue."
+        >
+          <DraftRevisionEditor revision={draftRevision(line)} tree={tree} />
+        </Section>
+      ) : (
+        <Section
+          title="Sheets"
+          note={`${line.files.length} ${line.files.length === 1 ? "sheet" : "sheets"}. Each opens under the name it saves as.`}
+        >
+          <RevisionLog entries={line.revisionLog} />
+          {line.files.length === 0 ? (
+            <p className="text-muted mt-1 text-xs">No sheets on this revision.</p>
+          ) : (
+            <ul className="divide-border mt-2 divide-y">
+              {line.files.map((file) => (
+                <li key={file.id} className="py-2">
+                  <a
+                    href={`/design-management/files/${file.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-foreground hover:text-accent flex min-w-0 items-center gap-2 text-sm break-all"
+                  >
+                    <FileText className="text-muted size-4 shrink-0" />
+                    {file.displayName}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Section>
+      )}
 
       {/* One way back and one way out. The link to the villa is the back
           link at the top — repeating it here was part of the clutter. */}
@@ -256,10 +179,33 @@ export default async function TransmittalDetailPage({
         <div className="flex justify-end">
           <DeleteDraftTransmittalButton
             transmittalId={transmittal.id}
-            draftCount={transmittal.lines.filter((line) => line.revisionStatus === "draft").length}
+            draft={
+              line && line.revisionStatus === "draft"
+                ? {
+                    label: setLabel ?? "",
+                    revisionNo: line.revisionNo,
+                    sheetCount: line.files.length,
+                  }
+                : null
+            }
           />
         </div>
       )}
     </div>
   );
+}
+
+/** The editor takes a revision; the draft line carries every part of one. */
+function draftRevision(
+  line: NonNullable<Awaited<ReturnType<typeof getTransmittalDetail>>>["lines"][number],
+): DrawingRevisionRow {
+  return {
+    id: line.revisionId,
+    revisionNo: line.revisionNo,
+    status: "draft",
+    note: line.revisionNote,
+    releasedAt: null,
+    files: line.files,
+    workItemIds: line.draftWorkItemIds ?? [],
+  };
 }

@@ -10,6 +10,7 @@ import {
   moveDesignStage,
   renameDesignStage,
   setDesignStageActive,
+  setDesignStageCode,
 } from "@/lib/design-management/actions";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
@@ -77,6 +78,54 @@ export function DesignStageNameField({ id, name }: { id: string; name: string })
         }}
         disabled={pending}
         className="h-9 max-w-56 text-sm font-medium"
+      />
+      <FormMessage error={error} size="xs" />
+    </div>
+  );
+}
+
+/**
+ * The stage's short code, which every sheet of the stage carries in its
+ * file name (WD in SAA-Saarang-Villa12-WD-TR0003-GFP.pdf). Saved on
+ * leaving the field; a change renames those sheets on their next download.
+ */
+export function DesignStageCodeField({ id, code }: { id: string; code: string | null }) {
+  const [value, setValue] = useState(code ?? "");
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string>();
+
+  const save = () => {
+    const next = value.trim().toUpperCase();
+    if (next === (code ?? "")) {
+      setValue(code ?? "");
+      return;
+    }
+    startTransition(async () => {
+      const result = await setDesignStageCode(id, next);
+      if (result?.error) {
+        setError(result.error);
+        setValue(code ?? "");
+      } else {
+        setError(undefined);
+      }
+    });
+  };
+
+  return (
+    <div className="space-y-1">
+      <Input
+        aria-label="Stage code for sheet file names"
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
+        onBlur={save}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") (event.target as HTMLInputElement).blur();
+          if (event.key === "Escape") setValue(code ?? "");
+        }}
+        disabled={pending}
+        maxLength={6}
+        placeholder="WD"
+        className="h-9 w-20 font-mono text-sm uppercase"
       />
       <FormMessage error={error} size="xs" />
     </div>
