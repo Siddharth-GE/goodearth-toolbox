@@ -3,6 +3,9 @@ import "server-only";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 
+import { sheetNamingContext, type SheetContext } from "./sheet-context";
+import { sheetFileName } from "./sheet-name";
+
 /**
  * The released drawings, read.
  *
@@ -24,8 +27,9 @@ import { createClient } from "@/lib/supabase/server";
  * nothing on top of that — but it must stay narrowly about released
  * drawings, the same discipline lib/design-views keeps about photographs.
  *
- * Imports only the shared Supabase surface (createClient, fetchAll) —
- * never lib/design-management/ or lib/supervisors/, per CLAUDE.md's "one
+ * Imports only the shared Supabase surface (createClient, fetchAll) and
+ * its own siblings in lib/drawings/ — never lib/design-management/ or
+ * lib/supervisors/, per CLAUDE.md's "one
  * tool never imports another tool's code; shared code never imports a
  * tool's."
  *
@@ -40,6 +44,8 @@ import { createClient } from "@/lib/supabase/server";
 export type ReleasedDrawingFile = {
   id: string;
   fileName: string;
+  /** The sheet's name as it downloads: SAA-Saarang-Villa12-WD-TR0003-GFP.pdf. */
+  displayName: string;
   contentType: string;
 };
 
@@ -108,7 +114,9 @@ export async function listReleasedDrawingsForUnit(unitId: string): Promise<Relea
     drawing_revision_id: string;
     file_name: string;
     content_type: string;
+    sheet_code: string | null;
   }[];
+  let naming: Map<string, SheetContext>;
   let works: { drawing_revision_id: string; work_item_id: string }[];
 
   try {
@@ -146,7 +154,7 @@ export async function listReleasedDrawingsForUnit(unitId: string): Promise<Relea
       fetchAll((from, to) =>
         supabase
           .from("drawing_revision_files")
-          .select("id, drawing_revision_id, file_name, content_type")
+          .select("id, drawing_revision_id, file_name, content_type, sheet_code")
           .in("drawing_revision_id", releasedIds)
           .order("sort_order")
           .order("id")
@@ -161,6 +169,7 @@ export async function listReleasedDrawingsForUnit(unitId: string): Promise<Relea
           .range(from, to),
       ),
     ]);
+    naming = await sheetNamingContext(supabase, releasedIds);
   } catch (error) {
     throw new Error(
       `Could not read the released drawings for this villa: ${(error as Error).message}`,
@@ -172,7 +181,20 @@ export async function listReleasedDrawingsForUnit(unitId: string): Promise<Relea
   const filesByRevision = new Map<string, ReleasedDrawingFile[]>();
   for (const file of files) {
     const list = filesByRevision.get(file.drawing_revision_id) ?? [];
-    list.push({ id: file.id, fileName: file.file_name, contentType: file.content_type });
+    const context = naming.get(file.drawing_revision_id);
+    list.push({
+      id: file.id,
+      fileName: file.file_name,
+      displayName: context
+        ? sheetFileName({
+            ...context,
+            sheetCode: file.sheet_code,
+            originalFileName: file.file_name,
+            contentType: file.content_type,
+          })
+        : file.file_name,
+      contentType: file.content_type,
+    });
     filesByRevision.set(file.drawing_revision_id, list);
   }
   const workIdsByRevision = new Map<string, string[]>();
