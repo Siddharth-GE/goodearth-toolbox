@@ -133,7 +133,7 @@ Each step is one commit with a plain-English message. Owner tags per `MODELS.md`
 - Workspace `Section` note: "Each drawing here goes to site when you press Issue."
 - `StatusBadge` wording unchanged.
 
-### 9. `[Sonnet]` Villas: type to find one
+### 9. `[Sonnet]` Villas: type to find one — done (Opus)
 
 - `villas/_components/villa-filter.tsx` (client): an `Input` "Find a villa…" filtering cards by villa, plot or project name; rendered only when there are more than 12 villas. Grouping by project stays. No URL state.
 
