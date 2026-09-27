@@ -170,21 +170,44 @@ export function RemoveLineButton({
 }
 
 /**
- * Issue is deliberately pressable on a draft with no drawings on it: the
- * refusal that comes back — "Add at least one drawing before issuing
- * this transmittal" — is the database's own sentence, written for a
- * person, and reading it teaches more than a greyed-out button.
+ * The row under the title: whether this draft is ready to go, and Issue.
+ *
+ * The readiness line is worked out from the page's own data
+ * (lib/design-management/readiness.ts) so the problem is named before
+ * the press. Issue stays pressable either way: `issue_transmittal` is
+ * the rule, and if it refuses, its own sentence replaces the readiness
+ * line at full size, right where the eye already is — not in small
+ * print beside the button.
  */
-export function IssueTransmittalButton({ transmittalId }: { transmittalId: string }) {
+export function IssueBar({
+  transmittalId,
+  problem,
+  drawingCount,
+}: {
+  transmittalId: string;
+  problem: string | null;
+  drawingCount: number;
+}) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string>();
 
   return (
-    <div className="flex items-center gap-2">
-      <FormMessage error={error} size="xs" />
+    <div className="border-border bg-surface flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3">
+      <div className="min-w-0 flex-1">
+        {error ? (
+          <FormMessage error={error} />
+        ) : problem ? (
+          <p className="text-warning text-sm font-medium">{problem}</p>
+        ) : (
+          <FormMessage
+            success={`Ready to issue · ${drawingCount} ${drawingCount === 1 ? "drawing" : "drawings"}`}
+          />
+        )}
+      </div>
       <Button
         type="button"
         disabled={pending}
+        className="w-full sm:w-auto"
         onClick={() => {
           setError(undefined);
           startTransition(async () => {
@@ -193,7 +216,7 @@ export function IssueTransmittalButton({ transmittalId }: { transmittalId: strin
           });
         }}
       >
-        {pending ? "Issuing…" : "Issue"}
+        {pending ? "Issuing…" : "Issue to site"}
       </Button>
     </div>
   );

@@ -13,6 +13,7 @@ import {
   type DrawingRevisionRow,
   type VillaDrawingSetState,
 } from "@/lib/design-management/queries";
+import { transmittalReadiness } from "@/lib/design-management/readiness";
 import { formatDate } from "@/lib/format";
 import { getWorksTree, type WorksTreeCategory } from "@/lib/masters/works";
 import { FileText } from "lucide-react";
@@ -24,7 +25,7 @@ import { AddDrawingDialog } from "./_components/add-drawing-dialog";
 import {
   DeleteDraftTransmittalButton,
   DraftDetails,
-  IssueTransmittalButton,
+  IssueBar,
   RemoveLineButton,
 } from "./_components/transmittal-forms";
 
@@ -73,6 +74,15 @@ export default async function TransmittalDetailPage({
     .map((stage) => ({ id: stage.id, name: stage.name }));
 
   const setIdsOnTransmittal = transmittal.lines.map((line) => line.setId);
+  const readiness = transmittalReadiness(
+    transmittal.lines.map((line) => ({
+      setName: line.setName,
+      revisionNo: line.revisionNo,
+      revisionStatus: line.revisionStatus,
+      fileCount: line.files.length,
+      note: line.revisionNote,
+    })),
+  );
   const addDrawing = (variant: "primary" | "secondary") => (
     <AddDrawingDialog
       transmittalId={transmittal.id}
@@ -92,17 +102,28 @@ export default async function TransmittalDetailPage({
         actions={
           <>
             <Badge variant={isDraft ? "warning" : "success"}>{isDraft ? "Draft" : "Issued"}</Badge>
-            <LinkButton
-              href={`/design-management/transmittals/${transmittal.id}/pdf`}
-              variant="secondary"
-              plain
-            >
-              Cover sheet (PDF)
-            </LinkButton>
-            {isDraft && <IssueTransmittalButton transmittalId={transmittal.id} />}
+            {/* The cover sheet is what goes out beside the drawings, so it
+                is offered once there is something that went out. */}
+            {!isDraft && (
+              <LinkButton
+                href={`/design-management/transmittals/${transmittal.id}/pdf`}
+                variant="secondary"
+                plain
+              >
+                Cover sheet (PDF)
+              </LinkButton>
+            )}
           </>
         }
       />
+
+      {isDraft && (
+        <IssueBar
+          transmittalId={transmittal.id}
+          problem={readiness.problem}
+          drawingCount={transmittal.lines.length}
+        />
+      )}
 
       {issued && (
         <FormMessage

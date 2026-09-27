@@ -114,7 +114,7 @@ Each step is one commit with a plain-English message. Owner tags per `MODELS.md`
 - `createSetOnTransmittal` / `createRevisionOnTransmittal`: when `appendTransmittalLine` fails right after `startDraftRevision`, discard the revision just started so no orphan is born.
 - Per-file delete keeps no confirm (one sheet, re-uploadable) — say so in a comment.
 
-### 6. `[Sonnet]` Ready-to-issue, and errors where the eye is
+### 6. `[Sonnet]` Ready-to-issue, and errors where the eye is — done (Opus)
 
 - New pure module `lib/design-management/readiness.ts` + `readiness.test.ts`: `transmittalReadiness(lines: { setName, revisionNo, revisionStatus, fileCount, note }[]) → { ready: boolean; problem: string | null }` mirroring `issue_transmittal`'s three refusals in the same order and words: no lines → "Add at least one drawing before issuing."; a line with no file → "\"{set}\" R{n} has no drawing file yet."; a draft R≥1 without a note → "\"{set}\" R{n} needs a note saying what changed.". Tests: empty, ready, each refusal, order.
 - Page: under `PageTitle`, one line — `FormMessage success` "Ready to issue · {n} drawings" or a `text-warning text-sm` problem. Issue **stays pressable** (PLAN.md: the database's sentence is the boundary).
