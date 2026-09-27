@@ -15,9 +15,11 @@ import {
   deleteDraftTransmittal,
   issueTransmittal,
   removeTransmittalLine,
-  updateDraftTransmittal,
+  setDraftTransmittalNote,
+  setDraftTransmittalStage,
 } from "@/lib/design-management/actions";
 import type { VillaDrawingSetState } from "@/lib/design-management/queries";
+import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
 import { Trash2 } from "lucide-react";
 import { useActionState, useState, useTransition } from "react";
 
@@ -27,7 +29,7 @@ import { useActionState, useState, useTransition } from "react";
  * writes anyway, and an issued transmittal that looks editable is worse
  * than one that plainly isn't.
  */
-export function DraftDetailsForm({
+export function DraftDetails({
   transmittalId,
   stages,
   stageId,
@@ -38,40 +40,68 @@ export function DraftDetailsForm({
   stageId: string;
   note: string | null;
 }) {
-  const [state, formAction, pending] = useActionState(
-    updateDraftTransmittal.bind(null, transmittalId),
-    undefined,
-  );
+  // The stage saves on pick. It is held locally so a failed save can put
+  // the select back to what the database still says.
+  const [stage, setStage] = useState(stageId);
+  const [stagePending, startStage] = useTransition();
+  const [stageError, setStageError] = useState<string>();
+  const [stageSaved, setStageSaved] = useState(false);
+
+  const [noteValue, setNoteValue] = useState(note ?? "");
+  const noteSave = useSaveOnBlur<string>({
+    initial: note ?? "",
+    save: (next) => setDraftTransmittalNote(transmittalId, next),
+  });
+
+  const changeStage = (next: string) => {
+    const before = stage;
+    setStage(next);
+    setStageError(undefined);
+    setStageSaved(false);
+    startStage(async () => {
+      const result = await setDraftTransmittalStage(transmittalId, next);
+      if (result?.error) {
+        setStage(before);
+        setStageError(result.error);
+      } else {
+        setStageSaved(true);
+        setTimeout(() => setStageSaved(false), 1200);
+      }
+    });
+  };
 
   return (
-    <form action={formAction}>
-      <fieldset disabled={pending} className="space-y-3">
-        <div className="space-y-1.5">
-          <Label htmlFor="design_stage_id">Design stage</Label>
-          <Select id="design_stage_id" name="design_stage_id" defaultValue={stageId}>
-            {stages.map((stage) => (
-              <option key={stage.id} value={stage.id}>
-                {stage.name}
-              </option>
-            ))}
-          </Select>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="note">Note (optional)</Label>
-          <Textarea
-            id="note"
-            name="note"
-            rows={2}
-            defaultValue={note ?? ""}
-            placeholder="Anything site should know about this issue…"
-          />
-        </div>
-        <div className="flex items-center gap-3">
-          <Button type="submit">{pending ? "Saving…" : "Save changes"}</Button>
-          <FormMessage error={state?.error} size="xs" />
-        </div>
-      </fieldset>
-    </form>
+    <div className="grid gap-3 sm:grid-cols-[minmax(12rem,1fr)_2fr]">
+      <div className="space-y-1.5">
+        <Label htmlFor="design_stage_id">Design stage</Label>
+        <Select
+          id="design_stage_id"
+          value={stage}
+          disabled={stagePending}
+          onChange={(event) => changeStage(event.target.value)}
+        >
+          {stages.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.name}
+            </option>
+          ))}
+        </Select>
+        <FormMessage error={stageError} success={stageSaved ? "Saved" : null} size="xs" />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="transmittal-note">Note for site (optional)</Label>
+        <Textarea
+          id="transmittal-note"
+          rows={2}
+          value={noteValue}
+          maxLength={1000}
+          onChange={(event) => setNoteValue(event.target.value)}
+          onBlur={() => noteSave.flush(noteValue)}
+          placeholder="Anything site should know about this issue…"
+        />
+        <FormMessage error={noteSave.error} success={noteSave.saved ? "Saved" : null} size="xs" />
+      </div>
+    </div>
   );
 }
 

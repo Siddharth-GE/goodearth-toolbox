@@ -22,7 +22,7 @@ import { RevisionLog } from "../../_components/revision-log";
 import {
   AddDrawingsBoard,
   DeleteDraftTransmittalButton,
-  DraftDetailsForm,
+  DraftDetails,
   IssueTransmittalButton,
   NewDrawingSetForm,
   RemoveLineButton,
@@ -117,17 +117,16 @@ export default async function TransmittalDetailPage({
       )}
 
       {isDraft ? (
-        <Section
-          title="Details"
-          note="A draft can still be changed. Issuing it gives it a number and releases its drawings."
-        >
-          <DraftDetailsForm
+        // No heading and no Save button: two fields that save themselves,
+        // at the top because they are the first thing to check.
+        <Card className="p-4">
+          <DraftDetails
             transmittalId={transmittal.id}
             stages={stageOptions}
             stageId={transmittal.stageId}
             note={transmittal.note}
           />
-        </Section>
+        </Card>
       ) : (
         // Said as a sentence rather than a grid of labels: it is one
         // fact — this went out, for this stage, on this day, from this

@@ -667,30 +667,52 @@ async function appendTransmittalLine(
   return dbErrorMessage(error, "Could not add that drawing. Try again.");
 }
 
-/** Note and stage, editable only while the transmittal is a draft — the
- *  guard trigger refuses both once it has been issued, and that refusal
- *  is shown rather than swallowed. */
-export async function updateDraftTransmittal(
+/**
+ * Stage and note, each saved the moment it changes — editable only while
+ * the transmittal is a draft. The guard trigger refuses both once it has
+ * been issued, and that refusal is shown rather than swallowed. Two
+ * actions, not one form, because the screen saves each field on its own
+ * and a Save button for two fields was one more thing to forget.
+ */
+export async function setDraftTransmittalStage(
   transmittalId: string,
-  _prev: ActionState,
-  formData: FormData,
+  stageId: string,
 ): Promise<ActionState> {
   await requireTool(GRANT);
-
-  const stageId = text(formData, "design_stage_id");
   if (!stageId) return { error: "Pick the design stage this goes out at." };
-
-  const note = text(formData, "note");
-  if (note.length > NOTE_LIMIT) return { error: `Keep the note under ${NOTE_LIMIT} characters.` };
 
   const supabase = await createClient();
   const { error } = await supabase
     .from("transmittals")
-    .update({ design_stage_id: stageId, note: note || null })
+    .update({ design_stage_id: stageId })
     .eq("id", transmittalId);
   if (error) {
-    console.error("updateDraftTransmittal failed:", error);
-    return { error: dbErrorMessage(error, "Could not save this transmittal. Try again.") };
+    console.error("setDraftTransmittalStage failed:", error);
+    return { error: dbErrorMessage(error, "Could not change the stage. Try again.") };
+  }
+
+  revalidatePath("/design-management", "layout");
+  return undefined;
+}
+
+export async function setDraftTransmittalNote(
+  transmittalId: string,
+  note: string,
+): Promise<ActionState> {
+  await requireTool(GRANT);
+  const trimmed = note.trim();
+  if (trimmed.length > NOTE_LIMIT) {
+    return { error: `Keep the note under ${NOTE_LIMIT} characters.` };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("transmittals")
+    .update({ note: trimmed || null })
+    .eq("id", transmittalId);
+  if (error) {
+    console.error("setDraftTransmittalNote failed:", error);
+    return { error: dbErrorMessage(error, "Could not save the note. Try again.") };
   }
 
   revalidatePath("/design-management", "layout");

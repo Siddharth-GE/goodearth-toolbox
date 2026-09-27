@@ -80,7 +80,7 @@ Each step is one commit with a plain-English message. Owner tags per `MODELS.md`
 - Delete `villas/[unitId]/_components/create-transmittal-dialog.tsx`. Replace with `new-transmittal-button.tsx`: a client `Button` using `useTransition`, "New transmittal" / "Starting…", `FormMessage` for an error; disabled with "No design stages yet" when the page passes zero active stages (keep that guard).
 - Villa page empty-state copy: "Press New transmittal to start one, add its drawings, and issue them."
 
-### 2. `[Sonnet]` The details card saves itself
+### 2. `[Sonnet]` The details card saves itself — done (Opus)
 
 - Split `updateDraftTransmittal` into `setDraftTransmittalStage(transmittalId, stageId)` and `setDraftTransmittalNote(transmittalId, note)` — same validation and `dbErrorMessage`, no `FormData`.
 - `DraftDetailsForm` → `DraftDetails`: stage `Select` saves on `onChange`; note `Textarea` through `useSaveOnBlur` (`lib/hooks/use-save-on-blur.ts`), showing its `saved` flash as a small "Saved" `FormMessage success`. No Save button. Retired-stage handling (`stageOptions`) stays.
