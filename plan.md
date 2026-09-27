@@ -22,8 +22,8 @@ Branch `feature/design-management-sets` off `staging`. Built by Opus on 2026-09-
    npx tsx scripts/wipe-drawings.ts --project ipstebqawrvhkyntctrv
    npx tsx scripts/wipe-drawings.ts --project ipstebqawrvhkyntctrv --commit
    ```
-8. `[Fable]` Review `0099` (MODELS.md: triggers reach `db:apply` only after a Fable review), and the previous build's open review (the one-press flow, PR #81).
-9. `[Opus]` Apply `0099` to staging, `npm run db:types:staging`, commit, then PR into `staging`.
+8. `[Fable]` Review `0099` and the previous build's flow (PR #81). **Skipped for staging by the founder on 2026-09-27; still due before production.**
+9. `[Opus]` Apply `0099` to staging, `npm run db:types:staging`, commit, then PR into `staging`. — applied 2026-09-27; the triggers were fired in a rolled-back transaction and every refusal held.
 10. `[Founder]` Vet on staging.
 
 ## Notes for the review

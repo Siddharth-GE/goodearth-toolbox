@@ -1643,17 +1643,17 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "drawing_sets_design_stage_id_fkey"
-            columns: ["design_stage_id"]
-            isOneToOne: false
-            referencedRelation: "design_stages"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "drawing_sets_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drawing_sets_design_stage_id_fkey"
+            columns: ["design_stage_id"]
+            isOneToOne: false
+            referencedRelation: "design_stages"
             referencedColumns: ["id"]
           },
           {
