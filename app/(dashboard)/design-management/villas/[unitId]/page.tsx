@@ -11,7 +11,7 @@ import { ChevronRight, Send } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { NewTransmittalButton } from "./_components/new-transmittal-button";
+import { NewTransmittalDialog } from "./_components/new-transmittal-dialog";
 import { TransmittalList } from "./_components/transmittal-list";
 
 /**
@@ -27,6 +27,10 @@ import { TransmittalList } from "./_components/transmittal-list";
  * So: the transmittals are the page, the sets list is a short reference
  * underneath it, and the stage board is gone — it said the same thing as
  * the list above it, one level less usefully.
+ *
+ * 2026-09-27: every set belongs to a stage and every transmittal sends
+ * one set, so New transmittal asks for both, and each set row says its
+ * stage.
  */
 export default async function VillaDesignPage({ params }: { params: Promise<{ unitId: string }> }) {
   const { unitId } = await params;
@@ -37,7 +41,18 @@ export default async function VillaDesignPage({ params }: { params: Promise<{ un
   ]);
   if (!villa) notFound();
 
-  const hasStages = stages.some((stage) => stage.isActive);
+  const activeStages = stages
+    .filter((stage) => stage.isActive)
+    .map((stage) => ({ id: stage.id, name: stage.name }));
+  const stageNames = new Map(stages.map((stage) => [stage.id, stage.name]));
+  const stageOrder = new Map(stages.map((stage, index) => [stage.id, index]));
+  // Grouped by stage in the stage list's own order; a set from before
+  // sets had stages sorts last.
+  const orderedSets = [...sets].sort(
+    (a, b) =>
+      (a.stageId ? (stageOrder.get(a.stageId) ?? 999) : 1000) -
+      (b.stageId ? (stageOrder.get(b.stageId) ?? 999) : 1000),
+  );
 
   return (
     <div className="space-y-4">
@@ -46,14 +61,21 @@ export default async function VillaDesignPage({ params }: { params: Promise<{ un
         description={`Plot ${villa.plotName} · ${villa.projectName}`}
         backHref="/design-management/villas"
         backLabel="Villas"
-        actions={<NewTransmittalButton unitId={villa.unitId} hasStages={hasStages} />}
+        actions={
+          <NewTransmittalDialog
+            unitId={villa.unitId}
+            stages={activeStages}
+            sets={sets}
+            defaultStageId={villa.transmittals[0]?.stageId ?? null}
+          />
+        }
       />
 
       {villa.transmittals.length === 0 ? (
         <EmptyState
           icon={Send}
           title="Nothing has been sent to site for this villa yet"
-          description="Press New transmittal to start one, add its drawings, and issue them."
+          description="Press New transmittal, pick the stage and the drawing set, upload its sheets and issue it."
         />
       ) : (
         <Section title="Transmittals" note="Newest first. Open one to see what went out on it.">
@@ -67,7 +89,7 @@ export default async function VillaDesignPage({ params }: { params: Promise<{ un
           note="Each set at its latest revision. Open one to see its sheets."
         >
           <ul className="divide-border divide-y">
-            {sets.map((set) => {
+            {orderedSets.map((set) => {
               const latest = set.draft ?? set.released;
               // A draft opens on the transmittal it is being prepared on;
               // a released set on the transmittal that sent it.
@@ -76,8 +98,13 @@ export default async function VillaDesignPage({ params }: { params: Promise<{ un
                 : null;
               const body = (
                 <>
-                  <span className="text-foreground min-w-0 text-sm">
-                    {set.setCode ? `${set.setCode} — ${set.setName}` : set.setName}
+                  <span className="min-w-0">
+                    <span className="text-foreground block text-sm">
+                      {set.setCode ? `${set.setCode} — ${set.setName}` : set.setName}
+                    </span>
+                    <span className="text-muted block text-xs">
+                      {set.stageId ? (stageNames.get(set.stageId) ?? "—") : "No stage"}
+                    </span>
                   </span>
                   <span className="flex items-center gap-2">
                     <span className="text-muted text-xs">

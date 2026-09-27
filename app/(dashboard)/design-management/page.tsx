@@ -17,7 +17,7 @@ export default async function DesignManagementPage() {
       icon="DraftingCompass"
       intro={[
         "This is where a villa's drawings live: what has gone to site, what revision each set is on, and what is still being prepared.",
-        "Open a villa, press New transmittal, add the drawings and issue them. Relay tracks who holds each task; this tool holds the drawings.",
+        "Open a villa and press New transmittal: pick the stage and the drawing set, upload its sheets and issue it. Relay tracks who holds each task; this tool holds the drawings.",
       ]}
       stats={[
         {

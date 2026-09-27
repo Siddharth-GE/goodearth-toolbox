@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { FormMessage } from "@/components/ui/form-message";
 import { IconButton } from "@/components/ui/icon-button";
+import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { setDrawingRevisionWorks, updateDraftRevisionNote } from "@/lib/design-management/actions";
@@ -11,6 +12,7 @@ import {
   uploadDrawingRevisionFile,
 } from "@/lib/design-management/files-actions";
 import type { DrawingRevisionRow } from "@/lib/design-management/queries";
+import { normaliseSheetCode } from "@/lib/drawings/sheet-name";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
 import type { WorksTreeCategory } from "@/lib/masters/works";
 import { ChevronDown, ChevronUp, FileText, Trash2, UploadCloud } from "lucide-react";
@@ -93,6 +95,13 @@ function NoteField({
   );
 }
 
+/**
+ * The set's sheets. Each one is uploaded under a sheet code the person
+ * types first — GFP for ground floor plan — which ends the name it
+ * downloads under (founder, 2026-09-27: "when uploading a sheet user has
+ * to enter it"). One file per code, so the code and the sheet can never
+ * be paired wrongly.
+ */
 function FilesEditor({
   revisionId,
   files,
@@ -101,29 +110,32 @@ function FilesEditor({
   files: DrawingRevisionRow["files"];
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [code, setCode] = useState("");
   const [uploading, startUpload] = useTransition();
   const [uploadError, setUploadError] = useState<string>();
   const [removingId, setRemovingId] = useState<string>();
   const [removeError, setRemoveError] = useState<string>();
   const [removing, startRemove] = useTransition();
 
-  const upload = (fileList: FileList | null) => {
-    if (!fileList || fileList.length === 0) return;
+  const sheetCode = normaliseSheetCode(code);
+  const taken = sheetCode !== null && files.some((file) => file.sheetCode === sheetCode);
+
+  const upload = (file: File | undefined) => {
+    if (!file || !sheetCode) return;
     setUploadError(undefined);
     startUpload(async () => {
-      // Sequential: Server Actions dispatch one at a time per client
-      // anyway, and this keeps the order and any error predictable.
-      for (const file of Array.from(fileList)) {
-        if (file.size > MAX_UPLOAD_BYTES) {
-          setUploadError(`"${file.name}" is over 4 MB — split a big set into several sheets.`);
-          break;
-        }
+      if (file.size > MAX_UPLOAD_BYTES) {
+        setUploadError(`"${file.name}" is over 4 MB — split it into two sheets.`);
+      } else {
         const formData = new FormData();
+        formData.set("sheet_code", sheetCode);
         formData.set("file", file);
         const result = await uploadDrawingRevisionFile(revisionId, formData);
         if (result?.error) {
           setUploadError(result.error);
-          break;
+        } else {
+          setCode("");
+          document.getElementById(`sheet-code-${revisionId}`)?.focus();
         }
       }
       if (inputRef.current) inputRef.current.value = "";
@@ -141,33 +153,14 @@ function FilesEditor({
   };
 
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Sheets</p>
-        <input
-          ref={inputRef}
-          type="file"
-          accept="application/pdf,image/jpeg,image/png"
-          multiple
-          hidden
-          onChange={(event) => upload(event.target.files)}
-        />
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          disabled={uploading}
-          onClick={() => inputRef.current?.click()}
-        >
-          {uploading ? <Spinner className="size-4 border-2" /> : <UploadCloud className="size-4" />}
-          {uploading ? "Uploading…" : "Add sheet"}
-        </Button>
-      </div>
-      <FormMessage error={uploadError} size="xs" />
+    <div className="space-y-2">
+      <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
+        Sheets ({files.length})
+      </p>
 
       {files.length === 0 ? (
         <p className="text-muted text-xs">
-          Add the sheet — a PDF or a photo, up to 4 MB each. It can&apos;t go to site without one.
+          No sheets yet. The set can&apos;t go to site without at least one.
         </p>
       ) : (
         <ul className="divide-border divide-y">
@@ -177,15 +170,15 @@ function FilesEditor({
                 href={`/design-management/files/${file.id}`}
                 target="_blank"
                 rel="noreferrer"
-                className="text-foreground flex min-w-0 items-center gap-1.5 truncate hover:underline"
+                className="text-foreground flex min-w-0 items-center gap-2 hover:underline"
               >
                 <FileText className="text-muted size-3.5 shrink-0" />
-                <span className="truncate">{file.fileName}</span>
+                <span className="min-w-0 break-all">{file.displayName}</span>
               </a>
               {/* No confirmation: one sheet, on a draft, put back with one
                   upload. Everything that loses more than that asks first. */}
               <IconButton
-                aria-label={`Remove ${file.fileName}`}
+                aria-label={`Remove ${file.sheetCode ?? file.fileName}`}
                 tone="danger"
                 disabled={removing && removingId === file.id}
                 onClick={() => remove(file.id)}
@@ -196,6 +189,50 @@ function FilesEditor({
           ))}
         </ul>
       )}
+
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="w-40 space-y-1.5">
+          <label
+            htmlFor={`sheet-code-${revisionId}`}
+            className="text-foreground text-sm font-medium"
+          >
+            Sheet code
+          </label>
+          <Input
+            id={`sheet-code-${revisionId}`}
+            value={code}
+            onChange={(event) => setCode(event.target.value)}
+            maxLength={24}
+            autoComplete="off"
+            placeholder="e.g. GFP"
+            className="font-mono uppercase"
+            disabled={uploading}
+          />
+        </div>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="application/pdf,image/jpeg,image/png"
+          hidden
+          onChange={(event) => upload(event.target.files?.[0])}
+        />
+        <Button
+          type="button"
+          variant="secondary"
+          className="h-11"
+          disabled={uploading || !sheetCode || taken}
+          onClick={() => inputRef.current?.click()}
+        >
+          {uploading ? <Spinner className="size-4 border-2" /> : <UploadCloud className="size-4" />}
+          {uploading ? "Uploading…" : "Choose the sheet"}
+        </Button>
+      </div>
+      <p className="text-muted text-xs">
+        {taken
+          ? `This set already has ${sheetCode}. Use another code.`
+          : "A short code for the sheet, like GFP for ground floor plan. Then pick its PDF or photo, up to 4 MB."}
+      </p>
+      <FormMessage error={uploadError} size="xs" />
       <FormMessage error={removeError} size="xs" />
     </div>
   );

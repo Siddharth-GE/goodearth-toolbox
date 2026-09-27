@@ -111,10 +111,10 @@ export default async function VillaPage({ params }: { params: Promise<{ plotId: 
                         href={`/design-management/files/${file.id}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="border-border bg-background text-foreground hover:border-accent hover:text-accent inline-flex min-h-11 items-center gap-1.5 rounded-xl border px-3 text-sm font-medium"
+                        className="border-border bg-background text-foreground hover:border-accent hover:text-accent inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-xl border px-3 text-sm font-medium break-all"
                       >
                         <FileText className="size-4 shrink-0" aria-hidden />
-                        {file.fileName}
+                        {file.displayName}
                       </a>
                     ))}
                   </div>

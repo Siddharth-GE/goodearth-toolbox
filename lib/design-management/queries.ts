@@ -1,6 +1,8 @@
 import "server-only";
 
 import { requireTool } from "@/lib/auth/access";
+import { sheetNamingContext } from "@/lib/drawings/sheet-context";
+import { sheetFileName } from "@/lib/drawings/sheet-name";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { readFailed } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
@@ -81,6 +83,8 @@ export async function getWelcomeCounts(): Promise<{
 export type DesignStageRow = {
   id: string;
   name: string;
+  /** The short code in sheet file names (0099); null until one is set. */
+  code: string | null;
   sortOrder: number;
   isActive: boolean;
 };
@@ -92,12 +96,13 @@ export async function listDesignStages(): Promise<DesignStageRow[]> {
   const data = await fetchAll<{
     id: string;
     name: string;
+    code: string | null;
     sort_order: number;
     is_active: boolean;
   }>((from, to) =>
     supabase
       .from("design_stages")
-      .select("id, name, sort_order, is_active")
+      .select("id, name, code, sort_order, is_active")
       .order("sort_order")
       .order("name")
       .order("id")
@@ -107,6 +112,7 @@ export async function listDesignStages(): Promise<DesignStageRow[]> {
   return data.map((stage) => ({
     id: stage.id,
     name: stage.name,
+    code: stage.code,
     sortOrder: stage.sort_order,
     isActive: stage.is_active,
   }));
@@ -201,7 +207,12 @@ export async function listVillas(): Promise<DesignVillaRow[]> {
 
 export type DrawingRevisionFileRow = {
   id: string;
+  /** The name it was uploaded under. */
   fileName: string;
+  /** GFP — typed at upload; null only for sheets from before 0099. */
+  sheetCode: string | null;
+  /** The name it downloads under: SAA-Saarang-Villa12-WD-TR0003-GFP.pdf. */
+  displayName: string;
   contentType: string;
   sortOrder: number;
 };
@@ -229,6 +240,9 @@ export type VillaTransmittalRow = {
   stageId: string;
   stageName: string;
   lineCount: number;
+  /** The drawing set it carries and its revision — one per transmittal (0099). */
+  setName: string | null;
+  revisionNo: number | null;
   issuedAt: string | null;
   issuedByName: string | null;
   createdAt: string;
@@ -322,10 +336,10 @@ export async function getVillaDesignDetail(unitId: string): Promise<VillaDesignD
   // runtime that every local gate passes (BUGCATCHER #2).
   const [lines, issuers] = await Promise.all([
     transmittalIds.length > 0
-      ? fetchAll<{ transmittal_id: string }>((from, to) =>
+      ? fetchAll<{ transmittal_id: string; drawing_revision_id: string }>((from, to) =>
           supabase
             .from("transmittal_lines")
-            .select("transmittal_id")
+            .select("transmittal_id, drawing_revision_id")
             .in("transmittal_id", transmittalIds)
             .order("id")
             .range(from, to),
@@ -343,6 +357,43 @@ export async function getVillaDesignDetail(unitId: string): Promise<VillaDesignD
       : Promise.resolve([]),
   ]);
 
+  // The set each transmittal carries: its line's revision, then the set.
+  const lineRevisionIds = [...new Set(lines.map((line) => line.drawing_revision_id))];
+  const lineRevisions =
+    lineRevisionIds.length > 0
+      ? await fetchAll<{ id: string; drawing_set_id: string; revision_no: number }>((from, to) =>
+          supabase
+            .from("drawing_revisions")
+            .select("id, drawing_set_id, revision_no")
+            .in("id", lineRevisionIds)
+            .order("id")
+            .range(from, to),
+        )
+      : [];
+  const lineSetIds = [...new Set(lineRevisions.map((revision) => revision.drawing_set_id))];
+  const lineSets =
+    lineSetIds.length > 0
+      ? await fetchAll<{ id: string; name: string }>((from, to) =>
+          supabase
+            .from("drawing_sets")
+            .select("id, name")
+            .in("id", lineSetIds)
+            .order("id")
+            .range(from, to),
+        )
+      : [];
+  const lineRevisionsById = new Map(lineRevisions.map((revision) => [revision.id, revision]));
+  const lineSetNames = new Map(lineSets.map((set) => [set.id, set.name]));
+  const carried = new Map<string, { setName: string | null; revisionNo: number }>();
+  for (const line of lines) {
+    const revision = lineRevisionsById.get(line.drawing_revision_id);
+    if (!revision || carried.has(line.transmittal_id)) continue;
+    carried.set(line.transmittal_id, {
+      setName: lineSetNames.get(revision.drawing_set_id) ?? null,
+      revisionNo: revision.revision_no,
+    });
+  }
+
   const lineCounts = new Map<string, number>();
   for (const line of lines) {
     lineCounts.set(line.transmittal_id, (lineCounts.get(line.transmittal_id) ?? 0) + 1);
@@ -357,6 +408,8 @@ export async function getVillaDesignDetail(unitId: string): Promise<VillaDesignD
     stageId: row.design_stage_id,
     stageName: stageNames.get(row.design_stage_id) ?? "—",
     lineCount: lineCounts.get(row.id) ?? 0,
+    setName: carried.get(row.id)?.setName ?? null,
+    revisionNo: carried.get(row.id)?.revisionNo ?? null,
     issuedAt: row.issued_at,
     issuedByName: row.issued_by ? (issuerNames.get(row.issued_by) ?? null) : null,
     createdAt: row.created_at,
@@ -394,6 +447,8 @@ export type VillaDrawingSetState = {
   setId: string;
   setCode: string | null;
   setName: string;
+  /** The stage the set belongs to (0099); null for a set from before. */
+  stageId: string | null;
   /** The one open draft on this villa, if there is one. */
   draft: VillaRevisionSummary | null;
   /** The current released revision, if this set has ever gone out here. */
@@ -458,10 +513,11 @@ export async function listVillaDrawingSetStates(unitId: string): Promise<VillaDr
     code: string | null;
     name: string;
     sort_order: number;
+    design_stage_id: string | null;
   }>((from, to) =>
     supabase
       .from("drawing_sets")
-      .select("id, code, name, sort_order")
+      .select("id, code, name, sort_order, design_stage_id")
       .in("id", setIds)
       .order("sort_order")
       .order("id")
@@ -576,6 +632,7 @@ export async function listVillaDrawingSetStates(unitId: string): Promise<VillaDr
         setId: set.id,
         setCode: set.code,
         setName: set.name,
+        stageId: set.design_stage_id,
         draft: held?.draft ?? null,
         released: held?.released ?? null,
         nextRevisionNo: (held?.highest ?? -1) + 1,
@@ -707,10 +764,11 @@ export async function getTransmittalDetail(
           file_name: string;
           content_type: string;
           sort_order: number;
+          sheet_code: string | null;
         }>((from, to) =>
           supabase
             .from("drawing_revision_files")
-            .select("id, drawing_revision_id, file_name, content_type, sort_order")
+            .select("id, drawing_revision_id, file_name, content_type, sort_order, sheet_code")
             .in("drawing_revision_id", revisionIds)
             .order("sort_order")
             .order("id")
@@ -778,14 +836,28 @@ export async function getTransmittalDetail(
     logBySet.set(row.drawing_set_id, list);
   }
 
+  // The same naming path as the download (lib/drawings/sheet-context.ts),
+  // so the name on this screen is the name the file saves under.
+  const naming = await sheetNamingContext(supabase, revisionIds);
+
   const setsById = new Map(sets.map((set) => [set.id, set]));
   const revisionsById = new Map(revisions.map((revision) => [revision.id, revision]));
   const filesByRevision = new Map<string, DrawingRevisionFileRow[]>();
   for (const file of files) {
     const list = filesByRevision.get(file.drawing_revision_id) ?? [];
+    const context = naming.get(file.drawing_revision_id);
     list.push({
       id: file.id,
       fileName: file.file_name,
+      sheetCode: file.sheet_code,
+      displayName: context
+        ? sheetFileName({
+            ...context,
+            sheetCode: file.sheet_code,
+            originalFileName: file.file_name,
+            contentType: file.content_type,
+          })
+        : file.file_name,
       contentType: file.content_type,
       sortOrder: file.sort_order,
     });

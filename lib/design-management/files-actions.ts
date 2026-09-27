@@ -7,6 +7,7 @@ import { requireTool } from "@/lib/auth/access";
 import { dbErrorMessage } from "@/lib/db-error";
 import { DRAWINGS_BUCKET } from "@/lib/design-management/storage";
 import { GRANT } from "@/lib/design-management/shared";
+import { normaliseSheetCode } from "@/lib/drawings/sheet-name";
 import { designView } from "@/lib/pdf/theme";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
@@ -37,12 +38,23 @@ const ACCEPTED_FILE_TYPES = ["application/pdf", "image/jpeg", "image/png"];
  * `Blob`, never a raw `Buffer` (BUGCATCHER #1); what actually landed is
  * read back and size-checked before the row is written; a failed row
  * write removes the object it would otherwise orphan.
+ *
+ * Every sheet carries a sheet code the person types (GFP for ground
+ * floor plan) — the last part of the name it downloads under
+ * (lib/drawings/sheet-name.ts). Required, and unique within the set's
+ * revision (0099); a clash is refused BEFORE the upload, so nobody waits
+ * for a file only to be told its code is taken.
  */
 export async function uploadDrawingRevisionFile(
   revisionId: string,
   formData: FormData,
 ): Promise<ActionState> {
   const user = await requireTool(GRANT);
+
+  const sheetCode = normaliseSheetCode(String(formData.get("sheet_code") ?? ""));
+  if (!sheetCode) {
+    return { error: "Give the sheet a short code first, like GFP for ground floor plan." };
+  }
 
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) return { error: "Choose a file to upload." };
@@ -85,6 +97,19 @@ export async function uploadDrawingRevisionFile(
   }
 
   const supabase = await createClient();
+
+  const { data: clash, error: clashError } = await supabase
+    .from("drawing_revision_files")
+    .select("id")
+    .eq("drawing_revision_id", revisionId)
+    .eq("sheet_code", sheetCode)
+    .maybeSingle();
+  if (clashError) {
+    console.error("uploadDrawingRevisionFile code check failed:", clashError);
+    return { error: "Could not save the file. Try again." };
+  }
+  if (clash) return { error: `This set already has a sheet ${sheetCode}. Use another code.` };
+
   const path = `revisions/${revisionId}/${crypto.randomUUID()}.${extension}`;
 
   // A BLOB, NOT THE RAW Buffer, AND THIS IS NOT STYLE — BUGCATCHER #1.
@@ -138,6 +163,7 @@ export async function uploadDrawingRevisionFile(
     storage_path: path,
     file_name: file.name,
     content_type: contentType,
+    sheet_code: sheetCode,
     sort_order: (last?.sort_order ?? -1) + 1,
     uploaded_by: user.id,
   });
@@ -145,6 +171,9 @@ export async function uploadDrawingRevisionFile(
     // Object first, then row — a failed row write leaves an invisible
     // orphan rather than a row pointing at nothing.
     await supabase.storage.from(DRAWINGS_BUCKET).remove([path]);
+    if (error.code === "23505") {
+      return { error: `This set already has a sheet ${sheetCode}. Use another code.` };
+    }
     console.error("uploadDrawingRevisionFile row write failed:", error);
     return { error: dbErrorMessage(error, "Could not save the file. Try again.") };
   }
