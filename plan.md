@@ -189,3 +189,16 @@ Untouched: every migration, `lib/drawings/`, the Supervisors screens, the PDF ro
   11. Dark mode: open the Add drawing dialog and the confirm.
   12. Phone: the Add drawing dialog rises as a bottom sheet; Issue and the readiness line are readable without wrapping into the badge.
   13. Supervisors → the same villa → Drawings shows the released set (the read seam is untouched; this proves it).
+
+## Build notes (Opus, 2026-09-27)
+
+Steps 1–9 are built, each its own commit, on draft PR #81 into `staging`. Step 10 is Fable's. Where the build differs from the text above:
+
+- **Issue sits in its own row under the title**, not in the header. The row holds the readiness line and the button, and the database's refusal replaces the readiness line there. The button says "Issue to site".
+- **The re-send offer is "Send R{n} again"** beside "Revise to R{n}", not an arrow.
+- **`createRevisionOnTransmittal` now refuses a draft already on another transmittal**, as well as the dialog not offering it. This is what makes "a draft lives on one transmittal" true for the actions, not only the screen.
+- **A draft that fails to delete after its transmittal is gone is logged, not shown.** The person is sent back to the villa, where the Add drawing dialog offers "Continue draft" for it. Showing the error would have left them on a page that no longer exists.
+- **Legacy data**: before this change a draft could sit on two draft transmittals. Removing it from one now deletes the line and reports that the draft could not be deleted, because `delete_draft_revision` still sees the other line. No data fix is included.
+- **The Sheets label replaces Files**, and the upload button says "Add sheet".
+
+For the Fable pass: the `PLAN.md` rewrite in step 10 is not done.
