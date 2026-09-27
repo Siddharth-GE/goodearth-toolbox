@@ -10,7 +10,7 @@ import {
 import { Send } from "lucide-react";
 import { notFound } from "next/navigation";
 
-import { CreateTransmittalDialog } from "./_components/create-transmittal-dialog";
+import { NewTransmittalButton } from "./_components/new-transmittal-button";
 import { TransmittalList } from "./_components/transmittal-list";
 
 /**
@@ -36,9 +36,7 @@ export default async function VillaDesignPage({ params }: { params: Promise<{ un
   ]);
   if (!villa) notFound();
 
-  const activeStages = stages
-    .filter((stage) => stage.isActive)
-    .map((stage) => ({ id: stage.id, name: stage.name }));
+  const hasStages = stages.some((stage) => stage.isActive);
 
   return (
     <div className="space-y-4">
@@ -47,14 +45,14 @@ export default async function VillaDesignPage({ params }: { params: Promise<{ un
         description={`Plot ${villa.plotName} · ${villa.projectName}`}
         backHref="/design-management/villas"
         backLabel="Villas"
-        actions={<CreateTransmittalDialog unitId={villa.unitId} stages={activeStages} />}
+        actions={<NewTransmittalButton unitId={villa.unitId} hasStages={hasStages} />}
       />
 
       {villa.transmittals.length === 0 ? (
         <EmptyState
           icon={Send}
           title="Nothing has been sent to site for this villa yet"
-          description="Press New transmittal to start one, upload its drawings, and issue them."
+          description="Press New transmittal to start one, add its drawings, and issue them."
         />
       ) : (
         <Section title="Transmittals" note="Newest first. Open one to see what went out on it.">

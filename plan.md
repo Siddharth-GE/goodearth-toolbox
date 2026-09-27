@@ -16,20 +16,20 @@ Two decisions below are yours (see **Decisions for the founder**); the plan take
 
 **A. First drawings for a villa** (grant `/design-management`, laptop)
 
-| # | Press | What they see | Friction |
-| - | ----- | ------------- | -------- |
-| 1 | Sidebar → Design Management | Welcome: three paragraphs, three counts, two buttons | Long intro for a screen passed through every time |
-| 2 | Villas | Every villa as a card, grouped by project (43 on production) | No way to jump to one; scroll |
-| 3 | A villa | Title, "New transmittal", empty state | fine |
-| 4 | New transmittal | **Pop-up**: pick a design stage (required), optional note, **Save** | A question before any work; "Save" for something that creates an empty draft |
-| 5 | Save | New page: "Draft transmittal", Draft badge, **Cover sheet (PDF)**, **Issue**. Then *Details* (stage + note again, **Save changes**), then *Drawings* with red "No drawings yet — add one below", then *Add drawings* with a message, a name box and "Add set and start R0", then "Delete this draft" | Three sections; the one thing to do is last; the PDF button on a draft downloads a watermarked stub; Issue is pressable and will fail |
-| 6 | Type a set name → Add set and start R0 | Page re-renders; the line appears with a yellow editor: Note, Files (**Add file**), and the **entire works checklist expanded** with "Save work links" | The checklist dominates the screen; the note placeholder says "required" though R0's note is optional |
-| 7 | Add file → pick → wait | File listed | fine |
-| 8 | Issue | Redirect, green "Issued as TR-0001" | fine |
+| #   | Press                                  | What they see                                                                                                                                                                                                                                                                                        | Friction                                                                                                                              |
+| --- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Sidebar → Design Management            | Welcome: three paragraphs, three counts, two buttons                                                                                                                                                                                                                                                 | Long intro for a screen passed through every time                                                                                     |
+| 2   | Villas                                 | Every villa as a card, grouped by project (43 on production)                                                                                                                                                                                                                                         | No way to jump to one; scroll                                                                                                         |
+| 3   | A villa                                | Title, "New transmittal", empty state                                                                                                                                                                                                                                                                | fine                                                                                                                                  |
+| 4   | New transmittal                        | **Pop-up**: pick a design stage (required), optional note, **Save**                                                                                                                                                                                                                                  | A question before any work; "Save" for something that creates an empty draft                                                          |
+| 5   | Save                                   | New page: "Draft transmittal", Draft badge, **Cover sheet (PDF)**, **Issue**. Then _Details_ (stage + note again, **Save changes**), then _Drawings_ with red "No drawings yet — add one below", then _Add drawings_ with a message, a name box and "Add set and start R0", then "Delete this draft" | Three sections; the one thing to do is last; the PDF button on a draft downloads a watermarked stub; Issue is pressable and will fail |
+| 6   | Type a set name → Add set and start R0 | Page re-renders; the line appears with a yellow editor: Note, Files (**Add file**), and the **entire works checklist expanded** with "Save work links"                                                                                                                                               | The checklist dominates the screen; the note placeholder says "required" though R0's note is optional                                 |
+| 7   | Add file → pick → wait                 | File listed                                                                                                                                                                                                                                                                                          | fine                                                                                                                                  |
+| 8   | Issue                                  | Redirect, green "Issued as TR-0001"                                                                                                                                                                                                                                                                  | fine                                                                                                                                  |
 
-**B. A revision (R1)** — same as A to step 5, then scroll past *Details* and the *Drawings* section to *Add drawings* → "Revise — starts R1" → editor appears above → type the note → Add file → Issue. If the note is forgotten, the refusal appears in `text-xs` beside the Issue button at the top while the empty note field sits far below.
+**B. A revision (R1)** — same as A to step 5, then scroll past _Details_ and the _Drawings_ section to _Add drawings_ → "Revise — starts R1" → editor appears above → type the note → Add file → Issue. If the note is forgotten, the refusal appears in `text-xs` beside the Issue button at the top while the empty note field sits far below.
 
-**C. A mistake** — a set added by accident shows two controls: a grey text button "Remove and delete the draft" and a red trash icon whose hidden label is "Take off this transmittal". The trash (the thing that looks like delete) is the *less* destructive one: it leaves an orphan draft revision that then appears on the villa page as "Draft R1" with no way to open it, and is only reachable by starting *another* transmittal and pressing "Continue draft R1". Neither control confirms. "Delete this draft" at the bottom of the page and the per-file trash don't confirm either; deleting the draft transmittal also orphans its draft revisions.
+**C. A mistake** — a set added by accident shows two controls: a grey text button "Remove and delete the draft" and a red trash icon whose hidden label is "Take off this transmittal". The trash (the thing that looks like delete) is the _less_ destructive one: it leaves an orphan draft revision that then appears on the villa page as "Draft R1" with no way to open it, and is only reachable by starting _another_ transmittal and pressing "Continue draft R1". Neither control confirms. "Delete this draft" at the bottom of the page and the per-file trash don't confirm either; deleting the draft transmittal also orphans its draft revisions.
 
 **D. On a phone** — the header actions (badge, PDF, Issue, and Issue's error text) wrap into a stack; the works checklist is a 28 rem scroll region inside the page scroll; the three add-forms and the details form each have their own button.
 
@@ -74,7 +74,7 @@ Ready to issue · 2 drawings          (or: "Working Drawings R1 still needs a sh
 
 Each step is one commit with a plain-English message. Owner tags per `MODELS.md`.
 
-### 1. `[Sonnet]` New transmittal is one press
+### 1. `[Sonnet]` New transmittal is one press — done (Opus)
 
 - `lib/design-management/actions.ts` → `createTransmittal(unitId)` loses its form signature. It reads the villa's most recent transmittal's `design_stage_id` (any status, by `created_at desc`, `maybeSingle`, **check `error`**); if none, the first active stage by `sort_order`; if no active stage, return `{ error: "Add a design stage first." }`. Insert, revalidate layout, redirect to the workspace as today.
 - Delete `villas/[unitId]/_components/create-transmittal-dialog.tsx`. Replace with `new-transmittal-button.tsx`: a client `Button` using `useTransition`, "New transmittal" / "Starting…", `FormMessage` for an error; disabled with "No design stages yet" when the page passes zero active stages (keep that guard).
@@ -110,7 +110,7 @@ Each step is one commit with a plain-English message. Owner tags per `MODELS.md`
 
 - New `_components/confirm-dialog.tsx` inside `design-management` (two uses in one tool; not yet `components/ui` — DESIGN.md's third-copy rule): `Dialog` with title, description, Cancel and a danger `Button` running a `useTransition` action, error shown inside.
 - `RemoveLineButton` → one `ghost sm` "Remove". Draft line: confirm "Remove {set} R{n} from this transmittal? Its draft and {files} sheet(s) will be deleted." → `removeTransmittalLine(lineId, true)`. Released line: no confirm, `removeTransmittalLine(lineId, false)` (nothing is lost).
-- `DeleteDraftTransmittalButton`: confirm "Delete this draft transmittal? {k} draft drawing(s) and their sheets go with it." → `deleteDraftTransmittal`, which now: reads the draft revision ids on its lines (`transmittal_lines` → `drawing_revisions.status = 'draft'`, **check `error`**), calls `delete_draft_transmittal`, then `discardDraftRevision` for each (rows, then files — the existing helper). A partial failure is reported in the sentence, as `removeTransmittalLine` already does. A draft revision that also sits on *another* draft transmittal is refused by `delete_draft_revision` and stays; the message says so.
+- `DeleteDraftTransmittalButton`: confirm "Delete this draft transmittal? {k} draft drawing(s) and their sheets go with it." → `deleteDraftTransmittal`, which now: reads the draft revision ids on its lines (`transmittal_lines` → `drawing_revisions.status = 'draft'`, **check `error`**), calls `delete_draft_transmittal`, then `discardDraftRevision` for each (rows, then files — the existing helper). A partial failure is reported in the sentence, as `removeTransmittalLine` already does. A draft revision that also sits on _another_ draft transmittal is refused by `delete_draft_revision` and stays; the message says so.
 - `createSetOnTransmittal` / `createRevisionOnTransmittal`: when `appendTransmittalLine` fails right after `startDraftRevision`, discard the revision just started so no orphan is born.
 - Per-file delete keeps no confirm (one sheet, re-uploadable) — say so in a comment.
 
@@ -145,21 +145,21 @@ Each step is one commit with a plain-English message. Owner tags per `MODELS.md`
 
 ## Files
 
-| Change | Path |
-| ------ | ---- |
-| edit | `lib/design-management/actions.ts` (createTransmittal, set stage/note, createSetOnTransmittal signature, deleteDraftTransmittal, orphan cleanup) |
-| edit | `lib/design-management/queries.ts` (`listVillaDrawingSetStates` transmittal ids) |
-| new | `lib/design-management/readiness.ts`, `readiness.test.ts` |
-| edit | `app/(dashboard)/design-management/transmittals/[transmittalId]/page.tsx` |
-| rewrite | `…/transmittals/[transmittalId]/_components/transmittal-forms.tsx` (DraftDetails, Remove, Issue, Delete) |
-| new | `…/transmittals/[transmittalId]/_components/add-drawing-dialog.tsx` |
-| new | `app/(dashboard)/design-management/_components/confirm-dialog.tsx` |
-| edit | `app/(dashboard)/design-management/_components/draft-revision-editor.tsx` |
-| delete | `…/villas/[unitId]/_components/create-transmittal-dialog.tsx` |
-| new | `…/villas/[unitId]/_components/new-transmittal-button.tsx` |
-| edit | `…/villas/[unitId]/page.tsx`, `…/villas/page.tsx`, `…/page.tsx` |
-| new | `…/villas/_components/villa-filter.tsx` |
-| edit | `app/(dashboard)/design-management/PLAN.md` |
+| Change  | Path                                                                                                                                             |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| edit    | `lib/design-management/actions.ts` (createTransmittal, set stage/note, createSetOnTransmittal signature, deleteDraftTransmittal, orphan cleanup) |
+| edit    | `lib/design-management/queries.ts` (`listVillaDrawingSetStates` transmittal ids)                                                                 |
+| new     | `lib/design-management/readiness.ts`, `readiness.test.ts`                                                                                        |
+| edit    | `app/(dashboard)/design-management/transmittals/[transmittalId]/page.tsx`                                                                        |
+| rewrite | `…/transmittals/[transmittalId]/_components/transmittal-forms.tsx` (DraftDetails, Remove, Issue, Delete)                                         |
+| new     | `…/transmittals/[transmittalId]/_components/add-drawing-dialog.tsx`                                                                              |
+| new     | `app/(dashboard)/design-management/_components/confirm-dialog.tsx`                                                                               |
+| edit    | `app/(dashboard)/design-management/_components/draft-revision-editor.tsx`                                                                        |
+| delete  | `…/villas/[unitId]/_components/create-transmittal-dialog.tsx`                                                                                    |
+| new     | `…/villas/[unitId]/_components/new-transmittal-button.tsx`                                                                                       |
+| edit    | `…/villas/[unitId]/page.tsx`, `…/villas/page.tsx`, `…/page.tsx`                                                                                  |
+| new     | `…/villas/_components/villa-filter.tsx`                                                                                                          |
+| edit    | `app/(dashboard)/design-management/PLAN.md`                                                                                                      |
 
 Untouched: every migration, `lib/drawings/`, the Supervisors screens, the PDF route and document, the files route, `lib/tools.ts`.
 

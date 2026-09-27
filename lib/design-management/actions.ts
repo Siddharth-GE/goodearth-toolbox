@@ -371,44 +371,72 @@ export async function setDrawingRevisionWorks(
 // ---------------------------------------------------------------------
 
 /**
- * Raises an EMPTY draft transmittal and opens it.
+ * Raises an EMPTY draft transmittal and opens it — one press, no questions.
  *
- * The founder redirected the flow on the staging vet (2026-08-22):
- * "press new transmittal, upload the docs and issue to site". So this
- * asks only what a transmittal is _for_ — the villa it belongs to, the
- * design stage it goes out at, and an optional note — and the drawings
- * are assembled on the transmittal itself, which is now the workspace.
+ * The stage is `not null` (0091), so it is guessed rather than asked:
+ * the stage of this villa's most recent transmittal if still active,
+ * else the first active stage on the list. The workspace shows it at the
+ * top and saves a change the moment it is made, so a wrong guess costs
+ * one pick. Asking in a pop-up and then again on the page was the first
+ * thing a designer hit (2026-09-27 audit).
  *
  * The header carries no number: 0091's CHECK ties `number`, `issued_at`
- * and `issued_by` to the issued status both ways, so a draft holding a
- * number is refused by the database. The number is minted on Issue and
- * nowhere else, which is why an abandoned draft cannot burn TR-0003.
- *
- * "At least one drawing" is not checked here any more — it is enforced
- * where it belongs, at Issue, by `issue_transmittal` itself.
+ * and `issued_by` to the issued status both ways, so the number is
+ * minted on Issue and an abandoned draft cannot burn TR-0003. "At least
+ * one drawing" is enforced at Issue by `issue_transmittal` itself.
  */
-export async function createTransmittal(
-  unitId: string,
-  _prev: ActionState,
-  formData: FormData,
-): Promise<ActionState> {
+export async function createTransmittal(unitId: string): Promise<ActionState> {
   const user = await requireTool(GRANT);
-
-  const stageId = text(formData, "design_stage_id");
-  if (!stageId) return { error: "Pick the design stage this goes out at." };
-
-  const note = text(formData, "note");
-  if (note.length > NOTE_LIMIT) return { error: `Keep the note under ${NOTE_LIMIT} characters.` };
-
   const supabase = await createClient();
+
+  const { data: previous, error: previousError } = await supabase
+    .from("transmittals")
+    .select("design_stage_id")
+    .eq("unit_id", unitId)
+    .order("created_at", { ascending: false })
+    .order("id")
+    .limit(1)
+    .maybeSingle();
+  if (previousError) {
+    console.error("createTransmittal previous stage read failed:", previousError);
+    return { error: "Could not start the transmittal. Try again." };
+  }
+
+  let stageId: string | null = previous?.design_stage_id ?? null;
+  if (stageId) {
+    // The last stage may since have been retired; a new draft should not
+    // start on a stage nobody can pick any more.
+    const { data: stage, error: stageError } = await supabase
+      .from("design_stages")
+      .select("is_active")
+      .eq("id", stageId)
+      .maybeSingle();
+    if (stageError) {
+      console.error("createTransmittal stage read failed:", stageError);
+      return { error: "Could not start the transmittal. Try again." };
+    }
+    if (!stage?.is_active) stageId = null;
+  }
+  if (!stageId) {
+    const { data: first, error: firstError } = await supabase
+      .from("design_stages")
+      .select("id")
+      .eq("is_active", true)
+      .order("sort_order")
+      .order("id")
+      .limit(1)
+      .maybeSingle();
+    if (firstError) {
+      console.error("createTransmittal first stage read failed:", firstError);
+      return { error: "Could not start the transmittal. Try again." };
+    }
+    if (!first) return { error: "Add a design stage first, under Design stages." };
+    stageId = first.id;
+  }
+
   const { data: transmittal, error } = await supabase
     .from("transmittals")
-    .insert({
-      unit_id: unitId,
-      design_stage_id: stageId,
-      note: note || null,
-      created_by: user.id,
-    })
+    .insert({ unit_id: unitId, design_stage_id: stageId, created_by: user.id })
     .select("id")
     .single();
   if (error) {
