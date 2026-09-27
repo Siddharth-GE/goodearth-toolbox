@@ -2,7 +2,6 @@
 
 import { Button } from "@/components/ui/button";
 import { FormMessage } from "@/components/ui/form-message";
-import { IconButton } from "@/components/ui/icon-button";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,8 +13,9 @@ import {
   setDraftTransmittalStage,
 } from "@/lib/design-management/actions";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
-import { Trash2 } from "lucide-react";
 import { useState, useTransition } from "react";
+
+import { ConfirmDialog } from "../../../_components/confirm-dialog";
 
 /**
  * Everything a DRAFT transmittal can be changed by. Once issued, none of
@@ -100,56 +100,71 @@ export function DraftDetails({
 }
 
 /**
- * Taking a drawing off, and — for a draft — the separate question of
- * whether to throw the drawing away too.
+ * One Remove per drawing, and one question when it costs something.
  *
- * They are deliberately two presses. Off-this-transmittal is a change of
- * mind about what goes out today; deleting the draft destroys uploaded
- * sheets. Guessing between them would either strand a draft nobody can
- * find or lose work nobody meant to lose, so the screen asks.
+ * A draft drawing lives on exactly one draft transmittal, so taking it
+ * off deletes it and its sheets — left behind, it would be a draft
+ * nobody can open (2026-09-27 audit: a red trash icon that quietly
+ * stranded it sat beside a grey button that deleted it, neither asking).
+ * A released drawing being sent again loses nothing when it comes off,
+ * so it goes without a question.
  */
 export function RemoveLineButton({
   lineId,
   label,
+  revisionNo,
   isDraft,
+  fileCount,
 }: {
   lineId: string;
   label: string;
+  revisionNo: number;
   isDraft: boolean;
+  fileCount: number;
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string>();
 
-  const remove = (discardDraft: boolean) => {
-    setError(undefined);
-    startTransition(async () => {
-      const result = await removeTransmittalLine(lineId, discardDraft);
-      if (result?.error) setError(result.error);
-    });
-  };
+  if (isDraft) {
+    const sheets =
+      fileCount === 0
+        ? "It has no sheets yet."
+        : `Its ${fileCount === 1 ? "sheet" : `${fileCount} sheets`} will be deleted too.`;
+    return (
+      <ConfirmDialog
+        trigger={
+          <Button type="button" variant="ghost" size="sm">
+            Remove
+          </Button>
+        }
+        title={`Remove ${label} R${revisionNo}?`}
+        description={`The draft comes off this transmittal and is deleted. ${sheets}`}
+        confirmLabel="Remove and delete"
+        pendingLabel="Removing…"
+        onConfirm={() => removeTransmittalLine(lineId, true)}
+      />
+    );
+  }
 
   return (
     <div className="flex flex-wrap items-center justify-end gap-2">
       <FormMessage error={error} size="xs" />
-      {isDraft && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          disabled={pending}
-          onClick={() => remove(true)}
-        >
-          {pending ? "Working…" : "Remove and delete the draft"}
-        </Button>
-      )}
-      <IconButton
-        aria-label={`Take ${label} off this transmittal`}
-        tone="danger"
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
         disabled={pending}
-        onClick={() => remove(false)}
+        aria-label={`Take ${label} off this transmittal`}
+        onClick={() => {
+          setError(undefined);
+          startTransition(async () => {
+            const result = await removeTransmittalLine(lineId, false);
+            if (result?.error) setError(result.error);
+          });
+        }}
       >
-        <Trash2 className="size-3.5" />
-      </IconButton>
+        {pending ? "Removing…" : "Remove"}
+      </Button>
     </div>
   );
 }
@@ -184,27 +199,30 @@ export function IssueTransmittalButton({ transmittalId }: { transmittalId: strin
   );
 }
 
-export function DeleteDraftTransmittalButton({ transmittalId }: { transmittalId: string }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
-
+/** The whole draft, gone — said out loud first, with what goes with it. */
+export function DeleteDraftTransmittalButton({
+  transmittalId,
+  draftCount,
+}: {
+  transmittalId: string;
+  draftCount: number;
+}) {
+  const goesWithIt =
+    draftCount === 0
+      ? "Nothing has been sent, so nothing on site changes."
+      : `${draftCount === 1 ? "Its draft drawing" : `Its ${draftCount} draft drawings`} and their sheets are deleted with it. Nothing on site changes.`;
   return (
-    <div className="flex items-center gap-2">
-      <FormMessage error={error} size="xs" />
-      <Button
-        type="button"
-        variant="ghost"
-        disabled={pending}
-        onClick={() => {
-          setError(undefined);
-          startTransition(async () => {
-            const result = await deleteDraftTransmittal(transmittalId);
-            if (result?.error) setError(result.error);
-          });
-        }}
-      >
-        {pending ? "Deleting…" : "Delete this draft"}
-      </Button>
-    </div>
+    <ConfirmDialog
+      trigger={
+        <Button type="button" variant="ghost">
+          Delete this draft
+        </Button>
+      }
+      title="Delete this draft transmittal?"
+      description={goesWithIt}
+      confirmLabel="Delete draft"
+      pendingLabel="Deleting…"
+      onConfirm={() => deleteDraftTransmittal(transmittalId)}
+    />
   );
 }

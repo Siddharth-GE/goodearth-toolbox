@@ -209,7 +209,9 @@ export default async function TransmittalDetailPage({
                       <RemoveLineButton
                         lineId={line.lineId}
                         label={setLabel}
+                        revisionNo={line.revisionNo}
                         isDraft={lineIsDraft}
+                        fileCount={line.files.length}
                       />
                     )}
                   </div>
@@ -231,7 +233,10 @@ export default async function TransmittalDetailPage({
           link at the top — repeating it here was part of the clutter. */}
       {isDraft && (
         <div className="flex justify-end">
-          <DeleteDraftTransmittalButton transmittalId={transmittal.id} />
+          <DeleteDraftTransmittalButton
+            transmittalId={transmittal.id}
+            draftCount={transmittal.lines.filter((line) => line.revisionStatus === "draft").length}
+          />
         </div>
       )}
     </div>

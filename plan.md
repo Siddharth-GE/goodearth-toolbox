@@ -106,7 +106,7 @@ Each step is one commit with a plain-English message. Owner tags per `MODELS.md`
 - Files: the empty state carries the Add file button and reads "Add the sheet — a PDF or a photo, up to 4 MB each". Section labels stay the Section Label style.
 - Drop the `border-warning/30 bg-warning/5` tint; the line's `Badge warning` "Draft" already says it (DESIGN.md: status colours mean status, not decoration).
 
-### 5. `[Opus]` One Remove, one question, no orphan drafts
+### 5. `[Opus]` One Remove, one question, no orphan drafts — done (Opus)
 
 - New `_components/confirm-dialog.tsx` inside `design-management` (two uses in one tool; not yet `components/ui` — DESIGN.md's third-copy rule): `Dialog` with title, description, Cancel and a danger `Button` running a `useTransition` action, error shown inside.
 - `RemoveLineButton` → one `ghost sm` "Remove". Draft line: confirm "Remove {set} R{n} from this transmittal? Its draft and {files} sheet(s) will be deleted." → `removeTransmittalLine(lineId, true)`. Released line: no confirm, `removeTransmittalLine(lineId, false)` (nothing is lost).
