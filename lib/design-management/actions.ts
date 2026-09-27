@@ -8,6 +8,7 @@ import { dbErrorMessage } from "@/lib/db-error";
 import { GRANT } from "@/lib/design-management/shared";
 import { DRAWINGS_BUCKET } from "@/lib/design-management/storage";
 import { text } from "@/lib/form-data";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -900,31 +901,45 @@ export async function deleteDraftTransmittal(transmittalId: string): Promise<Act
 
   // Read the villa and the drafts BEFORE the rows go: afterwards there is
   // nothing left pointing at either.
-  const [header, lineRows] = await Promise.all([
-    supabase.from("transmittals").select("unit_id").eq("id", transmittalId).maybeSingle(),
-    supabase
-      .from("transmittal_lines")
-      .select("drawing_revision_id")
-      .eq("transmittal_id", transmittalId),
-  ]);
-  if (header.error || lineRows.error) {
-    console.error("deleteDraftTransmittal read failed:", header.error ?? lineRows.error);
+  const { data: header, error: headerError } = await supabase
+    .from("transmittals")
+    .select("unit_id")
+    .eq("id", transmittalId)
+    .maybeSingle();
+  if (headerError) {
+    console.error("deleteDraftTransmittal read failed:", headerError);
     return { error: "Could not delete this draft. Try again." };
   }
 
-  const revisionIds = (lineRows.data ?? []).map((line) => line.drawing_revision_id);
-  let draftIds: string[] = [];
-  if (revisionIds.length > 0) {
-    const { data: drafts, error: draftsError } = await supabase
-      .from("drawing_revisions")
-      .select("id")
-      .in("id", revisionIds)
-      .eq("status", "draft");
-    if (draftsError) {
-      console.error("deleteDraftTransmittal drafts read failed:", draftsError);
-      return { error: "Could not delete this draft. Try again." };
-    }
-    draftIds = (drafts ?? []).map((draft) => draft.id);
+  // Complete, not capped: a draft missed here is a draft left behind.
+  // fetchAll throws on a failed read; an action answers with a sentence.
+  let draftIds: string[];
+  try {
+    const lines = await fetchAll<{ drawing_revision_id: string }>((from, to) =>
+      supabase
+        .from("transmittal_lines")
+        .select("drawing_revision_id")
+        .eq("transmittal_id", transmittalId)
+        .order("id")
+        .range(from, to),
+    );
+    const revisionIds = lines.map((line) => line.drawing_revision_id);
+    const drafts =
+      revisionIds.length > 0
+        ? await fetchAll<{ id: string }>((from, to) =>
+            supabase
+              .from("drawing_revisions")
+              .select("id")
+              .in("id", revisionIds)
+              .eq("status", "draft")
+              .order("id")
+              .range(from, to),
+          )
+        : [];
+    draftIds = drafts.map((draft) => draft.id);
+  } catch (readError) {
+    console.error("deleteDraftTransmittal drafts read failed:", readError);
+    return { error: "Could not delete this draft. Try again." };
   }
 
   const { error } = await supabase.rpc("delete_draft_transmittal", {
@@ -946,7 +961,5 @@ export async function deleteDraftTransmittal(transmittalId: string): Promise<Act
   }
 
   revalidatePath("/design-management", "layout");
-  redirect(
-    header.data ? `/design-management/villas/${header.data.unit_id}` : "/design-management/villas",
-  );
+  redirect(header ? `/design-management/villas/${header.unit_id}` : "/design-management/villas");
 }
