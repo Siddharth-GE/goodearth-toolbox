@@ -27,6 +27,8 @@ html[data-dexter-sent] .send-button {
 
 **5. Don't use the browser's own memory.** `localStorage`, `sessionStorage`, cookies and `document.domain` are blocked inside Dexter — the page runs in a sandbox, by design. Everything you want kept goes through rule 3.
 
+**The WhatsApp preview is automatic.** When the link is shared on WhatsApp, the preview shows the Kaadal mark on your page's background colour, with your page's `<title>` beneath it — so write a title a client should read. Dexter reads the colour from the background of `body`; if your cover is a photo or a gradient, name the colour yourself in `<head>`: `<meta name="theme-color" content="#521323" />`.
+
 **Limits:** 200 named fields, 10,000 characters per text answer, 64 KB of answers in all. **Test:** open the link Goodearth gives you, type something, reload — it must come back. **Changing the page later:** Goodearth replaces the file at the same link; answers stay as long as the names do.
 
 ## A complete example

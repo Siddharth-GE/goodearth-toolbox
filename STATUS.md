@@ -47,7 +47,7 @@ Production unless marked. Each tool's rules are its `PLAN.md` (Google Chat door:
 - **Financial Management** — cash, forward view and funding facilities, read from views.
 - **Reporter** — a report builder over a dataset registry; carries money by founder decision.
 - **Directory** — everyone who works here; people keep their own details current.
-- **Dexter** — client presentations as shareable links; a deck can carry questions and keeps the client's answers (staging only).
+- **Dexter** — client presentations as shareable links; a deck can carry questions and keeps the client's answers, and every link shows the Kaadal mark when shared on WhatsApp (staging only).
 - **Training** — stub.
 
 The chain runs end to end: design → price → indent → PO → goods in / stock / goods out → bill → paid.

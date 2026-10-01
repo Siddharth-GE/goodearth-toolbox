@@ -261,3 +261,48 @@ Left for the founder on staging: the Dexter screen itself (Answers badge, dialog
 ## Questions for the tier above
 
 _(none yet — a lower tier writes any here rather than improvising)_
+
+---
+
+# Second build — every deck link carries the Kaadal preview (2026-10-02)
+
+**Why.** A deck link pasted into WhatsApp shows as a bare address. The founder wants every one to show the Kaadal mark on the deck's own background colour.
+
+## Decisions
+
+- **The preview comes from tags in the page WhatsApp fetches**, so Dexter adds them to every HTML page as it serves it — the response only. The stored file is never touched, which is why decks already uploaded and links already sent get the preview too.
+- **The picture is the K mark**, paths taken from the brand's own artwork, centred on the deck's background colour, drawn in the brand colour that reads best against it (approved pairings first, then contrast). The wordmark is a swap inside `lib/dexter/preview-image.tsx` if the founder prefers it.
+- **The colour is read from the page**: `<meta name="theme-color">`, then the `body` background, then `html`, then brand burgundy. It rides to the picture as a validated six-digit `?bg=` parameter, so the picture route needs no file download.
+- **Title** is the page's own `<title>`, falling back to "Kaadal"; the description is Kaadal's tagline.
+- **No migration, no new library** (`next/og` ships with Next). The generator is loaded lazily inside the one branch that uses it (BUGCATCHER #15).
+- **Any failure serves the deck as before** — a broken preview must never break a client's link.
+
+## Steps
+
+1. ✅ `[Sonnet]` `lib/dexter/preview.ts` + tests — colour parsing, background detection, mark colour, title, tag text, safe insertion.
+2. ✅ `[Fable, in the chair]` `lib/dexter/preview-image.tsx` — the picture.
+3. ✅ `[Fable, in the chair]` `app/deck/[token]/[[...path]]/route.ts` — the `.preview.png` branch and the tags on HTML responses.
+4. ✅ `[Fable, in the chair]` Docs — `DECK-AUTHORING.md`, Dexter's `PLAN.md`, `SECURITY.md`, `STATUS.md`, `TODO.md`.
+5. `[Fable]` Vet, drive the public link, PR → `staging`.
+
+## What to verify
+
+**Public link, no sign-in:** `.preview.png` → 200 `image/png`, 1200×630, a K on the deck's colour; `?bg=` garbage → brand burgundy; unknown token and a switched-off link → 404. The page's HTML carries `og:title`, `og:image` (absolute, https on staging) and the rest, once, right after `<head>`; the page renders and behaves exactly as before, sandbox header intact; a deck with no `<head>`, and a UTF-16 deck, still open.
+
+**Founder, on staging:**
+
+1. Dexter → **Dexter answers test** → Copy link → paste it into a WhatsApp chat (to yourself is fine). The preview shows the Kaadal K on the page's colour, with the page's title and "Designs that grow from the inside out".
+2. Paste a link to any older deck — it gets the preview too.
+3. Open the link — the deck looks and works exactly as it did.
+4. Switch a link off, paste it again — no preview, and the link does not open.
+
+## Verified 2026-10-02 (Fable, against staging through a local dev server)
+
+The handout's sample deck on staging was driven without a sign-in:
+
+- The page: 200, sandbox header intact, no CORS header; one set of preview tags right after `<head>`, the rest of the page as stored. In headless Chrome the page's own script still ran — a saved name came back into its field.
+- The picture: 200 `image/png`, 1200×630, `private, max-age=300`, `noindex`. Looked at: the K is drawn correctly, blush on the default burgundy, white on ochre (`?bg=be904c`), burgundy on cream (`?bg=fdf3f6`). A garbage `?bg=` gives the default.
+- Unknown token → 404 for the picture and the page; a preview name inside a subfolder → 404; the bare link still redirects; `.state` and `.dexter.js` still answer.
+- `npm test` 945 pass (40 new), lint, typecheck, build and `check:actions` clean.
+
+Not verified, because it cannot be from here: the card as WhatsApp itself draws it (founder step 1), and a deck whose own page sets a background colour — the sample has none, so only the default and the `?bg=` path were seen live; the detection is covered by the unit tests.
