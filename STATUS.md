@@ -12,14 +12,14 @@ A snapshot, not a changelog: what exists now. Next work is `TODO.md`, each tool'
 How they move, and every rule that keeps them apart, is `SHIPPING.md`.
 
 - **Production is paused** (free tier, found `INACTIVE` 2026-09-25 despite the weekly keep-alive) and has **no backups**. Restoring it is the founder's — `TODO.md`.
-- **Staging carries work production does not have yet**, each waiting for the founder's vet or a ship day: the "stone and glass" skin, the Google Chat door (`0094`), Dexter (`0095`), the Estimator's measurement sheet and rework (`0096`–`0098`), Design Management's sets by stage (`0099`), the catalogue pictures, and smaller Reporter/Selections/Design Management changes. How it can reach `master` is in `TODO.md`.
+- **Staging carries work production does not have yet**, each waiting for the founder's vet or a ship day: the "stone and glass" skin, the Google Chat door (`0094`), Dexter (`0095`, `0100`), the Estimator's measurement sheet and rework (`0096`–`0098`), Design Management's sets by stage (`0099`), the catalogue pictures, and smaller Reporter/Selections/Design Management changes. How it can reach `master` is in `TODO.md`.
 - **Staging's data is practice.** Selections, budgets, rooms and everything built on them were cleared on 2026-09-26 at the founder's request, so the team starts from scratch there; master data (people, projects, units, clients, vendors, the catalogue) stayed.
 - **Only two accounts can sign in on staging** — the founder's and the probe (`siddharth.cyriac.99+probe@gmail.com`, holds `/inventory` only; set a throwaway password through the auth admin API each time). Every other staff email there is `@staging.invalid`, so reproduce a colleague's problem with the probe and a grant.
 
 ## Platform
 
 - **Stack:** Next.js 16.2 (Turbopack) · React 19.2 · Tailwind 4 · Supabase Postgres. Vercel `bom1` + Supabase `ap-south-1`, both Mumbai.
-- **Migrations:** `0001`–`0093` on both databases; `0094`–`0099` on staging only. `applied_migrations` (`0067`) is the ledger, and CI checks it on every pull request.
+- **Migrations:** `0001`–`0093` on both databases; `0094`–`0100` on staging only. `applied_migrations` (`0067`) is the ledger, and CI checks it on every pull request.
 - **Access:** per-user grants (`user_apps`) + role bundles (`role_apps`), enforced in the database by `has_app()`. `profiles.team` is a dead column.
 - **Sign-in:** password → emailed 6-digit code (30-day trusted device), self-service reset, Google for existing team emails only; both steps rate-limited in the database. Mail rides Resend as `toolbox@goodearthkannur.org`. The rules are `SECURITY.md`.
 - **Performance:** warm TTFB ~0.2s, cold ~1.0s — cold starts are the one measured problem. Every dashboard page shows a loading state: 84 of 127 pages have their own `loading.tsx`, the rest inherit the nearest parent's.
@@ -47,7 +47,7 @@ Production unless marked. Each tool's rules are its `PLAN.md` (Google Chat door:
 - **Financial Management** — cash, forward view and funding facilities, read from views.
 - **Reporter** — a report builder over a dataset registry; carries money by founder decision.
 - **Directory** — everyone who works here; people keep their own details current.
-- **Dexter** — client presentations as shareable links (staging only).
+- **Dexter** — client presentations as shareable links; a deck can carry questions and keeps the client's answers (staging only).
 - **Training** — stub.
 
 The chain runs end to end: design → price → indent → PO → goods in / stock / goods out → bill → paid.
