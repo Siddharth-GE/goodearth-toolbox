@@ -15,6 +15,7 @@ import { Presentation } from "lucide-react";
 import { notFound } from "next/navigation";
 
 import { DeckActions } from "./_components/deck-actions";
+import { DeckAnswers } from "./_components/deck-answers";
 import { ProjectHeaderActions } from "./_components/project-actions";
 import { UploadDeckDialog } from "./_components/upload-deck-dialog";
 
@@ -65,6 +66,7 @@ export default async function DexterProjectPage({
             <TableRow>
               <TableHeaderCell>Title</TableHeaderCell>
               <TableHeaderCell>Link</TableHeaderCell>
+              <TableHeaderCell>Answers</TableHeaderCell>
               <TableHeaderCell>Size</TableHeaderCell>
               <TableHeaderCell>Uploaded</TableHeaderCell>
               <TableHeaderCell></TableHeaderCell>
@@ -78,6 +80,13 @@ export default async function DexterProjectPage({
                   <Badge variant={deck.shareEnabled ? "success" : "neutral"}>
                     {deck.shareEnabled ? "Link on" : "Link off"}
                   </Badge>
+                </TableCell>
+                <TableCell>
+                  {deck.answers ? (
+                    <DeckAnswers deck={{ id: deck.id, title: deck.title, answers: deck.answers }} />
+                  ) : (
+                    <span className="text-muted">—</span>
+                  )}
                 </TableCell>
                 <TableCell className="whitespace-nowrap">
                   {formatDeckSize(deck.totalBytes)}
