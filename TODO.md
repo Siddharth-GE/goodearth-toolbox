@@ -16,12 +16,12 @@ Everything below is on `staging.goodearthkannur.org`. Each ships only after the 
 - **The Estimator rework** (`0096`–`0098`). Its approval pass by Fable was deferred by the founder and is due before production.
 - **Relay × Google Chat round two** — the founder's steps and the checks are in `lib/google-chat/PLAN.md`; production has its own checklist there.
 - **The skin** — nobody has looked at the signed-in screens in it yet; the browser checklist is `git show 42463f8:plan.md`.
-- **Dexter** (`0095`) — tried and confirmed good; production needs `0095` first.
+- **Dexter** (`0095`, `0100`) — the links were tried and confirmed good; **saved answers (`0100`) are waiting for the founder's vet** — the checklist is in `plan.md`. Production needs both migrations.
 - **Settings refreshes every page after a change** — **vetted by the founder 2026-09-26**.
 - **Design Management's simpler transmittal flow** (PR #81, on staging) — waiting for the founder's vet and the Fable review it skipped.
 - **Design Management: sets by stage, sheets by code** (`0099`) — on staging, waiting for the founder's vet. Staging's drawings were wiped for it. **The Fable review of `0099` was skipped for staging and is due before production**; production then needs `scripts/wipe-drawings.ts` (dry run first) and `0099`.
 
-**Getting it to `master`.** `staging` is ~150 commits ahead and carries `0094`–`0098`. Either the Chat door's ship checklist runs first and everything goes together, or a piece travels alone on a release branch cut from `master` (the skin: cherry-pick `a096e58`…`3fe4c95`, skip the sweep `f8a9e5c` and re-run it on `master`). Every route needs production restored first, then the migrations applied there and `db:compare` empty.
+**Getting it to `master`.** `staging` is ~150 commits ahead and carries `0094`–`0100`. Either the Chat door's ship checklist runs first and everything goes together, or a piece travels alone on a release branch cut from `master` (the skin: cherry-pick `a096e58`…`3fe4c95`, skip the sweep `f8a9e5c` and re-run it on `master`). Every route needs production restored first, then the migrations applied there and `db:compare` empty.
 
 ## Setup the tools are waiting on
 

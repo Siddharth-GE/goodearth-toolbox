@@ -177,3 +177,11 @@ test("planZip refuses more than 40 MB unpacked", () => {
   const entries = [file("index.html", 41 * 1024 * 1024)];
   assert.deepEqual(planZip(entries), { error: "That zip unpacks to more than 40 MB." });
 });
+
+test("planZip drops the reserved names .dexter.js and .state", () => {
+  const plan = planZip([file("index.html"), file(".dexter.js"), file(".state")]);
+  assert.deepEqual(plan, {
+    entry: "index.html",
+    files: [{ zipName: "index.html", deckPath: "index.html", size: 10 }],
+  });
+});

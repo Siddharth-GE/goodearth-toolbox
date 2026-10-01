@@ -1,5 +1,6 @@
 import "server-only";
 
+import { readAnswerFields, type AnswerFields } from "@/lib/dexter/answers";
 import { GRANT } from "@/lib/dexter/shared";
 import { requireTool } from "@/lib/auth/access";
 import { fetchAll } from "@/lib/supabase/fetch-all";
@@ -111,6 +112,7 @@ export type DexterDeckRow = {
   totalBytes: number;
   uploadedByName: string | null;
   createdAt: string;
+  answers: { fields: AnswerFields; updatedAt: string; submittedAt: string | null } | null;
 };
 
 export type DexterProjectDetail = {
@@ -169,18 +171,47 @@ export async function getProject(projectId: string): Promise<DexterProjectDetail
       : [];
   const uploaderNames = new Map(uploaders.map((uploader) => [uploader.id, uploader.full_name]));
 
+  const deckIds = decks.map((deck) => deck.id);
+  const answerRows =
+    deckIds.length > 0
+      ? await fetchAll<{
+          deck_id: string;
+          fields: unknown;
+          submitted_at: string | null;
+          updated_at: string;
+        }>((from, to) =>
+          supabase
+            .from("dexter_answers")
+            .select("deck_id, fields, submitted_at, updated_at")
+            .in("deck_id", deckIds)
+            .order("deck_id")
+            .range(from, to),
+        )
+      : [];
+  const answersByDeck = new Map(answerRows.map((row) => [row.deck_id, row]));
+
   return {
     project: { id: project.id, name: project.name, clientName: project.client_name },
-    decks: decks.map((deck) => ({
-      id: deck.id,
-      title: deck.title,
-      entryPath: deck.entry_path,
-      shareToken: deck.share_token,
-      shareEnabled: deck.share_enabled,
-      fileCount: deck.file_count,
-      totalBytes: deck.total_bytes,
-      uploadedByName: deck.uploaded_by ? (uploaderNames.get(deck.uploaded_by) ?? null) : null,
-      createdAt: deck.created_at,
-    })),
+    decks: decks.map((deck) => {
+      const answerRow = answersByDeck.get(deck.id);
+      return {
+        id: deck.id,
+        title: deck.title,
+        entryPath: deck.entry_path,
+        shareToken: deck.share_token,
+        shareEnabled: deck.share_enabled,
+        fileCount: deck.file_count,
+        totalBytes: deck.total_bytes,
+        uploadedByName: deck.uploaded_by ? (uploaderNames.get(deck.uploaded_by) ?? null) : null,
+        createdAt: deck.created_at,
+        answers: answerRow
+          ? {
+              fields: readAnswerFields(answerRow.fields),
+              updatedAt: answerRow.updated_at,
+              submittedAt: answerRow.submitted_at,
+            }
+          : null,
+      };
+    }),
   };
 }

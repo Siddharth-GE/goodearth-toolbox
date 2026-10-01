@@ -49,6 +49,7 @@ export type DexterDeckActionRow = {
   entryPath: string;
   shareToken: string;
   shareEnabled: boolean;
+  answers: unknown | null;
 };
 
 /**
@@ -105,7 +106,10 @@ export function DeckActions({ deck }: { deck: DexterDeckActionRow }) {
   }
 
   async function onDelete() {
-    if (!window.confirm(`Delete "${deck.title}"? This can't be undone.`)) return;
+    const message = deck.answers
+      ? `Delete "${deck.title}" and its saved answers? This can't be undone.`
+      : `Delete "${deck.title}"? This can't be undone.`;
+    if (!window.confirm(message)) return;
     setBusy(true);
     setError(undefined);
     const result = await deleteDeck(deck.id);
@@ -295,7 +299,7 @@ function ReplaceDeckFileForm({ deckId, onDone }: { deckId: string; onDone: () =>
             autoFocus
           />
           <p className="text-muted text-xs">
-            The link stays the same — only what it opens changes.
+            The link stays the same — only what it opens changes. Saved answers stay.
           </p>
         </div>
         <FormMessage error={error} />

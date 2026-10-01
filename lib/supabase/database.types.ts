@@ -1255,6 +1255,38 @@ export type Database = {
           },
         ]
       }
+      dexter_answers: {
+        Row: {
+          created_at: string
+          deck_id: string
+          fields: Json
+          submitted_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deck_id: string
+          fields?: Json
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deck_id?: string
+          fields?: Json
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dexter_answers_deck_id_fkey"
+            columns: ["deck_id"]
+            isOneToOne: true
+            referencedRelation: "dexter_decks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dexter_decks: {
         Row: {
           created_at: string

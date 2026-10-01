@@ -560,6 +560,21 @@ export async function reissueDeckLink(deckId: string): Promise<ActionState> {
   return undefined;
 }
 
+/** Staff clear a deck's saved answers; the public side can never clear or un-send. */
+export async function clearDeckAnswers(deckId: string): Promise<ActionState> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("dexter_answers").delete().eq("deck_id", deckId);
+  if (error) {
+    console.error("clearDeckAnswers failed:", error);
+    return { error: dbErrorMessage(error, "Could not clear the answers. Try again.") };
+  }
+
+  revalidatePath("/dexter", "layout");
+  return undefined;
+}
+
 /** Row first, then the objects — the reverse of upload, same reasoning.
  *  A cleanup failure is logged, not surfaced: the deck is already gone
  *  from every screen and every link, which is what the person asked for. */
