@@ -6,6 +6,16 @@ import {
   readAnswerFields,
 } from "@/lib/dexter/answers";
 import { DEXTER_CLIENT_SCRIPT } from "@/lib/dexter/client-script";
+import {
+  canInjectPreviewTags,
+  DEFAULT_PREVIEW_BACKGROUND,
+  deckBackgroundColor,
+  DEXTER_PREVIEW_PATH,
+  injectPreviewTags,
+  pageTitle,
+  PREVIEW_SITE_NAME,
+  previewTags,
+} from "@/lib/dexter/preview";
 import { SHARE_TOKEN_PATTERN } from "@/lib/dexter/share";
 import { DEXTER_BUCKET, deckFolder } from "@/lib/dexter/storage";
 import { contentTypeFor, safeDeckPath } from "@/lib/dexter/unpack";
@@ -20,6 +30,14 @@ import { createAdminClient } from "@/lib/supabase/admin";
  *   /deck/<token>/assets/a.css   → an asset, relative to the page
  *   /deck/<token>/.dexter.js     → our script (any depth), never a file
  *   /deck/<token>/.state         → GET the deck's answers, POST to save
+ *   /deck/<token>/.preview.png   → the picture WhatsApp shows for the link
+ *
+ * Every HTML page is served with our link-preview tags added to the
+ * RESPONSE: the Kaadal mark on the page's own background colour, the
+ * page's own title. The stored file is never changed, so decks uploaded
+ * before this existed, and links already sent, get the preview too. The
+ * tags are inert `<meta>` elements — nothing that runs — and the page
+ * they are added to is still sandboxed exactly as below.
  *
  * There is no session here, by design, so this is the one place in a
  * tool that reads AND writes through the service-role client — the reads
@@ -82,6 +100,41 @@ function stateJson(body: unknown, status = 200) {
 
 type Admin = ReturnType<typeof createAdminClient>;
 
+const PREVIEW_COLOR_PARAM = /^[0-9a-f]{6}$/i;
+
+/**
+ * The page's bytes with our link-preview tags added, or the bytes exactly
+ * as stored when anything at all goes wrong. The colour and the title are
+ * read from a UTF-8 decoding; the tags (pure ASCII) are spliced into a
+ * latin1 decoding, one character per byte, so a page in any other charset
+ * comes back byte for byte outside the few lines we add. A title that
+ * did not decode cleanly is not used — the preview says "Kaadal" instead.
+ */
+function withPreview(raw: Buffer, requestUrl: string, token: string): Buffer {
+  try {
+    if (!canInjectPreviewTags(raw)) return raw;
+
+    const analysed = raw.toString("utf8");
+    const background = deckBackgroundColor(analysed) ?? DEFAULT_PREVIEW_BACKGROUND;
+    const ownTitle = pageTitle(analysed);
+    const title = ownTitle && !ownTitle.includes("�") ? ownTitle : PREVIEW_SITE_NAME;
+    const imageUrl =
+      `${new URL(requestUrl).origin}/deck/${token}/${DEXTER_PREVIEW_PATH}` +
+      `?bg=${background.slice(1)}`;
+
+    return Buffer.from(
+      injectPreviewTags(raw.toString("latin1"), previewTags({ title, imageUrl })),
+      "latin1",
+    );
+  } catch (error) {
+    console.error(
+      "deck viewer: preview tags failed:",
+      error instanceof Error ? error.message : "unknown error",
+    );
+    return raw;
+  }
+}
+
 /**
  * The token's shape, then the one row it names. Both doors (GET and
  * POST) go through here, so a missing deck, a switched-off link and a
@@ -139,6 +192,37 @@ export async function GET(
     });
   }
 
+  // The preview picture, root only: the Kaadal mark on the colour named
+  // in the link our own tags wrote (anything else gets the brand
+  // burgundy). The generator is loaded HERE, lazily — a deploy that
+  // cannot load it loses this picture and nothing else; the deck still
+  // opens (BUGCATCHER #15). Rendered to bytes inside the try, so a
+  // failed render is a 404 here and never a broken stream.
+  if (relative === DEXTER_PREVIEW_PATH) {
+    const requested = new URL(request.url).searchParams.get("bg") ?? "";
+    const background = PREVIEW_COLOR_PARAM.test(requested)
+      ? `#${requested.toLowerCase()}`
+      : DEFAULT_PREVIEW_BACKGROUND;
+    try {
+      const { renderPreviewImage } = await import("@/lib/dexter/preview-image");
+      const image = await renderPreviewImage(background).arrayBuffer();
+      return new Response(image, {
+        headers: {
+          "Content-Type": "image/png",
+          "X-Content-Type-Options": "nosniff",
+          "X-Robots-Tag": "noindex",
+          "Cache-Control": "private, max-age=300",
+        },
+      });
+    } catch (error) {
+      console.error(
+        "deck viewer: preview image failed:",
+        error instanceof Error ? error.message : "unknown error",
+      );
+      return notFound();
+    }
+  }
+
   // The deck's answers, root only. No row yet reads as empty, not as an
   // error — a fresh deck has simply not been answered.
   if (relative === DEXTER_STATE_PATH) {
@@ -178,6 +262,12 @@ export async function GET(
   // opened on its own (an <img> ignores scripts anyway).
   if (contentType.startsWith("text/html") || contentType === "image/svg+xml") {
     headers.set("Content-Security-Policy", SANDBOX);
+  }
+
+  // Every HTML page gets the preview tags, in the response only.
+  if (contentType.startsWith("text/html")) {
+    const raw = Buffer.from(await object.arrayBuffer());
+    return new Response(new Uint8Array(withPreview(raw, request.url, token)), { headers });
   }
 
   return new Response(object.stream(), { headers });

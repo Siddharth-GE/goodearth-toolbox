@@ -16,7 +16,7 @@ Everything below is on `staging.goodearthkannur.org`. Each ships only after the 
 - **The Estimator rework** (`0096`–`0098`). Its approval pass by Fable was deferred by the founder and is due before production.
 - **Relay × Google Chat round two** — the founder's steps and the checks are in `lib/google-chat/PLAN.md`; production has its own checklist there.
 - **The skin** — nobody has looked at the signed-in screens in it yet; the browser checklist is `git show 42463f8:plan.md`.
-- **Dexter** (`0095`, `0100`) — the links were tried and confirmed good; **saved answers (`0100`) are waiting for the founder's vet** — the checklist is in `plan.md`. Production needs both migrations.
+- **Dexter** (`0095`, `0100`) — the links were tried and confirmed good; **saved answers (`0100`) are waiting for the founder's vet** — the checklist is in `plan.md`. **The WhatsApp preview is waiting too** (no migration). Production needs both migrations.
 - **Settings refreshes every page after a change** — **vetted by the founder 2026-09-26**.
 - **Design Management's simpler transmittal flow** (PR #81, on staging) — waiting for the founder's vet and the Fable review it skipped.
 - **Design Management: sets by stage, sheets by code** (`0099`) — on staging, waiting for the founder's vet. Staging's drawings were wiped for it. **The Fable review of `0099` was skipped for staging and is due before production**; production then needs `scripts/wipe-drawings.ts` (dry run first) and `0099`.
