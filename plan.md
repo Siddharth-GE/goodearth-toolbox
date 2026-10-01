@@ -24,7 +24,7 @@ So the toolbox saves the answers instead. The deck includes **one script tag** D
 
 ## Steps
 
-### 1. `[Sonnet]` The pure module — `lib/dexter/answers.ts` + `answers.test.ts`
+### 1. ✅ `[Sonnet]` The pure module — `lib/dexter/answers.ts` + `answers.test.ts`
 
 Import-free, like `lib/dexter/unpack.ts`, because the public route and the `"use server"` file both read it.
 
@@ -53,7 +53,7 @@ export function formatAnswer(value: AnswerValue): string;
 
 Tests (`node:test`, the `unpack.test.ts` shape): accepts the three value kinds; rejects non-object, nested objects, numbers, oversize body, too many fields, long name, long text, long list; `submitted` defaults to false and must be boolean; `readAnswerFields` drops bad entries; `formatAnswer` for each kind. Plus **one test in `unpack.test.ts`**: a zip entry named `.dexter.js` or `.state` is dropped by `planZip`.
 
-### 2. `[Sonnet]` The browser script — `lib/dexter/client-script.ts`
+### 2. ✅ `[Sonnet]` The browser script — `lib/dexter/client-script.ts`
 
 `export const DEXTER_CLIENT_SCRIPT = \`…\`` — plain ES2017, no dependencies, about 80 lines, the only browser code in Dexter. Behaviour, exactly:
 
@@ -64,7 +64,7 @@ Tests (`node:test`, the `unpack.test.ts` shape): accepts the three value kinds; 
 - **Save:** on `input`/`change` (delegated on `document`), 800 ms after the last one; on any `<form>` `submit` → `preventDefault()`, set `submitted = true`, save at once; on `pagehide` → save with `keepalive: true` if anything is unsaved. Body `JSON.stringify({ fields, submitted })`, `Content-Type: text/plain`.
 - **Status:** `document.documentElement.dataset.dexter` = `"saving" | "saved" | "error"`; `dataset.dexterSent = "true"` once submitted (from the GET too). Nothing else — no UI of ours inside the client's page.
 
-### 3. `[Fable — drafted here, verbatim]` Migration `supabase/migrations/0100_dexter_answers.sql`
+### 3. ✅ `[Fable — drafted here, verbatim]` Migration (applied to staging 2026-10-02; types regenerated) `supabase/migrations/0100_dexter_answers.sql`
 
 ```sql
 -- 0100 — Dexter: a deck's answers
@@ -141,7 +141,7 @@ end $$;
 
 Apply: `npm run db:apply -- --project ipstebqawrvhkyntctrv --commit`, then `npm run db:types:staging`; commit the types with the migration. Production waits for the founder's vet (`SHIPPING.md`).
 
-### 4. `[Opus]` The public door — `app/deck/[token]/[[...path]]/route.ts`
+### 4. ✅ `[Fable, in the chair]` The public door — `app/deck/[token]/[[...path]]/route.ts`
 
 - Lift the token-shape check + deck lookup into one helper used by `GET` and the new `POST` (same 404 for a missing/off deck; `select("id, entry_path, share_enabled")`).
 - **In `GET`, after `safeDeckPath` and before Storage:**
@@ -150,20 +150,20 @@ Apply: `npm run db:apply -- --project ipstebqawrvhkyntctrv --commit`, then `npm 
 - **New `export async function POST`:** token + deck lookup → path must be exactly `[DEXTER_STATE_PATH]`, else 404 → `request.text()`; longer than `ANSWER_LIMITS.bytes` → 413 `{ error }` → `parseAnswers` → 400 `{ error }` on refusal → read the existing row's `submitted_at` (check `error`) → `upsert({ deck_id, fields, submitted_at: submitted ? (existing ?? now) : existing }, { onConflict: "deck_id" })` → 200 `{ ok: true, savedAt }`. Every response carries `Access-Control-Allow-Origin: *`, `Cache-Control: no-store`. Log the status only, never the token or the body.
 - Rewrite the file's doc comment: the door is now "reads, and one write — the deck's own answers, after the token matched".
 
-### 5. `[Sonnet]` Reads and writes — `lib/dexter/queries.ts`, `lib/dexter/actions.ts`
+### 5. ✅ `[Sonnet]` Reads and writes — `lib/dexter/queries.ts`, `lib/dexter/actions.ts`
 
 - `getProject`: after the decks, `fetchAll` of `dexter_answers` (`deck_id, fields, submitted_at, updated_at`) with `.in("deck_id", deckIds)` when there are decks; merge by `Map`. `DexterDeckRow` gains `answers: { fields: AnswerFields; updatedAt: string; submittedAt: string | null } | null`.
 - `clearDeckAnswers(deckId): Promise<ActionState>` — `requireTool(GRANT)`, delete where `deck_id`, `revalidatePath("/dexter", "layout")`. Check `error`.
 - `deleteDeck` needs no change (cascade); the confirm text does (step 6).
 
-### 6. `[Sonnet]` The staff screen — `app/(dashboard)/dexter/projects/[projectId]/`
+### 6. ✅ `[Sonnet]` The staff screen — `app/(dashboard)/dexter/projects/[projectId]/`
 
 - `page.tsx`: a new **Answers** column between Link and Size. `—` (muted) when `answers` is null; otherwise `<DeckAnswers deck={deck} />`.
 - New `_components/deck-answers.tsx` (`"use client"`): a `Badge` rendered as the trigger — `success` "Sent · {formatDate(submittedAt)}" or `info` "In progress · {formatDate(updatedAt)}" — opening a `Dialog` titled "Answers — {title}": `Table` with Field | Answer (`formatAnswer`, `whitespace-pre-wrap` on the answer cell, field name in `font-medium`), a caption "Last saved {formatDate} {formatTime}", `FormMessage` for errors, footer `DialogClose` Close + a `danger` **Clear answers** button (`window.confirm`, then `clearDeckAnswers`, then `router.refresh()`). Plain `useState` booleans, not `useTransition` (the note in `deck-actions.tsx`).
 - `deck-actions.tsx`: the delete confirm reads `Delete "X" and its saved answers? This can't be undone.` when `deck.answers` is set; `DexterDeckActionRow` gains `answers: … | null`. The Replace dialog's helper line gains "Saved answers stay."
 - Everything from `components/ui/*`; no raw colour classes; check it in dark mode and at phone width (the dialog becomes a sheet).
 
-### 7. `[Sonnet]` The handout — `app/(dashboard)/dexter/DECK-AUTHORING.md`
+### 7. ✅ `[Sonnet]` The handout — `app/(dashboard)/dexter/DECK-AUTHORING.md`
 
 The deliverable the founder asked for. One page, written for the person making the HTML, not for us. Draft, to be kept this short:
 
@@ -200,7 +200,7 @@ The deliverable the founder asked for. One page, written for the person making t
 
 After the build, also publish it as a private artifact page so the founder has a link to forward; the repo file stays the source of truth and `PLAN.md` points at it.
 
-### 8. `[Opus]` Docs — the facts move to their homes
+### 8. ✅ `[Fable, in the chair]` Docs — the facts move to their homes
 
 - `app/(dashboard)/dexter/PLAN.md`: "How it is built" gains the answers paragraph (table, reserved names, CORS, the script, the write); "The link is the only gate" stands; **"Deliberately not built" is reworded** — view counts are still unbuilt, now because they would be a write on every open rather than on the client's own action; add per-visitor answers, CSV export, auto-injection, e-mail on Send. Point at `DECK-AUTHORING.md`.
 - `SECURITY.md`, _Dexter's public door_: "Admin client, reads only" → reads, and one write: an upsert of the deck's own `dexter_answers` row after the token matched, body capped and validated by `lib/dexter/answers.ts`, `Access-Control-Allow-Origin: *` on `.state` only (argue it: opaque origin, no credentials). The sanctioned-exceptions sentence in _Auth and permissions_ changes from "(two reads, never a write)" to "(reads, and the one write `_Dexter's public door_` describes)".
@@ -238,6 +238,17 @@ Reused as they are: `requireTool`, `createClient`/`createAdminClient`, `fetchAll
 5. **Delete** the deck — the confirm mentions the saved answers; after it, no row remains (`dexter_answers` is empty for that id).
 6. Dark mode and a phone: open the Answers dialog in both.
 7. As the probe (`/inventory` only): `/dexter` is refused as before — the new table is reached only through Dexter's screens.
+
+## Verified 2026-10-02 (Fable, against staging through a local dev server)
+
+A sample deck — the handout's own example, seeded on staging as project "Dexter answers test" — was driven without a sign-in:
+
+- `.dexter.js` → 200 `text/javascript`, no CSP, also from a subfolder path. `.state` GET → 200 JSON, `Access-Control-Allow-Origin: *`, `no-store`; empty deck answers `{"fields":{},"submitted":false}`.
+- POST good → 200 and the GET returns it; `submitted:true` sets Sent and a later `submitted:false` cannot clear it; 70 KB → 413; `fields` not an object, nested object, number, non-JSON → 400 with the plain-English reason; unknown token → 404 on GET and POST; POST to `index.html` → 404; the page carries the sandbox CSP and no CORS header.
+- Headless Chrome on the real link: `<html data-dexter="saved" data-dexter-sent="true">` after load and the saved name filled in; typing a name, ticking a box and choosing an option autosaved from inside the sandbox; after a reload all three came back.
+- `npm test` 905 pass, lint, typecheck, build and `check:actions` clean.
+
+Left for the founder on staging: the Dexter screen itself (Answers badge, dialog, Clear, dark mode, phone) — a model session cannot sign in.
 
 ## Plain summary for the founder (the "before" bullets)
 
