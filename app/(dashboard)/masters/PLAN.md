@@ -11,9 +11,18 @@ The shared reference data every tool reads: projects, plots, units, clients, ven
 - **`plots` ↔ `units` is strictly 1:1** (`0029`), and `units` has a second FK to `plots`, so an embed through `units` names the key: `plots!units_plot_id_fkey`.
 - **One list of units of measure** (`uoms`, `0082`) for every unit column in the toolbox: picked, never typed; a FK by name, so a rename cascades; history excused (`NOT VALID`). Nothing stops two units meaning the same thing (cft, cuft) — look before adding one.
 - **Construction stages are picked, never typed** (`0053`); a rename cascades to indents.
-- **Works and construction stages are two vocabularies on purpose.** Stages (Foundation … Handover) are what construction budgets picked from; works are the site team's list — `work_categories` (FD) → optional `work_groups` (FD.3) → `work_items` (FD.4), loaded by `scripts/import-works.ts` — and they are what indents, issues, estimates and drawings name. A category's groups and works share one numbering space across two tables, so the actions check clashes the database cannot. Works codes (`FD.15`) are a second sanctioned code style beside `items.code`; don't harmonise them.
+- **Works and construction stages are two vocabularies on purpose.** Stages are what indents and construction budgets pick from; works are the site team's list — `work_categories` (FD) → optional `work_groups` (FD.3) → `work_items` (FD.4) — and they are what indents, issues, estimates and drawings name. Since the final workbook the eight stages carry the work categories' names (Engineering Consultation … MEP), but they stay two tables. A category's groups and works share one numbering space across two tables, so the actions check clashes the database cannot. Works codes (`FD.15`) are a second sanctioned code style beside `items.code`; don't harmonise them.
 - **Contractors are vendors** — `vendors.is_contractor` (`0073`) only filters the one counterparty list.
-- **Materials are items** (`kind = 'material'`, `0086`): 2,057 imported by `scripts/import-material-master.ts`, their rate `indicative_price`. 74 came without a price (`TODO.md`).
+- **Materials are items** (`kind = 'material'`, `0086`), their rate `indicative_price`. Staging has the workbook's 1,118; production still has the 2,057 of `scripts/import-material-master.ts`, 74 without a price.
+
+## The founder's final masters workbook (2026-10-07)
+
+`scripts/import-masters-workbook.ts` loads Masters.xlsx: vendors and contractors, works with their labour rates (into the Estimator's rate book), material categories, materials and construction stages. Its cleaning rules are `lib/masters/masters-workbook.ts`, tested, with the founder's decisions in its header. On staging since 2026-10-07; production waits for ship day (`TODO.md`).
+
+- **It is the final list.** What the workbook no longer names is deleted, so it runs after `scripts/wipe-staging-records.ts`; while any record still points at a master it drops, it stops before writing.
+- **A blank cell keeps what the database has.** The sheet has no payment-terms column, so terms survive on every vendor it keeps.
+- **Look-alike vendor names stay apart** (Santhosh K / K Santhosh, GeoBricks / Geo Bricks …) — the founder's call. Merging is a Masters job, once someone knows they are one party.
+- **The "Project IDs" sheet is not read.** Companies, projects, plots and cost centres such as Rent House are their own step.
 
 ## Cross-tool writes into Masters, declared elsewhere
 

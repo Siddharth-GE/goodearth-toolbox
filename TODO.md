@@ -6,12 +6,13 @@ Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, histor
 
 0. **Restore production, then find out why the keep-alive did not keep it awake.** Found `INACTIVE` 2026-09-25, twenty days after the weekly cron went in. Restore in the Supabase dashboard (a model session is refused the API call, rightly), then read the cron's runs under Vercel → Settings → Cron Jobs: a red run means `CRON_SECRET` (BUGCATCHER #18), no run means it never fired. The founder's call: "production later".
 1. **Supabase Pro** — the founder's call. The only real answer to pausing, and the only way to get backups.
-2. **Press one real write button on production** — the ship protocol's last step, still not done since the masters releases. Editing one of the 74 price-less materials (item 6) is the natural one.
+2. **Press one real write button on production** — the ship protocol's last step, still not done since the masters releases. Editing one of the 74 price-less materials (item 8) is the natural one.
 
 ## Waiting on staging for the founder's vet
 
 Everything below is on `staging.goodearthkannur.org`. Each ships only after the founder says they have tried it there.
 
+- **The final masters workbook** — loaded on staging 2026-10-07, after every record there was cleared. Waiting for the founder's look through Masters → Vendors, Works, Items and Stages. On ship day, on production: `scripts/import-masters-workbook.ts --project pajfrgnkapicdgangjey --xlsx <workbook>`, dry run first. It stops while production's own records point at masters it drops, and the wipe script refuses production by design, so what happens to those records is the founder's call that day.
 - **Catalogue pictures** — **vetted by the founder 2026-09-26**, and the close calls sorted in Masters. On ship day, on production: `scripts/import-catalogue-sheet.ts --project pajfrgnkapicdgangjey --xlsx <workbook>` and `scripts/fetch-catalogue-images.ts --project pajfrgnkapicdgangjey`, dry run first.
 - **The Estimator rework** (`0096`–`0098`). Its approval pass by Fable was deferred by the founder and is due before production.
 - **Relay × Google Chat round two** — the founder's steps and the checks are in `lib/google-chat/PLAN.md`; production has its own checklist there.
@@ -27,8 +28,10 @@ Everything below is on `staging.goodearthkannur.org`. Each ships only after the 
 
 3. **Grant `/design-management` to the design team** — nobody holds it.
 4. **Grant `/supervisors` to the site supervisors** — nothing is visible to staff, and drawings reach site through it.
-5. **Price the works an estimate uses** — the Rate book's "Used but not priced" list; the 25–40 bulk-material works first.
-6. **Re-enter 74 material rates in Masters** — the source sheets disagreed about their units. `npx tsx scripts/import-material-master.ts --project <ref>` prints the list; "Hose Coller PVC 32mm" also needs a code (`PLD/836` named two products).
+5. **Rebuild the rate book's materials** (staging) — clearing staging took the materials each work uses, since they pointed at the old material list. The workbook gave 131 of 266 works a labour rate; the Rate book's "Used but not priced" list shows the rest as estimates use them.
+6. **The workbook's "Project IDs" sheet** — companies, projects, plots and cost centres such as Rent House and Access Road. Its own step, not loaded: it renames Saarang to "Saarang Villas" and leaves out Plots 11–16, which have villas and clients.
+7. **Tidy in Masters what the workbook left for a person** (staging): the look-alike vendors kept apart (Santhosh K / K Santhosh, C Saju / Saju C, Prabhakaran M / Prabhakaran, Rijesh / Rijesh K P, Madhu / Madhu M A, GeoBricks / Geo Bricks); Perfetto Industries and Chendayad Granites share one bank account and address — check with accounts; works F.1.38 / F.1.40 and F.1.39 / F.1.41 share a name at different rates; eight materials came with no unit and got `nos` (CAR/06A, MIS/28, MIS/30, MIS/35, PLD/103B, PLD/114, TILE/44, TILE/52), and MIS/28 "Non Data Available" and MIS/30 "Others" look like placeholders.
+8. **Production only: re-enter 74 material rates** — superseded on ship day by the workbook, which prices every material.
 
 ## Next builds — the founder picks
 

@@ -8,7 +8,7 @@ What a villa costs to build. Works come from the Masters vocabulary (`0073`); th
 
 **Every villa is different** — "finishes are different, foundations can be different" — so there is no house type villas follow. What is shared is **how a work is priced**, never how much of it a villa has.
 
-- **Rate book** (the Works tab): per work, its unit, labour ₹/unit and materials per unit at Masters' prices. Mixes are their own tab.
+- **Rate book** (the Works tab): per work, its unit, labour ₹/unit and materials per unit at Masters' prices. Mixes are their own tab. Units and labour rates come from the founder's masters workbook (`scripts/import-masters-workbook.ts`); its Superstructure and MEP works carry their share of the stage's package rate as ₹ per sqft (0.12 × 230 = 27.6).
 - **Villa**: one working estimate, its own list of works, each measured for that villa. It follows the rate book unless it has its own labour rate, materials or price for a work — grey follows the rate book, black is this villa's own, ↺ puts it back.
 - **Official**: a numbered, frozen copy (EST/…/NNN) — what the stores and site check against.
 - **Site check**: one list across villas.
