@@ -7,10 +7,15 @@
  * Cleared (CLEARED below): indents, POs, goods in and out, stock, bills,
  * labour, estimates — and the rate book's material recipes, which point
  * at the materials the import replaces — budgets, selections and rooms,
- * Relay runs, drawings and transmittals, Dexter decks, client payment
- * schedules and receipts, business plans, funding, saved reports, item
- * requests, every numbering counter and the audit history; and the files
- * in the Dexter, drawings and room-photo buckets.
+ * Relay runs, drawings and transmittals, Dexter decks, client receipts,
+ * business plans, funding, saved reports, item requests, every numbering
+ * counter and the audit history; and the files in the Dexter, drawings
+ * and room-photo buckets.
+ *
+ * Blanked, not deleted (BLANKED below): each villa's payment schedule.
+ * Its nine steps are made with the villa and the app can only edit them,
+ * never add them back, so the steps stay and lose their amounts, dates
+ * and invoices — the state a new villa starts in.
  *
  * Kept (KEPT below): people, logins and access, approver lists, clients,
  * the plot register, projects, plots and villas, the design catalogue,
@@ -18,7 +23,7 @@
  * links, Marathon. The masters the workbook replaces are the import's
  * business, not this script's.
  *
- * Every table in the database must be on one list or the other — a table
+ * Every table in the database must be on one of the lists — a table
  * added since this was written stops the run until someone decides which.
  *
  * STAGING ONLY: it refuses any other ref. Production carries real work
@@ -114,7 +119,6 @@ const CLEARED = [
   "dexter_projects",
   // Client Relations money
   "client_receipts",
-  "client_payment_milestones",
   // Business Planning, Financial Management
   "business_plan_targets",
   "business_plans",
@@ -182,17 +186,31 @@ const KEPT = [
   "marathon_runs",
 ] as const;
 
+/** Kept rows, emptied of what people entered — see "Blanked" above. */
+const BLANKED = [
+  {
+    table: "client_payment_milestones",
+    columns: ["due_amount", "due_on", "invoice_no", "invoiced_on", "note"],
+  },
+] as const;
+
 const BUCKETS = ["dexter", "drawings", "design-views"] as const;
 
 type Storage = ReturnType<typeof createClient>["storage"];
 
 const array = (names: readonly string[]) => `array[${names.map(literal).join(", ")}]::text[]`;
 
+const filled = (columns: readonly string[]) => columns.map((c) => `${c} is not null`).join(" or ");
+
 async function counts(ref: string): Promise<{ t: string; n: number }[]> {
   return sql<{ t: string; n: number }>(
     ref,
     [
       ...CLEARED.map((table) => `select '${table}' as t, count(*)::int as n from ${table}`),
+      ...BLANKED.map(
+        ({ table, columns }) =>
+          `select '${table} (to blank)' as t, count(*)::int as n from ${table} where ${filled(columns)}`,
+      ),
       ...BUCKETS.map(
         (bucket) =>
           `select 'storage: ${bucket}' as t, count(*)::int as n from storage.objects where bucket_id = '${bucket}'`,
@@ -207,7 +225,7 @@ async function unlisted(ref: string): Promise<string[]> {
     ref,
     `select c.relname as t from pg_class c join pg_namespace s on s.oid = c.relnamespace
      where s.nspname = 'public' and c.relkind in ('r', 'p')
-       and not (c.relname = any(${array([...CLEARED, ...KEPT])}))
+       and not (c.relname = any(${array([...CLEARED, ...BLANKED.map((b) => b.table), ...KEPT])}))
      order by 1`,
   );
   return rows.map((row) => row.t);
@@ -264,7 +282,7 @@ async function main() {
   const missing = await unlisted(ref);
   if (missing.length > 0) {
     throw new Error(
-      `Tables on neither list: ${missing.join(", ")}. Decide whether each is a record (CLEARED) or setup (KEPT) first.`,
+      `Tables on no list: ${missing.join(", ")}. Decide whether each is a record (CLEARED) or setup (KEPT) first.`,
     );
   }
   const dangling = await keptPointingAtCleared(ref);
@@ -286,7 +304,7 @@ async function main() {
     auth: { persistSession: false, autoRefreshToken: false },
   }).storage;
 
-  const dir = await backupTables(ref, "wipe", CLEARED);
+  const dir = await backupTables(ref, "wipe", [...CLEARED, ...BLANKED.map((b) => b.table)]);
   const files = new Map<string, string[]>();
   for (const bucket of BUCKETS) {
     const paths = await listAll(storage, bucket);
@@ -306,6 +324,10 @@ async function main() {
     `begin;
      set local session_replication_role = replica;
      ${CLEARED.map((table) => `delete from ${table};`).join("\n     ")}
+     ${BLANKED.map(
+       ({ table, columns }) =>
+         `update ${table} set ${columns.map((c) => `${c} = null`).join(", ")} where ${filled(columns)};`,
+     ).join("\n     ")}
      commit;`,
   );
   console.log("Rows deleted.");
