@@ -59,13 +59,13 @@ The money/permission migrations may be **drafted** by Opus but reach `db:apply` 
 
 ## Part A — no migration
 
-### A1. ☐ `[Opus]` Indents: the estimate pull follows the indent's work
+### A1. ✅ `[Opus]` Indents: the estimate pull follows the indent's work
 
 - `getEstimatePull` (`lib/indents/queries.ts`) takes the indent's `work_item_id`; when set, only that work's takeoff rows are offered, with a "Show every work on this villa" toggle (`?all=1`). "Already requested" stays villa-wide by item (the double-buy rule is unchanged). Grouping stays `groupEstimatePull`; add a work filter to the pure layer with tests.
 - **Which estimate it is reading, always said:** "From EST/SAA/004, made official 3 Oct. Changes the QS makes after that show here only once they make it official again." (`reference` and `submitted_at` are already in `estimate_takeoff_facts`; no new read.) A sharper "the working estimate has changed since" notice needs the working estimate's date across the boundary — a question for Fable #1 below.
 - An empty pull says why: "The official estimate has no materials for Footing — FD.15. The QS adds them in Estimator → Works."
 
-### A2. ☐ `[Opus]` A material moves in its Master unit, always
+### A2. ✅ `[Opus]` A material moves in its Master unit, always
 
 Found 2026-10-08 (founder: "did you see that unit change issue?"): besides the old frozen row, two live paths let a material leave its Master unit — the indent line grid's unit picker accepted any unit (cement → cft), and that unit then rode onto the PO, the receipt and stock, which sums quantities whatever their unit; and `recordStockAdjustment` saved the unit the browser sent.
 
@@ -74,7 +74,7 @@ Found 2026-10-08 (founder: "did you see that unit change issue?"): besides the o
 - The pull basket shows the estimate's figure in the Master unit when the units match or convert, else "estimate says 100 cft — enter in bag" (`needs_qty`, already classified).
 - POs and receipts already copy the unit from the line before them, so the chain holds once the indent does. Lines already saved in another unit (production) are listed for a person on ship day — `scripts/report-unit-mismatches.ts --project <ref>`, read-only.
 
-### A3. ☐ `[Opus]` Indents: remaining to buy, and print
+### A3. ✅ `[Opus]` Indents: remaining to buy, and print
 
 - Each line shows **Remaining = requested − ordered** (non-cancelled POs, `po_line_facts`, already read) beside "ordered X of Y"; the indent header shows "N lines still to buy"; the list shows a Remaining column.
 - **Print**: `app/(dashboard)/indents/[indentId]/pdf/route.ts` + `lib/indents/indent-document.tsx` on `lib/pdf/document.tsx` — company, project, villa, work, number, status, lines (code, material, unit, requested, ordered, remaining), requested/approved by. No money. A Print button on the indent page.

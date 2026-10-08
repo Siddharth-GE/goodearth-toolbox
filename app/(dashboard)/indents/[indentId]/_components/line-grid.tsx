@@ -22,6 +22,7 @@ import { formatCount, formatQuantity } from "@/lib/format";
 import { addDirectLines, removeLine, updateLine } from "@/lib/indents/actions";
 import type { IndentLineRow, IndentLineSource } from "@/lib/indents/queries";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
+import { stillToBuy } from "@/lib/indents/workflow";
 import { Calculator, PackageOpen, Palette, Trash2 } from "lucide-react";
 import { useState, useTransition } from "react";
 
@@ -123,6 +124,7 @@ export function LineGrid({
               <TableHeaderCell className="w-28">Qty</TableHeaderCell>
               <TableHeaderCell className="w-28">Unit</TableHeaderCell>
               {showOrdered && <TableHeaderCell className="w-36">Ordered</TableHeaderCell>}
+              {showOrdered && <TableHeaderCell className="w-24">To buy</TableHeaderCell>}
               <TableHeaderCell>Note</TableHeaderCell>
               <TableHeaderCell className="w-12">By</TableHeaderCell>
               {editable && <TableHeaderCell className="w-12"></TableHeaderCell>}
@@ -358,6 +360,17 @@ function LineRow({
                 </>
               ) : (
                 <span className="text-muted">not yet</span>
+              )}
+            </TableCell>
+          )}
+          {showOrdered && (
+            <TableCell>
+              {stillToBuy(line.quantity, line.ordered_quantity) > 0 ? (
+                <span className="text-foreground font-medium">
+                  {formatQuantity(stillToBuy(line.quantity, line.ordered_quantity))}
+                </span>
+              ) : (
+                <span className="text-muted">—</span>
               )}
             </TableCell>
           )}

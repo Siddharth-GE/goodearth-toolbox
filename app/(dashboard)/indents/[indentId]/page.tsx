@@ -1,12 +1,14 @@
 import { Attribution } from "@/components/ui/attribution";
+import { LinkButton } from "@/components/ui/button";
 import { PageTitle } from "@/components/ui/page-title";
 import { formatDate } from "@/lib/format";
 import { getIndent, isCurrentUserApprover } from "@/lib/indents/queries";
-import { canEditIndent } from "@/lib/indents/workflow";
+import { canEditIndent, stillToBuy } from "@/lib/indents/workflow";
 import { listBrands } from "@/lib/masters/brands";
 import { listItemCategories } from "@/lib/masters/item-categories";
 import { listActiveUomNames } from "@/lib/masters/uoms";
 import { listWorkCategories, listWorkItems } from "@/lib/masters/works";
+import { Printer } from "lucide-react";
 import { notFound } from "next/navigation";
 import { IndentStatusBadge } from "../_components/status-badge";
 import { ActionButtons } from "./_components/action-buttons";
@@ -27,6 +29,9 @@ export default async function IndentPage({ params }: { params: Promise<{ indentI
   if (!indent) notFound();
 
   const editable = canEditIndent(indent.status);
+  const linesToBuy = indent.lines.filter(
+    (line) => stillToBuy(line.quantity, line.ordered_quantity) > 0,
+  ).length;
   const categoryNameById = new Map(workCategories.map((c) => [c.id, c.name]));
   const works = workItems
     .filter((work) => work.is_active)
@@ -52,6 +57,10 @@ export default async function IndentPage({ params }: { params: Promise<{ indentI
         }
         actions={
           <>
+            <LinkButton href={`/indents/${indent.id}/pdf`} variant="secondary" size="sm" plain>
+              <Printer className="size-4" />
+              Print
+            </LinkButton>
             <IndentStatusBadge status={indent.status} />
             <ActionButtons
               indentId={indent.id}
@@ -97,7 +106,15 @@ export default async function IndentPage({ params }: { params: Promise<{ indentI
             {indent.approved_at && (
               <span className="text-muted">on {formatDate(indent.approved_at)}</span>
             )}
-            . This indent is final — purchase orders are raised from it.
+            . This indent is final — purchase orders are raised from it.{" "}
+            {linesToBuy === 0 ? (
+              <span className="text-success font-medium">Everything on it has been ordered.</span>
+            ) : (
+              <span className="font-medium">
+                {linesToBuy} of {indent.line_count} {indent.line_count === 1 ? "line" : "lines"}{" "}
+                still to buy.
+              </span>
+            )}
           </p>
           <Attribution name={indent.approved_by_name} label="Approved by" />
         </div>
