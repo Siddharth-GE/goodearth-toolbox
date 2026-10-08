@@ -14,7 +14,7 @@ Anyone with `/indents` raises an indent on a project (plot, unit and the **work*
    - **the villa's official estimate** (`0078`) — `estimate_id` plus the line's `item_id`; `unique (indent_id, estimate_id, item_id)` is the double-buy rule;
    - a **direct pick** through the shared catalogue picker.
      `indent_lines_one_anchor` keeps the anchors exclusive. The retired construction-plan source, `construction_line_id`, `indents.stage` and their saved rows stay forever as read-only history — retirement is UI-only, never schema.
-3. **The estimate pull** reads `estimate_takeoff_facts` (frozen quantities and the item each is bought as, never a rate) and groups **per item** across works (`groupEstimatePull`, keyed on `item_id` — `material_id` is null on every row since `0086`, BUGCATCHER #16). "Already requested" counts estimate-anchored lines on **every indent of the villa** (`requestedByItem`), so a re-issued official never reopens double-buying. Estimates from before `0086` convert fact by fact (`classifyEstimatePull`, tested); a row with no item cannot be picked.
+3. **The estimate pull** reads the **official** estimate only — the screen names it and its date, and says the QS's later changes arrive once they make it official again. An indent raised for a work offers **that work's materials** (`factsForWork`; "Show every work" widens it) — listing the whole villa under Footing is how sand, jelly and steel read as missing (2026-10-08). It reads `estimate_takeoff_facts` (frozen quantities and the item each is bought as, never a rate) and groups **per item** across works (`groupEstimatePull`, keyed on `item_id` — `material_id` is null on every row since `0086`, BUGCATCHER #16). "Already requested" counts estimate-anchored lines on **every indent of the villa** (`requestedByItem`), so a re-issued official never reopens double-buying; a pull for one work also shows that work's own figure beside it. Estimates from before `0086` convert fact by fact (`classifyEstimatePull`, tested); a row with no item cannot be picked.
 4. **The interiors pull sees money-free views only** — `approved_budgets(_lines)`; `lib/indents/queries.ts` cannot select a cost.
 5. **Numbers are permanent.** `delete_draft_indent()` is the only delete, and the counter never rewinds. `lib/indents/reference.ts` mirrors the SQL mint under test.
 
@@ -26,6 +26,9 @@ Every issued revision of a unit's design gets its own budget, and **`line_key` i
 - **"Already asked" spans all of the unit's budgets by `line_key`** — and that read is error-checked, because an empty result reads as "nothing ordered" and reopens the bug through one database blip.
 - `getBudgetPull`/`addBudgetPullLines` refuse superseded budgets and cross-unit pulls; the `indent_lines_budget_current` trigger (`0028`) holds against stale tabs and pasted URLs.
 - Lines whose revision was superseded after the pull get a warning badge (`classifyDesignDrift`); Selections' diff page shows the mirror warning.
+
+6. **A material moves in its Masters unit.** Every line except an interiors one is saved in the item's `default_uom` whatever the browser sends (`updateLine` re-reads it; the grid shows it as text) — a cement line switched to cft once rode onto the PO, the receipt and the stock sum beside bags. Interiors lines keep the selection's unit (a tile per sqft). Adjustments and issues follow the same rule (Inventory). `scripts/report-unit-mismatches.ts` lists anything saved before it.
+7. **Still to buy** = requested less what live POs ordered (`stillToBuy`, never negative), shown per line, as a count on an approved indent, and on the printed indent (`/indents/[id]/pdf`, inline — no money).
 
 ## Things that will bite
 
