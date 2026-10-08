@@ -56,3 +56,24 @@ test("fully priced means every line has both rate and slab", () => {
   assert.equal(isFullyPriced([priced, noGst]), false);
   assert.equal(isFullyPriced([]), false);
 });
+
+test("a PO line's discount and freight reach the totals, and GST splits by state", () => {
+  const lines = [
+    { quantity: 50, rate: 400, gst_pct: 18, discount_pct: 10, other_charges: 500 },
+    { quantity: 10, rate: 100, gst_pct: 5, discount_amount: 50 },
+  ];
+  const kerala = rollUpPo(lines, false);
+  assert.equal(kerala.gross, 21000);
+  assert.equal(kerala.discount, 2050);
+  assert.equal(kerala.taxable, 18950);
+  assert.equal(kerala.gst, 3240 + 47.5);
+  assert.equal(kerala.cgst, (3240 + 47.5) / 2);
+  assert.equal(kerala.igst, 0);
+  assert.equal(kerala.other, 500);
+  assert.equal(kerala.grand, 18950 + 3287.5 + 500);
+  assert.equal(lineTotal(lines[0]), 21740);
+
+  const outOfState = rollUpPo(lines, true);
+  assert.equal(outOfState.igst, 3287.5);
+  assert.equal(outOfState.cgst + outOfState.sgst, 0);
+});

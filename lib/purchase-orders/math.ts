@@ -1,10 +1,10 @@
 /**
- * Purchase order arithmetic — pure functions, no database, no imports.
+ * Purchase order arithmetic — pure functions, no database.
  *
  * The lib/budgets/math.ts pattern, for the same reasons: this is the one
  * module allowed to compute PO money, and it is testable without I/O.
- * The database stores quantity, rate and gst_pct; every amount here is
- * DERIVED, never stored, so a printed total can't disagree with its own
+ * The database stores quantity, rate, gst_pct, a discount and other
+ * charges (0102); every amount here is DERIVED, never stored, so a printed total can't disagree with its own
  * lines.
  *
  * The two budget-math rules apply unchanged:
@@ -17,39 +17,48 @@
  *    very end.
  */
 
+import { lineMoney, splitGst } from "@/lib/line-money";
+
 export type PoLineMoney = {
   quantity: number;
   /** Purchase price per uom agreed with the vendor; null while drafting. */
   rate: number | null;
   /** Snapshot of the picked GST slab; null while drafting. */
   gst_pct: number | null;
+  /** 0102: a percentage OR a rupee discount, never both. */
+  discount_pct?: number | null;
+  discount_amount?: number | null;
+  /** 0102: freight and the like, added after GST. */
+  other_charges?: number | null;
 };
 
-/** Value before tax for the whole line, or null while unpriced. */
+/** Value before tax for the whole line (after its discount), or null while unpriced. */
 export function lineTaxable(line: PoLineMoney): number | null {
   if (line.rate === null) return null;
-  return line.quantity * line.rate;
+  return lineMoney({ ...line, gst_pct: line.gst_pct ?? 0 })?.taxable ?? null;
 }
 
 /** GST owed on the line. Needs BOTH a rate and a GST % — see rollUpPo. */
 export function lineGst(line: PoLineMoney): number | null {
-  const taxable = lineTaxable(line);
-  if (taxable === null || line.gst_pct === null) return null;
-  return taxable * (line.gst_pct / 100);
+  return lineMoney(line)?.gst ?? null;
 }
 
-/** What the vendor invoices for the line: taxable + GST. */
+/** What the vendor invoices for the line: taxable + GST + other charges. */
 export function lineTotal(line: PoLineMoney): number | null {
-  const taxable = lineTaxable(line);
-  const gst = lineGst(line);
-  if (taxable === null || gst === null) return null;
-  return taxable + gst;
+  return lineMoney(line)?.total ?? null;
 }
 
 export type PoTotals = {
   /** Full precision. Round at display, never here. */
+  gross: number;
+  discount: number;
   taxable: number;
   gst: number;
+  /** The GST split for this PO's vendor (lib/line-money.ts gstRegime). */
+  cgst: number;
+  sgst: number;
+  igst: number;
+  other: number;
   grand: number;
   /** GST subtotal per slab (key: the gst_pct), for the PDF's totals box. */
   gstBySlab: Map<number, number>;
@@ -64,29 +73,38 @@ export type PoTotals = {
  * A line counts only when BOTH rate and gst_pct are present — the same
  * both-or-neither rule budget math applies, so a half-priced line stays
  * pending rather than entering one total but not the other. (Issuing is
- * blocked until nothing is pending — the 0021 guard.)
+ * blocked until nothing is pending — the 0021 guard.) `interState`
+ * decides whether the GST reads as IGST or as CGST + SGST halves.
  */
-export function rollUpPo(lines: PoLineMoney[]): PoTotals {
+export function rollUpPo(lines: PoLineMoney[], interState = false): PoTotals {
+  let gross = 0;
+  let discount = 0;
   let taxable = 0;
   let gst = 0;
+  let other = 0;
   let pricedCount = 0;
   const gstBySlab = new Map<number, number>();
 
   for (const line of lines) {
-    const lineTax = lineTaxable(line);
-    const lineTaxAmount = lineGst(line);
-    if (lineTax === null || lineTaxAmount === null || line.gst_pct === null) continue;
-
+    const money = lineMoney(line);
+    if (money === null || line.gst_pct === null) continue;
     pricedCount++;
-    taxable += lineTax;
-    gst += lineTaxAmount;
-    gstBySlab.set(line.gst_pct, (gstBySlab.get(line.gst_pct) ?? 0) + lineTaxAmount);
+    gross += money.gross;
+    discount += money.discount;
+    taxable += money.taxable;
+    gst += money.gst;
+    other += money.other;
+    gstBySlab.set(line.gst_pct, (gstBySlab.get(line.gst_pct) ?? 0) + money.gst);
   }
 
   return {
+    gross,
+    discount,
     taxable,
     gst,
-    grand: taxable + gst,
+    ...splitGst(gst, interState),
+    other,
+    grand: taxable + gst + other,
     gstBySlab,
     lineCount: lines.length,
     pricedCount,
