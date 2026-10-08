@@ -90,7 +90,9 @@ stable
 security invoker
 set search_path = public
 as $$
-  select is_admin() or exists (select 1 from bill_approvers a where a.user_id = auth.uid());
+  -- can_approve_bills (0034): a named approver or a role that approves,
+  -- with an active profile — the same test bills_guard applies.
+  select is_admin() or can_approve_bills(auth.uid());
 $$;
 
 revoke execute on function is_bill_approver() from public, anon;
@@ -173,6 +175,13 @@ begin
   if tg_op = 'DELETE' or tg_op = 'INSERT' then
     if v_status <> 'draft' then
       raise exception 'Bills and advances are added or removed only while the request is a draft';
+    end if;
+    -- Only an approved bill is asked for: a recorded one may still be
+    -- edited or deleted, and money goes out only against approved bills.
+    if tg_op = 'INSERT' and new.item_kind = 'bill' and not exists (
+      select 1 from bills b where b.id = new.bill_id and b.status = 'approved'
+    ) then
+      raise exception 'Only an approved bill goes on a cash request';
     end if;
     return case when tg_op = 'DELETE' then old else new end;
   end if;
@@ -361,6 +370,98 @@ create trigger advance_recoveries_marks_paid
   for each row execute function bill_settlement_marks_paid();
 
 -- ---------------------------------------------------------------------
+-- 2b. bills_guard: paid is what the money says
+-- ---------------------------------------------------------------------
+-- 0034's guard, carried forward whole, with two rules the tables above
+-- make possible: approved → paid only once payments and recoveries
+-- reach the total (the marks-paid trigger is the one caller that
+-- passes; the old "Mark paid" button no longer can), and approved →
+-- recorded refused once any money has gone out against the bill — a
+-- sent-back bill's lines may be edited, and the figures must never fall
+-- below what was paid.
+
+create or replace function bills_guard()
+returns trigger
+language plpgsql
+as $$
+declare
+  v_cap numeric;
+  v_settled numeric;
+begin
+  if (new.project_id, new.plot_id, new.unit_id, new.scope_code, new.vendor_id,
+      new.po_id, new.labour_contract_id, new.kind, new.bill_no, new.reference)
+     is distinct from
+     (old.project_id, old.plot_id, old.unit_id, old.scope_code, old.vendor_id,
+      old.po_id, old.labour_contract_id, old.kind, old.bill_no, old.reference) then
+    raise exception 'A bill''s anchor, vendor, scope and number are permanent';
+  end if;
+
+  if new.status = old.status then
+    if old.status <> 'recorded' then
+      raise exception 'A % bill can no longer be edited', old.status;
+    end if;
+    return new;
+  end if;
+
+  if old.status = 'recorded' and new.status = 'approved' then
+    -- Self-approval allowed (founder decision): the recorder may sit on
+    -- this list — no recorder <> approver check, deliberately.
+    if not (is_admin() or can_approve_bills(auth.uid())) then
+      raise exception 'Only a named bill approver or an admin can approve a bill';
+    end if;
+    if not is_admin() then
+      v_cap := bill_approval_cap(auth.uid());
+      if v_cap is not null and new.total_amount > v_cap then
+        raise exception 'This bill is above your approval limit of %', v_cap;
+      end if;
+    end if;
+    if new.approved_by is null or new.approved_at is null then
+      raise exception 'Approving must record who approved and when';
+    end if;
+    if new.rejection_note is not null then
+      raise exception 'Approving must clear the rejection note';
+    end if;
+    return new;
+  end if;
+
+  if old.status = 'approved' and new.status = 'recorded' then
+    if exists (select 1 from bill_payments p where p.bill_id = old.id)
+       or exists (select 1 from advance_recoveries r where r.bill_id = old.id) then
+      raise exception 'Money has gone out against this bill — it can no longer be sent back';
+    end if;
+    if not (is_admin() or can_approve_bills(auth.uid())) then
+      raise exception 'Only a named bill approver or an admin can send a bill back';
+    end if;
+    if new.rejection_note is null or length(trim(new.rejection_note)) = 0 then
+      raise exception 'Say what needs changing — a send-back needs a note';
+    end if;
+    if new.approved_by is not null or new.approved_at is not null then
+      raise exception 'Sending back must clear the approval fields';
+    end if;
+    return new;
+  end if;
+
+  if old.status = 'approved' and new.status = 'paid' then
+    select coalesce((select sum(amount) from bill_payments where bill_id = old.id), 0)
+         + coalesce((select sum(amount) from advance_recoveries where bill_id = old.id), 0)
+      into v_settled;
+    if v_settled < old.total_amount - 0.005 then
+      raise exception 'Record the payments first — ₹% of this bill is still pending',
+        round(old.total_amount - v_settled, 2);
+    end if;
+    if new.payment_ref is null or length(trim(new.payment_ref)) = 0 then
+      raise exception 'Record the payment reference before marking this bill paid';
+    end if;
+    if new.paid_by is null or new.paid_at is null then
+      raise exception 'Marking paid must record who paid and when';
+    end if;
+    return new;
+  end if;
+
+  raise exception 'Invalid bill status change: % -> %', old.status, new.status;
+end $$;
+
+-- ---------------------------------------------------------------------
 -- 3. Audit, updated_at, RLS
 -- ---------------------------------------------------------------------
 
@@ -458,5 +559,13 @@ begin
   if exists (select 1 from pg_trigger where tgrelid = 'bill_payments'::regclass
     and not tgisinternal and tgenabled = 'D') then
     raise exception '0107: a bill_payments trigger was left disabled';
+  end if;
+
+  if position('bill_approval_cap' in (select prosrc from pg_proc where proname = 'bills_guard')) = 0
+     or position('bill_payments' in (select prosrc from pg_proc where proname = 'bills_guard')) = 0 then
+    raise exception '0107: bills_guard must carry 0034''s limits and the settlement rule';
+  end if;
+  if position('can_approve_bills' in (select prosrc from pg_proc where proname = 'is_bill_approver')) = 0 then
+    raise exception '0107: is_bill_approver must use can_approve_bills';
   end if;
 end $$;

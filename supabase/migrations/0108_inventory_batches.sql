@@ -251,6 +251,55 @@ revoke execute on function stock_issue_lines_allocate() from public, anon, authe
 revoke execute on function stock_adjustments_allocate() from public, anon, authenticated;
 
 -- ---------------------------------------------------------------------
+-- 2b. Lines are history
+-- ---------------------------------------------------------------------
+-- 0023's header rule — quantities are corrected by an adjustment with a
+-- reason, never by rewriting history — had no trigger behind it: the
+-- update policies admit any /inventory holder. Now a line is also a
+-- batch's record: the allocation moved the quantity as it was, so a
+-- rewritten quantity would leave batch_on_hand wrong forever. uom is
+-- left out — a unit renamed in Masters cascades here (0082).
+
+create or replace function inventory_lines_immutable()
+returns trigger
+language plpgsql
+as $$
+begin
+  if tg_table_name = 'goods_receipt_lines' then
+    if (new.receipt_id, new.po_line_id, new.item_id, new.quantity)
+       is distinct from (old.receipt_id, old.po_line_id, old.item_id, old.quantity) then
+      raise exception 'A receipt line is permanent — correct the stock with an adjustment and a reason';
+    end if;
+  elsif tg_table_name = 'stock_issue_lines' then
+    if (new.issue_id, new.item_id, new.quantity, new.preferred_receipt_line_id)
+       is distinct from (old.issue_id, old.item_id, old.quantity, old.preferred_receipt_line_id) then
+      raise exception 'An issue line is permanent — correct the stock with an adjustment and a reason';
+    end if;
+  else
+    if (new.store_id, new.item_id, new.quantity)
+       is distinct from (old.store_id, old.item_id, old.quantity) then
+      raise exception 'An adjustment is permanent — record another one to correct it';
+    end if;
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists goods_receipt_lines_immutable on goods_receipt_lines;
+create trigger goods_receipt_lines_immutable
+  before update on goods_receipt_lines
+  for each row execute function inventory_lines_immutable();
+
+drop trigger if exists stock_issue_lines_immutable on stock_issue_lines;
+create trigger stock_issue_lines_immutable
+  before update on stock_issue_lines
+  for each row execute function inventory_lines_immutable();
+
+drop trigger if exists stock_adjustments_immutable on stock_adjustments;
+create trigger stock_adjustments_immutable
+  before update on stock_adjustments
+  for each row execute function inventory_lines_immutable();
+
+-- ---------------------------------------------------------------------
 -- 3. Audit, updated_at, RLS
 -- ---------------------------------------------------------------------
 
@@ -343,5 +392,10 @@ begin
     where routine_schema = 'public' and routine_name = 'goods_receipt_lines_copy_rate'
       and grantee in ('PUBLIC', 'anon', 'authenticated') and privilege_type = 'EXECUTE') then
     raise exception '0108: a client role can execute goods_receipt_lines_copy_rate';
+  end if;
+
+  if (select count(*) from pg_trigger
+      where tgname in ('goods_receipt_lines_immutable', 'stock_issue_lines_immutable', 'stock_adjustments_immutable')) <> 3 then
+    raise exception '0108: an inventory line is still rewritable';
   end if;
 end $$;

@@ -84,13 +84,33 @@ begin
     return old;
   end if;
 
-  if old.bill_id is not null then
-    raise exception 'This entry has been billed and can no longer be changed.';
+  -- The stamp moves (set by Send to Bill, cleared when a recorded bill
+  -- is deleted) only under the transaction-local flag that 0106's two
+  -- definer functions raise; nothing a client can call sets it. And the
+  -- stamp is all they move.
+  if new.bill_id is distinct from old.bill_id then
+    if coalesce(current_setting('toolbox.labour_billing', true), '') <> 'on' then
+      raise exception 'Labour entries are billed from Bills → Labour, with Send to Bill.';
+    end if;
+    if (new.plot_id, new.work_item_id, new.contractor_id, new.log_date, new.kind,
+        new.masons, new.helpers, new.others, new.quantity, new.description, new.note)
+       is distinct from
+       (old.plot_id, old.work_item_id, old.contractor_id, old.log_date, old.kind,
+        old.masons, old.helpers, old.others, old.quantity, old.description, old.note) then
+      raise exception 'Billing an entry does not rewrite it.';
+    end if;
+    return new;
   end if;
 
-  if new.bill_id is distinct from old.bill_id
-     and coalesce(current_setting('toolbox.labour_billing', true), '') <> 'on' then
-    raise exception 'Labour entries are billed from Bills → Labour, with Send to Bill.';
+  -- uom is left out of the comparison: a unit renamed in Masters cascades
+  -- here (0082) and must not be refused.
+  if old.bill_id is not null
+     and (new.plot_id, new.work_item_id, new.contractor_id, new.log_date, new.kind,
+          new.masons, new.helpers, new.others, new.quantity, new.description, new.note)
+         is distinct from
+         (old.plot_id, old.work_item_id, old.contractor_id, old.log_date, old.kind,
+          old.masons, old.helpers, old.others, old.quantity, old.description, old.note) then
+    raise exception 'This entry has been billed and can no longer be changed.';
   end if;
 
   return new;

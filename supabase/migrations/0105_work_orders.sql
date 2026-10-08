@@ -112,12 +112,15 @@ begin
   end loop;
 end $$;
 
--- 0026's guard, with the number permanent always and the terms
+-- 0034's guard (role approvers and approval limits — can_approve_bills,
+-- bill_approval_cap), with the number permanent always and the terms
 -- permanent once approved. Everything else unchanged.
 create or replace function labour_contracts_guard()
 returns trigger
 language plpgsql
 as $$
+declare
+  v_cap numeric;
 begin
   if (new.wo_no, new.reference) is distinct from (old.wo_no, old.reference)
      and old.reference is not null then
@@ -137,10 +140,14 @@ begin
   end if;
 
   if old.status = 'pending_approval' and new.status = 'approved' then
-    if not (is_admin() or exists (
-      select 1 from bill_approvers a where a.user_id = auth.uid()
-    )) then
+    if not (is_admin() or can_approve_bills(auth.uid())) then
       raise exception 'Only a named bill approver or an admin can approve a work order';
+    end if;
+    if not is_admin() then
+      v_cap := bill_approval_cap(auth.uid());
+      if v_cap is not null and new.contract_value > v_cap then
+        raise exception 'This work order is above your approval limit of %', v_cap;
+      end if;
     end if;
     if new.approved_by is null or new.approved_at is null then
       raise exception 'Approving must record who approved and when';
@@ -373,5 +380,10 @@ begin
       and grantee in ('anon', 'authenticated', 'PUBLIC')
       and privilege_type in ('INSERT', 'UPDATE', 'DELETE', 'TRUNCATE')) then
     raise exception '0105: work_labour_rate_facts is writable';
+  end if;
+
+  if position('bill_approval_cap' in (select prosrc from pg_proc where proname = 'labour_contracts_guard')) = 0
+     or position('can_approve_bills' in (select prosrc from pg_proc where proname = 'labour_contracts_guard')) = 0 then
+    raise exception '0105: labour_contracts_guard lost 0034''s approval limits';
   end if;
 end $$;

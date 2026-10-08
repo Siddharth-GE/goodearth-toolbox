@@ -13,8 +13,14 @@ declare
   v_work uuid := (select id from work_items where code = 'FD.15');
   v_po uuid; v_pl uuid; v_grn1 uuid; v_grn2 uuid; v_gl1 uuid; v_gl2 uuid; v_iss uuid; v_il uuid;
   v_bill uuid; v_n numeric; v_txt text; v_wo uuid;
+  v_log uuid; v_bill2 uuid; v_cr uuid; v_n2 numeric;
 begin
   perform set_config('request.jwt.claims', json_build_object('sub', v_user, 'role', 'authenticated')::text, true);
+  -- The Bills grant (send_labour_logs_to_bill and delete_recorded_bill check it in
+  -- their bodies) and a named approver for the release and approval steps — both
+  -- rolled back with the rest.
+  insert into user_apps (user_id, app) values (v_user, '/bills') on conflict do nothing;
+  insert into bill_approvers (user_id) values (v_user) on conflict do nothing;
   select p.id, u.id, u.code into v_plot, v_unit, v_ucode
     from plots p join units u on u.plot_id = p.id
     where p.project_id = v_project and u.code is not null limit 1;
@@ -132,6 +138,92 @@ begin
   values (v_wo, v_work, 'Footing', 'cum', 2, 4000, v_user, v_user);
   select contract_value into v_n from labour_contracts where id = v_wo;
   if v_n <> 8000 then raise exception 'TRIAL 11 FAILED: value % expected 8000', v_n; end if;
+
+  -- 12. Send to Bill: the piece-work entry against the approved work order makes a bill of 2 x 4,000,
+  --     stamps the entry, and the entry is frozen.
+  update labour_contracts set status = 'approved', approved_by = v_user, approved_at = now() where id = v_wo;
+  select id into v_log from labour_logs
+    where kind = 'pw_qty' and plot_id = v_plot and contractor_id = v_contractor and created_by = v_user;
+  v_bill2 := send_labour_logs_to_bill(array[v_log], v_wo, 'MR-TRIAL-1', current_date,
+    jsonb_build_object(v_log::text, jsonb_build_object('rate', 4000, 'gst_pct', 0)), null, null, null);
+  select total_amount into v_n from bills where id = v_bill2;
+  if v_n <> 8000 then raise exception 'TRIAL 12 FAILED: piece-work bill total % expected 8000', v_n; end if;
+  if (select bill_id from labour_logs where id = v_log) is distinct from v_bill2 then
+    raise exception 'TRIAL 12 FAILED: the entry was not stamped';
+  end if;
+  begin
+    update labour_logs set quantity = 3 where id = v_log;
+    raise exception 'TRIAL 12 FAILED: a billed entry was changed';
+  exception when others then
+    if sqlerrm like 'TRIAL%' then raise; end if;
+  end;
+
+  -- 13. Deleting the recorded bill gives the entry back.
+  perform delete_recorded_bill(v_bill2);
+  if exists (select 1 from bills where id = v_bill2) then raise exception 'TRIAL 13 FAILED: the bill is still there'; end if;
+  if (select bill_id from labour_logs where id = v_log) is not null then
+    raise exception 'TRIAL 13 FAILED: the entry is still stamped';
+  end if;
+
+  -- 14. Daily wages: 2 masons at 900 and 3 helpers at 700 make 3,900 taxable; the total overwritten to 4,000 with a note.
+  insert into labour_logs (plot_id, work_item_id, contractor_id, kind, masons, helpers, created_by, updated_by)
+  values (v_plot, v_work, v_contractor, 'nmr', 2, 3, v_user, v_user) returning id into v_log;
+  v_bill2 := send_labour_logs_to_bill(array[v_log], null, 'MR-TRIAL-2', current_date,
+    '{"mason": 900, "helper": 700, "gst_pct": 0}'::jsonb, 4000, 'Muster roll says 4,000', null);
+  select total_amount, taxable_amount into v_n, v_n2 from bills where id = v_bill2;
+  if v_n <> 4000 or v_n2 <> 3900 then
+    raise exception 'TRIAL 14 FAILED: total % taxable % expected 4000 / 3900', v_n, v_n2;
+  end if;
+
+  -- 15. Paid is what the money says: an unsettled bill cannot be marked paid; a bill with money out cannot be sent back.
+  alter table bills disable trigger bills_guard;
+  update bills set status = 'approved', approved_by = v_user, approved_at = now() where id = v_bill2;
+  alter table bills enable trigger bills_guard;
+  begin
+    update bills set status = 'paid', payment_ref = 'X', paid_by = v_user, paid_at = now() where id = v_bill2;
+    raise exception 'TRIAL 15 FAILED: an unpaid bill was marked paid';
+  exception when others then
+    if sqlerrm like 'TRIAL%' then raise; end if;
+    if sqlerrm not like '%still pending%' then raise exception 'TRIAL 15 FAILED: wrong refusal: %', sqlerrm; end if;
+  end;
+  insert into bill_payments (bill_id, amount, payment_ref, created_by, updated_by) values (v_bill2, 1000, 'UTR4', v_user, v_user);
+  begin
+    update bills set status = 'recorded', rejection_note = 'oops', approved_by = null, approved_at = null where id = v_bill2;
+    raise exception 'TRIAL 15 FAILED: a part-paid bill was sent back';
+  exception when others then
+    if sqlerrm like 'TRIAL%' then raise; end if;
+    if sqlerrm not like '%Money has gone out%' then raise exception 'TRIAL 15 FAILED: wrong refusal: %', sqlerrm; end if;
+  end;
+
+  -- 16. A cash request takes only approved bills; releasing fills in what the approver did not cut.
+  insert into bills (project_id, unit_id, scope_code, vendor_id, po_id, kind, bill_no, reference,
+                     invoice_no, invoice_date, taxable_amount, gst_amount, total_amount, created_by, updated_by)
+  values (v_project, v_unit, v_ucode, v_vendor, v_po, 'po', 9002, 'BILL/TRIAL/002',
+          'INV-2', current_date, 100, 0, 100, v_user, v_user) returning id into v_bill;
+  insert into cash_requests (week_of, created_by, updated_by)
+  values (date_trunc('week', current_date)::date, v_user, v_user) returning id into v_cr;
+  begin
+    insert into cash_request_items (cash_request_id, item_kind, bill_id, requested_amount, created_by, updated_by)
+    values (v_cr, 'bill', v_bill, 100, v_user, v_user);
+    raise exception 'TRIAL 16 FAILED: a recorded bill went on a cash request';
+  exception when others then
+    if sqlerrm like 'TRIAL%' then raise; end if;
+  end;
+  insert into cash_request_items (cash_request_id, item_kind, bill_id, requested_amount, created_by, updated_by)
+  values (v_cr, 'bill', v_bill2, 3000, v_user, v_user);
+  update cash_requests set status = 'submitted', submitted_by = v_user, submitted_at = now() where id = v_cr;
+  update cash_requests set status = 'released', released_by = v_user, released_at = now() where id = v_cr;
+  select released_amount into v_n from cash_request_items where cash_request_id = v_cr;
+  if v_n <> 3000 then raise exception 'TRIAL 16 FAILED: released % expected 3000', v_n; end if;
+
+  -- 17. Lines are history: an issue line's quantity cannot be rewritten after its batches moved.
+  begin
+    update stock_issue_lines set quantity = 41 where id = v_il;
+    raise exception 'TRIAL 17 FAILED: an issue line was rewritten';
+  exception when others then
+    if sqlerrm like 'TRIAL%' then raise; end if;
+    if sqlerrm not like '%permanent%' then raise exception 'TRIAL 17 FAILED: wrong refusal: %', sqlerrm; end if;
+  end;
 
   raise exception 'ALL TRIALS PASSED';
 end $trial$;
