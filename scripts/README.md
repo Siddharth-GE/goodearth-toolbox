@@ -11,6 +11,8 @@ The `data/` files importers read are gitignored: real business data, some of it 
 - `apply-migrations.ts` — applies pending migrations to one database and records them. `npm run db:apply -- --project <ref> --commit`
 - `check-migrations.ts` — fails if a database lacks a migration in this branch or an applied file was edited. `npm run db:check -- --project <ref>` (read-only; CI runs it)
 - `check-view-columns.ts` — checks every view against `view-manifest.ts`: columns, guards, flags, no write grants. `npm run db:check-views -- --project <ref>` (read-only)
+- `dry-run-migrations.ts` — runs migration files, and an optional trial from `scripts/trials/`, inside one transaction that always aborts: every statement and assert runs, nothing is kept. Refuses production. `--project <ref> <files…> [--trial <file>]`
+- `trials/erp-chain.sql` — the behaviour trial for `0101`–`0108` (a PO issue raises the rate, batches go oldest-first, bill lines set the total, part-payments and advances settle a bill, the labour-log fences hold, work orders are numbered). Run it through the dry run above.
 - `compare-schema.ts` — every difference between two databases, schema and auth settings. `npm run db:compare -- --project <a> --against <b>` (read-only)
 - `migration-ledger.ts`, `view-manifest.ts`, `supabase-management.ts` — libraries: the ledger reader, the list of what each view may be, and the management API in one place (never defaults a ref; throws on a failed query answered with 200; `serviceRoleKey()` for Storage).
 

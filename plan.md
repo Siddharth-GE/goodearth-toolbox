@@ -2,6 +2,26 @@
 
 **Owner tags** per `MODELS.md`. The founder put Opus in the chair for this plan and the build (2026-10-08); `[Fable]` marks the two review sessions the founder asked for. Branch `feature/erp-corrections` (off `feature/masters`, whose three commits are not on `staging` yet — they go with this branch). Tick each step here as it lands.
 
+## Where the build stands — read this first (handover, 2026-10-08)
+
+The session that wrote this plan ran out of room; the next one starts here.
+
+**Done, committed and pushed** on `feature/erp-corrections` (nothing merged, nothing on `staging`):
+
+- Docs leaned; this plan written with the founder's answers.
+- **Part A, all of it** (A1–A6, ticked below). No migration needed; it runs on the branch's Vercel preview today. Not yet seen signed-in by anyone — the founder's checklist for it is the first block of _Verification_ below, steps 1 and 7, plus every list's search bar and the Adjustments sentence.
+- **Part B migrations `0101`–`0108` drafted, NOT applied.** Proof, re-runnable: `npx tsx scripts/dry-run-migrations.ts --project ipstebqawrvhkyntctrv supabase/migrations/010[1-8]*.sql --trial scripts/trials/erp-chain.sql` prints OK — every statement, every assert, 11/11 behaviour checks, nothing kept. The view manifest already lists the four new views.
+- **Part B's pure logic, tested and committed:** `lib/line-money.ts` (the line formula POs and bills share — discount, GST split by vendor state, other charges), `lib/purchase-orders/math.ts` rebuilt on it, `lib/bills/math.ts` (bill roll-up rounded as the database stores it; pending), `lib/bills/ledger.ts` (the cash request's week; a contractor's position), `lib/inventory/batches.ts` (batch names; the oldest-first preview; issue value). Shared PDF blocks in `lib/pdf/document.tsx` (heading, details band, notes, signatures).
+
+**Next, in order:**
+
+1. **`[Fable]` review #1** — the eight migrations and the questions at the end of this file. Re-run the dry run above first. Then apply to staging (`npm run db:apply -- --project ipstebqawrvhkyntctrv --commit`), `npm run db:types:staging`, `npm run db:check-views -- --project ipstebqawrvhkyntctrv`, and commit the types. Any change to a migration → re-run the dry run.
+2. **`[Opus]` Part B screens**, B1 → B10, against the applied schema, ticking each below. The pure modules above are ready to wire in; B2's PO screen and PDF call `rollUpPo(lines, interState)` with `gstRegime(vendor.gst_state, company.state)`.
+3. **`[Opus]` B11 docs** — SECURITY, STATUS's contract table, the tool PLANs, TODO.
+4. **`[Fable]` review #2**, then a PR → `staging` (CI runs on pull requests only; its `db:check` stays red until the migrations are on staging), then the founder's vet.
+
+**Traps this build already hit:** patching a file with `String.replace` in a `node -e` one-liner turns `$$` into `$` (it broke two migrations' dollar quotes) — use the Edit tool or split/join. Long `node -e` and heredoc patches through bash break on quoting — write the patch to a file. Staging's rate book has no materials on any work (`TODO.md` item 5), so estimate pulls are empty until someone enters them: expected, not a bug.
+
 ## Context
 
 The founder's team reviewed the purchase-to-payment chain on staging and sent "ERP Corrections and Clarifications" (Supervisor, Indent, PO, Work Order, Inventory, Bills, Reporter, Master). The founder's ruling over all of it: **indent, PO and bill are one chain — everything a person would otherwise pick is derived from the step before.** You don't make a PO, you pick an indent and go; company, project, location, work, material, unit and rate all come along.

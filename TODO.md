@@ -4,7 +4,7 @@ Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, histor
 
 ## Building now
 
-**The ERP corrections** — `plan.md`: indents from the estimate, PO from an indent, itemised bills from the labour log, work orders, payments with advances and a weekly cash request, store batches with rates, search/filter/total bars, prints. On `feature/erp-corrections`; Fable reviews before staging, then the founder's vet.
+**The ERP corrections** — `plan.md`: indents from the estimate, PO from an indent, itemised bills from the labour log, work orders, payments with advances and a weekly cash request, store batches with rates, search/filter/total bars, prints. On `feature/erp-corrections`: Part A built (try it on the branch's preview); Part B's migrations drafted and waiting for **Fable review #1** — the next session's first step, spelled out at the top of `plan.md`. Then the founder's vet on staging.
 
 ## Production
 
