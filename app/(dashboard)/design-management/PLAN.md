@@ -16,7 +16,7 @@ A drawing approval is a Relay activity, with a holder and a clock. The drawing t
 4. **Sharing is in-app plus a letterhead PDF cover sheet**, forwarded by hand. No outbound email.
 5. **One transmittal is one stage, one drawing set and its sheets** (2026-09-27): a set belongs to a stage, several named sets may share one, and each issue sends the set's full set of sheets.
 6. **Every sheet has a sheet code** typed at upload (GFP), and downloads as `SAA-Saarang-Villa12-WD-TR0003-GFP.pdf` — project code, project, villa, stage code, transmittal number, sheet code (2026-09-27).
-7. **Plot level, everything** (2026-08-22): villas as cards → a villa's transmittals → a transmittal, and every screen goes back exactly one step. No company-wide transmittals list and no project-wide set catalogue — both were deleted, not hidden.
+7. **Plot level, everything** (2026-08-22): villas as cards → a villa's transmittals → a transmittal, and every screen goes back exactly one step. No company-wide transmittals list and no project-wide set catalogue.
 
 | Screen                           | What it is                                                            | Back to     |
 | -------------------------------- | --------------------------------------------------------------------- | ----------- |

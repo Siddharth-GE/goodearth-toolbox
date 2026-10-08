@@ -33,13 +33,12 @@ An internal system shaped tool by tool with the founder around Goodearth's real 
 ## Operating Context
 
 - Projects → plots ↔ units (1:1). The chain the toolbox mirrors: design selections → issued revision → budget → site indents (or from a villa's official estimate) → purchase orders → goods receipt / stock / issues → bills (PO, labour contract, NMR) → payment; client payments come in through Client Relations.
-- Money visibility is an organisational boundary enforced in the database: indents and inventory carry no money; PO, bill, budget, estimate and client money are each visible only to their tool's holders.
+- Money visibility is an organisational boundary enforced in the database: each tool's money is visible only to its holders (`SECURITY.md`).
 - Production is `toolbox.goodearthkannur.org`, from `master`; staging is `staging.goodearthkannur.org`.
 
 ## Capabilities and Constraints
 
-- Twenty tools across Operations, Management, People, Events and Admin — the list and each one's state is `STATUS.md`.
-- Constraints to preserve: tools are self-contained and never import each other's code; the app grant is the permission boundary; migrations are additive only; at ~200 users, no over-engineering and no new library without proven need.
+- Twenty tools across Operations, Management, People, Events and Admin — the list and each one's state is `STATUS.md`; the constraints to preserve are `CLAUDE.md`.
 - Domain words in daily use: indent, GRN/ISS/PO/BILL/EST references minted per project, `line_key` (a line's identity across revisions), an "issued" revision, an "official" estimate, NMR (daily-wage muster roll), villa, plot, trail and baton (Relay).
 
 ## Brand Commitments
@@ -50,7 +49,7 @@ An internal system shaped tool by tool with the founder around Goodearth's real 
 
 ## Evidence on Hand
 
-- A real catalogue of ~2,770 interiors items, most with a picture and a vendor link, plus ~2,060 construction materials.
+- A real catalogue of ~2,770 interiors items, most with a picture and a vendor link, plus the founder's final list of construction materials.
 - Real staff, projects, plots, units and clients in production.
 - No testimonials or marketing content exist or are needed.
 

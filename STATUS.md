@@ -11,8 +11,8 @@ A snapshot, not a changelog: what exists now. Next work is `TODO.md`, each tool'
 
 How they move, and every rule that keeps them apart, is `SHIPPING.md`.
 
-- **Production is paused** (free tier, found `INACTIVE` 2026-09-25 despite the weekly keep-alive) and has **no backups**. Restoring it is the founder's — `TODO.md`.
-- **Staging carries work production does not have yet**, each waiting for the founder's vet or a ship day: the "stone and glass" skin, the Google Chat door (`0094`), Dexter (`0095`, `0100`), the Estimator's measurement sheet and rework (`0096`–`0098`), Design Management's sets by stage (`0099`), the catalogue pictures, and smaller Reporter/Selections/Design Management changes. How it can reach `master` is in `TODO.md`.
+- **Production is paused** (free tier, despite the weekly keep-alive) and has **no backups**. Restoring it is the founder's — `TODO.md`.
+- **Staging carries work production does not have yet** (`0094`–`0100` and more); the list, and how it reaches `master`, is `TODO.md`.
 - **Staging starts from scratch.** Every record made in the tools was cleared on 2026-10-07 at the founder's request (`scripts/wipe-staging-records.ts`, backup in `data/backups/`), and vendors, contractors, works with their labour rates, materials, material categories and stages are now the founder's final masters workbook (`masters/PLAN.md`). People, access, clients, projects, plots, villas and the design catalogue stayed.
 - **Only two accounts can sign in on staging** — the founder's and the probe (`siddharth.cyriac.99+probe@gmail.com`, holds `/inventory` only; set a throwaway password through the auth admin API each time). Every other staff email there is `@staging.invalid`, so reproduce a colleague's problem with the probe and a grant.
 
