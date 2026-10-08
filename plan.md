@@ -101,6 +101,8 @@ Found 2026-10-08 (founder: "did you see that unit change issue?"): besides the o
 
 ## Part B — the chain (migrations `0101`–`0108`, Fable review #1 before any is applied)
 
+**Status (2026-10-08): all eight drafted and committed, NOT applied.** Run together on staging inside a transaction that always aborts: every statement and every migration's own asserts pass, and a behaviour trial (`git show` this commit's message) passed 11 of 11 — PO issue raises the Masters rate net of discount; receipts copy the PO's net rate; an issue of 40 takes 30 from the older batch and 10 from the newer; a breakage draws from what is left; a bill line of 2 × ₹4,000 makes the header ₹8,000; a ₹5,000 part-payment leaves the bill approved, ₹4,000 more is refused, an advance recovery plus ₹2,000 marks it paid; piece-work needs a quantity; a log cannot be billed outside Send to Bill; a work order is numbered WO/SAA/… and its lines set its value. Staging was checked unchanged afterwards. **Waiting for Fable review #1.**
+
 Every migration: re-runnable, additive, ends asserting what it claimed, RLS on every new table, one SELECT policy per table, revokes on every new view (`anon, authenticated`) and function (`public, anon`), manifest row for every new view, `db:check-views` clean. Every new cross-tool write is added to `SECURITY.md`'s list; every new cross-tool read to `STATUS.md`'s contract table.
 
 ### B1. ☐ `[Opus]` Companies and terms templates — `0101_companies_and_terms.sql`
@@ -177,7 +179,7 @@ Every migration: re-runnable, additive, ends asserting what it claimed, RLS on e
 
 ### B10. ☐ `[Opus]` The off-estimate reason — inside `0104`
 
-- `issue_requests` + `off_estimate_reason text`; required (CHECK via the action, and the guard) when the item is not on the official estimate for that work. Site check shows the reason beside an "outside" row.
+- `issue_requests` + `off_estimate_reason text`; required by the action (which knows the estimate) when the item is not on the official estimate for that work; the database keeps it non-blank and the guard keeps resolving from rewriting it. Site check shows the reason beside an "outside" row.
 
 ### B11. ☐ `[Opus]` Docs — every fact to its home
 
@@ -230,3 +232,6 @@ _(Opus writes here instead of improvising.)_
 
 - **For Fable #1:** A1's working-vs-official notice — is adding `working_updated_at` to `estimate_takeoff_facts` acceptable (a date, no rate)?
 - **For Fable #1:** B4 — keep the rising rate on the open `indicative_price`, or a separate gated budget rate?
+- **For Fable #1:** the definer functions — `po_issue_raises_item_rates`, `goods_receipt_lines_copy_rate`, `allocate_batches` and its two triggers (execute revoked from every client role), `send_labour_logs_to_bill` and `delete_recorded_bill` (callable, each checking `has_app('/bills')` in its body). The labour-log stamp is fenced by a transaction-local setting only those two functions raise (`toolbox.labour_billing`) — is that fence strong enough, given `set_config` is not exposed through PostgREST?
+- **For Fable #1:** the two new money views (`work_labour_rate_facts`, `po_line_billing_facts`) and `po_billing_totals` redefined with its gate carried forward (0106 asserts it).
+- **For Fable #1:** `0107` backfills one payment per already-paid bill with the payment triggers disabled for that one statement, re-enabled and asserted in the same migration.
