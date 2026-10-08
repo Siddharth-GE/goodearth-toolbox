@@ -149,12 +149,27 @@ export function EstimatePullBasket({
                     )}
                   {row.state === "needs_qty" && (
                     <span className="text-muted block text-xs">
-                      bought in {row.item_default_uom} — no conversion set, type the quantity
+                      Masters unit is {row.item_default_uom} — type the quantity in{" "}
+                      {row.item_default_uom}
                     </span>
                   )}
                 </TableCell>
                 <TableCell className="text-sm whitespace-nowrap">
-                  {row.already_requested > 0 ? (
+                  {row.already_requested_for_work !== null ? (
+                    // A pull for one work: what this work's indents asked
+                    // for, with the villa-wide figure (the double-buy rule
+                    // is per item across the villa) beneath it.
+                    <>
+                      {row.already_requested_for_work > 0
+                        ? `${formatQuantity(row.already_requested_for_work)} ${row.item_default_uom}`
+                        : "—"}
+                      {row.already_requested > row.already_requested_for_work && (
+                        <span className="text-muted block text-xs">
+                          {formatQuantity(row.already_requested)} for the whole villa
+                        </span>
+                      )}
+                    </>
+                  ) : row.already_requested > 0 ? (
                     <>
                       {formatQuantity(row.already_requested)} {row.item_default_uom}
                     </>

@@ -11,6 +11,7 @@ import {
   classifyBudgetChooser,
   classifyDesignDrift,
   classifyEstimatePull,
+  factsForWork,
   groupEstimatePull,
   requestedByItem,
   type BudgetCandidate,
@@ -256,4 +257,35 @@ test("estimate pull: differing units with no factor ask a person instead of gues
     }),
     { state: "needs_qty" },
   );
+});
+
+test("an indent for one work offers that work's materials only — the Footing case", () => {
+  // 2026-10-08: "only cement appears" under Footing — the pull listed the
+  // whole villa, so Footing's sand, jelly and steel read as missing.
+  const facts = [
+    { work_item_id: "footing", item_id: "cement" },
+    { work_item_id: "footing", item_id: "sand" },
+    { work_item_id: "footing", item_id: "steel" },
+    { work_item_id: "marking", item_id: "cement" },
+  ];
+  assert.deepEqual(
+    factsForWork(facts, "footing").map((fact) => fact.item_id),
+    ["cement", "sand", "steel"],
+  );
+  assert.equal(factsForWork(facts, null).length, 4, "no work on the indent offers everything");
+  assert.equal(factsForWork(facts, "plastering").length, 0);
+});
+
+test("already requested for a work counts only indents raised for that work", () => {
+  const { requested, forWork } = requestedByItem(
+    [
+      { item_id: "cement", quantity: 5, indent_id: "a", work_item_id: "footing" },
+      { item_id: "cement", quantity: 10, indent_id: "b", work_item_id: "plinth" },
+      { item_id: "cement", quantity: 2, indent_id: "c", work_item_id: null },
+    ],
+    "d",
+    "footing",
+  );
+  assert.equal(requested.get("cement"), 17, "the villa-wide figure is unchanged");
+  assert.equal(forWork.get("cement"), 5);
 });

@@ -18,6 +18,7 @@ import {
   type DriftLine,
   type DriftStatus,
   type EstimatePullState as EstimateVerdict,
+  factsForWork,
   groupEstimatePull,
   type IssuedRevision,
   requestedByItem,
@@ -203,6 +204,8 @@ export type IndentHeader = {
   project_id: string;
   project_name: string;
   unit_id: string | null;
+  /** The work the indent serves (0078), when it names one. */
+  work_item_id: string | null;
 };
 
 /**
@@ -216,7 +219,7 @@ export const getIndentHeader = cache(async (indentId: string): Promise<IndentHea
   const { data, error } = await withRetry(() =>
     supabase
       .from("indents")
-      .select("id, reference, status, project_id, unit_id, projects(name)")
+      .select("id, reference, status, project_id, unit_id, work_item_id, projects(name)")
       .eq("id", indentId)
       .maybeSingle(),
   );
@@ -235,6 +238,7 @@ export const getIndentHeader = cache(async (indentId: string): Promise<IndentHea
     project_id: data.project_id,
     project_name: (data.projects as { name: string } | null)?.name ?? "—",
     unit_id: data.unit_id,
+    work_item_id: data.work_item_id,
   };
 });
 
@@ -959,6 +963,9 @@ export type EstimatePullRow = {
   /** Requested against ANY of this villa's estimates, in the item's
    * unit — the figure that says it is already covered. */
   already_requested: number;
+  /** Of that, what indents raised for this pull's work asked for; null
+   * when the pull is not for one work. */
+  already_requested_for_work: number | null;
   on_this_indent: boolean;
 };
 
@@ -970,17 +977,29 @@ export type EstimatePull = {
   rows: EstimatePullRow[];
   /** Rows of an older estimate that name no catalogue item. */
   unlinked_count: number;
+  /** The work the rows are for — the indent's, unless every work was
+   * asked for. Null when the pull covers every work. */
+  work: { id: string; label: string } | null;
+  /** The indent's own work, so the screen can offer to go back to it. */
+  indent_work: { id: string; label: string } | null;
+  /** Materials the official estimate has under OTHER works — what
+   * "Show every work" would add. */
+  other_work_material_count: number;
 };
 
 /**
  * The official estimate's takeoff for a unit, one row per item, annotated
  * with what has already been requested against this villa's estimates.
- * Returns null when the unit has no official estimate — the screen says
- * "submit one in the Estimator" for that.
+ * An indent raised for a work sees that work's materials (`factsForWork`)
+ * unless `allWorks` is asked for. Returns null when the unit's official
+ * estimate carries no materials at all — or it has none — and the screen
+ * says which to check.
  */
 export async function getEstimatePull(
   unitId: string,
   indentId: string,
+  indentWorkItemId: string | null,
+  allWorks: boolean,
 ): Promise<EstimatePull | null> {
   await requireTool("/indents");
   const supabase = await createClient();
@@ -1029,8 +1048,16 @@ export async function getEstimatePull(
   if (usable.length === 0) return null;
   const head = usable[0];
 
+  const workItemId = allWorks ? null : indentWorkItemId;
+  const offered = factsForWork(usable, workItemId);
+  const otherWorkItems = new Set(
+    usable
+      .filter((fact) => workItemId && fact.work_item_id !== workItemId)
+      .map((fact) => fact.item_id ?? `unlinked:${fact.material_name}`),
+  );
+
   const itemIds = [
-    ...new Set(usable.map((fact) => fact.item_id).filter((id): id is string => !!id)),
+    ...new Set(offered.map((fact) => fact.item_id).filter((id): id is string => !!id)),
   ];
 
   // The villa's indents, so the double-buy figure can span every estimate
@@ -1038,13 +1065,16 @@ export async function getEstimatePull(
   // estimate's pulls are still material on its way to the same villa.
   const { data: villaIndents, error: indentsError } = await supabase
     .from("indents")
-    .select("id")
+    .select("id, work_item_id")
     .eq("unit_id", unitId);
   if (indentsError) {
     console.error("estimate pull indents read failed:", indentsError);
     throw new Error("Could not open the estimate.", { cause: indentsError });
   }
   const villaIndentIds = (villaIndents ?? []).map((indent) => indent.id);
+  const workByIndent = new Map(
+    (villaIndents ?? []).map((indent) => [indent.id, indent.work_item_id]),
+  );
 
   const [items, raised] = await Promise.all([
     itemIds.length
@@ -1077,7 +1107,25 @@ export async function getEstimatePull(
   ]);
 
   const itemById = new Map(items.map((item) => [item.id, item]));
-  const { requested, onThisIndent } = requestedByItem(raised, indentId);
+  const { requested, forWork, onThisIndent } = requestedByItem(
+    raised.map((line) => ({ ...line, work_item_id: workByIndent.get(line.indent_id) ?? null })),
+    indentId,
+    workItemId,
+  );
+
+  // Work labels — the works vocabulary is Masters, open to every reader.
+  const labelWorkIds = [workItemId, indentWorkItemId].filter((id): id is string => !!id);
+  const { data: works, error: worksError } = labelWorkIds.length
+    ? await supabase.from("work_items").select("id, code, name").in("id", labelWorkIds)
+    : { data: [], error: null };
+  if (worksError) {
+    console.error("estimate pull works read failed:", worksError);
+    throw new Error("Could not open the estimate.", { cause: worksError });
+  }
+  const workLabel = (id: string | null) => {
+    const work = id ? (works ?? []).find((row) => row.id === id) : undefined;
+    return work && id ? { id, label: `${work.name} — ${work.code}` } : null;
+  };
 
   const { data: unit, error: unitError } = await supabase
     .from("units")
@@ -1090,7 +1138,7 @@ export async function getEstimatePull(
   }
 
   const groups = groupEstimatePull(
-    usable,
+    offered,
     new Map(items.map((item) => [item.id, item.default_uom])),
   );
   const rows: EstimatePullRow[] = groups
@@ -1109,6 +1157,8 @@ export async function getEstimatePull(
         state: group.verdict.state,
         prefill_qty: group.verdict.state === "ready" ? group.verdict.prefillQty : null,
         already_requested: group.item_id ? (requested.get(group.item_id) ?? 0) : 0,
+        already_requested_for_work:
+          workItemId && group.item_id ? (forWork.get(group.item_id) ?? 0) : null,
         on_this_indent: group.item_id ? onThisIndent.has(group.item_id) : false,
       };
     })
@@ -1121,5 +1171,8 @@ export async function getEstimatePull(
     unit_name: unit?.name ?? "—",
     rows,
     unlinked_count: rows.filter((row) => row.state === "unlinked").length,
+    work: workLabel(workItemId),
+    indent_work: workLabel(indentWorkItemId),
+    other_work_material_count: otherWorkItems.size,
   };
 }
