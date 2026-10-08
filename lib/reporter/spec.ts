@@ -433,3 +433,83 @@ export function builderDataset(datasetKey: string): BuilderDataset {
     })),
   };
 }
+
+// ---------------------------------------------------------------------
+// Quick filters — the bar above the builder (plan.md, A5)
+// ---------------------------------------------------------------------
+// Date range, project, villa and vendor, always in view. Each writes an
+// ORDINARY picker filter into the spec — the same filter the builder
+// would make — so a saved report, the CSV and the PDF see exactly what
+// the screen does, and the parser stays the only door.
+
+export type QuickFilterKind = "date" | "project" | "unit" | "vendor";
+export type QuickFilterFields = Partial<Record<QuickFilterKind, string>>;
+export type QuickFilterValues = {
+  from?: string;
+  to?: string;
+  project?: string;
+  unit?: string;
+  vendor?: string;
+};
+
+/** Which field of a dataset each quick filter writes to; absent = not offered. */
+export function quickFilterFields(datasetKey: string): QuickFilterFields {
+  const dataset = DATASETS[datasetKey];
+  if (!dataset) return {};
+  const fields: QuickFilterFields = {};
+  for (const [key, field] of Object.entries(dataset.fields)) {
+    if (!field.filterColumn) continue;
+    if (!fields.date && field.type === "date") fields.date = key;
+    if (field.lookup === "projects" && !fields.project) fields.project = key;
+    if (field.lookup === "units" && !fields.unit) fields.unit = key;
+    if (field.lookup === "vendors" && !fields.vendor) fields.vendor = key;
+  }
+  return fields;
+}
+
+/** The quick filters' current values, read back from a spec. */
+export function readQuickFilters(spec: ReportSpec, fields: QuickFilterFields): QuickFilterValues {
+  const find = (field: string | undefined, op: Op) =>
+    field
+      ? spec.filters.find((filter) => filter.field === field && filter.op === op)?.value
+      : undefined;
+  const text = (value: unknown) => (typeof value === "string" ? value : undefined);
+  return {
+    from: text(find(fields.date, "gte")),
+    to: text(find(fields.date, "lte")),
+    project: text(find(fields.project, "eq")),
+    unit: text(find(fields.unit, "eq")),
+    vendor: text(find(fields.vendor, "eq")),
+  };
+}
+
+/**
+ * The spec with the quick filters set to `values`: each quick filter's own
+ * filter (date gte/lte, lookup eq) is replaced, every other filter kept,
+ * and the result goes back through the parser so it stays valid and
+ * bounded. An empty value removes that filter.
+ */
+export function applyQuickFilters(
+  spec: ReportSpec,
+  fields: QuickFilterFields,
+  values: QuickFilterValues,
+): ReportSpec {
+  const owned = (filter: ReportFilter) =>
+    (filter.field === fields.date && (filter.op === "gte" || filter.op === "lte")) ||
+    (filter.op === "eq" &&
+      (filter.field === fields.project ||
+        filter.field === fields.unit ||
+        filter.field === fields.vendor));
+  const next: ReportFilter[] = [];
+  if (fields.date && values.from) next.push({ field: fields.date, op: "gte", value: values.from });
+  if (fields.date && values.to) next.push({ field: fields.date, op: "lte", value: values.to });
+  if (fields.project && values.project)
+    next.push({ field: fields.project, op: "eq", value: values.project });
+  if (fields.unit && values.unit) next.push({ field: fields.unit, op: "eq", value: values.unit });
+  if (fields.vendor && values.vendor)
+    next.push({ field: fields.vendor, op: "eq", value: values.vendor });
+  return parseReportSpec({
+    ...spec,
+    filters: [...next, ...spec.filters.filter((filter) => !owned(filter))],
+  });
+}

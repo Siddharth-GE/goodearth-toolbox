@@ -10,6 +10,9 @@ import { test } from "node:test";
 
 import { DATASETS, DEFAULT_DATASET } from "./datasets";
 import {
+  applyQuickFilters,
+  quickFilterFields,
+  readQuickFilters,
   DEFAULT_LIMIT,
   MAX_GROUP_BY,
   MAX_LIMIT,
@@ -211,4 +214,58 @@ test("defaultSpec opens with the dataset's own columns and sort", () => {
 
 test("measureId is the one spelling everything shares", () => {
   assert.equal(measureId({ field: "quantity", agg: "sum" }), "quantity:sum");
+});
+
+test("quick filters write ordinary filters, replace their own and keep the rest", () => {
+  const fields = quickFilterFields("bills");
+  assert.ok(
+    fields.date && fields.project && fields.vendor,
+    "bills offers date, project and vendor",
+  );
+
+  const base = parseReportSpec({
+    dataset: "bills",
+    filters: [
+      { field: fields.project, op: "eq", value: "old-project" },
+      { field: "status", op: "eq", value: "paid" },
+    ],
+  });
+  const next = applyQuickFilters(base, fields, {
+    from: "2026-10-01",
+    to: "2026-10-31",
+    project: "new-project",
+  });
+  assert.deepEqual(readQuickFilters(next, fields), {
+    from: "2026-10-01",
+    to: "2026-10-31",
+    project: "new-project",
+    unit: undefined,
+    vendor: undefined,
+  });
+  assert.ok(
+    next.filters.some((filter) => filter.field === "status" && filter.value === "paid"),
+    "a builder filter the bar does not own survives",
+  );
+  assert.equal(
+    next.filters.filter((filter) => filter.field === fields.project).length,
+    1,
+    "the old project filter was replaced, not added to",
+  );
+
+  const cleared = applyQuickFilters(next, fields, {});
+  assert.deepEqual(readQuickFilters(cleared, fields), {
+    from: undefined,
+    to: undefined,
+    project: undefined,
+    unit: undefined,
+    vendor: undefined,
+  });
+});
+
+test("a bad quick-filter date is dropped by the parser", () => {
+  const fields = quickFilterFields("bills");
+  const next = applyQuickFilters(parseReportSpec({ dataset: "bills" }), fields, {
+    from: "8/10/2026",
+  });
+  assert.equal(readQuickFilters(next, fields).from, undefined);
 });

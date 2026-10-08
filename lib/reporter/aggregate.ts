@@ -47,6 +47,15 @@ export type ReportResult = {
   groups: GroupRow[] | null;
   /** Grand totals keyed by measure id, over every matched row. */
   totals: Record<string, number | null>;
+  /**
+   * The detail view's totals row: each money or number column summed over
+   * EVERY matched row (not the rows shown), nulls skipped; null when the
+   * column has no value at all. A quantity column is not added up across
+   * different units — 40 bags and 5 loads are not 45 of anything — so it
+   * is null here and named in `mixedUnitColumns`.
+   */
+  columnTotals: Record<string, number | null>;
+  mixedUnitColumns: string[];
 };
 
 // ---------------------------------------------------------------------
@@ -275,6 +284,7 @@ export function runReport(
 ): ReportResult {
   const sorted = sortDetail(rows, spec);
   const detail = sorted.slice(0, spec.limit);
+  const { columnTotals, mixedUnitColumns } = totalsByColumn(dataset, spec.columns, rows);
   return {
     columns: spec.columns,
     detail,
@@ -282,5 +292,40 @@ export function runReport(
     truncated: detail.length < matched,
     groups: spec.groupBy.length > 0 ? groupRows(dataset, sorted, spec) : null,
     totals: measuresOver(dataset, rows, spec),
+    columnTotals,
+    mixedUnitColumns,
   };
+}
+
+/** The detail totals row (see ReportResult.columnTotals). */
+export function totalsByColumn(
+  dataset: DatasetDef,
+  columns: string[],
+  rows: ReportRow[],
+): { columnTotals: Record<string, number | null>; mixedUnitColumns: string[] } {
+  // A dataset with a unit field says what a quantity is counted in.
+  const unitField = Object.prototype.hasOwnProperty.call(dataset.fields, "uom") ? "uom" : null;
+  const units = unitField
+    ? new Set(rows.map((row) => row[unitField]).filter((unit) => unit !== null && unit !== ""))
+    : new Set<ReportValue>();
+  const mixedUnits = units.size > 1;
+
+  const columnTotals: Record<string, number | null> = {};
+  const mixedUnitColumns: string[] = [];
+  for (const column of columns) {
+    const field = dataset.fields[column];
+    if (!field || (field.type !== "money" && field.type !== "number")) continue;
+    if (field.type === "number" && mixedUnits) {
+      columnTotals[column] = null;
+      mixedUnitColumns.push(column);
+      continue;
+    }
+    let sum: number | null = null;
+    for (const row of rows) {
+      const value = row[column];
+      if (typeof value === "number" && Number.isFinite(value)) sum = (sum ?? 0) + value;
+    }
+    columnTotals[column] = sum === null ? null : Math.round(sum * 1e6) / 1e6;
+  }
+  return { columnTotals, mixedUnitColumns };
 }

@@ -85,7 +85,7 @@ Found 2026-10-08 (founder: "did you see that unit change issue?"): besides the o
 - Applied in Part A to: Indents list, POs list, Bills list (search on number, invoice no., vendor; totals of taxable / GST / total over **all matched rows**, not the page — computed in the query), Inventory receipts, issues, adjustments, stock, requests. Each query takes the filters server-side; "N of M" from a real count.
 - Payments and Work orders get the same bar when they are built (B5, B6).
 
-### A5. ☐ `[Opus]` Reporter: search, totals, quick filters
+### A5. ✅ `[Opus]` Reporter: search, totals, quick filters
 
 - A search box over the **result table** (filters the shaped rows in the browser — not a filter in the spec, so founder decision #4, pickers-only filters, stands and `PLAN.md` says why the search is different).
 - A totals row under every summable column even without grouping (the aggregate already computes the grand total; show it).
