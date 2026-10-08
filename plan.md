@@ -91,7 +91,7 @@ Found 2026-10-08 (founder: "did you see that unit change issue?"): besides the o
 - A totals row under every summable column even without grouping (the aggregate already computes the grand total; show it).
 - Quick filters above the builder: date range, project, villa, vendor — each writes an ordinary picker filter into the spec, shown only when the dataset has that field.
 
-### A6. ☐ `[Opus]` Small ones
+### A6. ✅ `[Opus]` Small ones
 
 - Bills: the vendor/contractor name beside every bill number (list, detail, print).
 - Inventory → Adjustments: the one-sentence purpose above the form (_clarify_ answer above).

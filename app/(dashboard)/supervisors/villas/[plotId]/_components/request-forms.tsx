@@ -126,7 +126,7 @@ export function RequestIssueDialog({
             <p className="text-muted text-xs">
               {workPicks.length > 0
                 ? "Pick from the estimate's list, or browse the whole catalogue."
-                : "This work has no materials in the estimate — browse the catalogue."}
+                : "The official estimate has no materials for this work yet (the QS adds them in the Estimator). You can still pick from the catalogue."}
             </p>
           )}
         </div>
