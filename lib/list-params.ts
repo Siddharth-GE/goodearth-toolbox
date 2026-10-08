@@ -4,9 +4,41 @@
  * module can import it and the tests need no database.
  */
 
-/** A date param as YYYY-MM-DD, or undefined — never trusted raw into a query. */
+/** A real calendar date as YYYY-MM-DD, or undefined — never trusted raw into a query. */
 export function dateParam(value: string | undefined): string | undefined {
-  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined;
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
+  // 2026-02-31 parses to 3 March: only a date that round-trips is real.
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value
+    ? value
+    : undefined;
+}
+
+/**
+ * The day after a YYYY-MM-DD date (already checked by dateParam). A
+ * "to" date on a timestamptz column means "up to the end of that day",
+ * which is `lt` the day after — `lte` the date alone would stop at its
+ * midnight and drop that whole day's rows. A date column uses plain `lte`.
+ */
+export function dayAfter(date: string): string {
+  const next = new Date(`${date}T00:00:00Z`);
+  if (Number.isNaN(next.getTime())) return date;
+  next.setUTCDate(next.getUTCDate() + 1);
+  return next.toISOString().slice(0, 10);
+}
+
+/**
+ * A date range on a timestamptz column, in India time: from the start of
+ * `from` to the start of the day after `to` (use with gte / lt). UTC
+ * bounds would file anything made between midnight and 05:30 IST under
+ * the previous day.
+ */
+export function istDayStart(date: string): string {
+  return `${date}T00:00:00+05:30`;
+}
+
+export function istDayEndExclusive(date: string): string {
+  return `${dayAfter(date)}T00:00:00+05:30`;
 }
 
 /**
@@ -36,6 +68,8 @@ export type Filterable<T> = {
   eq(column: string, value: string): T;
   neq(column: string, value: string): T;
   gte(column: string, value: string): T;
+  in(column: string, values: string[]): T;
+  lt(column: string, value: string): T;
   lte(column: string, value: string): T;
   or(filters: string): T;
 };

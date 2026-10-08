@@ -3,6 +3,7 @@ import "server-only";
 import { cache } from "react";
 
 import { requireTool } from "@/lib/auth/access";
+import type { Filterable } from "@/lib/list-params";
 import { labelsById, profileNames } from "@/lib/masters/names";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
@@ -104,9 +105,10 @@ export async function listReceivablePos({
     .order("id")
     .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
 
+  // A failed read is an error screen, never "Nothing is on its way".
   if (error) {
     console.error("listReceivablePos failed:", error);
-    return { orders: [], total: 0, page: currentPage, pageCount: 1, pageSize };
+    throw new Error("Could not read the purchase orders awaiting delivery.", { cause: error });
   }
 
   // Every column of a view is typed nullable by the generator (a view
@@ -364,28 +366,58 @@ export type ReceiptPage = {
   pageSize: number;
 };
 
+export type ReceiptListFilters = {
+  page?: number;
+  projectId?: string;
+  storeId?: string;
+  /** Delivery-note reference or challan number — already made safe by searchParam. */
+  q?: string;
+  /** Received-on date range, YYYY-MM-DD, already checked by dateParam. */
+  from?: string;
+  to?: string;
+};
+
 export async function listGoodsReceipts({
   page = 1,
-}: { page?: number } = {}): Promise<ReceiptPage> {
+  projectId,
+  storeId,
+  q,
+  from,
+  to,
+}: ReceiptListFilters = {}): Promise<ReceiptPage> {
   await requireTool("/inventory");
   const supabase = await createClient();
 
   const pageSize = INVENTORY_LIST_LIMIT;
   const currentPage = Math.max(1, page);
 
-  const { data, count, error } = await supabase
-    .from("goods_receipts")
-    .select(
-      "id, reference, po_id, store_id, to_site, plot_id, unit_id, challan_no, received_at, created_by, goods_receipt_lines(count)",
-      { count: "exact" },
-    )
+  // Every filter in one place. received_at is a date, so `to` is plain lte.
+  const filtered = <T extends Filterable<T>>(query: T): T => {
+    let next = query;
+    if (projectId) next = next.eq("project_id", projectId);
+    if (storeId) next = next.eq("store_id", storeId);
+    if (from) next = next.gte("received_at", from);
+    if (to) next = next.lte("received_at", to);
+    if (q) next = next.or(`reference.ilike.*${q}*,challan_no.ilike.*${q}*`);
+    return next;
+  };
+
+  const { data, count, error } = await filtered(
+    supabase
+      .from("goods_receipts")
+      .select(
+        "id, reference, po_id, store_id, to_site, plot_id, unit_id, challan_no, received_at, created_by, goods_receipt_lines(count)",
+        { count: "exact" },
+      ),
+  )
     .order("received_at", { ascending: false })
     .order("id")
     .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
 
+  // A failed read is an error screen, never an empty list.
   if (error) {
     console.error("listGoodsReceipts failed:", error);
-    return { receipts: [], total: 0, page: currentPage, pageCount: 1, pageSize };
+    throw new Error("Could not read the deliveries.", { cause: error });
   }
 
   const rows = data ?? [];

@@ -3,6 +3,7 @@ import "server-only";
 import { cache } from "react";
 
 import { requireTool } from "@/lib/auth/access";
+import { istDayEndExclusive, istDayStart, type Filterable } from "@/lib/list-params";
 import { listPlots } from "@/lib/masters/plots";
 import { listProjects } from "@/lib/masters/projects";
 import { listWorkCategories, listWorkItems } from "@/lib/masters/works";
@@ -23,7 +24,7 @@ import {
   type IssuedRevision,
   requestedByItem,
 } from "./pull-rules";
-import type { IndentStatus } from "./workflow";
+import { stillToBuy, type IndentStatus } from "./workflow";
 
 // Indents reads the construction/selections/masters tables DIRECTLY,
 // under its own /indents grant. It deliberately does not call another
@@ -50,6 +51,9 @@ export type IndentListRow = {
   project_name: string;
   unit_name: string | null;
   line_count: number;
+  /** Lines still to buy — requested less what live POs ordered. Null
+   * unless the indent is approved: only approved indents get bought. */
+  lines_to_buy: number | null;
 };
 
 export type IndentListPage = {
@@ -89,41 +93,75 @@ export async function getWelcomeCounts() {
   };
 }
 
+export type IndentListFilters = {
+  page?: number;
+  status?: IndentStatus;
+  projectId?: string;
+  /** The work an indent serves (work_items.id). */
+  workItemId?: string;
+  /** Indent reference — already made safe by searchParam. */
+  q?: string;
+  /** Raised-on date range, YYYY-MM-DD, already checked by dateParam. */
+  from?: string;
+  to?: string;
+};
+
 export async function listIndents({
   page = 1,
   status,
-}: {
-  page?: number;
-  status?: IndentStatus;
-} = {}): Promise<IndentListPage> {
+  projectId,
+  workItemId,
+  q,
+  from,
+  to,
+}: IndentListFilters = {}): Promise<IndentListPage> {
   await requireTool("/indents");
   const supabase = await createClient();
 
   const pageSize = INDENTS_LIST_LIMIT;
   const currentPage = Math.max(1, page);
 
+  // Every filter in one place. created_at is a timestamp, so the "to" day
+  // runs up to — not including — the day after it.
+  const filtered = <T extends Filterable<T>>(query: T): T => {
+    let next = query;
+    if (status) next = next.eq("status", status);
+    if (projectId) next = next.eq("project_id", projectId);
+    if (workItemId) next = next.eq("work_item_id", workItemId);
+    if (from) next = next.gte("created_at", istDayStart(from));
+    if (to) next = next.lt("created_at", istDayEndExclusive(to));
+    if (q) next = next.or(`reference.ilike.*${q}*`);
+    return next;
+  };
+
   // A stated limit with an exact database count — the total is never
   // derived from the rows that happened to arrive.
-  let query = supabase
-    .from("indents")
-    .select(
-      "id, reference, status, stage, required_by, created_at, projects(name), units(name), indent_lines(count)",
-      { count: "exact" },
-    )
+  const { data, count, error } = await filtered(
+    supabase
+      .from("indents")
+      .select(
+        "id, reference, status, stage, required_by, created_at, projects(name), units(name), indent_lines(count)",
+        { count: "exact" },
+      ),
+  )
     .order("created_at", { ascending: false })
     .order("id")
     .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
-  if (status) query = query.eq("status", status);
-
-  const { data, count, error } = await query;
+  // A failed read is an error screen, never an empty list — "no indents"
+  // and "could not read the indents" mean opposite things.
   if (error) {
     console.error("listIndents failed:", error);
-    return { indents: [], total: 0, page: currentPage, pageCount: 1, pageSize };
+    throw new Error("Could not read the indents.", { cause: error });
   }
+
+  const linesToBuy = await countLinesToBuy(
+    supabase,
+    data.filter((row) => row.status === "approved").map((row) => row.id),
+  );
 
   const total = count ?? 0;
   return {
-    indents: (data ?? []).map((row) => ({
+    indents: data.map((row) => ({
       id: row.id,
       reference: row.reference ?? "—",
       status: row.status as IndentStatus,
@@ -133,11 +171,81 @@ export async function listIndents({
       project_name: (row.projects as { name: string } | null)?.name ?? "—",
       unit_name: (row.units as { name: string } | null)?.name ?? null,
       line_count: (row.indent_lines as { count: number }[] | null)?.[0]?.count ?? 0,
+      lines_to_buy: row.status === "approved" ? (linesToBuy.get(row.id) ?? 0) : null,
     })),
     total,
     page: currentPage,
     pageCount: Math.max(1, Math.ceil(total / pageSize)),
     pageSize,
+  };
+}
+
+/**
+ * For each of these (approved) indents, how many lines still have
+ * something to buy: requested less what non-cancelled POs ordered, from
+ * the money-free po_line_facts view (migration 0022) — quantities only,
+ * so a site user without /purchase-orders sees the same figure. Both
+ * reads are SUMMED, so they go through fetchAll: a silent 1,000-row cap
+ * would call a line fully ordered, or not ordered at all.
+ */
+async function countLinesToBuy(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  indentIds: string[],
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  if (indentIds.length === 0) return counts;
+
+  const lines = await fetchAll((rangeFrom, rangeTo) =>
+    supabase
+      .from("indent_lines")
+      .select("id, indent_id, quantity")
+      .in("indent_id", indentIds)
+      .order("id")
+      .range(rangeFrom, rangeTo),
+  );
+  const lineIds = lines.map((line) => line.id);
+  const facts = lineIds.length
+    ? await fetchAll((rangeFrom, rangeTo) =>
+        supabase
+          .from("po_line_facts")
+          .select("indent_line_id, quantity, po_status")
+          .in("indent_line_id", lineIds)
+          .order("id")
+          .range(rangeFrom, rangeTo),
+      )
+    : [];
+
+  const ordered = new Map<string, number>();
+  for (const fact of facts) {
+    if (fact.po_status === "cancelled" || !fact.indent_line_id) continue;
+    ordered.set(
+      fact.indent_line_id,
+      (ordered.get(fact.indent_line_id) ?? 0) + (fact.quantity ?? 0),
+    );
+  }
+
+  for (const line of lines) {
+    if (stillToBuy(line.quantity, ordered.get(line.id) ?? 0) > 0) {
+      counts.set(line.indent_id, (counts.get(line.indent_id) ?? 0) + 1);
+    }
+  }
+  return counts;
+}
+
+/** The list page's filter dropdowns — every project, and the active
+ * works (the one vocabulary, Masters). The reads are open; this wrapper
+ * is the gate. */
+export async function getIndentFilterOptions(): Promise<{
+  projects: { id: string; name: string }[];
+  works: { id: string; label: string }[];
+}> {
+  await requireTool("/indents");
+  const [projects, workItems] = await Promise.all([listProjects(), listWorkItems()]);
+  return {
+    projects: projects.map(({ id, name }) => ({ id, name })),
+    works: workItems
+      .filter((work) => work.is_active)
+      .map((work) => ({ id: work.id, label: `${work.name} — ${work.code}` })),
   };
 }
 

@@ -1,6 +1,7 @@
 import { LinkButton } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageTitle } from "@/components/ui/page-title";
+import { ListToolbar } from "@/components/ui/list-toolbar";
 import { Pagination } from "@/components/ui/pagination";
 import {
   Table,
@@ -12,7 +13,8 @@ import {
 } from "@/components/ui/table";
 import { NavTabs } from "@/components/ui/tabs";
 import { formatCount, formatDate } from "@/lib/format";
-import { listPurchaseOrders } from "@/lib/purchase-orders/queries";
+import { dateParam, idParam, searchParam } from "@/lib/list-params";
+import { getPoFilterOptions, listPurchaseOrders } from "@/lib/purchase-orders/queries";
 import type { PoStatus } from "@/lib/purchase-orders/workflow";
 import { ShoppingCart } from "lucide-react";
 import Link from "next/link";
@@ -30,21 +32,64 @@ const TABS: { key: string; label: string; status?: PoStatus }[] = [
 export default async function PurchaseOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; page?: string }>;
+  searchParams: Promise<{
+    status?: string;
+    page?: string;
+    vendor?: string;
+    project?: string;
+    q?: string;
+    from?: string;
+    to?: string;
+  }>;
 }) {
-  const { status: statusParam, page } = await searchParams;
-  const tab = TABS.find((t) => t.status === statusParam) ?? TABS[0];
+  const raw = await searchParams;
+  const page = raw.page;
+  const vendor = idParam(raw.vendor);
+  const project = idParam(raw.project);
+  const q = searchParam(raw.q);
+  const from = dateParam(raw.from);
+  const to = dateParam(raw.to);
+  const tab = TABS.find((t) => t.status === raw.status) ?? TABS[0];
 
-  const result = await listPurchaseOrders({ page: Number(page) || 1, status: tab.status });
+  const [result, filterOptions] = await Promise.all([
+    listPurchaseOrders({
+      page: Number(page) || 1,
+      status: tab.status,
+      vendorId: vendor,
+      projectId: project,
+      q,
+      from,
+      to,
+    }),
+    getPoFilterOptions(),
+  ]);
   const { orders, total, page: currentPage, pageCount, pageSize } = result;
+
+  // Every choice rides along, so a tab or a page link never drops a filter.
+  const hrefWith = (params: URLSearchParams) => {
+    if (vendor) params.set("vendor", vendor);
+    if (project) params.set("project", project);
+    if (q) params.set("q", q);
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    const query = params.toString();
+    return query ? `/purchase-orders/list?${query}` : "/purchase-orders/list";
+  };
 
   const hrefForPage = (target: number) => {
     const params = new URLSearchParams();
     if (tab.status) params.set("status", tab.status);
     if (target > 1) params.set("page", String(target));
-    const query = params.toString();
-    return query ? `/purchase-orders/list?${query}` : "/purchase-orders/list";
+    return hrefWith(params);
   };
+
+  const hrefForTab = (status?: PoStatus) => {
+    const params = new URLSearchParams();
+    if (status) params.set("status", status);
+    return hrefWith(params);
+  };
+
+  const filtered = Boolean(vendor || project || q || from || to);
 
   return (
     <div className="space-y-4">
@@ -58,25 +103,51 @@ export default async function PurchaseOrdersPage({
       <NavTabs
         tabs={TABS.map((t) => ({
           key: t.key,
-          href: t.status ? `/purchase-orders/list?status=${t.status}` : "/purchase-orders/list",
+          href: hrefForTab(t.status),
           label: t.label,
         }))}
         active={tab.key}
+      />
+
+      <ListToolbar
+        action="/purchase-orders/list"
+        values={{ q, from, to, vendor, project }}
+        keep={{ status: tab.status }}
+        search={{ placeholder: "PO number or vendor…" }}
+        dates={{ label: "Created" }}
+        filters={[
+          {
+            param: "vendor",
+            label: "Vendor",
+            allLabel: "All vendors",
+            options: filterOptions.vendors.map((row) => ({ value: row.id, label: row.name })),
+          },
+          {
+            param: "project",
+            label: "Project",
+            allLabel: "All projects",
+            options: filterOptions.projects.map((row) => ({ value: row.id, label: row.name })),
+          },
+        ]}
       />
 
       {orders.length === 0 ? (
         <EmptyState
           icon={ShoppingCart}
           title={
-            tab.status ? `No ${tab.label.toLowerCase()} purchase orders` : "No purchase orders yet"
+            tab.status || filtered
+              ? `No ${tab.status ? `${tab.label.toLowerCase()} ` : ""}purchase orders${filtered ? " match these filters" : ""}`
+              : "No purchase orders yet"
           }
           description={
-            tab.status
+            tab.status || filtered
               ? undefined
               : "Raise one — pull approved indent lines or add items directly, price them, issue it."
           }
           action={
-            tab.status ? undefined : <LinkButton href="/purchase-orders/new">New PO</LinkButton>
+            tab.status || filtered ? undefined : (
+              <LinkButton href="/purchase-orders/new">New PO</LinkButton>
+            )
           }
         />
       ) : (

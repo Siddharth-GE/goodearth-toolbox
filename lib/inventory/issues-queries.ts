@@ -3,6 +3,7 @@ import "server-only";
 import { cache } from "react";
 
 import { requireTool } from "@/lib/auth/access";
+import type { Filterable } from "@/lib/list-params";
 import { labelsById, profileNames } from "@/lib/masters/names";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
@@ -36,26 +37,62 @@ export type IssuePage = {
   pageSize: number;
 };
 
-export async function listStockIssues({ page = 1 }: { page?: number } = {}): Promise<IssuePage> {
+export type IssueListFilters = {
+  page?: number;
+  projectId?: string;
+  /** The store the material went out of. */
+  storeId?: string;
+  plotId?: string;
+  /** Issue reference — already made safe by searchParam. */
+  q?: string;
+  /** Issued-on date range, YYYY-MM-DD, already checked by dateParam. */
+  from?: string;
+  to?: string;
+};
+
+export async function listStockIssues({
+  page = 1,
+  projectId,
+  storeId,
+  plotId,
+  q,
+  from,
+  to,
+}: IssueListFilters = {}): Promise<IssuePage> {
   await requireTool("/inventory");
   const supabase = await createClient();
 
   const pageSize = INVENTORY_LIST_LIMIT;
   const currentPage = Math.max(1, page);
 
-  const { data, count, error } = await supabase
-    .from("stock_issues")
-    .select(
-      "id, reference, store_id, to_store_id, plot_id, work_item_id, issued_at, created_by, stock_issue_lines(count), work_items(name)",
-      { count: "exact" },
-    )
+  // Every filter in one place. issued_at is a date, so `to` is plain lte.
+  const filtered = <T extends Filterable<T>>(query: T): T => {
+    let next = query;
+    if (projectId) next = next.eq("project_id", projectId);
+    if (storeId) next = next.eq("store_id", storeId);
+    if (plotId) next = next.eq("plot_id", plotId);
+    if (from) next = next.gte("issued_at", from);
+    if (to) next = next.lte("issued_at", to);
+    if (q) next = next.or(`reference.ilike.*${q}*`);
+    return next;
+  };
+
+  const { data, count, error } = await filtered(
+    supabase
+      .from("stock_issues")
+      .select(
+        "id, reference, store_id, to_store_id, plot_id, work_item_id, issued_at, created_by, stock_issue_lines(count), work_items(name)",
+        { count: "exact" },
+      ),
+  )
     .order("issued_at", { ascending: false })
     .order("id")
     .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
 
+  // A failed read is an error screen, never an empty list.
   if (error) {
     console.error("listStockIssues failed:", error);
-    return { issues: [], total: 0, page: currentPage, pageCount: 1, pageSize };
+    throw new Error("Could not read the issues.", { cause: error });
   }
 
   const rows = data ?? [];
@@ -264,30 +301,57 @@ export type AdjustmentPage = {
   stores: { id: string; name: string }[];
 };
 
+export type AdjustmentListFilters = {
+  page?: number;
+  storeId?: string;
+  /** Searched in the reason text — already made safe by searchParam. */
+  q?: string;
+  /** Dated-on range, YYYY-MM-DD, already checked by dateParam. */
+  from?: string;
+  to?: string;
+};
+
 export async function listStockAdjustments({
   page = 1,
-}: { page?: number } = {}): Promise<AdjustmentPage> {
+  storeId,
+  q,
+  from,
+  to,
+}: AdjustmentListFilters = {}): Promise<AdjustmentPage> {
   await requireTool("/inventory");
   const supabase = await createClient();
 
   const pageSize = INVENTORY_LIST_LIMIT;
   const currentPage = Math.max(1, page);
 
+  // Every filter in one place. adjusted_at is a date, so `to` is plain lte.
+  const filtered = <T extends Filterable<T>>(query: T): T => {
+    let next = query;
+    if (storeId) next = next.eq("store_id", storeId);
+    if (from) next = next.gte("adjusted_at", from);
+    if (to) next = next.lte("adjusted_at", to);
+    if (q) next = next.or(`reason.ilike.*${q}*`);
+    return next;
+  };
+
   const [{ data, count, error }, stores] = await Promise.all([
-    supabase
-      .from("stock_adjustments")
-      .select("id, store_id, item_id, quantity, uom, reason, adjusted_at, created_by", {
-        count: "exact",
-      })
+    filtered(
+      supabase
+        .from("stock_adjustments")
+        .select("id, store_id, item_id, quantity, uom, reason, adjusted_at, created_by", {
+          count: "exact",
+        }),
+    )
       .order("adjusted_at", { ascending: false })
       .order("id")
       .range((currentPage - 1) * pageSize, currentPage * pageSize - 1),
     listActiveStores(supabase),
   ]);
 
+  // A failed read is an error screen, never an empty list.
   if (error) {
     console.error("listStockAdjustments failed:", error);
-    return { adjustments: [], total: 0, page: currentPage, pageCount: 1, pageSize, stores };
+    throw new Error("Could not read the adjustments.", { cause: error });
   }
 
   const rows = data ?? [];

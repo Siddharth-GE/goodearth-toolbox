@@ -79,7 +79,7 @@ Found 2026-10-08 (founder: "did you see that unit change issue?"): besides the o
 - Each line shows **Remaining = requested − ordered** (non-cancelled POs, `po_line_facts`, already read) beside "ordered X of Y"; the indent header shows "N lines still to buy"; the list shows a Remaining column.
 - **Print**: `app/(dashboard)/indents/[indentId]/pdf/route.ts` + `lib/indents/indent-document.tsx` on `lib/pdf/document.tsx` — company, project, villa, work, number, status, lines (code, material, unit, requested, ordered, remaining), requested/approved by. No money. A Print button on the indent page.
 
-### A4. ☐ `[Opus]` One search / filter / total bar
+### A4. ✅ `[Opus]` One search / filter / total bar
 
 - `components/ui/list-toolbar.tsx` — a GET form: search box (`q`), date range (`from`, `to`), and the filter selects a list passes in (project, villa, vendor, status…); `components/ui/table.tsx` gains a `TotalsRow`. This is the shared filter toolbar `DESIGN.md` reserved for the third copy — there are now nine.
 - Applied in Part A to: Indents list, POs list, Bills list (search on number, invoice no., vendor; totals of taxable / GST / total over **all matched rows**, not the page — computed in the query), Inventory receipts, issues, adjustments, stock, requests. Each query takes the filters server-side; "N of M" from a real count.

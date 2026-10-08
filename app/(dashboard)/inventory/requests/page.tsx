@@ -1,20 +1,42 @@
 import { Badge } from "@/components/ui/badge";
 import { LinkButton } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ListToolbar } from "@/components/ui/list-toolbar";
 import { PageTitle } from "@/components/ui/page-title";
 import { Section } from "@/components/ui/section";
 import { formatDate, formatQuantity } from "@/lib/format";
+import { getInventoryFilterOptions } from "@/lib/inventory/queries";
 import { listSiteRequests, type SiteRequestRow } from "@/lib/inventory/requests-queries";
+import { idParam, searchParam } from "@/lib/list-params";
 import { Inbox } from "lucide-react";
 import Link from "next/link";
 import { DeclineRequestDialog } from "./_components/request-actions";
+
+const STATUSES: { value: SiteRequestRow["status"]; label: string }[] = [
+  { value: "requested", label: "Waiting" },
+  { value: "fulfilled", label: "Issued" },
+  { value: "declined", label: "Declined" },
+];
 
 // The store-keeper's queue (Phase 2 Step H): what the site is asking
 // for, oldest first. Fulfil walks into the issue form with the villa,
 // work, item and quantity already filled — the store stays the
 // keeper's choice. Decline needs a reason the supervisor sees.
-export default async function RequestsPage() {
-  const { open, answered, answeredTotal } = await listSiteRequests();
+export default async function RequestsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; plot?: string; status?: string }>;
+}) {
+  const raw = await searchParams;
+  const q = searchParam(raw.q);
+  const plot = idParam(raw.plot);
+  const status = STATUSES.find((option) => option.value === raw.status)?.value;
+  const filtered = Boolean(q || plot || status);
+
+  const [{ open, answered, answeredTotal, searchCapped }, filterOptions] = await Promise.all([
+    listSiteRequests({ plotId: plot, status, q }),
+    getInventoryFilterOptions(),
+  ]);
 
   return (
     <div className="space-y-4">
@@ -25,12 +47,49 @@ export default async function RequestsPage() {
         backLabel="Inventory"
       />
 
-      {open.length === 0 ? (
+      <ListToolbar
+        action="/inventory/requests"
+        values={{ q, plot, status }}
+        search={{ placeholder: "Item name…" }}
+        filters={[
+          {
+            param: "plot",
+            label: "Villa",
+            allLabel: "All villas",
+            options: filterOptions.plots.map((row) => ({ value: row.id, label: row.name })),
+          },
+          {
+            param: "status",
+            label: "Status",
+            allLabel: "Any status",
+            options: STATUSES,
+          },
+        ]}
+      />
+
+      {searchCapped && (
+        <p className="text-muted text-xs">
+          That search matches a lot of items, so only the first few are shown. Type more of the name
+          to narrow it down.
+        </p>
+      )}
+
+      {filtered && open.length === 0 && answered.length === 0 && (
         <EmptyState
           icon={Inbox}
-          title="Nothing waiting"
-          description="When a supervisor requests material for their villa, it lands here."
+          title="No requests match these filters"
+          description="Try a different villa or status, or clear the filters."
         />
+      )}
+
+      {open.length === 0 ? (
+        !filtered && (
+          <EmptyState
+            icon={Inbox}
+            title="Nothing waiting"
+            description="When a supervisor requests material for their villa, it lands here."
+          />
+        )
       ) : (
         <ul className="space-y-3">
           {open.map((request) => (
@@ -66,7 +125,7 @@ export default async function RequestsPage() {
           title="Answered"
           note={`Showing ${answered.length} of ${answeredTotal}, newest first.`}
           collapsible
-          defaultOpen={false}
+          defaultOpen={filtered}
         >
           <ul className="divide-border divide-y">
             {answered.map((request) => (

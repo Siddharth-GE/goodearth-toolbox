@@ -3,6 +3,7 @@ import "server-only";
 import { cache } from "react";
 
 import { requireTool } from "@/lib/auth/access";
+import { istDayEndExclusive, istDayStart, type Filterable } from "@/lib/list-params";
 import { labelsById, profileNames } from "@/lib/masters/names";
 import { listPlots } from "@/lib/masters/plots";
 import { listProjects } from "@/lib/masters/projects";
@@ -73,36 +74,84 @@ export async function getWelcomeCounts() {
   };
 }
 
+export type PoListFilters = {
+  page?: number;
+  status?: PoStatus;
+  vendorId?: string;
+  projectId?: string;
+  /** PO reference or vendor name — already made safe by searchParam. */
+  q?: string;
+  /** Created-on date range, YYYY-MM-DD, already checked by dateParam. */
+  from?: string;
+  to?: string;
+};
+
 export async function listPurchaseOrders({
   page = 1,
   status,
-}: {
-  page?: number;
-  status?: PoStatus;
-} = {}): Promise<PoListPage> {
+  vendorId,
+  projectId,
+  q,
+  from,
+  to,
+}: PoListFilters = {}): Promise<PoListPage> {
   await requireTool("/purchase-orders");
   const supabase = await createClient();
 
   const pageSize = PO_LIST_LIMIT;
   const currentPage = Math.max(1, page);
 
+  // A vendor-name search becomes a list of vendor ids (vendors is an open
+  // Masters read), so one or() can cover reference and vendor.
+  let vendorIdsForSearch: string[] = [];
+  if (q) {
+    const { data: matched, error: vendorError } = await supabase
+      .from("vendors")
+      .select("id")
+      .ilike("name", `%${q}%`)
+      .limit(200);
+    if (vendorError) {
+      console.error("listPurchaseOrders vendor search failed:", vendorError);
+      throw new Error("Could not search purchase orders.", { cause: vendorError });
+    }
+    vendorIdsForSearch = (matched ?? []).map((row) => row.id);
+  }
+
+  // Every filter in one place. created_at is a timestamp, so the "to" day
+  // runs up to — not including — the day after it.
+  const filtered = <T extends Filterable<T>>(query: T): T => {
+    let next = query;
+    if (status) next = next.eq("status", status);
+    if (vendorId) next = next.eq("vendor_id", vendorId);
+    if (projectId) next = next.eq("project_id", projectId);
+    if (from) next = next.gte("created_at", istDayStart(from));
+    if (to) next = next.lt("created_at", istDayEndExclusive(to));
+    if (q) {
+      const clauses = [`reference.ilike.*${q}*`];
+      if (vendorIdsForSearch.length) clauses.push(`vendor_id.in.(${vendorIdsForSearch.join(",")})`);
+      next = next.or(clauses.join(","));
+    }
+    return next;
+  };
+
   // A stated limit with an exact database count — the total is never
   // derived from the rows that happened to arrive.
-  let query = supabase
-    .from("purchase_orders")
-    .select(
-      "id, reference, status, scope_code, expected_by, created_at, projects(name), vendors(name), purchase_order_lines(count)",
-      { count: "exact" },
-    )
+  const { data, count, error } = await filtered(
+    supabase
+      .from("purchase_orders")
+      .select(
+        "id, reference, status, scope_code, expected_by, created_at, projects(name), vendors(name), purchase_order_lines(count)",
+        { count: "exact" },
+      ),
+  )
     .order("created_at", { ascending: false })
     .order("id")
     .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
-  if (status) query = query.eq("status", status);
-
-  const { data, count, error } = await query;
+  // A failed read is an error screen, never an empty list — "no orders"
+  // and "could not read the orders" mean opposite things.
   if (error) {
     console.error("listPurchaseOrders failed:", error);
-    return { orders: [], total: 0, page: currentPage, pageCount: 1, pageSize };
+    throw new Error("Could not read the purchase orders.", { cause: error });
   }
 
   const total = count ?? 0;
@@ -122,6 +171,20 @@ export async function listPurchaseOrders({
     page: currentPage,
     pageCount: Math.max(1, Math.ceil(total / pageSize)),
     pageSize,
+  };
+}
+
+/** The list page's filter dropdowns — every vendor and project by name.
+ * The Masters reads are open; this wrapper is the gate. */
+export async function getPoFilterOptions(): Promise<{
+  vendors: { id: string; name: string }[];
+  projects: { id: string; name: string }[];
+}> {
+  await requireTool("/purchase-orders");
+  const [vendors, projects] = await Promise.all([listVendors(), listProjects()]);
+  return {
+    vendors: vendors.map(({ id, name }) => ({ id, name })),
+    projects: projects.map(({ id, name }) => ({ id, name })),
   };
 }
 
