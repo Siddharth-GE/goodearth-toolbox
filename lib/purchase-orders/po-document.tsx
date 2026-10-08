@@ -131,6 +131,7 @@ export function PoDocument({ data }: { data: PoPdfData }) {
     reference: po.reference,
     footerLeft: `${po.project_name} · ${po.reference}`,
     isDraft,
+    company: data.company,
   };
 
   const deliverTo =
@@ -205,7 +206,9 @@ export function PoDocument({ data }: { data: PoPdfData }) {
           <View style={styles.signatureRow}>
             <View style={styles.signatureBox}>
               <View style={styles.signatureRule}>
-                <Text style={styles.signatureLabel}>For Goodearth</Text>
+                <Text style={styles.signatureLabel}>
+                  For {data.company?.legal_name || data.company?.name || "Goodearth"}
+                </Text>
               </View>
             </View>
             <View style={styles.signatureBox}>

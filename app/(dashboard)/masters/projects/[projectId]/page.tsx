@@ -14,6 +14,7 @@ import { hasApp } from "@/lib/auth/access";
 import { requireUser } from "@/lib/auth/dal";
 import { formatCount, formatDate } from "@/lib/format";
 import type { PlotStatus } from "@/lib/masters/plots";
+import { listCompanies } from "@/lib/masters/companies";
 import { getProjectDetail } from "@/lib/masters/project-detail";
 import type { UnitStatus } from "@/lib/masters/units";
 import { Boxes } from "lucide-react";
@@ -41,9 +42,13 @@ export default async function ProjectDetailPage({
   // approved_budgets is RLS-gated to /budgets|/indents — without one of
   // those grants the budget column is omitted, not shown misleadingly empty.
   const includeBudgets = (await hasApp(user, "/budgets")) || (await hasApp(user, "/indents"));
-  const detail = await getProjectDetail(projectId, { includeBudgets });
+  const [detail, companies] = await Promise.all([
+    getProjectDetail(projectId, { includeBudgets }),
+    listCompanies(),
+  ]);
   if (!detail) notFound();
   const { project, updatedByName, plots, plotTotal, units, unitTotal, counts } = detail;
+  const company = companies.find((row) => row.id === project.company_id);
 
   return (
     <div className="space-y-4">
@@ -51,7 +56,12 @@ export default async function ProjectDetailPage({
         title={project.name}
         backHref="/masters/projects"
         backLabel="All projects"
-        description={[project.code, project.location, project.project_type.replace(/_/g, " ")]
+        description={[
+          project.code,
+          project.location,
+          project.project_type.replace(/_/g, " "),
+          company ? company.name : "No company yet",
+        ]
           .filter(Boolean)
           .join(" · ")}
         actions={
@@ -62,7 +72,7 @@ export default async function ProjectDetailPage({
             >
               {project.status}
             </Badge>
-            <ProjectFormDialog project={project} />
+            <ProjectFormDialog project={project} companies={companies} />
           </>
         }
       />

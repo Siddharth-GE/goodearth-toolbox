@@ -42,6 +42,8 @@ const styles = StyleSheet.create({
   wordmark: { fontFamily: pdf.fontBold, fontSize: pdf.size.title, letterSpacing: 1.5 },
   wordmarkRule: { color: pdf.color.accent },
   companyLine: { fontSize: pdf.size.tiny, color: pdf.color.muted, marginTop: 2 },
+  companyName: { fontFamily: pdf.fontBold, fontSize: pdf.size.title },
+  companyBlock: { maxWidth: "62%" },
   docType: {
     fontFamily: pdf.fontBold,
     fontSize: pdf.size.small,
@@ -86,24 +88,66 @@ export type DocumentMeta = {
   footerLeft: string;
   /** Draft documents are watermarked and must never look signable. */
   isDraft?: boolean;
+  /**
+   * The company the document is issued by — its project's (0101). Absent
+   * or null prints the placeholder letterhead.
+   */
+  company?: LetterheadCompany | null;
+};
+
+/** What the letterhead prints of a company; Masters' CompanyRow fits it. */
+export type LetterheadCompany = {
+  name: string;
+  legal_name: string | null;
+  address: string | null;
+  gstin: string | null;
+  phone: string | null;
+  email: string | null;
 };
 
 /**
  * Company identity block.
  *
- * PLACEHOLDER: the wordmark is set in type and the address line is a
- * stand-in. Swap for the real logo, registered address and GST number
- * when those assets arrive — this is the only place they appear.
+ * With a company (Masters → Companies, through the document's project):
+ * its legal name, registered address, GSTIN and contacts — never invented
+ * here. Without one, the PLACEHOLDER: the wordmark set in type and a
+ * stand-in line, as every document printed before companies existed.
  */
-function Letterhead({ documentType, reference }: { documentType: string; reference: string }) {
+function Letterhead({
+  documentType,
+  reference,
+  company,
+}: {
+  documentType: string;
+  reference: string;
+  company?: LetterheadCompany | null;
+}) {
+  // A typed address keeps its lines; the letterhead runs them into one,
+  // whether or not each line already ended in a comma.
+  const address = company?.address
+    ?.split("\n")
+    .map((part) => part.trim().replace(/,$/, ""))
+    .filter(Boolean)
+    .join(", ");
+  const contacts = company
+    ? [company.gstin && `GSTIN ${company.gstin}`, company.phone, company.email].filter(Boolean)
+    : [];
   return (
     <View style={styles.letterhead} fixed>
-      <View>
-        <Text style={styles.wordmark}>
-          GOODEARTH<Text style={styles.wordmarkRule}>.</Text>
-        </Text>
-        <Text style={styles.companyLine}>Kerala, India · goodearth.co.in</Text>
-      </View>
+      {company ? (
+        <View style={styles.companyBlock}>
+          <Text style={styles.companyName}>{company.legal_name || company.name}</Text>
+          {address && <Text style={styles.companyLine}>{address}</Text>}
+          {contacts.length > 0 && <Text style={styles.companyLine}>{contacts.join(" · ")}</Text>}
+        </View>
+      ) : (
+        <View>
+          <Text style={styles.wordmark}>
+            GOODEARTH<Text style={styles.wordmarkRule}>.</Text>
+          </Text>
+          <Text style={styles.companyLine}>Kerala, India · goodearth.co.in</Text>
+        </View>
+      )}
       <View>
         <Text style={styles.docType}>{documentType}</Text>
         <Text style={styles.docRef}>{reference}</Text>
@@ -124,7 +168,11 @@ export function DocumentPage({ meta, children }: { meta: DocumentMeta; children:
           DRAFT
         </Text>
       )}
-      <Letterhead documentType={meta.documentType} reference={meta.reference} />
+      <Letterhead
+        documentType={meta.documentType}
+        reference={meta.reference}
+        company={meta.company}
+      />
       {children}
       <View style={styles.footer} fixed>
         <Text style={styles.footerText}>{meta.footerLeft}</Text>

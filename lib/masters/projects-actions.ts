@@ -22,6 +22,7 @@ function readProjectForm(formData: FormData) {
     location: String(formData.get("location") ?? "").trim() || null,
     project_type: String(formData.get("project_type") ?? "") as ProjectType,
     status: String(formData.get("status") ?? "planning") as ProjectStatus,
+    company_id: String(formData.get("company_id") ?? "") || null,
   };
 }
 
@@ -37,7 +38,7 @@ function validateCode(code: string | null): string | undefined {
 export async function createProject(_state: ActionState, formData: FormData): Promise<ActionState> {
   await requireTool("/masters");
 
-  const { name, code, location, project_type, status } = readProjectForm(formData);
+  const { name, code, location, project_type, status, company_id } = readProjectForm(formData);
   if (!name) return { error: "Enter a project name." };
   const codeError = validateCode(code);
   if (codeError) return { error: codeError };
@@ -47,14 +48,15 @@ export async function createProject(_state: ActionState, formData: FormData): Pr
   const supabase = await createClient();
   const { error } = await supabase
     .from("projects")
-    .insert({ name, code, location, project_type, status });
+    .insert({ name, code, location, project_type, status, company_id });
   if (error) {
     if (error.code === "23505") return { error: "That code is already used by another project." };
     console.error("createProject failed:", error);
     return { error: "Could not create project. Try again." };
   }
 
-  revalidatePath("/masters/projects");
+  revalidatePath("/masters/projects", "layout");
+  revalidatePath("/masters/companies");
   return undefined;
 }
 
@@ -65,7 +67,7 @@ export async function updateProject(
 ): Promise<ActionState> {
   const user = await requireTool("/masters");
 
-  const { name, code, location, project_type, status } = readProjectForm(formData);
+  const { name, code, location, project_type, status, company_id } = readProjectForm(formData);
   if (!name) return { error: "Enter a project name." };
   const codeError = validateCode(code);
   if (codeError) return { error: codeError };
@@ -75,7 +77,7 @@ export async function updateProject(
   const supabase = await createClient();
   const { error } = await supabase
     .from("projects")
-    .update({ name, code, location, project_type, status, updated_by: user.id })
+    .update({ name, code, location, project_type, status, company_id, updated_by: user.id })
     .eq("id", id);
   if (error) {
     if (error.code === "23505") return { error: "That code is already used by another project." };
@@ -83,6 +85,7 @@ export async function updateProject(
     return { error: "Could not update project. Try again." };
   }
 
-  revalidatePath("/masters/projects");
+  revalidatePath("/masters/projects", "layout");
+  revalidatePath("/masters/companies");
   return undefined;
 }

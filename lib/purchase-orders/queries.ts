@@ -4,6 +4,7 @@ import { cache } from "react";
 
 import { requireTool } from "@/lib/auth/access";
 import { istDayEndExclusive, istDayStart, type Filterable } from "@/lib/list-params";
+import { getProjectCompany, type CompanyRow } from "@/lib/masters/companies";
 import { labelsById, profileNames } from "@/lib/masters/names";
 import { listPlots } from "@/lib/masters/plots";
 import { listProjects } from "@/lib/masters/projects";
@@ -440,6 +441,8 @@ export type PoPdfData = {
     address: string | null;
   };
   deliver_store_name: string | null;
+  /** The project's company, printed on the letterhead; null → placeholder. */
+  company: CompanyRow | null;
 };
 
 /** Everything the PO document needs — the detail plus the vendor's
@@ -449,7 +452,7 @@ export async function getPoPdfData(poId: string): Promise<PoPdfData | null> {
   if (!po) return null;
 
   const supabase = await createClient();
-  const [{ data: vendor }, store] = await Promise.all([
+  const [{ data: vendor }, store, company] = await Promise.all([
     supabase
       .from("vendors")
       .select("name, contact_name, mobile, gst_no, address")
@@ -458,6 +461,7 @@ export async function getPoPdfData(poId: string): Promise<PoPdfData | null> {
     po.deliver_store_id
       ? supabase.from("stores").select("name").eq("id", po.deliver_store_id).maybeSingle()
       : Promise.resolve({ data: null }),
+    getProjectCompany(po.project_id),
   ]);
 
   return {
@@ -470,6 +474,7 @@ export async function getPoPdfData(poId: string): Promise<PoPdfData | null> {
       address: vendor?.address ?? null,
     },
     deliver_store_name: store?.data?.name ?? null,
+    company,
   };
 }
 

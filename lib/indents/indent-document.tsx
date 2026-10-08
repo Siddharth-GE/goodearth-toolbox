@@ -9,6 +9,7 @@ import {
   Signatures,
   type Column,
   type DocumentMeta,
+  type LetterheadCompany,
 } from "@/lib/pdf/document";
 import { formatDate, formatQuantity } from "@/lib/format";
 import type { IndentDetail, IndentLineRow } from "./queries";
@@ -24,6 +25,8 @@ export type IndentPdfData = {
   indent: IndentDetail;
   /** "Footing — (Base + 4 Sides) Area — FD.15", or null. */
   work_label: string | null;
+  /** The project's company, printed on the letterhead; null → placeholder. */
+  company: LetterheadCompany | null;
 };
 
 const STATUS_LABEL: Record<IndentDetail["status"], string> = {
@@ -71,6 +74,7 @@ export function IndentDocument({ data }: { data: IndentPdfData }) {
     reference: indent.reference,
     footerLeft: `${indent.project_name} · ${indent.reference}`,
     isDraft,
+    company: data.company,
   };
 
   return (

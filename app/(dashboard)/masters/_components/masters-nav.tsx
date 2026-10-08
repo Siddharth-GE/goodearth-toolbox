@@ -2,6 +2,7 @@ import { ToolNav } from "@/components/ui/tool-nav";
 
 const TABS = [
   { key: "projects", href: "/masters/projects", label: "Projects" },
+  { key: "companies", href: "/masters/companies", label: "Companies" },
   { key: "plots", href: "/masters/plots", label: "Plots" },
   { key: "units", href: "/masters/units", label: "Units" },
   { key: "clients", href: "/masters/clients", label: "Clients" },
@@ -13,6 +14,7 @@ const TABS = [
   { key: "uoms", href: "/masters/uoms", label: "Units" },
   { key: "works", href: "/masters/works", label: "Works" },
   { key: "gst-rates", href: "/masters/gst-rates", label: "GST Rates" },
+  { key: "terms", href: "/masters/terms", label: "Terms" },
   { key: "requests", href: "/masters/requests", label: "Requests" },
 ] as const;
 

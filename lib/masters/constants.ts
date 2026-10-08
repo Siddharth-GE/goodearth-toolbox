@@ -26,3 +26,17 @@ export type Placement = "fixed" | "loose" | "soft_furnishing";
 export function isItemKind(value: string): value is ItemKind {
   return (ITEM_KINDS as readonly string[]).includes(value);
 }
+
+// Terms templates (0101): which document a named text is for. The CHECK
+// on document_terms.kind is the enforcement; this is the app's copy.
+export const TERMS_KINDS = ["po", "work_order"] as const;
+export type TermsKind = (typeof TERMS_KINDS)[number];
+
+export const TERMS_KIND_LABEL: Record<TermsKind, string> = {
+  po: "Purchase orders",
+  work_order: "Work orders",
+};
+
+export function isTermsKind(value: string): value is TermsKind {
+  return (TERMS_KINDS as readonly string[]).includes(value);
+}

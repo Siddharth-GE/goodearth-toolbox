@@ -126,7 +126,9 @@ Found 2026-10-08 (founder: "did you see that unit change issue?"): besides the o
 
 Every migration: re-runnable, additive, ends asserting what it claimed, RLS on every new table, one SELECT policy per table, revokes on every new view (`anon, authenticated`) and function (`public, anon`), manifest row for every new view, `db:check-views` clean. Every new cross-tool write is added to `SECURITY.md`'s list; every new cross-tool read to `STATUS.md`'s contract table.
 
-### B1. ☐ `[Opus]` Companies and terms templates — `0101_companies_and_terms.sql`
+### B1. ✅ `[Opus]` Companies and terms templates — `0101_companies_and_terms.sql`
+
+_Landed 2026-10-08:_ Masters → Companies and Masters → Terms (list + dialog each; one default per kind, saved flag-down first so a name clash never clears the old default), a Company picker on the project form and a Company column on the list, and the letterhead printing the project's company on the indent and PO (bills and work orders pass it in B6/B7). Select strings run against staging; the letterhead's text checked in a rendered sample. **The founder's staging account holds no `/masters`**, so they can't open these screens until it is granted.
 
 - `companies` (Masters, reads open, writes `/masters`): `name`, `legal_name`, `address`, `gstin`, `state` (default `'Kerala'`), `phone`, `email`. `projects.company_id` nullable FK. **No seed** — the founder enters Goodearth's real details in Masters (never invented — `PRODUCT.md`); every print shows the placeholder letterhead until they do.
 - `document_terms` (Masters): `kind` (`po` | `work_order`), `name`, `body`, `is_default` (one default per kind, partial unique index). Masters → Terms screen to edit them.
