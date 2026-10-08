@@ -8736,6 +8736,7 @@ export type Database = {
           unit_id: string | null
           uom: string | null
           work_item_id: string | null
+          working_updated_at: string | null
         }
         Relationships: [
           {

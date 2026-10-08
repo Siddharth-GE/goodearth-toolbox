@@ -295,6 +295,20 @@ export function factsForWork<T extends { work_item_id: string | null }>(
   return workItemId ? facts.filter((fact) => fact.work_item_id === workItemId) : facts;
 }
 
+/**
+ * When the villa's working estimate changed after the official copy a pull
+ * reads was made (0109) — the date to warn with, or null when it has not.
+ * Equal is not "after": making an estimate official writes everything in
+ * one transaction, sharing one clock reading.
+ */
+export function workingChangedSince(
+  submittedAt: string | null,
+  workingUpdatedAt: string | null,
+): string | null {
+  if (!submittedAt || !workingUpdatedAt) return null;
+  return Date.parse(workingUpdatedAt) > Date.parse(submittedAt) ? workingUpdatedAt : null;
+}
+
 /** Six places, the estimator's rounding — sums of decimals drift otherwise. */
 function roundQty(value: number): number {
   return Math.round(value * 1e6) / 1e6;

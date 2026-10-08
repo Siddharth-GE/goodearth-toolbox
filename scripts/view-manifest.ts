@@ -98,12 +98,13 @@ export const VIEW_MANIFEST: Record<string, ViewExpectation> = {
       "quantity",
       "item_id",
       "item_uom_factor",
+      "working_updated_at",
     ],
     guards: ["/estimator", "/indents", "/inventory", "/supervisors"],
     barrier: true,
     invoker: false,
     money: false,
-    why: "The official estimate's frozen material takeoff — what Indents pulls from and issues are compared against. /supervisors joined 0084 so a request for issue shows the estimate's figure beside it. Quantities and the catalogue link only: the snapshot's rate column stays behind /estimator, because adding it here would put construction pricing in front of every site engineer or supervisor.",
+    why: "The official estimate's frozen material takeoff — what Indents pulls from and issues are compared against. /supervisors joined 0084 so a request for issue shows the estimate's figure beside it. Quantities and the catalogue link only: the snapshot's rate column stays behind /estimator, because adding it here would put construction pricing in front of every site engineer or supervisor. working_updated_at (0109) is when the villa's working estimate last changed — a date, so Indents can say the official copy it reads is out of date.",
   },
   po_facts: {
     columns: [

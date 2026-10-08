@@ -14,6 +14,7 @@ import {
   factsForWork,
   groupEstimatePull,
   requestedByItem,
+  workingChangedSince,
   type BudgetCandidate,
   type DriftLine,
   type EstimateFact,
@@ -288,4 +289,21 @@ test("already requested for a work counts only indents raised for that work", ()
   );
   assert.equal(requested.get("cement"), 17, "the villa-wide figure is unchanged");
   assert.equal(forWork.get("cement"), 5);
+});
+
+test("the working estimate's notice shows only for a change after the official copy", () => {
+  const official = "2026-10-03T10:00:00+00:00";
+  assert.equal(
+    workingChangedSince(official, "2026-10-05T09:30:00+00:00"),
+    "2026-10-05T09:30:00+00:00",
+  );
+  assert.equal(workingChangedSince(official, "2026-10-01T09:30:00+00:00"), null, "edited before");
+  assert.equal(workingChangedSince(official, official), null, "made official in the same moment");
+  assert.equal(
+    workingChangedSince(official, "2026-10-03T10:00:00.000Z"),
+    null,
+    "same instant, other spelling",
+  );
+  assert.equal(workingChangedSince(official, null), null, "the villa has no working estimate");
+  assert.equal(workingChangedSince(null, "2026-10-05T09:30:00+00:00"), null);
 });

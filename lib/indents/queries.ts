@@ -23,6 +23,7 @@ import {
   groupEstimatePull,
   type IssuedRevision,
   requestedByItem,
+  workingChangedSince,
 } from "./pull-rules";
 import { stillToBuy, type IndentStatus } from "./workflow";
 
@@ -1081,6 +1082,9 @@ export type EstimatePull = {
   estimate_id: string;
   reference: string;
   submitted_at: string | null;
+  /** When the villa's working estimate changed after this official copy
+   * was made (0109) — its changes are not here yet. Null when it has not. */
+  working_changed_at: string | null;
   unit_name: string;
   rows: EstimatePullRow[];
   /** Rows of an older estimate that name no catalogue item. */
@@ -1127,11 +1131,12 @@ export async function getEstimatePull(
     quantity: number | null;
     item_id: string | null;
     item_uom_factor: number | null;
+    working_updated_at: string | null;
   }>((from, to) =>
     supabase
       .from("estimate_takeoff_facts")
       .select(
-        "estimate_id, reference, submitted_at, work_item_id, material_name, uom, quantity, item_id, item_uom_factor",
+        "estimate_id, reference, submitted_at, work_item_id, material_name, uom, quantity, item_id, item_uom_factor, working_updated_at",
       )
       .eq("unit_id", unitId)
       .order("work_item_id")
@@ -1276,6 +1281,7 @@ export async function getEstimatePull(
     estimate_id: head.estimate_id,
     reference: head.reference ?? "—",
     submitted_at: head.submitted_at,
+    working_changed_at: workingChangedSince(head.submitted_at, head.working_updated_at),
     unit_name: unit?.name ?? "—",
     rows,
     unlinked_count: rows.filter((row) => row.state === "unlinked").length,

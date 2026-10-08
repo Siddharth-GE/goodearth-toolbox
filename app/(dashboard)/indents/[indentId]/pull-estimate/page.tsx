@@ -72,6 +72,13 @@ export default async function EstimatePullPage({
             {pull.submitted_at && <>, made official {formatDate(pull.submitted_at)}</>}. Changes the
             QS makes after that show here only once they make the estimate official again.
           </p>
+          {pull.working_changed_at && (
+            <p className="text-warning text-sm">
+              The QS has changed this villa&apos;s working estimate since — last on{" "}
+              {formatDate(pull.working_changed_at)}. Those changes are not here yet: ask them to
+              make the estimate official again.
+            </p>
+          )}
 
           {pull.work
             ? pull.other_work_material_count > 0 && (
