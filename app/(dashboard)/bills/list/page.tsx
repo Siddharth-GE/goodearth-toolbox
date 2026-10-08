@@ -2,21 +2,24 @@ import { LinkButton } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageTitle } from "@/components/ui/page-title";
 import { Pagination } from "@/components/ui/pagination";
+import { ListToolbar } from "@/components/ui/list-toolbar";
 import {
   Table,
   TableBody,
   TableCell,
+  TableFoot,
   TableHead,
   TableHeaderCell,
   TableRow,
+  TableTotalCell,
 } from "@/components/ui/table";
 import { NavTabs } from "@/components/ui/tabs";
 import { getBillFilterOptions, listBills } from "@/lib/bills/queries";
 import type { BillStatus } from "@/lib/bills/workflow";
-import { formatDate, formatMoney } from "@/lib/format";
+import { formatCount, formatDate, formatMoney } from "@/lib/format";
+import { dateParam, idParam, searchParam } from "@/lib/list-params";
 import { Receipt } from "lucide-react";
 import Link from "next/link";
-import { BillFilters } from "../_components/bill-filters";
 import { BillStatusBadge } from "../_components/status-badge";
 
 // "Unpaid" is a derived view (everything not yet paid — recorded and
@@ -33,9 +36,24 @@ const TABS: { key: string; label: string; param?: string; status?: BillStatus; u
 export default async function BillsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; page?: string; vendor?: string; project?: string }>;
+  searchParams: Promise<{
+    status?: string;
+    page?: string;
+    vendor?: string;
+    project?: string;
+    q?: string;
+    from?: string;
+    to?: string;
+  }>;
 }) {
-  const { status: statusParam, page, vendor, project } = await searchParams;
+  const raw = await searchParams;
+  const statusParam = raw.status;
+  const page = raw.page;
+  const vendor = idParam(raw.vendor);
+  const project = idParam(raw.project);
+  const q = searchParam(raw.q);
+  const from = dateParam(raw.from);
+  const to = dateParam(raw.to);
   const tab = TABS.find((t) => t.param === statusParam) ?? TABS[0];
 
   const [result, filterOptions] = await Promise.all([
@@ -43,16 +61,22 @@ export default async function BillsPage({
       page: Number(page) || 1,
       status: tab.status,
       unpaid: tab.unpaid,
-      vendorId: vendor || undefined,
-      projectId: project || undefined,
+      vendorId: vendor,
+      projectId: project,
+      q,
+      from,
+      to,
     }),
     getBillFilterOptions(),
   ]);
-  const { bills, total, page: currentPage, pageCount, pageSize } = result;
+  const { bills, total, page: currentPage, pageCount, pageSize, sums } = result;
 
   const hrefWith = (params: URLSearchParams) => {
     if (vendor) params.set("vendor", vendor);
     if (project) params.set("project", project);
+    if (q) params.set("q", q);
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
     const query = params.toString();
     return query ? `/bills/list?${query}` : "/bills/list";
   };
@@ -70,7 +94,7 @@ export default async function BillsPage({
     return hrefWith(params);
   };
 
-  const filtered = Boolean(vendor || project);
+  const filtered = Boolean(vendor || project || q || from || to);
 
   return (
     <div className="space-y-4">
@@ -97,12 +121,26 @@ export default async function BillsPage({
         active={tab.key}
       />
 
-      <BillFilters
-        vendors={filterOptions.vendors}
-        projects={filterOptions.projects}
-        selectedVendor={vendor ?? ""}
-        selectedProject={project ?? ""}
-        status={tab.param ?? ""}
+      <ListToolbar
+        action="/bills/list"
+        values={{ q, from, to, vendor, project }}
+        keep={{ status: tab.param }}
+        search={{ placeholder: "Bill no., invoice no. or vendor…" }}
+        dates={{ label: "Invoice date" }}
+        filters={[
+          {
+            param: "vendor",
+            label: "Vendor",
+            allLabel: "All vendors",
+            options: filterOptions.vendors.map((row) => ({ value: row.id, label: row.name })),
+          },
+          {
+            param: "project",
+            label: "Project",
+            allLabel: "All projects",
+            options: filterOptions.projects.map((row) => ({ value: row.id, label: row.name })),
+          },
+        ]}
       />
 
       {bills.length === 0 ? (
@@ -171,6 +209,21 @@ export default async function BillsPage({
                 </TableRow>
               ))}
             </TableBody>
+            {/* Over every bill these filters match, not just this page. */}
+            <TableFoot>
+              <tr>
+                <TableTotalCell colSpan={5}>
+                  {formatCount(total)} {total === 1 ? "bill" : "bills"}
+                  <span className="text-muted ml-2 text-xs font-normal">
+                    Taxable {formatMoney(sums.taxable)} · GST {formatMoney(sums.gst)}
+                  </span>
+                </TableTotalCell>
+                <TableTotalCell className="text-right font-mono text-xs">
+                  {formatMoney(sums.total)}
+                </TableTotalCell>
+                <TableTotalCell colSpan={2} />
+              </tr>
+            </TableFoot>
           </Table>
 
           <Pagination

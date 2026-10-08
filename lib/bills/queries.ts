@@ -7,6 +7,7 @@ import { listPlots } from "@/lib/masters/plots";
 import { listProjects } from "@/lib/masters/projects";
 import { listUnits } from "@/lib/masters/units";
 import { listVendors } from "@/lib/masters/vendors";
+import type { Filterable } from "@/lib/list-params";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 
@@ -39,6 +40,8 @@ export type BillListPage = {
   page: number;
   pageCount: number;
   pageSize: number;
+  /** Over EVERY bill the filters match, not just this page. */
+  sums: { taxable: number; gst: number; total: number };
 };
 
 /** Headline counts for the tool's welcome screen. Counts only — bill
@@ -70,47 +73,105 @@ export async function getWelcomeCounts() {
   };
 }
 
-export async function listBills({
-  page = 1,
-  status,
-  unpaid,
-  vendorId,
-  projectId,
-}: {
+export type BillListFilters = {
   page?: number;
   status?: BillStatus;
   /** The Unpaid view: everything not yet paid (recorded + approved). */
   unpaid?: boolean;
   vendorId?: string;
   projectId?: string;
-} = {}): Promise<BillListPage> {
+  /** Bill number, invoice number or vendor name — already made safe by searchParam. */
+  q?: string;
+  /** Invoice date range, YYYY-MM-DD, already checked by dateParam. */
+  from?: string;
+  to?: string;
+};
+
+export async function listBills({
+  page = 1,
+  status,
+  unpaid,
+  vendorId,
+  projectId,
+  q,
+  from,
+  to,
+}: BillListFilters = {}): Promise<BillListPage> {
   await requireTool("/bills");
   const supabase = await createClient();
 
   const pageSize = BILL_LIST_LIMIT;
   const currentPage = Math.max(1, page);
 
+  // A vendor-name search becomes a list of vendor ids (vendors is an open
+  // Masters read), so one or() can cover number, invoice and vendor.
+  let vendorIdsForSearch: string[] = [];
+  if (q) {
+    const { data: matched, error: vendorError } = await supabase
+      .from("vendors")
+      .select("id")
+      .ilike("name", `%${q}%`)
+      .limit(200);
+    if (vendorError) {
+      console.error("listBills vendor search failed:", vendorError);
+      throw new Error("Could not search bills.", { cause: vendorError });
+    }
+    vendorIdsForSearch = (matched ?? []).map((row) => row.id);
+  }
+
+  // Every filter, applied identically to the page and to the totals.
+  const filtered = <T extends Filterable<T>>(query: T): T => {
+    let next = query;
+    if (status) next = next.eq("status", status);
+    if (unpaid) next = next.neq("status", "paid");
+    if (vendorId) next = next.eq("vendor_id", vendorId);
+    if (projectId) next = next.eq("project_id", projectId);
+    if (from) next = next.gte("invoice_date", from);
+    if (to) next = next.lte("invoice_date", to);
+    if (q) {
+      const clauses = [`reference.ilike.*${q}*`, `invoice_no.ilike.*${q}*`];
+      if (vendorIdsForSearch.length) clauses.push(`vendor_id.in.(${vendorIdsForSearch.join(",")})`);
+      next = next.or(clauses.join(","));
+    }
+    return next;
+  };
+
   // A stated limit with an exact database count — the total is never
   // derived from the rows that happened to arrive.
-  let query = supabase
-    .from("bills")
-    .select(
-      "id, reference, status, kind, invoice_no, invoice_date, total_amount, created_at, projects(name), vendors(name)",
-      { count: "exact" },
+  const [{ data, count, error }, sumRows] = await Promise.all([
+    filtered(
+      supabase
+        .from("bills")
+        .select(
+          "id, reference, status, kind, invoice_no, invoice_date, total_amount, created_at, projects(name), vendors(name)",
+          { count: "exact" },
+        ),
     )
-    .order("created_at", { ascending: false })
-    .order("id")
-    .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
-  if (status) query = query.eq("status", status);
-  if (unpaid) query = query.neq("status", "paid");
-  if (vendorId) query = query.eq("vendor_id", vendorId);
-  if (projectId) query = query.eq("project_id", projectId);
-
-  const { data, count, error } = await query;
+      .order("created_at", { ascending: false })
+      .order("id")
+      .range((currentPage - 1) * pageSize, currentPage * pageSize - 1),
+    fetchAll<{ taxable_amount: number; gst_amount: number; total_amount: number }>(
+      (rangeFrom, rangeTo) =>
+        filtered(supabase.from("bills").select("taxable_amount, gst_amount, total_amount"))
+          .order("id")
+          .range(rangeFrom, rangeTo),
+    ),
+  ]);
+  // A failed read is an error screen, never an empty list — "no bills"
+  // and "could not read the bills" mean opposite things.
   if (error) {
     console.error("listBills failed:", error);
-    return { bills: [], total: 0, page: currentPage, pageCount: 1, pageSize };
+    throw new Error("Could not read the bills.", { cause: error });
   }
+
+  const sums = sumRows.reduce(
+    (acc, row) => ({
+      taxable: acc.taxable + Number(row.taxable_amount ?? 0),
+      gst: acc.gst + Number(row.gst_amount ?? 0),
+      total: acc.total + Number(row.total_amount ?? 0),
+    }),
+    { taxable: 0, gst: 0, total: 0 },
+  );
 
   const total = count ?? 0;
   return {
@@ -130,6 +191,7 @@ export async function listBills({
     page: currentPage,
     pageCount: Math.max(1, Math.ceil(total / pageSize)),
     pageSize,
+    sums,
   };
 }
 
