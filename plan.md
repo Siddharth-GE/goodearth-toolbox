@@ -65,9 +65,14 @@ The money/permission migrations may be **drafted** by Opus but reach `db:apply` 
 - **Which estimate it is reading, always said:** "From EST/SAA/004, made official 3 Oct. Changes the QS makes after that show here only once they make it official again." (`reference` and `submitted_at` are already in `estimate_takeoff_facts`; no new read.) A sharper "the working estimate has changed since" notice needs the working estimate's date across the boundary — a question for Fable #1 below.
 - An empty pull says why: "The official estimate has no materials for Footing — FD.15. The QS adds them in Estimator → Works."
 
-### A2. ☐ `[Opus]` Indents: the Master unit, always
+### A2. ☐ `[Opus]` A material moves in its Master unit, always
 
-- Estimate-pulled lines take `items.default_uom` (already true at insert); the line grid **locks the unit** on estimate-pulled lines (direct lines keep the picker). The pull basket shows the estimate's figure in the Master unit when the units match or convert, else "estimate says 100 cft — enter in bag" (`needs_qty`, already classified).
+Found 2026-10-08 (founder: "did you see that unit change issue?"): besides the old frozen row, two live paths let a material leave its Master unit — the indent line grid's unit picker accepted any unit (cement → cft), and that unit then rode onto the PO, the receipt and stock, which sums quantities whatever their unit; and `recordStockAdjustment` saved the unit the browser sent.
+
+- **Indent lines from the estimate or a direct pick carry `items.default_uom` and nothing else**: the line grid shows the unit as text (no picker), and `updateLine` ignores any unit for those lines, re-reading the item's. Budget-pulled (interiors) lines keep the selection's unit — a tile can be specified per sqft — and their picker.
+- **Adjustments** re-read the item's `default_uom` on the server; the browser's unit is ignored.
+- The pull basket shows the estimate's figure in the Master unit when the units match or convert, else "estimate says 100 cft — enter in bag" (`needs_qty`, already classified).
+- POs and receipts already copy the unit from the line before them, so the chain holds once the indent does. Lines already saved in another unit (production) are listed for a person on ship day — `scripts/report-unit-mismatches.ts --project <ref>`, read-only.
 
 ### A3. ☐ `[Opus]` Indents: remaining to buy, and print
 

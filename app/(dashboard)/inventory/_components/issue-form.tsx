@@ -105,11 +105,7 @@ export function IssueForm({
         issuedAt: issuedAt || null,
         note: note || null,
         requestId: destination === "plot" ? (request?.id ?? null) : null,
-        lines: pickedEntries.map(([itemId, quantity]) => ({
-          itemId,
-          quantity,
-          uom: holdings.find((row) => row.item_id === itemId)?.uom ?? "each",
-        })),
+        lines: pickedEntries.map(([itemId, quantity]) => ({ itemId, quantity })),
       });
       if (result?.error) setError(result.error);
       // On success the action redirects to the issue note.

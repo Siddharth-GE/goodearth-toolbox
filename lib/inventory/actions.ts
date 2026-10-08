@@ -185,10 +185,11 @@ export async function recordGoodsReceipt(input: RecordReceiptInput): Promise<Act
  * Issuing material out of a store
  * ------------------------------------------------------------------ */
 
+/** The unit is not sent: every line is issued in the item's Masters unit,
+ * read on the server (the same rule as indents and adjustments). */
 export type IssueLineInput = {
   itemId: string;
   quantity: number;
-  uom: string;
 };
 
 export type RecordIssueInput = {
@@ -239,6 +240,19 @@ export async function recordStockIssue(input: RecordIssueInput): Promise<ActionS
 
   const supabase = await createClient();
 
+  const { data: items, error: itemsError } = await supabase
+    .from("items")
+    .select("id, name, default_uom")
+    .in("id", [...itemIds]);
+  if (itemsError) {
+    console.error("recordStockIssue item read failed:", itemsError);
+    return { error: "Could not record this issue. Try again." };
+  }
+  const uomByItem = new Map((items ?? []).map((item) => [item.id, item.default_uom]));
+  const unitless = (items ?? []).find((item) => !item.default_uom);
+  if (unitless) return { error: `${unitless.name} has no unit in Masters. Set one there first.` };
+  if (uomByItem.size !== itemIds.size) return { error: "An item on this issue no longer exists." };
+
   const { data: issueId, error } = await supabase.rpc("create_stock_issue", {
     p_store_id: input.storeId,
     p_to_store_id: (input.toStoreId || null) as unknown as string,
@@ -267,7 +281,7 @@ export async function recordStockIssue(input: RecordIssueInput): Promise<ActionS
       issue_id: issueId,
       item_id: line.itemId,
       quantity: line.quantity,
-      uom: line.uom,
+      uom: uomByItem.get(line.itemId) as string,
       created_by: user.id,
       updated_by: user.id,
     });
@@ -348,7 +362,6 @@ export type RecordAdjustmentInput = {
   itemId: string;
   /** Signed: positive adds (opening stock, a found box), negative removes. */
   quantity: number;
-  uom: string;
   reason: string;
   adjustedAt: string | null;
 };
@@ -356,7 +369,9 @@ export type RecordAdjustmentInput = {
 /**
  * The only way a balance changes without a movement behind it, which is
  * why the reason is mandatory both here and at the database. Opening
- * stock is simply a positive adjustment.
+ * stock is simply a positive adjustment. The unit is the item's Masters
+ * unit, read here — stock sums quantities whatever their unit, so a
+ * correction in another one would quietly mix bags with cft.
  */
 export async function recordStockAdjustment(input: RecordAdjustmentInput): Promise<ActionState> {
   const user = await requireTool("/inventory");
@@ -371,11 +386,23 @@ export async function recordStockAdjustment(input: RecordAdjustmentInput): Promi
   }
 
   const supabase = await createClient();
+  const { data: item, error: itemError } = await supabase
+    .from("items")
+    .select("default_uom")
+    .eq("id", input.itemId)
+    .maybeSingle();
+  if (itemError) {
+    console.error("recordStockAdjustment item read failed:", itemError);
+    return { error: "Could not save that adjustment. Try again." };
+  }
+  if (!item?.default_uom)
+    return { error: "This item has no unit in Masters. Set one there first." };
+
   const { error } = await supabase.from("stock_adjustments").insert({
     store_id: input.storeId,
     item_id: input.itemId,
     quantity: input.quantity,
-    uom: input.uom,
+    uom: item.default_uom,
     reason: input.reason.trim(),
     adjusted_at: input.adjustedAt || undefined,
     created_by: user.id,

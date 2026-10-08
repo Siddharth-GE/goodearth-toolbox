@@ -71,7 +71,6 @@ export function AdjustmentForm({
         storeId,
         itemId: item.id,
         quantity: direction === "add" ? amount : -amount,
-        uom,
         reason,
         adjustedAt: adjustedAt || null,
       });

@@ -167,6 +167,26 @@ export function LineGrid({
   );
 }
 
+/** The unit of a non-interiors line, as text. A line saved in another unit
+ * before the Masters-unit rule says so, because its next save switches it
+ * to the Masters unit and the quantity must be re-typed in that unit. */
+function UnitText({ line }: { line: IndentLineRow }) {
+  const master = line.item_default_uom;
+  const differs = master != null && master.trim().toLowerCase() !== line.uom.trim().toLowerCase();
+  return (
+    <div>
+      <span className="text-muted text-sm">{line.uom}</span>
+      {differs && (
+        <div className="mt-1">
+          <Badge variant="warning">
+            Masters says {master} — re-enter the quantity in {master}
+          </Badge>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function LineRow({
   indentId,
   line,
@@ -257,26 +277,32 @@ function LineRow({
             />
           </TableCell>
           <TableCell>
-            {/* Saved immediately on change — a select has no meaningful
-                blur, and waiting for one loses the edit on remove/submit. */}
-            <Select
-              value={uom}
-              onChange={(event) => {
-                setUom(event.target.value);
-                save(event.target.value);
-              }}
-              className="h-9"
-              aria-label={`Unit for ${line.item_name}`}
-            >
-              {/* A saved unit that has since left the master stays
-                  choosable, so an old line can be reopened and saved. */}
-              {uom && !uoms.includes(uom) && <option value={uom}>{uom}</option>}
-              {uoms.map((unit) => (
-                <option key={unit} value={unit}>
-                  {unit}
-                </option>
-              ))}
-            </Select>
+            {line.source === "interiors" ? (
+              // Saved immediately on change — a select has no meaningful
+              // blur, and waiting for one loses the edit on remove/submit.
+              <Select
+                value={uom}
+                onChange={(event) => {
+                  setUom(event.target.value);
+                  save(event.target.value);
+                }}
+                className="h-9"
+                aria-label={`Unit for ${line.item_name}`}
+              >
+                {/* A saved unit that has since left the master stays
+                    choosable, so an old line can be reopened and saved. */}
+                {uom && !uoms.includes(uom) && <option value={uom}>{uom}</option>}
+                {uoms.map((unit) => (
+                  <option key={unit} value={unit}>
+                    {unit}
+                  </option>
+                ))}
+              </Select>
+            ) : (
+              // Every other line moves in the item's Masters unit — the
+              // server saves that whatever is sent (updateLine).
+              <UnitText line={line} />
+            )}
           </TableCell>
           <TableCell>
             <Input
@@ -310,7 +336,9 @@ function LineRow({
       ) : (
         <>
           <TableCell>{formatQuantity(line.quantity)}</TableCell>
-          <TableCell className="text-muted">{line.uom}</TableCell>
+          <TableCell className="text-muted">
+            {line.source === "interiors" ? line.uom : <UnitText line={line} />}
+          </TableCell>
           {showOrdered && (
             <TableCell>
               {line.ordered_quantity > 0 ? (

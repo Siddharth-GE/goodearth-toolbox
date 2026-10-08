@@ -153,6 +153,10 @@ export type IndentLineRow = {
   item_thumb_url: string | null;
   quantity: number;
   uom: string;
+  /** The item's unit in Masters. Every line except an interiors one moves
+   * in it (a tile may be specified per sqft); a line saved in another unit
+   * before that rule shows a warning. */
+  item_default_uom: string | null;
   note: string | null;
   source: IndentLineSource;
   /** Who last touched the line — the attribution rule. */
@@ -250,7 +254,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
       supabase
         .from("indent_lines")
         .select(
-          "id, item_id, quantity, uom, note, budget_id, line_key, construction_line_id, estimate_id, created_by, updated_by, created_at, items(name, code, thumb_url, brands(name))",
+          "id, item_id, quantity, uom, note, budget_id, line_key, construction_line_id, estimate_id, created_by, updated_by, created_at, items(name, code, thumb_url, default_uom, brands(name))",
         )
         .eq("indent_id", indentId)
         .order("created_at")
@@ -435,6 +439,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
       name: string;
       code: string | null;
       thumb_url: string | null;
+      default_uom: string | null;
       brands: { name: string } | null;
     } | null;
     const ordered = orderedByLine.get(line.id);
@@ -447,6 +452,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
       item_thumb_url: item?.thumb_url ?? null,
       quantity: line.quantity,
       uom: line.uom,
+      item_default_uom: item?.default_uom ?? null,
       note: line.note,
       source:
         line.budget_id != null
