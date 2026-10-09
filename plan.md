@@ -4,7 +4,7 @@
 
 ## Where the build stands — read this first (handover, 2026-10-09)
 
-**The founder asked on 2026-10-09 for the whole of Part B to be built, then Fable review #2, then staging.** B1 and `0109` landed on 2026-10-08; B2 and B3 on 2026-10-09 (ticked and noted below). The next step not ticked is where to start.
+**The founder asked on 2026-10-09 for the whole of Part B to be built, then Fable review #2, then staging.** B1 and `0109` landed on 2026-10-08; B2–B4 on 2026-10-09 (ticked and noted below). The next step not ticked is where to start.
 
 **Done, committed and pushed** on `feature/erp-corrections` (nothing merged, nothing on `staging`):
 
@@ -18,7 +18,7 @@
 **Next, in order:**
 
 1. ✅ **`[Fable]` review #1** — done 2026-10-08; the answers are under _Questions for the tier above_. **Consequences for Opus in Part B:** `markBillPaid` is now refused by the database until B8 replaces it with "Record payment" (the marks-paid trigger is the only path to `paid`); `deleteBill` must call `delete_recorded_bill` once bills have lines (B7); the cash-request screen lists approved bills only; the trial runs as the founder's staging account, which is a staff account with four grants, so it grants itself `/bills` and an approver row inside the rolled-back transaction.
-2. **`[Opus]` Part B screens**, B4 → B10 (B1–B3 done), against the applied schema, ticking each below. The pure modules above are ready to wire in.
+2. **`[Opus]` Part B screens**, B5 → B10 (B1–B4 done), against the applied schema, ticking each below. The pure modules above are ready to wire in.
 3. **`[Opus]` B11 docs** — SECURITY, STATUS's contract table, the tool PLANs, TODO.
 4. **`[Fable]` review #2**, then a PR → `staging` (CI runs on pull requests only; its `db:check` stays red until the migrations are on staging), then the founder's vet.
 
@@ -156,7 +156,9 @@ _Landed 2026-10-09:_ `/purchase-orders/from-indent` (approved indents with lines
 - `/purchase-orders/from-indent/[indentId]` — every remaining line: material, unit, remaining qty (editable down), **vendor per line** (suggested: the last vendor that line's item was bought from on a non-cancelled PO), **rate suggested** from that vendor's last PO rate for the item. **Create** → one draft PO per vendor, scope from the indent (unit/plot), delivery defaulting to the villa's site, terms from the default template, lines added through the existing `addPoolLines` path (row by row, partial success reported). Lands on the first PO, with the others linked.
 - No new table: `createPosFromIndent` in `lib/purchase-orders/actions.ts` calls `create_purchase_order` per vendor.
 
-### B4. ☐ `[Opus]` The budget rate rises with POs — `0103_item_rate_from_po.sql`
+### B4. ✅ `[Opus]` The budget rate rises with POs — `0103_item_rate_from_po.sql`
+
+_Landed 2026-10-09:_ the trigger was already on staging (proved in review #1's trial). Masters → Items shows the newest rise under each price — "Raised from ₹345 by PO/… · date" — from `item_price_changes` (gated) with the PO number from `po_facts` (`lib/masters/item-price-changes.ts`); there is no per-item page, so the list carries it. The item form says the rate rises by itself and may be lowered by hand. Select strings run against staging.
 
 - On a PO's `draft → issued`, an AFTER trigger (security definer, execute revoked from `anon, authenticated`) raises `items.indicative_price` to the line's net unit rate (`rate − discount per unit`, before GST) when that is higher **and the line's unit is the item's `default_uom`**; writes `item_price_changes` (item, old, new, po_id, at). Never lowers.
 - `item_price_changes`: SELECT `/masters` or `/purchase-orders`; no client writes. Masters → item page shows "Rate raised from ₹345 to ₹360 by PO/…".

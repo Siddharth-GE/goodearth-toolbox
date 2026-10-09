@@ -109,6 +109,10 @@ export function ItemFormDialog({
           step="0.01"
           defaultValue={item?.indicative_price ?? ""}
         />
+        <p className="text-muted text-xs">
+          Per {item?.default_uom ?? "unit"}, before GST. It rises by itself when a PO is issued at a
+          higher rate; lower it here by hand if it should come down.
+        </p>
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="code">Code (optional)</Label>
