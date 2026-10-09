@@ -97,7 +97,14 @@ export default async function PurchaseOrdersPage({
         title="All purchase orders"
         description="Orders to vendors — from approved indents or raised directly — one vendor and one plot/unit per PO."
         backHref="/purchase-orders"
-        actions={<LinkButton href="/purchase-orders/new">New PO</LinkButton>}
+        actions={
+          <>
+            <LinkButton href="/purchase-orders/new" variant="secondary">
+              New PO (direct)
+            </LinkButton>
+            <LinkButton href="/purchase-orders/from-indent">From an indent</LinkButton>
+          </>
+        }
       />
 
       <NavTabs
@@ -142,11 +149,11 @@ export default async function PurchaseOrdersPage({
           description={
             tab.status || filtered
               ? undefined
-              : "Raise one — pull approved indent lines or add items directly, price them, issue it."
+              : "Pick an approved indent and its lines become draft POs, one per vendor — or raise one directly for a bulk or urgent buy."
           }
           action={
             tab.status || filtered ? undefined : (
-              <LinkButton href="/purchase-orders/new">New PO</LinkButton>
+              <LinkButton href="/purchase-orders/from-indent">From an indent</LinkButton>
             )
           }
         />

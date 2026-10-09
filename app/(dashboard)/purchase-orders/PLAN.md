@@ -2,7 +2,7 @@
 
 Grant `/purchase-orders`. Migrations `0020`–`0022`, `0079`.
 
-POs are raised from **approved indent lines**, or **directly** for bulk and urgent buys (`0079`, founder 2026-08-19 — never directly from a budget). One vendor and one plot/unit (or "General") per PO — the scope is part of the number: `PO/<project>/<plot-or-unit>/NNN`, numbers running per scope. **Money enters the system here**: a line's rate is the vendor-agreed purchase price plus a GST % picked from the `gst_rates` master. **Nothing from Budgets — cost, margin, client rate — appears on a PO, ever.**
+POs are raised from **approved indent lines**, or **directly** for bulk and urgent buys (`0079`, founder 2026-08-19 — never directly from a budget). The front door is **From an indent** (`/purchase-orders/from-indent`, founder 2026-10-08: "you pick an indent and go"): its remaining lines each get a vendor — the last vendor that item was bought from on an issued PO suggested, with that vendor's last rate and GST — and Create makes one draft PO per vendor, scoped to the indent's unit or plot, delivering to its site, terms from the default template. The older "From approved indents" pull on a draft PO stays. One vendor and one plot/unit (or "General") per PO — the scope is part of the number: `PO/<project>/<plot-or-unit>/NNN`, numbers running per scope. **Money enters the system here**: a line's rate is the vendor-agreed purchase price plus a GST % picked from the `gst_rates` master. **Nothing from Budgets — cost, margin, client rate — appears on a PO, ever.**
 
 ## The rules everything rests on
 

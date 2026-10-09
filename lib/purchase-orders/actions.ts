@@ -2,6 +2,14 @@
 
 import { requireTool } from "@/lib/auth/access";
 import { dbErrorMessage, guardError } from "@/lib/db-error";
+import { getDefaultTerms } from "@/lib/masters/terms";
+import {
+  leftToBuy,
+  orderedByIndentLine,
+  picksProblem,
+  splitByVendor,
+  type IndentPick,
+} from "@/lib/purchase-orders/from-indent";
 import { lineChargesProblem } from "@/lib/purchase-orders/math";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
@@ -456,6 +464,135 @@ export async function deleteDraftPo(poId: string): Promise<ActionState> {
 
   revalidatePath("/purchase-orders", "layout");
   redirect("/purchase-orders/list");
+}
+
+/**
+ * A PO from an indent (plan.md, B3): one draft PO per vendor, scoped to
+ * the indent's unit or plot, delivering to its site, terms from the
+ * default template. The client says only which lines, how many, which
+ * vendor and what rate; the item and unit come from the indent line, and
+ * what is left to buy is re-read here. Lines go in row by row (the
+ * addPoolLines reason: the quantity guard refuses per line, and a batch
+ * would lose the lines that were fine). Lands on the first PO with the
+ * others named; a refusal part-way says what was made.
+ */
+export async function createPosFromIndent(
+  indentId: string,
+  picks: IndentPick[],
+): Promise<ActionState> {
+  const user = await requireTool("/purchase-orders");
+  const supabase = await createClient();
+
+  const { data: indent, error: indentError } = await supabase
+    .from("indents")
+    .select("id, status, project_id, plot_id, unit_id, plots(name), units(name)")
+    .eq("id", indentId)
+    .maybeSingle();
+  if (indentError) {
+    console.error("createPosFromIndent indent read failed:", indentError);
+    return { error: "Could not read the indent. Try again." };
+  }
+  if (!indent) return { error: "That indent no longer exists." };
+  if (indent.status !== "approved") return { error: "Only an approved indent can be ordered." };
+
+  const { data: lines, error: linesError } = await supabase
+    .from("indent_lines")
+    .select("id, item_id, quantity, uom")
+    .eq("indent_id", indentId);
+  if (linesError) {
+    console.error("createPosFromIndent lines read failed:", linesError);
+    return { error: "Could not read the indent. Try again." };
+  }
+  const lineIds = lines.map((line) => line.id);
+  const { data: ordered, error: orderedError } = lineIds.length
+    ? await supabase
+        .from("purchase_order_lines")
+        .select("indent_line_id, quantity, purchase_orders(status)")
+        .in("indent_line_id", lineIds)
+    : { data: [], error: null };
+  if (orderedError) {
+    console.error("createPosFromIndent ordered read failed:", orderedError);
+    return { error: "Could not read what is already ordered. Try again." };
+  }
+  const orderedByLine = orderedByIndentLine(
+    ordered.map((row) => ({
+      indent_line_id: row.indent_line_id,
+      quantity: row.quantity,
+      status: (row.purchase_orders as { status: string } | null)?.status ?? "cancelled",
+    })),
+  );
+  const left = new Map(
+    lines.map((line) => [line.id, leftToBuy(line.quantity, orderedByLine.get(line.id) ?? 0)]),
+  );
+  const problem = picksProblem(picks, left);
+  if (problem) return { error: problem };
+
+  const byId = new Map(lines.map((line) => [line.id, line]));
+  const place =
+    (indent.units as { name: string } | null)?.name ??
+    (indent.plots as { name: string } | null)?.name ??
+    null;
+  const terms = await getDefaultTerms("po");
+
+  const made: string[] = [];
+  const stopped = (reason: string): ActionState => {
+    revalidatePath("/purchase-orders", "layout");
+    return {
+      error:
+        made.length > 0
+          ? `Made ${made.length} draft ${made.length === 1 ? "PO" : "POs"}, then stopped: ${reason} What was made is in the list as drafts.`
+          : reason,
+    };
+  };
+
+  for (const group of splitByVendor(picks)) {
+    // The casts paper over the typegen limitation createPurchaseOrder notes.
+    const { data: poId, error } = await supabase.rpc("create_purchase_order", {
+      p_project_id: indent.project_id,
+      p_plot_id: (indent.unit_id ? null : indent.plot_id) as unknown as string,
+      p_unit_id: indent.unit_id as unknown as string,
+      p_vendor_id: group.vendorId,
+      p_deliver_store_id: null as unknown as string,
+      p_deliver_note: (place ? `Site — ${place}` : null) as unknown as string,
+      p_expected_by: null as unknown as string,
+      p_terms: terms as unknown as string,
+      p_note: null as unknown as string,
+    });
+    if (error || !poId) {
+      console.error("createPosFromIndent create failed:", error);
+      return stopped(
+        guardError(error ?? { message: "" }, "Could not make the purchase order.", PO_GUARD_PHRASES)
+          ?.error ?? "Could not make the purchase order.",
+      );
+    }
+    made.push(poId);
+
+    for (const pick of group.lines) {
+      const source = byId.get(pick.indentLineId);
+      if (!source) return stopped("A ticked line is no longer on this indent.");
+      const { error: lineError } = await supabase.from("purchase_order_lines").insert({
+        po_id: poId,
+        item_id: source.item_id,
+        quantity: pick.quantity,
+        uom: source.uom,
+        indent_line_id: source.id,
+        rate: pick.rate,
+        gst_pct: pick.gstPct,
+        created_by: user.id,
+        updated_by: user.id,
+      });
+      if (lineError) {
+        console.error("createPosFromIndent line insert failed:", lineError);
+        return stopped(
+          guardError(lineError, "A line was refused.", PO_GUARD_PHRASES)?.error ??
+            "A line was refused.",
+        );
+      }
+    }
+  }
+
+  revalidatePath("/purchase-orders", "layout");
+  redirect(`/purchase-orders/${made[0]}?made=${made.join(",")}`);
 }
 
 export type DirectPoLineInput = { itemId: string; quantity: number };

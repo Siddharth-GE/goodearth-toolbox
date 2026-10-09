@@ -4,7 +4,7 @@
 
 ## Where the build stands — read this first (handover, 2026-10-09)
 
-**The next session starts at B3** (PO from an indent) — `[Opus]`, against the schema already on staging. B1 and `0109` landed on 2026-10-08, B2 on 2026-10-09 (ticked and noted below). B3's terms come from `getDefaultTerms("po")` (`lib/masters/terms.ts`, added in B2).
+**The founder asked on 2026-10-09 for the whole of Part B to be built, then Fable review #2, then staging.** B1 and `0109` landed on 2026-10-08; B2 and B3 on 2026-10-09 (ticked and noted below). The next step not ticked is where to start.
 
 **Done, committed and pushed** on `feature/erp-corrections` (nothing merged, nothing on `staging`):
 
@@ -18,7 +18,7 @@
 **Next, in order:**
 
 1. ✅ **`[Fable]` review #1** — done 2026-10-08; the answers are under _Questions for the tier above_. **Consequences for Opus in Part B:** `markBillPaid` is now refused by the database until B8 replaces it with "Record payment" (the marks-paid trigger is the only path to `paid`); `deleteBill` must call `delete_recorded_bill` once bills have lines (B7); the cash-request screen lists approved bills only; the trial runs as the founder's staging account, which is a staff account with four grants, so it grants itself `/bills` and an approver row inside the rolled-back transaction.
-2. **`[Opus]` Part B screens**, B3 → B10 (B1, B2 done), against the applied schema, ticking each below. The pure modules above are ready to wire in.
+2. **`[Opus]` Part B screens**, B4 → B10 (B1–B3 done), against the applied schema, ticking each below. The pure modules above are ready to wire in.
 3. **`[Opus]` B11 docs** — SECURITY, STATUS's contract table, the tool PLANs, TODO.
 4. **`[Fable]` review #2**, then a PR → `staging` (CI runs on pull requests only; its `db:check` stays red until the migrations are on staging), then the founder's vet.
 
@@ -148,7 +148,9 @@ _Landed 2026-10-09:_ each line takes a discount (% or ₹ toggle) and other char
 - **Terms**: a new PO's `terms` is pre-filled from the default `po` template; the field becomes "Terms and conditions" (multi-line), editable while draft; "Use template…" replaces it.
 - `po_line_facts` (money-free) is unchanged.
 
-### B3. ☐ `[Opus]` PO from an indent
+### B3. ✅ `[Opus]` PO from an indent
+
+_Landed 2026-10-09:_ `/purchase-orders/from-indent` (approved indents with lines left, searchable) → `/purchase-orders/from-indent/[indentId]` (every line ticked, vendor suggested from the last **issued** PO of that item with that vendor's rate and GST; "one vendor for every ticked line"; the foot bar says "3 lines → 2 draft POs"). `createPosFromIndent` makes one draft per vendor through `create_purchase_order`, lines row by row with rate and GST; lands on the first PO, whose page names the others (`?made=`). Rules pure and tested in `lib/purchase-orders/from-indent.ts`. Select strings run against staging (no indents there); the form screenshotted from a probe. Not seen signed-in.
 
 - `/purchase-orders/from-indent` — the approved indents with anything left to buy (project, villa, work, number, lines remaining), searchable. The POs welcome and list get a **"From an indent"** primary button; "New PO (direct)" stays for bulk/urgent buys.
 - `/purchase-orders/from-indent/[indentId]` — every remaining line: material, unit, remaining qty (editable down), **vendor per line** (suggested: the last vendor that line's item was bought from on a non-cancelled PO), **rate suggested** from that vendor's last PO rate for the item. **Create** → one draft PO per vendor, scope from the indent (unit/plot), delivery defaulting to the villa's site, terms from the default template, lines added through the existing `addPoolLines` path (row by row, partial success reported). Lands on the first PO, with the others linked.

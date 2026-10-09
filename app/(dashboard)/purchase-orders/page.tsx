@@ -18,7 +18,7 @@ export default async function PurchaseOrdersPage() {
       <ToolWelcome
         icon="ShoppingCart"
         intro={[
-          "An order starts from an approved indent line, or is raised directly for a bulk or urgent buy that belongs to no one plot — one vendor and one plot, unit or general scope per PO, priced here and issued to the vendor. An issued PO is what deliveries are received against and what bills are recorded against.",
+          "An order starts from an approved indent: pick it, give each line a vendor, and one draft PO per vendor is made. A bulk or urgent buy that belongs to no one plot is raised directly. Each PO is one vendor and one plot, unit or general scope, priced here and issued to the vendor. An issued PO is what deliveries are received against and what bills are recorded against.",
           "Deleting an issued PO is never quiet: it has to be requested, and someone else approves it.",
         ]}
         stats={[
@@ -31,7 +31,8 @@ export default async function PurchaseOrdersPage() {
           },
         ]}
         links={[
-          { label: "New PO", href: "/purchase-orders/new", primary: true },
+          { label: "From an indent", href: "/purchase-orders/from-indent", primary: true },
+          { label: "New PO (direct)", href: "/purchase-orders/new" },
           { label: "All purchase orders", href: "/purchase-orders/list" },
           { label: "Deletion requested", href: "/purchase-orders/list?status=deletion_requested" },
         ]}

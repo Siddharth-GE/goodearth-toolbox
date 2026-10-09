@@ -2,6 +2,7 @@ import { Attribution } from "@/components/ui/attribution";
 import { LinkButton } from "@/components/ui/button";
 import { PageTitle } from "@/components/ui/page-title";
 import { formatDate } from "@/lib/format";
+import { idParam } from "@/lib/list-params";
 import { DEFAULT_COMPANY_STATE, gstRegime } from "@/lib/line-money";
 import { getProjectCompany } from "@/lib/masters/companies";
 import { listActiveGstRates } from "@/lib/masters/gst-rates";
@@ -11,11 +12,13 @@ import {
   getPoBilledTotals,
   getPoFormOptions,
   getPoReceipts,
+  getPoSummaries,
   getPoTermsTemplates,
   getPurchaseOrder,
 } from "@/lib/purchase-orders/queries";
 import { canEditPo } from "@/lib/purchase-orders/workflow";
 import { FileDown } from "lucide-react";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PoStatusBadge } from "../_components/status-badge";
 import { ActionButtons } from "./_components/action-buttons";
@@ -26,17 +29,31 @@ import { listItemCategories } from "@/lib/masters/item-categories";
 import { LineGrid } from "./_components/line-grid";
 import { ReceiptsSection } from "./_components/receipts-section";
 
-export default async function PurchaseOrderPage({ params }: { params: Promise<{ poId: string }> }) {
+export default async function PurchaseOrderPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ poId: string }>;
+  /** `made`: the POs a from-indent Create just made, this one first. */
+  searchParams: Promise<{ made?: string }>;
+}) {
   const { poId } = await params;
-  const [po, actor, gstRates, receipts, billedTotals, categories, brands] = await Promise.all([
-    getPurchaseOrder(poId),
-    getCurrentPoActor(),
-    listActiveGstRates(),
-    getPoReceipts(poId),
-    getPoBilledTotals(poId),
-    listItemCategories(),
-    listBrands(),
-  ]);
+  const madeIds = ((await searchParams).made ?? "")
+    .split(",")
+    .map((id) => idParam(id))
+    .filter((id): id is string => Boolean(id))
+    .slice(0, 20);
+  const [po, actor, gstRates, receipts, billedTotals, categories, brands, madeTogether] =
+    await Promise.all([
+      getPurchaseOrder(poId),
+      getCurrentPoActor(),
+      listActiveGstRates(),
+      getPoReceipts(poId),
+      getPoBilledTotals(poId),
+      listItemCategories(),
+      listBrands(),
+      madeIds.length > 1 ? getPoSummaries(madeIds) : [],
+    ]);
   if (!po) notFound();
 
   const editable = canEditPo(po.status);
@@ -88,6 +105,32 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
           </>
         }
       />
+
+      {madeTogether.length > 1 && (
+        <div className="border-accent/30 bg-accent/5 rounded-xl border px-4 py-3">
+          <p className="text-foreground text-sm">
+            {`Made ${madeTogether.length} draft purchase orders from the indent, one per vendor:`}
+          </p>
+          <ul className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+            {madeTogether.map((made) => (
+              <li key={made.id}>
+                {made.id === po.id ? (
+                  <span className="text-foreground font-medium">
+                    {`${made.reference} · ${made.vendor_name} (this one)`}
+                  </span>
+                ) : (
+                  <Link
+                    href={`/purchase-orders/${made.id}`}
+                    className="text-accent font-medium hover:underline"
+                  >
+                    {`${made.reference} · ${made.vendor_name}`}
+                  </Link>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {editable && (
         <div className="border-border bg-surface flex items-center justify-between gap-3 rounded-xl border px-4 py-3">
