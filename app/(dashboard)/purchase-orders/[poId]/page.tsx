@@ -2,6 +2,8 @@ import { Attribution } from "@/components/ui/attribution";
 import { LinkButton } from "@/components/ui/button";
 import { PageTitle } from "@/components/ui/page-title";
 import { formatDate } from "@/lib/format";
+import { DEFAULT_COMPANY_STATE, gstRegime } from "@/lib/line-money";
+import { getProjectCompany } from "@/lib/masters/companies";
 import { listActiveGstRates } from "@/lib/masters/gst-rates";
 import { isFullyPriced } from "@/lib/purchase-orders/math";
 import {
@@ -9,6 +11,7 @@ import {
   getPoBilledTotals,
   getPoFormOptions,
   getPoReceipts,
+  getPoTermsTemplates,
   getPurchaseOrder,
 } from "@/lib/purchase-orders/queries";
 import { canEditPo } from "@/lib/purchase-orders/workflow";
@@ -37,10 +40,17 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
   if (!po) notFound();
 
   const editable = canEditPo(po.status);
-  // The vendor/store pickers only render on an editable draft — most
-  // views of a PO are of issued ones, and paid for the whole options
-  // bag (all projects, plots, units, vendors, stores) without using it.
-  const options = editable ? await getPoFormOptions() : { vendors: [], stores: [] };
+  // The vendor/store pickers and the terms templates only render on an
+  // editable draft — most views of a PO are of issued ones, and paid for
+  // the whole options bag (all projects, plots, units, vendors, stores)
+  // without using it.
+  const [company, options, termsTemplates] = await Promise.all([
+    getProjectCompany(po.project_id),
+    editable ? getPoFormOptions() : { vendors: [], stores: [] },
+    editable ? getPoTermsTemplates() : [],
+  ]);
+  const regime = gstRegime(po.vendor_gst_state, company?.state);
+  const companyState = company?.state || DEFAULT_COMPANY_STATE;
   const activeRates = gstRates.map((rate) => rate.rate);
   const fullyPriced = isFullyPriced(
     po.lines.map((line) => ({ quantity: line.quantity, rate: line.rate, gst_pct: line.gst_pct })),
@@ -145,11 +155,32 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
         </div>
       )}
 
+      {regime.assumed && (
+        <div className="border-warning/40 bg-warning/5 rounded-xl border px-4 py-3">
+          <p className="text-foreground text-sm">
+            {po.vendor_name}&apos;s GST state isn&apos;t set in Masters, so this order assumes{" "}
+            {companyState} and splits GST into CGST + SGST.
+          </p>
+          <p className="text-muted mt-1 text-xs">
+            If the vendor is outside {companyState}, set their GST state in Masters → Vendors and
+            the order will show IGST instead.
+          </p>
+        </div>
+      )}
+
       <HeaderFields
         poId={po.id}
+        facts={{
+          company: company ? company.legal_name || company.name : null,
+          project: po.project_name,
+          location: po.scope_name ?? "General",
+          date: formatDate(po.issued_at ?? po.created_at),
+        }}
         vendorId={po.vendor_id}
         vendorName={po.vendor_name}
+        vendorGstState={po.vendor_gst_state}
         deliverStoreId={po.deliver_store_id}
+        deliverStoreName={po.deliver_store_name}
         deliverNote={po.deliver_note}
         expectedBy={po.expected_by}
         terms={po.terms}
@@ -157,12 +188,14 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
         editable={editable}
         vendors={options.vendors}
         stores={options.stores}
+        termsTemplates={termsTemplates}
       />
 
       <LineGrid
         poId={po.id}
         lines={po.lines}
         editable={editable}
+        interState={regime.interState}
         gstRates={activeRates}
         categories={categories.map(({ id, name }) => ({ id, name }))}
         brands={brands.map(({ id, name }) => ({ id, name }))}

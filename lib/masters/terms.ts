@@ -32,3 +32,30 @@ export async function listDocumentTerms(): Promise<DocumentTermsRow[]> {
   );
   return data as DocumentTermsRow[];
 }
+
+export type TermsTemplate = { id: string; name: string; body: string; is_default: boolean };
+
+/**
+ * The switched-on templates of one kind, the default first — what a
+ * document's "Use template…" offers. Its first row, when it is the
+ * default, is what a new document starts from.
+ */
+export async function listActiveTerms(kind: TermsKind): Promise<TermsTemplate[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("document_terms")
+    .select("id, name, body, is_default")
+    .eq("kind", kind)
+    .eq("is_active", true)
+    .order("is_default", { ascending: false })
+    .order("name")
+    .order("id");
+  if (error) throw error;
+  return data;
+}
+
+/** The default template's text for a new document, or null when none is set. */
+export async function getDefaultTerms(kind: TermsKind): Promise<string | null> {
+  const templates = await listActiveTerms(kind);
+  return templates[0]?.is_default ? templates[0].body : null;
+}

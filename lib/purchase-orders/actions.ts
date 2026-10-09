@@ -2,6 +2,7 @@
 
 import { requireTool } from "@/lib/auth/access";
 import { dbErrorMessage, guardError } from "@/lib/db-error";
+import { lineChargesProblem } from "@/lib/purchase-orders/math";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -182,13 +183,23 @@ export async function addPoolLines(poId: string, lines: PoolLineInput[]): Promis
   return undefined;
 }
 
-/** Save-on-blur target for a row: quantity, rate, GST %, note. The uom
- * is NOT editable — it stays the indent line's unit, because the
- * over-ordering guard compares quantities in that unit. No revalidate —
- * the values are already on screen (the updateLine pattern). */
+/** Save-on-blur target for a row: quantity, rate, GST %, discount, other
+ * charges, note. The uom is NOT editable — it stays the indent line's
+ * unit, because the over-ordering guard compares quantities in that unit.
+ * No revalidate — the values are already on screen (the updateLine
+ * pattern). */
 export async function updatePoLine(
   lineId: string,
-  input: { quantity: number; rate: number | null; gstPct: number | null; note: string | null },
+  input: {
+    quantity: number;
+    rate: number | null;
+    gstPct: number | null;
+    /** A percentage OR a rupee discount (0102) — the other stays null. */
+    discountPct: number | null;
+    discountAmount: number | null;
+    otherCharges: number | null;
+    note: string | null;
+  },
 ): Promise<ActionState> {
   const user = await requireTool("/purchase-orders");
 
@@ -201,6 +212,15 @@ export async function updatePoLine(
   if (input.gstPct !== null && (!Number.isFinite(input.gstPct) || input.gstPct < 0)) {
     return { error: "Pick a GST rate from the list" };
   }
+  const chargesProblem = lineChargesProblem({
+    quantity: input.quantity,
+    rate: input.rate,
+    gst_pct: input.gstPct,
+    discount_pct: input.discountPct,
+    discount_amount: input.discountAmount,
+    other_charges: input.otherCharges,
+  });
+  if (chargesProblem) return { error: chargesProblem };
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -209,6 +229,9 @@ export async function updatePoLine(
       quantity: input.quantity,
       rate: input.rate,
       gst_pct: input.gstPct,
+      discount_pct: input.discountPct,
+      discount_amount: input.discountAmount,
+      other_charges: input.otherCharges,
       note: input.note?.trim() || null,
       updated_by: user.id,
     })
@@ -235,7 +258,9 @@ export async function removePoLine(poId: string, lineId: string): Promise<Action
 }
 
 /** Save-on-blur target for the header fields editable in draft (the
- * scope and number are permanent — re-scope means delete and re-raise). */
+ * scope and number are permanent — re-scope means delete and re-raise).
+ * Unlike a line save it refreshes the page: a new vendor can move the
+ * order between CGST + SGST and IGST, which the server works out. */
 export async function updatePoHeader(
   poId: string,
   input: {
@@ -268,6 +293,7 @@ export async function updatePoHeader(
     console.error("updatePoHeader failed:", error);
     return guardError(error, "Could not save. Try again.", PO_GUARD_PHRASES);
   }
+  revalidatePath(`/purchase-orders/${poId}`);
   return undefined;
 }
 

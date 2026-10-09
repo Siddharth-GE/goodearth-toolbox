@@ -19,7 +19,14 @@ import { useMemo, useState, useTransition } from "react";
  * number and permanent once created — the form says so, and previews
  * the number as it's chosen.
  */
-export function PoForm({ options }: { options: PoFormOptions }) {
+export function PoForm({
+  options,
+  defaultTerms,
+}: {
+  options: PoFormOptions;
+  /** The default PO terms from Masters → Terms, or null when none is set. */
+  defaultTerms: string | null;
+}) {
   const [projectId, setProjectId] = useState("");
   // "" = general, "unit:<id>" or "plot:<id>" otherwise — one select, so
   // it's impossible to pick a plot AND a unit.
@@ -28,7 +35,7 @@ export function PoForm({ options }: { options: PoFormOptions }) {
   const [deliverStoreId, setDeliverStoreId] = useState("");
   const [deliverNote, setDeliverNote] = useState("");
   const [expectedBy, setExpectedBy] = useState("");
-  const [terms, setTerms] = useState("");
+  const [terms, setTerms] = useState(defaultTerms ?? "");
   const [note, setNote] = useState("");
   const [error, setError] = useState<string>();
   const [creating, startTransition] = useTransition();
@@ -181,18 +188,18 @@ export function PoForm({ options }: { options: PoFormOptions }) {
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="po-terms">Payment terms (optional)</Label>
+        <Label htmlFor="po-terms">Terms and conditions</Label>
         <Textarea
           id="po-terms"
           value={terms}
           onChange={(event) => setTerms(event.target.value)}
-          placeholder="e.g. 50% advance, balance on delivery"
-          rows={2}
+          placeholder="Delivery, payment, warranty…"
+          rows={defaultTerms ? 5 : 2}
         />
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="po-note">Note</Label>
+        <Label htmlFor="po-note">Remarks</Label>
         <Textarea
           id="po-note"
           value={note}

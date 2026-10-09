@@ -210,6 +210,7 @@ const tableStyles = StyleSheet.create({
     paddingVertical: 5,
   },
   cell: { fontSize: pdf.size.body, paddingRight: 6 },
+  cellDetail: { fontSize: pdf.size.tiny, color: pdf.color.muted, marginTop: 2, lineHeight: 1.3 },
 });
 
 export type Column<T> = {
@@ -218,6 +219,8 @@ export type Column<T> = {
   width: number;
   align?: "left" | "right";
   render: (row: T, index: number) => string;
+  /** A smaller muted line under the cell's text — a description, a work. */
+  detail?: (row: T, index: number) => string | null;
 };
 
 /**
@@ -242,14 +245,28 @@ export function DocumentTable<T>({ columns, rows }: { columns: Column<T>[]; rows
       </View>
       {rows.map((row, index) => (
         <View key={index} style={tableStyles.row} wrap={false}>
-          {columns.map((column) => (
-            <Text
-              key={column.header}
-              style={[tableStyles.cell, { flex: column.width, textAlign: column.align ?? "left" }]}
-            >
-              {column.render(row, index)}
-            </Text>
-          ))}
+          {columns.map((column) => {
+            const align = column.align ?? "left";
+            const detail = column.detail?.(row, index);
+            if (!detail) {
+              return (
+                <Text
+                  key={column.header}
+                  style={[tableStyles.cell, { flex: column.width, textAlign: align }]}
+                >
+                  {column.render(row, index)}
+                </Text>
+              );
+            }
+            return (
+              <View key={column.header} style={{ flex: column.width, paddingRight: 6 }}>
+                <Text style={[tableStyles.cell, { textAlign: align, paddingRight: 0 }]}>
+                  {column.render(row, index)}
+                </Text>
+                <Text style={[tableStyles.cellDetail, { textAlign: align }]}>{detail}</Text>
+              </View>
+            );
+          })}
         </View>
       ))}
     </View>

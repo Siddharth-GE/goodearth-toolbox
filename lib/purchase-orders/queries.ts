@@ -5,6 +5,7 @@ import { cache } from "react";
 import { requireTool } from "@/lib/auth/access";
 import { istDayEndExclusive, istDayStart, type Filterable } from "@/lib/list-params";
 import { getProjectCompany, type CompanyRow } from "@/lib/masters/companies";
+import { listActiveTerms, type TermsTemplate } from "@/lib/masters/terms";
 import { labelsById, profileNames } from "@/lib/masters/names";
 import { listPlots } from "@/lib/masters/plots";
 import { listProjects } from "@/lib/masters/projects";
@@ -243,14 +244,25 @@ export type PoLineRow = {
   item_code: string | null;
   item_brand: string | null;
   item_thumb_url: string | null;
+  item_description: string | null;
+  item_category: string | null;
   quantity: number;
   uom: string;
   rate: number | null;
   gst_pct: number | null;
+  /** 0102: a percentage OR a rupee discount, never both. */
+  discount_pct: number | null;
+  discount_amount: number | null;
+  /** 0102: freight, loading and the like, added after GST. */
+  other_charges: number | null;
   note: string | null;
   /** Null = a direct line (0079) — a bulk or urgent buy with no indent. */
   indent_line_id: string | null;
   indent_reference: string | null;
+  /** The indent's work, "Footing — FD.15" — derived, never picked here. */
+  work_label: string | null;
+  /** Invoiced so far: the bill lines against this line (0106). */
+  billed_quantity: number;
   /** Who last touched the line — the attribution rule. */
   updated_by_name: string | null;
 };
@@ -267,7 +279,10 @@ export type PoDetail = {
   scope_name: string | null;
   vendor_id: string;
   vendor_name: string;
+  /** Against the company's state: same → CGST + SGST, else IGST. */
+  vendor_gst_state: string | null;
   deliver_store_id: string | null;
+  deliver_store_name: string | null;
   deliver_note: string | null;
   expected_by: string | null;
   terms: string | null;
@@ -291,11 +306,11 @@ export const getPurchaseOrder = cache(async (poId: string): Promise<PoDetail | n
   await requireTool("/purchase-orders");
   const supabase = await createClient();
 
-  const [{ data: po }, lines] = await Promise.all([
+  const [{ data: po, error: poError }, lines, billed] = await Promise.all([
     supabase
       .from("purchase_orders")
       .select(
-        "id, reference, status, project_id, plot_id, unit_id, scope_code, vendor_id, deliver_store_id, deliver_note, expected_by, terms, note, deletion_note, created_by, created_at, issued_by, issued_at, deletion_requested_by, deletion_requested_at, cancelled_by, cancelled_at, projects(name), plots(name), units(name), vendors(name)",
+        "id, reference, status, project_id, plot_id, unit_id, scope_code, vendor_id, deliver_store_id, deliver_note, expected_by, terms, note, deletion_note, created_by, created_at, issued_by, issued_at, deletion_requested_by, deletion_requested_at, cancelled_by, cancelled_at, projects(name), plots(name), units(name), vendors(name, gst_state), stores(name)",
       )
       .eq("id", poId)
       .maybeSingle(),
@@ -303,7 +318,7 @@ export const getPurchaseOrder = cache(async (poId: string): Promise<PoDetail | n
       supabase
         .from("purchase_order_lines")
         .select(
-          "id, item_id, quantity, uom, rate, gst_pct, note, indent_line_id, created_by, updated_by, created_at, items(name, code, thumb_url, brands(name)), indent_lines(indents(reference))",
+          "id, item_id, quantity, uom, rate, gst_pct, discount_pct, discount_amount, other_charges, note, indent_line_id, created_by, updated_by, created_at, items(name, code, description, thumb_url, brands(name), item_categories(name)), indent_lines(indents(reference, work_items(code, name)))",
         )
         .eq("po_id", poId)
         .order("sort_order")
@@ -311,9 +326,28 @@ export const getPurchaseOrder = cache(async (poId: string): Promise<PoDetail | n
         .order("id")
         .range(from, to),
     ),
+    // Invoiced so far per line — po_line_billing_facts (0106), the PO ↔
+    // Bills window, WHERE-gated to /purchase-orders or /bills.
+    fetchAll((from, to) =>
+      supabase
+        .from("po_line_billing_facts")
+        .select("po_line_id, billed_quantity")
+        .eq("po_id", poId)
+        .order("po_line_id")
+        .range(from, to),
+    ),
   ]);
 
+  // A failed read is an error screen, never "not found".
+  if (poError) {
+    console.error("getPurchaseOrder failed:", poError);
+    throw new Error("Could not read the purchase order.", { cause: poError });
+  }
   if (!po) return null;
+
+  const billedByLine = new Map(
+    billed.map((row) => [row.po_line_id ?? "", row.billed_quantity ?? 0]),
+  );
 
   // One profiles read resolves every actor on the document — simpler
   // and safer than four embedded joins on a table with several FKs to
@@ -339,10 +373,15 @@ export const getPurchaseOrder = cache(async (poId: string): Promise<PoDetail | n
     const item = line.items as {
       name: string;
       code: string | null;
+      description: string | null;
       thumb_url: string | null;
       brands: { name: string } | null;
+      item_categories: { name: string } | null;
     } | null;
-    const indent = line.indent_lines as { indents: { reference: string } | null } | null;
+    const indent = line.indent_lines as {
+      indents: { reference: string; work_items: { code: string; name: string } | null } | null;
+    } | null;
+    const work = indent?.indents?.work_items;
     return {
       id: line.id,
       item_id: line.item_id,
@@ -350,13 +389,20 @@ export const getPurchaseOrder = cache(async (poId: string): Promise<PoDetail | n
       item_code: item?.code ?? null,
       item_brand: item?.brands?.name ?? null,
       item_thumb_url: item?.thumb_url ?? null,
+      item_description: item?.description?.trim() || null,
+      item_category: item?.item_categories?.name ?? null,
       quantity: line.quantity,
       uom: line.uom,
       rate: line.rate,
       gst_pct: line.gst_pct,
+      discount_pct: line.discount_pct,
+      discount_amount: line.discount_amount,
+      other_charges: line.other_charges,
       note: line.note,
       indent_line_id: line.indent_line_id,
       indent_reference: indent?.indents?.reference ?? null,
+      work_label: work ? `${work.name} — ${work.code}` : null,
+      billed_quantity: billedByLine.get(line.id) ?? 0,
       updated_by_name: nameOf(line.updated_by ?? line.created_by),
     };
   });
@@ -376,7 +422,9 @@ export const getPurchaseOrder = cache(async (poId: string): Promise<PoDetail | n
       null,
     vendor_id: po.vendor_id,
     vendor_name: (po.vendors as { name: string } | null)?.name ?? "—",
+    vendor_gst_state: (po.vendors as { gst_state: string | null } | null)?.gst_state ?? null,
     deliver_store_id: po.deliver_store_id,
+    deliver_store_name: (po.stores as { name: string } | null)?.name ?? null,
     deliver_note: po.deliver_note,
     expected_by: po.expected_by,
     terms: po.terms,
@@ -440,7 +488,6 @@ export type PoPdfData = {
     gst_no: string | null;
     address: string | null;
   };
-  deliver_store_name: string | null;
   /** The project's company, printed on the letterhead; null → placeholder. */
   company: CompanyRow | null;
 };
@@ -452,17 +499,18 @@ export async function getPoPdfData(poId: string): Promise<PoPdfData | null> {
   if (!po) return null;
 
   const supabase = await createClient();
-  const [{ data: vendor }, store, company] = await Promise.all([
+  const [{ data: vendor, error: vendorError }, company] = await Promise.all([
     supabase
       .from("vendors")
       .select("name, contact_name, mobile, gst_no, address")
       .eq("id", po.vendor_id)
       .maybeSingle(),
-    po.deliver_store_id
-      ? supabase.from("stores").select("name").eq("id", po.deliver_store_id).maybeSingle()
-      : Promise.resolve({ data: null }),
     getProjectCompany(po.project_id),
   ]);
+  if (vendorError) {
+    console.error("getPoPdfData vendor read failed:", vendorError);
+    throw new Error("Could not read the vendor for this purchase order.", { cause: vendorError });
+  }
 
   return {
     po,
@@ -473,9 +521,18 @@ export async function getPoPdfData(poId: string): Promise<PoPdfData | null> {
       gst_no: vendor?.gst_no ?? null,
       address: vendor?.address ?? null,
     },
-    deliver_store_name: store?.data?.name ?? null,
     company,
   };
+}
+
+/**
+ * The terms templates a PO can use (Masters → Terms, 0101) — the default
+ * first, which a new PO starts from. The Masters read is open; this
+ * wrapper is the gate.
+ */
+export async function getPoTermsTemplates(): Promise<TermsTemplate[]> {
+  await requireTool("/purchase-orders");
+  return listActiveTerms("po");
 }
 
 /** Who the signed-in user is to this tool — drives the creator-or-admin

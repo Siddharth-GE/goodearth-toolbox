@@ -4,7 +4,7 @@
 
 ## Where the build stands — read this first (handover, 2026-10-09)
 
-**The next session starts at B2** (PO line charges and the tax split) — `[Opus]`, against the schema already on staging. B1 and `0109` landed on 2026-10-08 (ticked and noted below).
+**The next session starts at B3** (PO from an indent) — `[Opus]`, against the schema already on staging. B1 and `0109` landed on 2026-10-08, B2 on 2026-10-09 (ticked and noted below). B3's terms come from `getDefaultTerms("po")` (`lib/masters/terms.ts`, added in B2).
 
 **Done, committed and pushed** on `feature/erp-corrections` (nothing merged, nothing on `staging`):
 
@@ -18,7 +18,7 @@
 **Next, in order:**
 
 1. ✅ **`[Fable]` review #1** — done 2026-10-08; the answers are under _Questions for the tier above_. **Consequences for Opus in Part B:** `markBillPaid` is now refused by the database until B8 replaces it with "Record payment" (the marks-paid trigger is the only path to `paid`); `deleteBill` must call `delete_recorded_bill` once bills have lines (B7); the cash-request screen lists approved bills only; the trial runs as the founder's staging account, which is a staff account with four grants, so it grants itself `/bills` and an approver row inside the rolled-back transaction.
-2. **`[Opus]` Part B screens**, B2 → B10 (B1 done), against the applied schema, ticking each below. The pure modules above are ready to wire in; B2's PO screen and PDF call `rollUpPo(lines, interState)` with `gstRegime(vendor.gst_state, company.state)` — the company comes from `getProjectCompany(po.project_id)` (`lib/masters/companies.ts`, already in `getPoPdfData`), and B2's default terms need a `getDefaultTerms(kind)` read added to `lib/masters/terms.ts`.
+2. **`[Opus]` Part B screens**, B3 → B10 (B1, B2 done), against the applied schema, ticking each below. The pure modules above are ready to wire in.
 3. **`[Opus]` B11 docs** — SECURITY, STATUS's contract table, the tool PLANs, TODO.
 4. **`[Fable]` review #2**, then a PR → `staging` (CI runs on pull requests only; its `db:check` stays red until the migrations are on staging), then the founder's vet.
 
@@ -138,7 +138,9 @@ _Landed 2026-10-08:_ Masters → Companies and Masters → Terms (list + dialog 
 - `lib/pdf/document.tsx`'s letterhead takes a `company` prop; POs, bills, work orders and indents pass their project's company.
 - Masters screens: Companies (list + form), Terms (list + form), a Company picker on the project form.
 
-### B2. ☐ `[Opus]` PO lines: discount, other charges, tax split — `0102_po_line_charges.sql`
+### B2. ✅ `[Opus]` PO lines: discount, other charges, tax split — `0102_po_line_charges.sql`
+
+_Landed 2026-10-09:_ each line takes a discount (% or ₹ toggle) and other charges, saved on blur and checked by `lineChargesProblem` before the database's CHECKs; the amount cell shows before-tax, GST and other beneath the total; the totals box and the print share `summaryRows` (CGST/SGST per slab, or IGST). The header shows company, project, location and date; terms are a multi-line box with "Use template…", and a new PO starts from the default template. Invoiced per line reads `po_line_billing_facts`. The print carries code, material (category, description, line note), indent and work, discount, taxable, GST, other and amount; "Invoiced" only once something is billed. Select strings run against staging (no POs there to open — wiped 2026-10-07); the print's text checked in two rendered samples (in-state and out-of-state); the grid and header screenshotted from a throwaway probe at 1440px and phone width. Not seen signed-in.
 
 - `purchase_order_lines` + `discount_pct numeric` / `discount_amount numeric` (one or the other — CHECK), `other_charges numeric`. Nothing new stored for CGST/SGST/IGST: **derived** from the vendor's `gst_state` against the project's company `state` (a vendor with no state is treated as same-state, with an amber "vendor's GST state not set — assumed Kerala" on the PO).
 - `lib/purchase-orders/math.ts` (pure, tested): `taxable = qty × rate − discount`; `gst = taxable × gst_pct`; split into CGST/SGST halves or IGST; `line total = taxable + gst + other_charges` (other charges are added after tax, as vendors bill freight; a taxed charge is entered as its own line). `rollUpPo` gains discount, other charges, CGST/SGST/IGST totals. Null is not zero.
