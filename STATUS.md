@@ -37,7 +37,7 @@ Production unless marked. Each tool's rules are its `PLAN.md` (Google Chat door:
 - **Indents** — site requests from a villa's official estimate, an approved interiors budget, or direct. No money.
 - **Purchase Orders** — from approved indents, or direct for bulk/urgent buys. The money entry point, gated.
 - **Inventory** — goods in, stock issues, adjustments, stock by location, the supervisors' request queue. Quantities only.
-- **Bills** — PO, labour-contract and NMR bills; a bill has no lines.
+- **Bills** — PO, work-order and NMR bills; a bill has no lines. Work orders (the labour contracts, renamed) carry their works, terms and a print (on the ERP branch).
 - **Relay** — the baton relay: trails, departments, schedules, a wave per villa. Stores no documents. The **Google Chat door** drives it from Chat (staging).
 - **Design Management** — drawing sets, revisions and transmittals per villa; released drawings reach Supervisors.
 - **Estimator** — what a villa costs: a rate book, each villa measured on its own, a frozen official copy, one site-check list (the rework on staging).
@@ -58,7 +58,7 @@ The chain runs end to end: design → price → indent → PO → goods in / sto
 
 | Tool                 | Reads from outside itself                                                                                                                                            |
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Bills                | `po_facts`, `po_billing_totals`                                                                                                                                      |
+| Bills                | `po_facts`, `po_billing_totals`, `work_labour_rate_facts` (a work's labour rate, for work orders)                                                                    |
 | Budgets              | `selections`, `selection_lines`, `spaces`, `indent_lines`, `indents` (refusing to delete a construction line an indent uses)                                         |
 | Indents              | `approved_budgets(_lines)`, `selections`, `selection_lines`, `po_line_facts`, `estimate_takeoff_facts`                                                               |
 | Purchase Orders      | `indents`, `indent_lines`, `goods_receipts(_lines)`, `po_billing_totals`, `po_line_billing_facts` (invoiced per line)                                                |

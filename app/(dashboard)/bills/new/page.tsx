@@ -11,7 +11,7 @@ export default async function NewBillPage() {
         title="Record a bill"
         backHref="/bills/list"
         backLabel="All bills"
-        description="The vendor's paper invoice, as printed — against one purchase order or one labour contract."
+        description="The vendor's paper invoice, as printed — against one purchase order or one work order."
       />
       <BillForm options={options} />
     </div>

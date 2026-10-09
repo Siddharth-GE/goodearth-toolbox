@@ -151,7 +151,7 @@ export const TOOLS: Tool[] = [
   },
   {
     name: "Bills",
-    description: "Recording against POs and labour contracts.",
+    description: "Recording against POs and work orders.",
     href: "/bills",
     icon: "Receipt",
     group: "Operations",

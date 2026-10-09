@@ -4,7 +4,7 @@
 
 ## Where the build stands — read this first (handover, 2026-10-09)
 
-**The founder asked on 2026-10-09 for the whole of Part B to be built, then Fable review #2, then staging.** B1 and `0109` landed on 2026-10-08; B2–B5 on 2026-10-09 (ticked and noted below). The next step not ticked is where to start.
+**The founder asked on 2026-10-09 for the whole of Part B to be built, then Fable review #2, then staging.** B1 and `0109` landed on 2026-10-08; B2–B6 and B10 on 2026-10-09 (ticked and noted below). The next step not ticked is where to start.
 
 **Done, committed and pushed** on `feature/erp-corrections` (nothing merged, nothing on `staging`):
 
@@ -18,7 +18,7 @@
 **Next, in order:**
 
 1. ✅ **`[Fable]` review #1** — done 2026-10-08; the answers are under _Questions for the tier above_. **Consequences for Opus in Part B:** `markBillPaid` is now refused by the database until B8 replaces it with "Record payment" (the marks-paid trigger is the only path to `paid`); `deleteBill` must call `delete_recorded_bill` once bills have lines (B7); the cash-request screen lists approved bills only; the trial runs as the founder's staging account, which is a staff account with four grants, so it grants itself `/bills` and an approver row inside the rolled-back transaction.
-2. **`[Opus]` Part B screens**, B6 → B10 (B1–B5 done), against the applied schema, ticking each below. The pure modules above are ready to wire in.
+2. **`[Opus]` Part B screens**, B7 → B9 (B1–B6 and B10 done), against the applied schema, ticking each below. The pure modules above are ready to wire in.
 3. **`[Opus]` B11 docs** — SECURITY, STATUS's contract table, the tool PLANs, TODO.
 4. **`[Fable]` review #2**, then a PR → `staging` (CI runs on pull requests only; its `db:check` stays red until the migrations are on staging), then the founder's vet.
 
@@ -174,7 +174,9 @@ _Landed 2026-10-09:_ the log dialog asks "How is this paid?" — daily wages (he
 - **The work's unit on a phone:** new money-free view `work_unit_facts (work_item_id, uom)` over `estimator_work_info`, open to signed-in, write-revoked, in the manifest — the supervisor's PW form shows "2 cum".
 - Supervisors form: a three-way choice (Daily wages / Piece-work by quantity / Piece-work lump sum); quantity in the work's unit; no rupees. A sent log shows "Billed · BILL/…".
 
-### B6. ☐ `[Opus]` Work orders — `0105_work_orders.sql`
+### B6. ✅ `[Opus]` Work orders — `0105_work_orders.sql`
+
+_Landed 2026-10-09:_ `/bills/work-orders` (search, project / contractor / status filters, value and billed totals over every match), `/new` and `/[id]` sharing one editor (`WorkOrderEditor`: contractor, project fixed once made, villa, covers, works from the Masters list with the rate book's unit and labour rate offered, lump sums, terms from the default `work_order` text, "Start from a template"), `/[id]/pdf` (`lib/bills/work-order-document.tsx`, DRAFT until approved), `/templates` (Save as template on an order; switch off, never delete). Saving a pending order puts the new works in before taking the old out. `/bills/contracts` forwards to work orders; the old contract dialog and its actions are gone; every "labour contract" on screen reads "work order", and a bill's "Against" shows the WO number. Rules pure and tested (`lib/bills/work-orders.ts`). Select strings run against staging; the editor screenshotted from a probe; the print's text read from a sample.
 
 - `labour_contracts` stays the table (Bills' anchor; history intact) and becomes **Work orders** on every screen: + `wo_no`, `reference` (`WO/<project>/NNN`, minted like bills via a `wo_counters` table), `terms text`, `company`-derived print.
 - `labour_contract_lines`: `work_item_id`, `description`, `uom`, `quantity` (null for lump sum), `rate`, `is_lump_sum`, `amount` derived. `contract_value` becomes the lines' sum, written by the action and checked by a trigger once lines exist (older contracts keep their typed value). Lines editable only while `pending_approval` (same guard as the terms).

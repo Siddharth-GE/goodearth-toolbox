@@ -100,12 +100,12 @@ export default async function BillsPage({
     <div className="space-y-4">
       <PageTitle
         title="All bills"
-        description="Vendor invoices recorded against POs and labour contracts — what we owe and what we've paid."
+        description="Vendor invoices recorded against POs and work orders — what we owe and what we've paid."
         backHref="/bills"
         actions={
           <>
-            <LinkButton href="/bills/contracts" variant="secondary">
-              Labour contracts
+            <LinkButton href="/bills/work-orders" variant="secondary">
+              Work orders
             </LinkButton>
             <LinkButton href="/bills/new">Record bill</LinkButton>
           </>
@@ -154,7 +154,7 @@ export default async function BillsPage({
           description={
             tab.param || filtered
               ? undefined
-              : "Record the first vendor invoice against a purchase order or a labour contract."
+              : "Record the first vendor invoice against a purchase order or a work order."
           }
           action={
             tab.param || filtered ? undefined : (

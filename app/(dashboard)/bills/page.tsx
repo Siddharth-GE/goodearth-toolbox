@@ -11,12 +11,12 @@ export default async function BillsPage() {
 
   return (
     <div className="space-y-4">
-      <PageTitle title="Bills" description="Vendor invoices against POs and labour contracts." />
+      <PageTitle title="Bills" description="Vendor invoices against POs and work orders." />
       <ToolWelcome
         icon="Receipt"
         intro={[
-          "The vendor's paper invoice, recorded as printed — against one purchase order or one labour contract. A recorded bill goes to an approver, and only an approved bill can be marked paid, so what we owe is never a matter of memory.",
-          "Labour contracts live here too: a contractor's agreement is recorded, approved, and then billed against milestone by milestone.",
+          "The vendor's paper invoice, recorded as printed — against one purchase order or one work order. A recorded bill goes to an approver, and only an approved bill can be marked paid, so what we owe is never a matter of memory.",
+          "Work orders live here too: a contractor's works from the Masters list, priced, with their terms — approved by a bill approver, then billed against.",
         ]}
         stats={[
           {
@@ -30,7 +30,7 @@ export default async function BillsPage() {
         links={[
           { label: "Record bill", href: "/bills/new", primary: true },
           { label: "All bills", href: "/bills/list" },
-          { label: "Labour contracts", href: "/bills/contracts" },
+          { label: "Work orders", href: "/bills/work-orders" },
         ]}
       />
     </div>

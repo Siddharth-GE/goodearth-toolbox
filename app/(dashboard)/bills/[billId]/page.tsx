@@ -20,7 +20,7 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
       : bill.po_reference
         ? `against ${bill.po_reference}`
         : bill.contract_description
-          ? `against the contract "${bill.contract_description}"`
+          ? `against the work order ${bill.contract_reference ?? ""} "${bill.contract_description}"`
           : null;
 
   return (

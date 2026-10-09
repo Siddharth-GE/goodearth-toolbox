@@ -163,13 +163,13 @@ export function BillForm({ options }: { options: BillFormOptions }) {
           onChange={(event) => switchKind(event.target.value as FormKind)}
         >
           <option value="po">A purchase order</option>
-          <option value="contract">A labour contract</option>
+          <option value="contract">A work order</option>
           <option value="nmr">NMR — daily wages</option>
         </Select>
         {kind === "contract" && (
           <p className="text-muted text-xs">
-            Only approved, active contracts can take bills — manage them under Bills → Labour
-            contracts.
+            Only approved work orders that are switched on can take bills — make them under Bills →
+            Work orders.
           </p>
         )}
       </div>
@@ -198,7 +198,7 @@ export function BillForm({ options }: { options: BillFormOptions }) {
             <p className="text-muted text-xs">
               {kind === "po"
                 ? "Only vendors with an issued PO appear here."
-                : "Only contractors with an approved, active contract appear here."}
+                : "Only contractors with an approved work order appear here."}
             </p>
           </div>
 
@@ -211,7 +211,7 @@ export function BillForm({ options }: { options: BillFormOptions }) {
               disabled={!vendorId}
             >
               <option value="" disabled>
-                {kind === "po" ? "Choose a purchase order" : "Choose a contract"}
+                {kind === "po" ? "Choose a purchase order" : "Choose a work order"}
               </option>
               {kind === "po"
                 ? pos.map((po) => (
@@ -221,6 +221,7 @@ export function BillForm({ options }: { options: BillFormOptions }) {
                   ))
                 : contracts.map((contract) => (
                     <option key={contract.id} value={contract.id}>
+                      {contract.reference ? `${contract.reference} · ` : ""}
                       {contract.description} — {contract.project_name} ({contract.scope_name})
                     </option>
                   ))}
@@ -230,7 +231,7 @@ export function BillForm({ options }: { options: BillFormOptions }) {
                 {anchoredPo
                   ? `PO value ${formatMoney(anchoredPo.ordered_total)} · billed so far ${formatMoney(alreadyBilled)}`
                   : anchoredContract
-                    ? `Contract value ${formatMoney(anchoredContract.contract_value)} · billed so far ${formatMoney(alreadyBilled)}`
+                    ? `Work order value ${formatMoney(anchoredContract.contract_value)} · billed so far ${formatMoney(alreadyBilled)}`
                     : null}
               </p>
             )}

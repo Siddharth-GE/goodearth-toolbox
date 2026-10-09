@@ -59,7 +59,7 @@ export async function createBill(input: CreateBillInput): Promise<ActionState> {
   await requireTool("/bills");
 
   if (!input.poId === !input.labourContractId) {
-    return { error: "Pick what this bill is against — one purchase order or one labour contract." };
+    return { error: "Pick what this bill is against — one purchase order or one work order." };
   }
   if (!input.invoiceNo.trim()) {
     return { error: "Type the invoice number as printed on the vendor's bill." };
@@ -159,87 +159,9 @@ export async function createNmrBill(input: CreateNmrBillInput): Promise<ActionSt
 }
 
 /* ------------------------------------------------------------------ *
- * Labour contracts — created and approved inside Bills
+ * Work orders (the labour contracts, 0105) — approval and the off-switch.
+ * Making and editing them is lib/bills/work-order-actions.ts.
  * ------------------------------------------------------------------ */
-
-function readContractForm(formData: FormData) {
-  // One "scope" select encoding plot:<id> / unit:<id> / "" (general) —
-  // picking both is structurally impossible, mirroring the DB CHECK.
-  const scope = String(formData.get("scope") ?? "");
-  return {
-    vendor_id: String(formData.get("vendor_id") ?? ""),
-    project_id: String(formData.get("project_id") ?? ""),
-    plot_id: scope.startsWith("plot:") ? scope.slice("plot:".length) : null,
-    unit_id: scope.startsWith("unit:") ? scope.slice("unit:".length) : null,
-    description: String(formData.get("description") ?? "").trim(),
-    contract_value: Number(formData.get("contract_value")),
-  };
-}
-
-function validateContract(form: ReturnType<typeof readContractForm>): string | undefined {
-  if (!form.vendor_id) return "Choose the contractor (a vendor in Masters).";
-  if (!form.project_id) return "Choose a project.";
-  if (!form.description) return "Say what the contract covers.";
-  if (!Number.isFinite(form.contract_value) || form.contract_value <= 0)
-    return "Enter the contract value — more than zero.";
-  return undefined;
-}
-
-/** New contracts start pending — a bill approver or an admin must
- * approve before bills can be recorded against them. */
-export async function createLabourContract(
-  _state: ActionState,
-  formData: FormData,
-): Promise<ActionState> {
-  const user = await requireTool("/bills");
-
-  const form = readContractForm(formData);
-  const invalid = validateContract(form);
-  if (invalid) return { error: invalid };
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("labour_contracts")
-    .insert({ ...form, created_by: user.id, updated_by: user.id });
-  if (error) {
-    console.error("createLabourContract failed:", error);
-    return { error: "Could not record the labour contract. Try again." };
-  }
-
-  revalidatePath("/bills", "layout");
-  return undefined;
-}
-
-/** Terms are editable only while pending — the guard refuses after
- * approval (deactivate and record a new one instead). */
-export async function updateLabourContract(
-  id: string,
-  _state: ActionState,
-  formData: FormData,
-): Promise<ActionState> {
-  const user = await requireTool("/bills");
-
-  const form = readContractForm(formData);
-  const invalid = validateContract(form);
-  if (invalid) return { error: invalid };
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("labour_contracts")
-    .update({ ...form, updated_by: user.id })
-    .eq("id", id);
-  if (error) {
-    console.error("updateLabourContract failed:", error);
-    return guardError(
-      error,
-      "Could not update the labour contract. Try again.",
-      BILL_GUARD_PHRASES,
-    );
-  }
-
-  revalidatePath("/bills", "layout");
-  return undefined;
-}
 
 /** pending → approved. The DB guard re-checks the approver list. */
 export async function approveLabourContract(contractId: string): Promise<ActionState> {
