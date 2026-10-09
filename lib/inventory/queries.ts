@@ -8,6 +8,8 @@ import { fetchAll } from "@/lib/supabase/fetch-all";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 
+import { batchLabel, placesOnReceipts, type LineRate } from "./batches";
+
 /**
  * Shared lookups for the Inventory read modules — receipts-queries.ts,
  * stock-queries.ts, issues-queries.ts and requests-queries.ts. Everything
@@ -23,16 +25,130 @@ import type { Database } from "@/lib/supabase/database.types";
  *     whose reads are open, read directly under this tool's own grant
  *     (the lib/indents/queries.ts rule) rather than through another
  *     tool's gated queries module.
- *  2. Inventory itself carries no money at all, so its own tables' reads
- *     are open to any signed-in staff member — a site engineer must be
- *     able to see whether their material arrived. The gate in every
- *     exported read is still called: what is open is the row-level
- *     read, not the screen.
+ *  2. Inventory's stock tables carry no money, so their reads are open to
+ *     any signed-in staff member — a site engineer must be able to see
+ *     whether their material arrived. The one exception is a batch's
+ *     rate (0108): it lives in its own table, goods_receipt_line_rates,
+ *     readable by /inventory and the money tools only. The gate in every
+ *     exported read is still called: what is open is the row-level read,
+ *     not the screen.
  */
 
 export const INVENTORY_LIST_LIMIT = 50;
 
 export type Client = SupabaseClient<Database>;
+
+/** Ids one `.in()` filter carries — each is a 36-character uuid in the
+ * request URL, and a store can hold hundreds of batches. */
+const IDS_PER_REQUEST = 100;
+
+function inGroups<T>(values: T[]): T[][] {
+  const groups: T[][] = [];
+  for (let at = 0; at < values.length; at += IDS_PER_REQUEST) {
+    groups.push(values.slice(at, at + IDS_PER_REQUEST));
+  }
+  return groups;
+}
+
+export type ReceiptLineRate = LineRate & { note: string | null };
+
+/**
+ * The rate on each of these receipt lines (0108). Every Inventory screen
+ * holds /inventory, which reads the table, so a line with no row simply
+ * has no rate — but a failed read is an error, never "no rates".
+ */
+export async function receiptLineRates(
+  supabase: Client,
+  ids: string[],
+): Promise<Map<string, ReceiptLineRate>> {
+  const rates = new Map<string, ReceiptLineRate>();
+  for (const group of inGroups([...new Set(ids)])) {
+    const data = await fetchAll((from, to) =>
+      supabase
+        .from("goods_receipt_line_rates")
+        .select("receipt_line_id, rate, gst_pct, po_rate, po_gst_pct, note")
+        .in("receipt_line_id", group)
+        .order("receipt_line_id")
+        .range(from, to),
+    );
+    for (const row of data) {
+      rates.set(row.receipt_line_id, {
+        rate: row.rate,
+        gstPct: row.gst_pct,
+        poRate: row.po_rate,
+        poGstPct: row.po_gst_pct,
+        note: row.note,
+      });
+    }
+  }
+  return rates;
+}
+
+export type BatchFacts = {
+  receiptLineId: string;
+  receiptId: string;
+  /** "GRN/SAA/012-1" — the receipt's reference and the line's place on it. */
+  label: string;
+  receivedAt: string;
+  rate: number | null;
+};
+
+/**
+ * A batch's name, date and rate, for a set of receipt line ids. The name
+ * is derived, never stored, so every line of each receipt is read to count
+ * the places — in the order the delivery note lists them.
+ */
+export async function batchFactsById(
+  supabase: Client,
+  ids: string[],
+): Promise<Map<string, BatchFacts>> {
+  const unique = [...new Set(ids)];
+  const facts = new Map<string, BatchFacts>();
+  if (unique.length === 0) return facts;
+
+  const receiptIds = new Set<string>();
+  for (const group of inGroups(unique)) {
+    const owners = await fetchAll((from, to) =>
+      supabase
+        .from("goods_receipt_lines")
+        .select("id, receipt_id")
+        .in("id", group)
+        .order("id")
+        .range(from, to),
+    );
+    for (const line of owners) receiptIds.add(line.receipt_id);
+  }
+
+  const wanted = new Set(unique);
+  const rates = await receiptLineRates(supabase, unique);
+  for (const group of inGroups([...receiptIds])) {
+    const lines = await fetchAll((from, to) =>
+      supabase
+        .from("goods_receipt_lines")
+        .select("id, receipt_id, goods_receipts(reference, received_at)")
+        .in("receipt_id", group)
+        .order("receipt_id")
+        .order("created_at")
+        .order("id")
+        .range(from, to),
+    );
+    const places = placesOnReceipts(
+      lines.map((line) => ({ id: line.id, receiptId: line.receipt_id })),
+    );
+    for (const line of lines) {
+      if (!wanted.has(line.id)) continue;
+      const receipt = line.goods_receipts as { reference: string; received_at: string } | null;
+      facts.set(line.id, {
+        receiptLineId: line.id,
+        receiptId: line.receipt_id,
+        label: batchLabel(receipt?.reference ?? "GRN", places.get(line.id) ?? 0),
+        receivedAt: receipt?.received_at ?? "",
+        rate: rates.get(line.id)?.rate ?? null,
+      });
+    }
+  }
+  return facts;
+}
 
 export type ItemFacts = {
   id: string;

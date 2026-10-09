@@ -6,13 +6,16 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFoot,
   TableHead,
   TableHeaderCell,
   TableRow,
+  TableTotalCell,
 } from "@/components/ui/table";
-import { formatDate, formatQuantity } from "@/lib/format";
+import { formatDate, formatMoney, formatQuantity } from "@/lib/format";
 import { getOverIssueRows, getStockIssue } from "@/lib/inventory/issues-queries";
 import { listWorkCategories, listWorkItems } from "@/lib/masters/works";
+import { BatchDraws } from "../../_components/batch-draws";
 import { RetagWork } from "../../_components/retag-work";
 import { notFound } from "next/navigation";
 
@@ -90,6 +93,8 @@ export default async function IssuePage({ params }: { params: Promise<{ issueId:
             </div>
           </div>
         )}
+        <Field label="Project" value={issue.project_name} />
+        <Field label="Company" value={issue.company_name ?? "— (set in Masters → Projects)"} />
         <Field label="Issued on" value={formatDate(issue.issued_at)} />
         <div className="min-w-0">
           <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
@@ -121,6 +126,8 @@ export default async function IssuePage({ params }: { params: Promise<{ issueId:
             <TableHeaderCell className="w-14"></TableHeaderCell>
             <TableHeaderCell>Item</TableHeaderCell>
             <TableHeaderCell className="w-32">Quantity</TableHeaderCell>
+            <TableHeaderCell className="min-w-56">From batch</TableHeaderCell>
+            <TableHeaderCell className="w-36 text-right">Value</TableHeaderCell>
             <TableHeaderCell>Note</TableHeaderCell>
             <TableHeaderCell className="w-16">By</TableHeaderCell>
           </TableRow>
@@ -147,6 +154,12 @@ export default async function IssuePage({ params }: { params: Promise<{ issueId:
               <TableCell className="text-foreground">
                 {formatQuantity(line.quantity)} {line.uom}
               </TableCell>
+              <TableCell>
+                <BatchDraws draws={line.draws} uom={line.uom} />
+              </TableCell>
+              <TableCell className="text-foreground text-right font-mono">
+                {formatMoney(line.value, { paise: true })}
+              </TableCell>
               <TableCell className="text-muted">{line.note ?? "—"}</TableCell>
               <TableCell>
                 <Attribution name={line.recorded_by_name} label="Recorded by" />
@@ -154,11 +167,22 @@ export default async function IssuePage({ params }: { params: Promise<{ issueId:
             </TableRow>
           ))}
         </TableBody>
+        <TableFoot>
+          <TableRow>
+            <TableTotalCell colSpan={4}>Value of this issue, before GST</TableTotalCell>
+            <TableTotalCell className="text-right font-mono">
+              {formatMoney(issue.total_value, { paise: true })}
+            </TableTotalCell>
+            <TableTotalCell colSpan={2}></TableTotalCell>
+          </TableRow>
+        </TableFoot>
       </Table>
 
       <p className="text-muted text-xs">
         An issue note records something that already happened, so it cannot be deleted. If a
-        quantity was wrong, correct it with a stock adjustment — that keeps the reason visible.
+        quantity was wrong, correct it with a stock adjustment — that keeps the reason visible. Each
+        batch is a delivery into the store, valued at its rate; stock older than batches has no
+        rate, so a line drawing on it shows no value.
       </p>
     </div>
   );

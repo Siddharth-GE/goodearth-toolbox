@@ -96,7 +96,8 @@ export function AdjustmentForm({
       <p className="text-muted text-sm">
         For a store&apos;s count only, with the reason written down: opening stock, a box found
         (add), breakage or a recount (remove). A wrong delivery or issue is not fixed here — record
-        it against its receipt or issue instead.
+        it against its receipt or issue instead. A removal comes out of the oldest batch; an
+        addition is stock with no batch and no rate.
       </p>
 
       <div className="grid gap-4 sm:grid-cols-2">

@@ -76,3 +76,74 @@ export function issueValue(draws: BatchDraw[]): number | null {
   }
   return total;
 }
+
+/**
+ * What an issue line actually drew, read back from the batch movements the
+ * database recorded for it. Whatever no batch covered came from stock older
+ * than batches, and is shown as "No batch" — the same tail `planBatches`
+ * previews.
+ */
+export function recordedDraws(
+  quantity: number,
+  drawn: { receiptLineId: string; label: string; quantity: number; rate: number | null }[],
+): BatchDraw[] {
+  const draws: BatchDraw[] = drawn.map((draw) => ({ ...draw }));
+  const covered = drawn.reduce((total, draw) => total + draw.quantity, 0);
+  const left = Math.round((quantity - covered) * 1e6) / 1e6;
+  if (left > 0) draws.push({ receiptLineId: null, label: "No batch", quantity: left, rate: null });
+  return draws;
+}
+
+/**
+ * Each receipt line's 0-based place on its receipt, given the lines in the
+ * receipt's own order (created_at, then id — the order the delivery note
+ * lists them). The place is half of a batch's name.
+ */
+export function placesOnReceipts(lines: { id: string; receiptId: string }[]): Map<string, number> {
+  const counted = new Map<string, number>();
+  const places = new Map<string, number>();
+  for (const line of lines) {
+    const place = counted.get(line.receiptId) ?? 0;
+    places.set(line.id, place);
+    counted.set(line.receiptId, place + 1);
+  }
+  return places;
+}
+
+/** A receipt line's money, as goods_receipt_line_rates holds it. */
+export type LineRate = {
+  rate: number | null;
+  gstPct: number | null;
+  /** The PO's net rate and GST, copied at receiving — never changed. */
+  poRate: number | null;
+  poGstPct: number | null;
+};
+
+/** The delivery bill said something other than the PO — flagged for accounts. */
+export function differsFromPo(line: LineRate): boolean {
+  return line.rate !== line.poRate || line.gstPct !== line.poGstPct;
+}
+
+export type Amount = { taxable: number | null; gst: number | null; total: number | null };
+
+/** Quantity × rate, and the GST on it. An unknown rate or GST is an unknown
+ * amount — never ₹0 (BUGCATCHER #13). */
+export function lineAmount(quantity: number, rate: number | null, gstPct: number | null): Amount {
+  const taxable = rate === null ? null : quantity * rate;
+  const gst = taxable === null || gstPct === null ? null : (taxable * gstPct) / 100;
+  return { taxable, gst, total: taxable === null || gst === null ? null : taxable + gst };
+}
+
+/** Column totals: each one unknown if any line's is. */
+export function sumAmounts(amounts: Amount[]): Amount {
+  const sum = (pick: (amount: Amount) => number | null) =>
+    amounts.reduce<number | null>((total, amount) => {
+      const value = pick(amount);
+      return total === null || value === null ? null : total + value;
+    }, 0);
+  return {
+    taxable: sum((amount) => amount.taxable),
+    gst: sum((amount) => amount.gst),
+    total: sum((amount) => amount.total),
+  };
+}

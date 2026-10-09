@@ -4,7 +4,8 @@
 -- Everything after the setup runs UNDER ROW-LEVEL SECURITY (set local
 -- role authenticated) as a /bills-only person who is a named bill
 -- approver — the staff Siddharth account (the gmail one, not the
--- founder's admin login), made so inside this transaction. A trial run as the database owner bypasses every policy.
+-- founder's admin login), made so inside this transaction. A trial run
+-- as the database owner bypasses every policy.
 --
 --   npx tsx scripts/dry-run-migrations.ts --project ipstebqawrvhkyntctrv \
 --     supabase/migrations/0110_*.sql supabase/migrations/0111_*.sql \

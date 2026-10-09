@@ -5,7 +5,9 @@ import { labelsById, profileNames } from "@/lib/masters/names";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 
+import type { Batch } from "./batches";
 import {
+  batchFactsById,
   INVENTORY_LIST_LIMIT,
   itemsById,
   matchingItemIds,
@@ -518,6 +520,59 @@ export type StoreHolding = {
   uom: string;
   quantity: number;
 };
+
+/**
+ * The batches a store still holds (0108), per item, oldest first — the
+ * order an issue draws them in. Quantities from batch_on_hand (open, like
+ * stock_on_hand); each batch's rate from its receipt line. Stock from
+ * before batches has no row here: an issue draws it last, as "no batch".
+ */
+export async function listStoreBatches(
+  storeId: string,
+  itemId?: string,
+): Promise<Record<string, Batch[]>> {
+  await requireTool("/inventory");
+  const supabase = await createClient();
+
+  // Completeness-critical: a batch missing here would be previewed as
+  // stock with no batch, at no rate.
+  const data = await fetchAll((from, to) => {
+    let query = supabase
+      .from("batch_on_hand")
+      .select("receipt_line_id, item_id, quantity")
+      .eq("store_id", storeId)
+      .gt("quantity", 0);
+    if (itemId) query = query.eq("item_id", itemId);
+    return query.order("receipt_line_id").range(from, to);
+  });
+  const rows = data.filter(
+    (row): row is { receipt_line_id: string; item_id: string; quantity: number } =>
+      row.receipt_line_id != null && row.item_id != null && row.quantity != null,
+  );
+  const facts = await batchFactsById(
+    supabase,
+    rows.map((row) => row.receipt_line_id),
+  );
+
+  const byItem: Record<string, Batch[]> = {};
+  for (const row of rows) {
+    const batch = facts.get(row.receipt_line_id);
+    (byItem[row.item_id] ??= []).push({
+      receiptLineId: row.receipt_line_id,
+      label: batch?.label ?? "Batch",
+      receivedAt: batch?.receivedAt ?? "",
+      quantity: row.quantity,
+      rate: batch?.rate ?? null,
+    });
+  }
+  for (const batches of Object.values(byItem)) {
+    batches.sort(
+      (a, b) =>
+        a.receivedAt.localeCompare(b.receivedAt) || a.receiptLineId.localeCompare(b.receiptLineId),
+    );
+  }
+  return byItem;
+}
 
 export async function listStoreHoldings(storeId: string): Promise<StoreHolding[]> {
   await requireTool("/inventory");

@@ -182,6 +182,56 @@ export async function recordGoodsReceipt(input: RecordReceiptInput): Promise<Act
 }
 
 /* ------------------------------------------------------------------ *
+ * The rate a delivery carries (0108)
+ * ------------------------------------------------------------------ */
+
+export type ReceiptRateInput = {
+  rate: number;
+  gstPct: number;
+  note: string | null;
+};
+
+/**
+ * Changes the rate on one receipt line when the delivery bill says
+ * something other than the PO. The PO's own figures stay beside it — the
+ * database refuses to move them — so the difference is always visible to
+ * accounts. The table's policy admits /inventory only.
+ */
+export async function updateReceiptLineRate(
+  receiptLineId: string,
+  input: ReceiptRateInput,
+): Promise<ActionState> {
+  const user = await requireTool("/inventory");
+
+  if (!receiptLineId) return { error: "Which line?" };
+  if (!Number.isFinite(input.rate) || input.rate < 0) {
+    return { error: "Enter the rate as a number, 0 or more." };
+  }
+  if (!Number.isFinite(input.gstPct) || input.gstPct < 0 || input.gstPct > 100) {
+    return { error: "GST is a percentage between 0 and 100." };
+  }
+  const note = input.note?.trim() || null;
+  if (note && note.length > 500) return { error: "Keep the note under 500 characters." };
+
+  const supabase = await createClient();
+  const { error, count } = await supabase
+    .from("goods_receipt_line_rates")
+    .update(
+      { rate: input.rate, gst_pct: input.gstPct, note, updated_by: user.id },
+      { count: "exact" },
+    )
+    .eq("receipt_line_id", receiptLineId);
+  if (error) {
+    console.error("updateReceiptLineRate failed:", error);
+    return guardError(error, "Could not save the rate. Try again.", INVENTORY_GUARD_PHRASES);
+  }
+  if (!count) return { error: "This line has no rate to change. Reload the page." };
+
+  revalidatePath("/inventory", "layout");
+  return undefined;
+}
+
+/* ------------------------------------------------------------------ *
  * Issuing material out of a store
  * ------------------------------------------------------------------ */
 
@@ -190,6 +240,9 @@ export async function recordGoodsReceipt(input: RecordReceiptInput): Promise<Act
 export type IssueLineInput = {
   itemId: string;
   quantity: number;
+  /** The batch the store-keeper chose to draw first (0108); null means
+   * the oldest. The rest always comes oldest first. */
+  preferredReceiptLineId?: string | null;
 };
 
 export type RecordIssueInput = {
@@ -253,6 +306,29 @@ export async function recordStockIssue(input: RecordIssueInput): Promise<ActionS
   if (unitless) return { error: `${unitless.name} has no unit in Masters. Set one there first.` };
   if (uomByItem.size !== itemIds.size) return { error: "An item on this issue no longer exists." };
 
+  // A chosen batch must still be in this store, of this item. The
+  // allocation would skip a stale one anyway — refusing says so instead.
+  const chosen = input.lines.filter((line) => line.preferredReceiptLineId);
+  if (chosen.length > 0) {
+    const { data: held, error: heldError } = await supabase
+      .from("batch_on_hand")
+      .select("receipt_line_id, item_id")
+      .eq("store_id", input.storeId)
+      .gt("quantity", 0)
+      .in(
+        "receipt_line_id",
+        chosen.map((line) => line.preferredReceiptLineId as string),
+      );
+    if (heldError) {
+      console.error("recordStockIssue batch read failed:", heldError);
+      return { error: "Could not record this issue. Try again." };
+    }
+    const heldFor = new Map((held ?? []).map((row) => [row.receipt_line_id, row.item_id]));
+    if (chosen.some((line) => heldFor.get(line.preferredReceiptLineId as string) !== line.itemId)) {
+      return { error: "A batch you picked is no longer in this store. Reload and pick again." };
+    }
+  }
+
   const { data: issueId, error } = await supabase.rpc("create_stock_issue", {
     p_store_id: input.storeId,
     p_to_store_id: (input.toStoreId || null) as unknown as string,
@@ -282,6 +358,7 @@ export async function recordStockIssue(input: RecordIssueInput): Promise<ActionS
       item_id: line.itemId,
       quantity: line.quantity,
       uom: uomByItem.get(line.itemId) as string,
+      preferred_receipt_line_id: line.preferredReceiptLineId || null,
       created_by: user.id,
       updated_by: user.id,
     });

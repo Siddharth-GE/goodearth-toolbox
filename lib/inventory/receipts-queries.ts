@@ -8,12 +8,15 @@ import { labelsById, profileNames } from "@/lib/masters/names";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 
+import { batchLabel, lineAmount, sumAmounts, type Amount } from "./batches";
 import {
   INVENTORY_LIST_LIMIT,
   itemsById,
   listActiveStores,
   poReferencesById,
+  receiptLineRates,
   type Client,
+  type ReceiptLineRate,
 } from "./queries";
 import { remainingToReceive } from "./stock";
 
@@ -23,8 +26,8 @@ import { remainingToReceive } from "./stock";
  * shape everything here are documented in ./queries.ts.
  */
 
-/** Headline counts for the tool's welcome screen. Inventory carries no
- * money at all, so these are counts of movements, nothing else. */
+/** Headline counts for the tool's welcome screen. A welcome screen never
+ * shows rupees, so these are counts of movements, nothing else. */
 export async function getWelcomeCounts() {
   await requireTool("/inventory");
   const supabase = await createClient();
@@ -494,6 +497,13 @@ export type ReceiptLineRow = {
   uom: string;
   note: string | null;
   recorded_by_name: string | null;
+  /** "GRN/SAA/012-1" for a delivery into a store; a site delivery is no batch. */
+  batch_label: string | null;
+  /** The indent and work the line was bought for, when it came from one. */
+  bought_for: string | null;
+  /** The rate this delivery carries (0108): the PO's, or the delivery bill's. */
+  rate: ReceiptLineRate;
+  amount: Amount;
 };
 
 export type ReceiptDetail = {
@@ -513,7 +523,61 @@ export type ReceiptDetail = {
   created_at: string;
   received_by_name: string | null;
   lines: ReceiptLineRow[];
+  totals: Amount;
 };
+
+/**
+ * What each PO line was bought for: its indent's number and work, through
+ * the money-free po_line_facts and the indent tables (open reads). A PO
+ * line made without an indent has no entry.
+ */
+async function boughtForByPoLine(
+  supabase: Client,
+  poLineIds: string[],
+): Promise<Map<string, string>> {
+  const found = new Map<string, string>();
+  const unique = [...new Set(poLineIds)];
+  if (unique.length === 0) return found;
+
+  const poLines = await fetchAll((from, to) =>
+    supabase
+      .from("po_line_facts")
+      .select("id, indent_line_id")
+      .in("id", unique)
+      .order("id")
+      .range(from, to),
+  );
+  const indentLineIds = [
+    ...new Set(poLines.map((line) => line.indent_line_id).filter((id): id is string => !!id)),
+  ];
+  if (indentLineIds.length === 0) return found;
+
+  const indentLines = await fetchAll((from, to) =>
+    supabase
+      .from("indent_lines")
+      .select("id, indents(reference, work_items(code, name))")
+      .in("id", indentLineIds)
+      .order("id")
+      .range(from, to),
+  );
+  const labelByIndentLine = new Map(
+    indentLines.map((line) => {
+      const indent = line.indents as {
+        reference: string;
+        work_items: { code: string; name: string } | null;
+      } | null;
+      const work = indent?.work_items
+        ? `${indent.work_items.name} (${indent.work_items.code})`
+        : null;
+      return [line.id, [work, indent?.reference].filter(Boolean).join(" · ")];
+    }),
+  );
+  for (const line of poLines) {
+    const label = line.indent_line_id ? labelByIndentLine.get(line.indent_line_id) : null;
+    if (line.id && label) found.set(line.id, label);
+  }
+  return found;
+}
 
 export const getGoodsReceipt = cache(async (receiptId: string): Promise<ReceiptDetail | null> => {
   await requireTool("/inventory");
@@ -528,32 +592,69 @@ export const getGoodsReceipt = cache(async (receiptId: string): Promise<ReceiptD
     .maybeSingle();
   if (!receipt) return null;
 
+  // The order the batch names count in (batchFactsById) — keep the two alike.
   const lines = await fetchAll((from, to) =>
     supabase
       .from("goods_receipt_lines")
-      .select("id, item_id, quantity, uom, note, created_by, updated_by")
+      .select("id, po_line_id, item_id, quantity, uom, note, created_by, updated_by")
       .eq("receipt_id", receiptId)
       .order("created_at")
       .order("id")
       .range(from, to),
   );
 
-  const [items, poRefs, projects, stores, plots, units, names] = await Promise.all([
-    itemsById(
-      supabase,
-      lines.map((line) => line.item_id),
-    ),
-    poReferencesById(supabase, [receipt.po_id]),
-    labelsById(supabase, "projects", [receipt.project_id]),
-    labelsById(supabase, "stores", [receipt.store_id]),
-    labelsById(supabase, "plots", [receipt.plot_id]),
-    labelsById(supabase, "units", [receipt.unit_id]),
-    profileNames(supabase, [
-      receipt.created_by,
-      ...lines.map((line) => line.updated_by ?? line.created_by),
-    ]),
-  ]);
+  const [items, rates, boughtFor, poRefs, projects, stores, plots, units, names] =
+    await Promise.all([
+      itemsById(
+        supabase,
+        lines.map((line) => line.item_id),
+      ),
+      receiptLineRates(
+        supabase,
+        lines.map((line) => line.id),
+      ),
+      boughtForByPoLine(
+        supabase,
+        lines.map((line) => line.po_line_id),
+      ),
+      poReferencesById(supabase, [receipt.po_id]),
+      labelsById(supabase, "projects", [receipt.project_id]),
+      labelsById(supabase, "stores", [receipt.store_id]),
+      labelsById(supabase, "plots", [receipt.plot_id]),
+      labelsById(supabase, "units", [receipt.unit_id]),
+      profileNames(supabase, [
+        receipt.created_by,
+        ...lines.map((line) => line.updated_by ?? line.created_by),
+      ]),
+    ]);
   const nameOf = (id: string | null | undefined) => (id ? (names.get(id) ?? null) : null);
+  const noRate: ReceiptLineRate = {
+    rate: null,
+    gstPct: null,
+    poRate: null,
+    poGstPct: null,
+    note: null,
+  };
+
+  const rows = lines.map((line, place): ReceiptLineRow => {
+    const item = items.get(line.item_id);
+    const rate = rates.get(line.id) ?? noRate;
+    return {
+      id: line.id,
+      item_name: item?.name ?? "—",
+      item_code: item?.code ?? null,
+      item_brand: item?.brand ?? null,
+      item_thumb_url: item?.thumb_url ?? null,
+      quantity: line.quantity,
+      uom: line.uom,
+      note: line.note,
+      recorded_by_name: nameOf(line.updated_by ?? line.created_by),
+      batch_label: receipt.store_id ? batchLabel(receipt.reference ?? "GRN", place) : null,
+      bought_for: boughtFor.get(line.po_line_id) ?? null,
+      rate,
+      amount: lineAmount(line.quantity, rate.rate, rate.gstPct),
+    };
+  });
 
   return {
     id: receipt.id,
@@ -574,19 +675,7 @@ export const getGoodsReceipt = cache(async (receiptId: string): Promise<ReceiptD
     note: receipt.note,
     created_at: receipt.created_at,
     received_by_name: nameOf(receipt.created_by),
-    lines: lines.map((line) => {
-      const item = items.get(line.item_id);
-      return {
-        id: line.id,
-        item_name: item?.name ?? "—",
-        item_code: item?.code ?? null,
-        item_brand: item?.brand ?? null,
-        item_thumb_url: item?.thumb_url ?? null,
-        quantity: line.quantity,
-        uom: line.uom,
-        note: line.note,
-        recorded_by_name: nameOf(line.updated_by ?? line.created_by),
-      };
-    }),
+    lines: rows,
+    totals: sumAmounts(rows.map((row) => row.amount)),
   };
 });

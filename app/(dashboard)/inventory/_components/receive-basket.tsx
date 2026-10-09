@@ -245,6 +245,10 @@ export function ReceiveBasket({ pool, works }: { pool: ReceivePool; works: WorkO
             {allPicked ? "Clear" : "Everything outstanding"}
           </Button>
         </div>
+        <p className="text-muted text-xs">
+          Each line takes its rate from the purchase order. If the delivery bill says otherwise,
+          change it on the delivery note once it is recorded.
+        </p>
 
         <Table>
           <TableHead>

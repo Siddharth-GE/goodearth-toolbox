@@ -19,7 +19,8 @@ export default async function InventoryPage() {
       <ToolWelcome
         icon="Warehouse"
         intro={[
-          "Every material movement on site, recorded as it happens: goods arriving against a purchase order, stock sitting in each store, and issues going out to a plot or another store. No prices anywhere — quantities are this tool's whole language.",
+          "Every material movement on site, recorded as it happens: goods arriving against a purchase order, stock sitting in each store, and issues going out to a plot or another store.",
+          "Each delivery into a store is a batch that keeps the purchase order's rate, and an issue takes the oldest batch first — so every issue knows what it is worth. Only people with Inventory access see those rates.",
           "Receive is the everyday screen: pick the purchase order, tick off what the lorry actually brought, and the stock is up to date.",
         ]}
         stats={[

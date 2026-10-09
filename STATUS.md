@@ -62,7 +62,7 @@ The chain runs end to end: design → price → indent → PO → goods in / sto
 | Budgets              | `selections`, `selection_lines`, `spaces`, `indent_lines`, `indents` (refusing to delete a construction line an indent uses)                                         |
 | Indents              | `approved_budgets(_lines)`, `selections`, `selection_lines`, `po_line_facts`, `estimate_takeoff_facts`                                                               |
 | Purchase Orders      | `indents`, `indent_lines`, `goods_receipts(_lines)`, `po_billing_totals`, `po_line_billing_facts` (invoiced per line)                                                |
-| Inventory            | `po_facts`, `po_line_facts`, `estimate_takeoff_facts`, `issue_requests`                                                                                              |
+| Inventory            | `po_facts`, `po_line_facts`, `estimate_takeoff_facts`, `issue_requests`, `indent_lines`, `indents` (what a delivery line was bought for)                             |
 | Selections           | `indents`, `indent_lines`, `po_line_facts`                                                                                                                           |
 | Masters              | `po_facts`, `bill_facts`, `approved_budgets`, `indents`, `selections`, `selection_lines`                                                                             |
 | Overview (home page) | `indents`, `indent_lines`, `po_facts`, `bill_facts`, `goods_receipts`, `staff_departments` (counts only) + `lib/marathon/queries`                                    |
