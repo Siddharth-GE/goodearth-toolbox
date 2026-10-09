@@ -4,7 +4,7 @@
 
 ## Where the build stands — read this first (handover, 2026-10-09)
 
-**The founder asked on 2026-10-09 for the whole of Part B to be built, then Fable review #2, then staging.** B1 and `0109` landed on 2026-10-08; B2–B7 and B10 on 2026-10-09 (ticked and noted below). The next step not ticked is where to start.
+**The founder asked on 2026-10-09 for the whole of Part B to be built, then Fable review #2, then staging.** B1 and `0109` landed on 2026-10-08; B2–B8 and B10 on 2026-10-09 (ticked and noted below). The next step not ticked is where to start.
 
 **Done, committed and pushed** on `feature/erp-corrections` (nothing merged, nothing on `staging`):
 
@@ -18,7 +18,7 @@
 **Next, in order:**
 
 1. ✅ **`[Fable]` review #1** — done 2026-10-08; the answers are under _Questions for the tier above_. **Consequences for Opus in Part B:** `markBillPaid` is now refused by the database until B8 replaces it with "Record payment" (the marks-paid trigger is the only path to `paid`); `deleteBill` must call `delete_recorded_bill` once bills have lines (B7); the cash-request screen lists approved bills only; the trial runs as the founder's staging account, which is a staff account with four grants, so it grants itself `/bills` and an approver row inside the rolled-back transaction.
-2. **`[Opus]` Part B screens**, B8 → B9 (B1–B7 and B10 done), against the applied schema, ticking each below. The pure modules above are ready to wire in.
+2. **`[Opus]` Part B screens**, B9 (B1–B8 and B10 done), against the applied schema, ticking each below. The pure modules above are ready to wire in.
 3. **`[Opus]` B11 docs** — SECURITY, STATUS's contract table, the tool PLANs, TODO.
 4. **`[Fable]` review #2**, then a PR → `staging` (CI runs on pull requests only; its `db:check` stays red until the migrations are on staging), then the founder's vet.
 
@@ -199,7 +199,9 @@ _Landed 2026-10-09:_ the bill page edits a recorded bill's lines (`BillLinesEdit
 - **Auto calculation everywhere**: qty × rate shown live, totals live (2 cum × ₹4,000 = ₹8,000).
 - **Print**: `lib/bills/bill-document.tsx` — company, bill no. + vendor name, project, villa, work, lines, totals, paid / pending.
 
-### B8. ☐ `[Opus]` Payments, advances and the weekly cash request — `0107_payments.sql`
+### B8. ✅ `[Opus]` Payments, advances and the weekly cash request — `0107_payments.sql`
+
+_Landed 2026-10-09:_ an approved bill shows paid / pending and its payments and recoveries, with "Record a payment" (all or part) and "Recover from an advance"; "Mark paid" and `markBillPaid` are gone (`canTakePayment` replaces `canMarkPaid`). `/bills/cash-requests` (start a week) → `/[id]`: add payable bills (asking for all or part) and advances while drafting; submit; the approver cuts or releases, or sends back with a note; pay each released line (a payment, or the advance given); close. `/bills/payments` (every payment, advance and recovery, A4 bar, money-out total) and `/bills/contractors` (the advance summary). Rules in `ledger.ts` (tested). `scripts/trials/payments-as-billing-team.sql` runs the whole flow as a `/bills`-only approver under RLS — OK. Select strings run against staging. Not screenshotted.
 
 - `bill_payments`: `bill_id`, `amount > 0`, `paid_on`, `payment_ref`, `cash_request_item_id`, `advance_recovered numeric default 0`. `contractor_advances`: `vendor_id`, `project_id`, `labour_contract_id?`, `amount`, `paid_on`, `payment_ref`, `note`, `cash_request_item_id?`. `advance_recoveries`: `advance_id`, `bill_payment_id`, `amount`. `cash_requests`: `week_of` (Monday), `status` draft → submitted → released → closed, `released_by/at`, `note`. `cash_request_items`: `cash_request_id`, `bill_id` **or** advance (`vendor_id`, `project_id`, `labour_contract_id?`), `requested_amount`, `released_amount`.
 - All `/bills`-gated on SELECT (and the widened `/reporter` qual, as `bills`); writes `/bills`; release only by a bill approver or admin (checked in the guard, like `bills_guard`). Payments refuse more than the bill's pending balance; a recovery refuses more than the advance's outstanding.

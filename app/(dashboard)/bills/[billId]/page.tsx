@@ -7,9 +7,14 @@ import {
   getPoLinesForBill,
   getWorkOrderLinesForBill,
 } from "@/lib/bills/line-queries";
+import {
+  getBillMoneyEvents,
+  getBillSettlement,
+  getOpenAdvances,
+} from "@/lib/bills/payment-queries";
 import { getBill, getCurrentBillActor } from "@/lib/bills/queries";
-import { canEditBill } from "@/lib/bills/workflow";
-import { formatDate } from "@/lib/format";
+import { canEditBill, canTakePayment } from "@/lib/bills/workflow";
+import { formatDate, formatMoney } from "@/lib/format";
 import { listActiveGstRates } from "@/lib/masters/gst-rates";
 import { listActiveUomNames } from "@/lib/masters/uoms";
 import { FileDown } from "lucide-react";
@@ -20,6 +25,15 @@ import { BillLinesPanel } from "./_components/bill-lines-panel";
 import { BillLinesTable } from "./_components/bill-lines-table";
 import { DetailsFields, TotalOverride } from "./_components/details-fields";
 import { HeaderFields } from "./_components/header-fields";
+import { SettlementPanel } from "./_components/settlement-panel";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+} from "@/components/ui/table";
 
 export default async function BillPage({ params }: { params: Promise<{ billId: string }> }) {
   const { billId } = await params;
@@ -33,6 +47,17 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
 
   const editable = canEditBill(bill.status);
   const itemised = lines.length > 0;
+  // Money against the bill (0107): once approved, it takes payments.
+  const moneyMoves = bill.status !== "recorded";
+  const [settlement, events, advances] = moneyMoves
+    ? await Promise.all([
+        getBillSettlement(bill.id, bill.total_amount),
+        getBillMoneyEvents(bill.id),
+        canTakePayment(bill.status) && bill.vendor_id
+          ? getOpenAdvances(bill.vendor_id)
+          : Promise.resolve([]),
+      ])
+    : [null, [], []];
   // What the line editor offers, only while the bill can change.
   const [gstRates, uoms, poLines, workLines] = editable
     ? await Promise.all([
@@ -122,7 +147,9 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
             {bill.approved_at && (
               <span className="text-muted"> on {formatDate(bill.approved_at)}</span>
             )}
-            {" — "}ready to pay.
+            {settlement && settlement.paid + settlement.recovered > 0
+              ? ` — part paid ${formatMoney(settlement.paid + settlement.recovered, { paise: true })} · pending ${formatMoney(settlement.pending, { paise: true })}.`
+              : " — ready to pay."}
           </p>
           <Attribution name={bill.approved_by_name} label="Approved by" />
         </div>
@@ -178,6 +205,47 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
       )}
       {bill.kind === "nmr" && itemised && !editable && bill.total_override_note && (
         <p className="text-muted text-sm">{`Total set by hand — ${bill.total_override_note}`}</p>
+      )}
+
+      {moneyMoves && settlement && (
+        <div className="space-y-2">
+          <h2 className="text-foreground text-lg font-bold tracking-tight">Payments</h2>
+          <p className="text-muted text-sm">
+            {`Total ${formatMoney(bill.total_amount, { paise: true })} · paid ${formatMoney(settlement.paid, { paise: true })}${settlement.recovered > 0 ? ` · recovered from advances ${formatMoney(settlement.recovered, { paise: true })}` : ""} · pending ${formatMoney(settlement.pending, { paise: true })}`}
+          </p>
+          {events.length > 0 && (
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableHeaderCell>On</TableHeaderCell>
+                  <TableHeaderCell>What</TableHeaderCell>
+                  <TableHeaderCell>Reference</TableHeaderCell>
+                  <TableHeaderCell>By</TableHeaderCell>
+                  <TableHeaderCell className="text-right">Amount</TableHeaderCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {events.map((event) => (
+                  <TableRow key={event.id}>
+                    <TableCell className="whitespace-nowrap">{formatDate(event.on)}</TableCell>
+                    <TableCell>
+                      {event.kind === "payment" ? "Payment" : "Advance recovered"}
+                      {event.note && <div className="text-muted text-xs">{event.note}</div>}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">{event.reference}</TableCell>
+                    <TableCell className="text-muted">{event.by ?? "—"}</TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatMoney(event.amount, { paise: true })}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+          {canTakePayment(bill.status) && settlement.pending > 0 && (
+            <SettlementPanel billId={bill.id} pending={settlement.pending} advances={advances} />
+          )}
+        </div>
       )}
 
       <div className="space-y-2">

@@ -37,7 +37,7 @@ Production unless marked. Each tool's rules are its `PLAN.md` (Google Chat door:
 - **Indents** — site requests from a villa's official estimate, an approved interiors budget, or direct. No money.
 - **Purchase Orders** — from approved indents, or direct for bulk/urgent buys. The money entry point, gated.
 - **Inventory** — goods in, stock issues, adjustments, stock by location, the supervisors' request queue. Quantities only.
-- **Bills** — PO, work-order and NMR bills (on the ERP branch: bills have lines and print; labour logs become bills with Send to Bill; work orders replace labour contracts).
+- **Bills** — PO, work-order and NMR bills (on the ERP branch: bills have lines and print; labour logs become bills with Send to Bill; work orders replace labour contracts; payments, advances and the weekly cash request).
 - **Relay** — the baton relay: trails, departments, schedules, a wave per villa. Stores no documents. The **Google Chat door** drives it from Chat (staging).
 - **Design Management** — drawing sets, revisions and transmittals per villa; released drawings reach Supervisors.
 - **Estimator** — what a villa costs: a rate book, each villa measured on its own, a frozen official copy, one site-check list (the rework on staging).

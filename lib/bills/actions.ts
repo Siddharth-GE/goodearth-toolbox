@@ -208,34 +208,6 @@ export async function sendBackBill(billId: string, note: string): Promise<Action
   return undefined;
 }
 
-/** approved → paid, with the payment reference the guard insists on. */
-export async function markBillPaid(billId: string, paymentRef: string): Promise<ActionState> {
-  const user = await requireTool("/bills");
-
-  if (!paymentRef.trim()) {
-    return { error: "Record the payment reference — UTR, cheque number, UPI ref." };
-  }
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("bills")
-    .update({
-      status: "paid",
-      payment_ref: paymentRef.trim(),
-      paid_by: user.id,
-      paid_at: new Date().toISOString(),
-      updated_by: user.id,
-    })
-    .eq("id", billId);
-  if (error) {
-    console.error("markBillPaid failed:", error);
-    return guardError(error, "Could not mark the bill paid. Try again.", BILL_GUARD_PHRASES);
-  }
-
-  revalidatePath("/bills", "layout");
-  return undefined;
-}
-
 /** A wrongly recorded bill is thrown away and recorded again — the
  * number is burnt, gaps accepted. Only while recorded, and only by
  * whoever recorded it or an admin (delete_recorded_bill checks both). */

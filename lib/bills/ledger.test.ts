@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { contractorPosition, mondayOf } from "./ledger";
+import {
+  cashRequestFigures,
+  contractorPosition,
+  lineLeftToPay,
+  mondayOf,
+  paymentProblem,
+} from "./ledger";
 
 test("a cash request's week starts on Monday", () => {
   assert.equal(mondayOf("2026-10-08"), "2026-10-05"); // a Thursday
@@ -35,4 +41,27 @@ test("advances: given, recovered from bills, still out", () => {
   assert.equal(position.advancesGiven, 50000);
   assert.equal(position.advancesRecovered, 25000);
   assert.equal(position.advancesOutstanding, 25000);
+});
+
+test("a cash request: asked, released (one cut), paid, still to pay", () => {
+  const figures = cashRequestFigures([
+    { requested: 1500000, released: 1000000, paid: 600000 },
+    { requested: 1000000, released: 1000000, paid: 1000000 },
+    { requested: 50000, released: null, paid: 0 },
+  ]);
+  assert.equal(figures.requested, 2550000);
+  assert.equal(figures.released, 2000000);
+  assert.equal(figures.paid, 1600000);
+  assert.equal(figures.toPay, 400000);
+  assert.equal(lineLeftToPay({ requested: 10, released: 5, paid: 9 }), 0);
+});
+
+test("a payment's refusals, said first", () => {
+  const ok = { amount: 50000, reference: "UTR1", pending: 50000 };
+  assert.equal(paymentProblem(ok), undefined);
+  assert.match(paymentProblem({ ...ok, amount: 0 }) ?? "", /more than zero/);
+  assert.match(paymentProblem({ ...ok, reference: " " }) ?? "", /UTR/);
+  assert.match(paymentProblem({ ...ok, amount: 50001 }) ?? "", /pending/);
+  assert.match(paymentProblem({ ...ok, cap: 40000 }) ?? "", /released/);
+  assert.equal(paymentProblem({ ...ok, cap: null }), undefined);
 });
