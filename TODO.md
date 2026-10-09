@@ -4,7 +4,7 @@ Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, histor
 
 ## Building now
 
-**The ERP corrections** — `plan.md`: indents from the estimate, PO from an indent, itemised bills from the labour log, work orders, payments with advances and a weekly cash request, store batches with rates, search/filter/total bars, prints. On `feature/erp-corrections`: Part A built (try it on the branch's preview); Part B's migrations `0101`–`0109` on the staging database; B1–B3 built (Companies and Terms; PO discounts, charges and the GST split; POs from an indent). The founder asked for all of Part B before looking (2026-10-09); the next step not ticked in `plan.md` is where to start. Then Fable review #2 and the founder's vet on staging — which needs the founder's staging account granted Masters, Bills, Inventory, Supervisors and the Estimator first (their call).
+**The ERP corrections** — `plan.md`: indents from the estimate, PO from an indent, itemised bills from the labour log, work orders, payments with advances and a weekly cash request, store batches with rates, search/filter/total bars, prints. On `feature/erp-corrections`: Part A and B1–B8, B10 built and pushed. **Next: B9 (store batches), then B11 (docs), then Fable review #2** — which approves and applies the drafted `0110` and `0111` (a real bug fix for the billing team) — then a PR to `staging` and the founder's vet. The handover is at the top of `plan.md`. The founder's staging account needs Masters, Bills, Inventory, Supervisors and the Estimator granted before the vet (their call; offered 2026-10-09).
 
 ## Production
 
