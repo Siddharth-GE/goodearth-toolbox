@@ -12,14 +12,14 @@ A snapshot, not a changelog: what exists now. Next work is `TODO.md`, each tool'
 How they move, and every rule that keeps them apart, is `SHIPPING.md`.
 
 - **Production is paused** (free tier, despite the weekly keep-alive) and has **no backups**. Restoring it is the founder's — `TODO.md`.
-- **Staging carries work production does not have yet** (`0094`–`0100` and more); the list, and how it reaches `master`, is `TODO.md`.
+- **Staging carries work production does not have yet** (`0094`–`0109` and more); the list, and how it reaches `master`, is `TODO.md`.
 - **Staging starts from scratch.** Every record made in the tools was cleared on 2026-10-07 at the founder's request (`scripts/wipe-staging-records.ts`, backup in `data/backups/`), and vendors, contractors, works with their labour rates, materials, material categories and stages are now the founder's final masters workbook (`masters/PLAN.md`). People, access, clients, projects, plots, villas and the design catalogue stayed.
 - **Only two accounts can sign in on staging** — the founder's and the probe (`siddharth.cyriac.99+probe@gmail.com`, holds `/inventory` only; set a throwaway password through the auth admin API each time). Every other staff email there is `@staging.invalid`, so reproduce a colleague's problem with the probe and a grant.
 
 ## Platform
 
 - **Stack:** Next.js 16.2 (Turbopack) · React 19.2 · Tailwind 4 · Supabase Postgres. Vercel `bom1` + Supabase `ap-south-1`, both Mumbai.
-- **Migrations:** `0001`–`0093` on both databases; `0094`–`0100` on staging only. `applied_migrations` (`0067`) is the ledger, and CI checks it on every pull request.
+- **Migrations:** `0001`–`0093` on both databases; `0094`–`0109` on staging only (`0101`–`0109` belong to the ERP build on `feature/erp-corrections`, not yet merged to `staging`). `applied_migrations` (`0067`) is the ledger, and CI checks it on every pull request.
 - **Access:** per-user grants (`user_apps`) + role bundles (`role_apps`), enforced in the database by `has_app()`. `profiles.team` is a dead column.
 - **Sign-in:** password → emailed 6-digit code (30-day trusted device), self-service reset, Google for existing team emails only; both steps rate-limited in the database. Mail rides Resend as `toolbox@goodearthkannur.org`. The rules are `SECURITY.md`.
 - **Performance:** warm TTFB ~0.2s, cold ~1.0s — cold starts are the one measured problem. Every dashboard page shows a loading state: 84 of 127 pages have their own `loading.tsx`, the rest inherit the nearest parent's.

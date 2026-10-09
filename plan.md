@@ -2,9 +2,9 @@
 
 **Owner tags** per `MODELS.md`. The founder put Opus in the chair for this plan and the build (2026-10-08); `[Fable]` marks the two review sessions the founder asked for. Branch `feature/erp-corrections` (off `feature/masters`, whose three commits are not on `staging` yet — they go with this branch). Tick each step here as it lands.
 
-## Where the build stands — read this first (handover, 2026-10-08)
+## Where the build stands — read this first (handover, 2026-10-09)
 
-The session that wrote this plan ran out of room; the next one starts here.
+**The next session starts at B2** (PO line charges and the tax split) — `[Opus]`, against the schema already on staging. B1 and `0109` landed on 2026-10-08 (ticked and noted below).
 
 **Done, committed and pushed** on `feature/erp-corrections` (nothing merged, nothing on `staging`):
 
@@ -12,16 +12,19 @@ The session that wrote this plan ran out of room; the next one starts here.
 - **Part A, all of it** (A1–A6, ticked below). No migration needed; it runs on the branch's Vercel preview today. Not yet seen signed-in by anyone — the founder's checklist for it is the first block of _Verification_ below, steps 1 and 7, plus every list's search bar and the Adjustments sentence.
 - **Part B migrations `0101`–`0108` reviewed by Fable (review #1, 2026-10-08) and APPLIED TO STAGING**, ledger level, types regenerated and committed, `db:check-views` clean (19 views, 8 money views each behind its own WHERE). Proof, re-runnable: `npx tsx scripts/dry-run-migrations.ts --project ipstebqawrvhkyntctrv supabase/migrations/010[1-8]*.sql --trial scripts/trials/erp-chain.sql` prints OK — every statement, every assert, 17/17 behaviour checks, nothing kept.
 - **What review #1 changed in the migrations** (each proved by a trial step): `0104` the billed-log guard refused the un-stamp `delete_recorded_bill` needs, so a recorded labour bill could never be deleted — now the fence lets the stamp move, and nothing else; `0105` the work-order guard had reverted to 0026's version, losing 0034's role approvers and approval limits — restored; `0107` `is_bill_approver()` now uses `can_approve_bills()`; `bills_guard` carries 0034 forward plus two rules — **approved → paid only once payments + recoveries reach the total**, and approved → recorded refused once money has gone out; a cash request takes only approved bills; `0108` receipt lines, issue lines and adjustments are immutable (a rewritten quantity would leave `batch_on_hand` wrong forever; 0023's rule, now enforced).
+- **B1 (Companies and Terms in Masters, the letterhead printing the project's company on the indent and PO)** and **`0109` (the working estimate's date, and the pull screen's amber notice — applied to staging, trial `scripts/trials/takeoff-working-date.sql`)**. B1's preview built; neither has been seen signed-in.
 - **Part B's pure logic, tested and committed:** `lib/line-money.ts` (the line formula POs and bills share — discount, GST split by vendor state, other charges), `lib/purchase-orders/math.ts` rebuilt on it, `lib/bills/math.ts` (bill roll-up rounded as the database stores it; pending), `lib/bills/ledger.ts` (the cash request's week; a contractor's position), `lib/inventory/batches.ts` (batch names; the oldest-first preview; issue value). Shared PDF blocks in `lib/pdf/document.tsx` (heading, details band, notes, signatures).
 
 **Next, in order:**
 
 1. ✅ **`[Fable]` review #1** — done 2026-10-08; the answers are under _Questions for the tier above_. **Consequences for Opus in Part B:** `markBillPaid` is now refused by the database until B8 replaces it with "Record payment" (the marks-paid trigger is the only path to `paid`); `deleteBill` must call `delete_recorded_bill` once bills have lines (B7); the cash-request screen lists approved bills only; the trial runs as the founder's staging account, which is a staff account with four grants, so it grants itself `/bills` and an approver row inside the rolled-back transaction.
-2. **`[Opus]` Part B screens**, B1 → B10, against the applied schema, ticking each below. The pure modules above are ready to wire in; B2's PO screen and PDF call `rollUpPo(lines, interState)` with `gstRegime(vendor.gst_state, company.state)`.
+2. **`[Opus]` Part B screens**, B2 → B10 (B1 done), against the applied schema, ticking each below. The pure modules above are ready to wire in; B2's PO screen and PDF call `rollUpPo(lines, interState)` with `gstRegime(vendor.gst_state, company.state)` — the company comes from `getProjectCompany(po.project_id)` (`lib/masters/companies.ts`, already in `getPoPdfData`), and B2's default terms need a `getDefaultTerms(kind)` read added to `lib/masters/terms.ts`.
 3. **`[Opus]` B11 docs** — SECURITY, STATUS's contract table, the tool PLANs, TODO.
 4. **`[Fable]` review #2**, then a PR → `staging` (CI runs on pull requests only; its `db:check` stays red until the migrations are on staging), then the founder's vet.
 
-**Traps this build already hit:** patching a file with `String.replace` in a `node -e` one-liner turns `$$` into `$` (it broke two migrations' dollar quotes) — use the Edit tool or split/join. Long `node -e` and heredoc patches through bash break on quoting — write the patch to a file. Staging's rate book has no materials on any work (`TODO.md` item 5), so estimate pulls are empty until someone enters them: expected, not a bug.
+**Waiting on the founder:** their staging account holds only `/indents`, `/project-management`, `/purchase-orders` and `/reporter`, and no account that can sign in there is an admin — so they cannot open Masters (B1), Bills, Inventory, Supervisors or the Estimator to vet this build. Asked 2026-10-08 whether to grant them those five on staging by SQL; no answer yet. Ask again before pointing them at any of those screens.
+
+**Traps this build already hit:** patching a file with `String.replace` in a `node -e` one-liner turns `$$` into `$` (it broke two migrations' dollar quotes) — use the Edit tool or split/join. Long `node -e` and heredoc patches through bash break on quoting — write the patch to a file (and a regex inside a quoted heredoc patch still lost its backslashes once — use the Edit tool for those). A scratch script outside the repo needs `NODE_PATH=<repo>/node_modules`; there is no PDF-to-image tool here, so a print is checked by reading its text runs, not by looking at it. Staging's rate book has no materials on any work (`TODO.md` item 5), so estimate pulls are empty until someone enters them: expected, not a bug.
 
 ## Context
 
