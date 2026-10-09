@@ -30,6 +30,7 @@ export default async function BillsPage() {
         links={[
           { label: "Record bill", href: "/bills/new", primary: true },
           { label: "All bills", href: "/bills/list" },
+          { label: "Labour to bill", href: "/bills/labour" },
           { label: "Work orders", href: "/bills/work-orders" },
         ]}
       />

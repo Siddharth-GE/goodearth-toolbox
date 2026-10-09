@@ -75,6 +75,8 @@ STATUS.md's contract table lists every read a tool makes outside itself; it IS t
 - Client Relations writes Masters (`0050`, `0051`) through two column-narrow definer functions and the `units_seed_engagement` trigger.
 - Directory's `profiles_seed_staff_details` trigger (`0060`) gives every new account a blank card inside Settings' `inviteUser` — give `staff_details` a `not null` column without a default and `inviteUser` breaks. Plus `updateMyName`: a person's own `profiles.full_name`.
 - Inventory resolves Supervisors' `issue_requests` (`0084`) — fulfil stamps `fulfilled_issue_id`, decline records a reason; `issue_requests_guard()` lets that side move only `requested → fulfilled/declined`.
+- Bills stamps Supervisors' `labour_logs.bill_id` (`0104`/`0106`) — only inside `send_labour_logs_to_bill()` and `delete_recorded_bill()`, definer functions that check `/bills` first, behind a transaction-local flag only they raise; `labour_logs_billed_guard()` lets that column move and nothing else, and freezes a billed entry.
+- Issuing a PO raises Masters' `items.indicative_price` (`0103`) when the PO paid more — a trigger-only definer, execute revoked from every client role, never lowering; `item_price_changes` logs it, gated to `/masters` or `/purchase-orders`.
 - Selections proposes catalogue items: the "items proposable by selections app" INSERT policy admits `/selections` for `is_provisional` rows only, through the invoker function `create_item_request`; Masters approves or merges them later.
 
 **A cross-tool trigger or definer function not listed here is what nobody finds until it misfires.**

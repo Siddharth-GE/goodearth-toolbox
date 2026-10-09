@@ -50,3 +50,8 @@ export function rollUpBill(lines: BillLineMoney[]): BillTotals {
 export function pendingOnBill(total: number, paid: number, recovered: number): number {
   return Math.max(0, paisa(total - paid - recovered));
 }
+
+/** One line's figures — taxable, GST, other, total — or null while it has no rate. */
+export function billLineMoney(line: BillLineMoney) {
+  return lineMoney({ ...line, gst_pct: line.gst_pct ?? 0 });
+}

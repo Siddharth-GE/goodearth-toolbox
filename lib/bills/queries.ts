@@ -219,6 +219,7 @@ export type BillDetail = {
   reference: string;
   status: BillStatus;
   kind: BillKind;
+  project_id: string;
   project_name: string;
   /** The plot/unit the bill's anchor is for, or null for General. */
   scope_name: string | null;
@@ -236,6 +237,8 @@ export type BillDetail = {
   taxable_amount: number;
   gst_amount: number;
   total_amount: number;
+  /** 0106: an NMR bill's total differs from its lines, and why. */
+  total_override_note: string | null;
   note: string | null;
   rejection_note: string | null;
   payment_ref: string | null;
@@ -252,13 +255,18 @@ export const getBill = cache(async (billId: string): Promise<BillDetail | null> 
   await requireTool("/bills");
   const supabase = await createClient();
 
-  const { data: bill } = await supabase
+  const { data: bill, error: billError } = await supabase
     .from("bills")
     .select(
-      "id, reference, status, kind, scope_code, po_id, labour_contract_id, invoice_no, invoice_date, taxable_amount, gst_amount, total_amount, note, rejection_note, payment_ref, created_by, created_at, approved_by, approved_at, paid_by, paid_at, projects(name), plots(name), units(name), vendors(name), labour_contracts(description, reference)",
+      "id, reference, status, kind, project_id, scope_code, po_id, labour_contract_id, invoice_no, invoice_date, taxable_amount, gst_amount, total_amount, total_override_note, note, rejection_note, payment_ref, created_by, created_at, approved_by, approved_at, paid_by, paid_at, projects(name), plots(name), units(name), vendors(name), labour_contracts(description, reference)",
     )
     .eq("id", billId)
     .maybeSingle();
+  // A failed read is an error screen, never "not found".
+  if (billError) {
+    console.error("getBill failed:", billError);
+    throw new Error("Could not read the bill.", { cause: billError });
+  }
   if (!bill) return null;
 
   // The PO reference comes from the money-free po_facts view, NOT an
@@ -292,6 +300,7 @@ export const getBill = cache(async (billId: string): Promise<BillDetail | null> 
     reference: bill.reference ?? "—",
     status: bill.status as BillStatus,
     kind: bill.kind as BillKind,
+    project_id: bill.project_id,
     project_name: (bill.projects as { name: string } | null)?.name ?? "—",
     scope_name:
       (bill.units as { name: string } | null)?.name ??
@@ -311,6 +320,7 @@ export const getBill = cache(async (billId: string): Promise<BillDetail | null> 
     taxable_amount: bill.taxable_amount ?? 0,
     gst_amount: bill.gst_amount ?? 0,
     total_amount: bill.total_amount ?? 0,
+    total_override_note: bill.total_override_note,
     note: bill.note,
     rejection_note: bill.rejection_note,
     payment_ref: bill.payment_ref,

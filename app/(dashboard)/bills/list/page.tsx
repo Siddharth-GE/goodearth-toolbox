@@ -104,6 +104,9 @@ export default async function BillsPage({
         backHref="/bills"
         actions={
           <>
+            <LinkButton href="/bills/labour" variant="secondary">
+              Labour to bill
+            </LinkButton>
             <LinkButton href="/bills/work-orders" variant="secondary">
               Work orders
             </LinkButton>

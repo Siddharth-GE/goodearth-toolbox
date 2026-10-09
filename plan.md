@@ -4,7 +4,7 @@
 
 ## Where the build stands — read this first (handover, 2026-10-09)
 
-**The founder asked on 2026-10-09 for the whole of Part B to be built, then Fable review #2, then staging.** B1 and `0109` landed on 2026-10-08; B2–B6 and B10 on 2026-10-09 (ticked and noted below). The next step not ticked is where to start.
+**The founder asked on 2026-10-09 for the whole of Part B to be built, then Fable review #2, then staging.** B1 and `0109` landed on 2026-10-08; B2–B7 and B10 on 2026-10-09 (ticked and noted below). The next step not ticked is where to start.
 
 **Done, committed and pushed** on `feature/erp-corrections` (nothing merged, nothing on `staging`):
 
@@ -18,7 +18,7 @@
 **Next, in order:**
 
 1. ✅ **`[Fable]` review #1** — done 2026-10-08; the answers are under _Questions for the tier above_. **Consequences for Opus in Part B:** `markBillPaid` is now refused by the database until B8 replaces it with "Record payment" (the marks-paid trigger is the only path to `paid`); `deleteBill` must call `delete_recorded_bill` once bills have lines (B7); the cash-request screen lists approved bills only; the trial runs as the founder's staging account, which is a staff account with four grants, so it grants itself `/bills` and an approver row inside the rolled-back transaction.
-2. **`[Opus]` Part B screens**, B7 → B9 (B1–B6 and B10 done), against the applied schema, ticking each below. The pure modules above are ready to wire in.
+2. **`[Opus]` Part B screens**, B8 → B9 (B1–B7 and B10 done), against the applied schema, ticking each below. The pure modules above are ready to wire in.
 3. **`[Opus]` B11 docs** — SECURITY, STATUS's contract table, the tool PLANs, TODO.
 4. **`[Fable]` review #2**, then a PR → `staging` (CI runs on pull requests only; its `db:check` stays red until the migrations are on staging), then the founder's vet.
 
@@ -185,7 +185,9 @@ _Landed 2026-10-09:_ `/bills/work-orders` (search, project / contractor / status
 - Print: `lib/bills/work-order-document.tsx` — company letterhead, WO number, contractor, project, villa, lines, total, terms, signatures.
 - Approval unchanged (bill approvers). The bills list's contract filter and the bill form's "Against" read "Work order".
 
-### B7. ☐ `[Opus]` Itemised bills — `0106_bill_lines.sql`
+### B7. ✅ `[Opus]` Itemised bills — `0106_bill_lines.sql` (+ `0111`, drafted)
+
+_Landed 2026-10-09:_ the bill page edits a recorded bill's lines (`BillLinesEditor`: quantity, rate, GST, ₹ discount, other charges; "Add the PO's materials still to bill", "Add the work order's works", "Add a line"); the header shows the lines' sums; a daily-wages bill's total can be set by hand with a reason; a bill made from labour keeps its lines and quantities. `/bills/new` loads the PO's or work order's lines into the same editor (kind, vendor and anchor in the address) and records header and lines together (`createBillWithLines`). `/bills/labour` is Send to Bill (day rates suggested from the contractor's last bill; piece-work rates from the work order, else the rate book). Deleting goes through `delete_recorded_bill`. `/bills/[id]/pdf` prints. Rules pure and tested (`lines.ts`, `labour-billing.ts`). The old typed-amount `createBill` / `createNmrBill` are gone. **Found while building: `0106`'s `bill_lines_guard` refused every material line to a `/bills`-only person** (it read `purchase_order_lines` as the person); `0111_bill_lines_guard_reads_billing_facts.sql` fixes it — **drafted, proved, NOT applied** (`scripts/trials/bill-line-po-check.sql`: refused without it, accepted with it). `scripts/trials/bills-as-billing-team.sql` runs every B7 write as a `/bills`-only person under RLS — OK with `0110`+`0111`. Select strings run against staging; the editor and Send to Bill screenshotted from a probe.
 
 - `bill_lines`: `bill_id`, `line_kind` (`material` | `nmr` | `pw_qty` | `pw_lump` | `other`), `po_line_id`, `item_id`, `labour_log_id`, `work_item_id`, `description`, `uom`, `quantity`, `rate`, `gst_pct`, `discount_amount`, `other_charges`, `note`. RLS = `bills`' quals (`/bills`, widened for `/reporter` like `bills`). Editable only while the bill is `recorded`.
 - **Header totals stay stored** (every money view reads them): for a bill with lines, the action recomputes `taxable_amount`, `gst_amount`, `total_amount` from `lib/bills/math.ts` (pure, tested — same formula as the PO) on every line save, and a trigger refuses a header total that disagrees with its lines, **except an NMR bill's total overwritten with a note** (`total_override_note`). Bills without lines (history) keep their typed amounts.
@@ -268,6 +270,7 @@ Changed: Indents, POs, Bills, Inventory, Supervisors and Reporter queries/action
 
 _(Opus writes here instead of improvising.)_
 
+- **For Fable #2:** `0111_bill_lines_guard_reads_billing_facts.sql` (B7) — `bill_lines_guard` (0106) checked a material line's PO line by reading `purchase_order_lines` as the person, which a `/bills`-only person cannot see, so every material line was refused for the billing team. The check now reads `po_line_billing_facts` (gated `/purchase-orders` or `/bills`), still invoker, same message. Proof: `bill-line-po-check.sql` fails without it, passes with it. **Wider lesson for review #2: review #1's trial ran as the database owner (RLS bypassed), so no policy was exercised.** `bills-as-billing-team.sql` (and the B8/B9 trials to come) run under `set local role authenticated`; please read them as the RLS proof the first trial was not. Approve and apply both to staging.
 - **For Fable #2:** `0110_issue_requests_estimator_read.sql` (B10) widens `issue_requests`' one SELECT policy from `/supervisors or /inventory` to add `/estimator`, so Site check can show site's off-estimate reason. No money on the table; writes untouched; asserts one SELECT policy, three write policies, RLS on. Dry-run on staging OK. Approve and apply to staging, or propose a narrower view.
 
 - **For Fable #1:** A1's working-vs-official notice — is adding `working_updated_at` to `estimate_takeoff_facts` acceptable (a date, no rate)?
