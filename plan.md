@@ -4,7 +4,7 @@
 
 ## Where the build stands — read this first (handover, 2026-10-09)
 
-**The founder asked on 2026-10-09 for the whole of Part B to be built, then Fable review #2, then staging.** B1 and `0109` landed on 2026-10-08; B2–B4 on 2026-10-09 (ticked and noted below). The next step not ticked is where to start.
+**The founder asked on 2026-10-09 for the whole of Part B to be built, then Fable review #2, then staging.** B1 and `0109` landed on 2026-10-08; B2–B5 on 2026-10-09 (ticked and noted below). The next step not ticked is where to start.
 
 **Done, committed and pushed** on `feature/erp-corrections` (nothing merged, nothing on `staging`):
 
@@ -18,7 +18,7 @@
 **Next, in order:**
 
 1. ✅ **`[Fable]` review #1** — done 2026-10-08; the answers are under _Questions for the tier above_. **Consequences for Opus in Part B:** `markBillPaid` is now refused by the database until B8 replaces it with "Record payment" (the marks-paid trigger is the only path to `paid`); `deleteBill` must call `delete_recorded_bill` once bills have lines (B7); the cash-request screen lists approved bills only; the trial runs as the founder's staging account, which is a staff account with four grants, so it grants itself `/bills` and an approver row inside the rolled-back transaction.
-2. **`[Opus]` Part B screens**, B5 → B10 (B1–B4 done), against the applied schema, ticking each below. The pure modules above are ready to wire in.
+2. **`[Opus]` Part B screens**, B6 → B10 (B1–B5 done), against the applied schema, ticking each below. The pure modules above are ready to wire in.
 3. **`[Opus]` B11 docs** — SECURITY, STATUS's contract table, the tool PLANs, TODO.
 4. **`[Fable]` review #2**, then a PR → `staging` (CI runs on pull requests only; its `db:check` stays red until the migrations are on staging), then the founder's vet.
 
@@ -165,7 +165,9 @@ _Landed 2026-10-09:_ the trigger was already on staging (proved in review #1's t
 - **A cross-tool write (PO → Masters)** — added to `SECURITY.md`. **Consequence stated for Fable:** `indicative_price` is readable by every signed-in person, so the highest price paid for each material becomes visible to all. The founder chose this rate for budgeting; Fable confirms or proposes a gated budget rate.
 - Working estimates follow the new rate on next render; official estimates are frozen.
 
-### B5. ☐ `[Opus]` Labour log kinds — `0104_labour_log_kinds.sql`
+### B5. ✅ `[Opus]` Labour log kinds — `0104_labour_log_kinds.sql`
+
+_Landed 2026-10-09:_ the log dialog asks "How is this paid?" — daily wages (heads), piece-work by quantity (in the work's unit, read from `work_unit_facts` on the server; the box is disabled with a sentence when the work has no unit), or a lump sum (what was done). `lib/supervisors/labour.ts` holds the shapes (pure, tested); the actions clear the other kinds' fields. The villa page reads each log by its kind, and a billed log shows "Billed · BILL/…" (from `bill_facts`) instead of Edit and Delete. Select strings run against staging. The dialog was not screenshotted (it opens on a press).
 
 - `labour_logs` + `kind` (`nmr` | `pw_lump` | `pw_qty`, default `nmr` so existing rows read as NMR), `quantity numeric`, `uom` (FK `uoms`), `description text`, `bill_id uuid` (FK `bills`, set when sent). CHECKs: `nmr` → heads > 0, no quantity; `pw_qty` → quantity > 0 and uom; `pw_lump` → description. Unique key widens to `(plot, work, contractor, date, kind)`.
 - **Bills reads and stamps them:** the existing SELECT qual widens to `has_app('/supervisors') or has_app('/bills')` (one policy); the stamp goes only through B7's definer function. A sent log is frozen (guard trigger: no edit or delete once `bill_id` is set).

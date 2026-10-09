@@ -56,25 +56,25 @@ The chain runs end to end: design → price → indent → PO → goods in / sto
 
 **This table IS the contract.** A column in it can't be renamed or dropped without checking every tool in its row, and a tool that starts reading outside itself adds its row here in the same change. Everything is a `SELECT`; the writes that cross a boundary are the exceptions `SECURITY.md` lists. Masters, `profiles` and `items` are shared surfaces, not another tool's property, and are not listed.
 
-| Tool                 | Reads from outside itself                                                                                                                                          |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Bills                | `po_facts`, `po_billing_totals`                                                                                                                                    |
-| Budgets              | `selections`, `selection_lines`, `spaces`, `indent_lines`, `indents` (refusing to delete a construction line an indent uses)                                       |
-| Indents              | `approved_budgets(_lines)`, `selections`, `selection_lines`, `po_line_facts`, `estimate_takeoff_facts`                                                             |
-| Purchase Orders      | `indents`, `indent_lines`, `goods_receipts(_lines)`, `po_billing_totals`, `po_line_billing_facts` (invoiced per line)                                              |
-| Inventory            | `po_facts`, `po_line_facts`, `estimate_takeoff_facts`, `issue_requests`                                                                                            |
-| Selections           | `indents`, `indent_lines`, `po_line_facts`                                                                                                                         |
-| Masters              | `po_facts`, `bill_facts`, `approved_budgets`, `indents`, `selections`, `selection_lines`                                                                           |
-| Overview (home page) | `indents`, `indent_lines`, `po_facts`, `bill_facts`, `goods_receipts`, `staff_departments` (counts only) + `lib/marathon/queries`                                  |
-| Relay                | nothing outside the shared surfaces                                                                                                                                |
-| Google Chat door     | Relay's own `pusher_*` tables and `pusher_chain_state`, through the admin client (`SECURITY.md`)                                                                   |
-| Client Relations     | `pusher_chain_state`, `selections`                                                                                                                                 |
-| Reporter             | `lib/reporter/datasets.ts` is the list: indents, POs, bills, budget report lines, CRM facts, goods receipts, stock, selections, `pusher_chain_state`, plan targets |
-| Financial Management | `crm_milestone_facts`, `crm_receipt_facts`, `bill_money_facts`, `business_plan_target_facts`                                                                       |
-| Estimator            | `stock_issues(_lines)`, `goods_receipts(_lines)` (issued-vs-estimated)                                                                                             |
-| Supervisors          | `estimate_takeoff_facts`, `stock_issues(_lines)`, `goods_receipts(_lines)`, `lib/drawings/`                                                                        |
-| Design Management    | nothing outside the shared surfaces; owns the tables behind `lib/drawings/`                                                                                        |
-| Business Planning    | `projects` (its one optional link)                                                                                                                                 |
-| Directory, Dexter    | nothing outside the shared surfaces                                                                                                                                |
+| Tool                 | Reads from outside itself                                                                                                                                            |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bills                | `po_facts`, `po_billing_totals`                                                                                                                                      |
+| Budgets              | `selections`, `selection_lines`, `spaces`, `indent_lines`, `indents` (refusing to delete a construction line an indent uses)                                         |
+| Indents              | `approved_budgets(_lines)`, `selections`, `selection_lines`, `po_line_facts`, `estimate_takeoff_facts`                                                               |
+| Purchase Orders      | `indents`, `indent_lines`, `goods_receipts(_lines)`, `po_billing_totals`, `po_line_billing_facts` (invoiced per line)                                                |
+| Inventory            | `po_facts`, `po_line_facts`, `estimate_takeoff_facts`, `issue_requests`                                                                                              |
+| Selections           | `indents`, `indent_lines`, `po_line_facts`                                                                                                                           |
+| Masters              | `po_facts`, `bill_facts`, `approved_budgets`, `indents`, `selections`, `selection_lines`                                                                             |
+| Overview (home page) | `indents`, `indent_lines`, `po_facts`, `bill_facts`, `goods_receipts`, `staff_departments` (counts only) + `lib/marathon/queries`                                    |
+| Relay                | nothing outside the shared surfaces                                                                                                                                  |
+| Google Chat door     | Relay's own `pusher_*` tables and `pusher_chain_state`, through the admin client (`SECURITY.md`)                                                                     |
+| Client Relations     | `pusher_chain_state`, `selections`                                                                                                                                   |
+| Reporter             | `lib/reporter/datasets.ts` is the list: indents, POs, bills, budget report lines, CRM facts, goods receipts, stock, selections, `pusher_chain_state`, plan targets   |
+| Financial Management | `crm_milestone_facts`, `crm_receipt_facts`, `bill_money_facts`, `business_plan_target_facts`                                                                         |
+| Estimator            | `stock_issues(_lines)`, `goods_receipts(_lines)` (issued-vs-estimated)                                                                                               |
+| Supervisors          | `estimate_takeoff_facts`, `stock_issues(_lines)`, `goods_receipts(_lines)`, `lib/drawings/`, `work_unit_facts` (a work's unit), `bill_facts` (a billed log's number) |
+| Design Management    | nothing outside the shared surfaces; owns the tables behind `lib/drawings/`                                                                                          |
+| Business Planning    | `projects` (its one optional link)                                                                                                                                   |
+| Directory, Dexter    | nothing outside the shared surfaces                                                                                                                                  |
 
 **Nothing reads** Financial Management, Dexter or the Estimator's own tables — only its rate-free view `estimate_takeoff_facts`. A redefinition of `pusher_chain_state` must check Client Relations, Reporter and the Google Chat door (`relay/PLAN.md`).

@@ -7,6 +7,7 @@ import { listWorkCategories, listWorkItems } from "@/lib/masters/works";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { readFailed } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
+import { isLabourKind, type LabourKind } from "./labour";
 import {
   groupSiteMaterials,
   type SiteIssuedLine,
@@ -151,10 +152,19 @@ export type LabourLogRow = {
   workLabel: string;
   contractorId: string;
   contractorName: string;
+  /** 0104: daily wages, piece-work by quantity, or a lump sum. */
+  kind: LabourKind;
   masons: number;
   helpers: number;
   others: number;
+  quantity: number | null;
+  uom: string | null;
+  description: string | null;
   note: string | null;
+  /** Set once Bills has sent it to a bill — the log is then frozen. */
+  billId: string | null;
+  /** The bill's number, from the money-free bill_facts. */
+  billReference: string | null;
 };
 
 export type IssueRequestRow = {
@@ -339,9 +349,10 @@ export async function getVillaDetail(plotId: string): Promise<VillaDetail | null
   const [logsPage, requestRows] = await Promise.all([
     supabase
       .from("labour_logs")
-      .select("id, log_date, work_item_id, contractor_id, masons, helpers, others, note", {
-        count: "exact",
-      })
+      .select(
+        "id, log_date, work_item_id, contractor_id, kind, masons, helpers, others, quantity, uom, description, note, bill_id",
+        { count: "exact" },
+      )
       .eq("plot_id", plotId)
       .order("log_date", { ascending: false })
       .order("created_at", { ascending: false })
@@ -368,6 +379,21 @@ export async function getVillaDetail(plotId: string): Promise<VillaDetail | null
   ]);
   if (logsPage.error) fail("the labour logs", logsPage.error);
   const logs = logsPage.data ?? [];
+
+  // A billed log names its bill — through bill_facts, the money-free view
+  // every signed-in person may read; the bills table itself is /bills only.
+  const billIds = [...new Set(logs.flatMap((log) => (log.bill_id ? [log.bill_id] : [])))];
+  const billRefs = new Map<string, string>();
+  if (billIds.length) {
+    const { data: bills, error: billsError } = await supabase
+      .from("bill_facts")
+      .select("id, reference")
+      .in("id", billIds);
+    if (billsError) fail("the bills", billsError);
+    for (const bill of bills ?? []) {
+      if (bill.id && bill.reference) billRefs.set(bill.id, bill.reference);
+    }
+  }
 
   // Names: items (name + unit), works (label + category), contractors.
   const itemIds = [
@@ -482,10 +508,16 @@ export async function getVillaDetail(plotId: string): Promise<VillaDetail | null
       workLabel: workLabel(log.work_item_id),
       contractorId: log.contractor_id,
       contractorName: vendorNames.get(log.contractor_id) ?? "—",
+      kind: isLabourKind(log.kind) ? log.kind : "nmr",
       masons: log.masons,
       helpers: log.helpers,
       others: log.others,
+      quantity: log.quantity,
+      uom: log.uom,
+      description: log.description,
       note: log.note,
+      billId: log.bill_id,
+      billReference: log.bill_id ? (billRefs.get(log.bill_id) ?? null) : null,
     })),
     labourTotal: logsPage.count ?? logs.length,
     requests: requestRows.map((request) => ({
@@ -522,18 +554,33 @@ export type WorkOption = {
   id: string;
   label: string;
   categoryName: string;
+  /** The work's unit in the rate book (work_unit_facts), for piece-work. */
+  uom: string | null;
 };
 
 /** Active works flattened for a phone-first single select, category optgroups. */
 export async function listWorkOptions(): Promise<WorkOption[]> {
   await requireTool(GRANT);
-  const [workItems, categories] = await Promise.all([listWorkItems(), listWorkCategories()]);
+  const supabase = await createClient();
+  const [workItems, categories, units] = await Promise.all([
+    listWorkItems(),
+    listWorkCategories(),
+    fetchAll((from, to) =>
+      supabase
+        .from("work_unit_facts")
+        .select("work_item_id, uom")
+        .order("work_item_id")
+        .range(from, to),
+    ),
+  ]);
   const categoryNameById = new Map(categories.map((category) => [category.id, category.name]));
+  const unitByWork = new Map(units.map((unit) => [unit.work_item_id, unit.uom]));
   return workItems
     .filter((work) => work.is_active)
     .map((work) => ({
       id: work.id,
       label: `${work.code} · ${work.name}`,
       categoryName: categoryNameById.get(work.category_id) ?? "—",
+      uom: unitByWork.get(work.id) ?? null,
     }));
 }
