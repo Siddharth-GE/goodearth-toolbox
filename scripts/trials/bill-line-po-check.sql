@@ -3,8 +3,9 @@
 -- Unlike erp-chain.sql, the line is written UNDER ROW-LEVEL SECURITY
 -- (set local role authenticated): a trial run as the database owner
 -- bypasses every policy, which is how 0106's guard passed review while
--- refusing the billing team. The founder's staging account is made a
--- /bills-only person for the length of the transaction.
+-- refusing the billing team. The staff Siddharth account (the gmail one,
+-- not the founder's admin login) is made a /bills-only person for the
+-- length of the transaction.
 do $trial$
 declare
   v_user uuid := (select id from auth.users where email = 'siddharth.cyriac.99@gmail.com');

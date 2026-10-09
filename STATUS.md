@@ -14,7 +14,7 @@ How they move, and every rule that keeps them apart, is `SHIPPING.md`.
 - **Production is paused** (free tier, despite the weekly keep-alive) and has **no backups**. Restoring it is the founder's — `TODO.md`.
 - **Staging carries work production does not have yet** (`0094`–`0109` and more); the list, and how it reaches `master`, is `TODO.md`.
 - **Staging starts from scratch.** Every record made in the tools was cleared on 2026-10-07 at the founder's request (`scripts/wipe-staging-records.ts`, backup in `data/backups/`), and vendors, contractors, works with their labour rates, materials, material categories and stages are now the founder's final masters workbook (`masters/PLAN.md`). People, access, clients, projects, plots, villas and the design catalogue stayed.
-- **Only two accounts can sign in on staging** — the founder's and the probe (`siddharth.cyriac.99+probe@gmail.com`, holds `/inventory` only; set a throwaway password through the auth admin API each time). Every other staff email there is `@staging.invalid`, so reproduce a colleague's problem with the probe and a grant.
+- **Staging holds the team's real email addresses, and colleagues sign in there to try work.** The founder runs its accounts and grants, and is admin as `siddharth@goodearthkannur.org`. Two accounts are for checks, not people: `siddharth.cyriac.99@gmail.com` (staff, four grants — the trials' single-grant person) and the probe (`siddharth.cyriac.99+probe@gmail.com`, holds `/estimator` and `/inventory`; set a throwaway password through the auth admin API each time). Reproduce a colleague's problem with the probe and a grant.
 
 ## Platform
 

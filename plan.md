@@ -19,7 +19,7 @@
      `npx tsx scripts/dry-run-migrations.ts --project ipstebqawrvhkyntctrv supabase/migrations/0110_*.sql supabase/migrations/0111_*.sql --trial scripts/trials/bills-as-billing-team.sql` (and `payments-as-billing-team.sql`; `bill-line-po-check.sql` fails without `0111`, passes with it) — all OK on 2026-10-09.
 4. **The PR → `staging`** after Fable's yes (CI runs on pull requests only), then **the founder's vet** with the checklist under _Verification_.
 
-**Waiting on the founder:** their staging account holds only `/indents`, `/project-management`, `/purchase-orders` and `/reporter` (checked in the database 2026-10-09; staff, not admin), so they cannot open Masters, Bills, Inventory, Supervisors or the Estimator. Offered on 2026-10-09 to grant those five on staging; no answer yet. **Ask again before the vet** — it is one rolled-forward SQL insert on staging only.
+**The founder vets as admin** (`siddharth@goodearthkannur.org` on staging) and configures staging's accounts and grants themselves (2026-10-09) — don't offer grants. `siddharth.cyriac.99@gmail.com` is a second, staff account: the trials' single-grant person, not the founder's.
 
 **How this session checked work no one could sign in to see** (repeat it for B9):
 
@@ -134,7 +134,7 @@ Every migration: re-runnable, additive, ends asserting what it claimed, RLS on e
 
 ### B1. ✅ `[Opus]` Companies and terms templates — `0101_companies_and_terms.sql`
 
-_Landed 2026-10-08:_ Masters → Companies and Masters → Terms (list + dialog each; one default per kind, saved flag-down first so a name clash never clears the old default), a Company picker on the project form and a Company column on the list, and the letterhead printing the project's company on the indent and PO (bills and work orders pass it in B6/B7). Select strings run against staging; the letterhead's text checked in a rendered sample. **The founder's staging account holds no `/masters`**, so they can't open these screens until it is granted.
+_Landed 2026-10-08:_ Masters → Companies and Masters → Terms (list + dialog each; one default per kind, saved flag-down first so a name clash never clears the old default), a Company picker on the project form and a Company column on the list, and the letterhead printing the project's company on the indent and PO (bills and work orders pass it in B6/B7). Select strings run against staging; the letterhead's text checked in a rendered sample.
 
 - `companies` (Masters, reads open, writes `/masters`): `name`, `legal_name`, `address`, `gstin`, `state` (default `'Kerala'`), `phone`, `email`. `projects.company_id` nullable FK. **No seed** — the founder enters Goodearth's real details in Masters (never invented — `PRODUCT.md`); every print shows the placeholder letterhead until they do.
 - `document_terms` (Masters): `kind` (`po` | `work_order`), `name`, `body`, `is_default` (one default per kind, partial unique index). Masters → Terms screen to edit them.

@@ -49,7 +49,7 @@ begin
          submitted_by = v_user, submitted_at = v_before + interval '1 minute'
    where id = v_official;
 
-  -- 1. As the founder's staging account (/indents): the official's row
+  -- 1. As the staff Siddharth account (/indents): the official's row
   --    carries the working estimate's date, which is before it was made official.
   perform set_config('request.jwt.claims',
     json_build_object('sub', v_user, 'role', 'authenticated')::text, true);
