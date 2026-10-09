@@ -60,6 +60,7 @@ export default async function VillaPage({ params }: { params: Promise<{ plotId: 
             <RequestIssueDialog
               plotId={plotId}
               works={works}
+              hasEstimate={villa.estimate !== null}
               quickPicks={villa.quickPicks}
               categories={pickerCategories}
               brands={pickerBrands}
@@ -210,6 +211,11 @@ export default async function VillaPage({ params }: { params: Promise<{ plotId: 
                       ? ` · ${request.declinedReason}`
                       : ""}
                   </p>
+                  {request.offEstimateReason && (
+                    <p className="text-muted text-xs">
+                      {`Not on the estimate — ${request.offEstimateReason}`}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <RequestBadge status={request.status} />

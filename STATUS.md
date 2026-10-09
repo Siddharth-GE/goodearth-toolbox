@@ -71,7 +71,7 @@ The chain runs end to end: design → price → indent → PO → goods in / sto
 | Client Relations     | `pusher_chain_state`, `selections`                                                                                                                                   |
 | Reporter             | `lib/reporter/datasets.ts` is the list: indents, POs, bills, budget report lines, CRM facts, goods receipts, stock, selections, `pusher_chain_state`, plan targets   |
 | Financial Management | `crm_milestone_facts`, `crm_receipt_facts`, `bill_money_facts`, `business_plan_target_facts`                                                                         |
-| Estimator            | `stock_issues(_lines)`, `goods_receipts(_lines)` (issued-vs-estimated)                                                                                               |
+| Estimator            | `stock_issues(_lines)`, `goods_receipts(_lines)` (issued-vs-estimated), `issue_requests` (site's off-estimate reason, `0110`)                                        |
 | Supervisors          | `estimate_takeoff_facts`, `stock_issues(_lines)`, `goods_receipts(_lines)`, `lib/drawings/`, `work_unit_facts` (a work's unit), `bill_facts` (a billed log's number) |
 | Design Management    | nothing outside the shared surfaces; owns the tables behind `lib/drawings/`                                                                                          |
 | Business Planning    | `projects` (its one optional link)                                                                                                                                   |

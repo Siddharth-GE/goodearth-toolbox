@@ -211,7 +211,9 @@ _Landed 2026-10-09:_ the log dialog asks "How is this paid?" — daily wages (he
 - **Receipt fields** (the PDF's list): received date (typed), project, work, material code and work description (from the PO / its indent), material, unit, quantity, rate, GST, amount, remarks. **Issue fields**: date, company, project, villa, work (from the request or chosen), material, quantity, batch, rate (from the batch), value.
 - `PLAN.md`, the welcome screen's "No prices anywhere" sentence and `SECURITY.md`'s money list change to say rates live here for `/inventory` holders, in their own gated table.
 
-### B10. ☐ `[Opus]` The off-estimate reason — inside `0104`
+### B10. ✅ `[Opus]` The off-estimate reason — inside `0104` (+ `0110`, drafted)
+
+_Landed 2026-10-09:_ the request form asks "Why is it needed?" when the villa has an official estimate and the picked material isn't on it for that work; `createIssueRequest` decides the same from `estimate_takeoff_facts` and refuses without a reason, storing it only when off the estimate. The villa's request list shows it; Site check shows "Site's reason: …" under an outside row (`getOffEstimateReasons`). **Site check is an `/estimator` screen and `issue_requests` was readable only by `/supervisors` and `/inventory`**, so `0110_issue_requests_estimator_read.sql` widens its one SELECT policy to `/estimator` — **drafted and dry-run on staging (OK, nothing kept), NOT applied: a policy change waits for Fable #2.** Until it is applied an estimator-only person sees no reasons; nothing errors. Select strings run against staging.
 
 - `issue_requests` + `off_estimate_reason text`; required by the action (which knows the estimate) when the item is not on the official estimate for that work; the database keeps it non-blank and the guard keeps resolving from rewriting it. Site check shows the reason beside an "outside" row.
 
@@ -263,6 +265,8 @@ Changed: Indents, POs, Bills, Inventory, Supervisors and Reporter queries/action
 ## Questions for the tier above
 
 _(Opus writes here instead of improvising.)_
+
+- **For Fable #2:** `0110_issue_requests_estimator_read.sql` (B10) widens `issue_requests`' one SELECT policy from `/supervisors or /inventory` to add `/estimator`, so Site check can show site's off-estimate reason. No money on the table; writes untouched; asserts one SELECT policy, three write policies, RLS on. Dry-run on staging OK. Approve and apply to staging, or propose a narrower view.
 
 - **For Fable #1:** A1's working-vs-official notice — is adding `working_updated_at` to `estimate_takeoff_facts` acceptable (a date, no rate)?
   **Fable, 2026-10-08: yes.** A date is not money. Do it as `0109`: redefine the view carrying its column list and WHERE forward, add the column to the manifest row with a sentence, `db:check-views` clean. Fable #2 reads it.

@@ -176,6 +176,8 @@ export type IssueRequestRow = {
   note: string | null;
   status: "requested" | "fulfilled" | "declined";
   declinedReason: string | null;
+  /** Why it was asked for although the estimate doesn't list it (0104). */
+  offEstimateReason: string | null;
   createdAt: string;
 };
 
@@ -366,11 +368,14 @@ export async function getVillaDetail(plotId: string): Promise<VillaDetail | null
       /** Narrowed on mapping — the CHECK allows exactly three values. */
       status: string;
       declined_reason: string | null;
+      off_estimate_reason: string | null;
       created_at: string;
     }>((from, to) =>
       supabase
         .from("issue_requests")
-        .select("id, work_item_id, item_id, quantity, note, status, declined_reason, created_at")
+        .select(
+          "id, work_item_id, item_id, quantity, note, status, declined_reason, off_estimate_reason, created_at",
+        )
         .eq("plot_id", plotId)
         .order("created_at", { ascending: false })
         .order("id")
@@ -529,6 +534,7 @@ export async function getVillaDetail(plotId: string): Promise<VillaDetail | null
       note: request.note,
       status: request.status as IssueRequestRow["status"],
       declinedReason: request.declined_reason,
+      offEstimateReason: request.off_estimate_reason,
       createdAt: request.created_at,
     })),
     quickPicks,

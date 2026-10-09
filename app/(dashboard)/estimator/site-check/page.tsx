@@ -14,6 +14,7 @@ import {
 import {
   getApprovalsFor,
   getItemLabels,
+  getOffEstimateReasons,
   getOfficialComparisons,
 } from "@/lib/estimator/estimate-queries";
 import { drawnPercent, materialTotals, siteCheckEntries } from "@/lib/estimator/site-check";
@@ -50,9 +51,11 @@ export default async function SiteCheckPage({
 
   const entries = siteCheckEntries(officials);
   const totals = materialTotals(officials);
-  const [approvals, labels] = await Promise.all([
+  const officialUnits = new Set(officials.map((official) => official.unitId));
+  const [approvals, labels, reasons] = await Promise.all([
     getApprovalsFor(officials.map((official) => official.unitId)),
     getItemLabels([...entries.map((entry) => entry.itemId), ...totals.map((t) => t.itemId)]),
+    getOffEstimateReasons(units.filter((unit) => officialUnits.has(unit.id))),
   ]);
 
   const unitName = new Map(units.map((unit) => [unit.id, unit.name]));
@@ -164,6 +167,10 @@ export default async function SiteCheckPage({
           <ul className="divide-border divide-y">
             {sorted.map((entry) => {
               const approval = entry.kind === "outside" ? approvalFor(entry) : undefined;
+              const asked =
+                entry.kind === "outside"
+                  ? reasons.get(`${entry.unitId} ${entry.workItemId ?? ""} ${entry.itemId}`)
+                  : undefined;
               const name = materialName(entry.itemId, entry.materialName);
               const uom = materialUom(entry.itemId, entry.uom);
               const work = entry.workItemId ? (workName.get(entry.workItemId) ?? null) : null;
@@ -194,6 +201,11 @@ export default async function SiteCheckPage({
                         ? `${formatQuantity(entry.reached)} ${uom} reached, against ${formatQuantity(entry.estimated)} ${uom} estimated (${formatPercent(drawnPercent(entry.estimated ?? 0, entry.reached))})`
                         : `${formatQuantity(entry.reached)} ${uom} reached — the estimate doesn't plan it for this work`}
                     </p>
+                    {asked && (
+                      <p className="text-foreground text-sm">
+                        {`Site's reason: ${asked.join(" · ")}`}
+                      </p>
+                    )}
                     {approval && (
                       <p className="text-muted text-xs">
                         Approved by {approval.approvedByName} on {formatDate(approval.approvedAt)}

@@ -214,12 +214,57 @@ export async function createIssueRequest(
   }
 
   const supabase = await createClient();
+
+  // Off the estimate (0104, founder: "allowed with a reason"): the villa
+  // has an official estimate, and it does not list this material for this
+  // work. Decided here from the estimate, never from the phone; a villa
+  // with no official estimate has nothing to be off.
+  const { data: unit, error: unitError } = await supabase
+    .from("units")
+    .select("id")
+    .eq("plot_id", plotId)
+    .maybeSingle();
+  if (unitError) {
+    console.error("createIssueRequest unit read failed:", unitError);
+    return { error: "Could not check the estimate. Try again." };
+  }
+  let offEstimate = false;
+  if (unit) {
+    const [planned, listed] = await Promise.all([
+      supabase
+        .from("estimate_takeoff_facts")
+        .select("unit_id", { count: "exact", head: true })
+        .eq("unit_id", unit.id),
+      supabase
+        .from("estimate_takeoff_facts")
+        .select("unit_id", { count: "exact", head: true })
+        .eq("unit_id", unit.id)
+        .eq("work_item_id", workItemId)
+        .eq("item_id", itemId),
+    ]);
+    if (planned.error || listed.error) {
+      console.error("createIssueRequest estimate read failed:", planned.error ?? listed.error);
+      return { error: "Could not check the estimate. Try again." };
+    }
+    offEstimate = (planned.count ?? 0) > 0 && (listed.count ?? 0) === 0;
+  }
+  const reason = text(formData, "off_estimate_reason");
+  if (offEstimate && !reason) {
+    return {
+      error: "This material isn't on the estimate for this work — say why it's needed.",
+    };
+  }
+  if (reason.length > NOTE_LIMIT) {
+    return { error: `Keep the reason under ${NOTE_LIMIT} characters.` };
+  }
+
   const { error } = await supabase.from("issue_requests").insert({
     plot_id: plotId,
     work_item_id: workItemId,
     item_id: itemId,
     quantity,
     note: note || null,
+    off_estimate_reason: offEstimate ? reason : null,
     created_by: user.id,
     updated_by: user.id,
   });
