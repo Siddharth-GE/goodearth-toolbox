@@ -2,11 +2,11 @@
 
 **Owner tags** per `MODELS.md`. The founder put Opus in the chair for this plan and the build (2026-10-08); `[Fable]` marks the two review sessions the founder asked for. Branch `feature/erp-corrections` (off `feature/masters`, whose three commits are not on `staging` yet — they go with this branch). Tick each step here as it lands.
 
-## Where the build stands — read this first (handover, 2026-10-09, end of the Opus build session)
+## Where the build stands — read this first (handover, 2026-10-10, after B9)
 
 **The founder asked (2026-10-09) for the whole of Part B to be built, then Fable review #2, then staging — they will try it all on staging.goodearthkannur.org once it lands.** Everything below is committed and pushed on `feature/erp-corrections` (nothing merged, nothing on the `staging` branch). Each step's "_Landed_" note under Part B says what was built and how it was checked.
 
-**Done:** Part A (A1–A6) · B1 Companies and Terms · `0109` · B2 PO discounts, charges and the GST split · B3 PO from an indent · B4 the rising rate shown in Masters · B5 labour log kinds · B6 work orders · B7 itemised bills, Send to Bill, bill print · B8 payments, advances, the weekly cash request · B9 store batches with rates · B10 the off-estimate reason. **Migrations `0101`–`0109` are on staging** (`0101`–`0108` after Fable review #1 — what it changed is under _Questions for the tier above_ and in `git show 7fc5e15`; its owner-run proof is `scripts/trials/erp-chain.sql`), types regenerated; `0110`–`0111` are drafted only. `npm test` (1,029), lint, typecheck, prettier, `npm run build` and `check:actions` all clean at the last commit.
+**Done:** Part A (A1–A6) · B1 Companies and Terms · `0109` · B2 PO discounts, charges and the GST split · B3 PO from an indent · B4 the rising rate shown in Masters · B5 labour log kinds · B6 work orders · B7 itemised bills, Send to Bill, bill print · B8 payments, advances, the weekly cash request · B9 store batches with rates · B10 the off-estimate reason. **Migrations `0101`–`0109` are on staging** (`0101`–`0108` after Fable review #1 — what it changed is under _Questions for the tier above_ and in `git show 7fc5e15`; its owner-run proof is `scripts/trials/erp-chain.sql`), types regenerated; `0110`–`0111` are drafted only. `npm test` (1,033), lint, typecheck, prettier, `npm run build` and `check:actions` all clean at `da9e009` (B9). **The founder has not yet said go on B11** — give the before-bullets and wait, per CLAUDE.md.
 
 **Next session starts here, in order:**
 
@@ -20,10 +20,11 @@
 
 **The founder vets as admin** (`siddharth@goodearthkannur.org` on staging) and configures staging's accounts and grants themselves (2026-10-09) — don't offer grants. `siddharth.cyriac.99@gmail.com` is a second, staff account: the trials' single-grant person, not the founder's.
 
-**How this session checked work no one could sign in to see** (repeat it for B9):
+**How the build checked work no one could sign in to see:**
 
 - **Every new `select` string run against staging** through PostgREST with a read-only scratch script (service-role key from `.env.local`, refuses anything but staging). BUGCATCHER #2 bit once: an embed from `plots` to `units` must name the key — `units!units_plot_id_fkey(name)`.
-- **Screens screenshotted** from a throwaway probe page under `app/marathon/probe-*` (the one path `proxy.ts` skips), dev server on port 3100 (3000 is another app), headless Chrome `--screenshot` at 1440px; the probe is deleted before every commit.
+- **Screens screenshotted** from a throwaway probe page under `app/marathon/probe-*` (the one path `proxy.ts` skips), dev server on port 3100 (3000 is another app), headless Chrome `--screenshot` at 1440px; the probe is deleted before every commit. `--window-size=390` is not a phone (Chrome on Windows lays out ~500px and crops) — a true phone shot needs DevTools-protocol device emulation (the auto-memory has the recipe).
+- **RLS trials as a single-grant person**, and once with one expected figure wrong to prove the trial bites.
 - **Prints checked by their text runs** (no PDF viewer here): render with `renderToBuffer`, inflate the streams, read the `TJ` strings.
 
 **Traps this build hit:** `String.replace` in a patch turns `$$` into `$` (it broke two migrations) — use the Edit tool or split/join. **Long patches through bash break on quoting** (heredocs with apostrophes, `node -e` with nested quotes) — write the patch script to the scratchpad with the Write tool, then `node` it; anchor each swap on text that occurs exactly once. A scratch script outside the repo needs `NODE_PATH=<repo>/node_modules`. One tool never imports another's code — Bills restates its own one-line labour description rather than import Supervisors'. Staging's rate book has no materials on any work (`TODO.md` item 5), so estimate pulls are empty until someone enters them: expected, not a bug.

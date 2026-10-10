@@ -4,7 +4,7 @@ Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, histor
 
 ## Building now
 
-**The ERP corrections** — `plan.md`: indents from the estimate, PO from an indent, itemised bills from the labour log, work orders, payments with advances and a weekly cash request, store batches with rates, search/filter/total bars, prints. On `feature/erp-corrections`: Part A and B1–B8, B10 built and pushed. **Next: B9 (store batches), then B11 (docs), then Fable review #2** — which approves and applies the drafted `0110` and `0111` (a real bug fix for the billing team) — then a PR to `staging` and the founder's vet. The handover is at the top of `plan.md`.
+**The ERP corrections** — `plan.md`: indents from the estimate, PO from an indent, itemised bills from the labour log, work orders, payments with advances and a weekly cash request, store batches with rates, search/filter/total bars, prints. On `feature/erp-corrections`: Part A and B1–B10 built and pushed. **Next: B11 (docs), then Fable review #2** — which approves and applies the drafted `0110` and `0111` (a real bug fix for the billing team) and answers B9's question about stores with issues from before batches — then a PR to `staging` and the founder's vet. The handover is at the top of `plan.md`.
 
 ## Production
 
