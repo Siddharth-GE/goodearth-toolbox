@@ -4,7 +4,7 @@ Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, histor
 
 ## Building now
 
-**The ERP corrections** — `plan.md`: indents from the estimate, PO from an indent, itemised bills from the labour log, work orders, payments with advances and a weekly cash request, store batches with rates, search/filter/total bars, prints. On `feature/erp-corrections`: Part A and B1–B10 built and pushed. **Next: B11 (docs), then Fable review #2** — which approves and applies the drafted `0110` and `0111` (a real bug fix for the billing team) and answers B9's question about stores with issues from before batches — then a PR to `staging` and the founder's vet. The handover is at the top of `plan.md`.
+**The ERP corrections** — `plan.md`: indents from the estimate, PO from an indent, itemised bills from the labour log, work orders, payments with advances and a weekly cash request, store batches with rates, search/filter/total bars, prints. **Built and pushed on `feature/erp-corrections`, docs included. Next: Fable review #2** — which approves and applies the drafted `0110` and `0111` (a real bug fix for the billing team) and answers B9's question about stores with issues from before batches — then a PR to `staging` and the founder's vet. The handover is at the top of `plan.md`.
 
 ## Production
 
@@ -39,6 +39,7 @@ Everything below is on `staging.goodearthkannur.org`. Each ships only after the 
 
 ## Next builds — the founder picks
 
+- **Set aside from the ERP corrections (founder, 2026-10-08), planned later:** subprojects; the works schedule (the PDF asked for a Gantt and cash flow — the founder: "I don't like Gantt", so its shape is open); drawing requests.
 - **The Google Chat door, round three** — three candidates in `lib/google-chat/PLAN.md`.
 - **Phone-first lists and forms** — tables that become stacked cards on a phone, sticky Save, bigger tap targets; Indents, Inventory, Supervisors and Directory first.
 - **A real sidebar search** — jump to any tool or screen over `lib/tools.ts`.

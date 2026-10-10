@@ -19,7 +19,7 @@ How they move, and every rule that keeps them apart, is `SHIPPING.md`.
 ## Platform
 
 - **Stack:** Next.js 16.2 (Turbopack) · React 19.2 · Tailwind 4 · Supabase Postgres. Vercel `bom1` + Supabase `ap-south-1`, both Mumbai.
-- **Migrations:** `0001`–`0093` on both databases; `0094`–`0109` on staging only (`0101`–`0109` belong to the ERP build on `feature/erp-corrections`, not yet merged to `staging`). `applied_migrations` (`0067`) is the ledger, and CI checks it on every pull request.
+- **Migrations:** `0001`–`0093` on both databases; `0094`–`0109` on staging only (`0101`–`0109` belong to the ERP build on `feature/erp-corrections`, not yet merged to `staging`); `0110`–`0111` are drafted on that branch and applied nowhere — they wait for Fable review #2. `applied_migrations` (`0067`) is the ledger, and CI checks it on every pull request.
 - **Access:** per-user grants (`user_apps`) + role bundles (`role_apps`), enforced in the database by `has_app()`. `profiles.team` is a dead column.
 - **Sign-in:** password → emailed 6-digit code (30-day trusted device), self-service reset, Google for existing team emails only; both steps rate-limited in the database. Mail rides Resend as `toolbox@goodearthkannur.org`. The rules are `SECURITY.md`.
 - **Performance:** warm TTFB ~0.2s, cold ~1.0s — cold starts are the one measured problem. Every dashboard page shows a loading state: 84 of 127 pages have their own `loading.tsx`, the rest inherit the nearest parent's.
@@ -30,22 +30,22 @@ How they move, and every rule that keeps them apart, is `SHIPPING.md`.
 Production unless marked. Each tool's rules are its `PLAN.md` (Google Chat door: `lib/google-chat/PLAN.md`). Every Operations and Management tool opens on a welcome screen (`_components/tool-welcome.tsx`, counts from each tool's `getWelcomeCounts()`).
 
 - **Marathon** — race-day kiosk: PIN login, entries, bibs, admin. Own auth and service-role client — the one kiosk, not a pattern.
-- **Masters** — the shared reference data every tool reads: projects, plots, units, clients, vendors, stores, items (catalogue and materials), categories, brands, GST rates, construction stages, units of measure, works, item requests. Reads ungated, writes need `/masters`.
+- **Masters** — the shared reference data every tool reads: projects, plots, units, clients, vendors, stores, items (catalogue and materials), categories, brands, GST rates, construction stages, units of measure, works, item requests (on the ERP branch: companies, terms templates, and a material rate that rises with POs). Reads ungated, writes need `/masters`.
 - **Settings** — people, grants, roles, approver lists. Admin only.
 - **Selections** — what design specifies per room; revisions immutable once issued. Tiles and lines show the item's picture, description and product link (catalogue pictures on staging).
 - **Budgets** — prices an issued revision (interiors) and a construction stage tree; money gated.
-- **Indents** — site requests from a villa's official estimate, an approved interiors budget, or direct. No money.
-- **Purchase Orders** — from approved indents, or direct for bulk/urgent buys. The money entry point, gated.
-- **Inventory** — goods in, stock issues, adjustments, stock by location, the supervisors' request queue. Quantities only.
+- **Indents** — site requests from a villa's official estimate, an approved interiors budget, or direct. No money (on the ERP branch: the indent's work's own materials, always in the Masters unit, what is still to buy, and a print).
+- **Purchase Orders** — from approved indents, or direct for bulk/urgent buys. The money entry point, gated (on the ERP branch: made from an indent with a vendor per line, discount and charges per line, CGST + SGST or IGST, terms from a template, the company on the print).
+- **Inventory** — goods in, stock issues, adjustments, stock by location, the supervisors' request queue. Quantities, open to every signed-in person (on the ERP branch: every store delivery line is a batch carrying its PO rate, issues draw the oldest batch first, and only `/inventory` holders see the rates).
 - **Bills** — PO, work-order and NMR bills (on the ERP branch: bills have lines and print; labour logs become bills with Send to Bill; work orders replace labour contracts; payments, advances and the weekly cash request).
 - **Relay** — the baton relay: trails, departments, schedules, a wave per villa. Stores no documents. The **Google Chat door** drives it from Chat (staging).
 - **Design Management** — drawing sets, revisions and transmittals per villa; released drawings reach Supervisors.
 - **Estimator** — what a villa costs: a rate book, each villa measured on its own, a frozen official copy, one site-check list (the rework on staging).
-- **Supervisors** — the site's day on a phone: labour, material requests, drawn-vs-estimated per work.
+- **Supervisors** — the site's day on a phone: labour, material requests, drawn-vs-estimated per work (on the ERP branch: labour as daily wages or piece-work, and a request off the estimate asks why).
 - **Client Relations** — the plot register and the only money coming in: payment schedules and receipts.
 - **Business Planning** — the founder's JV business plan as a recalculating tool.
 - **Financial Management** — cash, forward view and funding facilities, read from views.
-- **Reporter** — a report builder over a dataset registry; carries money by founder decision.
+- **Reporter** — a report builder over a dataset registry; carries money by founder decision (on the ERP branch: a search box, a totals row and quick filters).
 - **Directory** — everyone who works here; people keep their own details current.
 - **Dexter** — client presentations as shareable links; a deck can carry questions and keeps the client's answers, and every link shows the Kaadal mark when shared on WhatsApp (staging only).
 - **Training** — stub.
@@ -77,4 +77,4 @@ The chain runs end to end: design → price → indent → PO → goods in / sto
 | Business Planning    | `projects` (its one optional link)                                                                                                                                   |
 | Directory, Dexter    | nothing outside the shared surfaces                                                                                                                                  |
 
-**Nothing reads** Financial Management, Dexter or the Estimator's own tables — only its rate-free view `estimate_takeoff_facts`. A redefinition of `pusher_chain_state` must check Client Relations, Reporter and the Google Chat door (`relay/PLAN.md`).
+**Nothing reads** Financial Management, Dexter or the Estimator's own tables — only its views: the rate-free `estimate_takeoff_facts` and `work_unit_facts`, and `work_labour_rate_facts` (Bills, gated). A redefinition of `pusher_chain_state` must check Client Relations, Reporter and the Google Chat door (`relay/PLAN.md`).
