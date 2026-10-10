@@ -2,20 +2,11 @@
 
 **Owner tags** per `MODELS.md`. The founder put Opus in the chair for this plan and the build (2026-10-08); `[Fable]` marks the two review sessions the founder asked for. Branch `feature/erp-corrections` (off `feature/masters`, whose three commits are not on `staging` yet — they go with this branch). Tick each step here as it lands.
 
-## Where the build stands — read this first (handover, 2026-10-10, after B11)
+## Where the build stands — read this first (2026-10-10)
 
-**The founder asked (2026-10-09) for the whole of Part B to be built, then Fable review #2, then staging — they will try it all on staging.goodearthkannur.org once it lands.** Everything below is committed and pushed on `feature/erp-corrections` (nothing merged, nothing on the `staging` branch). Each step's "_Landed_" note under Part B says what was built and how it was checked.
+**Built in full and merged to `staging`; waiting for the founder's vet** with the checklist under _Verification_. Fable review #2 was **skipped on the founder's explicit word** (2026-10-10: "skip the fable review if you are confident"). In its place Opus re-reviewed `0110` (Estimator reads `issue_requests`' one SELECT policy) and `0111` (the bill-line guard reads `po_line_billing_facts`, so the billing team can bill a PO's materials — one changed line against `0106`'s guard), re-ran the rolled-back RLS trials as single-grant people (`bills-as-billing-team`, `payments-as-billing-team`, `bill-line-po-check` — which still fails without `0111` — and `batches-as-store-keeper`), swept the diff for admin or browser clients, ungated reads and missing loading states, then applied both to staging: `0001`–`0111` level, `db:check-views` clean, types unchanged.
 
-**Done:** Part A (A1–A6) · B1 Companies and Terms · `0109` · B2 PO discounts, charges and the GST split · B3 PO from an indent · B4 the rising rate shown in Masters · B5 labour log kinds · B6 work orders · B7 itemised bills, Send to Bill, bill print · B8 payments, advances, the weekly cash request · B9 store batches with rates · B10 the off-estimate reason · B11 the docs. **Migrations `0101`–`0109` are on staging** (`0101`–`0108` after Fable review #1 — what it changed is under _Questions for the tier above_ and in `git show 7fc5e15`; its owner-run proof is `scripts/trials/erp-chain.sql`), types regenerated; `0110`–`0111` are drafted only. `npm test` (1,033), lint, typecheck, prettier, `npm run build` and `check:actions` all clean at `da9e009` (B9); B11 changed docs only.
-
-**Next session starts here, in order:**
-
-1. **`[Fable]` review #2** (the founder switches the model). The full diff against this plan, `SECURITY.md` and `BUGCATCHER.md`, and **two drafted migrations to approve and apply to staging** — questions at the foot of this file:
-   - `0110_issue_requests_estimator_read.sql` (B10): `/estimator` joins `issue_requests`' one SELECT policy, so Site check shows site's reason.
-   - `0111_bill_lines_guard_reads_billing_facts.sql` (B7): **a real bug in `0106`** — the material-line check read `purchase_order_lines` as the person, so the billing team (`/bills` without `/purchase-orders`) was refused every material line. Until `0111` is applied, recording a material bill as a Bills-only person fails at its lines.
-   - **The RLS proof review #1 lacked:** `erp-chain.sql` ran as the database owner, which bypasses every policy. These run as a single-grant person under RLS, rolled back:
-     `npx tsx scripts/dry-run-migrations.ts --project ipstebqawrvhkyntctrv supabase/migrations/0110_*.sql supabase/migrations/0111_*.sql --trial scripts/trials/bills-as-billing-team.sql` (and `payments-as-billing-team.sql`; `bill-line-po-check.sql` fails without `0111`, passes with it) — all OK on 2026-10-09. B9's: `… supabase/migrations/0108_*.sql --trial scripts/trials/batches-as-store-keeper.sql` — OK.
-2. **The PR → `staging`** after Fable's yes (CI runs on pull requests only), then **the founder's vet** with the checklist under _Verification_.
+**Still open before production:** B9's question below (batches against pre-`0108` issue history). Nobody has opened a Part B screen signed in; the founder's vet is the first look.
 
 **The founder vets as admin** (`siddharth@goodearthkannur.org` on staging) and configures staging's accounts and grants themselves (2026-10-09) — don't offer grants. `siddharth.cyriac.99@gmail.com` is a second, staff account: the trials' single-grant person, not the founder's.
 

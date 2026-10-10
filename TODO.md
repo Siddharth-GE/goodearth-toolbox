@@ -2,10 +2,6 @@
 
 Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, history is git.
 
-## Building now
-
-**The ERP corrections** — `plan.md`: indents from the estimate, PO from an indent, itemised bills from the labour log, work orders, payments with advances and a weekly cash request, store batches with rates, search/filter/total bars, prints. **Built and pushed on `feature/erp-corrections`, docs included. Next: Fable review #2** — which approves and applies the drafted `0110` and `0111` (a real bug fix for the billing team) and answers B9's question about stores with issues from before batches — then a PR to `staging` and the founder's vet. The handover is at the top of `plan.md`.
-
 ## Production
 
 0. **Restore production, then find out why the keep-alive did not keep it awake** — still `INACTIVE` on 2026-10-08. Restore in the Supabase dashboard (a model session is refused the API call, rightly), then read the cron's runs under Vercel → Settings → Cron Jobs: a red run means `CRON_SECRET` (BUGCATCHER #18), no run means it never fired. The founder's call: "production later".
@@ -15,6 +11,8 @@ Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, histor
 ## Waiting on staging for the founder's vet
 
 Everything below is on `staging.goodearthkannur.org`. Each ships only after the founder says they have tried it there.
+
+- **The ERP corrections** (`0101`–`0111`) — indents from the estimate, PO from an indent, itemised bills from the labour log, work orders, payments with advances and a weekly cash request, store batches with rates, search/filter/total bars, prints. Merged to staging 2026-10-10; Fable review #2 was skipped on the founder's explicit word, after Opus re-reviewed `0110`/`0111` and re-ran the RLS trials. **The founder's checklist is _Verification_ in `plan.md`.** Before production: an answer to B9's question there (store batches against issues recorded before `0108`).
 
 - **The final masters workbook** — loaded on staging 2026-10-07, after every record there was cleared. Waiting for the founder's look through Masters → Vendors, Works, Items and Stages. On ship day, on production: `scripts/import-masters-workbook.ts --project pajfrgnkapicdgangjey --xlsx <workbook>`, dry run first. It stops while production's own records point at masters it drops, and the wipe script refuses production by design, so what happens to those records is the founder's call that day.
 - **Catalogue pictures** — **vetted by the founder 2026-09-26**, and the close calls sorted in Masters. On ship day, on production: `scripts/import-catalogue-sheet.ts --project pajfrgnkapicdgangjey --xlsx <workbook>` and `scripts/fetch-catalogue-images.ts --project pajfrgnkapicdgangjey`, dry run first.
