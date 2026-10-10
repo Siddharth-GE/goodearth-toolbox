@@ -1,10 +1,20 @@
 # Inventory — the rules
 
-The store-keeper's tool: what arrives against a purchase order, what each store holds, what goes out. Grant `/inventory`. Migrations `0023`, `0024`, `0080`, `0081`, `0084`.
+The store-keeper's tool: what arrives against a purchase order, what each store holds, what goes out. Grant `/inventory`. Migrations `0023`, `0024`, `0080`, `0081`, `0084`, `0108`.
 
 ## The shape of it
 
-Three movements and one balance. **Goods receipts** (`GRN/<project>/NNN`) are always against an issued PO and land in a store or straight at the PO's site. **Stock issues** (`ISS/<project>/NNN`) take material from a store to a plot (used there) or to another store (a transfer). **Adjustments** are signed corrections with a mandatory reason — opening stock is a positive one. **Stock is computed from all three, never stored. No money exists anywhere in this tool**, which is why its reads are open to any signed-in person; writes need `/inventory`.
+Three movements and one balance. **Goods receipts** (`GRN/<project>/NNN`) are always against an issued PO and land in a store or straight at the PO's site. **Stock issues** (`ISS/<project>/NNN`) take material from a store to a plot (used there) or to another store (a transfer). **Adjustments** are signed corrections with a mandatory reason — opening stock is a positive one. **Stock is computed from all three, never stored.** The stock tables carry no money, which is why their reads are open to any signed-in person; writes need `/inventory`.
+
+## Batches and their rates (`0108`)
+
+The founder reversed "no money in Inventory" on 2026-10-08, for `/inventory` holders only: a store-keeper values what goes out.
+
+- **A batch is a store receipt line.** Its name, `GRN/SAA/012-1`, is the receipt's reference and the line's place on the delivery note (created, then id) — derived, never stored. A direct-to-site delivery is used where it lands and is no batch.
+- **The money lives in one gated table, `goods_receipt_line_rates`** — SELECT `/inventory`, `/purchase-orders`, `/bills`, `/reporter`; UPDATE `/inventory`; no insert policy. A definer trigger copies the PO line's net rate (after its discount, before GST) and GST at receiving, because a store-keeper cannot read `purchase_order_lines`. The keeper may change the rate, GST and a note when the delivery bill differs; the PO's own figures stay beside them (a guard refuses moving them), and any difference shows in amber on the delivery note for accounts. The stock views never carry a rate — `batch_on_hand`'s manifest row says so.
+- **An issue takes the oldest batch first** — or the batch the keeper picked (`preferred_receipt_line_id`), then the oldest. `allocate_batches()` writes `stock_batch_movements` from a trigger on the issue line, under the negative-stock guard's lock; no client role can call it or write movements. A transfer lands the same batches in the receiving store; a removal adjustment draws oldest first. Stock with no batch behind it (opening stock, additions) is drawn last as "no batch" and has no rate, so a line drawing on it has no value — unknown, never ₹0.
+- **The issue form previews the allocation** with `planBatches` (`lib/inventory/batches.ts`, tested) — the same order as the database; keep the two alike. The issue note reads back what was actually drawn. Values are before GST.
+- **Lines are permanent** (`0108`): a receipt, issue or adjustment line's item and quantity cannot be rewritten, because the batch movements were made from them. Correct with an adjustment.
 
 ## Two stock views, deliberately
 
@@ -13,7 +23,7 @@ Three movements and one balance. **Goods receipts** (`GRN/<project>/NNN`) are al
 
 ## Settled decisions
 
-- **PO reads go through `po_facts` / `po_line_facts`** — a store-keeper rarely holds `/purchase-orders`. Never widen the PO tables' policies for this.
+- **PO reads go through `po_facts` / `po_line_facts`** — a store-keeper rarely holds `/purchase-orders`. Never widen the PO tables' policies for this. A delivery line shows what it was bought for (the indent's number and work) through `po_line_facts.indent_line_id` and the open indent tables.
 - **A location is a store or a plot.** A delivery to a unit shows under its plot (1:1 since `0029`).
 - **A general-scope PO cannot be delivered "to site"** — it has no plot; refused in `create_goods_receipt`.
 - **Numbering is minted in the database**, per project; `lib/inventory/reference.ts` mirrors it under test.
@@ -40,5 +50,6 @@ The quantity guards serialise on an **advisory transaction lock**, not `select �
 
 - **A mis-keyed receipt cannot be deleted**, only corrected by an adjustment — and adjustments apply only to stores, so **a wrong site delivery cannot be corrected at all**. If it bites, build an admin-approved reversal, not a DELETE policy.
 - **Units are not reconciled across movements** — stock sums quantities whatever unit each recorded. If an item's unit changes, the fix belongs in `stock_on_hand`.
+- **Batches start at `0108`.** Issues recorded before it moved no batch, so in a store with older history `batch_on_hand` still counts what those issues took — a question for Fable in `plan.md` before production.
 - **`stores` has no `updated_at` or actor columns** (`0004`).
 - **The receipt page is read-only.** The guard permits editing `challan_no`, `received_at` and `note` — one small form when someone needs it.

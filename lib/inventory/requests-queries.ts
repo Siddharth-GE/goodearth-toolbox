@@ -1,10 +1,13 @@
 import "server-only";
 
 import { requireTool } from "@/lib/auth/access";
+import type { Filterable } from "@/lib/list-params";
 import { listWorkItems } from "@/lib/masters/works";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { readFailed } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
+
+import { matchingItemIds } from "./queries";
 
 /**
  * The store-keeper's side of the Supervisors' requests (Phase 2 Step
@@ -56,42 +59,76 @@ type RequestRecord = {
 const REQUEST_COLUMNS =
   "id, plot_id, work_item_id, item_id, quantity, note, status, declined_reason, fulfilled_issue_id, created_by, created_at";
 
-export async function listSiteRequests(): Promise<{
+export type SiteRequestFilters = {
+  plotId?: string;
+  /** Waiting (requested), issued (fulfilled) or declined. */
+  status?: SiteRequestRow["status"];
+  /** Item name — already made safe by searchParam. */
+  q?: string;
+};
+
+export async function listSiteRequests({ plotId, status, q }: SiteRequestFilters = {}): Promise<{
   open: SiteRequestRow[];
   answered: SiteRequestRow[];
   answeredTotal: number;
+  /** More items matched the search than it can carry — the screen says so. */
+  searchCapped: boolean;
 }> {
   await requireTool("/inventory");
   const supabase = await createClient();
 
+  // The search is over items (an open Masters read): find the matching
+  // item ids first, then keep only the requests for those items.
+  const found = q ? await matchingItemIds(supabase, q, ["name"]) : null;
+  if (found && found.ids.length === 0) {
+    return { open: [], answered: [], answeredTotal: 0, searchCapped: false };
+  }
+
+  // Every filter in one place; the status filter picks WHICH list(s) to
+  // read below, since waiting and answered are two separate lists.
+  const filtered = <T extends Filterable<T>>(query: T): T => {
+    let next = query;
+    if (plotId) next = next.eq("plot_id", plotId);
+    if (found) next = next.in("item_id", found.ids);
+    return next;
+  };
+  const wantOpen = !status || status === "requested";
+  const wantAnswered = status !== "requested";
+
+  const readAnswered = () => {
+    const base = filtered(
+      supabase.from("issue_requests").select(REQUEST_COLUMNS, { count: "exact" }),
+    );
+    return (status ? base.eq("status", status) : base.neq("status", "requested"))
+      .order("created_at", { ascending: false })
+      .order("id")
+      .range(0, ANSWERED_SHOWN - 1);
+  };
+
   // The queue reads complete (a capped queue silently starves the
   // oldest request); answered is a display list and says its limit.
   const [open, answeredPage] = await Promise.all([
-    fetchAll<RequestRecord>((from, to) =>
-      supabase
-        .from("issue_requests")
-        .select(REQUEST_COLUMNS)
-        .eq("status", "requested")
-        .order("created_at")
-        .order("id")
-        .range(from, to),
-    ),
-    supabase
-      .from("issue_requests")
-      .select(REQUEST_COLUMNS, { count: "exact" })
-      .neq("status", "requested")
-      .order("created_at", { ascending: false })
-      .order("id")
-      .range(0, ANSWERED_SHOWN - 1),
+    wantOpen
+      ? fetchAll<RequestRecord>((from, to) =>
+          filtered(
+            supabase.from("issue_requests").select(REQUEST_COLUMNS).eq("status", "requested"),
+          )
+            .order("created_at")
+            .order("id")
+            .range(from, to),
+        )
+      : Promise.resolve([] as RequestRecord[]),
+    wantAnswered ? readAnswered() : Promise.resolve(null),
   ]);
-  if (answeredPage.error) fail("the answered requests", answeredPage.error);
-  const answered = (answeredPage.data ?? []) as RequestRecord[];
+  if (answeredPage?.error) fail("the answered requests", answeredPage.error);
+  const answered = (answeredPage?.data ?? []) as RequestRecord[];
 
   const shaped = await shapeRequests(supabase, [...open, ...answered]);
   return {
     open: shaped.slice(0, open.length),
     answered: shaped.slice(open.length),
-    answeredTotal: answeredPage.count ?? answered.length,
+    answeredTotal: answeredPage?.count ?? answered.length,
+    searchCapped: found?.capped ?? false,
   };
 }
 

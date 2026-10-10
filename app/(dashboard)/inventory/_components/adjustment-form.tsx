@@ -71,7 +71,6 @@ export function AdjustmentForm({
         storeId,
         itemId: item.id,
         quantity: direction === "add" ? amount : -amount,
-        uom,
         reason,
         adjustedAt: adjustedAt || null,
       });
@@ -93,6 +92,13 @@ export function AdjustmentForm({
       <h2 className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
         Correct a count
       </h2>
+      {/* The founder's team asked what this section is for (2026-10-08). */}
+      <p className="text-muted text-sm">
+        For a store&apos;s count only, with the reason written down: opening stock, a box found
+        (add), breakage or a recount (remove). A wrong delivery or issue is not fixed here — record
+        it against its receipt or issue instead. A removal comes out of the oldest batch; an
+        addition is stock with no batch and no rate.
+      </p>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">

@@ -54,3 +54,23 @@ export function TableHeaderCell({ className, ...props }: ThHTMLAttributes<HTMLTa
 export function TableCell({ className, ...props }: TdHTMLAttributes<HTMLTableCellElement>) {
   return <td className={cn("text-foreground px-4 py-3.5 text-sm", className)} {...props} />;
 }
+
+/**
+ * The totals row under a list (plan.md, A4): a hairline above, the figures
+ * in the column's own alignment. Totals are over EVERY matched row, worked
+ * out in the query — never the sum of the page on screen.
+ */
+export function TableFoot({ className, ...props }: HTMLAttributes<HTMLTableSectionElement>) {
+  return (
+    <tfoot className={cn("border-border bg-foreground/[0.02] border-t", className)} {...props} />
+  );
+}
+
+export function TableTotalCell({ className, ...props }: TdHTMLAttributes<HTMLTableCellElement>) {
+  return (
+    <td
+      className={cn("text-foreground px-4 py-3 text-sm font-semibold tabular-nums", className)}
+      {...props}
+    />
+  );
+}

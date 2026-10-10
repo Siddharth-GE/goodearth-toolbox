@@ -15,13 +15,15 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/components/ui/table";
-import { formatQuantity } from "@/lib/format";
+import { formatMoney, formatQuantity } from "@/lib/format";
 import { recordStockIssue } from "@/lib/inventory/actions";
+import { issueValue, planBatches, type Batch } from "@/lib/inventory/batches";
 import type { IssueFormOptions } from "@/lib/inventory/issues-queries";
 import type { SiteRequestRow } from "@/lib/inventory/requests-queries";
 import type { StoreHolding } from "@/lib/inventory/stock-queries";
 import { wouldGoNegative } from "@/lib/inventory/stock";
 import { useMemo, useState, useTransition } from "react";
+import { BatchDraws } from "./batch-draws";
 
 type Destination = "plot" | "store";
 
@@ -36,12 +38,15 @@ export type IssueWorkOption = { id: string; code: string; name: string; category
 export function IssueForm({
   store,
   holdings,
+  batches,
   options,
   works,
   request,
 }: {
   store: { id: string; name: string; project_id: string | null };
   holdings: StoreHolding[];
+  /** The store's batches per item, oldest first (0108). */
+  batches: Record<string, Batch[]>;
   options: IssueFormOptions;
   /** Active works from the masters — what a plot issue is FOR (0080). */
   works: IssueWorkOption[];
@@ -61,6 +66,8 @@ export function IssueForm({
       ? { [request.itemId]: request.quantity }
       : {},
   );
+  /** The batch to draw first, per item; absent or "" is the oldest. */
+  const [preferred, setPreferred] = useState<Record<string, string>>({});
   const [error, setError] = useState<string>();
   const [saving, startSaving] = useTransition();
 
@@ -69,6 +76,30 @@ export function IssueForm({
     () => new Map(holdings.map((row) => [row.item_id, row.quantity])),
     [holdings],
   );
+
+  // The database decides the batches (allocate_batches, 0108); this is
+  // the same rule run early so the keeper sees it before Save.
+  const plans = useMemo(
+    () =>
+      new Map(
+        pickedEntries.map(([itemId, quantity]) => [
+          itemId,
+          Number.isFinite(quantity) && quantity > 0
+            ? planBatches(batches[itemId] ?? [], quantity, preferred[itemId] || null)
+            : [],
+        ]),
+      ),
+    [pickedEntries, batches, preferred],
+  );
+  const pickedValue = useMemo(() => {
+    let total = 0;
+    for (const draws of plans.values()) {
+      const value = issueValue(draws);
+      if (value === null) return null;
+      total += value;
+    }
+    return total;
+  }, [plans]);
 
   const otherStores = options.stores.filter((s) => s.id !== store.id);
   /** Only a transfer out of a store with no project of its own needs
@@ -108,7 +139,7 @@ export function IssueForm({
         lines: pickedEntries.map(([itemId, quantity]) => ({
           itemId,
           quantity,
-          uom: holdings.find((row) => row.item_id === itemId)?.uom ?? "each",
+          preferredReceiptLineId: preferred[itemId] || null,
         })),
       });
       if (result?.error) setError(result.error);
@@ -265,7 +296,7 @@ export function IssueForm({
               <TableHeaderCell className="w-14"></TableHeaderCell>
               <TableHeaderCell>Item</TableHeaderCell>
               <TableHeaderCell className="w-32">In store</TableHeaderCell>
-              <TableHeaderCell className="w-36">Issuing</TableHeaderCell>
+              <TableHeaderCell className="min-w-36 sm:min-w-64">Issuing</TableHeaderCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -326,6 +357,30 @@ export function IssueForm({
                             Only {formatQuantity(row.quantity)} {row.uom} in this store
                           </p>
                         )}
+                        <div className="mt-2 space-y-1.5">
+                          {(batches[row.item_id]?.length ?? 0) > 1 && (
+                            <Select
+                              value={preferred[row.item_id] ?? ""}
+                              onChange={(event) =>
+                                setPreferred((current) => ({
+                                  ...current,
+                                  [row.item_id]: event.target.value,
+                                }))
+                              }
+                              className="h-9 text-xs"
+                              aria-label={`Batch to draw ${row.item_name} from first`}
+                            >
+                              <option value="">Oldest batch first</option>
+                              {batches[row.item_id].map((batch) => (
+                                <option key={batch.receiptLineId} value={batch.receiptLineId}>
+                                  {batch.label} first · {formatQuantity(batch.quantity)} {row.uom} ·{" "}
+                                  {formatMoney(batch.rate, { paise: true })}
+                                </option>
+                              ))}
+                            </Select>
+                          )}
+                          <BatchDraws draws={plans.get(row.item_id) ?? []} uom={row.uom} />
+                        </div>
                       </>
                     ) : (
                       <span className="text-muted/50 text-sm">—</span>
@@ -347,6 +402,12 @@ export function IssueForm({
             <p className="text-foreground text-sm font-medium">
               {pickedEntries.length} {pickedEntries.length === 1 ? "item" : "items"} out of{" "}
               {store.name}
+              {pickedValue !== null && (
+                <span className="text-muted font-normal">
+                  {" "}
+                  · worth {formatMoney(pickedValue, { paise: true })} before GST
+                </span>
+              )}
             </p>
           )}
           <FormMessage error={error} size="xs" />

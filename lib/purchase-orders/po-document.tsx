@@ -1,45 +1,39 @@
 import { Document, StyleSheet, Text, View } from "@react-pdf/renderer";
-import { DocumentPage, DocumentTable, type Column, type DocumentMeta } from "@/lib/pdf/document";
+import {
+  DocumentHeading,
+  DocumentPage,
+  DocumentTable,
+  MetaBlock,
+  NotesBlock,
+  SectionLabel,
+  Signatures,
+  type Column,
+  type DocumentMeta,
+} from "@/lib/pdf/document";
 import { pdf } from "@/lib/pdf/theme";
 import { formatAmount, formatDate, formatPercent, formatQuantity } from "@/lib/format";
-import { lineTotal, rollUpPo } from "./math";
+import { DEFAULT_COMPANY_STATE, gstRegime } from "@/lib/line-money";
+import { lineFigures, rollUpPo, summaryRows, type PoLineMoney } from "./math";
 import type { PoLineRow, PoPdfData } from "./queries";
 
 /**
  * Document D — the purchase order, the paper a vendor supplies against.
  *
- * Built on the shared shell (letterhead, footer, table), so it looks
- * like the same company as every other Goodearth document. Amounts via
- * formatAmount, digits only — Helvetica has no ₹ glyph — with the
- * currency stated once in the heading. A draft carries the DRAFT
- * watermark and no signature block; it must never look signable.
+ * Built on the shared shell and blocks (letterhead, heading, details band,
+ * table, notes, signatures), so it looks like the same company as every
+ * other Goodearth document, and it prints what the PO screen shows: per
+ * line the code, material, indent and its work, quantity, rate, discount,
+ * taxable value, GST and other charges; then the GST split — CGST + SGST
+ * when the vendor is in the company's state, IGST otherwise. Amounts via
+ * formatAmount, digits only — Helvetica has no ₹ glyph — with the currency
+ * stated once. A draft carries the DRAFT watermark and no signature block.
  *
- * The money here is the vendor's purchase price and its GST. Nothing
- * from Budgets exists on the underlying tables, so nothing from Budgets
- * can appear here — the QuoteData principle, held by the schema itself.
+ * The money here is the vendor's purchase price and its GST. Nothing from
+ * Budgets exists on the underlying tables, so nothing from Budgets can
+ * appear here — the QuoteData principle, held by the schema itself.
  */
 
 const styles = StyleSheet.create({
-  h1: { fontFamily: pdf.fontBold, fontSize: pdf.size.display, letterSpacing: -0.3 },
-  subtitle: { fontSize: pdf.size.body, color: pdf.color.muted, marginTop: 3 },
-
-  metaBlock: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    backgroundColor: pdf.color.wash,
-    borderRadius: 3,
-    padding: 12,
-    marginTop: pdf.space.block,
-  },
-  metaItem: { width: "25%", paddingRight: 8 },
-  metaLabel: {
-    fontSize: pdf.size.tiny,
-    letterSpacing: 0.6,
-    color: pdf.color.muted,
-    textTransform: "uppercase",
-  },
-  metaValue: { fontSize: pdf.size.body, marginTop: 2 },
-
   partyRow: { flexDirection: "row", marginTop: pdf.space.block },
   partyBox: { flex: 1, paddingRight: 14 },
   partyLabel: {
@@ -53,15 +47,6 @@ const styles = StyleSheet.create({
   partyName: { fontFamily: pdf.fontBold, fontSize: pdf.size.body },
   partyLine: { fontSize: pdf.size.small, color: pdf.color.muted, marginTop: 2, lineHeight: 1.4 },
 
-  sectionLabel: {
-    fontFamily: pdf.fontBold,
-    fontSize: pdf.size.sectionLabel,
-    letterSpacing: 1,
-    color: pdf.color.muted,
-    textTransform: "uppercase",
-    marginTop: pdf.space.block * 1.6,
-    marginBottom: 6,
-  },
   currencyNote: { fontSize: pdf.size.tiny, color: pdf.color.muted, marginBottom: 6 },
 
   totalsBox: { alignSelf: "flex-end", width: "45%", marginTop: 10 },
@@ -79,62 +64,103 @@ const styles = StyleSheet.create({
   grandLabel: { fontFamily: pdf.fontBold, fontSize: pdf.size.title },
   grandValue: { fontFamily: pdf.fontBold, fontSize: pdf.size.title },
 
-  terms: {
-    marginTop: pdf.space.block * 1.4,
-    borderTopWidth: 0.5,
-    borderTopColor: pdf.color.rule,
-    paddingTop: 8,
-  },
-  termsText: { fontSize: pdf.size.tiny, color: pdf.color.muted, lineHeight: 1.5 },
-
-  signatureRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 40 },
-  signatureBox: { width: "42%" },
-  signatureRule: { borderTopWidth: 0.5, borderTopColor: pdf.color.ruleStrong, paddingTop: 4 },
-  signatureLabel: { fontSize: pdf.size.tiny, color: pdf.color.muted },
+  termsText: { fontSize: pdf.size.small, color: pdf.color.ink, lineHeight: 1.5 },
 });
 
-const columns: Column<PoLineRow>[] = [
-  { header: "#", width: 0.4, render: (_row, index) => String(index + 1) },
-  {
-    header: "Item",
-    width: 3.2,
-    render: (row) => (row.item_code ? `${row.item_name} (${row.item_code})` : row.item_name),
-  },
-  { header: "Indent", width: 1.3, render: (row) => row.indent_reference ?? "Direct" },
-  { header: "Qty", width: 0.7, align: "right", render: (row) => formatQuantity(row.quantity) },
-  { header: "Unit", width: 0.6, render: (row) => row.uom },
-  { header: "Rate", width: 1, align: "right", render: (row) => formatAmount(row.rate) },
-  {
-    header: "GST",
-    width: 0.6,
-    align: "right",
-    render: (row) => (row.gst_pct === null ? "—" : formatPercent(row.gst_pct)),
-  },
-  {
-    header: "Amount",
-    width: 1.2,
-    align: "right",
-    render: (row) =>
-      formatAmount(lineTotal({ quantity: row.quantity, rate: row.rate, gst_pct: row.gst_pct })),
-  },
-];
+const moneyOf = (row: PoLineRow): PoLineMoney => ({
+  quantity: row.quantity,
+  rate: row.rate,
+  gst_pct: row.gst_pct,
+  discount_pct: row.discount_pct,
+  discount_amount: row.discount_amount,
+  other_charges: row.other_charges,
+});
+
+function discountLabel(row: PoLineRow): string {
+  if (row.discount_pct != null) return formatPercent(row.discount_pct);
+  if (row.discount_amount != null) return formatAmount(row.discount_amount);
+  return "—";
+}
+
+function columnsFor(interState: boolean, showInvoiced: boolean): Column<PoLineRow>[] {
+  const columns: Column<PoLineRow>[] = [
+    { header: "#", width: 0.35, render: (_row, index) => String(index + 1) },
+    { header: "Code", width: 0.85, render: (row) => row.item_code ?? "—" },
+    {
+      header: "Material",
+      width: 2.5,
+      render: (row) => row.item_name,
+      detail: (row) =>
+        [row.item_category, row.item_description, row.note && `Note: ${row.note}`]
+          .filter(Boolean)
+          .join(" · ") || null,
+    },
+    {
+      header: "Indent · Work",
+      width: 1.5,
+      render: (row) => row.indent_reference ?? "Direct",
+      detail: (row) => row.work_label,
+    },
+    { header: "Qty", width: 0.7, align: "right", render: (row) => formatQuantity(row.quantity) },
+    { header: "Unit", width: 0.5, render: (row) => row.uom },
+  ];
+  if (showInvoiced) {
+    columns.push({
+      header: "Invoiced",
+      width: 0.75,
+      align: "right",
+      render: (row) => formatQuantity(row.billed_quantity),
+    });
+  }
+  columns.push(
+    { header: "Rate", width: 0.85, align: "right", render: (row) => formatAmount(row.rate) },
+    { header: "Disc.", width: 0.65, align: "right", render: discountLabel },
+    {
+      header: "Taxable",
+      width: 0.95,
+      align: "right",
+      render: (row) => formatAmount(lineFigures(moneyOf(row), interState)?.taxable),
+    },
+    {
+      header: "GST",
+      width: 0.5,
+      align: "right",
+      render: (row) => (row.gst_pct === null ? "—" : formatPercent(row.gst_pct)),
+    },
+    {
+      header: "Other",
+      width: 0.65,
+      align: "right",
+      render: (row) => (row.other_charges ? formatAmount(row.other_charges) : "—"),
+    },
+    {
+      header: "Amount",
+      width: 1,
+      align: "right",
+      render: (row) => formatAmount(lineFigures(moneyOf(row), interState)?.total),
+    },
+  );
+  return columns;
+}
 
 export function PoDocument({ data }: { data: PoPdfData }) {
-  const { po, vendor } = data;
-  const totals = rollUpPo(
-    po.lines.map((line) => ({ quantity: line.quantity, rate: line.rate, gst_pct: line.gst_pct })),
-  );
+  const { po, vendor, company } = data;
+  const regime = gstRegime(po.vendor_gst_state, company?.state);
+  const companyState = company?.state || DEFAULT_COMPANY_STATE;
+  const totals = rollUpPo(po.lines.map(moneyOf), regime.interState);
   const isDraft = po.status === "draft";
+  const showInvoiced = po.lines.some((line) => line.billed_quantity > 0);
 
   const meta: DocumentMeta = {
     documentType: "PURCHASE ORDER",
     reference: po.reference,
     footerLeft: `${po.project_name} · ${po.reference}`,
     isDraft,
+    company,
   };
 
   const deliverTo =
-    [data.deliver_store_name, po.deliver_note].filter(Boolean).join(" — ") || "As advised";
+    [po.deliver_store_name, po.deliver_note].filter(Boolean).join(" — ") || "As advised";
 
   return (
     <Document
@@ -143,18 +169,23 @@ export function PoDocument({ data }: { data: PoPdfData }) {
       creator="Goodearth Toolbox"
     >
       <DocumentPage meta={meta}>
-        <Text style={styles.h1}>{po.reference}</Text>
-        <Text style={styles.subtitle}>
-          {po.project_name}
-          {po.scope_name ? ` · ${po.scope_name}` : ""} · Purchase Order
-        </Text>
+        <DocumentHeading
+          title={po.reference}
+          subtitle={[po.project_name, po.scope_name ?? "General", "Purchase Order"].join(" · ")}
+        />
 
-        <View style={styles.metaBlock}>
-          <Meta label="Date" value={formatDate(po.issued_at ?? po.created_at)} />
-          <Meta label="Expected by" value={po.expected_by ? formatDate(po.expected_by) : "—"} />
-          <Meta label="Lines" value={String(po.line_count)} />
-          <Meta label="Status" value={isDraft ? "DRAFT — not an order" : "Issued"} />
-        </View>
+        <MetaBlock
+          items={[
+            { label: "Date", value: formatDate(po.issued_at ?? po.created_at) },
+            { label: "Expected by", value: po.expected_by ? formatDate(po.expected_by) : "—" },
+            { label: "Status", value: isDraft ? "DRAFT — not an order" : "Issued" },
+            { label: "Lines", value: String(po.line_count) },
+            { label: "Project", value: po.project_name },
+            { label: "Location", value: po.scope_name ?? "General" },
+            { label: "GST", value: regime.interState ? "IGST" : "CGST + SGST" },
+            { label: "Raised by", value: po.created_by_name ?? "—" },
+          ]}
+        />
 
         <View style={styles.partyRow}>
           <View style={styles.partyBox}>
@@ -164,6 +195,9 @@ export function PoDocument({ data }: { data: PoPdfData }) {
             {vendor.mobile && <Text style={styles.partyLine}>{vendor.mobile}</Text>}
             {vendor.address && <Text style={styles.partyLine}>{vendor.address}</Text>}
             {vendor.gst_no && <Text style={styles.partyLine}>GSTIN: {vendor.gst_no}</Text>}
+            {po.vendor_gst_state && (
+              <Text style={styles.partyLine}>State: {po.vendor_gst_state}</Text>
+            )}
           </View>
           <View style={styles.partyBox}>
             <Text style={styles.partyLabel}>Deliver to</Text>
@@ -171,60 +205,48 @@ export function PoDocument({ data }: { data: PoPdfData }) {
           </View>
         </View>
 
-        <Text style={styles.sectionLabel}>Order lines</Text>
-        <Text style={styles.currencyNote}>All amounts in Indian Rupees, inclusive of GST.</Text>
-        <DocumentTable columns={columns} rows={po.lines} />
+        <SectionLabel>Order lines</SectionLabel>
+        <Text style={styles.currencyNote}>
+          All amounts in Indian Rupees. A discount comes off before GST; other charges (freight,
+          loading) are added after it.{" "}
+          {regime.interState
+            ? `GST is IGST: a supply from outside ${companyState}.`
+            : `GST is CGST + SGST: a supply within ${companyState}.`}
+        </Text>
+        <DocumentTable columns={columnsFor(regime.interState, showInvoiced)} rows={po.lines} />
 
         <View style={styles.totalsBox} wrap={false}>
-          <View style={styles.totalsRow}>
-            <Text style={styles.totalsLabel}>Taxable value</Text>
-            <Text style={styles.totalsValue}>{formatAmount(totals.taxable)}</Text>
-          </View>
-          {[...totals.gstBySlab.entries()]
-            .sort(([a], [b]) => a - b)
-            .map(([slab, amount]) => (
-              <View key={slab} style={styles.totalsRow}>
-                <Text style={styles.totalsLabel}>GST {formatPercent(slab)}</Text>
-                <Text style={styles.totalsValue}>{formatAmount(amount)}</Text>
-              </View>
-            ))}
+          {summaryRows(totals, regime.interState).map((row) => (
+            <View key={row.label} style={styles.totalsRow}>
+              <Text style={styles.totalsLabel}>{row.label}</Text>
+              <Text style={styles.totalsValue}>{formatAmount(row.amount)}</Text>
+            </View>
+          ))}
           <View style={styles.grandRow}>
             <Text style={styles.grandLabel}>Grand total</Text>
             <Text style={styles.grandValue}>{formatAmount(totals.grand)}</Text>
           </View>
         </View>
 
-        {(po.terms || po.note) && (
-          <View style={styles.terms}>
-            {po.terms && <Text style={styles.termsText}>Terms: {po.terms}</Text>}
-            {po.note && <Text style={styles.termsText}>Note: {po.note}</Text>}
+        {/* Not kept whole: a full set of terms can run past one page. */}
+        {po.terms && (
+          <View>
+            <SectionLabel>Terms and conditions</SectionLabel>
+            <Text style={styles.termsText}>{po.terms}</Text>
           </View>
         )}
 
+        <NotesBlock notes={[{ label: "Remarks", text: po.note }]} />
+
         {!isDraft && (
-          <View style={styles.signatureRow}>
-            <View style={styles.signatureBox}>
-              <View style={styles.signatureRule}>
-                <Text style={styles.signatureLabel}>For Goodearth</Text>
-              </View>
-            </View>
-            <View style={styles.signatureBox}>
-              <View style={styles.signatureRule}>
-                <Text style={styles.signatureLabel}>Vendor acknowledgement</Text>
-              </View>
-            </View>
-          </View>
+          <Signatures
+            labels={[
+              `For ${company?.legal_name || company?.name || "Goodearth"}`,
+              "Vendor acknowledgement",
+            ]}
+          />
         )}
       </DocumentPage>
     </Document>
-  );
-}
-
-function Meta({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.metaItem}>
-      <Text style={styles.metaLabel}>{label}</Text>
-      <Text style={styles.metaValue}>{value}</Text>
-    </View>
   );
 }

@@ -3,6 +3,7 @@ import "server-only";
 import { cache } from "react";
 
 import { requireTool } from "@/lib/auth/access";
+import { istDayEndExclusive, istDayStart, type Filterable } from "@/lib/list-params";
 import { listPlots } from "@/lib/masters/plots";
 import { listProjects } from "@/lib/masters/projects";
 import { listWorkCategories, listWorkItems } from "@/lib/masters/works";
@@ -18,11 +19,13 @@ import {
   type DriftLine,
   type DriftStatus,
   type EstimatePullState as EstimateVerdict,
+  factsForWork,
   groupEstimatePull,
   type IssuedRevision,
   requestedByItem,
+  workingChangedSince,
 } from "./pull-rules";
-import type { IndentStatus } from "./workflow";
+import { stillToBuy, type IndentStatus } from "./workflow";
 
 // Indents reads the construction/selections/masters tables DIRECTLY,
 // under its own /indents grant. It deliberately does not call another
@@ -49,6 +52,9 @@ export type IndentListRow = {
   project_name: string;
   unit_name: string | null;
   line_count: number;
+  /** Lines still to buy — requested less what live POs ordered. Null
+   * unless the indent is approved: only approved indents get bought. */
+  lines_to_buy: number | null;
 };
 
 export type IndentListPage = {
@@ -88,41 +94,75 @@ export async function getWelcomeCounts() {
   };
 }
 
+export type IndentListFilters = {
+  page?: number;
+  status?: IndentStatus;
+  projectId?: string;
+  /** The work an indent serves (work_items.id). */
+  workItemId?: string;
+  /** Indent reference — already made safe by searchParam. */
+  q?: string;
+  /** Raised-on date range, YYYY-MM-DD, already checked by dateParam. */
+  from?: string;
+  to?: string;
+};
+
 export async function listIndents({
   page = 1,
   status,
-}: {
-  page?: number;
-  status?: IndentStatus;
-} = {}): Promise<IndentListPage> {
+  projectId,
+  workItemId,
+  q,
+  from,
+  to,
+}: IndentListFilters = {}): Promise<IndentListPage> {
   await requireTool("/indents");
   const supabase = await createClient();
 
   const pageSize = INDENTS_LIST_LIMIT;
   const currentPage = Math.max(1, page);
 
+  // Every filter in one place. created_at is a timestamp, so the "to" day
+  // runs up to — not including — the day after it.
+  const filtered = <T extends Filterable<T>>(query: T): T => {
+    let next = query;
+    if (status) next = next.eq("status", status);
+    if (projectId) next = next.eq("project_id", projectId);
+    if (workItemId) next = next.eq("work_item_id", workItemId);
+    if (from) next = next.gte("created_at", istDayStart(from));
+    if (to) next = next.lt("created_at", istDayEndExclusive(to));
+    if (q) next = next.or(`reference.ilike.*${q}*`);
+    return next;
+  };
+
   // A stated limit with an exact database count — the total is never
   // derived from the rows that happened to arrive.
-  let query = supabase
-    .from("indents")
-    .select(
-      "id, reference, status, stage, required_by, created_at, projects(name), units(name), indent_lines(count)",
-      { count: "exact" },
-    )
+  const { data, count, error } = await filtered(
+    supabase
+      .from("indents")
+      .select(
+        "id, reference, status, stage, required_by, created_at, projects(name), units(name), indent_lines(count)",
+        { count: "exact" },
+      ),
+  )
     .order("created_at", { ascending: false })
     .order("id")
     .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
-  if (status) query = query.eq("status", status);
-
-  const { data, count, error } = await query;
+  // A failed read is an error screen, never an empty list — "no indents"
+  // and "could not read the indents" mean opposite things.
   if (error) {
     console.error("listIndents failed:", error);
-    return { indents: [], total: 0, page: currentPage, pageCount: 1, pageSize };
+    throw new Error("Could not read the indents.", { cause: error });
   }
+
+  const linesToBuy = await countLinesToBuy(
+    supabase,
+    data.filter((row) => row.status === "approved").map((row) => row.id),
+  );
 
   const total = count ?? 0;
   return {
-    indents: (data ?? []).map((row) => ({
+    indents: data.map((row) => ({
       id: row.id,
       reference: row.reference ?? "—",
       status: row.status as IndentStatus,
@@ -132,11 +172,81 @@ export async function listIndents({
       project_name: (row.projects as { name: string } | null)?.name ?? "—",
       unit_name: (row.units as { name: string } | null)?.name ?? null,
       line_count: (row.indent_lines as { count: number }[] | null)?.[0]?.count ?? 0,
+      lines_to_buy: row.status === "approved" ? (linesToBuy.get(row.id) ?? 0) : null,
     })),
     total,
     page: currentPage,
     pageCount: Math.max(1, Math.ceil(total / pageSize)),
     pageSize,
+  };
+}
+
+/**
+ * For each of these (approved) indents, how many lines still have
+ * something to buy: requested less what non-cancelled POs ordered, from
+ * the money-free po_line_facts view (migration 0022) — quantities only,
+ * so a site user without /purchase-orders sees the same figure. Both
+ * reads are SUMMED, so they go through fetchAll: a silent 1,000-row cap
+ * would call a line fully ordered, or not ordered at all.
+ */
+async function countLinesToBuy(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  indentIds: string[],
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  if (indentIds.length === 0) return counts;
+
+  const lines = await fetchAll((rangeFrom, rangeTo) =>
+    supabase
+      .from("indent_lines")
+      .select("id, indent_id, quantity")
+      .in("indent_id", indentIds)
+      .order("id")
+      .range(rangeFrom, rangeTo),
+  );
+  const lineIds = lines.map((line) => line.id);
+  const facts = lineIds.length
+    ? await fetchAll((rangeFrom, rangeTo) =>
+        supabase
+          .from("po_line_facts")
+          .select("indent_line_id, quantity, po_status")
+          .in("indent_line_id", lineIds)
+          .order("id")
+          .range(rangeFrom, rangeTo),
+      )
+    : [];
+
+  const ordered = new Map<string, number>();
+  for (const fact of facts) {
+    if (fact.po_status === "cancelled" || !fact.indent_line_id) continue;
+    ordered.set(
+      fact.indent_line_id,
+      (ordered.get(fact.indent_line_id) ?? 0) + (fact.quantity ?? 0),
+    );
+  }
+
+  for (const line of lines) {
+    if (stillToBuy(line.quantity, ordered.get(line.id) ?? 0) > 0) {
+      counts.set(line.indent_id, (counts.get(line.indent_id) ?? 0) + 1);
+    }
+  }
+  return counts;
+}
+
+/** The list page's filter dropdowns — every project, and the active
+ * works (the one vocabulary, Masters). The reads are open; this wrapper
+ * is the gate. */
+export async function getIndentFilterOptions(): Promise<{
+  projects: { id: string; name: string }[];
+  works: { id: string; label: string }[];
+}> {
+  await requireTool("/indents");
+  const [projects, workItems] = await Promise.all([listProjects(), listWorkItems()]);
+  return {
+    projects: projects.map(({ id, name }) => ({ id, name })),
+    works: workItems
+      .filter((work) => work.is_active)
+      .map((work) => ({ id: work.id, label: `${work.name} — ${work.code}` })),
   };
 }
 
@@ -153,6 +263,10 @@ export type IndentLineRow = {
   item_thumb_url: string | null;
   quantity: number;
   uom: string;
+  /** The item's unit in Masters. Every line except an interiors one moves
+   * in it (a tile may be specified per sqft); a line saved in another unit
+   * before that rule shows a warning. */
+  item_default_uom: string | null;
   note: string | null;
   source: IndentLineSource;
   /** Who last touched the line — the attribution rule. */
@@ -199,6 +313,8 @@ export type IndentHeader = {
   project_id: string;
   project_name: string;
   unit_id: string | null;
+  /** The work the indent serves (0078), when it names one. */
+  work_item_id: string | null;
 };
 
 /**
@@ -212,7 +328,7 @@ export const getIndentHeader = cache(async (indentId: string): Promise<IndentHea
   const { data, error } = await withRetry(() =>
     supabase
       .from("indents")
-      .select("id, reference, status, project_id, unit_id, projects(name)")
+      .select("id, reference, status, project_id, unit_id, work_item_id, projects(name)")
       .eq("id", indentId)
       .maybeSingle(),
   );
@@ -231,6 +347,7 @@ export const getIndentHeader = cache(async (indentId: string): Promise<IndentHea
     project_id: data.project_id,
     project_name: (data.projects as { name: string } | null)?.name ?? "—",
     unit_id: data.unit_id,
+    work_item_id: data.work_item_id,
   };
 });
 
@@ -250,7 +367,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
       supabase
         .from("indent_lines")
         .select(
-          "id, item_id, quantity, uom, note, budget_id, line_key, construction_line_id, estimate_id, created_by, updated_by, created_at, items(name, code, thumb_url, brands(name))",
+          "id, item_id, quantity, uom, note, budget_id, line_key, construction_line_id, estimate_id, created_by, updated_by, created_at, items(name, code, thumb_url, default_uom, brands(name))",
         )
         .eq("indent_id", indentId)
         .order("created_at")
@@ -435,6 +552,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
       name: string;
       code: string | null;
       thumb_url: string | null;
+      default_uom: string | null;
       brands: { name: string } | null;
     } | null;
     const ordered = orderedByLine.get(line.id);
@@ -447,6 +565,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
       item_thumb_url: item?.thumb_url ?? null,
       quantity: line.quantity,
       uom: line.uom,
+      item_default_uom: item?.default_uom ?? null,
       note: line.note,
       source:
         line.budget_id != null
@@ -953,6 +1072,9 @@ export type EstimatePullRow = {
   /** Requested against ANY of this villa's estimates, in the item's
    * unit — the figure that says it is already covered. */
   already_requested: number;
+  /** Of that, what indents raised for this pull's work asked for; null
+   * when the pull is not for one work. */
+  already_requested_for_work: number | null;
   on_this_indent: boolean;
 };
 
@@ -960,21 +1082,36 @@ export type EstimatePull = {
   estimate_id: string;
   reference: string;
   submitted_at: string | null;
+  /** When the villa's working estimate changed after this official copy
+   * was made (0109) — its changes are not here yet. Null when it has not. */
+  working_changed_at: string | null;
   unit_name: string;
   rows: EstimatePullRow[];
   /** Rows of an older estimate that name no catalogue item. */
   unlinked_count: number;
+  /** The work the rows are for — the indent's, unless every work was
+   * asked for. Null when the pull covers every work. */
+  work: { id: string; label: string } | null;
+  /** The indent's own work, so the screen can offer to go back to it. */
+  indent_work: { id: string; label: string } | null;
+  /** Materials the official estimate has under OTHER works — what
+   * "Show every work" would add. */
+  other_work_material_count: number;
 };
 
 /**
  * The official estimate's takeoff for a unit, one row per item, annotated
  * with what has already been requested against this villa's estimates.
- * Returns null when the unit has no official estimate — the screen says
- * "submit one in the Estimator" for that.
+ * An indent raised for a work sees that work's materials (`factsForWork`)
+ * unless `allWorks` is asked for. Returns null when the unit's official
+ * estimate carries no materials at all — or it has none — and the screen
+ * says which to check.
  */
 export async function getEstimatePull(
   unitId: string,
   indentId: string,
+  indentWorkItemId: string | null,
+  allWorks: boolean,
 ): Promise<EstimatePull | null> {
   await requireTool("/indents");
   const supabase = await createClient();
@@ -994,11 +1131,12 @@ export async function getEstimatePull(
     quantity: number | null;
     item_id: string | null;
     item_uom_factor: number | null;
+    working_updated_at: string | null;
   }>((from, to) =>
     supabase
       .from("estimate_takeoff_facts")
       .select(
-        "estimate_id, reference, submitted_at, work_item_id, material_name, uom, quantity, item_id, item_uom_factor",
+        "estimate_id, reference, submitted_at, work_item_id, material_name, uom, quantity, item_id, item_uom_factor, working_updated_at",
       )
       .eq("unit_id", unitId)
       .order("work_item_id")
@@ -1023,8 +1161,16 @@ export async function getEstimatePull(
   if (usable.length === 0) return null;
   const head = usable[0];
 
+  const workItemId = allWorks ? null : indentWorkItemId;
+  const offered = factsForWork(usable, workItemId);
+  const otherWorkItems = new Set(
+    usable
+      .filter((fact) => workItemId && fact.work_item_id !== workItemId)
+      .map((fact) => fact.item_id ?? `unlinked:${fact.material_name}`),
+  );
+
   const itemIds = [
-    ...new Set(usable.map((fact) => fact.item_id).filter((id): id is string => !!id)),
+    ...new Set(offered.map((fact) => fact.item_id).filter((id): id is string => !!id)),
   ];
 
   // The villa's indents, so the double-buy figure can span every estimate
@@ -1032,13 +1178,16 @@ export async function getEstimatePull(
   // estimate's pulls are still material on its way to the same villa.
   const { data: villaIndents, error: indentsError } = await supabase
     .from("indents")
-    .select("id")
+    .select("id, work_item_id")
     .eq("unit_id", unitId);
   if (indentsError) {
     console.error("estimate pull indents read failed:", indentsError);
     throw new Error("Could not open the estimate.", { cause: indentsError });
   }
   const villaIndentIds = (villaIndents ?? []).map((indent) => indent.id);
+  const workByIndent = new Map(
+    (villaIndents ?? []).map((indent) => [indent.id, indent.work_item_id]),
+  );
 
   const [items, raised] = await Promise.all([
     itemIds.length
@@ -1071,7 +1220,25 @@ export async function getEstimatePull(
   ]);
 
   const itemById = new Map(items.map((item) => [item.id, item]));
-  const { requested, onThisIndent } = requestedByItem(raised, indentId);
+  const { requested, forWork, onThisIndent } = requestedByItem(
+    raised.map((line) => ({ ...line, work_item_id: workByIndent.get(line.indent_id) ?? null })),
+    indentId,
+    workItemId,
+  );
+
+  // Work labels — the works vocabulary is Masters, open to every reader.
+  const labelWorkIds = [workItemId, indentWorkItemId].filter((id): id is string => !!id);
+  const { data: works, error: worksError } = labelWorkIds.length
+    ? await supabase.from("work_items").select("id, code, name").in("id", labelWorkIds)
+    : { data: [], error: null };
+  if (worksError) {
+    console.error("estimate pull works read failed:", worksError);
+    throw new Error("Could not open the estimate.", { cause: worksError });
+  }
+  const workLabel = (id: string | null) => {
+    const work = id ? (works ?? []).find((row) => row.id === id) : undefined;
+    return work && id ? { id, label: `${work.name} — ${work.code}` } : null;
+  };
 
   const { data: unit, error: unitError } = await supabase
     .from("units")
@@ -1084,7 +1251,7 @@ export async function getEstimatePull(
   }
 
   const groups = groupEstimatePull(
-    usable,
+    offered,
     new Map(items.map((item) => [item.id, item.default_uom])),
   );
   const rows: EstimatePullRow[] = groups
@@ -1103,6 +1270,8 @@ export async function getEstimatePull(
         state: group.verdict.state,
         prefill_qty: group.verdict.state === "ready" ? group.verdict.prefillQty : null,
         already_requested: group.item_id ? (requested.get(group.item_id) ?? 0) : 0,
+        already_requested_for_work:
+          workItemId && group.item_id ? (forWork.get(group.item_id) ?? 0) : null,
         on_this_indent: group.item_id ? onThisIndent.has(group.item_id) : false,
       };
     })
@@ -1112,8 +1281,12 @@ export async function getEstimatePull(
     estimate_id: head.estimate_id,
     reference: head.reference ?? "—",
     submitted_at: head.submitted_at,
+    working_changed_at: workingChangedSince(head.submitted_at, head.working_updated_at),
     unit_name: unit?.name ?? "—",
     rows,
     unlinked_count: rows.filter((row) => row.state === "unlinked").length,
+    work: workLabel(workItemId),
+    indent_work: workLabel(indentWorkItemId),
+    other_work_material_count: otherWorkItems.size,
   };
 }

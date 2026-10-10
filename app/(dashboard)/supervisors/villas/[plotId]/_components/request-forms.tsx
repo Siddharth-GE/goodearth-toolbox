@@ -25,12 +25,15 @@ export function RequestIssueDialog({
   plotId,
   works,
   quickPicks,
+  hasEstimate,
   categories,
   brands,
 }: {
   plotId: string;
   works: WorkOption[];
   quickPicks: EstimateQuickPick[];
+  /** The villa has an official estimate, so anything outside it needs a reason. */
+  hasEstimate: boolean;
   categories: { id: string; name: string }[];
   brands: { id: string; name: string }[];
 }) {
@@ -39,6 +42,9 @@ export function RequestIssueDialog({
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const workPicks = quickPicks.filter((pick) => pick.workItemId === workItemId);
+  // The server decides again from the estimate; this only asks in time.
+  const offEstimate =
+    hasEstimate && item !== null && !workPicks.some((pick) => pick.itemId === item.id);
   const workCategories = [...new Set(works.map((work) => work.categoryName))];
 
   const choose = (picked: PickedLine[]) => {
@@ -126,10 +132,27 @@ export function RequestIssueDialog({
             <p className="text-muted text-xs">
               {workPicks.length > 0
                 ? "Pick from the estimate's list, or browse the whole catalogue."
-                : "This work has no materials in the estimate — browse the catalogue."}
+                : "The official estimate has no materials for this work yet (the QS adds them in the Estimator). You can still pick from the catalogue."}
             </p>
           )}
         </div>
+
+        {offEstimate && (
+          <div className="space-y-1.5">
+            <Label htmlFor="off_estimate_reason">Why is it needed?</Label>
+            <Textarea
+              id="off_estimate_reason"
+              name="off_estimate_reason"
+              rows={2}
+              required
+              placeholder="e.g. Extra waterproofing where the slab leaked"
+            />
+            <p className="text-muted text-xs">
+              It isn&apos;t on the official estimate for this work, so the estimator sees your
+              reason when they check it.
+            </p>
+          </div>
+        )}
 
         <div className="space-y-1.5">
           <Label htmlFor="quantity">Quantity{item ? ` (${item.uom})` : ""}</Label>

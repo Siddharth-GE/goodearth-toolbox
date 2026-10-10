@@ -1,6 +1,6 @@
 # Masters — the rules
 
-The shared reference data every tool reads: projects, plots, units, clients, vendors, stores, items (catalogue and materials), categories, brands, GST rates, construction stages, units of measure, works, item requests. Grant `/masters` for writes. **Masters is a shared surface, not a peer tool** — when it degrades, everything degrades, and that is expected.
+The shared reference data every tool reads: companies, projects, plots, units, clients, vendors, stores, items (catalogue and materials), categories, brands, GST rates, construction stages, units of measure, works, terms templates, item requests. Grant `/masters` for writes. **Masters is a shared surface, not a peer tool** — when it degrades, everything degrades, and that is expected.
 
 ## The rules everything rests on
 
@@ -11,9 +11,21 @@ The shared reference data every tool reads: projects, plots, units, clients, ven
 - **`plots` ↔ `units` is strictly 1:1** (`0029`), and `units` has a second FK to `plots`, so an embed through `units` names the key: `plots!units_plot_id_fkey`.
 - **One list of units of measure** (`uoms`, `0082`) for every unit column in the toolbox: picked, never typed; a FK by name, so a rename cascades; history excused (`NOT VALID`). Nothing stops two units meaning the same thing (cft, cuft) — look before adding one.
 - **Construction stages are picked, never typed** (`0053`); a rename cascades to indents.
-- **Works and construction stages are two vocabularies on purpose.** Stages (Foundation … Handover) are what construction budgets picked from; works are the site team's list — `work_categories` (FD) → optional `work_groups` (FD.3) → `work_items` (FD.4), loaded by `scripts/import-works.ts` — and they are what indents, issues, estimates and drawings name. A category's groups and works share one numbering space across two tables, so the actions check clashes the database cannot. Works codes (`FD.15`) are a second sanctioned code style beside `items.code`; don't harmonise them.
+- **Works and construction stages are two vocabularies on purpose.** Stages are what indents and construction budgets pick from; works are the site team's list — `work_categories` (FD) → optional `work_groups` (FD.3) → `work_items` (FD.4) — and they are what indents, issues, estimates and drawings name. Since the final workbook the eight stages carry the work categories' names (Engineering Consultation … MEP), but they stay two tables. A category's groups and works share one numbering space across two tables, so the actions check clashes the database cannot. Works codes (`FD.15`) are a second sanctioned code style beside `items.code`; don't harmonise them.
 - **Contractors are vendors** — `vendors.is_contractor` (`0073`) only filters the one counterparty list.
-- **Materials are items** (`kind = 'material'`, `0086`): 2,057 imported by `scripts/import-material-master.ts`, their rate `indicative_price`. 74 came without a price (`TODO.md`).
+- **Materials are items** (`kind = 'material'`, `0086`), their rate `indicative_price` — per the item's own unit, before GST. **It rises by itself, never falls** (`0103`, founder 2026-10-08): issuing a PO at a higher net rate (after discount, before GST, in the item's own unit) raises it, and `item_price_changes` logs the old rate, the new one and the PO — readable by `/masters` or `/purchase-orders` only; the items list names the PO through `po_facts`. A person lowers it by hand. Official estimates stay frozen; working estimates follow. Staging has the workbook's 1,118; production still has the 2,057 of `scripts/import-material-master.ts`, 74 without a price.
+- **Documents are printed under a company, and nobody picks it** (`0101`): a project belongs to one (`projects.company_id`), and every indent, PO, work order and bill takes its project's letterhead — and the company's `state` decides a PO's CGST + SGST or IGST. A project without one prints the placeholder letterhead and reckons GST against Kerala. **No seed**: Goodearth's real details are entered by a person, never invented (`PRODUCT.md`).
+- **Terms templates** (`document_terms`, `0101`) are named texts per kind (`po`, `work_order`), one default each (partial unique index; a new default is saved with the flag down first, so a name clash fails before the old default is cleared). A new PO or work order copies the default's text, so editing a template never rewrites a document already made. Work order _line_ templates are Bills' own.
+- **Companies and terms are switched off, never deleted** — no delete policy on either; documents already made keep naming them.
+
+## The founder's final masters workbook (2026-10-07)
+
+`scripts/import-masters-workbook.ts` loads Masters.xlsx: vendors and contractors, works with their labour rates (into the Estimator's rate book), material categories, materials and construction stages. Its cleaning rules are `lib/masters/masters-workbook.ts`, tested, with the founder's decisions in its header. On staging since 2026-10-07; production waits for ship day (`TODO.md`).
+
+- **It is the final list.** What the workbook no longer names is deleted, so it runs after `scripts/wipe-staging-records.ts`; while any record still points at a master it drops, it stops before writing.
+- **A blank cell keeps what the database has.** The sheet has no payment-terms column, so terms survive on every vendor it keeps.
+- **Look-alike vendor names stay apart** (Santhosh K / K Santhosh, GeoBricks / Geo Bricks …) — the founder's call. Merging is a Masters job, once someone knows they are one party.
+- **The "Project IDs" sheet is not read.** Companies, projects, plots and cost centres such as Rent House are their own step.
 
 ## Cross-tool writes into Masters, declared elsewhere
 

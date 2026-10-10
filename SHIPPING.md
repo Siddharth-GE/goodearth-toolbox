@@ -76,7 +76,7 @@ git checkout staging && git merge master --ff-only && git push
 
 - **`--project` is required everywhere and never defaults** — not to production, not to `.env.local`.
 - **Staging is a snapshot, not a mirror.** The right place to prove a screen works, the wrong place to prove a number is correct.
-- **Staging cannot email anyone** — every address but the founder's and the probe's is `@staging.invalid`. Reproduce a colleague's problem with the probe account and a grant.
+- **Staging emails real people.** The team's real addresses are there and colleagues sign in to try work (`STATUS.md`), so anything staging sends reaches a person — a script or trial that sends mail on staging needs the same care as production. `scripts/scramble-staging-emails.ts` turns them back into `@staging.invalid` if the founder ever wants staging closed again.
 - **Production has no backups** (free tier). Treat every production migration as unrepeatable.
 - **`staging.goodearthkannur.org` follows `staging` only**; a feature branch gets Vercel's generated address. A feature is not on the staging URL until merged into `staging`.
 
@@ -84,4 +84,4 @@ git checkout staging && git merge master --ff-only && git push
 
 The free tier pauses a project after **7 days without a request**. A paused project answers the management API with `status: INACTIVE`, its database host stops resolving, and the login page still renders — "the site is up" proves nothing. **Before any production step**, read `GET /v1/projects/pajfrgnkapicdgangjey` and expect `ACTIVE_HEALTHY`; if not, restore it from the Supabase dashboard (about four minutes).
 
-A weekly Vercel cron (`vercel.json`, Mondays 09:00 IST) calls `/api/keep-alive` on production, which reads one row through the admin client. It needs `CRON_SECRET` in Vercel's Production environment — unset, the route answers 503 and the cron log goes red. **Production was found paused again on 2026-09-25 anyway**, so the cron is not yet trusted (`TODO.md`). Crons run only on production.
+A weekly Vercel cron (`vercel.json`, Mondays 09:00 IST) calls `/api/keep-alive` on production, which reads one row through the admin client. It needs `CRON_SECRET` in Vercel's Production environment — unset, the route answers 503 and the cron log goes red. **Production paused anyway**, so the cron is not yet trusted (`TODO.md`). Crons run only on production.

@@ -7,8 +7,9 @@ A report builder over a dataset registry — columns, pickers-only filters, two-
 1. **A builder over any data**, not a shelf of fixed reports — with seven starting points (Project scorecard · Sales & collections · Spend vs budget · Site & procurement activity · Stock & inventory position · Plan vs actual · Design & delivery progress).
 2. **Full line-level money, including client rates and margin %** — a deliberate reversal of `0011`'s margin boundary. `/reporter` is grantable to anyone, and granting it shows every vendor rate, bill amount and margin; Settings says so in amber.
 3. **Graphs are core**, and the report must be beautifully designed.
-4. **Every filter offers choices, never typing** — a `lookup` picker for id fields, the data's own distinct values for categorical text; otherwise not filterable. `datasets.test.ts` enforces it.
-5. **A distinct count counts things, not labels** — five armchairs are all "Armchair", so a field carries `identityPath` to the row's id. Every dataset counting a name-labelled entity has this trap.
+4. **Every filter offers choices, never typing** — a `lookup` picker for id fields, the data's own distinct values for categorical text; otherwise not filterable. `datasets.test.ts` enforces it. The **search box over a result table** (2026-10-08) is not a filter: it narrows the rows already returned, by any printed cell, and says so when the page was cut to its row limit. The **quick filters** above the builder (date range, project, villa, vendor) write ordinary picker filters (`applyQuickFilters`, tested), so builder, saved report, CSV and PDF agree.
+5. **The detail totals row adds every matched row**, money always; a quantity column only when every row shares one unit — otherwise it reads "mixed units" (`totalsByColumn`), because 40 bags and 5 loads are not 45 of anything.
+6. **A distinct count counts things, not labels** — five armchairs are all "Armchair", so a field carries `identityPath` to the row's id. Every dataset counting a name-labelled entity has this trap.
 
 ## The two architectural ideas
 

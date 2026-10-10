@@ -83,9 +83,13 @@ export function canSendBack(status: BillStatus, decider: BillDecider): boolean {
   return status === "approved" && (decider.isAdmin || decider.isApprover);
 }
 
-/** Paying takes an approved bill and a real payment reference. */
-export function canMarkPaid(status: BillStatus, paymentRef: string): boolean {
-  return status === "approved" && paymentRef.trim() !== "";
+/**
+ * Money goes out only against an approved bill (0107): payments and
+ * advance recoveries, part or whole. It becomes paid by itself once they
+ * reach its total — there is no "mark paid".
+ */
+export function canTakePayment(status: BillStatus): boolean {
+  return status === "approved";
 }
 
 /**

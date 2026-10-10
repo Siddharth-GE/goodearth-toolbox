@@ -13,6 +13,7 @@ import {
 } from "@/lib/reporter/queries";
 import { builderDataset, encodeSpec, type ReportSpec } from "@/lib/reporter/spec";
 
+import { QuickFilters } from "./quick-filters";
 import { ReportBuilder } from "./report-builder";
 import { ReportChart } from "./report-chart";
 import { ReportSummary } from "./report-summary";
@@ -51,6 +52,13 @@ export async function ReportView({
 
   return (
     <>
+      <QuickFilters
+        spec={spec}
+        basePath={basePath}
+        projects={projects}
+        units={units}
+        vendors={vendors}
+      />
       <ReportBuilder
         dataset={builderDataset(spec.dataset)}
         spec={spec}

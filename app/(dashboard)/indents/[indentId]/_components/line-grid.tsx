@@ -22,6 +22,7 @@ import { formatCount, formatQuantity } from "@/lib/format";
 import { addDirectLines, removeLine, updateLine } from "@/lib/indents/actions";
 import type { IndentLineRow, IndentLineSource } from "@/lib/indents/queries";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
+import { stillToBuy } from "@/lib/indents/workflow";
 import { Calculator, PackageOpen, Palette, Trash2 } from "lucide-react";
 import { useState, useTransition } from "react";
 
@@ -123,6 +124,7 @@ export function LineGrid({
               <TableHeaderCell className="w-28">Qty</TableHeaderCell>
               <TableHeaderCell className="w-28">Unit</TableHeaderCell>
               {showOrdered && <TableHeaderCell className="w-36">Ordered</TableHeaderCell>}
+              {showOrdered && <TableHeaderCell className="w-24">To buy</TableHeaderCell>}
               <TableHeaderCell>Note</TableHeaderCell>
               <TableHeaderCell className="w-12">By</TableHeaderCell>
               {editable && <TableHeaderCell className="w-12"></TableHeaderCell>}
@@ -162,6 +164,26 @@ export function LineGrid({
             )
           }
         />
+      )}
+    </div>
+  );
+}
+
+/** The unit of a non-interiors line, as text. A line saved in another unit
+ * before the Masters-unit rule says so, because its next save switches it
+ * to the Masters unit and the quantity must be re-typed in that unit. */
+function UnitText({ line }: { line: IndentLineRow }) {
+  const master = line.item_default_uom;
+  const differs = master != null && master.trim().toLowerCase() !== line.uom.trim().toLowerCase();
+  return (
+    <div>
+      <span className="text-muted text-sm">{line.uom}</span>
+      {differs && (
+        <div className="mt-1">
+          <Badge variant="warning">
+            Masters says {master} — re-enter the quantity in {master}
+          </Badge>
+        </div>
       )}
     </div>
   );
@@ -257,26 +279,32 @@ function LineRow({
             />
           </TableCell>
           <TableCell>
-            {/* Saved immediately on change — a select has no meaningful
-                blur, and waiting for one loses the edit on remove/submit. */}
-            <Select
-              value={uom}
-              onChange={(event) => {
-                setUom(event.target.value);
-                save(event.target.value);
-              }}
-              className="h-9"
-              aria-label={`Unit for ${line.item_name}`}
-            >
-              {/* A saved unit that has since left the master stays
-                  choosable, so an old line can be reopened and saved. */}
-              {uom && !uoms.includes(uom) && <option value={uom}>{uom}</option>}
-              {uoms.map((unit) => (
-                <option key={unit} value={unit}>
-                  {unit}
-                </option>
-              ))}
-            </Select>
+            {line.source === "interiors" ? (
+              // Saved immediately on change — a select has no meaningful
+              // blur, and waiting for one loses the edit on remove/submit.
+              <Select
+                value={uom}
+                onChange={(event) => {
+                  setUom(event.target.value);
+                  save(event.target.value);
+                }}
+                className="h-9"
+                aria-label={`Unit for ${line.item_name}`}
+              >
+                {/* A saved unit that has since left the master stays
+                    choosable, so an old line can be reopened and saved. */}
+                {uom && !uoms.includes(uom) && <option value={uom}>{uom}</option>}
+                {uoms.map((unit) => (
+                  <option key={unit} value={unit}>
+                    {unit}
+                  </option>
+                ))}
+              </Select>
+            ) : (
+              // Every other line moves in the item's Masters unit — the
+              // server saves that whatever is sent (updateLine).
+              <UnitText line={line} />
+            )}
           </TableCell>
           <TableCell>
             <Input
@@ -310,7 +338,9 @@ function LineRow({
       ) : (
         <>
           <TableCell>{formatQuantity(line.quantity)}</TableCell>
-          <TableCell className="text-muted">{line.uom}</TableCell>
+          <TableCell className="text-muted">
+            {line.source === "interiors" ? line.uom : <UnitText line={line} />}
+          </TableCell>
           {showOrdered && (
             <TableCell>
               {line.ordered_quantity > 0 ? (
@@ -330,6 +360,17 @@ function LineRow({
                 </>
               ) : (
                 <span className="text-muted">not yet</span>
+              )}
+            </TableCell>
+          )}
+          {showOrdered && (
+            <TableCell>
+              {stillToBuy(line.quantity, line.ordered_quantity) > 0 ? (
+                <span className="text-foreground font-medium">
+                  {formatQuantity(stillToBuy(line.quantity, line.ordered_quantity))}
+                </span>
+              ) : (
+                <span className="text-muted">—</span>
               )}
             </TableCell>
           )}

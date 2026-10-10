@@ -5,7 +5,15 @@ import { labelsById, profileNames } from "@/lib/masters/names";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 
-import { INVENTORY_LIST_LIMIT, itemsById, poReferencesById, type Client } from "./queries";
+import type { Batch } from "./batches";
+import {
+  batchFactsById,
+  INVENTORY_LIST_LIMIT,
+  itemsById,
+  matchingItemIds,
+  poReferencesById,
+  type Client,
+} from "./queries";
 
 /**
  * Stock reads — the balance at every location, and how it got there.
@@ -52,6 +60,8 @@ export type StockPage = {
   pageCount: number;
   pageSize: number;
   locations: LocationOption[];
+  /** More items matched the search than it can carry — the screen says so. */
+  searchCapped: boolean;
 };
 
 /**
@@ -72,31 +82,56 @@ export async function listStockByLocation({
   page = 1,
   kind,
   locationId,
-}: { page?: number; kind?: LocationKind; locationId?: string } = {}): Promise<StockPage> {
+  q,
+}: {
+  page?: number;
+  kind?: LocationKind;
+  locationId?: string;
+  /** Item name or code — already made safe by searchParam. */
+  q?: string;
+} = {}): Promise<StockPage> {
   await requireTool("/inventory");
   const supabase = await createClient();
 
   const pageSize = INVENTORY_LIST_LIMIT;
   const currentPage = Math.max(1, page);
 
+  // The search is over items (an open Masters read): find the matching
+  // item ids first, then keep only the stock rows for those items.
+  const found = q ? await matchingItemIds(supabase, q, ["name", "code"]) : null;
+  if (found && found.ids.length === 0) {
+    const locations = await listStockLocations(supabase);
+    return {
+      rows: [],
+      total: 0,
+      page: currentPage,
+      pageCount: 1,
+      pageSize,
+      locations,
+      searchCapped: false,
+    };
+  }
+
   let query = supabase
     .from("stock_by_location")
-    .select("location_kind, location_id, item_id, quantity", { count: "exact" })
-    .order("location_kind")
-    .order("location_id")
-    .order("item_id")
-    .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
+    .select("location_kind, location_id, item_id, quantity", { count: "exact" });
   if (kind) query = query.eq("location_kind", kind);
   if (locationId) query = query.eq("location_id", locationId);
+  if (found) query = query.in("item_id", found.ids);
 
   const [{ data, count, error }, locations] = await Promise.all([
-    query,
+    query
+      .order("location_kind")
+      .order("location_id")
+      .order("item_id")
+      .range((currentPage - 1) * pageSize, currentPage * pageSize - 1),
     listStockLocations(supabase),
   ]);
 
+  // A failed read is an error screen, never "No stock recorded yet".
   if (error) {
     console.error("listStockByLocation failed:", error);
-    return { rows: [], total: 0, page: currentPage, pageCount: 1, pageSize, locations };
+    throw new Error("Could not read the stock.", { cause: error });
   }
 
   // View columns are all typed nullable — normalise once (see above).
@@ -159,6 +194,7 @@ export async function listStockByLocation({
     pageCount: Math.max(1, Math.ceil(total / pageSize)),
     pageSize,
     locations,
+    searchCapped: found?.capped ?? false,
   };
 }
 
@@ -484,6 +520,59 @@ export type StoreHolding = {
   uom: string;
   quantity: number;
 };
+
+/**
+ * The batches a store still holds (0108), per item, oldest first — the
+ * order an issue draws them in. Quantities from batch_on_hand (open, like
+ * stock_on_hand); each batch's rate from its receipt line. Stock from
+ * before batches has no row here: an issue draws it last, as "no batch".
+ */
+export async function listStoreBatches(
+  storeId: string,
+  itemId?: string,
+): Promise<Record<string, Batch[]>> {
+  await requireTool("/inventory");
+  const supabase = await createClient();
+
+  // Completeness-critical: a batch missing here would be previewed as
+  // stock with no batch, at no rate.
+  const data = await fetchAll((from, to) => {
+    let query = supabase
+      .from("batch_on_hand")
+      .select("receipt_line_id, item_id, quantity")
+      .eq("store_id", storeId)
+      .gt("quantity", 0);
+    if (itemId) query = query.eq("item_id", itemId);
+    return query.order("receipt_line_id").range(from, to);
+  });
+  const rows = data.filter(
+    (row): row is { receipt_line_id: string; item_id: string; quantity: number } =>
+      row.receipt_line_id != null && row.item_id != null && row.quantity != null,
+  );
+  const facts = await batchFactsById(
+    supabase,
+    rows.map((row) => row.receipt_line_id),
+  );
+
+  const byItem: Record<string, Batch[]> = {};
+  for (const row of rows) {
+    const batch = facts.get(row.receipt_line_id);
+    (byItem[row.item_id] ??= []).push({
+      receiptLineId: row.receipt_line_id,
+      label: batch?.label ?? "Batch",
+      receivedAt: batch?.receivedAt ?? "",
+      quantity: row.quantity,
+      rate: batch?.rate ?? null,
+    });
+  }
+  for (const batches of Object.values(byItem)) {
+    batches.sort(
+      (a, b) =>
+        a.receivedAt.localeCompare(b.receivedAt) || a.receiptLineId.localeCompare(b.receiptLineId),
+    );
+  }
+  return byItem;
+}
 
 export async function listStoreHoldings(storeId: string): Promise<StoreHolding[]> {
   await requireTool("/inventory");

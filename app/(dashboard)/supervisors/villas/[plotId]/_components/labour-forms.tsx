@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { deleteLabourLog, recordLabourLog, updateLabourLog } from "@/lib/supervisors/actions";
+import { LABOUR_KIND_LABEL, LABOUR_KINDS, type LabourKind } from "@/lib/supervisors/labour";
 import type { ContractorOption, LabourLogRow, WorkOption } from "@/lib/supervisors/queries";
 import { useState, useTransition } from "react";
 
@@ -15,15 +16,23 @@ import { useState, useTransition } from "react";
 function WorkSelect({
   works,
   name,
-  defaultValue,
+  value,
+  onChange,
 }: {
   works: WorkOption[];
   name: string;
-  defaultValue?: string;
+  value: string;
+  onChange: (workItemId: string) => void;
 }) {
   const categories = [...new Set(works.map((work) => work.categoryName))];
   return (
-    <Select name={name} defaultValue={defaultValue ?? ""} required>
+    <Select
+      id={name}
+      name={name}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      required
+    >
       <option value="" disabled>
         Pick the work…
       </option>
@@ -86,6 +95,9 @@ export function LabourLogDialog({
 }) {
   const isEdit = !!log;
   const today = new Date().toISOString().slice(0, 10);
+  const [kind, setKind] = useState<LabourKind>(log?.kind ?? "nmr");
+  const [work, setWork] = useState(log?.workItemId ?? workItemId ?? "");
+  const workUom = works.find((option) => option.id === work)?.uom ?? null;
 
   return (
     <RecordFormDialog
@@ -110,11 +122,7 @@ export function LabourLogDialog({
 
       <div className="space-y-1.5">
         <Label htmlFor="work_item_id">Work</Label>
-        <WorkSelect
-          works={works}
-          name="work_item_id"
-          defaultValue={log?.workItemId ?? workItemId}
-        />
+        <WorkSelect works={works} name="work_item_id" value={work} onChange={setWork} />
       </div>
 
       <div className="space-y-1.5">
@@ -131,11 +139,72 @@ export function LabourLogDialog({
         </Select>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
-        <CountField name="masons" label="Masons" defaultValue={log?.masons} />
-        <CountField name="helpers" label="Helpers" defaultValue={log?.helpers} />
-        <CountField name="others" label="Others" defaultValue={log?.others} />
+      <div className="space-y-1.5">
+        <Label htmlFor="kind">How is this paid?</Label>
+        <Select
+          id="kind"
+          name="kind"
+          value={kind}
+          onChange={(event) => setKind(event.target.value as LabourKind)}
+        >
+          {LABOUR_KINDS.map((option) => (
+            <option key={option} value={option}>
+              {LABOUR_KIND_LABEL[option]}
+            </option>
+          ))}
+        </Select>
       </div>
+
+      {kind === "nmr" && (
+        <div className="grid grid-cols-3 gap-3">
+          <CountField name="masons" label="Masons" defaultValue={log?.masons} />
+          <CountField name="helpers" label="Helpers" defaultValue={log?.helpers} />
+          <CountField name="others" label="Others" defaultValue={log?.others} />
+        </div>
+      )}
+
+      {kind === "pw_qty" && (
+        <div className="space-y-1.5">
+          <Label htmlFor="quantity">How much was done</Label>
+          <div className="flex items-center gap-2">
+            <Input
+              id="quantity"
+              name="quantity"
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step="any"
+              defaultValue={log?.quantity ?? ""}
+              disabled={!workUom}
+              className="flex-1"
+            />
+            <span className="text-foreground min-w-12 text-sm font-medium">{workUom ?? ""}</span>
+          </div>
+          <p className="text-muted text-xs">
+            {!work
+              ? "Pick the work first — the quantity is in its unit."
+              : workUom
+                ? `In ${workUom}, the work's unit in the rate book.`
+                : "This work has no unit in the rate book yet — log it as a lump sum, or ask the QS to set its unit."}
+          </p>
+        </div>
+      )}
+
+      {kind !== "nmr" && (
+        <div className="space-y-1.5">
+          <Label htmlFor="description">
+            {kind === "pw_lump" ? "What was done" : "What was done (optional)"}
+          </Label>
+          <Input
+            id="description"
+            name="description"
+            defaultValue={log?.description ?? ""}
+            placeholder={kind === "pw_lump" ? "e.g. Porch plastering, both coats" : ""}
+            autoComplete="off"
+            required={kind === "pw_lump"}
+          />
+        </div>
+      )}
 
       <div className="space-y-1.5">
         <Label htmlFor="note">Note (optional)</Label>

@@ -41,6 +41,7 @@ export function RecordFormDialog({
   children,
   trigger,
   onOpen,
+  wide = false,
 }: {
   /** Singular record name, e.g. "Vendor". Titles and buttons derive from it. */
   label: string;
@@ -56,6 +57,8 @@ export function RecordFormDialog({
    * effect watching `open`.
    */
   onOpen?: () => void;
+  /** A wider card for a form carrying a paragraph of text (Terms). */
+  wide?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -74,7 +77,7 @@ export function RecordFormDialog({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className={wide ? "sm:max-w-2xl" : undefined}>
         <DialogHeader>
           <DialogTitle>{isEdit ? `Edit ${label}` : `New ${label}`}</DialogTitle>
         </DialogHeader>

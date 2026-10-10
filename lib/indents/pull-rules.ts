@@ -262,16 +262,51 @@ export function groupEstimatePull(
  * EST/…/001 counted for nothing once EST/…/002 superseded it.
  */
 export function requestedByItem(
-  lines: { item_id: string; quantity: number; indent_id: string }[],
+  lines: { item_id: string; quantity: number; indent_id: string; work_item_id?: string | null }[],
   indentId: string,
-): { requested: Map<string, number>; onThisIndent: Set<string> } {
+  /** When the pull is for one work, `forWork` counts only lines on indents
+   * raised for that work; `requested` stays villa-wide either way. */
+  workItemId: string | null = null,
+): { requested: Map<string, number>; forWork: Map<string, number>; onThisIndent: Set<string> } {
   const requested = new Map<string, number>();
+  const forWork = new Map<string, number>();
   const onThisIndent = new Set<string>();
   for (const line of lines) {
     requested.set(line.item_id, (requested.get(line.item_id) ?? 0) + line.quantity);
+    if (workItemId && line.work_item_id === workItemId) {
+      forWork.set(line.item_id, (forWork.get(line.item_id) ?? 0) + line.quantity);
+    }
     if (line.indent_id === indentId) onThisIndent.add(line.item_id);
   }
-  return { requested, onThisIndent };
+  return { requested, forWork, onThisIndent };
+}
+
+/**
+ * The takeoff rows a pull offers. An indent raised for one work offers
+ * that work's materials only — listing the whole villa under "Footing" is
+ * how "only cement appears" read as missing sand, jelly and steel
+ * (2026-10-08). No work on the indent, or "every work" asked for, offers
+ * everything.
+ */
+export function factsForWork<T extends { work_item_id: string | null }>(
+  facts: T[],
+  workItemId: string | null,
+): T[] {
+  return workItemId ? facts.filter((fact) => fact.work_item_id === workItemId) : facts;
+}
+
+/**
+ * When the villa's working estimate changed after the official copy a pull
+ * reads was made (0109) — the date to warn with, or null when it has not.
+ * Equal is not "after": making an estimate official writes everything in
+ * one transaction, sharing one clock reading.
+ */
+export function workingChangedSince(
+  submittedAt: string | null,
+  workingUpdatedAt: string | null,
+): string | null {
+  if (!submittedAt || !workingUpdatedAt) return null;
+  return Date.parse(workingUpdatedAt) > Date.parse(submittedAt) ? workingUpdatedAt : null;
 }
 
 /** Six places, the estimator's rounding — sums of decimals drift otherwise. */

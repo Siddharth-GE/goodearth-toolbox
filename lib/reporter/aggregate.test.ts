@@ -315,3 +315,16 @@ test("extractRows flattens embeds, tolerates array-wrapped to-ones, nulls the re
   assert.equal(row.stage, null);
   assert.equal(row.quantity, 4);
 });
+
+test("the detail totals row adds every matched row, not the rows shown", () => {
+  const result = runReport(dataset, spec({ columns: ["item", "quantity"], limit: 10 }), rows, 5);
+  // Mixed units (bag, load, kg): a quantity total would be nonsense.
+  assert.equal(result.columnTotals.quantity, null);
+  assert.deepEqual(result.mixedUnitColumns, ["quantity"]);
+
+  const bags = rows.filter((row) => row.uom === "bag");
+  const sameUnit = runReport(dataset, spec({ columns: ["item", "quantity"], limit: 10 }), bags, 3);
+  assert.equal(sameUnit.columnTotals.quantity, 60);
+  assert.deepEqual(sameUnit.mixedUnitColumns, []);
+  assert.equal("item" in sameUnit.columnTotals, false, "text columns have no total");
+});

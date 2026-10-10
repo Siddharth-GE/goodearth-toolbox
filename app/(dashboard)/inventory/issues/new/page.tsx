@@ -2,10 +2,11 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageTitle } from "@/components/ui/page-title";
 import { Select } from "@/components/ui/select";
 import { formatQuantity } from "@/lib/format";
+import type { Batch } from "@/lib/inventory/batches";
 import { getIssueFormOptions } from "@/lib/inventory/issues-queries";
 import { getSiteRequest } from "@/lib/inventory/requests-queries";
 import { listWorkCategories, listWorkItems } from "@/lib/masters/works";
-import { listStoreHoldings } from "@/lib/inventory/stock-queries";
+import { listStoreBatches, listStoreHoldings } from "@/lib/inventory/stock-queries";
 import { PackageMinus } from "lucide-react";
 import Link from "next/link";
 import { IssueForm } from "../../_components/issue-form";
@@ -22,9 +23,10 @@ export default async function NewIssuePage({
   searchParams: Promise<{ store?: string; request?: string }>;
 }) {
   const { store, request: requestId } = await searchParams;
-  const [options, holdings, workItems, workCategories, request] = await Promise.all([
+  const [options, holdings, batches, workItems, workCategories, request] = await Promise.all([
     getIssueFormOptions(),
     store ? listStoreHoldings(store) : Promise.resolve([]),
+    store ? listStoreBatches(store) : Promise.resolve<Record<string, Batch[]>>({}),
     listWorkItems(),
     listWorkCategories(),
     // Step H: arriving from the requests queue prefills the form.
@@ -104,6 +106,7 @@ export default async function NewIssuePage({
         <IssueForm
           store={chosen}
           holdings={holdings}
+          batches={batches}
           options={options}
           works={works}
           request={openRequest}

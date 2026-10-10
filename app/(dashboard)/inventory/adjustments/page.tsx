@@ -1,6 +1,7 @@
 import { ItemThumb } from "@/components/masters/item-thumb";
 import { Attribution } from "@/components/ui/attribution";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ListToolbar } from "@/components/ui/list-toolbar";
 import { PageTitle } from "@/components/ui/page-title";
 import { Pagination } from "@/components/ui/pagination";
 import {
@@ -13,6 +14,8 @@ import {
 } from "@/components/ui/table";
 import { formatDate, formatQuantity } from "@/lib/format";
 import { listStockAdjustments } from "@/lib/inventory/issues-queries";
+import { getInventoryFilterOptions } from "@/lib/inventory/queries";
+import { dateParam, idParam, searchParam } from "@/lib/list-params";
 import { listBrands } from "@/lib/masters/brands";
 import { listItemCategories } from "@/lib/masters/item-categories";
 import { SlidersHorizontal } from "lucide-react";
@@ -22,21 +25,44 @@ import { AdjustmentForm } from "../_components/adjustment-form";
 export default async function AdjustmentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{
+    page?: string;
+    q?: string;
+    store?: string;
+    from?: string;
+    to?: string;
+  }>;
 }) {
-  const { page } = await searchParams;
+  const raw = await searchParams;
+  const store = idParam(raw.store);
+  const q = searchParam(raw.q);
+  const from = dateParam(raw.from);
+  const to = dateParam(raw.to);
+
   const [
     { adjustments, total, page: currentPage, pageCount, pageSize, stores },
     categories,
     brands,
+    filterOptions,
   ] = await Promise.all([
-    listStockAdjustments({ page: Number(page) || 1 }),
+    listStockAdjustments({ page: Number(raw.page) || 1, storeId: store, q, from, to }),
     listItemCategories(),
     listBrands(),
+    getInventoryFilterOptions(),
   ]);
 
-  const hrefForPage = (target: number) =>
-    target > 1 ? `/inventory/adjustments?page=${target}` : "/inventory/adjustments";
+  const filtered = Boolean(store || q || from || to);
+
+  const hrefForPage = (target: number) => {
+    const params = new URLSearchParams();
+    if (store) params.set("store", store);
+    if (q) params.set("q", q);
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    if (target > 1) params.set("page", String(target));
+    const query = params.toString();
+    return query ? `/inventory/adjustments?${query}` : "/inventory/adjustments";
+  };
 
   return (
     <div className="space-y-4">
@@ -61,11 +87,30 @@ export default async function AdjustmentsPage({
         />
       )}
 
+      <ListToolbar
+        action="/inventory/adjustments"
+        values={{ q, from, to, store }}
+        search={{ placeholder: "Words in the reason…" }}
+        dates={{ label: "Dated" }}
+        filters={[
+          {
+            param: "store",
+            label: "Store",
+            allLabel: "All stores",
+            options: filterOptions.stores.map((row) => ({ value: row.id, label: row.name })),
+          },
+        ]}
+      />
+
       {adjustments.length === 0 ? (
         <EmptyState
           icon={SlidersHorizontal}
-          title="No adjustments recorded"
-          description="Every hand-made change to a count shows up here, with who made it and why."
+          title={filtered ? "No adjustments match these filters" : "No adjustments recorded"}
+          description={
+            filtered
+              ? undefined
+              : "Every hand-made change to a count shows up here, with who made it and why."
+          }
         />
       ) : (
         <>

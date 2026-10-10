@@ -12,7 +12,7 @@ import {
   canDeleteBill,
   canEditBill,
   canEditContract,
-  canMarkPaid,
+  canTakePayment,
   canSendBack,
   exceedsAnchor,
   exceedsApprovalLimit,
@@ -94,11 +94,10 @@ test("send-back takes an approved bill and a decider", () => {
   assert.equal(canSendBack("paid", approver), false);
 });
 
-test("paying takes an approved bill and a real payment reference", () => {
-  assert.equal(canMarkPaid("approved", "UTR123"), true);
-  assert.equal(canMarkPaid("approved", "   "), false);
-  assert.equal(canMarkPaid("recorded", "UTR123"), false);
-  assert.equal(canMarkPaid("paid", "UTR123"), false);
+test("money goes out only against an approved bill", () => {
+  assert.equal(canTakePayment("approved"), true);
+  assert.equal(canTakePayment("recorded"), false);
+  assert.equal(canTakePayment("paid"), false);
 });
 
 test("a recorded bill is its recorder's (or an admin's) to delete, never once approved", () => {

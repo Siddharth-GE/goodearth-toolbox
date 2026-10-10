@@ -13,6 +13,7 @@ import {
 import { formatDate, formatQuantity } from "@/lib/format";
 import { listBrands } from "@/lib/masters/brands";
 import { listItemCategories } from "@/lib/masters/item-categories";
+import { describeLabour } from "@/lib/supervisors/labour";
 import {
   getVillaDetail,
   listContractors,
@@ -59,6 +60,7 @@ export default async function VillaPage({ params }: { params: Promise<{ plotId: 
             <RequestIssueDialog
               plotId={plotId}
               works={works}
+              hasEstimate={villa.estimate !== null}
               quickPicks={villa.quickPicks}
               categories={pickerCategories}
               brands={pickerBrands}
@@ -156,24 +158,28 @@ export default async function VillaPage({ params }: { params: Promise<{ plotId: 
                     {formatDate(log.logDate)} · {log.contractorName}
                   </p>
                   <p className="text-muted text-xs">
-                    {log.workLabel} — {countLine(log.masons, log.helpers, log.others)}
-                    {log.note ? ` · ${log.note}` : ""}
+                    {`${log.workLabel} — ${describeLabour(log)}${log.note ? ` · ${log.note}` : ""}`}
                   </p>
                 </div>
-                <div className="flex items-center gap-1">
-                  <LabourLogDialog
-                    plotId={plotId}
-                    works={works}
-                    contractors={contractors}
-                    log={log}
-                    trigger={
-                      <button className="text-accent text-sm font-medium" type="button">
-                        Edit
-                      </button>
-                    }
-                  />
-                  <DeleteLabourLogButton logId={log.id} />
-                </div>
+                {/* A log on a bill is frozen (0104): it shows its bill instead. */}
+                {log.billId ? (
+                  <Badge variant="neutral">{`Billed · ${log.billReference ?? "on a bill"}`}</Badge>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <LabourLogDialog
+                      plotId={plotId}
+                      works={works}
+                      contractors={contractors}
+                      log={log}
+                      trigger={
+                        <button className="text-accent text-sm font-medium" type="button">
+                          Edit
+                        </button>
+                      }
+                    />
+                    <DeleteLabourLogButton logId={log.id} />
+                  </div>
+                )}
               </li>
             ))}
           </ul>
@@ -205,6 +211,11 @@ export default async function VillaPage({ params }: { params: Promise<{ plotId: 
                       ? ` · ${request.declinedReason}`
                       : ""}
                   </p>
+                  {request.offEstimateReason && (
+                    <p className="text-muted text-xs">
+                      {`Not on the estimate — ${request.offEstimateReason}`}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <RequestBadge status={request.status} />
@@ -308,14 +319,6 @@ export default async function VillaPage({ params }: { params: Promise<{ plotId: 
       </div>
     </div>
   );
-}
-
-function countLine(masons: number, helpers: number, others: number): string {
-  const parts: string[] = [];
-  if (masons) parts.push(`${masons} mason${masons === 1 ? "" : "s"}`);
-  if (helpers) parts.push(`${helpers} helper${helpers === 1 ? "" : "s"}`);
-  if (others) parts.push(`${others} other${others === 1 ? "" : "s"}`);
-  return parts.join(" · ");
 }
 
 function RequestBadge({ status }: { status: IssueRequestRow["status"] }) {

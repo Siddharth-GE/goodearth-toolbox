@@ -19,7 +19,8 @@ import { listItems, type ItemKind } from "@/lib/masters/items";
 import { listActiveUomNames } from "@/lib/masters/uoms";
 import { Package } from "lucide-react";
 import { ItemFormDialog } from "./_components/item-form-dialog";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
+import { latestPriceRaises, type PriceRaise } from "@/lib/masters/item-price-changes";
 
 // Indian digit grouping (1,23,456) — the catalogue runs to lakh-scale prices.
 export default async function ItemsPage({
@@ -40,6 +41,8 @@ export default async function ItemsPage({
     listActiveUomNames(),
   ]);
   const { items, total, page: currentPage, pageSize, pageCount } = result;
+  // The newest rise a PO made to each rate on this page (0103).
+  const raises = await latestPriceRaises(items.map((item) => item.id));
 
   const categoryName = (id: string) => categories.find((c) => c.id === id)?.name ?? "—";
   const brandName = (id: string | null) =>
@@ -141,6 +144,7 @@ export default async function ItemsPage({
                   <TableCell>{brandName(item.brand_id)}</TableCell>
                   <TableCell>
                     {item.indicative_price != null ? formatMoney(item.indicative_price) : "—"}
+                    <PriceRaiseHint raise={raises.get(item.id)} />
                   </TableCell>
                   <TableCell>
                     <ItemFormDialog
@@ -168,5 +172,15 @@ export default async function ItemsPage({
         </>
       )}
     </div>
+  );
+}
+
+/** "Raised from ₹345 by PO/SAA/P1/007 · 03 Oct 2026" — the newest PO rise. */
+function PriceRaiseHint({ raise }: { raise: PriceRaise | undefined }) {
+  if (!raise) return null;
+  const from = raise.old_price != null ? ` from ${formatMoney(raise.old_price)}` : "";
+  const by = raise.po_reference ? ` by ${raise.po_reference}` : " by a purchase order";
+  return (
+    <p className="text-muted mt-0.5 text-xs">{`Raised${from}${by} · ${formatDate(raise.changed_at)}`}</p>
   );
 }

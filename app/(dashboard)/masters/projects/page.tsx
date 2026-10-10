@@ -8,6 +8,7 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/components/ui/table";
+import { listCompanies } from "@/lib/masters/companies";
 import { listProjects, type ProjectStatus, type ProjectType } from "@/lib/masters/projects";
 import { Boxes } from "lucide-react";
 import Link from "next/link";
@@ -26,12 +27,14 @@ const STATUS_VARIANT: Record<ProjectStatus, "info" | "success" | "default"> = {
 };
 
 export default async function ProjectsPage() {
-  const projects = await listProjects();
+  const [projects, companies] = await Promise.all([listProjects(), listCompanies()]);
+  const companyName = (id: string | null) =>
+    id ? (companies.find((company) => company.id === id)?.name ?? "—") : "—";
 
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <ProjectFormDialog />
+        <ProjectFormDialog companies={companies} />
       </div>
 
       {projects.length === 0 ? (
@@ -48,6 +51,7 @@ export default async function ProjectsPage() {
               <TableHeaderCell>Code</TableHeaderCell>
               <TableHeaderCell>Location</TableHeaderCell>
               <TableHeaderCell>Type</TableHeaderCell>
+              <TableHeaderCell>Company</TableHeaderCell>
               <TableHeaderCell>Status</TableHeaderCell>
               <TableHeaderCell></TableHeaderCell>
             </TableRow>
@@ -63,13 +67,14 @@ export default async function ProjectsPage() {
                 <TableCell className="font-mono text-xs">{project.code || "—"}</TableCell>
                 <TableCell>{project.location || "—"}</TableCell>
                 <TableCell>{TYPE_LABELS[project.project_type]}</TableCell>
+                <TableCell>{companyName(project.company_id)}</TableCell>
                 <TableCell>
                   <Badge variant={STATUS_VARIANT[project.status]} className="capitalize">
                     {project.status}
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  <ProjectFormDialog project={project} />
+                  <ProjectFormDialog project={project} companies={companies} />
                 </TableCell>
               </TableRow>
             ))}

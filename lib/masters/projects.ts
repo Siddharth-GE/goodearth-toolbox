@@ -16,6 +16,9 @@ export type ProjectRow = {
   location: string | null;
   project_type: ProjectType;
   status: ProjectStatus;
+  // The company its documents print under (0101); null prints the
+  // placeholder letterhead.
+  company_id: string | null;
   created_at: string;
   updated_at: string | null;
   updated_by: string | null;

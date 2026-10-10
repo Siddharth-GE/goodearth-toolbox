@@ -98,12 +98,13 @@ export const VIEW_MANIFEST: Record<string, ViewExpectation> = {
       "quantity",
       "item_id",
       "item_uom_factor",
+      "working_updated_at",
     ],
     guards: ["/estimator", "/indents", "/inventory", "/supervisors"],
     barrier: true,
     invoker: false,
     money: false,
-    why: "The official estimate's frozen material takeoff — what Indents pulls from and issues are compared against. /supervisors joined 0084 so a request for issue shows the estimate's figure beside it. Quantities and the catalogue link only: the snapshot's rate column stays behind /estimator, because adding it here would put construction pricing in front of every site engineer or supervisor.",
+    why: "The official estimate's frozen material takeoff — what Indents pulls from and issues are compared against. /supervisors joined 0084 so a request for issue shows the estimate's figure beside it. Quantities and the catalogue link only: the snapshot's rate column stays behind /estimator, because adding it here would put construction pricing in front of every site engineer or supervisor. working_updated_at (0109) is when the villa's working estimate last changed — a date, so Indents can say the official copy it reads is out of date.",
   },
   po_facts: {
     columns: [
@@ -368,5 +369,54 @@ export const VIEW_MANIFEST: Record<string, ViewExpectation> = {
     invoker: true,
     money: true,
     why: "THE ONE security_invoker VIEW, and it must stay one. It carries unit_cost, margin_pct and client_rate, so it has to INHERIT row-level security rather than bypass it — its guards list is empty precisely because the policies on the tables underneath are doing the work. If invoker ever goes false here, every rupee of margin in the company is readable by anyone signed in.",
+  },
+
+  // -------------------------------------------------------------------
+  // The ERP corrections (0104–0108, 2026-10-08).
+  // -------------------------------------------------------------------
+  work_unit_facts: {
+    columns: ["work_item_id", "uom"],
+    guards: [],
+    barrier: false,
+    invoker: false,
+    money: false,
+    why: "A supervisor logging piece-work (0104) must see the work's unit — '2 cum' — and the unit lives in the /estimator-gated estimator_work_info beside the labour rate. The unit and nothing else: labour_rate must never appear here.",
+  },
+  work_labour_rate_facts: {
+    columns: ["work_item_id", "uom", "labour_rate"],
+    guards: ["/bills", "/estimator"],
+    barrier: true,
+    invoker: false,
+    money: true,
+    why: "The rate book's labour rate per work, offered on a work order line and a piece-work bill (0105). Money behind a gate: the two tools that price labour. Never widen it to /supervisors — the site phone carries no rupees.",
+  },
+  po_line_billing_facts: {
+    columns: [
+      "po_line_id",
+      "po_id",
+      "item_id",
+      "uom",
+      "ordered_quantity",
+      "received_quantity",
+      "billed_quantity",
+      "rate",
+      "gst_pct",
+      "discount_pct",
+      "discount_amount",
+      "other_charges",
+    ],
+    guards: ["/bills", "/purchase-orders"],
+    barrier: true,
+    invoker: false,
+    money: true,
+    why: "A material bill pre-fills from its PO's lines (0106), and a /bills-only user cannot read purchase_order_lines. The second sanctioned window between POs and bills, beside po_billing_totals, for the same two tools that already see both sides' money.",
+  },
+  batch_on_hand: {
+    columns: ["receipt_line_id", "store_id", "item_id", "received_at", "quantity"],
+    guards: [],
+    barrier: false,
+    invoker: false,
+    money: false,
+    why: "What is left of each store batch (0108). Quantities only, open like stock_on_hand; a batch's rate lives in the gated goods_receipt_line_rates and must never be joined in here.",
   },
 };

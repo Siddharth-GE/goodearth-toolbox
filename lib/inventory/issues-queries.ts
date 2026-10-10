@@ -3,12 +3,14 @@ import "server-only";
 import { cache } from "react";
 
 import { requireTool } from "@/lib/auth/access";
+import type { Filterable } from "@/lib/list-params";
 import { labelsById, profileNames } from "@/lib/masters/names";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
+import { issueValue, recordedDraws, type BatchDraw } from "./batches";
 import { findOverIssues, type OverIssueRow } from "./over-issue";
 
-import { INVENTORY_LIST_LIMIT, itemsById, listActiveStores } from "./queries";
+import { batchFactsById, INVENTORY_LIST_LIMIT, itemsById, listActiveStores } from "./queries";
 
 /**
  * Issues and adjustments reads — material leaving a store (to a site or
@@ -36,26 +38,62 @@ export type IssuePage = {
   pageSize: number;
 };
 
-export async function listStockIssues({ page = 1 }: { page?: number } = {}): Promise<IssuePage> {
+export type IssueListFilters = {
+  page?: number;
+  projectId?: string;
+  /** The store the material went out of. */
+  storeId?: string;
+  plotId?: string;
+  /** Issue reference — already made safe by searchParam. */
+  q?: string;
+  /** Issued-on date range, YYYY-MM-DD, already checked by dateParam. */
+  from?: string;
+  to?: string;
+};
+
+export async function listStockIssues({
+  page = 1,
+  projectId,
+  storeId,
+  plotId,
+  q,
+  from,
+  to,
+}: IssueListFilters = {}): Promise<IssuePage> {
   await requireTool("/inventory");
   const supabase = await createClient();
 
   const pageSize = INVENTORY_LIST_LIMIT;
   const currentPage = Math.max(1, page);
 
-  const { data, count, error } = await supabase
-    .from("stock_issues")
-    .select(
-      "id, reference, store_id, to_store_id, plot_id, work_item_id, issued_at, created_by, stock_issue_lines(count), work_items(name)",
-      { count: "exact" },
-    )
+  // Every filter in one place. issued_at is a date, so `to` is plain lte.
+  const filtered = <T extends Filterable<T>>(query: T): T => {
+    let next = query;
+    if (projectId) next = next.eq("project_id", projectId);
+    if (storeId) next = next.eq("store_id", storeId);
+    if (plotId) next = next.eq("plot_id", plotId);
+    if (from) next = next.gte("issued_at", from);
+    if (to) next = next.lte("issued_at", to);
+    if (q) next = next.or(`reference.ilike.*${q}*`);
+    return next;
+  };
+
+  const { data, count, error } = await filtered(
+    supabase
+      .from("stock_issues")
+      .select(
+        "id, reference, store_id, to_store_id, plot_id, work_item_id, issued_at, created_by, stock_issue_lines(count), work_items(name)",
+        { count: "exact" },
+      ),
+  )
     .order("issued_at", { ascending: false })
     .order("id")
     .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
 
+  // A failed read is an error screen, never an empty list.
   if (error) {
     console.error("listStockIssues failed:", error);
-    return { issues: [], total: 0, page: currentPage, pageCount: 1, pageSize };
+    throw new Error("Could not read the issues.", { cause: error });
   }
 
   const rows = data ?? [];
@@ -111,6 +149,9 @@ export type IssueDetail = {
   issued_at: string;
   note: string | null;
   issued_by_name: string | null;
+  project_name: string;
+  /** The project's company (0101); null until Masters gives it one. */
+  company_name: string | null;
   lines: {
     id: string;
     item_name: string;
@@ -121,7 +162,13 @@ export type IssueDetail = {
     uom: string;
     note: string | null;
     recorded_by_name: string | null;
+    /** The batches it drew (0108), and any stock older than batches. */
+    draws: BatchDraw[];
+    /** At each batch's rate, before GST; null if any part has no rate. */
+    value: number | null;
   }[];
+  /** Null if any line's value is unknown — never a smaller number. */
+  total_value: number | null;
 };
 
 export const getStockIssue = cache(async (issueId: string): Promise<IssueDetail | null> => {
@@ -131,7 +178,7 @@ export const getStockIssue = cache(async (issueId: string): Promise<IssueDetail 
   const { data: issue } = await supabase
     .from("stock_issues")
     .select(
-      "id, reference, store_id, to_store_id, plot_id, work_item_id, issued_at, note, created_by, work_items(name, work_categories(name))",
+      "id, reference, store_id, to_store_id, plot_id, work_item_id, issued_at, note, created_by, work_items(name, work_categories(name)), projects(name, companies(name))",
     )
     .eq("id", issueId)
     .maybeSingle();
@@ -147,10 +194,34 @@ export const getStockIssue = cache(async (issueId: string): Promise<IssueDetail 
       .range(from, to),
   );
 
-  const [items, stores, plots, names] = await Promise.all([
+  // What each line took out of the source store, batch by batch. A
+  // transfer also lands the same batches in the receiving store — the
+  // positive rows, not wanted here.
+  const movements = lines.length
+    ? await fetchAll((from, to) =>
+        supabase
+          .from("stock_batch_movements")
+          .select("issue_line_id, receipt_line_id, quantity")
+          .in(
+            "issue_line_id",
+            lines.map((line) => line.id),
+          )
+          .eq("store_id", issue.store_id)
+          .lt("quantity", 0)
+          .order("created_at")
+          .order("id")
+          .range(from, to),
+      )
+    : [];
+
+  const [items, batches, stores, plots, names] = await Promise.all([
     itemsById(
       supabase,
       lines.map((line) => line.item_id),
+    ),
+    batchFactsById(
+      supabase,
+      movements.map((movement) => movement.receipt_line_id),
     ),
     labelsById(supabase, "stores", [issue.store_id, issue.to_store_id]),
     labelsById(supabase, "plots", [issue.plot_id]),
@@ -160,6 +231,38 @@ export const getStockIssue = cache(async (issueId: string): Promise<IssueDetail 
     ]),
   ]);
   const nameOf = (id: string | null | undefined) => (id ? (names.get(id) ?? null) : null);
+  const project = issue.projects as { name: string; companies: { name: string } | null } | null;
+
+  const rows = lines.map((line) => {
+    const item = items.get(line.item_id);
+    const draws = recordedDraws(
+      line.quantity,
+      movements
+        .filter((movement) => movement.issue_line_id === line.id)
+        .map((movement) => {
+          const batch = batches.get(movement.receipt_line_id);
+          return {
+            receiptLineId: movement.receipt_line_id,
+            label: batch?.label ?? "Batch",
+            quantity: -movement.quantity,
+            rate: batch?.rate ?? null,
+          };
+        }),
+    );
+    return {
+      id: line.id,
+      item_name: item?.name ?? "—",
+      item_code: item?.code ?? null,
+      item_brand: item?.brand ?? null,
+      item_thumb_url: item?.thumb_url ?? null,
+      quantity: line.quantity,
+      uom: line.uom,
+      note: line.note,
+      recorded_by_name: nameOf(line.updated_by ?? line.created_by),
+      draws,
+      value: issueValue(draws),
+    };
+  });
 
   return {
     id: issue.id,
@@ -180,20 +283,13 @@ export const getStockIssue = cache(async (issueId: string): Promise<IssueDetail 
     issued_at: issue.issued_at,
     note: issue.note,
     issued_by_name: nameOf(issue.created_by),
-    lines: lines.map((line) => {
-      const item = items.get(line.item_id);
-      return {
-        id: line.id,
-        item_name: item?.name ?? "—",
-        item_code: item?.code ?? null,
-        item_brand: item?.brand ?? null,
-        item_thumb_url: item?.thumb_url ?? null,
-        quantity: line.quantity,
-        uom: line.uom,
-        note: line.note,
-        recorded_by_name: nameOf(line.updated_by ?? line.created_by),
-      };
-    }),
+    project_name: project?.name ?? "—",
+    company_name: project?.companies?.name ?? null,
+    lines: rows,
+    total_value: rows.reduce<number | null>(
+      (total, row) => (total === null || row.value === null ? null : total + row.value),
+      0,
+    ),
   };
 });
 
@@ -264,30 +360,57 @@ export type AdjustmentPage = {
   stores: { id: string; name: string }[];
 };
 
+export type AdjustmentListFilters = {
+  page?: number;
+  storeId?: string;
+  /** Searched in the reason text — already made safe by searchParam. */
+  q?: string;
+  /** Dated-on range, YYYY-MM-DD, already checked by dateParam. */
+  from?: string;
+  to?: string;
+};
+
 export async function listStockAdjustments({
   page = 1,
-}: { page?: number } = {}): Promise<AdjustmentPage> {
+  storeId,
+  q,
+  from,
+  to,
+}: AdjustmentListFilters = {}): Promise<AdjustmentPage> {
   await requireTool("/inventory");
   const supabase = await createClient();
 
   const pageSize = INVENTORY_LIST_LIMIT;
   const currentPage = Math.max(1, page);
 
+  // Every filter in one place. adjusted_at is a date, so `to` is plain lte.
+  const filtered = <T extends Filterable<T>>(query: T): T => {
+    let next = query;
+    if (storeId) next = next.eq("store_id", storeId);
+    if (from) next = next.gte("adjusted_at", from);
+    if (to) next = next.lte("adjusted_at", to);
+    if (q) next = next.or(`reason.ilike.*${q}*`);
+    return next;
+  };
+
   const [{ data, count, error }, stores] = await Promise.all([
-    supabase
-      .from("stock_adjustments")
-      .select("id, store_id, item_id, quantity, uom, reason, adjusted_at, created_by", {
-        count: "exact",
-      })
+    filtered(
+      supabase
+        .from("stock_adjustments")
+        .select("id, store_id, item_id, quantity, uom, reason, adjusted_at, created_by", {
+          count: "exact",
+        }),
+    )
       .order("adjusted_at", { ascending: false })
       .order("id")
       .range((currentPage - 1) * pageSize, currentPage * pageSize - 1),
     listActiveStores(supabase),
   ]);
 
+  // A failed read is an error screen, never an empty list.
   if (error) {
     console.error("listStockAdjustments failed:", error);
-    return { adjustments: [], total: 0, page: currentPage, pageCount: 1, pageSize, stores };
+    throw new Error("Could not read the adjustments.", { cause: error });
   }
 
   const rows = data ?? [];

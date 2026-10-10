@@ -6,11 +6,16 @@ import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { text } from "@/lib/form-data";
 import { createClient } from "@/lib/supabase/server";
+import {
+  LABOUR_KIND_LABEL,
+  labourShape,
+  type LabourKind,
+  type LabourShape,
+} from "@/lib/supervisors/labour";
 import { revalidatePath } from "next/cache";
 
 const GRANT = "/supervisors";
 const NOTE_LIMIT = 2000;
-const COUNT_LIMIT = 999;
 
 /**
  * Writes for the Supervisors app. Two tables, both its own: labour_logs
@@ -27,78 +32,94 @@ function count(formData: FormData, field: string): number {
   return Number(raw);
 }
 
-type LabourFields = {
+type LabourFields = LabourShape & {
   plot_id: string;
   work_item_id: string;
   contractor_id: string;
   log_date: string;
-  masons: number;
-  helpers: number;
-  others: number;
   note: string | null;
 };
 
-function readLabourFields(formData: FormData): LabourFields | { error: string } {
+/**
+ * The form as a row (0104): daily wages, piece-work by quantity, or a
+ * lump sum. A measured log takes the work's unit from the rate book
+ * (work_unit_facts, money-free), never a unit typed on the phone.
+ */
+async function readLabourFields(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  formData: FormData,
+): Promise<LabourFields | { error: string }> {
   const plotId = text(formData, "plot_id");
   const workItemId = text(formData, "work_item_id");
   const contractorId = text(formData, "contractor_id");
   const logDate = text(formData, "log_date");
-  const masons = count(formData, "masons");
-  const helpers = count(formData, "helpers");
-  const others = count(formData, "others");
+  const kind = text(formData, "kind") || "nmr";
   const note = text(formData, "note");
 
   if (!plotId) return { error: "Pick the villa." };
   if (!workItemId) return { error: "Pick the work the labour was on." };
   if (!contractorId) return { error: "Pick the contractor." };
   if (!logDate) return { error: "Pick the date." };
-  for (const [label, value] of [
-    ["masons", masons],
-    ["helpers", helpers],
-    ["others", others],
-  ] as const) {
-    if (!Number.isInteger(value) || value < 0 || value > COUNT_LIMIT) {
-      return { error: `The ${label} count must be a whole number between 0 and ${COUNT_LIMIT}.` };
-    }
-  }
-  if (masons + helpers + others === 0) {
-    return { error: "Enter at least one worker — a day with nobody on it needs no log." };
-  }
   if (note.length > NOTE_LIMIT) {
     return { error: `Keep the note under ${NOTE_LIMIT} characters.` };
   }
 
+  let workUom: string | null = null;
+  if (kind === "pw_qty") {
+    const { data, error } = await supabase
+      .from("work_unit_facts")
+      .select("uom")
+      .eq("work_item_id", workItemId)
+      .maybeSingle();
+    if (error) {
+      console.error("readLabourFields work unit failed:", error);
+      return { error: "Could not read the work's unit. Try again." };
+    }
+    workUom = data?.uom ?? null;
+  }
+
+  const quantityRaw = text(formData, "quantity").replace(/[,\s]/g, "");
+  const shape = labourShape({
+    kind,
+    masons: count(formData, "masons"),
+    helpers: count(formData, "helpers"),
+    others: count(formData, "others"),
+    quantity: quantityRaw ? Number(quantityRaw) : null,
+    workUom,
+    description: text(formData, "description"),
+  });
+  if ("error" in shape) return shape;
+
   return {
+    ...shape,
     plot_id: plotId,
     work_item_id: workItemId,
     contractor_id: contractorId,
     log_date: logDate,
-    masons,
-    helpers,
-    others,
     note: note || null,
   };
 }
+
+const sameDayMessage = (kind: LabourKind) =>
+  `That day already has a ${LABOUR_KIND_LABEL[kind].toLowerCase()} entry for this contractor and work — edit that one instead.`;
+
+/** The guard's refusal for a log already on a bill (0104). */
+const BILLED_MESSAGE = "This log is on a bill now, so it can't be changed or deleted.";
 
 export async function recordLabourLog(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
   const user = await requireTool(GRANT);
-  const fields = readLabourFields(formData);
+  const supabase = await createClient();
+  const fields = await readLabourFields(supabase, formData);
   if ("error" in fields) return fields;
 
-  const supabase = await createClient();
   const { error } = await supabase
     .from("labour_logs")
     .insert({ ...fields, created_by: user.id, updated_by: user.id });
   if (error) {
-    if (error.code === "23505") {
-      return {
-        error:
-          "That day already has an entry for this contractor and work — edit the existing one below.",
-      };
-    }
+    if (error.code === "23505") return { error: sameDayMessage(fields.kind) };
     console.error("recordLabourLog failed:", error);
     return {
       error: error.message.includes("contractor")
@@ -118,27 +139,30 @@ export async function updateLabourLog(
   const user = await requireTool(GRANT);
   const id = text(formData, "id");
   if (!id) return { error: "Which log?" };
-  const fields = readLabourFields(formData);
+  const supabase = await createClient();
+  const fields = await readLabourFields(supabase, formData);
   if ("error" in fields) return fields;
 
-  const supabase = await createClient();
   const { error } = await supabase
     .from("labour_logs")
     .update({
       work_item_id: fields.work_item_id,
       contractor_id: fields.contractor_id,
       log_date: fields.log_date,
+      kind: fields.kind,
       masons: fields.masons,
       helpers: fields.helpers,
       others: fields.others,
+      quantity: fields.quantity,
+      uom: fields.uom,
+      description: fields.description,
       note: fields.note,
       updated_by: user.id,
     })
     .eq("id", id);
   if (error) {
-    if (error.code === "23505") {
-      return { error: "That day already has an entry for this contractor and work." };
-    }
+    if (error.code === "23505") return { error: sameDayMessage(fields.kind) };
+    if (error.message.includes("bill")) return { error: BILLED_MESSAGE };
     console.error("updateLabourLog failed:", error);
     return { error: "Could not save the change. Try again." };
   }
@@ -154,6 +178,7 @@ export async function deleteLabourLog(id: string): Promise<ActionState> {
   const supabase = await createClient();
   const { error } = await supabase.from("labour_logs").delete().eq("id", id);
   if (error) {
+    if (error.message.includes("bill")) return { error: BILLED_MESSAGE };
     console.error("deleteLabourLog failed:", error);
     return { error: "Could not delete the log. Try again." };
   }
@@ -189,12 +214,57 @@ export async function createIssueRequest(
   }
 
   const supabase = await createClient();
+
+  // Off the estimate (0104, founder: "allowed with a reason"): the villa
+  // has an official estimate, and it does not list this material for this
+  // work. Decided here from the estimate, never from the phone; a villa
+  // with no official estimate has nothing to be off.
+  const { data: unit, error: unitError } = await supabase
+    .from("units")
+    .select("id")
+    .eq("plot_id", plotId)
+    .maybeSingle();
+  if (unitError) {
+    console.error("createIssueRequest unit read failed:", unitError);
+    return { error: "Could not check the estimate. Try again." };
+  }
+  let offEstimate = false;
+  if (unit) {
+    const [planned, listed] = await Promise.all([
+      supabase
+        .from("estimate_takeoff_facts")
+        .select("unit_id", { count: "exact", head: true })
+        .eq("unit_id", unit.id),
+      supabase
+        .from("estimate_takeoff_facts")
+        .select("unit_id", { count: "exact", head: true })
+        .eq("unit_id", unit.id)
+        .eq("work_item_id", workItemId)
+        .eq("item_id", itemId),
+    ]);
+    if (planned.error || listed.error) {
+      console.error("createIssueRequest estimate read failed:", planned.error ?? listed.error);
+      return { error: "Could not check the estimate. Try again." };
+    }
+    offEstimate = (planned.count ?? 0) > 0 && (listed.count ?? 0) === 0;
+  }
+  const reason = text(formData, "off_estimate_reason");
+  if (offEstimate && !reason) {
+    return {
+      error: "This material isn't on the estimate for this work — say why it's needed.",
+    };
+  }
+  if (reason.length > NOTE_LIMIT) {
+    return { error: `Keep the reason under ${NOTE_LIMIT} characters.` };
+  }
+
   const { error } = await supabase.from("issue_requests").insert({
     plot_id: plotId,
     work_item_id: workItemId,
     item_id: itemId,
     quantity,
     note: note || null,
+    off_estimate_reason: offEstimate ? reason : null,
     created_by: user.id,
     updated_by: user.id,
   });

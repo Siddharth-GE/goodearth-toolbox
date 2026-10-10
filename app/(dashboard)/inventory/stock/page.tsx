@@ -1,6 +1,7 @@
 import { ItemThumb } from "@/components/masters/item-thumb";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ListToolbar } from "@/components/ui/list-toolbar";
 import { PageTitle } from "@/components/ui/page-title";
 import { Pagination } from "@/components/ui/pagination";
 import {
@@ -17,6 +18,7 @@ import {
   listStockByLocation,
   type LocationKind,
 } from "@/lib/inventory/stock-queries";
+import { searchParam } from "@/lib/list-params";
 import { Boxes } from "lucide-react";
 import Link from "next/link";
 import { InventoryNav } from "../_components/inventory-nav";
@@ -42,9 +44,10 @@ const KIND_VARIANT: Record<LocationKind, "success" | "info"> = {
 export default async function StockPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; at?: string }>;
+  searchParams: Promise<{ page?: string; at?: string; q?: string }>;
 }) {
-  const { page, at } = await searchParams;
+  const { page, at, q: rawQ } = await searchParams;
+  const q = searchParam(rawQ);
 
   // The filter travels as "kind:id" in one param so a single select can
   // offer stores and plots together.
@@ -59,13 +62,15 @@ export default async function StockPage({
     pageCount,
     pageSize,
     locations,
-  } = await listStockByLocation({ page: Number(page) || 1, kind, locationId });
+    searchCapped,
+  } = await listStockByLocation({ page: Number(page) || 1, kind, locationId, q });
 
   const selected = locations.find((l) => l.kind === kind && l.id === locationId);
 
   const hrefForPage = (target: number) => {
     const params = new URLSearchParams();
     if (selected) params.set("at", `${selected.kind}:${selected.id}`);
+    if (q) params.set("q", q);
     if (target > 1) params.set("page", String(target));
     const query = params.toString();
     return query ? `/inventory/stock?${query}` : "/inventory/stock";
@@ -80,20 +85,45 @@ export default async function StockPage({
 
       <InventoryNav active="stock" />
 
+      <ListToolbar
+        action="/inventory/stock"
+        values={{ q }}
+        keep={{ at: selected ? `${selected.kind}:${selected.id}` : undefined }}
+        search={{ placeholder: "Item name or code…" }}
+      />
+
       <LocationFilter
         locations={locations}
         selected={selected ? `${selected.kind}:${selected.id}` : ""}
         basePath="/inventory/stock"
+        search={q}
       />
 
       {rows.length === 0 ? (
         <EmptyState
           icon={Boxes}
-          title={selected ? `Nothing recorded at ${selected.name}` : "No stock recorded yet"}
-          description="Material appears once a delivery is received, something is issued out to a plot, or an opening balance is entered as an adjustment."
+          title={
+            q
+              ? `No stock matches "${q}"${selected ? ` at ${selected.name}` : ""}`
+              : selected
+                ? `Nothing recorded at ${selected.name}`
+                : "No stock recorded yet"
+          }
+          description={
+            q
+              ? undefined
+              : "Material appears once a delivery is received, something is issued out to a plot, or an opening balance is entered as an adjustment."
+          }
         />
       ) : (
         <>
+          {searchCapped && (
+            <p className="text-muted text-xs">
+              That search matches a lot of items, so only the first few are shown. Type more of the
+              name to narrow it down.
+            </p>
+          )}
+
           <p className="text-muted text-xs">
             A store shows what is in it right now. A plot shows everything delivered there — to the
             plot or its unit — site material is used where it lands, so it is never issued back out.

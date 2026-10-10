@@ -11,8 +11,14 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/components/ui/table";
-import { formatDate, formatQuantity } from "@/lib/format";
-import { getItemMovements, isLocationKind, type MovementRow } from "@/lib/inventory/stock-queries";
+import { formatDate, formatMoney, formatQuantity } from "@/lib/format";
+import type { Batch } from "@/lib/inventory/batches";
+import {
+  getItemMovements,
+  isLocationKind,
+  listStoreBatches,
+  type MovementRow,
+} from "@/lib/inventory/stock-queries";
 import { History } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -41,10 +47,16 @@ export default async function ItemHistoryPage({
   const { kind, locationId, itemId } = await params;
   if (!isLocationKind(kind)) notFound();
 
-  const history = await getItemMovements(kind, locationId, itemId);
+  const [history, batchesByItem] = await Promise.all([
+    getItemMovements(kind, locationId, itemId),
+    kind === "store"
+      ? listStoreBatches(locationId, itemId)
+      : Promise.resolve<Record<string, Batch[]>>({}),
+  ]);
   if (!history) notFound();
 
   const isStore = history.location_kind === "store";
+  const batches = batchesByItem[itemId] ?? [];
 
   return (
     <div className="space-y-4">
@@ -79,6 +91,40 @@ export default async function ItemHistoryPage({
           Material at a site is used where it lands, so nothing is ever issued back out of here —
           this is the running total of everything delivered.
         </p>
+      )}
+
+      {batches.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
+            Batches in this store
+          </h2>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableHeaderCell>Batch</TableHeaderCell>
+                <TableHeaderCell className="w-32">Received</TableHeaderCell>
+                <TableHeaderCell className="w-32">Left</TableHeaderCell>
+                <TableHeaderCell className="w-36 text-right">Rate</TableHeaderCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {batches.map((batch) => (
+                <TableRow key={batch.receiptLineId}>
+                  <TableCell className="font-mono">{batch.label}</TableCell>
+                  <TableCell className="text-muted">{formatDate(batch.receivedAt)}</TableCell>
+                  <TableCell>{formatQuantity(batch.quantity)}</TableCell>
+                  <TableCell className="text-right font-mono">
+                    {formatMoney(batch.rate, { paise: true })}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          <p className="text-muted text-xs">
+            Each delivery into this store is a batch. An issue takes the oldest first unless the
+            store-keeper picks another; stock older than batches has no rate and goes last.
+          </p>
+        </section>
       )}
 
       {history.movements.length === 0 ? (

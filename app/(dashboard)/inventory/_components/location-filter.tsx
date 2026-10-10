@@ -15,16 +15,21 @@ const GROUP_LABEL = {
  * Component cannot hand a function to a Client Component (the hotfix
  * lesson from 2026-08-01), so the base path comes in as a string and
  * the href is built here.
+ *
+ * `search` is the list's search text, carried through so changing the
+ * place never throws the search away.
  */
 export function LocationFilter({
   locations,
   selected,
   basePath,
+  search,
 }: {
   locations: LocationOption[];
   /** "kind:id", matching the option values below. */
   selected: string;
   basePath: string;
+  search?: string;
 }) {
   const router = useRouter();
 
@@ -39,8 +44,11 @@ export function LocationFilter({
       aria-label="Filter by location"
       value={selected}
       onChange={(event) => {
-        const value = event.target.value;
-        router.push(value ? `${basePath}?at=${value}` : basePath);
+        const params = new URLSearchParams();
+        if (event.target.value) params.set("at", event.target.value);
+        if (search) params.set("q", search);
+        const query = params.toString();
+        router.push(query ? `${basePath}?${query}` : basePath);
       }}
       className="sm:max-w-xs"
     >

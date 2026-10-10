@@ -8,7 +8,7 @@ What a villa costs to build. Works come from the Masters vocabulary (`0073`); th
 
 **Every villa is different** — "finishes are different, foundations can be different" — so there is no house type villas follow. What is shared is **how a work is priced**, never how much of it a villa has.
 
-- **Rate book** (the Works tab): per work, its unit, labour ₹/unit and materials per unit at Masters' prices. Mixes are their own tab.
+- **Rate book** (the Works tab): per work, its unit, labour ₹/unit and materials per unit at Masters' prices. Mixes are their own tab. Units and labour rates come from the founder's masters workbook (`scripts/import-masters-workbook.ts`); its Superstructure and MEP works carry their share of the stage's package rate as ₹ per sqft (0.12 × 230 = 27.6).
 - **Villa**: one working estimate, its own list of works, each measured for that villa. It follows the rate book unless it has its own labour rate, materials or price for a work — grey follows the rate book, black is this villa's own, ↺ puts it back.
 - **Official**: a numbered, frozen copy (EST/…/NNN) — what the stores and site check against.
 - **Site check**: one list across villas.
@@ -23,7 +23,7 @@ What a villa costs to build. Works come from the Masters vocabulary (`0073`); th
 6. **A line's quantity can come from a measurement sheet** (`0096`): rows of Nos × Length × Breadth × Depth, a blank box not used, additions only (openings measured net by hand). After every row change the action re-sums the sheet through `calc.ts` and writes the total onto `estimator_estimate_lines.qty`, so nothing downstream changes; a measured line's quantity is read-only. Rows are draft-only in the database and stand after Make official as the record of where the quantity came from. Rows **copy to another work** of the estimate (a wall's rows feed masonry, plaster and paint) and **Duplicate** copies a row within its own sheet — both read from the database, never from the browser.
 7. **Units are picked from the shared Masters list** (`0082`), and a work's unit is **refused**, not warned, while any estimate line uses it — 40 cum becoming 40 sqm is the same number describing a different building.
 8. **The estimate reads as a BOQ**: one grand total, works grouped by category with subtotals, one rate and one amount per line. `groupLineCosts` in `calc.ts` produces it; anything that prints an estimate renders its output rather than grouping again.
-9. **Site check is one list across villas**: over-estimate and outside-the-estimate rows with Approve on the row, and every material estimated against reached, villa by villa (`getOfficialComparisons`, `site-check.ts`). An approval **carries to the villa's later officials**, matched on (work, item) — read-side only.
+9. **Site check is one list across villas**: over-estimate and outside-the-estimate rows with Approve on the row, and every material estimated against reached, villa by villa (`getOfficialComparisons`, `site-check.ts`). An approval **carries to the villa's later officials**, matched on (work, item) — read-side only. An outside row shows **site's reason** from the supervisor's request (`issue_requests.off_estimate_reason`, matched on plot, work and item) — a read of Supervisors' table that `0110` admits `/estimator` to.
 10. **No scheduling** — "this whole build is only estimation". If it is ever built, Relay's missing per-activity dates are where it goes.
 
 ## The rules everything rests on

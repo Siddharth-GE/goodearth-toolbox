@@ -349,7 +349,13 @@ export async function addBudgetPullLines(
 }
 
 /** Save-on-blur target for a row. No revalidate — the values are
- * already on screen (the saveLine pattern). */
+ * already on screen (the saveLine pattern).
+ *
+ * THE UNIT. A material moves in its Masters unit from indent to stock —
+ * a cement line switched to cft once rode onto the PO, the receipt and
+ * the stock sum beside bags. So only an interiors line (a tile may be
+ * specified per sqft by design) keeps a chosen unit; every other line is
+ * saved in the item's `default_uom`, re-read here, whatever was sent. */
 export async function updateLine(
   lineId: string,
   input: { quantity: number; uom: string; note: string | null },
@@ -359,14 +365,36 @@ export async function updateLine(
   if (!Number.isFinite(input.quantity) || input.quantity <= 0) {
     return { error: "Quantity must be more than 0" };
   }
-  if (!(await isActiveUom(input.uom))) return { error: "Pick a unit from the list" };
 
   const supabase = await createClient();
+  const { data: existing, error: readError } = await supabase
+    .from("indent_lines")
+    .select("budget_id, items(default_uom)")
+    .eq("id", lineId)
+    .maybeSingle();
+  if (readError) {
+    console.error("updateLine read failed:", readError);
+    return { error: "Could not save. Try again." };
+  }
+  if (!existing) return { error: "That line is no longer on this indent." };
+
+  let uom: string;
+  if (existing.budget_id != null) {
+    if (!(await isActiveUom(input.uom))) return { error: "Pick a unit from the list" };
+    uom = input.uom;
+  } else {
+    const masterUom = (existing.items as { default_uom: string | null } | null)?.default_uom;
+    if (!masterUom) {
+      return { error: "This item has no unit in Masters. Set one there first." };
+    }
+    uom = masterUom;
+  }
+
   const { error } = await supabase
     .from("indent_lines")
     .update({
       quantity: input.quantity,
-      uom: input.uom,
+      uom,
       note: input.note?.trim() || null,
       updated_by: user.id,
     })

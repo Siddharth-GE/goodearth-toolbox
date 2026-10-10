@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { canDecide, canDelete, canEditIndent, canSubmit } from "./workflow";
+import { canDecide, canDelete, canEditIndent, canSubmit, stillToBuy } from "./workflow";
 
 test("only a draft is editable", () => {
   assert.equal(canEditIndent("draft"), true);
@@ -40,4 +40,12 @@ test("only a draft can be deleted", () => {
   assert.equal(canDelete("draft"), true);
   assert.equal(canDelete("submitted"), false);
   assert.equal(canDelete("approved"), false);
+});
+
+test("still to buy is requested less ordered, never below zero", () => {
+  assert.equal(stillToBuy(45, 0), 45);
+  assert.equal(stillToBuy(45, 30), 15);
+  assert.equal(stillToBuy(45, 45), 0);
+  assert.equal(stillToBuy(45, 50), 0, "over-ordered reads as nothing left, not a negative");
+  assert.equal(stillToBuy(0.3, 0.1), 0.2, "no floating-point dust");
 });

@@ -1184,6 +1184,51 @@ export async function getApprovalsFor(
   );
 }
 
+/**
+ * Why site asked for material the estimate does not list (0104): each
+ * request's reason, keyed "unitId work item" like the approvals, so Site
+ * check shows it beside the "outside the estimate" row. Read from
+ * Supervisors' issue_requests (0110 admits /estimator to its one SELECT
+ * policy — before 0110 this simply finds nothing). A request names the
+ * plot; the villa's unit is found through the 1:1.
+ */
+export async function getOffEstimateReasons(
+  units: { id: string; plot_id: string | null }[],
+): Promise<Map<string, string[]>> {
+  await requireTool(GRANT);
+  const unitByPlot = new Map(
+    units.flatMap((unit) => (unit.plot_id ? [[unit.plot_id, unit.id] as const] : [])),
+  );
+  if (unitByPlot.size === 0) return new Map();
+  const supabase = await createClient();
+
+  const rows = await fetchAll<{
+    plot_id: string;
+    work_item_id: string;
+    item_id: string;
+    off_estimate_reason: string | null;
+  }>((from, to) =>
+    supabase
+      .from("issue_requests")
+      .select("plot_id, work_item_id, item_id, off_estimate_reason")
+      .in("plot_id", [...unitByPlot.keys()])
+      .not("off_estimate_reason", "is", null)
+      .order("created_at")
+      .order("id")
+      .range(from, to),
+  );
+
+  const reasons = new Map<string, string[]>();
+  for (const row of rows) {
+    if (!row.off_estimate_reason) continue;
+    const key = `${unitByPlot.get(row.plot_id) ?? ""} ${row.work_item_id} ${row.item_id}`;
+    const list = reasons.get(key) ?? [];
+    if (!list.includes(row.off_estimate_reason)) list.push(row.off_estimate_reason);
+    reasons.set(key, list);
+  }
+  return reasons;
+}
+
 /** Names and units of the given items — for material that reached a
  * villa outside any estimate, which carries only its item id. */
 export async function getItemLabels(

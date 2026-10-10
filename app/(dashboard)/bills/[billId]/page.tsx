@@ -1,26 +1,82 @@
 import { Attribution } from "@/components/ui/attribution";
+import { LinkButton } from "@/components/ui/button";
 import { PageTitle } from "@/components/ui/page-title";
+import {
+  countLabourEntriesOnBill,
+  getBillLines,
+  getPoLinesForBill,
+  getWorkOrderLinesForBill,
+} from "@/lib/bills/line-queries";
+import {
+  getBillMoneyEvents,
+  getBillSettlement,
+  getOpenAdvances,
+} from "@/lib/bills/payment-queries";
 import { getBill, getCurrentBillActor } from "@/lib/bills/queries";
-import { canEditBill } from "@/lib/bills/workflow";
-import { formatDate } from "@/lib/format";
+import { canEditBill, canTakePayment } from "@/lib/bills/workflow";
+import { formatDate, formatMoney } from "@/lib/format";
+import { listActiveGstRates } from "@/lib/masters/gst-rates";
+import { listActiveUomNames } from "@/lib/masters/uoms";
+import { FileDown } from "lucide-react";
 import { notFound } from "next/navigation";
 import { BillStatusBadge } from "../_components/status-badge";
 import { ActionButtons } from "./_components/action-buttons";
+import { BillLinesPanel } from "./_components/bill-lines-panel";
+import { BillLinesTable } from "./_components/bill-lines-table";
+import { DetailsFields, TotalOverride } from "./_components/details-fields";
 import { HeaderFields } from "./_components/header-fields";
+import { SettlementPanel } from "./_components/settlement-panel";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+} from "@/components/ui/table";
 
 export default async function BillPage({ params }: { params: Promise<{ billId: string }> }) {
   const { billId } = await params;
-  const [bill, actor] = await Promise.all([getBill(billId), getCurrentBillActor()]);
+  const [bill, actor, lines, fromLabour] = await Promise.all([
+    getBill(billId),
+    getCurrentBillActor(),
+    getBillLines(billId),
+    countLabourEntriesOnBill(billId),
+  ]);
   if (!bill) notFound();
 
   const editable = canEditBill(bill.status);
+  const itemised = lines.length > 0;
+  // Money against the bill (0107): once approved, it takes payments.
+  const moneyMoves = bill.status !== "recorded";
+  const [settlement, events, advances] = moneyMoves
+    ? await Promise.all([
+        getBillSettlement(bill.id, bill.total_amount),
+        getBillMoneyEvents(bill.id),
+        canTakePayment(bill.status) && bill.vendor_id
+          ? getOpenAdvances(bill.vendor_id)
+          : Promise.resolve([]),
+      ])
+    : [null, [], []];
+  // What the line editor offers, only while the bill can change.
+  const [gstRates, uoms, poLines, workLines] = editable
+    ? await Promise.all([
+        listActiveGstRates(),
+        listActiveUomNames(),
+        bill.po_id ? getPoLinesForBill(bill.po_id) : Promise.resolve(undefined),
+        bill.labour_contract_id && fromLabour === 0
+          ? getWorkOrderLinesForBill(bill.labour_contract_id)
+          : Promise.resolve(undefined),
+      ])
+    : [[], [], undefined, undefined];
+
   const anchorLabel =
     bill.kind === "nmr"
       ? "for daily wages (NMR)"
       : bill.po_reference
         ? `against ${bill.po_reference}`
         : bill.contract_description
-          ? `against the contract "${bill.contract_description}"`
+          ? `against the work order ${bill.contract_reference ?? ""} "${bill.contract_description}"`
           : null;
 
   return (
@@ -36,11 +92,15 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
             {bill.scope_name ? ` · ${bill.scope_name}` : " · General"}
             {bill.kind === "nmr" ? " · NMR daily wages" : ""}
             {bill.po_reference ? ` · ${bill.po_reference}` : ""}
-            {bill.contract_description ? ` · ${bill.contract_description}` : ""}
+            {bill.contract_reference ? ` · ${bill.contract_reference}` : ""}
           </>
         }
         actions={
           <>
+            <LinkButton href={`/bills/${bill.id}/pdf`} variant="secondary" size="sm" plain>
+              <FileDown className="size-4" />
+              Print
+            </LinkButton>
             <BillStatusBadge status={bill.status} />
             <ActionButtons
               billId={bill.id}
@@ -68,7 +128,7 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
         <div className="border-border bg-surface rounded-xl border px-4 py-3">
           <div className="flex items-center justify-between gap-3">
             <p className="text-foreground text-sm">
-              Recorded {anchorLabel} — waiting for approval. The figures can still be corrected.
+              Recorded {anchorLabel} — waiting for approval. The lines can still be corrected.
             </p>
             <Attribution name={bill.created_by_name} label="Recorded by" />
           </div>
@@ -87,7 +147,9 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
             {bill.approved_at && (
               <span className="text-muted"> on {formatDate(bill.approved_at)}</span>
             )}
-            {" — "}ready to pay. Marking it paid needs the payment reference.
+            {settlement && settlement.paid + settlement.recovered > 0
+              ? ` — part paid ${formatMoney(settlement.paid + settlement.recovered, { paise: true })} · pending ${formatMoney(settlement.pending, { paise: true })}.`
+              : " — ready to pay."}
           </p>
           <Attribution name={bill.approved_by_name} label="Approved by" />
         </div>
@@ -109,16 +171,112 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
         </div>
       )}
 
-      <HeaderFields
-        billId={bill.id}
-        invoiceNo={bill.invoice_no}
-        invoiceDate={bill.invoice_date}
-        taxableAmount={bill.taxable_amount}
-        gstAmount={bill.gst_amount}
-        totalAmount={bill.total_amount}
-        note={bill.note}
-        editable={editable}
-      />
+      {itemised ? (
+        <DetailsFields
+          billId={bill.id}
+          invoiceNo={bill.invoice_no}
+          invoiceDate={bill.invoice_date}
+          note={bill.note}
+          taxableAmount={bill.taxable_amount}
+          gstAmount={bill.gst_amount}
+          totalAmount={bill.total_amount}
+          editable={editable}
+        />
+      ) : (
+        // A bill from before bills had lines keeps its typed figures.
+        <HeaderFields
+          billId={bill.id}
+          invoiceNo={bill.invoice_no}
+          invoiceDate={bill.invoice_date}
+          taxableAmount={bill.taxable_amount}
+          gstAmount={bill.gst_amount}
+          totalAmount={bill.total_amount}
+          note={bill.note}
+          editable={editable}
+        />
+      )}
+
+      {bill.kind === "nmr" && itemised && editable && (
+        <TotalOverride
+          billId={bill.id}
+          currentTotal={bill.total_amount}
+          overrideNote={bill.total_override_note}
+        />
+      )}
+      {bill.kind === "nmr" && itemised && !editable && bill.total_override_note && (
+        <p className="text-muted text-sm">{`Total set by hand — ${bill.total_override_note}`}</p>
+      )}
+
+      {moneyMoves && settlement && (
+        <div className="space-y-2">
+          <h2 className="text-foreground text-lg font-bold tracking-tight">Payments</h2>
+          <p className="text-muted text-sm">
+            {`Total ${formatMoney(bill.total_amount, { paise: true })} · paid ${formatMoney(settlement.paid, { paise: true })}${settlement.recovered > 0 ? ` · recovered from advances ${formatMoney(settlement.recovered, { paise: true })}` : ""} · pending ${formatMoney(settlement.pending, { paise: true })}`}
+          </p>
+          {events.length > 0 && (
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableHeaderCell>On</TableHeaderCell>
+                  <TableHeaderCell>What</TableHeaderCell>
+                  <TableHeaderCell>Reference</TableHeaderCell>
+                  <TableHeaderCell>By</TableHeaderCell>
+                  <TableHeaderCell className="text-right">Amount</TableHeaderCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {events.map((event) => (
+                  <TableRow key={event.id}>
+                    <TableCell className="whitespace-nowrap">{formatDate(event.on)}</TableCell>
+                    <TableCell>
+                      {event.kind === "payment" ? "Payment" : "Advance recovered"}
+                      {event.note && <div className="text-muted text-xs">{event.note}</div>}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">{event.reference}</TableCell>
+                    <TableCell className="text-muted">{event.by ?? "—"}</TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatMoney(event.amount, { paise: true })}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+          {canTakePayment(bill.status) && settlement.pending > 0 && (
+            <SettlementPanel billId={bill.id} pending={settlement.pending} advances={advances} />
+          )}
+        </div>
+      )}
+
+      <div className="space-y-2">
+        <h2 className="text-foreground text-lg font-bold tracking-tight">Lines</h2>
+        {editable ? (
+          <>
+            {!itemised && (
+              <p className="text-muted text-sm">
+                This bill has no lines — its figures are the ones typed above. Adding lines makes
+                the figures follow them.
+              </p>
+            )}
+            <BillLinesPanel
+              billId={bill.id}
+              lines={lines}
+              gstRates={gstRates.map((rate) => rate.rate)}
+              uoms={uoms}
+              poLines={poLines}
+              workLines={workLines}
+              allowOther={bill.kind !== "po"}
+              locked={fromLabour > 0}
+            />
+          </>
+        ) : itemised ? (
+          <BillLinesTable lines={lines} />
+        ) : (
+          <p className="text-muted text-sm">
+            Recorded before bills had lines — its figures are the ones above.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

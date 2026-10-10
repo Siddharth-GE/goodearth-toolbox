@@ -34,3 +34,11 @@ export function canDecide(status: IndentStatus, decider: Decider): boolean {
 export function canDelete(status: IndentStatus): boolean {
   return status === "draft";
 }
+
+/**
+ * What is still to buy on a line: requested less what live POs have
+ * ordered against it. Never negative — a line ordered in full reads 0.
+ */
+export function stillToBuy(quantity: number, ordered: number): number {
+  return Math.max(0, Math.round((quantity - ordered) * 1e6) / 1e6);
+}
