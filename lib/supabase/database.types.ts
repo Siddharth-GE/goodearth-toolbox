@@ -9410,6 +9410,7 @@ export type Database = {
         Args: { p_chain_id: string; p_legs: Json }
         Returns: undefined
       }
+      replay_pre_batch_history: { Args: never; Returns: number }
       seed_default_project_stages: {
         Args: { p_project_id: string }
         Returns: undefined

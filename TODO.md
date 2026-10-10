@@ -12,7 +12,7 @@ Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, histor
 
 Everything below is on `staging.goodearthkannur.org`. Each ships only after the founder says they have tried it there.
 
-- **The ERP corrections** (`0101`–`0111`, merged 2026-10-10) — the whole purchase-to-payment chain. **The founder's checklist is `plan.md`, _Verification_**; before production, its B9 question needs an answer.
+- **The ERP corrections** (`0101`–`0112`, merged 2026-10-10) — the whole purchase-to-payment chain. **The founder's checklist is `plan.md`, _Verification_**; on production, `0108` and `0112` go in one run.
 
 - **The final masters workbook** — loaded on staging 2026-10-07, after every record there was cleared. Waiting for the founder's look through Masters → Vendors, Works, Items and Stages. On ship day, on production: `scripts/import-masters-workbook.ts --project pajfrgnkapicdgangjey --xlsx <workbook>`, dry run first. It stops while production's own records point at masters it drops, and the wipe script refuses production by design, so what happens to those records is the founder's call that day.
 - **Catalogue pictures** — **vetted by the founder 2026-09-26**, and the close calls sorted in Masters. On ship day, on production: `scripts/import-catalogue-sheet.ts --project pajfrgnkapicdgangjey --xlsx <workbook>` and `scripts/fetch-catalogue-images.ts --project pajfrgnkapicdgangjey`, dry run first.
@@ -24,7 +24,7 @@ Everything below is on `staging.goodearthkannur.org`. Each ships only after the 
 - **Design Management's simpler transmittal flow** (PR #81, on staging) — waiting for the founder's vet and the Fable review it skipped.
 - **Design Management: sets by stage, sheets by code** (`0099`) — on staging, waiting for the founder's vet. Staging's drawings were wiped for it. **The Fable review of `0099` was skipped for staging and is due before production**; production then needs `scripts/wipe-drawings.ts` (dry run first) and `0099`.
 
-**Getting it to `master`.** `staging` is ~185 commits ahead and carries `0094`–`0111`. Either the Chat door's ship checklist runs first and everything goes together, or a piece travels alone on a release branch cut from `master` (the skin: cherry-pick `a096e58`…`3fe4c95`, skip the sweep `f8a9e5c` and re-run it on `master`). Every route needs production restored first, then the migrations applied there and `db:compare` empty.
+**Getting it to `master`.** `staging` is ~185 commits ahead and carries `0094`–`0112`. Either the Chat door's ship checklist runs first and everything goes together, or a piece travels alone on a release branch cut from `master` (the skin: cherry-pick `a096e58`…`3fe4c95`, skip the sweep `f8a9e5c` and re-run it on `master`). Every route needs production restored first, then the migrations applied there and `db:compare` empty.
 
 ## Setup the tools are waiting on
 
