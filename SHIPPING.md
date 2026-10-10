@@ -17,12 +17,10 @@ Both are reached from this machine through the management API (`/database/query`
 
 - **Never apply one by hand.** `npm run db:apply -- --project <ref> --commit` applies what is pending and records it in `applied_migrations` (`0067`), so a re-run is a no-op. **`--project` is required everywhere and never defaults.**
 - **CI asks.** `npm run db:check -- --project <ref>` fails if a database lacks a migration in the branch, or an applied file was edited; it runs on every pull request against the database the base branch deploys to.
-- **Staging first, then production, then merge.** Apply to staging → `npm run db:types:staging` → build and test → apply to production → `npm run db:types` → merge. Commit the types with the migration.
+- **Staging first, then production, then merge** — the steps are _Building anything_ below. Commit the types with the migration.
 - **`npm run db:compare -- --project <a> --against <b>` must come back empty** whenever the two should be level. It compares columns, RLS, policies, grants, functions, views, triggers, indexes, constraints, storage and every auth setting — objects made by hand once went unrecorded until it looked.
 - **Additive only; never edit an applied migration** — a correction is a later file, and the ledger's checksum catches an edit.
-- **Write every one to run twice** (`if not exists`, `create or replace`) and end it asserting what it claimed to do.
-- **A seed is a fixture in development and a credential in production** — ask what a seed row becomes on a replayed database.
-- Making an admin: the toggle in Settings (`profiles_guard()` refuses to remove the last active admin). Raw SQL is only for when nobody can get in.
+- **Write every one to run twice** (`if not exists`, `create or replace`) and end it asserting what it claimed to do; dry-run it first (`scripts/dry-run-migrations.ts`, with a trial run as a single-grant person — BUGCATCHER #19).
 
 ## Environment
 
@@ -74,7 +72,6 @@ git checkout staging && git merge master --ff-only && git push
 
 ### The rules that make it hold
 
-- **`--project` is required everywhere and never defaults** — not to production, not to `.env.local`.
 - **Staging is a snapshot, not a mirror.** The right place to prove a screen works, the wrong place to prove a number is correct.
 - **Staging emails real people.** The team's real addresses are there and colleagues sign in to try work (`STATUS.md`), so anything staging sends reaches a person — a script or trial that sends mail on staging needs the same care as production. `scripts/scramble-staging-emails.ts` turns them back into `@staging.invalid` if the founder ever wants staging closed again.
 - **Production has no backups** (free tier). Treat every production migration as unrepeatable.

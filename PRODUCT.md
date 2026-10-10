@@ -32,7 +32,7 @@ An internal system shaped tool by tool with the founder around Goodearth's real 
 
 ## Operating Context
 
-- Projects → plots ↔ units (1:1). The chain the toolbox mirrors: design selections → issued revision → budget → site indents (or from a villa's official estimate) → purchase orders → goods receipt / stock / issues → bills (PO, labour contract, NMR) → payment; client payments come in through Client Relations.
+- Projects → plots ↔ units (1:1). The chain the toolbox mirrors: design selections → issued revision → budget → site indents (or from a villa's official estimate) → purchase orders → goods receipt / stock / issues → bills (PO, work order, NMR) → payment; client payments come in through Client Relations.
 - Money visibility is an organisational boundary enforced in the database: each tool's money is visible only to its holders (`SECURITY.md`).
 - Production is `toolbox.goodearthkannur.org`, from `master`; staging is `staging.goodearthkannur.org`.
 
@@ -45,7 +45,7 @@ An internal system shaped tool by tool with the founder around Goodearth's real 
 
 - **Goodearth Toolbox.** `DESIGN.md` is binding: Aman meets Apple — warm stone neutrals in three tones, Geist Sans alone, one green accent for actions, hairlines at rest and a shadow only on what floats, a small fixed motion vocabulary.
 - Plain English everywhere — UI copy, errors, everything the founder reads.
-- Letterhead assets (logo, address, GST number, PO terms) for PDFs are pending from the founder; never invent or placeholder them as real.
+- A document's letterhead is its project's company and its terms a template, both entered by a person in Masters (Companies, Terms); never invent them or pass a placeholder off as real.
 
 ## Evidence on Hand
 

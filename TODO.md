@@ -12,7 +12,7 @@ Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, histor
 
 Everything below is on `staging.goodearthkannur.org`. Each ships only after the founder says they have tried it there.
 
-- **The ERP corrections** (`0101`–`0111`) — indents from the estimate, PO from an indent, itemised bills from the labour log, work orders, payments with advances and a weekly cash request, store batches with rates, search/filter/total bars, prints. Merged to staging 2026-10-10; Fable review #2 was skipped on the founder's explicit word, after Opus re-reviewed `0110`/`0111` and re-ran the RLS trials. **The founder's checklist is _Verification_ in `plan.md`.** Before production: an answer to B9's question there (store batches against issues recorded before `0108`).
+- **The ERP corrections** (`0101`–`0111`, merged 2026-10-10) — the whole purchase-to-payment chain. **The founder's checklist is `plan.md`, _Verification_**; before production, its B9 question needs an answer.
 
 - **The final masters workbook** — loaded on staging 2026-10-07, after every record there was cleared. Waiting for the founder's look through Masters → Vendors, Works, Items and Stages. On ship day, on production: `scripts/import-masters-workbook.ts --project pajfrgnkapicdgangjey --xlsx <workbook>`, dry run first. It stops while production's own records point at masters it drops, and the wipe script refuses production by design, so what happens to those records is the founder's call that day.
 - **Catalogue pictures** — **vetted by the founder 2026-09-26**, and the close calls sorted in Masters. On ship day, on production: `scripts/import-catalogue-sheet.ts --project pajfrgnkapicdgangjey --xlsx <workbook>` and `scripts/fetch-catalogue-images.ts --project pajfrgnkapicdgangjey`, dry run first.
@@ -24,7 +24,7 @@ Everything below is on `staging.goodearthkannur.org`. Each ships only after the 
 - **Design Management's simpler transmittal flow** (PR #81, on staging) — waiting for the founder's vet and the Fable review it skipped.
 - **Design Management: sets by stage, sheets by code** (`0099`) — on staging, waiting for the founder's vet. Staging's drawings were wiped for it. **The Fable review of `0099` was skipped for staging and is due before production**; production then needs `scripts/wipe-drawings.ts` (dry run first) and `0099`.
 
-**Getting it to `master`.** `staging` is ~150 commits ahead and carries `0094`–`0100`. Either the Chat door's ship checklist runs first and everything goes together, or a piece travels alone on a release branch cut from `master` (the skin: cherry-pick `a096e58`…`3fe4c95`, skip the sweep `f8a9e5c` and re-run it on `master`). Every route needs production restored first, then the migrations applied there and `db:compare` empty.
+**Getting it to `master`.** `staging` is ~185 commits ahead and carries `0094`–`0111`. Either the Chat door's ship checklist runs first and everything goes together, or a piece travels alone on a release branch cut from `master` (the skin: cherry-pick `a096e58`…`3fe4c95`, skip the sweep `f8a9e5c` and re-run it on `master`). Every route needs production restored first, then the migrations applied there and `db:compare` empty.
 
 ## Setup the tools are waiting on
 
@@ -41,7 +41,7 @@ Everything below is on `staging.goodearthkannur.org`. Each ships only after the 
 - **The Google Chat door, round three** — three candidates in `lib/google-chat/PLAN.md`.
 - **Phone-first lists and forms** — tables that become stacked cards on a phone, sticky Save, bigger tap targets; Indents, Inventory, Supervisors and Directory first.
 - **A real sidebar search** — jump to any tool or screen over `lib/tools.ts`.
-- **The structure underneath** — one heading style (35 raw `<h2>`s in 28 files), one page rhythm, a shared filter toolbar and notice banner, `PageTitle` in one place.
+- **The structure underneath** — one heading style (35 raw `<h2>`s in 28 files), one page rhythm, a shared notice banner, `PageTitle` in one place.
 - **A lint rule against raw palette classes** (`text-red-600`, …) in `app/(dashboard)/**` and `components/**`; nothing in CI catches one today.
 - **Check `error` on every single-row read** (found by the 2026-09-26 audit). About 30 reads take `data` and ignore `error`, so a failed read shows "not found" instead of an error screen — the red line in CLAUDE.md. Most are fetch-one-by-id: `lib/masters/{client,project,vendor}-detail.ts`, `lib/bills/queries.ts`, `lib/budgets/{actions,queries}.ts`, `lib/purchase-orders/queries.ts`, `lib/inventory/{issues,receipts}-queries.ts`, `lib/design-management/actions.ts`, `lib/relay/actions.ts`, `lib/selections/views-actions.ts`, and the three file routes under `app/(dashboard)/`. Storage downloads and `getClaims()` are fine as they are.
 

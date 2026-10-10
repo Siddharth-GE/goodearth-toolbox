@@ -10,7 +10,7 @@ Race-day kiosk: PIN login, entry capture, atomic bib numbering, admin panel. Liv
 
 ## Before a real race day
 
-- **No agent on a published PIN.** `0002`'s seeded PIN, hash and salt are in this public repo; every agent was rotated 2026-08-17, and `npm run rotate-marathon-pins -- --project <ref>` finds any that come back. Admin → Members resets one by hand.
+- **No agent on a published PIN.** `0002`'s seeded PIN, hash and salt are in this public repo; `0070` deletes any match, every agent was rotated 2026-08-17, and `npm run rotate-marathon-pins -- --project <ref>` finds any that come back. Admin → Members resets one by hand.
 - The duplicate-mobile warning wants a Malayalam translation, never done.
 - One walkthrough on the actual devices.
 

@@ -33,7 +33,7 @@ A role names a job (Site Engineer, Purchase, Accounts) and bundles apps plus app
 - **Settings isn't grantable** — granting access can't be delegated through the mechanism it manages. It checks `requireAdmin()`, and `GRANTABLE_TOOLS` excludes it.
 - **It writes two other tools' tables**, `indent_approvers` and `bill_approvers` — both `is_admin()`-gated, a documented exception (`SECURITY.md`).
 - **`bill_approval_cap(uid)` answers about the caller only** (`0071`) and **raises** for anyone else's id unless the caller is an admin — never null, which means unlimited. `can_approve_bills`/`can_approve_indents` return `false` the same way.
-- **`admin_list_users()`** reads `auth.users` behind `is_admin()`; with Directory's `directory_emails()` it is one of two such functions.
+- **`admin_list_users()`** reads `auth.users` behind `is_admin()` (one of two such functions — `directory/PLAN.md`).
 
 ## Known gaps
 

@@ -2,12 +2,9 @@
 
 Relay's slash commands and card buttons inside the company's Google Chat spaces, on staging (production: the checklist below). Plain deterministic code, no AI, no new running cost. Shell code, not a tool: `app/api/google-chat/route.ts` (the door) + this folder. It never imports `lib/relay/`; its writes are the same event inserts and RPCs Relay's own actions use, made **as the person**.
 
-## Four trust steps on every event
+## On every event
 
-1. **Prove it is our Google.** Add-on-style ID token verified with `node:crypto`: RS256, issuer `accounts.google.com`, audience = `GOOGLE_CHAT_AUDIENCE` (the registered endpoint URL), **and** email = `service-<GOOGLE_CHAT_PROJECT_NUMBER>@gcp-sa-gsuiteaddons.iam.gserviceaccount.com`. The email check is load-bearing. Reject before reading the body.
-2. **Prove the person.** Sender email → toolbox account (admin lookup); must be active and hold `/relay` (or be admin). Five fixed private refusals.
-3. **Act as the person.** `act-as.ts` mints a short-lived real session (admin `generateLink` → `verifyOtp` → mark verified) and writes through it, so `has_app('/relay')` RLS and the `pusher_chain_events_guard` stay the boundary, untouched. Reads (`/court`, `/trail`) use the admin client on `pusher_chain_state`, the sanctioned view.
-4. **Answer within 30s, always 200, always a card.** Database guard messages pass through as-is.
+Prove it is our Google, prove the person, act as the person — the three trust steps are `SECURITY.md`, _The Google Chat door_. Then **answer within 30s, always 200, always a card**; database guard messages pass through as-is.
 
 **Space scoping:** `google_chat_spaces` (`0094`, service-role only, deny-all for signed-in roles) links a space to a unit or project — auto-matched on join, set by `/link`. In a linked space every command defaults to it; in a DM, commands span everything.
 
@@ -26,8 +23,7 @@ Google takes **one answer per button press**, and its data action is _create a m
 ## Invariants
 
 - Replies about one person are private (`privateMessageViewer`); confirmations post to the space.
-- The app credential (`outbound.ts`) edits only cards the app itself posted. It never reads or writes the database and never moves a baton — every write is still made as the person through `act-as.ts`, which keeps its one caller.
-- The log line never carries message text, an email or a token.
+- What the app credential and the log line may do: `SECURITY.md`.
 - Identity `ok` gates every command and button; joining a space needs none.
 - A dialog error re-renders the page with every value kept, never a toast.
 - A trail from a type never stamps `activity_id`.
@@ -37,7 +33,7 @@ Google takes **one answer per button press**, and its data action is _create a m
 
 ## Shipping to production — the checklist
 
-Standing instruction (2026-09-03): everything lands on `staging`; one merge to `master` after the founder has tested everything. Then: `0094` to production (`npm run db:apply -- --project pajfrgnkapicdgangjey --commit`, `db:types`, `db:compare` empty) → a production Cloud project and Chat app registered at `https://toolbox.goodearthkannur.org/api/google-chat` → `GOOGLE_CHAT_PROJECT_NUMBER` + `GOOGLE_CHAT_AUDIENCE` in Vercel **Production** (through the API, never pasted — BUGCATCHER #18) → a `relay-outbound` service account + JSON key in that production Cloud project → `GOOGLE_CHAT_SERVICE_ACCOUNT_KEY` in Vercel **Production** the same way (`npx tsx scripts/vercel-env.ts --name GOOGLE_CHAT_SERVICE_ACCOUNT_KEY --target production --commit`) → merge → one real command pressed in production, and one button, and the card must rewrite.
+After the founder's vet on staging: `0094` to production (`npm run db:apply -- --project pajfrgnkapicdgangjey --commit`, `db:types`, `db:compare` empty) → a production Cloud project and Chat app registered at `https://toolbox.goodearthkannur.org/api/google-chat` → `GOOGLE_CHAT_PROJECT_NUMBER` + `GOOGLE_CHAT_AUDIENCE` in Vercel **Production** (through the API, never pasted — BUGCATCHER #18) → a `relay-outbound` service account + JSON key in that production Cloud project → `GOOGLE_CHAT_SERVICE_ACCOUNT_KEY` in Vercel **Production** the same way (`npx tsx scripts/vercel-env.ts --name GOOGLE_CHAT_SERVICE_ACCOUNT_KEY --target production --commit`) → merge → one real command pressed in production, and one button, and the card must rewrite.
 
 Vetted on staging 2026-09-03: `/court`, `/trail`, `/newtrail` (standard, custom, people chosen), Push, Bounce, in-dialog errors. Round two's vet is **still the founder's to do**. First the founder's part: a `relay-outbound` service account in the staging Cloud project, its JSON key handed to a session as one line under `GOOGLE_CHAT_SERVICE_ACCOUNT_KEY` in `.env.local`, written to Vercel Preview through `scripts/vercel-env.ts` and `staging` redeployed. Then, in the linked test space with a baton in hand: `/court` → Push — the card must rewrite while the space still hears the confirmation; then Finish, With client, Back from client and a Bounce saved from its dialog, once each on real rows; then `/court` from a DM and one press; then the failure path — key blanked on Preview, redeploy, Push: the baton moves, the space is told, the card stays, the log says `refresh: "off"`. Restore the key. Still never pressed: `/trail <words>` in the DM.
 

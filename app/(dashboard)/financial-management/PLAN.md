@@ -24,4 +24,4 @@ The company's money picture in three screens, plus the one thing no other tool r
 
 ## Open — confirm with the founder as they come up
 
-An opening balance for a true bank figure; dated spend forecasting; partial bill payments (Bills has none); checking the interest convention against one real facility's statement before trusting the accrued column; whether equity returns need their own movement kind.
+An opening balance for a true bank figure; dated spend forecasting; **part-payments** — Bills records them since `0107`, but Cash counts a bill's money out only once it is fully paid (`paid_at`), and contractor advances not at all, until a view carries what was paid; checking the interest convention against one real facility's statement before trusting the accrued column; whether equity returns need their own movement kind.
