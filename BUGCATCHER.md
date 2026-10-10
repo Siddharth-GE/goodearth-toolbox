@@ -11,7 +11,7 @@ CI runs prettier, lint, typecheck and test, then build and `check:actions`. **Ev
 - **Look at the page in dark mode**, opening every control that opens something (#4).
 - **After a smoke test, read the rows** — a sign-in "worked" that never minted a session (#7).
 - **Render any new drawing from real data and look at it** (#8).
-- **Fire the trigger in a transaction you roll back** (#11).
+- **Fire the trigger in a transaction you roll back, as a single-grant person** (#11, #19).
 - **Confirm a Production deployment exists for the merged commit** (#12, #18).
 - **Read the number the screen prints for the empty and unknown cases** (#13).
 - **Ask whether the founder has seen every feature in the diff on staging** (#14).
@@ -88,7 +88,7 @@ On the fresh production project the 2FA email arrived as a magic link, not a cod
 The obvious fix for an unguarded definer function — `if not has_app('/client-relations') then raise` — would have stopped Masters creating any unit, because the function's real caller is a trigger firing for a `/masters` user, and `has_app()` reads `auth.uid()`, which a definer never changes. The migration's own assertions would have passed.
 
 **Rule.** A check inside a definer reached from a cross-tool trigger says which caller it means: `pg_trigger_depth() = 0` separates a direct call from a trigger. With no legitimate direct caller, revoke execute from `anon` and `authenticated` — the grant is the boundary.
-**Check.** Fire the trigger on staging in a transaction ending in a deliberate `raise`, and count what it created.
+**Check.** Fire the trigger on staging in a transaction ending in a deliberate `raise`, as the user the trigger fires for (#19), and count what it created.
 
 ### 12. A merge to `master` that never became a deployment
 
@@ -138,6 +138,13 @@ The door answers Google with hand-built JSON validated against a schema we don't
 
 **Rule.** Done means Vercel's Production row for the SHA says Ready. Secrets go through the API (`scripts/vercel-env.ts`), never pasted, never "sensitive".
 **Check.** After every push to `master`: `gh api repos/<owner>/<repo>/commits/<sha>/status --jq '.statuses[0].description'` says "Deployment has completed", then one call to the changed route.
+
+### 19. A trial run as the database owner proves no policy
+
+`0106`'s bill-line guard checked a material line against `purchase_order_lines` — read as the person saving it, and the billing team cannot read PO tables, so every material bill line was refused to them. The migration's asserts passed, and so did an eleven-step behaviour trial: it ran as the database owner, whom row-level security never applies to.
+
+**Rule.** An invoker trigger or function reads as the person; anything it reads must be readable by every grant that writes through it (`0111` reads the gated `po_line_billing_facts` instead).
+**Check.** Run the trial through `scripts/dry-run-migrations.ts --trial` under `set local role authenticated` as a single-grant person (the trials in `scripts/trials/` show how), and once with one figure wrong to prove it bites.
 
 ## Adding to this file
 

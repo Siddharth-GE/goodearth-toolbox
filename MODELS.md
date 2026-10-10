@@ -27,7 +27,7 @@ A one-file fix doesn't need the ladder: whichever model is in the chair fixes it
 ## Hard rules
 
 - A migration touching RLS, grants, views, definer functions or money may be **drafted** by any model but reaches `db:apply` only after a Fable review.
-- Merges to `staging` or `master`, and any push that deploys, wait for Fable's approval pass (step 3).
+- Merges to `staging` or `master`, and any push that deploys, wait for Fable's approval pass (step 3) — unless the founder waives it in so many words, for that merge; the model in the chair then re-reviews and says so in `plan.md`.
 - Don't burn Fable on typing: if a Fable session finds itself writing ordinary component code, that work belongs in `plan.md` for a cheaper session instead.
 - Don't spawn subagents by default — a fresh agent re-reads the whole rulebook from cold. One session, one model, unless a task genuinely splits into independent parts (then the orchestrator passes a model override and vets what comes back).
 - A lower tier never widens its own scope. Sonnet finding "one more thing to fix" writes it into `plan.md` or `TODO.md`; it does not fix it unasked.

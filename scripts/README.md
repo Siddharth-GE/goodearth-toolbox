@@ -12,7 +12,8 @@ The `data/` files importers read are gitignored: real business data, some of it 
 - `check-migrations.ts` — fails if a database lacks a migration in this branch or an applied file was edited. `npm run db:check -- --project <ref>` (read-only; CI runs it)
 - `check-view-columns.ts` — checks every view against `view-manifest.ts`: columns, guards, flags, no write grants. `npm run db:check-views -- --project <ref>` (read-only)
 - `dry-run-migrations.ts` — runs migration files, and an optional trial from `scripts/trials/`, inside one transaction that always aborts: every statement and assert runs, nothing is kept. Refuses production. `--project <ref> <files…> [--trial <file>]`
-- `trials/erp-chain.sql` — the behaviour trial for `0101`–`0108` (a PO issue raises the rate, batches go oldest-first, bill lines set the total, part-payments and advances settle a bill, the labour-log fences hold, work orders are numbered). Run it through the dry run above.
+- `trials/` — SQL trials for that dry run, each named for what it proves. `erp-chain.sql` runs as the database owner (behaviour only); the `*-as-*.sql` and `bill-line-po-check.sql` run as a single-grant person under RLS (BUGCATCHER #19).
+- `report-unit-mismatches.ts` — lists indent, PO, receipt and stock lines saved in a unit other than their item's Masters unit. `--project <ref>` (read-only)
 - `compare-schema.ts` — every difference between two databases, schema and auth settings. `npm run db:compare -- --project <a> --against <b>` (read-only)
 - `migration-ledger.ts`, `view-manifest.ts`, `supabase-management.ts` — libraries: the ledger reader, the list of what each view may be, and the management API in one place (never defaults a ref; throws on a failed query answered with 200; `serviceRoleKey()` for Storage).
 
@@ -22,6 +23,7 @@ The `data/` files importers read are gitignored: real business data, some of it 
 - `copy-storage.ts` — copies Storage objects between projects and rewrites the URLs pointing at them. `--from <ref> --to <ref>`
 - `scramble-staging-emails.ts` — makes staging's staff emails unroutable, or restores named ones to sign in. `--project <ref> --keep a@b`
 - `wipe-staging-records.ts` — clears every record made in the tools, staging only (it refuses any other ref), after writing every row and file it deletes to `data/backups/`. Every table must be on its cleared or kept list. `--project <ref>`
+- `wipe-drawings.ts` — deletes every drawing, transmittal and sheet file in Design Management (design stages stay), past the guards in one transaction. `--project <ref> [--commit]`
 - `backup-tables.ts` — library: whole tables to JSON in `data/backups/` before a script changes them.
 - `vercel-env.ts` — writes one variable from `.env.local` to Vercel through its API, trimmed and never pasted. `--name <VAR> --target preview|production`
 

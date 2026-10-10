@@ -21,7 +21,7 @@ The Saarang plot register, one record per villa, and **the only money coming in*
 
 ## Things that will bite
 
-- **An embed through `units` to `plots` names the key** (`plots!units_plot_id_fkey`). This tool shipped four dead screens through a green CI that way (BUGCATCHER #2).
+- **An embed through `units` to `plots` names the key** (`plots!units_plot_id_fkey`, BUGCATCHER #2).
 - **`crm_assign_unit` and `crm_release_unit` are `security definer`** — the `has_app` check in the body IS the boundary. Smoke-test them as a no-grant account.
 - **`create_client_engagement`** may not be executed by any client role, and its body admits `/client-relations` **or** a call through the `units_seed_engagement` trigger — its real caller, firing for a `/masters` user. A plain `has_app` check would break adding a plot in Masters (BUGCATCHER #11).
 - **It reads `pusher_chain_state` directly**, never `lib/relay/queries.ts` (every function there requires `/relay`). The small staff-name map is duplicated on purpose.

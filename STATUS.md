@@ -4,30 +4,25 @@ A snapshot, not a changelog: what exists now. Next work is `TODO.md`, each tool'
 
 ## Environments
 
-|                             | Supabase ref           | Who reaches it                                                                                   |
-| --------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------ |
-| `goodearth-toolbox`         | `pajfrgnkapicdgangjey` | **Production** — `toolbox.goodearthkannur.org`, from `master`. Real work, real staff.            |
-| `goodearth-toolbox-staging` | `ipstebqawrvhkyntctrv` | **Staging** — `staging.goodearthkannur.org` from `staging`, every preview URL, and `npm run dev` |
+Production is `toolbox.goodearthkannur.org` (from `master`); staging is `staging.goodearthkannur.org` (from `staging`, and behind every preview and `npm run dev`). The two databases, and every rule keeping them apart, are `SHIPPING.md`.
 
-How they move, and every rule that keeps them apart, is `SHIPPING.md`.
-
-- **Production is paused** (free tier, despite the weekly keep-alive) and has **no backups**. Restoring it is the founder's — `TODO.md`.
-- **Staging carries work production does not have yet** (`0094`–`0111` and more); the list, and how it reaches `master`, is `TODO.md`.
-- **Staging starts from scratch.** Every record made in the tools was cleared on 2026-10-07 at the founder's request (`scripts/wipe-staging-records.ts`, backup in `data/backups/`), and vendors, contractors, works with their labour rates, materials, material categories and stages are now the founder's final masters workbook (`masters/PLAN.md`). People, access, clients, projects, plots, villas and the design catalogue stayed.
+- **Production is paused** (free tier, despite the weekly keep-alive). Restoring it is the founder's — `TODO.md`.
+- **Staging carries work production does not have yet** — `TODO.md` lists it.
+- **Staging's tool records were cleared on 2026-10-07** (backup in `data/backups/`). Its vendors, contractors, works, materials, categories and stages are the founder's final masters workbook (`masters/PLAN.md`); people, access, clients, projects, plots, villas and the catalogue were kept.
 - **Staging holds the team's real email addresses, and colleagues sign in there to try work.** The founder runs its accounts and grants, and is admin as `siddharth@goodearthkannur.org`. Two accounts are for checks, not people: `siddharth.cyriac.99@gmail.com` (staff, four grants — the trials' single-grant person) and the probe (`siddharth.cyriac.99+probe@gmail.com`, holds `/estimator` and `/inventory`; set a throwaway password through the auth admin API each time). Reproduce a colleague's problem with the probe and a grant.
 
 ## Platform
 
 - **Stack:** Next.js 16.2 (Turbopack) · React 19.2 · Tailwind 4 · Supabase Postgres. Vercel `bom1` + Supabase `ap-south-1`, both Mumbai.
 - **Migrations:** `0001`–`0093` on both databases; `0094`–`0111` on staging only. `applied_migrations` (`0067`) is the ledger, and CI checks it on every pull request.
-- **Access:** per-user grants (`user_apps`) + role bundles (`role_apps`), enforced in the database by `has_app()`. `profiles.team` is a dead column.
+- **Access:** per-user grants (`user_apps`) + role bundles (`role_apps`), enforced in the database by `has_app()`.
 - **Sign-in:** password → emailed 6-digit code (30-day trusted device), self-service reset, Google for existing team emails only; both steps rate-limited in the database. Mail rides Resend as `toolbox@goodearthkannur.org`. The rules are `SECURITY.md`.
-- **Performance:** warm TTFB ~0.2s, cold ~1.0s — cold starts are the one measured problem. Every dashboard page shows a loading state: 84 of 127 pages have their own `loading.tsx`, the rest inherit the nearest parent's.
-- **Look:** "stone and glass" (on staging), rules in `DESIGN.md`. The home page shows only real numbers.
+- **Performance:** warm TTFB ~0.2s, cold ~1.0s — cold starts are the one measured problem.
+- **Look:** "stone and glass" (on staging), rules in `DESIGN.md`.
 
 ## Tools
 
-Production unless marked. Each tool's rules are its `PLAN.md` (Google Chat door: `lib/google-chat/PLAN.md`). Every Operations and Management tool opens on a welcome screen (`_components/tool-welcome.tsx`, counts from each tool's `getWelcomeCounts()`).
+Production unless marked. Each tool's rules are its `PLAN.md` (Google Chat door: `lib/google-chat/PLAN.md`).
 
 - **Marathon** — race-day kiosk: PIN login, entries, bibs, admin. Own auth and service-role client — the one kiosk, not a pattern.
 - **Masters** — the shared reference data every tool reads: projects, plots, units, clients, vendors, stores, items (catalogue and materials), categories, brands, GST rates, construction stages, units of measure, works, item requests (on staging: companies, terms templates, and a material rate that rises with POs). Reads ungated, writes need `/masters`.
@@ -77,4 +72,4 @@ The chain runs end to end: design → price → indent → PO → goods in / sto
 | Business Planning    | `projects` (its one optional link)                                                                                                                                   |
 | Directory, Dexter    | nothing outside the shared surfaces                                                                                                                                  |
 
-**Nothing reads** Financial Management, Dexter or the Estimator's own tables — only its views: the rate-free `estimate_takeoff_facts` and `work_unit_facts`, and `work_labour_rate_facts` (Bills, gated). A redefinition of `pusher_chain_state` must check Client Relations, Reporter and the Google Chat door (`relay/PLAN.md`).
+**Nothing reads** Financial Management, Dexter or the Estimator's own tables — only its views: the rate-free `estimate_takeoff_facts` and `work_unit_facts`, and `work_labour_rate_facts` (Bills, gated).

@@ -1,6 +1,6 @@
 # Estimator — the rules
 
-Grant `/estimator`. Migrations `0074`–`0088` and `0096`–`0098` (`0078`–`0081` shared with Indents and Inventory). The 2026-09-26 rework (`0096`–`0098`) is on staging; its Fable approval pass is due before production (`TODO.md`).
+Grant `/estimator`. Migrations `0074`–`0088` and `0096`–`0098` (`0078`–`0081` shared with Indents and Inventory).
 
 What a villa costs to build. Works come from the Masters vocabulary (`0073`); this tool adds what each is measured in, what its labour costs and what it consumes. Selections and Budgets are interiors and stay out of it.
 
@@ -28,7 +28,7 @@ What a villa costs to build. Works come from the Masters vocabulary (`0073`); th
 
 ## The rules everything rests on
 
-- **Every table here is `/estimator`-gated, SELECT included** (`0074`). Masters reads are ungated, so a rate cannot live there — a work's unit and labour rate are in `estimator_work_info`, never on `work_items`. It reads Inventory's money-free `stock_issues(_lines)` and `goods_receipts(_lines)`; nothing reads its tables except through `estimate_takeoff_facts`, which carries no rate, ever.
+- **Every table here is `/estimator`-gated, SELECT included** (`0074`). Masters reads are ungated, so a rate cannot live there — a work's unit and labour rate are in `estimator_work_info`, never on `work_items`. It reads Inventory's money-free `stock_issues(_lines)` and `goods_receipts(_lines)`; other tools see it only through its three views (`SECURITY.md`), and the two open ones carry no rate, ever.
 - **A missing rate is `null`, and `null` is never zero.** The calculator returns `null` for any cost it cannot know, `formatMoney(null)` prints "—", and a frozen unpriced figure stays unpriced forever (BUGCATCHER #13).
 - **All arithmetic is in `lib/estimator/calc.ts`**, pure and tested. The rate book's cost per unit and an estimate line's cost come from the same `computeLine`.
 - **Costs are live while working, frozen at official** (`0077`). The app computes the snapshot — per-line costs and the per-(work, material) takeoff — and SQL validates it, never re-implements it.

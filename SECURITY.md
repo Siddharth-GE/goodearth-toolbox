@@ -13,7 +13,7 @@ Auth, permissions, money, the line chain and the cross-tool contracts. CLAUDE.md
 - **A view is a read surface.** Views are owned by `postgres` and bypass RLS, and Supabase grants writes on every new relation, so a view left writable is an RLS bypass. Every new view revokes insert, update, delete, truncate from **`anon, authenticated`** (naming them — `from public` does not), and every new function revokes execute from `public, anon`, in the same migration. `drop view` restores the default grants every time. `npm run db:check-views` fails a pull request on a writable view (BUGCATCHER #3).
 - **Every `security definer` function checks `has_app(...)` or `is_admin()` in its own body** — that check is its whole boundary — unless no client role may execute it (revoked from `anon` and `authenticated`, reached only by a trigger), in which case the grant is. `security definer` changes the role, not `auth.uid()`, so a check inside a function reached from a cross-tool trigger uses `pg_trigger_depth() = 0` to tell a direct call from the trigger (BUGCATCHER #11).
 - **Actions return `ActionState`** (`lib/action-state.ts`), never throw. Queries may throw — a failed read has no partial answer worth showing.
-- **Never seed a real default credential.** `0002` seeded a Marathon PIN whose hash and salt are in this public repo; `0070` deletes anything matching it and `npm run rotate-marathon-pins -- --project <ref>` finds the rest. The kiosk has no Supabase session, so the PIN is all that stands in the way.
+- **Never seed a real default credential** — a seed is a fixture in development and a credential in production. `0002`'s Marathon PIN, hash and salt are in this public repo (`marathon/PLAN.md` has the rotation).
 
 ## The Google Chat door
 
@@ -71,9 +71,7 @@ Indents carries no money, and neither does a supervisor's phone — labour logs 
 
 ## Cross-tool reads and writes
 
-STATUS.md's contract table lists every read a tool makes outside itself; it IS the contract. **One tool never imports another tool's code, and shared code never imports a tool's** — when two tools want the same read, the answer is a shared module (`lib/design-views/`, `lib/drawings/`), not an import. `lib/overview/` is the shell's home and the one module that may import tools' queries, each call wrapped so one tool's failure cannot take the home page down.
-
-**No tool's code writes another tool's table**, except these, each deliberate:
+Reads: STATUS.md's contract table, which IS the contract; the import rule is CLAUDE.md's. **No tool's code writes another tool's table**, except these, each deliberate:
 
 - `indent_approvers` / `bill_approvers` are Settings'-owned, though they live in Indents' and Bills' migrations.
 - The `projects_seed_schedule` trigger (`0045`): creating a project in Masters seeds Relay's schedule — declared by Relay's migration, so the coupling points the right way.
@@ -84,12 +82,10 @@ STATUS.md's contract table lists every read a tool makes outside itself; it IS t
 - Issuing a PO raises Masters' `items.indicative_price` (`0103`) when the PO paid more — a trigger-only definer, execute revoked from every client role, never lowering; `item_price_changes` logs it, gated to `/masters` or `/purchase-orders`.
 - Selections proposes catalogue items: the "items proposable by selections app" INSERT policy admits `/selections` for `is_provisional` rows only, through the invoker function `create_item_request`; Masters approves or merges them later.
 
-**A cross-tool trigger or definer function not listed here is what nobody finds until it misfires.**
-
-`pusher_chain_state` has been redefined six times and has three readers outside Relay's screens: a seventh definition must check Client Relations, Reporter and the Google Chat door, carry the `entry` lateral's clock-anchor exclusions forward, and re-issue the revokes.
+**A cross-tool trigger or definer function not listed here is what nobody finds until it misfires.** Redefining `pusher_chain_state`, the most-read view: `relay/PLAN.md` first.
 
 ## Reads
 
 - **PostgREST caps a select at 1,000 rows.** Anything needing completeness goes through `fetchAll` (`lib/supabase/fetch-all.ts`), which throws if a page fails. Lists show "N of M" from a real count, never `rows.length`.
 - **Always check `error`, not just `data`.** An empty result and a failed read mean opposite things; conflating them has destroyed priced budget lines, cleared drift warnings and re-opened double-buying.
-- **An embed through a table with two FKs to the same target names the key** (`plots!units_plot_id_fkey`). A bare one answers HTTP 300 at runtime, and nothing local catches a bad `select` string — open the page, or run the query (BUGCATCHER #2).
+- **An embed through a table with two FKs to the same target names the key** (BUGCATCHER #2).
