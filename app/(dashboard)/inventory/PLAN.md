@@ -1,6 +1,6 @@
 # Inventory — the rules
 
-The store-keeper's tool: what arrives against a purchase order, what each store holds, what goes out. Grant `/inventory`. Migrations `0023`, `0024`, `0080`, `0081`, `0084`, `0108`.
+The store-keeper's tool: what arrives against a purchase order, what each store holds, what goes out. Grant `/inventory`. Migrations `0023`, `0024`, `0080`, `0081`, `0084`, `0108`, `0112`.
 
 ## The shape of it
 
@@ -50,6 +50,6 @@ The quantity guards serialise on an **advisory transaction lock**, not `select �
 
 - **A mis-keyed receipt cannot be deleted**, only corrected by an adjustment — and adjustments apply only to stores, so **a wrong site delivery cannot be corrected at all**. If it bites, build an admin-approved reversal, not a DELETE policy.
 - **Units are not reconciled across movements** — stock sums quantities whatever unit each recorded. If an item's unit changes, the fix belongs in `stock_on_hand`.
-- **Batches start at `0108`.** Issues recorded before it moved no batch, so in a store with older history `batch_on_hand` still counts what those issues took — to be decided before production (`plan.md`).
+- **History from before batches is replayed** (`0112`, `replay_pre_batch_history()`): every issue line and removal recorded before `0108` was applied draws its batches oldest first, but only from batches that existed at the time — receipt lines and movements recorded no later than the event — so an old issue never draws a later delivery. Owner-only, invoker, re-runnable (a second run writes nothing). **Apply `0108` and `0112` together**: an issue recorded between them drew batches the replay would draw again, and the replay refuses rather than leave a batch below zero.
 - **`stores` has no `updated_at` or actor columns** (`0004`).
 - **The receipt page is read-only.** The guard permits editing `challan_no`, `received_at` and `note` — one small form when someone needs it.
