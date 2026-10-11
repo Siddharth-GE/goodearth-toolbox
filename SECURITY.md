@@ -42,16 +42,16 @@ A client opens `/deck/<token>/index.html` and sees an uploaded presentation.
 
 Design flows to payment through the database, never through shared code. The two files deciding what carries forward (`lib/budgets/carry-forward.ts`, `lib/indents/pull-rules.ts`) are pure and import nothing.
 
-| Hop                | Anchor                                             |
-| ------------------ | -------------------------------------------------- |
-| selection → budget | composite FK `(selection_id, line_key)`            |
-| budget → indent    | composite FK `(budget_id, line_key)`               |
-| indent → PO        | FK `purchase_order_lines.indent_line_id`, not null |
-| PO → receipt       | FK `goods_receipt_lines.po_line_id`, not null      |
-| receipt → issue    | `stock_batch_movements.receipt_line_id` (`0108`)   |
-| PO → bill          | FK `bills.po_id`; per line `bill_lines.po_line_id` |
-| labour log → bill  | `labour_logs.bill_id`, `bill_lines.labour_log_id`  |
-| bill → paid        | `bill_payments.bill_id`, `advance_recoveries`      |
+| Hop                | Anchor                                                                        |
+| ------------------ | ----------------------------------------------------------------------------- |
+| selection → budget | composite FK `(selection_id, line_key)`                                       |
+| budget → indent    | composite FK `(budget_id, line_key)`                                          |
+| indent → PO        | FK `purchase_order_lines.indent_line_id`, required on every new line (`0113`) |
+| PO → receipt       | FK `goods_receipt_lines.po_line_id`, not null                                 |
+| receipt → issue    | `stock_batch_movements.receipt_line_id` (`0108`)                              |
+| PO → bill          | FK `bills.po_id`; per line `bill_lines.po_line_id`                            |
+| labour log → bill  | `labour_logs.bill_id`, `bill_lines.labour_log_id`                             |
+| bill → paid        | `bill_payments.bill_id`, `advance_recoveries`                                 |
 
 - **Anchor on stable ids or the composite FK — never a bare `line_key`.**
 - **Deletion is refused, not cascaded.** Issued revisions are immutable (`selection_lines_draft_only`) and the FKs restrict. Drift is flagged instead: `classifyDesignDrift` marks changed lines, `getDownstreamImpact` shows the indents and POs a change would hit.
@@ -79,6 +79,7 @@ Reads: STATUS.md's contract table, which IS the contract; the import rule is CLA
 - Directory's `profiles_seed_staff_details` trigger (`0060`) gives every new account a blank card inside Settings' `inviteUser` — give `staff_details` a `not null` column without a default and `inviteUser` breaks. Plus `updateMyName`: a person's own `profiles.full_name`.
 - Inventory resolves Supervisors' `issue_requests` (`0084`) — fulfil stamps `fulfilled_issue_id`, decline records a reason; `issue_requests_guard()` lets that side move only `requested → fulfilled/declined`.
 - Bills stamps Supervisors' `labour_logs.bill_id` (`0104`/`0106`) — only inside `send_labour_logs_to_bill()` and `delete_recorded_bill()`, definer functions that check `/bills` first, behind a transaction-local flag only they raise; `labour_logs_billed_guard()` lets that column move and nothing else, and freezes a billed entry.
+- The Estimator answers Indents' `indent_lines` (`0113`) — approve or refuse a line outside the estimate — only inside `decide_indent_line()`, a definer that checks `/estimator` first (it is only ever called directly, so `auth.uid()` is the estimator), that the indent is submitted and that the line has no anchor, behind a transaction-local flag only it raises; `indent_lines_draft_only` then lets the four answer columns move and nothing else. `indents_guard` refuses approval until every such line is approved.
 - Issuing a PO raises Masters' `items.indicative_price` (`0103`) when the PO paid more — a trigger-only definer, execute revoked from every client role, never lowering; `item_price_changes` logs it, gated to `/masters` or `/purchase-orders`.
 - Selections proposes catalogue items: the "items proposable by selections app" INSERT policy admits `/selections` for `is_provisional` rows only, through the invoker function `create_item_request`; Masters approves or merges them later.
 

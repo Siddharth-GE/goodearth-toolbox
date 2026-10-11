@@ -1,10 +1,10 @@
 # Indents — the rules
 
-Site teams request materials, numbered per project, approved before purchase. Grant `/indents`. Migrations `0019`, `0028`, `0078`. **No money anywhere in this tool** — items, quantities and units, never cost, margin or rate.
+Site teams request materials, numbered per project, approved before purchase. Grant `/indents`. Migrations `0019`, `0028`, `0078`, `0113`. **No money anywhere in this tool** — items, quantities and units, never cost, margin or rate.
 
 ## The idea
 
-Anyone with `/indents` raises an indent on a project (plot, unit and the **work** it serves optional), gets a permanent number (`IND/<code>/001`, minted in the database — deleted drafts leave gaps, accepted), fills it from up to three sources, and submits it. A named approver or an admin approves it; a rejection sends it back to draft with a note. Approved indents are what Purchase Orders consume.
+Anyone with `/indents` raises an indent on a project (plot, unit and the **work** it serves optional), gets a permanent number (`IND/<code>/001`, minted in the database — deleted drafts leave gaps, accepted), fills it from up to three sources, and submits it. A line no estimate or budget covers waits for the **estimator's** yes; then a named approver or an admin approves it; a rejection sends it back to draft with a note. Approved indents are the only thing Purchase Orders consume (founder, 2026-10-11: "a po can only be made from an indent").
 
 ## The rules everything rests on
 
@@ -19,6 +19,17 @@ Anyone with `/indents` raises an indent on a project (plot, unit and the **work*
 5. **Numbers are permanent.** `delete_draft_indent()` is the only delete, and the counter never rewinds. `lib/indents/reference.ts` mirrors the SQL mint under test.
 6. **A material moves in its Masters unit.** Every line except an interiors one is saved in the item's `default_uom` whatever the browser sends (`updateLine` re-reads it; the grid shows it as text) — a cement line switched to cft once rode onto the PO, the receipt and the stock sum beside bags. Interiors lines keep the selection's unit (a tile per sqft). Adjustments and issues follow the same rule (Inventory). `scripts/report-unit-mismatches.ts` lists anything saved before it.
 7. **Still to buy** = requested less what live POs ordered (`stillToBuy`, never negative), shown per line, as a count on an approved indent, and on the printed indent (`/indents/[id]/pdf`, inline — no money).
+
+## Outside the estimate waits for the estimator (`0113`)
+
+Founder, 2026-10-11: an indent may be made direct, but it is "the first thing reconciled in the estimate" — and "indent should wait for estimator approval for sure".
+
+- **A catalogue pick the villa's official estimate lists is an estimate line**, not a direct one (`addDirectLines` reads `estimate_takeoff_facts` for the villa — anywhere on it, the anchor's per-item rule — and sets `estimate_id`), so "already requested" counts it and it never waits. `indent_lines_estimate_anchor` refuses an anchor whose estimate is not the villa's current official or does not list the item, so a false anchor cannot dodge the estimator.
+- **Every other direct line is outside the estimate** — including every line on an indent for no villa, and on a villa with no official estimate yet: nothing covers it, so "no villa" is not a way around. Interiors lines answer to their approved budget instead and never wait. The test is structural (no budget, construction or estimate anchor — `waitsForEstimator`), never a read of the estimate at approval time.
+- **Submit needs a reason on each** ("Why is it needed?", saved with the line, `off_estimate_reason`); **approve needs the estimator's yes on each** (`estimator_decision`). Both are in `indents_guard`; `estimatorHold` / `approvalBlocker` mirror them for the page, which locks Approve and says why. Send back stays open: a refusal is the approver's cue to return it.
+- **The estimator answers in Estimator → Site check** through `decide_indent_line()` (the cross-tool write in `SECURITY.md`), only while the indent is submitted, and may change its answer until the indent moves. In a draft the answer can only be emptied — and a change to the line's item, quantity, unit or reason empties it, so an answer never outlives its question. A note edit keeps it.
+- **The reason and the answer are on the line, the page and the print.**
+- **Rows from before `0113` are not rewritten.** An already-submitted indent with direct lines waits for the estimator like any other; an approved one is untouched.
 
 ## Revision safety — the double-buy bug
 

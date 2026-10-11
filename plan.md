@@ -40,3 +40,24 @@ First, in **Estimator → Works**, give Footing (FD.15) its materials (M10 mix +
 6. **Cash request** for this week: add the bills and a ₹10,000 advance, submit, release with one amount cut; record the payments — a bill shows "Part paid · pending". On the next bill, recover part of the advance. **Contractors** shows given / recovered / outstanding; **Payments** searches, filters and sums.
 7. **Reporter** → any starter: type in the search box, see the totals row, use a quick filter.
 8. As the **probe** (it holds `/inventory` and `/estimator`): Inventory rates are visible, and Site check shows site's reason; Bills, POs and payments are refused.
+
+# Second build — indents wait for the estimator (2026-10-11)
+
+The founder: "a po can only be made from an indent … indents can be made direct but has to be first thing that is reconciled in the estimate"; asked whether the indent waits, "indent should wait for estimator approval for sure"; and a bulk buy is one PO gathering several villas' indents. Built by `[Opus]` on `feature/indent-estimator-gate`. The rules live in `indents/PLAN.md` (_Outside the estimate waits for the estimator_), `purchase-orders/PLAN.md`, `estimator/PLAN.md` (decision 11) and `SECURITY.md` (the cross-tool write); this section holds only what is still open.
+
+- [x] `[Opus]` `0113` written; dry-run on staging with `scripts/trials/indent-estimator-gate.sql` as a single-grant person, and proved to bite (a copy without the estimator check fails at TRIAL 5). The older trials lift the new PO rule inside their own transaction (`0113` + `batches-as-store-keeper` passes).
+- [x] `[Opus]` Indents, Estimator (Site check, welcome) and Purchase Orders screens; the types carry `0113`'s columns by hand.
+- [ ] `[Fable]` Review `0113` — a definer function, two redefined guards, a new cross-tool write (MODELS.md: required before `db:apply`, unless the founder waives it for this merge).
+- [ ] `[Opus]` `npm run db:apply -- --project ipstebqawrvhkyntctrv --commit`, then `npm run db:types:staging` (it should match the hand-written types), `db:check-views`; open every changed page on the preview, as the probe with `/indents`, then with `/estimator`.
+- [ ] `[Opus]` Pull request to `staging` after Fable's merge pass; `gh run list` green.
+- [ ] Founder — the checklist below, on staging. Then production: `0113` after `0112`.
+
+## Verification — the founder, on staging (second build)
+
+1. **Indents** → New indent on Plot 1, work Footing → **Add items**: pick cement (on the estimate) and something it does not list. Cement shows "from the official estimate"; the other shows amber **Outside the estimate** with a "Why is it needed?" box.
+2. **Submit** without typing a reason — it asks why. Type one, submit.
+3. As the approver: **Approve** is locked — "Waiting for the estimator on 1 line". Send back still works.
+4. **Estimator → Site check**: "Indents waiting for you" lists the line with site's reason. **Refuse** with a note → on the indent the approver sees the refusal and sends it back. Change the quantity (the old answer clears), resubmit; in Site check press **Approve**; now Approve on the indent works. The Estimator's welcome counts what waits.
+5. **Print** the indent: the line shows its reason and "Estimator approved".
+6. **Purchase Orders**: no "Add items directly". **Bulk PO from several indents** → General → **From approved indents** lists approved indents from every villa, each named by its villa.
+7. As the **probe** (it holds `/estimator` and `/inventory`): Site check shows the waiting lines and Approve works; Indents is refused.

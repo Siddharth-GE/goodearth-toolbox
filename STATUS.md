@@ -14,7 +14,7 @@ Production is `toolbox.goodearthkannur.org` (from `master`); staging is `staging
 ## Platform
 
 - **Stack:** Next.js 16.2 (Turbopack) · React 19.2 · Tailwind 4 · Supabase Postgres. Vercel `bom1` + Supabase `ap-south-1`, both Mumbai.
-- **Migrations:** `0001`–`0093` on both databases; `0094`–`0112` on staging only. `applied_migrations` (`0067`) is the ledger, and CI checks it on every pull request.
+- **Migrations:** `0001`–`0093` on both databases; `0094`–`0113` on staging only. `applied_migrations` (`0067`) is the ledger, and CI checks it on every pull request.
 - **Access:** per-user grants (`user_apps`) + role bundles (`role_apps`), enforced in the database by `has_app()`.
 - **Sign-in:** password → emailed 6-digit code (30-day trusted device), self-service reset, Google for existing team emails only; both steps rate-limited in the database. Mail rides Resend as `toolbox@goodearthkannur.org`. The rules are `SECURITY.md`.
 - **Performance:** warm TTFB ~0.2s, cold ~1.0s — cold starts are the one measured problem.
@@ -29,13 +29,13 @@ Production unless marked. Each tool's rules are its `PLAN.md` (Google Chat door:
 - **Settings** — people, grants, roles, approver lists. Admin only.
 - **Selections** — what design specifies per room; revisions immutable once issued. Tiles and lines show the item's picture, description and product link (catalogue pictures on staging).
 - **Budgets** — prices an issued revision (interiors) and a construction stage tree; money gated.
-- **Indents** — site requests from a villa's official estimate, an approved interiors budget, or direct. No money (on staging: the indent's work's own materials, always in the Masters unit, what is still to buy, and a print).
-- **Purchase Orders** — from approved indents, or direct for bulk/urgent buys. The money entry point, gated (on staging: made from an indent with a vendor per line, discount and charges per line, CGST + SGST or IGST, terms from a template, the company on the print).
+- **Indents** — site requests from a villa's official estimate, an approved interiors budget, or direct. No money (on staging: the indent's work's own materials, always in the Masters unit, what is still to buy, and a print; a line no estimate or budget covers says why and waits for the estimator's yes before the indent can be approved).
+- **Purchase Orders** — from approved indents, or direct for bulk/urgent buys. The money entry point, gated (on staging: only from indents — a bulk buy is one general PO gathering several villas' indents; made from an indent with a vendor per line, discount and charges per line, CGST + SGST or IGST, terms from a template, the company on the print).
 - **Inventory** — goods in, stock issues, adjustments, stock by location, the supervisors' request queue. Quantities, open to every signed-in person (on staging: every store delivery line is a batch carrying its PO rate, issues draw the oldest batch first, and only `/inventory` holders see the rates).
 - **Bills** — PO, work-order and NMR bills (on staging: bills have lines and print; labour logs become bills with Send to Bill; work orders replace labour contracts; payments, advances and the weekly cash request).
 - **Relay** — the baton relay: trails, departments, schedules, a wave per villa. Stores no documents. The **Google Chat door** drives it from Chat (staging).
 - **Design Management** — drawing sets, revisions and transmittals per villa; released drawings reach Supervisors.
-- **Estimator** — what a villa costs: a rate book, each villa measured on its own, a frozen official copy, one site-check list (the rework on staging).
+- **Estimator** — what a villa costs: a rate book, each villa measured on its own, a frozen official copy, one site-check list (the rework on staging; there, Site check opens with the indent lines waiting for the estimator).
 - **Supervisors** — the site's day on a phone: labour, material requests, drawn-vs-estimated per work (on staging: labour as daily wages or piece-work, and a request off the estimate asks why).
 - **Client Relations** — the plot register and the only money coming in: payment schedules and receipts.
 - **Business Planning** — the founder's JV business plan as a recalculating tool.
@@ -51,25 +51,25 @@ The chain runs end to end: design → price → indent → PO → goods in / sto
 
 **This table IS the contract.** A column in it can't be renamed or dropped without checking every tool in its row, and a tool that starts reading outside itself adds its row here in the same change. Everything is a `SELECT`; the writes that cross a boundary are the exceptions `SECURITY.md` lists. Masters, `profiles` and `items` are shared surfaces, not another tool's property, and are not listed.
 
-| Tool                 | Reads from outside itself                                                                                                                                            |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Bills                | `po_facts`, `po_billing_totals`, `po_line_billing_facts`, `work_labour_rate_facts`, `labour_logs` (Send to Bill)                                                     |
-| Budgets              | `selections`, `selection_lines`, `spaces`, `indent_lines`, `indents` (refusing to delete a construction line an indent uses)                                         |
-| Indents              | `approved_budgets(_lines)`, `selections`, `selection_lines`, `po_line_facts`, `estimate_takeoff_facts`                                                               |
-| Purchase Orders      | `indents`, `indent_lines`, `goods_receipts(_lines)`, `po_billing_totals`, `po_line_billing_facts` (invoiced per line)                                                |
-| Inventory            | `po_facts`, `po_line_facts`, `estimate_takeoff_facts`, `issue_requests`, `indent_lines`, `indents` (what a delivery line was bought for)                             |
-| Selections           | `indents`, `indent_lines`, `po_line_facts`                                                                                                                           |
-| Masters              | `po_facts`, `bill_facts`, `approved_budgets`, `indents`, `selections`, `selection_lines`                                                                             |
-| Overview (home page) | `indents`, `indent_lines`, `po_facts`, `bill_facts`, `goods_receipts`, `staff_departments` (counts only) + `lib/marathon/queries`                                    |
-| Relay                | nothing outside the shared surfaces                                                                                                                                  |
-| Google Chat door     | Relay's own `pusher_*` tables and `pusher_chain_state`, through the admin client (`SECURITY.md`)                                                                     |
-| Client Relations     | `pusher_chain_state`, `selections`                                                                                                                                   |
-| Reporter             | `lib/reporter/datasets.ts` is the list: indents, POs, bills, budget report lines, CRM facts, goods receipts, stock, selections, `pusher_chain_state`, plan targets   |
-| Financial Management | `crm_milestone_facts`, `crm_receipt_facts`, `bill_money_facts`, `business_plan_target_facts`                                                                         |
-| Estimator            | `stock_issues(_lines)`, `goods_receipts(_lines)` (issued-vs-estimated), `issue_requests` (site's off-estimate reason, `0110`)                                        |
-| Supervisors          | `estimate_takeoff_facts`, `stock_issues(_lines)`, `goods_receipts(_lines)`, `lib/drawings/`, `work_unit_facts` (a work's unit), `bill_facts` (a billed log's number) |
-| Design Management    | nothing outside the shared surfaces; owns the tables behind `lib/drawings/`                                                                                          |
-| Business Planning    | `projects` (its one optional link)                                                                                                                                   |
-| Directory, Dexter    | nothing outside the shared surfaces                                                                                                                                  |
+| Tool                 | Reads from outside itself                                                                                                                                                                       |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bills                | `po_facts`, `po_billing_totals`, `po_line_billing_facts`, `work_labour_rate_facts`, `labour_logs` (Send to Bill)                                                                                |
+| Budgets              | `selections`, `selection_lines`, `spaces`, `indent_lines`, `indents` (refusing to delete a construction line an indent uses)                                                                    |
+| Indents              | `approved_budgets(_lines)`, `selections`, `selection_lines`, `po_line_facts`, `estimate_takeoff_facts`                                                                                          |
+| Purchase Orders      | `indents`, `indent_lines`, `goods_receipts(_lines)`, `po_billing_totals`, `po_line_billing_facts` (invoiced per line)                                                                           |
+| Inventory            | `po_facts`, `po_line_facts`, `estimate_takeoff_facts`, `issue_requests`, `indent_lines`, `indents` (what a delivery line was bought for)                                                        |
+| Selections           | `indents`, `indent_lines`, `po_line_facts`                                                                                                                                                      |
+| Masters              | `po_facts`, `bill_facts`, `approved_budgets`, `indents`, `selections`, `selection_lines`                                                                                                        |
+| Overview (home page) | `indents`, `indent_lines`, `po_facts`, `bill_facts`, `goods_receipts`, `staff_departments` (counts only) + `lib/marathon/queries`                                                               |
+| Relay                | nothing outside the shared surfaces                                                                                                                                                             |
+| Google Chat door     | Relay's own `pusher_*` tables and `pusher_chain_state`, through the admin client (`SECURITY.md`)                                                                                                |
+| Client Relations     | `pusher_chain_state`, `selections`                                                                                                                                                              |
+| Reporter             | `lib/reporter/datasets.ts` is the list: indents, POs, bills, budget report lines, CRM facts, goods receipts, stock, selections, `pusher_chain_state`, plan targets                              |
+| Financial Management | `crm_milestone_facts`, `crm_receipt_facts`, `bill_money_facts`, `business_plan_target_facts`                                                                                                    |
+| Estimator            | `stock_issues(_lines)`, `goods_receipts(_lines)` (issued-vs-estimated), `issue_requests` (site's off-estimate reason, `0110`), `indents`, `indent_lines` (lines waiting for its answer, `0113`) |
+| Supervisors          | `estimate_takeoff_facts`, `stock_issues(_lines)`, `goods_receipts(_lines)`, `lib/drawings/`, `work_unit_facts` (a work's unit), `bill_facts` (a billed log's number)                            |
+| Design Management    | nothing outside the shared surfaces; owns the tables behind `lib/drawings/`                                                                                                                     |
+| Business Planning    | `projects` (its one optional link)                                                                                                                                                              |
+| Directory, Dexter    | nothing outside the shared surfaces                                                                                                                                                             |
 
 **Nothing reads** Financial Management, Dexter or the Estimator's own tables — only its views: the rate-free `estimate_takeoff_facts` and `work_unit_facts`, and `work_labour_rate_facts` (Bills, gated).
