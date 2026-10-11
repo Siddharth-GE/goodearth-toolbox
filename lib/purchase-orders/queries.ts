@@ -578,6 +578,8 @@ export type PoolIndentGroup = {
   indent_id: string;
   reference: string;
   stage: string | null;
+  /** The indent's villa — said on a bulk PO, which gathers many. */
+  place: string | null;
   lines: PoolLineRow[];
 };
 
@@ -588,12 +590,14 @@ export type IndentPool = {
 };
 
 /**
- * The approved indent lines a PO may order from: same project, same
- * scope (the founder's one-PO-one-plot/unit rule — a unit PO pulls from
- * that unit's indents, a plot PO from that plot's, a general PO from
- * indents tagged to neither). Every line is annotated with what's
- * already ordered across all live POs, and fully-ordered lines render
- * disabled-and-labelled rather than vanishing.
+ * The approved indent lines a PO may order from, in its project: a unit
+ * PO pulls from that unit's indents, a plot PO from that plot's (the
+ * founder's one-PO-one-plot/unit rule), and a GENERAL PO from every
+ * approved indent — the bulk buy, one order gathering several villas'
+ * indents (founder, 2026-10-11; before, it took only indents tagged to no
+ * villa). Every line is annotated with what's already ordered across all
+ * live POs, and fully-ordered lines render disabled-and-labelled rather
+ * than vanishing.
  */
 export async function getIndentPool(poId: string): Promise<IndentPool | null> {
   await requireTool("/purchase-orders");
@@ -613,15 +617,13 @@ export async function getIndentPool(poId: string): Promise<IndentPool | null> {
   const indents = await fetchAll((from, to) => {
     let query = supabase
       .from("indents")
-      .select("id, reference, stage")
+      .select("id, reference, stage, plots(name), units(name)")
       .eq("project_id", po.project_id)
       .eq("status", "approved");
     if (po.unit_id) {
       query = query.eq("unit_id", po.unit_id);
     } else if (po.plot_id) {
       query = query.eq("plot_id", po.plot_id);
-    } else {
-      query = query.is("unit_id", null).is("plot_id", null);
     }
     return query.order("created_at").order("id").range(from, to);
   });
@@ -630,7 +632,7 @@ export async function getIndentPool(poId: string): Promise<IndentPool | null> {
     ? `unit ${(po.units as { name: string } | null)?.name ?? ""}`.trim()
     : po.plot_id
       ? `plot ${(po.plots as { name: string } | null)?.name ?? ""}`.trim()
-      : "general (no plot or unit)";
+      : "every villa (a bulk buy)";
 
   if (indents.length === 0) return { scope_label, groups: [] };
 
@@ -709,6 +711,10 @@ export async function getIndentPool(poId: string): Promise<IndentPool | null> {
         indent_id: indent.id,
         reference: indent.reference ?? "—",
         stage: indent.stage,
+        place:
+          (indent.units as { name: string } | null)?.name ??
+          (indent.plots as { name: string } | null)?.name ??
+          null,
         lines: byIndent.get(indent.id) ?? [],
       })),
   };

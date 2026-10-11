@@ -138,7 +138,8 @@ export const TOOLS: Tool[] = [
     icon: "ShoppingCart",
     group: "Operations",
     built: true,
-    catalogue: true,
+    // No catalogue flag since 0113: a PO line comes from an indent, never
+    // from the picker, so this grant has no reason to reach /api/catalogue.
   },
   {
     name: "Inventory",

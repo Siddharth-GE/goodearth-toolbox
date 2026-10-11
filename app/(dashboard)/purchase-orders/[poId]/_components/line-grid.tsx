@@ -1,9 +1,9 @@
 "use client";
 
-import { CataloguePickerDialog } from "@/components/masters/catalogue-picker";
 import { ItemThumb } from "@/components/masters/item-thumb";
 import { Attribution } from "@/components/ui/attribution";
-import { Button, LinkButton } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { LinkButton } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FormMessage } from "@/components/ui/form-message";
 import { IconButton } from "@/components/ui/icon-button";
@@ -18,7 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCount, formatMoney, formatPercent, formatQuantity } from "@/lib/format";
-import { addDirectPoLines, removePoLine, updatePoLine } from "@/lib/purchase-orders/actions";
+import { removePoLine, updatePoLine } from "@/lib/purchase-orders/actions";
 import {
   lineChargesProblem,
   lineFigures,
@@ -41,8 +41,6 @@ import { useState, useTransition, type KeyboardEvent } from "react";
  * figure being agreed to. `interState` — the vendor's GST state against
  * the company's, worked out on the server — decides CGST + SGST or IGST.
  */
-type Option = { id: string; name: string };
-
 const moneyOf = (line: PoLineRow): PoLineMoney => ({
   quantity: line.quantity,
   rate: line.rate,
@@ -58,8 +56,6 @@ export function LineGrid({
   editable,
   interState,
   gstRates,
-  categories,
-  brands,
 }: {
   poId: string;
   lines: PoLineRow[];
@@ -67,10 +63,7 @@ export function LineGrid({
   interState: boolean;
   /** Active gst_rates from Masters, plus any inactive rate a line holds. */
   gstRates: number[];
-  categories: Option[];
-  brands: Option[];
 }) {
-  const [pickerOpen, setPickerOpen] = useState(false);
   // Live money per line, so the roll-up follows typing before a refresh.
   const [money, setMoney] = useState<Record<string, PoLineMoney>>(() =>
     Object.fromEntries(lines.map((line) => [line.id, moneyOf(line)])),
@@ -94,15 +87,12 @@ export function LineGrid({
           <span className="text-muted text-xs">
             {formatCount(lines.length)} {lines.length === 1 ? "line" : "lines"}
           </span>
+          {/* A line always comes from an approved indent (0113, founder
+              2026-10-11) — the catalogue path is gone. */}
           {editable && (
-            <>
-              <LinkButton href={`/purchase-orders/${poId}/pull`} size="sm" variant="secondary">
-                From approved indents
-              </LinkButton>
-              <Button size="sm" variant="secondary" onClick={() => setPickerOpen(true)}>
-                Add items directly
-              </Button>
-            </>
+            <LinkButton href={`/purchase-orders/${poId}/pull`} size="sm" variant="secondary">
+              From approved indents
+            </LinkButton>
           )}
         </div>
       </div>
@@ -111,11 +101,7 @@ export function LineGrid({
         <EmptyState
           icon={PackageOpen}
           title="Nothing on this order yet"
-          description={
-            editable
-              ? "Add lines from the approved indents for this scope — or directly for a bulk or urgent buy — then price them."
-              : undefined
-          }
+          description={editable ? "Add lines from approved indents, then price them." : undefined}
           action={
             editable ? (
               <LinkButton href={`/purchase-orders/${poId}/pull`}>From approved indents</LinkButton>
@@ -178,21 +164,6 @@ export function LineGrid({
           </div>
         </>
       )}
-
-      <CataloguePickerDialog
-        open={pickerOpen}
-        onOpenChange={setPickerOpen}
-        title="Add items to the order"
-        targetLabel="this purchase order"
-        categories={categories}
-        brands={brands}
-        onCommit={(picked) =>
-          addDirectPoLines(
-            poId,
-            picked.map(({ item, quantity }) => ({ itemId: item.id, quantity })),
-          )
-        }
-      />
     </div>
   );
 }
@@ -206,8 +177,10 @@ function TotalRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** What the item is and where it came from — the same in both modes. */
-function ItemDetails({ line }: { line: PoLineRow }) {
+/** What the item is and where it came from — the same in both modes. A
+ * line added directly before 0113 says so; on a draft it can no longer be
+ * saved, so it says what to do instead. */
+function ItemDetails({ line, editable }: { line: PoLineRow; editable: boolean }) {
   const meta = [line.item_code, line.item_brand, line.item_category].filter(Boolean);
   return (
     <>
@@ -220,6 +193,13 @@ function ItemDetails({ line }: { line: PoLineRow }) {
         {line.indent_reference ? `from ${line.indent_reference}` : "added directly"}
         {line.work_label && ` · ${line.work_label}`}
       </div>
+      {editable && !line.indent_reference && (
+        <div className="mt-1">
+          <Badge variant="warning">
+            A line now comes from an indent — remove this one and add it from an approved indent
+          </Badge>
+        </div>
+      )}
     </>
   );
 }
@@ -391,7 +371,7 @@ function LineRow({
           />
         </TableCell>
         <TableCell className="px-3">
-          <ItemDetails line={line} />
+          <ItemDetails line={line} editable={editable} />
           {line.note && <div className="text-muted mt-1 text-xs">Note: {line.note}</div>}
         </TableCell>
         <TableCell className="px-3 whitespace-nowrap">
@@ -436,7 +416,7 @@ function LineRow({
         />
       </TableCell>
       <TableCell className="px-3">
-        <ItemDetails line={line} />
+        <ItemDetails line={line} editable={editable} />
         <Input
           value={note}
           onChange={(event) => setNote(event.target.value)}
