@@ -280,6 +280,16 @@ export type IndentLineRow = {
    * direct/construction lines and for lines still on the current
    * revision. */
   design_drift: "changed" | "removed" | null;
+  /** Why a line outside the estimate is needed (0113); null on the rest. */
+  off_estimate_reason: string | null;
+  /** The estimator's answer on a line outside the estimate (0113) — null
+   * until it answers, and on every other line. */
+  estimator: {
+    decision: "approved" | "refused";
+    by_name: string | null;
+    at: string;
+    note: string | null;
+  } | null;
 };
 
 export type IndentDetail = {
@@ -367,7 +377,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
       supabase
         .from("indent_lines")
         .select(
-          "id, item_id, quantity, uom, note, budget_id, line_key, construction_line_id, estimate_id, created_by, updated_by, created_at, items(name, code, thumb_url, default_uom, brands(name))",
+          "id, item_id, quantity, uom, note, budget_id, line_key, construction_line_id, estimate_id, off_estimate_reason, estimator_decision, estimator_decided_by, estimator_decided_at, estimator_note, created_by, updated_by, created_at, items(name, code, thumb_url, default_uom, brands(name))",
         )
         .eq("indent_id", indentId)
         .order("created_at")
@@ -386,6 +396,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
         indent.submitted_by,
         indent.approved_by,
         ...lines.map((line) => line.updated_by ?? line.created_by),
+        ...lines.map((line) => line.estimator_decided_by),
       ].filter((id): id is string => id != null),
     ),
   ];
@@ -581,6 +592,17 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
       design_drift:
         line.budget_id && line.line_key
           ? (driftByAnchor.get(`${line.budget_id}:${line.line_key}`) ?? null)
+          : null,
+      off_estimate_reason: line.off_estimate_reason,
+      estimator:
+        (line.estimator_decision === "approved" || line.estimator_decision === "refused") &&
+        line.estimator_decided_at
+          ? {
+              decision: line.estimator_decision,
+              by_name: nameOf(line.estimator_decided_by),
+              at: line.estimator_decided_at,
+              note: line.estimator_note,
+            }
           : null,
     };
   });

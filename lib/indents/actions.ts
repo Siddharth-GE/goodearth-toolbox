@@ -3,7 +3,9 @@
 import { requireTool } from "@/lib/auth/access";
 import { dbErrorMessage, guardError } from "@/lib/db-error";
 import { isActiveUom } from "@/lib/masters/uoms";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
+import { approvalBlocker } from "./workflow";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -31,7 +33,14 @@ const INDENT_GUARD_PHRASES = [
   "no longer be edited",
   "before submitting",
   "short code",
+  // 0113: the estimate anchor and the estimator's hold.
+  "official estimate",
+  "outside the estimate",
+  "estimator",
 ] as const;
+
+/** How long a reason for a line outside the estimate may run. */
+const REASON_LIMIT = 500;
 
 export type CreateIndentInput = {
   projectId: string;
@@ -109,9 +118,15 @@ export type DirectLineInput = {
 };
 
 /**
- * Commits a picker basket as direct lines. An item already requested
- * directly on this indent has its quantity raised rather than gaining a
- * second row — the same behaviour every picker in the app promises.
+ * Commits a picker basket. An item already requested the same way on
+ * this indent has its quantity raised rather than gaining a second row —
+ * the same behaviour every picker in the app promises.
+ *
+ * A pick the villa's official estimate lists is filed as an ESTIMATE line
+ * (0113), so "already requested" counts it and it does not wait for the
+ * estimator; anything else is a direct line — outside the estimate, so it
+ * needs a reason and the estimator's yes. The estimate is read here, never
+ * trusted from the client, and indent_lines_estimate_anchor holds it.
  *
  * uom comes from the item master server-side, never from the client.
  */
@@ -127,16 +142,69 @@ export async function addDirectLines(
   }
 
   const supabase = await createClient();
-  const itemIds = lines.map((line) => line.itemId);
+  const itemIds = [...new Set(lines.map((line) => line.itemId))];
 
-  // Merging only considers direct lines — a line pulled from a budget or
-  // a construction stage keeps its provenance untouched.
+  const { data: indent, error: indentError } = await supabase
+    .from("indents")
+    .select("unit_id, plot_id")
+    .eq("id", indentId)
+    .maybeSingle();
+  if (indentError) {
+    console.error("addDirectLines indent read failed:", indentError);
+    return { error: "Could not add those items. Try again." };
+  }
+  if (!indent) return { error: "That indent no longer exists." };
+
+  // The villa's official estimate, through the money-free window. A failed
+  // read refuses rather than filing every pick as outside the estimate.
+  let unitId = indent.unit_id;
+  if (!unitId && indent.plot_id) {
+    const { data: unit, error: unitError } = await supabase
+      .from("units")
+      .select("id")
+      .eq("plot_id", indent.plot_id)
+      .maybeSingle();
+    if (unitError) {
+      console.error("addDirectLines unit read failed:", unitError);
+      return { error: "Could not check the estimate. Try again." };
+    }
+    unitId = unit?.id ?? null;
+  }
+  let estimateId: string | null = null;
+  const listed = new Set<string>();
+  if (unitId) {
+    const villaUnit = unitId;
+    try {
+      const facts = await fetchAll<{ estimate_id: string | null; item_id: string | null }>(
+        (from, to) =>
+          supabase
+            .from("estimate_takeoff_facts")
+            .select("estimate_id, item_id")
+            .eq("unit_id", villaUnit)
+            .in("item_id", itemIds)
+            .order("estimate_id")
+            .order("item_id")
+            .range(from, to),
+      );
+      for (const fact of facts) {
+        if (!fact.estimate_id || !fact.item_id) continue;
+        estimateId = fact.estimate_id;
+        listed.add(fact.item_id);
+      }
+    } catch (error) {
+      console.error("addDirectLines estimate read failed:", error);
+      return { error: "Could not check the estimate. Try again." };
+    }
+  }
+
+  // Merging considers lines of the same kind only — a line pulled from a
+  // budget or a construction stage keeps its provenance untouched.
   const [{ data: items, error: itemsError }, { data: existing, error: existingError }] =
     await Promise.all([
       supabase.from("items").select("id, default_uom").in("id", itemIds),
       supabase
         .from("indent_lines")
-        .select("id, item_id, quantity")
+        .select("id, item_id, quantity, estimate_id")
         .eq("indent_id", indentId)
         .is("budget_id", null)
         .is("construction_line_id", null)
@@ -148,7 +216,12 @@ export async function addDirectLines(
   }
 
   const uoms = new Map((items ?? []).map((item) => [item.id, item.default_uom]));
-  const already = new Map((existing ?? []).map((line) => [line.item_id, line]));
+  const anchorFor = (itemId: string) => (listed.has(itemId) ? estimateId : null);
+  const already = new Map(
+    (existing ?? [])
+      .filter((line) => line.estimate_id === anchorFor(line.item_id))
+      .map((line) => [line.item_id, line]),
+  );
 
   const inserts = [];
   for (const line of lines) {
@@ -168,6 +241,7 @@ export async function addDirectLines(
         item_id: line.itemId,
         quantity: line.quantity,
         uom: uoms.get(line.itemId) ?? "each",
+        estimate_id: anchorFor(line.itemId),
         created_by: user.id,
         updated_by: user.id,
       });
@@ -358,18 +432,29 @@ export async function addBudgetPullLines(
  * saved in the item's `default_uom`, re-read here, whatever was sent. */
 export async function updateLine(
   lineId: string,
-  input: { quantity: number; uom: string; note: string | null },
+  input: {
+    quantity: number;
+    uom: string;
+    note: string | null;
+    /** Why a line outside the estimate is needed (0113) — kept only on
+     * such a line; the database asks for it at submit. */
+    reason: string | null;
+  },
 ): Promise<ActionState> {
   const user = await requireTool("/indents");
 
   if (!Number.isFinite(input.quantity) || input.quantity <= 0) {
     return { error: "Quantity must be more than 0" };
   }
+  const reason = input.reason?.trim() || null;
+  if (reason && reason.length > REASON_LIMIT) {
+    return { error: `Keep the reason under ${REASON_LIMIT} characters.` };
+  }
 
   const supabase = await createClient();
   const { data: existing, error: readError } = await supabase
     .from("indent_lines")
-    .select("budget_id, items(default_uom)")
+    .select("budget_id, construction_line_id, estimate_id, items(default_uom)")
     .eq("id", lineId)
     .maybeSingle();
   if (readError) {
@@ -390,12 +475,19 @@ export async function updateLine(
     uom = masterUom;
   }
 
+  // A change of quantity, unit or reason empties an earlier estimator's
+  // answer (indent_lines_draft_only) — it answered a different question.
+  const outside =
+    existing.budget_id == null &&
+    existing.construction_line_id == null &&
+    existing.estimate_id == null;
   const { error } = await supabase
     .from("indent_lines")
     .update({
       quantity: input.quantity,
       uom,
       note: input.note?.trim() || null,
+      ...(outside ? { off_estimate_reason: reason } : {}),
       updated_by: user.id,
     })
     .eq("id", lineId);
@@ -471,6 +563,27 @@ export async function submitIndent(indentId: string): Promise<ActionState> {
     return { error: "Add at least one line before submitting." };
   }
 
+  // 0113: every line outside the estimate says why it is needed. The
+  // reason saves on blur without a refresh, so this reads the database
+  // rather than trusting the page's count.
+  const { count: noReason, error: reasonError } = await supabase
+    .from("indent_lines")
+    .select("id", { count: "exact", head: true })
+    .eq("indent_id", indentId)
+    .is("budget_id", null)
+    .is("construction_line_id", null)
+    .is("estimate_id", null)
+    .is("off_estimate_reason", null);
+  if (reasonError) {
+    console.error("submitIndent reason count failed:", reasonError);
+    return { error: "Could not submit. Try again." };
+  }
+  if ((noReason ?? 0) > 0) {
+    return {
+      error: `${noReason} ${noReason === 1 ? "line is" : "lines are"} outside the estimate — say why ${noReason === 1 ? "it is" : "each is"} needed, then submit.`,
+    };
+  }
+
   const { error } = await supabase
     .from("indents")
     .update({
@@ -504,6 +617,27 @@ export async function submitIndent(indentId: string): Promise<ActionState> {
 export async function approveIndent(indentId: string): Promise<ActionState> {
   const user = await requireTool("/indents");
   const supabase = await createClient();
+
+  // 0113: a line outside the estimate waits for the estimator's yes —
+  // indents_guard refuses it under the row lock; this says it plainly.
+  const { data: held, error: heldError } = await supabase
+    .from("indent_lines")
+    .select("estimator_decision")
+    .eq("indent_id", indentId)
+    .is("budget_id", null)
+    .is("construction_line_id", null)
+    .is("estimate_id", null)
+    .or("estimator_decision.is.null,estimator_decision.neq.approved");
+  if (heldError) {
+    console.error("approveIndent hold read failed:", heldError);
+    return { error: "Could not approve this indent. Try again." };
+  }
+  const blocker = approvalBlocker({
+    needReason: 0,
+    waiting: held.filter((line) => line.estimator_decision !== "refused").length,
+    refused: held.filter((line) => line.estimator_decision === "refused").length,
+  });
+  if (blocker) return { error: blocker };
 
   const { error } = await supabase
     .from("indents")

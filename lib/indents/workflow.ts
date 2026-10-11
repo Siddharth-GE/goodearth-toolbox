@@ -36,6 +36,53 @@ export function canDelete(status: IndentStatus): boolean {
 }
 
 /**
+ * A line outside the estimate (0113): not pulled from an estimate or a
+ * budget. It needs a reason to submit and the estimator's yes to approve
+ * — the same test indents_guard makes on the anchors.
+ */
+export function waitsForEstimator(source: string): boolean {
+  return source === "direct";
+}
+
+export type EstimatorHold = {
+  /** Outside lines with no reason yet — the indent cannot be submitted. */
+  needReason: number;
+  /** Outside lines the estimator has not answered. */
+  waiting: number;
+  /** Outside lines the estimator refused — it goes back to be changed. */
+  refused: number;
+};
+
+/** What the estimator rule still holds back, counted over the lines. */
+export function estimatorHold(
+  lines: {
+    source: string;
+    off_estimate_reason: string | null;
+    estimator_decision: string | null;
+  }[],
+): EstimatorHold {
+  const hold: EstimatorHold = { needReason: 0, waiting: 0, refused: 0 };
+  for (const line of lines) {
+    if (!waitsForEstimator(line.source)) continue;
+    if (!line.off_estimate_reason?.trim()) hold.needReason++;
+    if (line.estimator_decision === "refused") hold.refused++;
+    else if (line.estimator_decision !== "approved") hold.waiting++;
+  }
+  return hold;
+}
+
+/** Why an approver cannot approve yet, or null when nothing holds it. */
+export function approvalBlocker(hold: EstimatorHold): string | null {
+  if (hold.refused > 0) {
+    return `The estimator refused ${hold.refused} ${hold.refused === 1 ? "line" : "lines"} — send it back so ${hold.refused === 1 ? "it can" : "they can"} be changed.`;
+  }
+  if (hold.waiting > 0) {
+    return `Waiting for the estimator on ${hold.waiting} ${hold.waiting === 1 ? "line" : "lines"} outside the estimate.`;
+  }
+  return null;
+}
+
+/**
  * What is still to buy on a line: requested less what live POs have
  * ordered against it. Never negative — a line ordered in full reads 0.
  */
