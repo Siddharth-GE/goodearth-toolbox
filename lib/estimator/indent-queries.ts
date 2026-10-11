@@ -242,33 +242,13 @@ export async function getIndentApprovalsFor(
   if (units.length === 0) return new Map();
   const supabase = await createClient();
 
-  const unitIds = units.map((unit) => unit.id);
+  const villaUnits = new Set(units.map((unit) => unit.id));
   const unitByPlot = new Map(
     units.flatMap((unit) => (unit.plot_id ? [[unit.plot_id, unit.id] as const] : [])),
   );
-  const indents = await fetchAll<{
-    id: string;
-    reference: string | null;
-    unit_id: string | null;
-    plot_id: string | null;
-    work_item_id: string | null;
-  }>((from, to) =>
-    supabase
-      .from("indents")
-      .select("id, reference, unit_id, plot_id, work_item_id")
-      .or(
-        [
-          `unit_id.in.(${unitIds.join(",")})`,
-          unitByPlot.size ? `plot_id.in.(${[...unitByPlot.keys()].join(",")})` : null,
-        ]
-          .filter(Boolean)
-          .join(","),
-      )
-      .order("id")
-      .range(from, to),
-  );
-  if (indents.length === 0) return new Map();
 
+  // The approved lines first — few, however many indents the villas have —
+  // then only their indents, so no request carries a long list of ids.
   const lines = await fetchAll<{
     indent_id: string;
     item_id: string;
@@ -280,16 +260,27 @@ export async function getIndentApprovalsFor(
       supabase
         .from("indent_lines")
         .select("indent_id, item_id, estimator_decided_by, estimator_decided_at, estimator_note")
-        .in(
-          "indent_id",
-          indents.map((indent) => indent.id),
-        )
         .eq("estimator_decision", "approved"),
     )
       .order("id")
       .range(from, to),
   );
   if (lines.length === 0) return new Map();
+
+  const indents = await fetchAll<{
+    id: string;
+    reference: string | null;
+    unit_id: string | null;
+    plot_id: string | null;
+    work_item_id: string | null;
+  }>((from, to) =>
+    supabase
+      .from("indents")
+      .select("id, reference, unit_id, plot_id, work_item_id")
+      .in("id", [...new Set(lines.map((line) => line.indent_id))])
+      .order("id")
+      .range(from, to),
+  );
 
   const approverIds = [
     ...new Set(lines.map((line) => line.estimator_decided_by).filter((id) => id !== null)),
@@ -307,7 +298,7 @@ export async function getIndentApprovalsFor(
     if (!indent) continue;
     const unitId =
       indent.unit_id ?? (indent.plot_id ? (unitByPlot.get(indent.plot_id) ?? null) : null);
-    if (!unitId) continue;
+    if (!unitId || !villaUnits.has(unitId)) continue;
     approvals.set(`${unitId} ${indent.work_item_id ?? ""} ${line.item_id}`, {
       workItemId: indent.work_item_id,
       itemId: line.item_id,
