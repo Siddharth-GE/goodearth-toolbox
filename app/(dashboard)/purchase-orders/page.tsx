@@ -13,12 +13,12 @@ export default async function PurchaseOrdersPage() {
     <div className="space-y-4">
       <PageTitle
         title="Purchase Orders"
-        description="Orders to vendors — from approved indent lines, or raised directly for bulk and urgent buys."
+        description="Orders to vendors — always from approved indent lines."
       />
       <ToolWelcome
         icon="ShoppingCart"
         intro={[
-          "An order starts from an approved indent: pick it, give each line a vendor, and one draft PO per vendor is made. A bulk or urgent buy that belongs to no one plot is raised directly. Each PO is one vendor and one plot, unit or general scope, priced here and issued to the vendor. An issued PO is what deliveries are received against and what bills are recorded against.",
+          "An order always starts from an approved indent: pick it, give each line a vendor, and one draft PO per vendor is made. A bulk buy gathers several villas' approved indents into one general PO, delivered to a store. Each PO is one vendor and one plot, unit or general scope, priced here and issued to the vendor. An issued PO is what deliveries are received against and what bills are recorded against.",
           "Deleting an issued PO is never quiet: it has to be requested, and someone else approves it.",
         ]}
         stats={[
@@ -32,7 +32,7 @@ export default async function PurchaseOrdersPage() {
         ]}
         links={[
           { label: "From an indent", href: "/purchase-orders/from-indent", primary: true },
-          { label: "New PO (direct)", href: "/purchase-orders/new" },
+          { label: "Bulk PO from several indents", href: "/purchase-orders/new" },
           { label: "All purchase orders", href: "/purchase-orders/list" },
           { label: "Deletion requested", href: "/purchase-orders/list?status=deletion_requested" },
         ]}

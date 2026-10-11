@@ -4121,11 +4121,16 @@ export type Database = {
           created_at: string
           created_by: string | null
           estimate_id: string | null
+          estimator_decided_at: string | null
+          estimator_decided_by: string | null
+          estimator_decision: string | null
+          estimator_note: string | null
           id: string
           indent_id: string
           item_id: string
           line_key: string | null
           note: string | null
+          off_estimate_reason: string | null
           quantity: number
           uom: string
           updated_at: string
@@ -4137,11 +4142,16 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           estimate_id?: string | null
+          estimator_decided_at?: string | null
+          estimator_decided_by?: string | null
+          estimator_decision?: string | null
+          estimator_note?: string | null
           id?: string
           indent_id: string
           item_id: string
           line_key?: string | null
           note?: string | null
+          off_estimate_reason?: string | null
           quantity: number
           uom: string
           updated_at?: string
@@ -4153,11 +4163,16 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           estimate_id?: string | null
+          estimator_decided_at?: string | null
+          estimator_decided_by?: string | null
+          estimator_decision?: string | null
+          estimator_note?: string | null
           id?: string
           indent_id?: string
           item_id?: string
           line_key?: string | null
           note?: string | null
+          off_estimate_reason?: string | null
           quantity?: number
           uom?: string
           updated_at?: string
@@ -4211,6 +4226,13 @@ export type Database = {
             columns: ["estimate_id"]
             isOneToOne: false
             referencedRelation: "estimator_estimates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "indent_lines_estimator_decided_by_fkey"
+            columns: ["estimator_decided_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -9291,6 +9313,10 @@ export type Database = {
         Returns: undefined
       }
       crm_release_unit: { Args: { p_unit_id: string }; Returns: undefined }
+      decide_indent_line: {
+        Args: { p_decision: string; p_line_id: string; p_note: string }
+        Returns: undefined
+      }
       delete_draft_estimate: {
         Args: { p_estimate: string }
         Returns: undefined

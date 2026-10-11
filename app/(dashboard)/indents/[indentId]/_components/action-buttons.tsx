@@ -28,11 +28,15 @@ export function ActionButtons({
   status,
   lineCount,
   decider,
+  approvalBlocker,
 }: {
   indentId: string;
   status: IndentStatus;
   lineCount: number;
   decider: { isAdmin: boolean; isApprover: boolean };
+  /** Why Approve is locked (0113 — lines outside the estimate wait for
+   * the estimator), or null. Sending back stays open either way. */
+  approvalBlocker: string | null;
 }) {
   const [pending, startTransition] = useTransition();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -55,10 +59,15 @@ export function ActionButtons({
           <Button variant="secondary" disabled={pending} onClick={() => setRejecting(true)}>
             Send back
           </Button>
-          <Button disabled={pending} onClick={() => run(() => approveIndent(indentId))}>
+          <Button
+            disabled={pending || approvalBlocker !== null}
+            title={approvalBlocker ?? undefined}
+            onClick={() => run(() => approveIndent(indentId))}
+          >
             {pending ? "Approving…" : "Approve"}
           </Button>
         </div>
+        {approvalBlocker && <p className="text-muted text-xs">{approvalBlocker}</p>}
         <FormMessage error={error} size="xs" />
 
         <Dialog

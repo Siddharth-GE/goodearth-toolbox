@@ -17,6 +17,11 @@ import {
   getOffEstimateReasons,
   getOfficialComparisons,
 } from "@/lib/estimator/estimate-queries";
+import {
+  getIndentApprovalsFor,
+  getIndentsForEstimator,
+  type IndentForEstimator,
+} from "@/lib/estimator/indent-queries";
 import { drawnPercent, materialTotals, siteCheckEntries } from "@/lib/estimator/site-check";
 import { listWorkStatus } from "@/lib/estimator/works-queries";
 import { formatCount, formatDate, formatPercent, formatQuantity } from "@/lib/format";
@@ -25,6 +30,7 @@ import { cn } from "@/lib/utils";
 import { ClipboardCheck } from "lucide-react";
 import Link from "next/link";
 import { ApproveReconciliationButton } from "../estimates/[estimateId]/_components/reconciliation-forms";
+import { IndentLineAnswer } from "./_components/indent-answer";
 
 /**
  * Site check — one list, across every villa, of what needs an
@@ -43,19 +49,22 @@ export default async function SiteCheckPage({
   searchParams: Promise<{ item?: string }>;
 }) {
   const { item } = await searchParams;
-  const [officials, works, units] = await Promise.all([
+  const [officials, works, units, indents] = await Promise.all([
     getOfficialComparisons(),
     listWorkStatus(),
     listUnits(),
+    getIndentsForEstimator(),
   ]);
 
   const entries = siteCheckEntries(officials);
   const totals = materialTotals(officials);
   const officialUnits = new Set(officials.map((official) => official.unitId));
-  const [approvals, labels, reasons] = await Promise.all([
+  const officialVillas = units.filter((unit) => officialUnits.has(unit.id));
+  const [approvals, indentApprovals, labels, reasons] = await Promise.all([
     getApprovalsFor(officials.map((official) => official.unitId)),
+    getIndentApprovalsFor(officialVillas),
     getItemLabels([...entries.map((entry) => entry.itemId), ...totals.map((t) => t.itemId)]),
-    getOffEstimateReasons(units.filter((unit) => officialUnits.has(unit.id))),
+    getOffEstimateReasons(officialVillas),
   ]);
 
   const unitName = new Map(units.map((unit) => [unit.id, unit.name]));
@@ -63,8 +72,12 @@ export default async function SiteCheckPage({
   const referenceByEstimate = new Map(
     officials.map((official) => [official.estimateId, official.reference]),
   );
-  const approvalFor = (entry: (typeof entries)[number]) =>
-    approvals.get(`${entry.unitId} ${entry.workItemId ?? ""} ${entry.itemId}`);
+  // Approved here, or — since 0113 — at the indent that asked for the
+  // material: either way an estimator has looked at it.
+  const approvalFor = (entry: (typeof entries)[number]) => {
+    const key = `${entry.unitId} ${entry.workItemId ?? ""} ${entry.itemId}`;
+    return approvals.get(key) ?? indentApprovals.get(key);
+  };
 
   // Waiting for an approval first, then over-runs, then what has been
   // looked at — each group in villa order.
@@ -103,29 +116,48 @@ export default async function SiteCheckPage({
         )
     : [];
 
+  // Indents wait for the estimator whether or not any villa has an
+  // official estimate yet — a villa without one has nothing to cover it.
   if (officials.length === 0) {
     return (
-      <EmptyState
-        icon={ClipboardCheck}
-        title="No official estimates yet"
-        description="Site check lines up what reaches each villa against its official estimate. Submit a villa's estimate and it appears here."
-      />
+      <div className="space-y-4">
+        <IndentsWaiting indents={indents} />
+        <EmptyState
+          icon={ClipboardCheck}
+          title="No official estimates yet"
+          description="Site check lines up what reaches each villa against its official estimate. Submit a villa's estimate and it appears here."
+        />
+      </div>
     );
   }
+  const indentLinesWaiting = indents.reduce(
+    (sum, indent) => sum + indent.lines.filter((line) => line.decision === null).length,
+    0,
+  );
 
   return (
     <div className="space-y-4">
       <div className="max-w-2xl">
         <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Site check</p>
         <p className="text-muted mt-1 text-sm">
-          What has reached each villa — store issues and deliveries straight to site — against its
-          official estimate, work by work. Going over is flagged, never refused: site work never
-          waits. Material the estimate never planned needs an estimator&apos;s approval, and keeps
-          its flag either way.
+          First, indent lines no estimate covers: the indent waits for your answer. Then what has
+          reached each villa — store issues and deliveries straight to site — against its official
+          estimate, work by work. Going over is flagged, never refused: site work never waits.
+          Material the estimate never planned needs an estimator&apos;s approval, and keeps its flag
+          either way.
         </p>
       </div>
 
-      <FigureBand className="sm:grid-cols-3 lg:grid-cols-3">
+      <FigureBand>
+        <FigureBandCell>
+          <Figure
+            label="Indent lines"
+            value={formatCount(indentLinesWaiting)}
+            hint="outside the estimate, waiting for you"
+            tone={indentLinesWaiting > 0 ? "warn" : undefined}
+            size="lg"
+          />
+        </FigureBandCell>
         <FigureBandCell>
           <Figure
             label="Villas"
@@ -153,6 +185,8 @@ export default async function SiteCheckPage({
           />
         </FigureBandCell>
       </FigureBand>
+
+      <IndentsWaiting indents={indents} />
 
       <Card className="space-y-3 p-4">
         <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
@@ -356,5 +390,105 @@ export default async function SiteCheckPage({
         </Card>
       )}
     </div>
+  );
+}
+
+/**
+ * Indent lines outside the estimate (0113) — "the first thing reconciled
+ * in the estimate". Each submitted indent with such lines, oldest first;
+ * the indent cannot be approved until every one is approved here. To put a
+ * material on the estimate properly, open the villa's working estimate and
+ * make it official again — the next indent then pulls it from there.
+ */
+function IndentsWaiting({ indents }: { indents: IndentForEstimator[] }) {
+  if (indents.length === 0) return null;
+  return (
+    <Card className="space-y-3 p-4">
+      <div>
+        <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
+          Indents waiting for you
+        </p>
+        <p className="text-muted mt-1 text-sm">
+          Lines site asked for that no estimate or budget covers. The indent cannot be approved
+          until you approve each one; a refusal sends it back to be changed. To add a material to a
+          villa&apos;s estimate, open its estimate.
+        </p>
+      </div>
+      <ul className="divide-border divide-y">
+        {indents.map((indent) => (
+          <li key={indent.id} className="space-y-2 py-3">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-foreground text-sm font-medium">
+                  {indent.reference}
+                  <span className="text-muted font-normal">
+                    {" · "}
+                    {indent.villa ?? "no villa"}
+                    {" · "}
+                    {indent.work_label ?? "no work named"}
+                  </span>
+                </p>
+                <p className="text-muted text-xs">
+                  {indent.project_name}
+                  {indent.submitted_by_name && ` · asked by ${indent.submitted_by_name}`}
+                  {indent.submitted_at && ` on ${formatDate(indent.submitted_at)}`}
+                </p>
+              </div>
+              {indent.working_estimate_id && (
+                <LinkButton
+                  href={`/estimator/estimates/${indent.working_estimate_id}`}
+                  variant="ghost"
+                  size="sm"
+                >
+                  Open {indent.villa ?? "the villa"}&apos;s estimate
+                </LinkButton>
+              )}
+            </div>
+            <ul className="space-y-2">
+              {indent.lines.map((line) => (
+                <li
+                  key={line.id}
+                  className="border-border flex flex-wrap items-start justify-between gap-3 rounded-xl border px-3 py-2"
+                >
+                  <div className="min-w-0 space-y-0.5">
+                    <p className="text-sm">
+                      {line.item_name}
+                      {line.item_code && <span className="text-muted"> · {line.item_code}</span>}
+                      <span className="text-muted">
+                        {" — "}
+                        {formatQuantity(line.quantity)} {line.uom}
+                      </span>
+                    </p>
+                    <p className="text-foreground text-sm">
+                      <span className="text-muted">Why: </span>
+                      {line.reason ?? "—"}
+                    </p>
+                    {line.decision && (
+                      <p className="text-xs">
+                        <Badge variant={line.decision === "approved" ? "success" : "danger"}>
+                          {line.decision === "approved" ? "Approved" : "Refused"}
+                        </Badge>
+                        <span className="text-muted ml-2">
+                          {[line.decided_by_name, line.decided_at && formatDate(line.decided_at)]
+                            .filter(Boolean)
+                            .join(" · ")}
+                          {line.note ? ` — ${line.note}` : ""}
+                        </span>
+                      </p>
+                    )}
+                  </div>
+                  <IndentLineAnswer
+                    lineId={line.id}
+                    itemName={line.item_name}
+                    reference={indent.reference}
+                    decision={line.decision}
+                  />
+                </li>
+              ))}
+            </ul>
+          </li>
+        ))}
+      </ul>
+    </Card>
   );
 }

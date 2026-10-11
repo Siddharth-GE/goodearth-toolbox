@@ -1,4 +1,5 @@
 import { countVillasOverEstimate, getWelcomeCounts } from "@/lib/estimator/estimate-queries";
+import { countIndentLinesWaiting } from "@/lib/estimator/indent-queries";
 
 import { ToolWelcome } from "../_components/tool-welcome";
 
@@ -7,7 +8,11 @@ import { ToolWelcome } from "../_components/tool-welcome";
 // Counts only, never rupees: everything one click in is money, so the
 // welcome is the one screen in this tool that shows none.
 export default async function EstimatorPage() {
-  const [counts, overEstimate] = await Promise.all([getWelcomeCounts(), countVillasOverEstimate()]);
+  const [counts, overEstimate, indentLines] = await Promise.all([
+    getWelcomeCounts(),
+    countVillasOverEstimate(),
+    countIndentLinesWaiting(),
+  ]);
 
   return (
     <ToolWelcome
@@ -18,6 +23,11 @@ export default async function EstimatorPage() {
         "When a villa's estimate is ready, Submit it: it gets a number, freezes at that day's prices, and becomes the villa's official estimate — the one material requests and site issues are checked against.",
       ]}
       stats={[
+        {
+          label: "Indent lines waiting",
+          value: indentLines,
+          hint: "outside the estimate — the indent waits for your answer in Site check",
+        },
         { label: "Estimates", value: counts.estimates, hint: "for villas, drafts included" },
         { label: "Official", value: counts.official, hint: "submitted, one per villa" },
         { label: "Works set up", value: counts.worksSetUp, hint: "have a unit to be priced in" },

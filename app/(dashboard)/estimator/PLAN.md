@@ -1,6 +1,6 @@
 # Estimator — the rules
 
-Grant `/estimator`. Migrations `0074`–`0088` and `0096`–`0098` (`0078`–`0081` shared with Indents and Inventory).
+Grant `/estimator`. Migrations `0074`–`0088` and `0096`–`0098` (`0078`–`0081` shared with Indents and Inventory; `0113`'s `decide_indent_line` is the Estimator's answer on Indents' table).
 
 What a villa costs to build. Works come from the Masters vocabulary (`0073`); this tool adds what each is measured in, what its labour costs and what it consumes. Selections and Budgets are interiors and stay out of it.
 
@@ -25,6 +25,7 @@ What a villa costs to build. Works come from the Masters vocabulary (`0073`); th
 8. **The estimate reads as a BOQ**: one grand total, works grouped by category with subtotals, one rate and one amount per line. `groupLineCosts` in `calc.ts` produces it; anything that prints an estimate renders its output rather than grouping again.
 9. **Site check is one list across villas**: over-estimate and outside-the-estimate rows with Approve on the row, and every material estimated against reached, villa by villa (`getOfficialComparisons`, `site-check.ts`). An approval **carries to the villa's later officials**, matched on (work, item) — read-side only. An outside row shows **site's reason** from the supervisor's request (`issue_requests.off_estimate_reason`, matched on plot, work and item) — a read of Supervisors' table that `0110` admits `/estimator` to.
 10. **No scheduling** — "this whole build is only estimation". If it is ever built, Relay's missing per-activity dates are where it goes.
+11. **An indent line outside the estimate waits for the estimator** (`0113`, founder 2026-10-11: "the first thing reconciled in the estimate … indent should wait for estimator approval for sure"). Site check opens with **Indents waiting for you**: each submitted indent's lines no estimate or budget covers, with site's reason, **Approve** (one press) and **Refuse** (a note the approver reads). The indent cannot be approved until every one is approved; an answer can be changed while the indent waits. Written through `decide_indent_line()` onto Indents' table — the cross-tool write in `SECURITY.md`; read from Indents' open tables (`lib/estimator/indent-queries.ts`). Approving is not adding: **putting the material on the estimate** is the villa's working estimate (the row links to it) and Make official, after which the next indent pulls it from there. An approval at the indent **counts in Site check** when that material reaches the villa, matched on (villa, the indent's work, item) — read-side, nothing copied into `estimator_reconciliation_approvals`; an indent naming no work matches nothing there. The welcome screen counts the lines waiting.
 
 ## The rules everything rests on
 

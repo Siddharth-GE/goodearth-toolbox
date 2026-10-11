@@ -38,7 +38,7 @@ export default async function IndentsToOrderPage({
         description="Approved indents with something still to buy. Pick one: its lines get a vendor each, and one draft PO is made per vendor."
         actions={
           <LinkButton href="/purchase-orders/new" variant="secondary">
-            New PO (direct)
+            Bulk PO from several indents
           </LinkButton>
         }
       />

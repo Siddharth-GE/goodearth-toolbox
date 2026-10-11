@@ -104,6 +104,7 @@ export function PoolBasket({
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-foreground text-lg font-bold tracking-tight">
                 {group.reference}
+                {group.place && <span className="text-muted ml-2 text-sm">· {group.place}</span>}
                 {group.stage && <span className="text-muted ml-2 text-sm">· {group.stage}</span>}
               </h2>
               <div className="flex items-center gap-3">

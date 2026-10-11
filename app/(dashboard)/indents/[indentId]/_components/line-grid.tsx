@@ -18,11 +18,11 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/components/ui/table";
-import { formatCount, formatQuantity } from "@/lib/format";
+import { formatCount, formatDate, formatQuantity } from "@/lib/format";
 import { addDirectLines, removeLine, updateLine } from "@/lib/indents/actions";
 import type { IndentLineRow, IndentLineSource } from "@/lib/indents/queries";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
-import { stillToBuy } from "@/lib/indents/workflow";
+import { stillToBuy, waitsForEstimator } from "@/lib/indents/workflow";
 import { Calculator, PackageOpen, Palette, Trash2 } from "lucide-react";
 import { useState, useTransition } from "react";
 
@@ -109,7 +109,9 @@ export function LineGrid({
           icon={PackageOpen}
           title="Nothing requested yet"
           description={
-            editable ? "Add items from the catalogue. Nothing is sent until you submit." : undefined
+            editable
+              ? "Add items from the catalogue — anything the estimate does not list needs a reason and the estimator's yes. Nothing is sent until you submit."
+              : undefined
           }
           action={
             editable ? <Button onClick={() => setPickerOpen(true)}>Add items</Button> : undefined
@@ -189,6 +191,31 @@ function UnitText({ line }: { line: IndentLineRow }) {
   );
 }
 
+/** The estimator's answer on a line outside the estimate (0113). A draft
+ * has not reached the estimator yet, so it shows only an answer kept from
+ * before a send-back — changing the line empties it. */
+function EstimatorAnswer({ line, draft }: { line: IndentLineRow; draft: boolean }) {
+  const answer = line.estimator;
+  if (!answer) {
+    return draft ? null : <Badge variant="neutral">Waiting for the estimator</Badge>;
+  }
+  const by = [answer.by_name, formatDate(answer.at)].filter(Boolean).join(" · ");
+  return answer.decision === "approved" ? (
+    <p className="text-xs">
+      <Badge variant="success">Estimator approved</Badge>
+      <span className="text-muted ml-2">{by}</span>
+    </p>
+  ) : (
+    <div className="space-y-0.5 text-xs">
+      <p>
+        <Badge variant="danger">Estimator refused</Badge>
+        <span className="text-muted ml-2">{by}</span>
+      </p>
+      {answer.note && <p className="text-foreground">{answer.note}</p>}
+    </div>
+  );
+}
+
 function LineRow({
   indentId,
   line,
@@ -205,14 +232,25 @@ function LineRow({
   const [quantity, setQuantity] = useState(String(line.quantity));
   const [uom, setUom] = useState(line.uom);
   const [note, setNote] = useState(line.note ?? "");
+  const [reason, setReason] = useState(line.off_estimate_reason ?? "");
   const [removing, startTransition] = useTransition();
 
   const { flush, error, setError, saved } = useSaveOnBlur({
-    initial: { quantity: line.quantity, uom: line.uom, note: line.note ?? "" },
+    initial: {
+      quantity: line.quantity,
+      uom: line.uom,
+      note: line.note ?? "",
+      reason: line.off_estimate_reason ?? "",
+    },
     validate: ({ quantity: value }) =>
       Number.isFinite(value) && value > 0 ? undefined : "Quantity must be more than 0",
-    save: ({ quantity: value, uom: unit, note: text }) =>
-      updateLine(line.id, { quantity: value, uom: unit, note: text || null }),
+    save: ({ quantity: value, uom: unit, note: text, reason: why }) =>
+      updateLine(line.id, {
+        quantity: value,
+        uom: unit,
+        note: text || null,
+        reason: why.trim() || null,
+      }),
   });
 
   const save = (nextUom = uom) => {
@@ -220,10 +258,11 @@ function LineRow({
     if (!Number.isFinite(parsed) || !(parsed > 0)) {
       setQuantity(String(line.quantity));
     }
-    flush({ quantity: parsed, uom: nextUom, note });
+    flush({ quantity: parsed, uom: nextUom, note, reason });
   };
 
   const sourceLabel = SOURCE_LABELS[line.source];
+  const outside = waitsForEstimator(line.source);
 
   return (
     <TableRow className={removing ? "opacity-50" : undefined}>
@@ -252,6 +291,30 @@ function LineRow({
                 ? "Removed from the design since this was requested"
                 : "Design changed since this was requested"}
             </Badge>
+          </div>
+        )}
+        {outside && (
+          // Not from the estimate or a budget (0113): it says why, and it
+          // waits for the estimator before the indent can be approved.
+          <div className="mt-1.5 space-y-1">
+            <Badge variant="warning">Outside the estimate</Badge>
+            {editable ? (
+              <Input
+                value={reason}
+                onChange={(event) => setReason(event.target.value)}
+                onBlur={() => save()}
+                placeholder="Why is it needed?"
+                maxLength={500}
+                className="h-9"
+                aria-label={`Why ${line.item_name} is needed`}
+              />
+            ) : (
+              <p className="text-foreground text-xs">
+                <span className="text-muted">Why: </span>
+                {line.off_estimate_reason ?? "—"}
+              </p>
+            )}
+            <EstimatorAnswer line={line} draft={editable} />
           </div>
         )}
       </TableCell>

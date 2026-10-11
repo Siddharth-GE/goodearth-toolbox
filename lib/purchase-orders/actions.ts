@@ -246,6 +246,14 @@ export async function updatePoLine(
     .eq("id", lineId);
   if (error) {
     console.error("updatePoLine failed:", error);
+    // 0113: a line added directly before PO lines came only from indents
+    // cannot be saved again on a draft.
+    if (error.message.includes("purchase_order_lines_from_an_indent")) {
+      return {
+        error:
+          "This line was added directly, which is no longer allowed — remove it and add the item from an approved indent.",
+      };
+    }
     return guardError(error, "Could not save. Try again.", PO_GUARD_PHRASES);
   }
   return undefined;
@@ -593,83 +601,4 @@ export async function createPosFromIndent(
 
   revalidatePath("/purchase-orders", "layout");
   redirect(`/purchase-orders/${made[0]}?made=${made.join(",")}`);
-}
-
-export type DirectPoLineInput = { itemId: string; quantity: number };
-
-/**
- * Adds catalogue items straight onto a draft PO — the bulk/urgent path
- * (0079). No indent behind these lines, so no quantity ceiling either;
- * the gates that remain are pricing before issue and the receipt cap.
- * The uom comes from the item master server-side, because the qty guard
- * and the receipt guard both compare in that unit. Same-item direct
- * lines merge; a line pulled from an indent keeps its provenance
- * untouched.
- */
-export async function addDirectPoLines(
-  poId: string,
-  lines: DirectPoLineInput[],
-): Promise<ActionState> {
-  const user = await requireTool("/purchase-orders");
-
-  if (lines.length === 0) return { error: "Pick at least one item." };
-  if (lines.some((line) => !Number.isFinite(line.quantity) || line.quantity <= 0)) {
-    return { error: "Quantities must be more than 0." };
-  }
-
-  const supabase = await createClient();
-  const itemIds = lines.map((line) => line.itemId);
-
-  const [{ data: items, error: itemsError }, { data: existing, error: existingError }] =
-    await Promise.all([
-      supabase.from("items").select("id, default_uom").in("id", itemIds),
-      supabase
-        .from("purchase_order_lines")
-        .select("id, item_id, quantity")
-        .eq("po_id", poId)
-        .is("indent_line_id", null)
-        .in("item_id", itemIds),
-    ]);
-  if (itemsError || existingError) {
-    console.error("addDirectPoLines lookup failed:", itemsError ?? existingError);
-    return { error: "Could not add those items. Try again." };
-  }
-
-  const uoms = new Map((items ?? []).map((item) => [item.id, item.default_uom]));
-  const already = new Map((existing ?? []).map((line) => [line.item_id, line]));
-
-  const inserts = [];
-  for (const line of lines) {
-    const current = already.get(line.itemId);
-    if (current) {
-      const { error } = await supabase
-        .from("purchase_order_lines")
-        .update({ quantity: current.quantity + line.quantity, updated_by: user.id })
-        .eq("id", current.id);
-      if (error) {
-        console.error("addDirectPoLines merge failed:", error);
-        return guardError(error, "Could not add those items. Try again.", PO_GUARD_PHRASES);
-      }
-    } else {
-      inserts.push({
-        po_id: poId,
-        item_id: line.itemId,
-        quantity: line.quantity,
-        uom: uoms.get(line.itemId) ?? "each",
-        created_by: user.id,
-        updated_by: user.id,
-      });
-    }
-  }
-
-  if (inserts.length > 0) {
-    const { error } = await supabase.from("purchase_order_lines").insert(inserts);
-    if (error) {
-      console.error("addDirectPoLines insert failed:", error);
-      return guardError(error, "Could not add those items. Try again.", PO_GUARD_PHRASES);
-    }
-  }
-
-  revalidatePath(`/purchase-orders/${poId}`);
-  return undefined;
 }

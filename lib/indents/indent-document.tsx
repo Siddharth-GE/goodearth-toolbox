@@ -13,7 +13,7 @@ import {
 } from "@/lib/pdf/document";
 import { formatDate, formatQuantity } from "@/lib/format";
 import type { IndentDetail, IndentLineRow } from "./queries";
-import { stillToBuy } from "./workflow";
+import { stillToBuy, waitsForEstimator } from "./workflow";
 
 /**
  * The indent on paper — what site asked for, what has been ordered
@@ -61,8 +61,26 @@ const columns: Column<IndentLineRow>[] = [
       return left > 0 ? formatQuantity(left) : "—";
     },
   },
-  { header: "Note", width: 1.8, render: (row) => row.note ?? "" },
+  { header: "Note", width: 1.8, render: noteFor },
 ];
+
+/** The line's note, and — for a line outside the estimate (0113) — why it
+ * is needed and what the estimator said. */
+function noteFor(row: IndentLineRow): string {
+  if (!waitsForEstimator(row.source)) return row.note ?? "";
+  const answer = row.estimator
+    ? row.estimator.decision === "approved"
+      ? `Estimator approved${row.estimator.by_name ? ` (${row.estimator.by_name})` : ""}`
+      : `Estimator refused${row.estimator.note ? `: ${row.estimator.note}` : ""}`
+    : "Waiting for the estimator";
+  return [
+    `Outside the estimate${row.off_estimate_reason ? ` — ${row.off_estimate_reason}` : ""}`,
+    answer,
+    row.note,
+  ]
+    .filter(Boolean)
+    .join(". ");
+}
 
 export function IndentDocument({ data }: { data: IndentPdfData }) {
   const { indent } = data;

@@ -3,7 +3,7 @@ import { LinkButton } from "@/components/ui/button";
 import { PageTitle } from "@/components/ui/page-title";
 import { formatDate } from "@/lib/format";
 import { getIndent, isCurrentUserApprover } from "@/lib/indents/queries";
-import { canEditIndent, stillToBuy } from "@/lib/indents/workflow";
+import { approvalBlocker, canEditIndent, estimatorHold, stillToBuy } from "@/lib/indents/workflow";
 import { listBrands } from "@/lib/masters/brands";
 import { listItemCategories } from "@/lib/masters/item-categories";
 import { listActiveUomNames } from "@/lib/masters/uoms";
@@ -32,6 +32,16 @@ export default async function IndentPage({ params }: { params: Promise<{ indentI
   const linesToBuy = indent.lines.filter(
     (line) => stillToBuy(line.quantity, line.ordered_quantity) > 0,
   ).length;
+  // Lines outside the estimate wait for the estimator (0113). Read fresh
+  // on every load — the estimator answers from another screen.
+  const hold = estimatorHold(
+    indent.lines.map((line) => ({
+      source: line.source,
+      off_estimate_reason: line.off_estimate_reason,
+      estimator_decision: line.estimator?.decision ?? null,
+    })),
+  );
+  const blocker = approvalBlocker(hold);
   const categoryNameById = new Map(workCategories.map((c) => [c.id, c.name]));
   const works = workItems
     .filter((work) => work.is_active)
@@ -67,6 +77,7 @@ export default async function IndentPage({ params }: { params: Promise<{ indentI
               status={indent.status}
               lineCount={indent.line_count}
               decider={decider}
+              approvalBlocker={blocker}
             />
           </>
         }
@@ -91,9 +102,13 @@ export default async function IndentPage({ params }: { params: Promise<{ indentI
               <span className="text-muted">on {formatDate(indent.submitted_at)}</span>
             )}{" "}
             —{" "}
-            {decider.isAdmin || decider.isApprover
-              ? "yours to decide. Approve it, or send it back with a note."
-              : "waiting for an approver. Nothing can be changed while it waits."}
+            {hold.refused > 0
+              ? `the estimator refused ${hold.refused} ${hold.refused === 1 ? "line" : "lines"} outside the estimate. ${decider.isAdmin || decider.isApprover ? "Send it back with a note so the site team can change them." : "It goes back to the site team to change."}`
+              : hold.waiting > 0
+                ? `waiting for the estimator on ${hold.waiting} ${hold.waiting === 1 ? "line" : "lines"} outside the estimate, then for an approver. Nothing can be changed while it waits.`
+                : decider.isAdmin || decider.isApprover
+                  ? "yours to decide. Approve it, or send it back with a note."
+                  : "waiting for an approver. Nothing can be changed while it waits."}
           </p>
           <Attribution name={indent.submitted_by_name} label="Submitted by" />
         </div>

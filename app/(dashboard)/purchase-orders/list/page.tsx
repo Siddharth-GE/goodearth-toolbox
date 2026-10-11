@@ -95,12 +95,12 @@ export default async function PurchaseOrdersPage({
     <div className="space-y-4">
       <PageTitle
         title="All purchase orders"
-        description="Orders to vendors — from approved indents or raised directly — one vendor and one plot/unit per PO."
+        description="Orders to vendors, always from approved indents — one vendor and one plot, unit or general scope per PO."
         backHref="/purchase-orders"
         actions={
           <>
             <LinkButton href="/purchase-orders/new" variant="secondary">
-              New PO (direct)
+              Bulk PO
             </LinkButton>
             <LinkButton href="/purchase-orders/from-indent">From an indent</LinkButton>
           </>
@@ -149,7 +149,7 @@ export default async function PurchaseOrdersPage({
           description={
             tab.status || filtered
               ? undefined
-              : "Pick an approved indent and its lines become draft POs, one per vendor — or raise one directly for a bulk or urgent buy."
+              : "Pick an approved indent and its lines become draft POs, one per vendor — or gather several villas' indents into one bulk PO."
           }
           action={
             tab.status || filtered ? undefined : (

@@ -15,6 +15,9 @@ declare
   v_bill uuid; v_n numeric; v_txt text; v_wo uuid;
   v_log uuid; v_bill2 uuid; v_cr uuid; v_n2 numeric;
 begin
+  -- Its PO lines are fixtures with no indent behind them. Since 0113 a PO
+  -- line needs one, so this rolled-back trial lifts that rule for itself.
+  alter table purchase_order_lines drop constraint if exists purchase_order_lines_from_an_indent;
   perform set_config('request.jwt.claims', json_build_object('sub', v_user, 'role', 'authenticated')::text, true);
   -- The Bills grant (send_labour_logs_to_bill and delete_recorded_bill check it in
   -- their bodies) and a named approver for the release and approval steps — both

@@ -6,7 +6,16 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { canDecide, canDelete, canEditIndent, canSubmit, stillToBuy } from "./workflow";
+import {
+  approvalBlocker,
+  canDecide,
+  canDelete,
+  canEditIndent,
+  canSubmit,
+  estimatorHold,
+  stillToBuy,
+  waitsForEstimator,
+} from "./workflow";
 
 test("only a draft is editable", () => {
   assert.equal(canEditIndent("draft"), true);
@@ -48,4 +57,37 @@ test("still to buy is requested less ordered, never below zero", () => {
   assert.equal(stillToBuy(45, 45), 0);
   assert.equal(stillToBuy(45, 50), 0, "over-ordered reads as nothing left, not a negative");
   assert.equal(stillToBuy(0.3, 0.1), 0.2, "no floating-point dust");
+});
+
+test("only a line outside every estimate and budget waits for the estimator", () => {
+  assert.equal(waitsForEstimator("direct"), true);
+  assert.equal(waitsForEstimator("estimate"), false);
+  assert.equal(waitsForEstimator("interiors"), false);
+  assert.equal(waitsForEstimator("construction"), false, "retired history never waits");
+});
+
+test("the hold counts reasons, waiting and refused lines — outside lines only", () => {
+  const line = (source: string, reason: string | null, decision: string | null) => ({
+    source,
+    off_estimate_reason: reason,
+    estimator_decision: decision,
+  });
+  const hold = estimatorHold([
+    line("direct", null, null),
+    line("direct", "   ", null),
+    line("direct", "For the sump", "approved"),
+    line("direct", "For the sump", "refused"),
+    line("estimate", null, null),
+    line("interiors", null, null),
+  ]);
+  assert.deepEqual(hold, { needReason: 2, waiting: 2, refused: 1 });
+});
+
+test("a refusal outranks waiting, and nothing held means no blocker", () => {
+  assert.equal(approvalBlocker({ needReason: 0, waiting: 0, refused: 0 }), null);
+  assert.match(
+    approvalBlocker({ needReason: 0, waiting: 2, refused: 0 }) ?? "",
+    /Waiting for the estimator on 2 lines/,
+  );
+  assert.match(approvalBlocker({ needReason: 0, waiting: 1, refused: 1 }) ?? "", /refused 1 line/);
 });
