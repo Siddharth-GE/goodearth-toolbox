@@ -47,10 +47,10 @@ The founder: "a po can only be made from an indent … indents can be made direc
 
 - [x] `[Opus]` `0113` written; dry-run on staging with `scripts/trials/indent-estimator-gate.sql` as a single-grant person, and proved to bite (a copy without the estimator check fails at TRIAL 5). The older trials lift the new PO rule inside their own transaction (`0113` + `batches-as-store-keeper` passes).
 - [x] `[Opus]` Indents, Estimator (Site check, welcome) and Purchase Orders screens; the types carry `0113`'s columns by hand.
-- [ ] `[Fable]` Review `0113` — a definer function, two redefined guards, a new cross-tool write (MODELS.md: required before `db:apply`, unless the founder waives it for this merge).
-- [ ] `[Opus]` `npm run db:apply -- --project ipstebqawrvhkyntctrv --commit`, then `npm run db:types:staging` (it should match the hand-written types), `db:check-views`; open every changed page on the preview, as the probe with `/indents`, then with `/estimator`.
-- [ ] `[Opus]` Pull request to `staging` after Fable's merge pass; `gh run list` green.
-- [ ] Founder — the checklist below, on staging. Then production: `0113` after `0112`.
+- [x] ~~`[Fable]` Review `0113`~~ — **skipped on the founder's explicit word for this merge** (2026-10-11: "skip fable review you do the review and merge"). In its place `[Opus]` re-reviewed the whole diff against `SECURITY.md` and `BUGCATCHER.md`: `indents_guard` diffed against `0034`'s — the two checks are pure additions; `indent_lines_draft_only` is `0019`'s plus the answer path; the definer checks `/estimator` in its body and is reached by no trigger; no browser or admin client, every query and action behind `requireTool`, every read checks `error`. One finding, fixed: Site check's indent approvals read the few approved lines first, not every villa's indents. **The Fable review of `0113` is due before production.**
+- [x] `[Opus]` Applied to staging (`0001`–`0113`); types regenerated — they match the hand-written ones plus the estimator's FK to `profiles` (nothing embeds `profiles` through `indent_lines`, so nothing turns ambiguous); `db:check-views` and `db:check` clean; every new `select` string run at staging's PostgREST (zero rows, all valid); the trial re-run on the applied database passes. **No screen has been opened signed in** — a model session cannot sign in; the founder's vet is the first look.
+- [ ] `[Opus]` Pull request to `staging`; `gh run list` green; merge.
+- [ ] Founder — the checklist below, on staging. Then production: Fable's review of `0113`, then `0113` after `0112`.
 
 ## Verification — the founder, on staging (second build)
 
