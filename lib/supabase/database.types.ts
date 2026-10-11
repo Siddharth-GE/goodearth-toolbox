@@ -4229,6 +4229,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "indent_lines_estimator_decided_by_fkey"
+            columns: ["estimator_decided_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "indent_lines_indent_id_fkey"
             columns: ["indent_id"]
             isOneToOne: false
