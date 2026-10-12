@@ -22,6 +22,7 @@ import {
 import { History } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { BatchId } from "../../../../_components/batch-id";
 
 const KIND_LABEL: Record<MovementRow["kind"], string> = {
   receipt: "Received",
@@ -110,7 +111,9 @@ export default async function ItemHistoryPage({
             <TableBody>
               {batches.map((batch) => (
                 <TableRow key={batch.receiptLineId}>
-                  <TableCell className="font-mono">{batch.label}</TableCell>
+                  <TableCell>
+                    <BatchId label={batch.label} />
+                  </TableCell>
                   <TableCell className="text-muted">{formatDate(batch.receivedAt)}</TableCell>
                   <TableCell>{formatQuantity(batch.quantity)}</TableCell>
                   <TableCell className="text-right font-mono">

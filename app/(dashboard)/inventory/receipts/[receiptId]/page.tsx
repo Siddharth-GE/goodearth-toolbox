@@ -15,6 +15,7 @@ import {
 import { formatDate, formatMoney, formatQuantity } from "@/lib/format";
 import { getGoodsReceipt } from "@/lib/inventory/receipts-queries";
 import { notFound } from "next/navigation";
+import { BatchId } from "../../_components/batch-id";
 import { ReceiptRate } from "../../_components/receipt-rate";
 
 export default async function ReceiptPage({ params }: { params: Promise<{ receiptId: string }> }) {
@@ -101,8 +102,11 @@ export default async function ReceiptPage({ params }: { params: Promise<{ receip
                   {line.item_brand && <span className="ml-2">{line.item_brand}</span>}
                 </div>
                 {line.batch_label && (
-                  <div className="text-muted mt-0.5 font-mono text-xs">
-                    Batch {line.batch_label}
+                  <div className="mt-2">
+                    <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
+                      Batch
+                    </p>
+                    <BatchId label={line.batch_label} />
                   </div>
                 )}
                 {line.bought_for && <div className="text-muted text-xs">For {line.bought_for}</div>}
