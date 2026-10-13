@@ -146,6 +146,13 @@ The door answers Google with hand-built JSON validated against a schema we don't
 **Rule.** An invoker trigger or function reads as the person; anything it reads must be readable by every grant that writes through it (`0111` reads the gated `po_line_billing_facts` instead).
 **Check.** Run the trial through `scripts/dry-run-migrations.ts --trial` under `set local role authenticated` as a single-grant person (the trials in `scripts/trials/` show how), and once with one figure wrong to prove it bites.
 
+### 20. A session renewed a moment ago is "from the future" to the database
+
+The founder's first look at the sidebar's teams showed every tool under Other. PostgREST had refused the teams read with `PGRST303` "JWT issued at future": `proxy.ts` had just renewed the session, the new token's issue time was a hair ahead of the database's clock, and the teams read — fired alongside the profile read, so first through the door — landed in that window. The sidebar fell back as designed, and **the fallback stuck**: the dashboard layout is not re-rendered as someone moves between pages, so a one-off blip there lasts until a full reload. The trials run in SQL and the probe had no session, so no gate ever sent a freshly renewed token.
+
+**Rule.** "JWT issued at future" is retried (`isTransient`); every other token refusal is not. Anything read in the dashboard layout must survive one failed attempt, because its answer outlives the request.
+**Check.** A caught-and-logged failure never reaches `app_errors` — read the deployment's own log: `npx vercel logs -d <deployment-url> --since 2h --level error -x` (the CLI's login works where `.env.local` has no `VERCEL_TOKEN`).
+
 ## Adding to this file
 
 When something breaks that a green build said was fine, it belongs here, numbered next. Four things, short: **what happened, why every gate missed it, the rule, and the one check** — the check is the part that matters. Keep the whole page readable in five minutes.

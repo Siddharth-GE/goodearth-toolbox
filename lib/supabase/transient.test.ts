@@ -22,6 +22,25 @@ test("a definite answer from the database is never transient", () => {
   }
 });
 
+test("a session token a hair ahead of the database's clock is transient", () => {
+  // Exactly what PostgREST answered the sidebar's read on 2026-10-13.
+  const fromTheFuture = {
+    code: "PGRST303",
+    details: null,
+    hint: null,
+    message: "JWT issued at future",
+  };
+  assert.equal(isTransient(fromTheFuture), true);
+});
+
+test("every other token refusal stays permanent", () => {
+  for (const message of ["JWT expired", "JWT not yet valid", "Invalid audience", ""]) {
+    assert.equal(isTransient({ code: "PGRST303", message }), false, message);
+  }
+  // The same words under another code are not the clock blip.
+  assert.equal(isTransient({ code: "42501", message: "JWT issued at future" }), false);
+});
+
 test("a real SQLSTATE wins over a misleading message", () => {
   // The guard text below contains "timeout", but P0001 is a decision.
   assert.equal(isTransient({ code: "P0001", message: "request timeout window closed" }), false);

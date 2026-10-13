@@ -88,10 +88,28 @@ type MaybeError = {
   cause?: unknown;
 } | null;
 
+/**
+ * PostgREST's PGRST303 ("JWT claims validation failed") is almost always
+ * a definite no — an expired token, a wrong audience. One message is
+ * not: "JWT issued at future" means the session was renewed a moment ago
+ * on a clock a hair ahead of the database's, and the same token is valid
+ * a moment later. It blanked the sidebar's teams on 2026-10-13
+ * (BUGCATCHER #20).
+ */
+function isTokenFromTheFuture(candidate: NonNullable<MaybeError>): boolean {
+  return (
+    candidate.code === "PGRST303" &&
+    typeof candidate.message === "string" &&
+    candidate.message.toLowerCase().includes("issued at future")
+  );
+}
+
 export function isTransient(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const candidate = error as MaybeError;
   if (!candidate) return false;
+
+  if (isTokenFromTheFuture(candidate)) return true;
 
   // PostgREST puts the SQLSTATE in `code`; a numeric code is an HTTP
   // status from the fetch layer instead.
