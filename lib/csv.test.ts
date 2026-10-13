@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { csvCell, csvResponse, csvRow, safeFilename } from "./csv";
+import { csvCell, csvResponse, csvRow, parseCsv, safeFilename } from "./csv";
 
 test("every cell is quoted, and quotes inside it are doubled", () => {
   assert.equal(csvCell("Cement"), '"Cement"');
@@ -60,4 +60,23 @@ test("the response carries a BOM, CRLF rows and download headers", async () => {
   assert.equal(response.headers.get("Content-Type"), "text/csv; charset=utf-8");
   assert.equal(response.headers.get("Content-Disposition"), 'attachment; filename="Report.csv"');
   assert.equal(response.headers.get("Cache-Control"), "no-store");
+});
+
+test("reading a CSV: quotes, doubled quotes, commas and newlines inside, the BOM", () => {
+  const bom = String.fromCharCode(0xfeff);
+  assert.deepEqual(parseCsv(bom + 'Month,Amount\r\n2026-10,"1,200"\r\n'), [
+    ["Month", "Amount"],
+    ["2026-10", "1,200"],
+  ]);
+  assert.deepEqual(parseCsv('a,"say ""hi""",c\n\n"two\nlines",,x'), [
+    ["a", 'say "hi"', "c"],
+    ["two\nlines", "", "x"],
+  ]);
+  assert.deepEqual(parseCsv(""), []);
+});
+
+test("what this module writes, it reads back", () => {
+  const rows = [["Groceries", "=SUM(A1)", '12" pipe']];
+  const text = rows.map(csvRow).join("\r\n");
+  assert.deepEqual(parseCsv(text), [["Groceries", "'=SUM(A1)", '12" pipe']]);
 });
