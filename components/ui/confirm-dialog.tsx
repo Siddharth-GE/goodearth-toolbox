@@ -36,8 +36,11 @@ export function ConfirmDialog({
   tone = "danger",
   reason,
   onConfirm,
+  open: controlledOpen,
+  onOpenChange,
 }: {
-  trigger: ReactNode;
+  /** What opens it; omit when a menu item opens it through `open`. */
+  trigger?: ReactNode;
   title: string;
   description: string;
   confirmLabel: string;
@@ -46,8 +49,16 @@ export function ConfirmDialog({
   tone?: "danger" | "primary";
   reason?: { label: string; placeholder?: string };
   onConfirm: (reason: string) => Promise<{ error?: string } | undefined>;
+  /** Controlled from outside — a dropdown item cannot hold a dialog trigger. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [ownOpen, setOwnOpen] = useState(false);
+  const open = controlledOpen ?? ownOpen;
+  const setOpen = (next: boolean) => {
+    if (onOpenChange) onOpenChange(next);
+    else setOwnOpen(next);
+  };
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string>();
   const [why, setWhy] = useState("");
@@ -65,7 +76,7 @@ export function ConfirmDialog({
         }
       }}
     >
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
+      {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>

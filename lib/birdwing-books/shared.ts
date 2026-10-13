@@ -56,3 +56,12 @@ export function shiftMonth(month: string, by: number): string {
   const at = new Date(Date.UTC(year, mon - 1 + by, 1));
   return at.toISOString().slice(0, 7);
 }
+
+/** Every day of a "YYYY-MM" month, as YYYY-MM-DD. */
+export function daysOfMonth(month: string): string[] {
+  const [year, mon] = month.slice(0, 7).split("-").map(Number);
+  const count = new Date(Date.UTC(year, mon, 0)).getUTCDate();
+  return Array.from({ length: count }, (_, index) =>
+    new Date(Date.UTC(year, mon - 1, index + 1)).toISOString().slice(0, 10),
+  );
+}

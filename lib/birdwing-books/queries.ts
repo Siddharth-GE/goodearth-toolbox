@@ -205,6 +205,8 @@ export type ExpenseRow = {
   status: ExpenseStatus;
   reviewNote: string | null;
   isSalary: boolean;
+  /** The old sheet's "Sheet!Cell" for an imported line; null for one made here. */
+  sourceKey: string | null;
   files: { id: string; fileName: string }[];
 };
 
@@ -221,7 +223,7 @@ export async function listExpenses(
       let query = supabase
         .from("birdwing_expenses")
         .select(
-          "id, accounting_month, head_id, description, spent_on, amount, vendor_id, payee, bill_ref, payment_details, status, review_note, salary_run_id",
+          "id, accounting_month, head_id, description, spent_on, amount, vendor_id, payee, bill_ref, payment_details, status, review_note, salary_run_id, source_key",
         )
         .eq("accounting_month", first);
       if (headId) query = query.eq("head_id", headId);
@@ -267,6 +269,7 @@ export async function listExpenses(
       status: line.status === "confirmed" ? ("confirmed" as const) : ("recorded" as const),
       reviewNote: line.review_note,
       isSalary: line.salary_run_id !== null,
+      sourceKey: line.source_key,
       files: files
         .filter((file) => file.expense_id === line.id)
         .map((file) => ({ id: file.id, fileName: file.file_name })),
@@ -484,4 +487,21 @@ export async function getSalaryPreview(
   const card = board.find((entry) => entry.staff.id === staffId);
   if (!card || !card.preview) return null;
   return { name: card.staff.name, preview: card.preview };
+}
+
+/** Toolbox accounts a staff member may be linked to (the shared `profiles`, names only). */
+export async function listProfileOptions(): Promise<{ id: string; name: string }[]> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+  const data = await fetchAll((from, to) =>
+    supabase
+      .from("profiles")
+      .select("id, full_name, is_active")
+      .order("full_name")
+      .order("id")
+      .range(from, to),
+  );
+  return data
+    .filter((profile) => profile.is_active && profile.full_name)
+    .map((profile) => ({ id: profile.id, name: profile.full_name as string }));
 }

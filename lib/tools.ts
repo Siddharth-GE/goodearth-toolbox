@@ -270,7 +270,7 @@ export const TOOLS: Tool[] = [
     description: "Birdwing's expenses, staff attendance and salaries.",
     href: "/birdwing-books",
     icon: "BookOpen",
-    built: false,
+    built: true,
     grantWarning: "Shows every Birdwing staff member's salary and pay rule.",
   },
 ];
