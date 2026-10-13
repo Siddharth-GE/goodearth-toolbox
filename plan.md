@@ -49,7 +49,7 @@ The founder: "a po can only be made from an indent … indents can be made direc
 - [x] `[Opus]` Indents, Estimator (Site check, welcome) and Purchase Orders screens; the types carry `0113`'s columns by hand.
 - [x] ~~`[Fable]` Review `0113`~~ — **skipped on the founder's explicit word for this merge** (2026-10-11: "skip fable review you do the review and merge"). In its place `[Opus]` re-reviewed the whole diff against `SECURITY.md` and `BUGCATCHER.md`: `indents_guard` diffed against `0034`'s — the two checks are pure additions; `indent_lines_draft_only` is `0019`'s plus the answer path; the definer checks `/estimator` in its body and is reached by no trigger; no browser or admin client, every query and action behind `requireTool`, every read checks `error`. One finding, fixed: Site check's indent approvals read the few approved lines first, not every villa's indents. **The Fable review of `0113` is due before production.**
 - [x] `[Opus]` Applied to staging (`0001`–`0113`); types regenerated — they match the hand-written ones plus the estimator's FK to `profiles` (nothing embeds `profiles` through `indent_lines`, so nothing turns ambiguous); `db:check-views` and `db:check` clean; every new `select` string run at staging's PostgREST (zero rows, all valid); the trial re-run on the applied database passes. **No screen has been opened signed in** — a model session cannot sign in; the founder's vet is the first look.
-- [ ] `[Opus]` Pull request to `staging`; `gh run list` green; merge.
+- [x] `[Opus]` Pull request to `staging` (#89); CI green; merged.
 - [ ] Founder — the checklist below, on staging. Then production: Fable's review of `0113`, then `0113` after `0112`.
 
 ## Verification — the founder, on staging (second build)
@@ -61,3 +61,11 @@ The founder: "a po can only be made from an indent … indents can be made direc
 5. **Print** the indent: the line shows its reason and "Estimator approved".
 6. **Purchase Orders**: no "Add items directly". **Bulk PO from several indents** → General → **From approved indents** lists approved indents from every villa, each named by its villa.
 7. As the **probe** (it holds `/estimator` and `/inventory`): Site check shows the waiting lines and Approve works; Indents is refused.
+
+# Third piece — the batch ID, big and copyable (2026-10-12)
+
+The founder: "the batch id needs to be big and visible and copy as well as … a small button". Screens only, Inventory only, no migration; the rule is in `inventory/PLAN.md`. Built by `[Opus]` on `feature/inventory-batch-id` (#90).
+
+- [x] `[Opus]` `BatchId` on the delivery note, "Batches in this store" and the issue note. Rendered through a throwaway probe at a true 390px phone width, light and dark, inside the dashboard's own layout; the copy button pressed for real (the clipboard held the ID) and with the clipboard forced to fail (the fallback line showed). CI green.
+- [x] ~~`[Fable]` Review~~ — **skipped on the founder's explicit word for this merge** (2026-10-13: "merge"). In its place `[Opus]` re-reviewed the diff against `BUGCATCHER.md`: no database read, upload or permission touched; colours are tokens only (`text-success` for the tick), checked in dark mode (#4); the copy button is `type="button"`, so inside the issue form it never submits. One finding, fixed: the fallback said "tap the ID", but a phone selects on press and hold.
+- [ ] Founder — on staging: **Inventory → Receive → a delivery note**: the batch ID is large under each line; press the copy button and paste it into WhatsApp. The same on **Stock → a material in a store** and on an **issue note**. Once on a phone.
