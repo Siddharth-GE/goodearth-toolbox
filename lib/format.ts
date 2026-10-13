@@ -58,8 +58,15 @@ export function formatMoney(
  * Rounding happens here and nowhere earlier, so a column of rounded lines
  * still adds up to a total summed at full precision.
  */
-export function formatAmount(value: number | null | undefined): string {
+export function formatAmount(
+  value: number | null | undefined,
+  options?: { paise?: boolean },
+): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "—";
+  // A tax invoice states paise: its GST halves are worked to the paisa.
+  if (options?.paise) {
+    return value.toLocaleString(LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
   return Math.round(value).toLocaleString(LOCALE, { maximumFractionDigits: 0 });
 }
 

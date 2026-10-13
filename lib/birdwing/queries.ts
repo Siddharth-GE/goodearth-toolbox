@@ -6,6 +6,7 @@ import { profileNames } from "@/lib/masters/names";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { readFailed } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
+import { printDraft, printFromSnapshot, type InvoicePrint } from "./invoice";
 import { isSettled, nightsBetween, stayMoney, type StayMoney } from "./money";
 import {
   CHANNELS,
@@ -1015,4 +1016,111 @@ export async function pendingByStay(stayIds: string[]): Promise<Map<string, numb
     (data ?? []).map((stay) => stay.id),
   );
   return new Map((data ?? []).map((stay) => [stay.id, moneyOf(parts, stay).pending]));
+}
+
+// ---------------------------------------------------------------------
+// An invoice, as it prints
+// ---------------------------------------------------------------------
+
+/**
+ * The invoice to print for a stay: the one asked for by id, else the live
+ * issued one, else a DRAFT from the charges as they stand. Null when the
+ * stay (or the invoice asked for) is not this person's to see.
+ */
+export async function getInvoicePrint(
+  stayId: string,
+  invoiceId?: string,
+): Promise<InvoicePrint | null> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+
+  let query = supabase
+    .from("birdwing_invoices")
+    .select(
+      "number, status, issued_on, cancel_reason, bill_to_name, bill_to_gstin, bill_to_address, discount, snapshot",
+    )
+    .eq("stay_id", stayId);
+  query = invoiceId ? query.eq("id", invoiceId) : query.eq("status", "issued");
+  const { data: invoice, error } = await query.maybeSingle();
+  if (error) fail("the invoice", error);
+  if (invoice) return printFromSnapshot(invoice);
+  if (invoiceId) return null;
+
+  const [stay, settings] = await Promise.all([getStay(stayId), getSettings()]);
+  if (!stay || stay.isBlock) return null;
+  return printDraft({
+    company: settings.company,
+    placeOfSupply: settings.placeOfSupply,
+    bankDetails: settings.bankDetails,
+    upiId: settings.upiId,
+    terms: settings.invoiceTerms,
+    stay: {
+      ref: stay.ref,
+      arrival: stay.arrival,
+      departure: stay.departure,
+      guests: stay.adults + stay.children,
+      guestName: stay.guest?.name ?? null,
+      guestPhone: stay.guest?.phone ?? null,
+    },
+    discount: stay.discount,
+    charges: stay.charges,
+  });
+}
+
+// ---------------------------------------------------------------------
+// The review queue
+// ---------------------------------------------------------------------
+
+export type ReviewRow = {
+  id: string;
+  ref: string;
+  guestName: string | null;
+  use: StayUse | null;
+  arrival: string;
+  status: StayStatus;
+  flags: string[];
+  costCentreName: string | null;
+  billed: number;
+  pending: number;
+};
+
+/**
+ * What needs a person: every stay the import flagged and nobody has
+ * marked reviewed, and every Goodearth stay (not a paying guest) still
+ * carrying a pending balance — the ₹6.45L the old sheet left open.
+ */
+export async function listReviewQueue(): Promise<ReviewRow[]> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+  const stays = await fetchAll((from, to) =>
+    supabase
+      .from("birdwing_stays")
+      .select(
+        "id, ref, is_block, guest_id, use, channel, status, arrival, departure, adults, children, cost_centre_id, ota_commission, discount, review_flags, reviewed_at",
+      )
+      .eq("is_block", false)
+      .neq("status", "cancelled")
+      .or("use.neq.guest,and(reviewed_at.is.null,review_flags.neq.{})")
+      .order("arrival")
+      .order("id")
+      .range(from, to),
+  );
+  const rows = await decorateStays(supabase, stays);
+  const flagsOf = new Map(
+    stays.map((stay) => [stay.id, stay.reviewed_at ? [] : stay.review_flags]),
+  );
+  return rows
+    .filter((row) => row.flagged || (row.use !== "guest" && !isSettled(row.money.pending)))
+    .map((row) => ({
+      id: row.id,
+      ref: row.ref,
+      guestName: row.guestName,
+      use: row.use,
+      arrival: row.arrival,
+      status: row.status,
+      flags: flagsOf.get(row.id) ?? [],
+      costCentreName: row.costCentreName,
+      billed: row.money.billed,
+      pending: row.money.pending,
+    }));
 }

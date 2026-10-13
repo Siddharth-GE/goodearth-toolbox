@@ -138,3 +138,9 @@ test("amounts in words, the Indian invoice way", () => {
   assert.equal(amountInWords(0.07), "Rupees Zero and Seven Paise Only");
   assert.equal(amountInWords(null), "—");
 });
+
+test("print amounts carry paise when a tax invoice asks", () => {
+  assert.equal(formatAmount(1234567.5), "12,34,568");
+  assert.equal(formatAmount(1234567.5, { paise: true }), "12,34,567.50");
+  assert.equal(formatAmount(null, { paise: true }), "—");
+});
