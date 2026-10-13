@@ -91,3 +91,44 @@ The founder: "lets categorise and on the left they must just sit as a closed set
 4. The home page's tool cards and a person's apps in **Settings → People** are grouped the same way.
 5. On a phone: the menu shows the same closed teams.
 6. As the **probe** (it holds `/estimator` and `/inventory`): only the teams holding those two appear, and **Settings → Teams** is refused.
+
+# Fifth piece — Birdwing, the Hospitality section (2026-10-13)
+
+The founder: "We need to build a new section a couple of tools under it, heres the rough build plan tweak it as neccesary in our code base with our rools, to keep it modular seperate etc, another tool set in our tool box and build it" — with Fable's `BIRDWING-BUILD-PLAN.md` and `birdwing-consolidated.html` (the "before" picture). Two tools under a new **Hospitality** team: **Birdwing Stays** (`/birdwing` — bookings, rooms, calendar, charges, invoice, receipts, cross-charge) and **Birdwing Books** (`/birdwing-books` — expenses, attendance, salary). Built by `[Opus]` on `feature/birdwing`. The rules live in each tool's `PLAN.md`; this section holds only what is open.
+
+**Where the build plan was tweaked to this codebase:**
+
+- Migrations are `0115` (Stays), `0116` (Books), `0117` (the facts views) — staging was already at `0114`.
+- No `ToolGroup`/`GROUP_ORDER`: teams live in the database since `0114`, so `0115` makes a **Hospitality** team holding both tools (only if none exists; a re-run never fights Settings → Teams).
+- The multi-step operations (`birdwing_issue_invoice`, `birdwing_confirm_salary`) are **security invoker**, the `issue_transmittal` shape — RLS stays the boundary, no definer carries its own grant check.
+- **The letterhead is a Masters company** (PRODUCT.md): picked once in Birdwing → Settings; bank, UPI and the cancellation policy are typed there once, never seeded.
+- **One private bucket per tool** (`birdwing-stays`, `birdwing-books`) instead of one bucket with two prefixes — each tool self-contained.
+- **Room-days and guest-days come from the stays**, as the laptop app worked them out: Books reads one counts-only view, `birdwing_occupancy_facts` (no names, no money), instead of staff typing rooms served.
+- A **room block** is a stay with `is_block` (no guest, no use, no charges — a composite key makes it so); a cancelled stay **releases** its rooms (`released_at`) rather than deleting them.
+- An invoice row exists **only once issued**; the "draft" is the stay's charges, previewed with a DRAFT watermark.
+- The import reads the laptop app's own parsed data (`seed.json` — 220 stays, 599 expense lines, 767 attendance days, the 13 rates, bank/UPI/policy) rather than re-parsing the workbooks.
+- **Phase 5 (the guest's own check-in link) is not built**: it needs the first new public prefix since `/deck/`, argued in SECURITY.md first. Check-in details are staff-entered on the stay.
+
+## Steps
+
+- [x] `[Opus]` `0115` and `0116` written, with `scripts/trials/birdwing-stays.sql` and `birdwing-books.sql`: dry-run on staging under RLS as a single-grant person, and each proved to bite (without the overlap guard Stays fails at TRIAL 3; without the closed-month guard Books fails at TRIAL 8).
+- [x] ~~`[Fable]` Review `0115`/`0116`~~ — **skipped on the founder's explicit word for staging** (2026-10-13: "Opus reviews, apply"). In its place `[Opus]` reviewed against `SECURITY.md` and `BUGCATCHER.md`: RLS on every table, exactly one SELECT policy each, nothing for anon (all asserted in the files); no definer function — every function runs as the caller, execute revoked from `public, anon` (trigger functions from `authenticated` too); the one view money-free and name-free, write grants revoked, pinned in the manifest; both buckets private with `public.has_app` qualified; both app CHECKs restated in full. No findings. **The Fable review is due before production.**
+- [x] `[Opus]` Applied to staging (`0001`–`0116`); types regenerated (additions only); `db:check-views` and `db:check` clean; both migrations re-run and both trials passed on the applied database.
+- [ ] `[Opus]` Register both tools; Stays: queries, actions, workflow + tests, welcome, calendar, stays, stay page (rooms, charges, invoice + PDF, receipts, cross-charge, check-in details, documents), review, settings.
+- [ ] `[Opus]` Books: expenses (+ bills, CSV export, upload with preview), attendance grid, salary preview → confirm, settings; payroll + tests.
+- [ ] `[Opus]` `0117`: the facts views for Financial Management and Reporter; FM's Birdwing tab; Reporter datasets.
+- [ ] `[Opus]` `scripts/import-birdwing.ts` — dry run on staging, totals reconciled against the consolidated page.
+- [ ] Founder — the checklist below, on staging.
+
+## Verification — the founder, on staging (fifth piece)
+
+(Written as each part lands.)
+
+## Open questions for the founder (from the build plan, §8)
+
+1. **Cost centres** for internal stays — seeded Marketing, Sales, Projects, Directors, Kaadal (editable in Settings). Does a cross-charge need an approver, or is the person who records it enough? Built: the person who records it, named on the line.
+2. **Rate card** — the laptop app's 13 heads are seeded **switched off**; read them in Birdwing → Settings and switch on the right ones before the first real charge.
+3. **Pay rules** — only Sajna's is known (₹15,000, ₹80/hr OT, ₹80/room-day, shift 08:30–17:30). Amal ₹30,000 and Appu ₹40,000 look fixed; Bijeeth's basis is unknown. Needed before the first salary run.
+4. **Grants** — Amal, Akshay on `/birdwing`; who on `/birdwing-books`?
+5. **The 67 unpaid internal stays** — bulk-assign cost centres on the Review screen, or one by one?
+6. **November 2026 salaries** already in the sheet — imported flagged "future", never confirmed, unless you say drop them.
