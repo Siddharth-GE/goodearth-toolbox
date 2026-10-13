@@ -1,6 +1,8 @@
 import { Spinner } from "@/components/ui/spinner";
 import { requireUser } from "@/lib/auth/dal";
 import { formatLongDate } from "@/lib/format";
+import { arrangeTools } from "@/lib/nav/arrange";
+import { getToolArrangement } from "@/lib/nav/queries";
 import { visibleTools } from "@/lib/tools";
 import { Suspense } from "react";
 import { MarathonLiveCard } from "./_components/marathon-live-card";
@@ -16,12 +18,12 @@ function greeting() {
 }
 
 export default async function DashboardHome() {
-  const user = await requireUser();
+  const [user, arrangement] = await Promise.all([requireUser(), getToolArrangement()]);
   const firstName = user.profile?.full_name?.split(" ")[0];
   const today = formatLongDate(new Date());
-  // Same rule the sidebar uses, so a card and a nav row never disagree
-  // about whether someone can open a tool.
-  const tools = visibleTools(user.profile, user.grantedApps);
+  // Same rule and same teams as the sidebar, so a card and a nav row
+  // never disagree about whether someone can open a tool, or where it is.
+  const sections = arrangeTools(visibleTools(user.profile, user.grantedApps), arrangement);
 
   return (
     <div>
@@ -34,7 +36,7 @@ export default async function DashboardHome() {
       </div>
 
       <div className="space-y-8">
-        <ToolGrid tools={tools} />
+        <ToolGrid sections={sections} />
         {/* Fetches its own counts now that Indents is real, so it gets
             its own boundary rather than holding up the whole page. */}
         <Suspense

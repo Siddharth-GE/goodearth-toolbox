@@ -1,8 +1,19 @@
 # Settings — the rules
 
-People, grants, role templates and approver lists. Admin only. Migrations `0003`, `0013`/`0014`, `0032`, `0034`.
+People, grants, role templates, approver lists and the sidebar's teams. Admin only. Migrations `0003`, `0013`/`0014`, `0032`, `0034`, `0114`.
 
-Four screens: **People** (`/settings`), **a person** (`/settings/people/[id]`), **Roles** (`/settings/roles`) and **Overview** (`/settings/overview`) — the who-has-what grid, **read-only** (as an editor it made sixteen columns of mis-clicks). Actions refresh the whole `/settings` layout, so a person's page never shows stale access after a change.
+Five screens: **People** (`/settings`), **a person** (`/settings/people/[id]`), **Roles** (`/settings/roles`), **Overview** (`/settings/overview`) — the who-has-what grid, **read-only** (as an editor it made sixteen columns of mis-clicks) — and **Teams** (`/settings/teams`). Actions refresh the whole `/settings` layout, so a person's page never shows stale access after a change; Teams' actions refresh every page, because every page carries the sidebar.
+
+## Teams
+
+The headings in everyone's sidebar, on the home page and over the grant lists here (founder, 2026-10-13: "a place where you can make all the team tags so that we can rearrange as needed").
+
+- **Teams arrange; grants decide.** `tool_teams` and `tool_team_apps` (`0114`) are read by every signed-in person and written by admins; no policy, view or `has_app()` reads them. Like `user_apps`, they are the shell's tables (`lib/nav/`) that Settings manages.
+- **One team per tool** (`app` is the key). A tool with no team — a new one, or one whose team was deleted — sits under **Other**, always last, so a tool never vanishes for want of a heading. "Other" is refused as a team name.
+- **Deleting a team frees its tools to Other** (the FK cascades their rows) — nothing to refuse, because nothing is granted.
+- **No CHECK on the slug**, unlike `user_apps`/`role_apps`: `setToolTeam` checks `lib/tools.ts`, and a row for a slug the registry no longer has is never drawn — so a new tool needs no third CHECK.
+- **Order is `sort_order`, renumbered 1…n on every move**; tools inside a team keep `lib/tools.ts` order (Operations reads in chain order).
+- **The sidebar's read never takes a page down** (`getToolArrangement`): a failed read is logged and every tool shows under Other. This screen uses the throwing form, because an empty list here would look like "no teams yet".
 
 ## This is the permission system
 

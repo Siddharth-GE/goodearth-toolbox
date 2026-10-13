@@ -50,14 +50,14 @@ export const TOOL_ICONS = {
   Warehouse,
 } satisfies Record<string, LucideIcon>;
 
-export type ToolGroup = "Management" | "Operations" | "Events" | "People" | "Admin";
-
+// Which heading a tool sits under is not here: the founder arranges
+// teams in Settings → Teams (0114, lib/nav/). A new tool appears under
+// "Other" until it is given one.
 export type Tool = {
   name: string;
   description: string;
   href: string;
   icon: keyof typeof TOOL_ICONS;
-  group: ToolGroup;
   // false = the sidebar still links to it, but the route renders the
   // shared ComingSoon stub (app/(dashboard)/_components/coming-soon.tsx)
   // instead of a real tool.
@@ -92,7 +92,6 @@ export const TOOLS: Tool[] = [
     description: "Cost a villa from its works: materials, mixes and labour.",
     href: "/estimator",
     icon: "Calculator",
-    group: "Operations",
     built: true,
   },
   {
@@ -100,7 +99,6 @@ export const TOOLS: Tool[] = [
     description: "Log site labour and request materials, villa by villa.",
     href: "/supervisors",
     icon: "HardHat",
-    group: "Operations",
     built: true,
     catalogue: true,
   },
@@ -109,7 +107,6 @@ export const TOOLS: Tool[] = [
     description: "Specify what goes into every space of a unit.",
     href: "/selections",
     icon: "Palette",
-    group: "Operations",
     built: true,
     catalogue: true,
   },
@@ -118,7 +115,6 @@ export const TOOLS: Tool[] = [
     description: "Price an issued design revision, space by space.",
     href: "/budgets",
     icon: "PiggyBank",
-    group: "Operations",
     built: true,
     catalogue: true,
   },
@@ -127,7 +123,6 @@ export const TOOLS: Tool[] = [
     description: "Site teams request materials, tagged to project/plot.",
     href: "/indents",
     icon: "ClipboardList",
-    group: "Operations",
     built: true,
     catalogue: true,
   },
@@ -136,7 +131,6 @@ export const TOOLS: Tool[] = [
     description: "Created from indent lines, split by vendor.",
     href: "/purchase-orders",
     icon: "ShoppingCart",
-    group: "Operations",
     built: true,
     // No catalogue flag since 0113: a PO line comes from an indent, never
     // from the picker, so this grant has no reason to reach /api/catalogue.
@@ -146,7 +140,6 @@ export const TOOLS: Tool[] = [
     description: "Goods receipt against POs, stock by store, issues out.",
     href: "/inventory",
     icon: "Warehouse",
-    group: "Operations",
     built: true,
     catalogue: true,
   },
@@ -155,7 +148,6 @@ export const TOOLS: Tool[] = [
     description: "Recording against POs and work orders.",
     href: "/bills",
     icon: "Receipt",
-    group: "Operations",
     built: true,
   },
   {
@@ -163,7 +155,6 @@ export const TOOLS: Tool[] = [
     description: "Register runners and manage bib numbers on race day.",
     href: "/marathon",
     icon: "Footprints",
-    group: "Events",
     built: true,
   },
   {
@@ -171,7 +162,6 @@ export const TOOLS: Tool[] = [
     description: "Everyone who works here, and how to reach them.",
     href: "/directory",
     icon: "Users",
-    group: "People",
     built: true,
   },
   {
@@ -179,7 +169,6 @@ export const TOOLS: Tool[] = [
     description: "Assigned courses and completion tracking.",
     href: "/training",
     icon: "GraduationCap",
-    group: "People",
     built: false,
   },
   {
@@ -187,7 +176,6 @@ export const TOOLS: Tool[] = [
     description: "Projects, plots, items, vendors, stores.",
     href: "/masters",
     icon: "Boxes",
-    group: "Admin",
     built: true,
     catalogue: true,
   },
@@ -196,7 +184,6 @@ export const TOOLS: Tool[] = [
     description: "Manage which apps each person can access.",
     href: "/settings",
     icon: "Settings",
-    group: "Admin",
     built: true,
   },
   // Relay replaced both the planned Design Management AND
@@ -211,7 +198,6 @@ export const TOOLS: Tool[] = [
     description: "Who is holding each task, and for how long.",
     href: "/relay",
     icon: "Route",
-    group: "Management",
     built: true,
   },
   {
@@ -220,7 +206,6 @@ export const TOOLS: Tool[] = [
       "Drawing sets and their revisions for each villa, and the transmittals that send them to site.",
     href: "/design-management",
     icon: "DraftingCompass",
-    group: "Management",
     built: true,
   },
   {
@@ -228,7 +213,6 @@ export const TOOLS: Tool[] = [
     description: "Client presentations as shareable links — upload an HTML deck, send the link.",
     href: "/dexter",
     icon: "Presentation",
-    group: "Management",
     built: true,
   },
   {
@@ -236,7 +220,6 @@ export const TOOLS: Tool[] = [
     description: "Build a report over any data — chart it, save it, download it.",
     href: "/reporter",
     icon: "FileChartColumn",
-    group: "Management",
     built: true,
     // The founder's decision (Reporter PLAN.md, decisions 3 and 4;
     // policies widened by 0055) and the copy that decision requires.
@@ -248,7 +231,6 @@ export const TOOLS: Tool[] = [
     description: "Every client and plot, from first visit to the last payment.",
     href: "/client-relations",
     icon: "Handshake",
-    group: "Management",
     built: true,
   },
   {
@@ -256,7 +238,6 @@ export const TOOLS: Tool[] = [
     description: "Cash flow, receivables and spending across the company.",
     href: "/financial-management",
     icon: "Landmark",
-    group: "Management",
     built: true,
     // The founder's decision (Financial Management PLAN.md; views
     // restated by 0058) and the copy that decision requires.
@@ -268,7 +249,6 @@ export const TOOLS: Tool[] = [
     description: "Model a project before you build it — line by line, to profit and funding.",
     href: "/business-planning",
     icon: "Target",
-    group: "Management",
     built: true,
   },
 ];

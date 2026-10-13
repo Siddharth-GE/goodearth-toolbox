@@ -2,24 +2,22 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageTitle } from "@/components/ui/page-title";
 import { requireAdmin } from "@/lib/auth/access";
 import { requireUser } from "@/lib/auth/dal";
+import { arrangeTools } from "@/lib/nav/arrange";
+import { getToolArrangement } from "@/lib/nav/queries";
 import { listRoles } from "@/lib/settings/roles";
-import { GRANTABLE_TOOLS, type ToolGroup } from "@/lib/tools";
+import { GRANTABLE_TOOLS } from "@/lib/tools";
 import { ShieldCheck } from "lucide-react";
 import { NewRoleDialog } from "../_components/new-role-dialog";
 import { RoleCard } from "../_components/role-card";
 import { SettingsNav } from "../_components/settings-nav";
 
-const GROUP_ORDER: ToolGroup[] = ["Operations", "Management", "People", "Events", "Admin"];
-
 export default async function SettingsRolesPage() {
   const user = await requireUser();
   await requireAdmin(user);
 
-  const roles = await listRoles();
-  const groups = GROUP_ORDER.map((group) => ({
-    group,
-    tools: GRANTABLE_TOOLS.filter((tool) => tool.group === group),
-  })).filter((entry) => entry.tools.length > 0);
+  const [roles, arrangement] = await Promise.all([listRoles(), getToolArrangement()]);
+  // The apps read under the sidebar's own teams (Settings → Teams).
+  const sections = arrangeTools(GRANTABLE_TOOLS, arrangement);
 
   return (
     <div className="space-y-4">
@@ -46,7 +44,7 @@ export default async function SettingsRolesPage() {
       ) : (
         <div className="space-y-4">
           {roles.map((role) => (
-            <RoleCard key={role.id} role={role} groups={groups} />
+            <RoleCard key={role.id} role={role} sections={sections} />
           ))}
         </div>
       )}

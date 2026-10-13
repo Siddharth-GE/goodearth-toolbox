@@ -1,24 +1,17 @@
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { TOOL_ICONS, type Tool, type ToolGroup } from "@/lib/tools";
+import type { ToolSection } from "@/lib/nav/arrange";
+import { TOOL_ICONS } from "@/lib/tools";
 import Link from "next/link";
 
-// Mirrors the sidebar's group order (components/layout/sidebar.tsx's
-// GROUP_ORDER isn't exported, so it's duplicated here).
-const GROUP_ORDER: ToolGroup[] = ["Management", "Operations", "Events", "People", "Admin"];
-
-export function ToolGrid({ tools }: { tools: Tool[] }) {
-  const groups = GROUP_ORDER.map((group) => ({
-    group,
-    tools: tools.filter((tool) => tool.group === group),
-  })).filter((g) => g.tools.length > 0);
-
+/** Every tool the person holds, under the same teams as the sidebar — all open here. */
+export function ToolGrid({ sections }: { sections: ToolSection[] }) {
   return (
     <div className="space-y-8">
-      {groups.map(({ group, tools: groupTools }) => (
-        <section key={group}>
+      {sections.map(({ key, name, tools: groupTools }) => (
+        <section key={key}>
           <p className="text-muted mb-3 text-[11px] font-medium tracking-[0.14em] uppercase">
-            {group}
+            {name}
           </p>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {groupTools.map((tool) => {

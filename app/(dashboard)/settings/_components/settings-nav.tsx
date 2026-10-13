@@ -1,7 +1,7 @@
 import { NavTabs } from "@/components/ui/tabs";
 
 /** The section nav Settings screens share — real routes, not panel state. */
-export function SettingsNav({ active }: { active: "people" | "roles" | "overview" }) {
+export function SettingsNav({ active }: { active: "people" | "roles" | "overview" | "teams" }) {
   return (
     <NavTabs
       active={active}
@@ -9,6 +9,7 @@ export function SettingsNav({ active }: { active: "people" | "roles" | "overview
         { key: "people", href: "/settings", label: "People" },
         { key: "roles", href: "/settings/roles", label: "Roles" },
         { key: "overview", href: "/settings/overview", label: "Overview" },
+        { key: "teams", href: "/settings/teams", label: "Teams" },
       ]}
     />
   );
