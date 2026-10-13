@@ -53,8 +53,9 @@ test("occupancy counts complete months only, and says when it is estimated", () 
   assert.equal(tiles.occupancyCapacity, 120);
   assert.equal(Math.round((tiles.occupancy ?? 0) * 1000) / 10, 42.5);
   assert.equal(tiles.occupancyEstimated, true);
-  // The running month still counts in the money and the room rate.
+  // The running month still counts in the money, not in the room rate.
   assert.equal(tiles.monthCount, 2);
+  assert.equal(tiles.averageRoomRate, Math.round((131667.54 / 51) * 100) / 100);
   const model = occupancyModel(monthsSoFar(rows, "2026-10-13"), "2026-10-13");
   assert.equal(model.points[0].values.occupancy, 42.5);
   assert.equal(model.points[1].values.occupancy, null);

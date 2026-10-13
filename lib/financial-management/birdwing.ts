@@ -10,8 +10,9 @@
  *   occupancy (est.)  room-nights ÷ (rooms × days), over complete months
  *   average room rate room revenue ÷ room-nights
  *
- * A month still running counts in the money but not in occupancy (its
- * nights are not all slept yet); a month not yet begun counts in nothing.
+ * A month still running counts in the money but not in occupancy or the
+ * room rate (its nights are not all slept yet); a month not yet begun
+ * counts in nothing.
  */
 import { ACCENT_TOKEN, chartToken } from "@/lib/charts/palette";
 import type { CartesianModel } from "@/lib/charts/series";
@@ -91,8 +92,9 @@ export function birdwingTiles(rows: BirdwingMonth[], today: string): BirdwingTil
   const expenses = sum(months, (row) => row.expenses);
   const roomNights = sum(complete, (row) => row.roomNights);
   const capacity = complete.reduce((total, row) => total + row.rooms * row.daysInMonth, 0);
-  const soldNights = sum(months, (row) => row.roomNights);
-  const roomRevenue = sum(months, (row) => row.roomRevenue);
+  // The room rate over the same complete months as occupancy — the
+  // consolidated page's window.
+  const roomRevenue = sum(complete, (row) => row.roomRevenue);
 
   return {
     billed,
@@ -111,7 +113,7 @@ export function birdwingTiles(rows: BirdwingMonth[], today: string): BirdwingTil
     occupancyRoomNights: roomNights,
     occupancyCapacity: capacity,
     occupancyEstimated: complete.some((row) => row.roomNightsEstimated),
-    averageRoomRate: soldNights > 0 ? round2(roomRevenue / soldNights) : null,
+    averageRoomRate: roomNights > 0 ? round2(roomRevenue / roomNights) : null,
     monthCount: months.length,
   };
 }

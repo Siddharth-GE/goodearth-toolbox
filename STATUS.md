@@ -14,7 +14,7 @@ Production is `toolbox.goodearthkannur.org` (from `master`); staging is `staging
 ## Platform
 
 - **Stack:** Next.js 16.2 (Turbopack) · React 19.2 · Tailwind 4 · Supabase Postgres. Vercel `bom1` + Supabase `ap-south-1`, both Mumbai.
-- **Migrations:** `0001`–`0093` on both databases; `0094`–`0114` on staging only. `applied_migrations` (`0067`) is the ledger, and CI checks it on every pull request.
+- **Migrations:** `0001`–`0093` on both databases; `0094`–`0117` on staging only. `applied_migrations` (`0067`) is the ledger, and CI checks it on every pull request.
 - **Access:** per-user grants (`user_apps`) + role bundles (`role_apps`), enforced in the database by `has_app()`.
 - **Navigation** (staging): tools sit under closed teams in the sidebar, arranged by the founder in Settings → Teams (`0114`, `lib/nav/`); a tool with no team sits under Other. Teams arrange, grants decide.
 - **Sign-in:** password → emailed 6-digit code (30-day trusted device), self-service reset, Google for existing team emails only; both steps rate-limited in the database. Mail rides Resend as `toolbox@goodearthkannur.org`. The rules are `SECURITY.md`.
@@ -44,6 +44,8 @@ Production unless marked. Each tool's rules are its `PLAN.md` (Google Chat door:
 - **Reporter** — a report builder over a dataset registry; carries money by founder decision (on staging: a search box, a totals row and quick filters).
 - **Directory** — everyone who works here; people keep their own details current.
 - **Dexter** — client presentations as shareable links; a deck can carry questions and keeps the client's answers, and every link shows the Kaadal mark when shared on WhatsApp (staging only).
+- **Birdwing Stays** (staging) — the guest house's bookings: a room calendar no booking can double, charges, GST invoices numbered by the database (MEF/GH/133 on), dated receipts, and Goodearth's own stays closed to a cost centre. The old income sheet is imported (220 stays) and waits on its Review screen.
+- **Birdwing Books** (staging) — the guest house's expenses with their bills, daily attendance, and one confirmed salary per person per month from a dated pay rule. The old expenses workbook and attendance are imported.
 - **Training** — stub.
 
 The chain runs end to end: design → price → indent → PO → goods in / stock / goods out → bill → paid.
@@ -65,12 +67,14 @@ The chain runs end to end: design → price → indent → PO → goods in / sto
 | Relay                | nothing outside the shared surfaces                                                                                                                                                             |
 | Google Chat door     | Relay's own `pusher_*` tables and `pusher_chain_state`, through the admin client (`SECURITY.md`)                                                                                                |
 | Client Relations     | `pusher_chain_state`, `selections`                                                                                                                                                              |
-| Reporter             | `lib/reporter/datasets.ts` is the list: indents, POs, bills, budget report lines, CRM facts, goods receipts, stock, selections, `pusher_chain_state`, plan targets                              |
-| Financial Management | `crm_milestone_facts`, `crm_receipt_facts`, `bill_money_facts`, `business_plan_target_facts`                                                                                                    |
+| Reporter             | `lib/reporter/datasets.ts` is the list: indents, POs, bills, budget report lines, CRM facts, goods receipts, stock, selections, `pusher_chain_state`, plan targets, Birdwing stays and expenses |
+| Financial Management | `crm_milestone_facts`, `crm_receipt_facts`, `bill_money_facts`, `business_plan_target_facts`, `birdwing_month_facts`, `birdwing_stay_facts`, `birdwing_expense_facts`                           |
 | Estimator            | `stock_issues(_lines)`, `goods_receipts(_lines)` (issued-vs-estimated), `issue_requests` (site's off-estimate reason, `0110`), `indents`, `indent_lines` (lines waiting for its answer, `0113`) |
 | Supervisors          | `estimate_takeoff_facts`, `stock_issues(_lines)`, `goods_receipts(_lines)`, `lib/drawings/`, `work_unit_facts` (a work's unit), `bill_facts` (a billed log's number)                            |
 | Design Management    | nothing outside the shared surfaces; owns the tables behind `lib/drawings/`                                                                                                                     |
 | Business Planning    | `projects` (its one optional link)                                                                                                                                                              |
 | Directory, Dexter    | nothing outside the shared surfaces                                                                                                                                                             |
+| Birdwing Stays       | nothing outside the shared surfaces (`companies` for the letterhead)                                                                                                                            |
+| Birdwing Books       | `birdwing_occupancy_facts` (rooms and guests per day, counts only)                                                                                                                              |
 
-**Nothing reads** Financial Management, Dexter or the Estimator's own tables — only its views: the rate-free `estimate_takeoff_facts` and `work_unit_facts`, and `work_labour_rate_facts` (Bills, gated).
+**Nothing reads** Financial Management, Dexter, the Birdwing tools' or the Estimator's own tables — Birdwing only through `birdwing_occupancy_facts` and `0117`'s three facts views; the Estimator only through its views: the rate-free `estimate_takeoff_facts` and `work_unit_facts`, and `work_labour_rate_facts` (Bills, gated).

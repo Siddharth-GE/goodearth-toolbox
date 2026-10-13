@@ -153,7 +153,7 @@ export default async function BirdwingFinancePage() {
             label="Average room rate"
             value={formatMoney(tiles.averageRoomRate)}
             size="lg"
-            hint="room revenue ÷ room-nights, with GST"
+            hint="room revenue ÷ room-nights, with GST, complete months"
           />
         </FigureBandCell>
       </FigureBand>

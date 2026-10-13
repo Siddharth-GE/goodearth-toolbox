@@ -121,7 +121,9 @@ export function SalaryCardView({
       </div>
       <p className="text-muted mt-2 text-xs">
         {card.daysRecorded} of {daysInMonth} days marked · {preview.workedDays} present
-        {preview.halfDays ? ` · ${preview.halfDays} half days` : ""}
+        {preview.halfDays
+          ? ` · ${preview.halfDays} half day${preview.halfDays === 1 ? "" : "s"}`
+          : ""}
         {preview.leaveDays ? ` · ${preview.leaveDays} leave` : ""}
         {preview.absentDays ? ` · ${preview.absentDays} absent` : ""}
       </p>

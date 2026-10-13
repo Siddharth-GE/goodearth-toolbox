@@ -128,7 +128,7 @@ function IssueForm({ stayId, guestName }: { stayId: string; guestName: string })
             name="bill_to_gstin"
             maxLength={15}
             placeholder="Only for a business"
-            className="uppercase"
+            className="uppercase placeholder:normal-case"
           />
         </div>
         <div className="space-y-1.5 sm:col-span-2">

@@ -356,21 +356,23 @@ export async function getWelcomeCounts(): Promise<{
     if (result.error) fail("the welcome counts", result.error);
   }
 
-  let toInvoice = 0;
-  if (checkedOut.length > 0) {
-    const ids = checkedOut.map((stay) => stay.id);
+  // A hundred ids to a request keeps each URL short; every one is checked.
+  const ids = checkedOut.map((stay) => stay.id);
+  const invoiced = new Set<string>();
+  for (let index = 0; index < ids.length; index += 100) {
+    const chunk = ids.slice(index, index + 100);
     const issued = await fetchAll((from, to) =>
       supabase
         .from("birdwing_invoices")
         .select("id, stay_id")
         .eq("status", "issued")
-        .in("stay_id", ids.slice(0, 100))
+        .in("stay_id", chunk)
         .order("id")
         .range(from, to),
     );
-    const invoiced = new Set(issued.map((invoice) => invoice.stay_id));
-    toInvoice = ids.slice(0, 100).filter((id) => !invoiced.has(id)).length;
+    for (const invoice of issued) invoiced.add(invoice.stay_id);
   }
+  const toInvoice = ids.filter((id) => !invoiced.has(id)).length;
 
   return {
     arrivingToday: arriving.count ?? 0,
