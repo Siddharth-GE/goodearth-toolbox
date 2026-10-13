@@ -394,7 +394,21 @@ export type SalaryCard = {
   preview: SalaryPreview | null;
   daysRecorded: number;
   run: SalaryRun | null;
+  /**
+   * Salary already in Expenses for this person and month that no run
+   * wrote — the old sheet's, or typed by hand. Confirming on top of it
+   * would pay the month twice, so the screen and the action refuse.
+   */
+  recordedElsewhere: number;
 };
+
+/** "Sajna", "Sajna — salary", "Reviewed payroll Sajna": this person's line? */
+function namesPerson(line: { payee: string | null; description: string }, name: string): boolean {
+  const who = name.trim().toLowerCase();
+  const payee = (line.payee ?? "").trim().toLowerCase();
+  const description = line.description.trim().toLowerCase();
+  return payee === who || description === who || description.startsWith(`${who} `);
+}
 
 async function occupancyFor(supabase: Client, first: string): Promise<Map<string, DayOccupancy>> {
   const rows = await fetchAll((from, to) =>
@@ -422,7 +436,7 @@ export async function getSalaryBoard(month: string): Promise<SalaryCard[]> {
   const supabase = await createClient();
   const first = `${month.slice(0, 7)}-01`;
 
-  const [attendance, rules, occupancy, runs] = await Promise.all([
+  const [attendance, rules, occupancy, runs, salaryLines] = await Promise.all([
     getAttendanceMonth(first),
     listPayRules(),
     occupancyFor(supabase, first),
@@ -432,8 +446,15 @@ export async function getSalaryBoard(month: string): Promise<SalaryCard[]> {
         "id, staff_id, base, ot_hours, ot_amount, room_days, room_amount, guest_days, guest_amount, incentives, deductions, total, note, confirmed_at, confirmed_by",
       )
       .eq("month", first),
+    supabase
+      .from("birdwing_expenses")
+      .select("payee, description, amount, birdwing_expense_heads!inner(is_salary)")
+      .eq("accounting_month", first)
+      .is("salary_run_id", null)
+      .eq("birdwing_expense_heads.is_salary", true),
   ]);
   if (runs.error) fail("the salary runs", runs.error);
+  if (salaryLines.error) fail("the salary lines", salaryLines.error);
   const names = await profileNames(
     supabase,
     (runs.data ?? []).map((run) => run.confirmed_by),
@@ -456,6 +477,12 @@ export async function getSalaryBoard(month: string): Promise<SalaryCard[]> {
       rule,
       preview: rule ? computeSalary({ rule, days, occupancy }) : null,
       daysRecorded: days.length,
+      recordedElsewhere:
+        Math.round(
+          (salaryLines.data ?? [])
+            .filter((line) => namesPerson(line, person.name))
+            .reduce((total, line) => total + Number(line.amount), 0) * 100,
+        ) / 100,
       run: run
         ? {
             id: run.id,
@@ -482,11 +509,15 @@ export async function getSalaryBoard(month: string): Promise<SalaryCard[]> {
 export async function getSalaryPreview(
   staffId: string,
   month: string,
-): Promise<{ name: string; preview: SalaryPreview } | null> {
+): Promise<{ name: string; preview: SalaryPreview; recordedElsewhere: number } | null> {
   const board = await getSalaryBoard(month);
   const card = board.find((entry) => entry.staff.id === staffId);
   if (!card || !card.preview) return null;
-  return { name: card.staff.name, preview: card.preview };
+  return {
+    name: card.staff.name,
+    preview: card.preview,
+    recordedElsewhere: card.recordedElsewhere,
+  };
 }
 
 /** Toolbox accounts a staff member may be linked to (the shared `profiles`, names only). */

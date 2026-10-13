@@ -131,6 +131,13 @@ export function SalaryCardView({
           days count no overtime. Add the times in Attendance first if there was any.
         </p>
       )}
+      {card.recordedElsewhere > 0 && (
+        <p className="text-warning mt-1 text-xs">
+          {money(card.recordedElsewhere)} is already in Expenses as {staff.name}&rsquo;s{" "}
+          {monthLabel(month)} salary (from the old sheet, or typed by hand). Confirming here would
+          pay the month twice — remove that line in Expenses first if this is to replace it.
+        </p>
+      )}
 
       <div className="mt-3 grid grid-cols-2 gap-2">
         <div className="space-y-1.5">
@@ -167,7 +174,11 @@ export function SalaryCardView({
         <Figure label="Comes to" value={money(total)} size="lg" />
         <ConfirmDialog
           tone="primary"
-          trigger={<Button disabled={!canConfirm || total <= 0}>Confirm salary</Button>}
+          trigger={
+            <Button disabled={!canConfirm || total <= 0 || card.recordedElsewhere > 0}>
+              Confirm salary
+            </Button>
+          }
           title={`Confirm ${staff.name}'s ${monthLabel(month)} salary?`}
           description={`${money(total)} becomes ${monthLabel(month)}'s salary line in Expenses, and ${staff.name}'s attendance for the month closes. A confirmed salary can't be changed here.`}
           confirmLabel={`Confirm ${money(total)}`}

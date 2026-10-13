@@ -341,7 +341,12 @@ export async function confirmSalary(
   const found = await getSalaryPreview(staffId, first);
   if (!found)
     return { error: "This person has no pay rule for that month — an admin adds one in Settings." };
-  const { preview } = found;
+  const { preview, recordedElsewhere } = found;
+  if (recordedElsewhere > 0) {
+    return {
+      error: `₹${recordedElsewhere.toLocaleString("en-IN")} is already in Expenses as ${found.name}'s salary for this month. Remove that line first if this is to replace it.`,
+    };
+  }
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("birdwing_confirm_salary", {
