@@ -10,10 +10,85 @@ import {
   buildCalendar,
   daysFrom,
   monthDays,
+  packUnplaced,
   roomsTaken,
+  unnamedRoomsByDay,
   weekStart,
   type CalendarBooking,
+  type UnplacedStay,
 } from "./calendar";
+
+const unplaced = (over: Partial<UnplacedStay>): UnplacedStay => ({
+  stayId: "u1",
+  label: "Tom Boban",
+  from: "2026-09-08",
+  to: "2026-09-10",
+  roomCount: 1,
+  status: "checked_out",
+  ...over,
+});
+
+test("a stay with no room is a bar over its nights, not its departure day", () => {
+  const days = monthDays("2026-09");
+  const [lane] = packUnplaced([unplaced({})], days);
+  assert.equal(lane.length, 1);
+  assert.equal(lane[0].start, 7); // the 8th
+  assert.equal(lane[0].span, 2); // the 8th and 9th; they leave on the 10th
+  assert.equal(lane[0].dayVisit, false);
+});
+
+test("overlapping stays take separate rows; back-to-back ones share a row", () => {
+  const days = monthDays("2026-09");
+  const lanes = packUnplaced(
+    [
+      unplaced({ stayId: "a", from: "2026-09-08", to: "2026-09-10" }),
+      unplaced({ stayId: "b", from: "2026-09-09", to: "2026-09-11" }),
+      unplaced({ stayId: "c", from: "2026-09-10", to: "2026-09-12" }),
+    ],
+    days,
+  );
+  assert.equal(lanes.length, 2);
+  assert.deepEqual(
+    lanes.map((lane) => lane.map((bar) => bar.stayId)),
+    [["a", "c"], ["b"]],
+  );
+});
+
+test("a day visit holds its one day; a stay across the month end is cut and says so", () => {
+  const days = monthDays("2026-09");
+  const lanes = packUnplaced(
+    [
+      unplaced({ stayId: "meal", from: "2026-09-03", to: "2026-09-03", roomCount: null }),
+      unplaced({ stayId: "long", from: "2026-08-31", to: "2026-09-04" }),
+      unplaced({ stayId: "late", from: "2026-09-29", to: "2026-10-02" }),
+      unplaced({ stayId: "gone", from: "2026-08-28", to: "2026-09-01" }),
+    ],
+    days,
+  );
+  const bars = new Map(lanes.flat().map((bar) => [bar.stayId, bar]));
+  assert.equal(bars.get("meal")?.dayVisit, true);
+  assert.equal(bars.get("meal")?.span, 1);
+  assert.equal(bars.get("long")?.continuesBefore, true);
+  assert.equal(bars.get("long")?.start, 0);
+  assert.equal(bars.get("long")?.span, 3);
+  assert.equal(bars.get("late")?.continuesAfter, true);
+  assert.equal(bars.get("late")?.span, 2);
+  // Left the morning of the 1st: no night in September, so not drawn.
+  assert.equal(bars.has("gone"), false);
+});
+
+test("the sheet's room counts add up per night; a day visit adds none", () => {
+  const days = daysFrom("2026-09-08", 3);
+  const lanes = packUnplaced(
+    [
+      unplaced({ stayId: "a", roomCount: 2 }),
+      unplaced({ stayId: "b", from: "2026-09-09", to: "2026-09-11", roomCount: 1 }),
+      unplaced({ stayId: "meal", from: "2026-09-09", to: "2026-09-09", roomCount: 3 }),
+    ],
+    days,
+  );
+  assert.deepEqual(unnamedRoomsByDay(lanes, days.length), [2, 3, 1]);
+});
 
 const booking = (over: Partial<CalendarBooking>): CalendarBooking => ({
   stayId: "s1",

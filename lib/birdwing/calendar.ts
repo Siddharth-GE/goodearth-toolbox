@@ -122,3 +122,99 @@ export function roomsTaken(grid: Map<string, CalendarCell[]>, dayIndex: number):
   }
   return taken;
 }
+
+// ---------------------------------------------------------------------
+// Stays with no room named
+// ---------------------------------------------------------------------
+// The old income sheet said how MANY rooms a stay took, never which —
+// so its 220 stays have no room to sit in. They are drawn below the
+// rooms instead, each as a bar across its nights, and never guessed into
+// R1 or R2 (an invented room would feed occupancy and the double-booking
+// guard with a fact nobody recorded). A stay booked here without a room
+// yet sits in the same rows. A day visit (meals, an event) is one day.
+
+export type UnplacedStay = {
+  stayId: string;
+  label: string;
+  /** Arrival and departure; equal for a day visit. */
+  from: string;
+  to: string;
+  /** The sheet's room count, or null when it charged no room. */
+  roomCount: number | null;
+  status: StayStatus;
+};
+
+export type UnplacedBar = {
+  stayId: string;
+  label: string;
+  roomCount: number | null;
+  status: StayStatus;
+  dayVisit: boolean;
+  /** Index of the first day shown, and how many days the bar covers. */
+  start: number;
+  span: number;
+  /** The stay began before, or runs on after, the days in view. */
+  continuesBefore: boolean;
+  continuesAfter: boolean;
+};
+
+/**
+ * Each stay with no room, as a bar over the days in view, packed into as
+ * few rows as possible (first row it fits, earliest stay first). A stay
+ * holds the nights [from, to); a day visit holds its one day.
+ */
+export function packUnplaced(stays: UnplacedStay[], days: string[]): UnplacedBar[][] {
+  if (days.length === 0) return [];
+  const first = days[0];
+  const last = days[days.length - 1];
+  const bars: UnplacedBar[] = [];
+  for (const stay of stays) {
+    const dayVisit = stay.to <= stay.from;
+    const lastDay = dayVisit ? stay.from : addDays(stay.to, -1);
+    if (lastDay < first || stay.from > last) continue;
+    const startDay = stay.from < first ? first : stay.from;
+    const endDay = lastDay > last ? last : lastDay;
+    const start = days.indexOf(startDay);
+    const end = days.indexOf(endDay);
+    if (start < 0 || end < start) continue;
+    bars.push({
+      stayId: stay.stayId,
+      label: stay.label,
+      roomCount: stay.roomCount,
+      status: stay.status,
+      dayVisit,
+      start,
+      span: end - start + 1,
+      continuesBefore: stay.from < first,
+      continuesAfter: lastDay > last,
+    });
+  }
+  bars.sort((a, b) => a.start - b.start || b.span - a.span || a.label.localeCompare(b.label));
+
+  const lanes: UnplacedBar[][] = [];
+  for (const bar of bars) {
+    const lane = lanes.find((row) => {
+      const previous = row[row.length - 1];
+      return previous.start + previous.span <= bar.start;
+    });
+    if (lane) lane.push(bar);
+    else lanes.push([bar]);
+  }
+  return lanes;
+}
+
+/**
+ * Rooms the unnamed stays took on each day in view, from the sheet's room
+ * counts — a day visit takes none. The calendar prints it under "Taken"
+ * as an estimate, never adds it in.
+ */
+export function unnamedRoomsByDay(lanes: UnplacedBar[][], dayCount: number): number[] {
+  const counts = Array.from({ length: dayCount }, () => 0);
+  for (const bar of lanes.flat()) {
+    if (bar.dayVisit || !bar.roomCount) continue;
+    for (let index = bar.start; index < bar.start + bar.span; index += 1) {
+      counts[index] += bar.roomCount;
+    }
+  }
+  return counts.map((count) => Math.round(count * 100) / 100);
+}

@@ -144,6 +144,14 @@ You are admin, so you see both tools without a grant. A test stay made here is a
 15. **Reporter** → new report → **Birdwing stays** → group by _Who for_, sum _Pending_.
 16. As the **probe** (it holds `/estimator` and `/inventory`): neither Birdwing tool appears, and `/birdwing` sends it home.
 
+## The calendar shows the history (2026-10-13)
+
+The founder, after the merge: "the calender in the birdwing tab dosent show the history as per our sheet etc please add that". The old sheet never named rooms, so its stays had nothing to sit in. Built by `[Opus]` on `feature/birdwing-calendar-history`; no migration; the rule is in `birdwing/PLAN.md`.
+
+- [x] `[Opus]` Stays with no room drawn under the rooms (`packUnplaced`, `unnamedRoomsByDay`, four new tests), "+ not named" under "Taken", a month jump. Looked at with staging's real June and July 2026 through a throwaway probe (deleted) — that look caught day columns stretched by long names and the month cut at the 14th, fixed with a fixed-layout table; light, dark, and a week on a true 390px phone. Checks green.
+- [x] ~~`[Fable]` Approval pass~~ — **skipped on the founder's explicit word for this merge** (2026-10-13: "Merge when CI is green"); `[Opus]` reviewed the diff: the one new read opens with the grant check, reads completely and checks every error; no database change; tokens only. Pull request #94 into `staging`; CI green; merged.
+- [ ] Founder — **Stays → Calendar**, type **2026-06** in the month box → **Go**: June's stays from the sheet appear under the rooms as dashed bars with their names; "+ not named" counts their rooms each night. Hover a short bar for the whole name, or tap it to open the stay. **Week** shows one week with names in full.
+
 ## Open questions for the founder (from the build plan, §8)
 
 1. **Cost centres** for internal stays — seeded Marketing, Sales, Projects, Directors, Kaadal (editable in Settings). Does a cross-charge need an approver, or is the person who records it enough? Built: the person who records it, named on the line.
