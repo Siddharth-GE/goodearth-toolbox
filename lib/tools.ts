@@ -226,9 +226,10 @@ export const TOOLS: Tool[] = [
     icon: "FileChartColumn",
     built: true,
     // The founder's decision (Reporter PLAN.md, decisions 3 and 4;
-    // policies widened by 0055) and the copy that decision requires.
+    // policies widened by 0055; Birdwing's views by 0117) and the copy
+    // that decision requires.
     grantWarning:
-      "Shows all money: every vendor rate, every bill amount, and the margin on every quoted line.",
+      "Shows all money: every vendor rate, every bill amount, the margin on every quoted line, and Birdwing's stays, guests' bills and expenses.",
   },
   {
     name: "Client Relations",
@@ -244,9 +245,10 @@ export const TOOLS: Tool[] = [
     icon: "Landmark",
     built: true,
     // The founder's decision (Financial Management PLAN.md; views
-    // restated by 0058) and the copy that decision requires.
+    // restated by 0058; Birdwing's added by 0117) and the copy that
+    // decision requires.
     grantWarning:
-      "Shows the company's full money picture: every client's dues and receipts, every bill's amount, and every loan and investor with its terms.",
+      "Shows the company's full money picture: every client's dues and receipts, every bill's amount, every loan and investor with its terms, and Birdwing's takings and spending.",
   },
   {
     name: "Business Planning",
