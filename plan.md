@@ -79,7 +79,7 @@ The founder: "lets categorise and on the left they must just sit as a closed set
 - [x] `[Opus]` **Settings → Teams**: make, rename, reorder and delete teams; pick each tool's team. The sidebar and Teams screen rendered through a throwaway probe — desktop light and dark, a true 390px phone (drawer open; Teams with a delete confirmation). One fix from looking: on a phone, a team's buttons now wrap before its name is cut short. **No screen has been opened signed in.**
 - [x] ~~`[Fable]` Review `0114`~~ — **skipped on the founder's explicit word** (2026-10-13: "You review it"). In its place `[Opus]` reviewed against `SECURITY.md` and `BUGCATCHER.md`: RLS on both tables, one SELECT policy each, every write `is_admin()` and asserted so, no anon policy, no view or function (so no revokes owed), `has_app()`/`is_admin()` untouched; every action calls `requireAdmin` first (five of five); no admin or browser client; every read checks `error`, completeness through `fetchAll`; no embeds; colours are tokens only. Findings, fixed: the sidebar's catch swallowed Next's own signals; a team's list id appeared twice (rail and drawer).
 - [x] `[Opus]` Applied to staging (`0001`–`0114`); regenerated types identical to the hand-written ones; `db:check-views` and `db:check` clean; the migration re-run and the trial passed on the applied database; every new `select` string run at staging's PostgREST (five teams, twenty tools placed). **The Fable review is due before production**, like `0113`'s.
-- [ ] `[Opus]` Pull request to `staging`; CI green; merged.
+- [x] `[Opus]` Pull request to `staging` (#91); CI green; merged.
 - [ ] Founder — the checklist below, on staging.
 
 ## Verification — the founder, on staging (fourth piece)
