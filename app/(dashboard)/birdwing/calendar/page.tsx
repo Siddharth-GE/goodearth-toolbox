@@ -1,28 +1,34 @@
-import { LinkButton } from "@/components/ui/button";
+import { Button, LinkButton } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { NavTabs } from "@/components/ui/tabs";
 import {
   addDays,
   buildCalendar,
   daysFrom,
   monthDays,
+  packUnplaced,
   roomsTaken,
+  unnamedRoomsByDay,
   weekStart,
-  type CalendarCell,
 } from "@/lib/birdwing/calendar";
-import { listBookings, listRooms } from "@/lib/birdwing/queries";
+import { listBookings, listRooms, listUnplacedStays } from "@/lib/birdwing/queries";
 import { formatDate, todayInIndia } from "@/lib/format";
 import { dateParam } from "@/lib/list-params";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import Link from "next/link";
 import { BlockRoomsDialog } from "./block-rooms-dialog";
+import { Legend, Night, UnplacedLane } from "./calendar-rows";
 
 /**
  * The rooms against the days: every cell is one room's NIGHT. A free
  * night is a link to book that room from that day; a taken one opens its
  * stay. A turnover — somebody leaving that morning and somebody arriving
  * that afternoon — is marked, because housekeeping has hours, not a day.
+ *
+ * Below the rooms, the stays that hold no room: the old income sheet's,
+ * which counted rooms but never named them, drawn as bars over their
+ * nights with the sheet's room count — never guessed into a room.
  *
  * Month by default; a week at a time fits a phone without scrolling.
  */
@@ -42,7 +48,13 @@ export default async function CalendarPage({
   const first = days[0];
   const last = days[days.length - 1];
 
-  const [rooms, bookings] = await Promise.all([listRooms(), listBookings(first, addDays(last, 1))]);
+  const [rooms, bookings, unplaced] = await Promise.all([
+    listRooms(),
+    listBookings(first, addDays(last, 1)),
+    listUnplacedStays(first, addDays(last, 1)),
+  ]);
+  const lanes = packUnplaced(unplaced, days);
+  const unnamed = unnamedRoomsByDay(lanes, days.length);
   // A switched-off room still shows while it holds a booking in view.
   const booked = new Set(bookings.map((booking) => booking.roomId));
   const shown = rooms.filter((room) => room.isActive || booked.has(room.id));
@@ -83,6 +95,21 @@ export default async function CalendarPage({
           </LinkButton>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <form action="/birdwing/calendar" className="flex items-center gap-1.5">
+            <label htmlFor="jump-month" className="sr-only">
+              Go to a month
+            </label>
+            <Input
+              id="jump-month"
+              name="month"
+              type="month"
+              defaultValue={first.slice(0, 7)}
+              className="h-8 w-40 text-xs"
+            />
+            <Button type="submit" variant="secondary" size="sm">
+              Go
+            </Button>
+          </form>
           <NavTabs
             active={week ? "week" : "month"}
             tabs={[
@@ -107,10 +134,16 @@ export default async function CalendarPage({
         </Card>
       ) : (
         <div className="border-border bg-surface overflow-x-auto rounded-2xl border">
-          <table className="w-full border-collapse text-xs">
+          {/* Fixed layout: every day column the same width whatever a
+              guest's name is (a long name truncates in its bar), and a
+              month too wide for the screen scrolls rather than squeezes. */}
+          <table
+            className="w-full table-fixed border-collapse text-xs"
+            style={{ minWidth: 104 + days.length * 36 }}
+          >
             <thead>
               <tr className="border-border border-b">
-                <th className="bg-surface text-muted sticky left-0 z-10 px-3 py-2 text-left text-[11px] font-medium tracking-[0.14em] uppercase">
+                <th className="bg-surface text-muted sticky left-0 z-10 w-26 px-3 py-2 text-left text-[11px] font-medium tracking-[0.14em] uppercase">
                   Room
                 </th>
                 {days.map((day) => {
@@ -150,6 +183,20 @@ export default async function CalendarPage({
                   ))}
                 </tr>
               ))}
+              {lanes.length > 0 && (
+                <tr>
+                  <th
+                    colSpan={days.length + 1}
+                    scope="colgroup"
+                    className="text-muted bg-foreground/[0.02] px-3 pt-3 pb-1.5 text-left text-[11px] font-medium tracking-[0.14em] uppercase"
+                  >
+                    Rooms not named — the old sheet&rsquo;s stays, or booked without a room
+                  </th>
+                </tr>
+              )}
+              {lanes.map((lane, index) => (
+                <UnplacedLane key={index} lane={lane} dayCount={days.length} />
+              ))}
             </tbody>
             <tfoot className="border-border bg-foreground/[0.02] border-t">
               <tr>
@@ -162,104 +209,28 @@ export default async function CalendarPage({
                   </td>
                 ))}
               </tr>
+              {unnamed.some((count) => count > 0) && (
+                <tr>
+                  <th className="bg-surface text-muted sticky left-0 z-10 px-3 py-2 text-left text-[11px] font-medium tracking-[0.14em] whitespace-nowrap uppercase">
+                    + not named
+                  </th>
+                  {unnamed.map((count, index) => (
+                    <td
+                      key={days[index]}
+                      className="text-muted px-0.5 py-2 text-center tabular-nums"
+                      title="Rooms the old sheet counted for that night, never named"
+                    >
+                      {count > 0 ? count : ""}
+                    </td>
+                  ))}
+                </tr>
+              )}
             </tfoot>
           </table>
         </div>
       )}
 
       <Legend />
-    </div>
-  );
-}
-
-function Night({
-  cell,
-  roomId,
-  roomCode,
-  today,
-}: {
-  cell: CalendarCell;
-  roomId: string;
-  roomCode: string;
-  today: string;
-}) {
-  const base =
-    "relative flex h-9 items-center overflow-hidden rounded-md px-1 text-[11px] leading-tight focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none";
-
-  if (!cell.night) {
-    const past = cell.date < today;
-    return (
-      <Link
-        href={`/birdwing/stays/new?arrival=${cell.date}&departure=${addDays(cell.date, 1)}&room=${roomId}`}
-        className={cn(
-          base,
-          "hover:bg-foreground/[0.05] justify-center",
-          past ? "text-muted/40" : "text-muted/70",
-        )}
-        title={`Book ${roomCode} from ${formatDate(cell.date)}`}
-      >
-        {cell.departingStayId ? (
-          <span className="bg-warning size-1.5 rounded-full" aria-hidden />
-        ) : null}
-        <span className="sr-only">
-          {roomCode} free on {formatDate(cell.date)}
-          {cell.departingStayId ? ", a guest leaves that morning" : ""}
-        </span>
-      </Link>
-    );
-  }
-
-  const { night } = cell;
-  const tone = night.isBlock
-    ? "bg-foreground/[0.08] text-muted"
-    : night.status === "checked_in"
-      ? "bg-success/15 text-success"
-      : night.status === "enquiry"
-        ? "bg-muted/15 text-muted"
-        : night.status === "checked_out"
-          ? "bg-foreground/[0.06] text-foreground"
-          : "bg-info/15 text-info";
-  return (
-    <Link
-      href={`/birdwing/stays/${night.stayId}`}
-      className={cn(base, tone, "hover:brightness-95")}
-      title={`${roomCode} · ${night.label}${cell.turnover ? " · turnover day" : ""}`}
-    >
-      {cell.turnover && (
-        <span className="bg-warning absolute inset-y-1 left-0 w-1 rounded-full" aria-hidden />
-      )}
-      <span className={cn("truncate font-medium", cell.turnover && "pl-1.5")}>
-        {night.arrives ? night.label : ""}
-      </span>
-      <span className="sr-only">
-        {roomCode} on {formatDate(cell.date)}: {night.label}
-        {cell.turnover ? ", turnover day" : ""}
-      </span>
-    </Link>
-  );
-}
-
-function Legend() {
-  const items: { label: string; swatch: string }[] = [
-    { label: "Booked", swatch: "bg-info/15" },
-    { label: "In the house", swatch: "bg-success/15" },
-    { label: "Enquiry", swatch: "bg-muted/15" },
-    { label: "Left", swatch: "bg-foreground/[0.06]" },
-    { label: "Blocked", swatch: "bg-foreground/[0.08]" },
-  ];
-  return (
-    <div className="text-muted flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
-      {items.map((item) => (
-        <span key={item.label} className="inline-flex items-center gap-1.5">
-          <span className={cn("border-border size-3 rounded border", item.swatch)} aria-hidden />
-          {item.label}
-        </span>
-      ))}
-      <span className="inline-flex items-center gap-1.5">
-        <span className="bg-warning h-3 w-1 rounded-full" aria-hidden />
-        Turnover — someone leaves that morning, someone arrives
-      </span>
-      <span>Tap a free night to book it.</span>
     </div>
   );
 }

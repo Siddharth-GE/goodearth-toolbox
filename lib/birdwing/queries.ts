@@ -6,6 +6,7 @@ import { profileNames } from "@/lib/masters/names";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { readFailed } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
+import type { UnplacedStay } from "./calendar";
 import { printDraft, printFromSnapshot, type InvoicePrint } from "./invoice";
 import { isSettled, nightsBetween, stayMoney, type StayMoney } from "./money";
 import {
@@ -1018,6 +1019,74 @@ export async function pendingByStay(stayIds: string[]): Promise<Map<string, numb
     (data ?? []).map((stay) => stay.id),
   );
   return new Map((data ?? []).map((stay) => [stay.id, moneyOf(parts, stay).pending]));
+}
+
+/**
+ * The stays touching [from, to) that hold no room — the old sheet's,
+ * which counted rooms but never named them, and any booked here before a
+ * room was given. Cancelled stays and room blocks are left out. The
+ * calendar draws them below the rooms (lib/birdwing/calendar.ts).
+ */
+export async function listUnplacedStays(from: string, to: string): Promise<UnplacedStay[]> {
+  await requireTool(GRANT);
+  const supabase = await createClient();
+  const stays = await fetchAll((start, end) =>
+    supabase
+      .from("birdwing_stays")
+      .select("id, ref, guest_id, status, arrival, departure, legacy_room_count")
+      .eq("is_block", false)
+      .neq("status", "cancelled")
+      .lt("arrival", to)
+      .gte("departure", from)
+      .order("arrival")
+      .order("id")
+      .range(start, end),
+  );
+  if (stays.length === 0) return [];
+
+  // Which of them hold a room — a hundred ids to a request keeps the URL short.
+  const ids = stays.map((stay) => stay.id);
+  const placed = new Set<string>();
+  for (let index = 0; index < ids.length; index += 100) {
+    const chunk = ids.slice(index, index + 100);
+    const rows = await fetchAll((start, end) =>
+      supabase
+        .from("birdwing_stay_rooms")
+        .select("id, stay_id")
+        .in("stay_id", chunk)
+        .is("released_at", null)
+        .order("id")
+        .range(start, end),
+    );
+    for (const row of rows) placed.add(row.stay_id);
+  }
+  const unplaced = stays.filter((stay) => !placed.has(stay.id));
+
+  const guestIds = [
+    ...new Set(unplaced.map((stay) => stay.guest_id).filter((id) => id)),
+  ] as string[];
+  const guestName = new Map<string, string>();
+  for (let index = 0; index < guestIds.length; index += 100) {
+    const chunk = guestIds.slice(index, index + 100);
+    const rows = await fetchAll((start, end) =>
+      supabase
+        .from("birdwing_guests")
+        .select("id, name")
+        .in("id", chunk)
+        .order("id")
+        .range(start, end),
+    );
+    for (const row of rows) guestName.set(row.id, row.name);
+  }
+
+  return unplaced.map((stay) => ({
+    stayId: stay.id,
+    label: (stay.guest_id && guestName.get(stay.guest_id)) || stay.ref,
+    from: stay.arrival,
+    to: stay.departure,
+    roomCount: stay.legacy_room_count === null ? null : Number(stay.legacy_room_count),
+    status: oneOf(STAY_STATUSES, stay.status) ?? "confirmed",
+  }));
 }
 
 // ---------------------------------------------------------------------
