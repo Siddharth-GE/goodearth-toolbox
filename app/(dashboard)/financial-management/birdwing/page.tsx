@@ -21,7 +21,7 @@ import {
   occupancyModel,
   resultModel,
   shortMonth,
-  useSplitModel,
+  segmentSplitModel,
 } from "@/lib/financial-management/birdwing";
 import { getBirdwingPicture } from "@/lib/financial-management/birdwing-queries";
 import {
@@ -70,7 +70,7 @@ export default async function BirdwingFinancePage() {
   const first = shortMonth(months[0].month);
   const last = shortMonth(months[months.length - 1].month);
   const moneyModel = moneyByMonthModel(months);
-  const splitModel = useSplitModel(months);
+  const splitModel = segmentSplitModel(months);
   const expenseModel = expenseStackModel(
     picture.expenseLines.filter((line) => months.some((row) => row.month === line.month)),
     months,

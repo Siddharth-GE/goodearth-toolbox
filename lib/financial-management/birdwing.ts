@@ -136,7 +136,7 @@ export function moneyByMonthModel(months: BirdwingMonth[]): CartesianModel {
 }
 
 /** Who the rooms were for: paying guests against Goodearth's own use. */
-export function useSplitModel(months: BirdwingMonth[]): CartesianModel {
+export function segmentSplitModel(months: BirdwingMonth[]): CartesianModel {
   return {
     kind: "cartesian",
     type: "stacked",
