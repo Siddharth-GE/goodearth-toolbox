@@ -8,8 +8,8 @@ import { useState } from "react";
 /**
  * A batch's ID (0108), large enough to read off a screen at the store and
  * copy in one press — it goes onto boxes, messages and issue slips. The ID
- * itself selects whole on a tap, so a phone that refuses the clipboard can
- * still copy it by hand.
+ * itself selects whole (a click, or press and hold on a phone), so a phone
+ * that refuses the clipboard can still copy it by hand.
  */
 export function BatchId({ label, size = "lg" }: { label: string; size?: "lg" | "md" }) {
   const [copied, setCopied] = useState(false);
@@ -48,7 +48,7 @@ export function BatchId({ label, size = "lg" }: { label: string; size?: "lg" | "
       </span>
       {failed && (
         <span className="text-muted text-xs">
-          Copy didn&apos;t work here — tap the ID to select it.
+          Copy didn&apos;t work here — press and hold the ID to copy it.
         </span>
       )}
     </span>
