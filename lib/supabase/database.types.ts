@@ -875,6 +875,13 @@ export type Database = {
             foreignKeyName: "birdwing_cross_charges_stay_id_fkey"
             columns: ["stay_id"]
             isOneToOne: false
+            referencedRelation: "birdwing_stay_facts"
+            referencedColumns: ["stay_id"]
+          },
+          {
+            foreignKeyName: "birdwing_cross_charges_stay_id_fkey"
+            columns: ["stay_id"]
+            isOneToOne: false
             referencedRelation: "birdwing_stays"
             referencedColumns: ["id"]
           },
@@ -925,6 +932,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_expense_files_expense_id_fkey"
+            columns: ["expense_id"]
+            isOneToOne: false
+            referencedRelation: "birdwing_expense_facts"
+            referencedColumns: ["expense_id"]
           },
           {
             foreignKeyName: "birdwing_expense_files_expense_id_fkey"
@@ -1253,6 +1267,13 @@ export type Database = {
             foreignKeyName: "birdwing_invoices_stay_id_fkey"
             columns: ["stay_id"]
             isOneToOne: false
+            referencedRelation: "birdwing_stay_facts"
+            referencedColumns: ["stay_id"]
+          },
+          {
+            foreignKeyName: "birdwing_invoices_stay_id_fkey"
+            columns: ["stay_id"]
+            isOneToOne: false
             referencedRelation: "birdwing_stays"
             referencedColumns: ["id"]
           },
@@ -1458,6 +1479,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "birdwing_invoices"
             referencedColumns: ["id", "stay_id"]
+          },
+          {
+            foreignKeyName: "birdwing_receipts_stay_id_fkey"
+            columns: ["stay_id"]
+            isOneToOne: false
+            referencedRelation: "birdwing_stay_facts"
+            referencedColumns: ["stay_id"]
           },
           {
             foreignKeyName: "birdwing_receipts_stay_id_fkey"
@@ -1860,6 +1888,13 @@ export type Database = {
             foreignKeyName: "birdwing_stay_files_stay_id_fkey"
             columns: ["stay_id"]
             isOneToOne: false
+            referencedRelation: "birdwing_stay_facts"
+            referencedColumns: ["stay_id"]
+          },
+          {
+            foreignKeyName: "birdwing_stay_files_stay_id_fkey"
+            columns: ["stay_id"]
+            isOneToOne: false
             referencedRelation: "birdwing_stays"
             referencedColumns: ["id"]
           },
@@ -1919,6 +1954,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "birdwing_rooms"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_stay_rooms_stay_id_fkey"
+            columns: ["stay_id"]
+            isOneToOne: false
+            referencedRelation: "birdwing_stay_facts"
+            referencedColumns: ["stay_id"]
           },
           {
             foreignKeyName: "birdwing_stay_rooms_stay_id_fkey"
@@ -10003,11 +10045,86 @@ export type Database = {
           },
         ]
       }
+      birdwing_expense_facts: {
+        Row: {
+          amount: number | null
+          description: string | null
+          expense_id: string | null
+          has_bill: boolean | null
+          head: string | null
+          is_salary: boolean | null
+          month: string | null
+          paid_to: string | null
+          spent_on: string | null
+          status: string | null
+        }
+        Relationships: []
+      }
+      birdwing_month_facts: {
+        Row: {
+          billed: number | null
+          billed_guest: number | null
+          billed_internal: number | null
+          charged: number | null
+          collected: number | null
+          cross_charged: number | null
+          days_in_month: number | null
+          discount: number | null
+          expenses: number | null
+          guest_nights: number | null
+          guest_stays: number | null
+          internal_stays: number | null
+          month: string | null
+          ota_commission: number | null
+          pending: number | null
+          pending_guest: number | null
+          pending_internal: number | null
+          room_nights: number | null
+          room_nights_estimated: boolean | null
+          room_revenue: number | null
+          rooms: number | null
+          salary_expenses: number | null
+          stays: number | null
+          written_off: number | null
+        }
+        Relationships: []
+      }
       birdwing_occupancy_facts: {
         Row: {
           guests_in_house: number | null
           on_date: string | null
           rooms_occupied: number | null
+        }
+        Relationships: []
+      }
+      birdwing_stay_facts: {
+        Row: {
+          arrival: string | null
+          billed: number | null
+          channel: string | null
+          charged: number | null
+          collected: number | null
+          cost_centre: string | null
+          cross_charged: number | null
+          departure: string | null
+          discount: number | null
+          guest_name: string | null
+          guests: number | null
+          imported: boolean | null
+          invoice_number: string | null
+          month: string | null
+          nights: number | null
+          ota_commission: number | null
+          pending: number | null
+          ref: string | null
+          room_nights: number | null
+          room_nights_estimated: boolean | null
+          room_revenue: number | null
+          segment: string | null
+          status: string | null
+          stay_id: string | null
+          use: string | null
+          written_off: number | null
         }
         Relationships: []
       }
