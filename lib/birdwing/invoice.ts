@@ -1,0 +1,185 @@
+/**
+ * What an invoice prints, in one shape, whichever way it was made:
+ *
+ *   * ISSUED (or cancelled) — read from the snapshot the database took at
+ *     issue (0115's birdwing_issue_invoice): lines, letterhead, bank and
+ *     terms as they were, so a reprint next year reads exactly as the one
+ *     handed over.
+ *   * DRAFT — the stay's charges and the settings as they are now, marked
+ *     DRAFT and never numbered.
+ *
+ * Pure: the route reads, this shapes, lib/birdwing/invoice-document.tsx
+ * draws.
+ */
+import type { LetterheadCompany } from "@/lib/pdf/document";
+import { gstBreakdown, taxableOf, type GstRow } from "./money";
+
+export type InvoiceLine = {
+  head: string;
+  description: string | null;
+  sac: string | null;
+  qty: number;
+  rate: number;
+  rateIncludesGst: boolean;
+  gstPct: number;
+  taxable: number;
+  amount: number;
+};
+
+export type InvoicePrint = {
+  mode: "draft" | "issued" | "cancelled";
+  number: string | null;
+  issuedOn: string | null;
+  cancelReason: string | null;
+  billTo: { name: string; gstin: string | null; address: string | null };
+  company: LetterheadCompany | null;
+  placeOfSupply: string | null;
+  stay: {
+    ref: string;
+    arrival: string;
+    departure: string;
+    guests: number;
+    guestName: string | null;
+    guestPhone: string | null;
+  };
+  lines: InvoiceLine[];
+  taxSummary: GstRow[];
+  taxable: number;
+  cgst: number;
+  sgst: number;
+  total: number;
+  discount: number;
+  payable: number;
+  bankDetails: string | null;
+  upiId: string | null;
+  terms: string | null;
+};
+
+const num = (value: unknown): number => (typeof value === "number" ? value : Number(value ?? 0));
+const str = (value: unknown): string | null =>
+  typeof value === "string" && value.trim() !== "" ? value : null;
+
+function totalsOf(lines: InvoiceLine[], discount: number) {
+  const taxSummary = gstBreakdown(
+    lines.map((line) => ({ amount: line.amount, gstPct: line.gstPct })),
+  );
+  const sum = (pick: (row: GstRow) => number) =>
+    Math.round(taxSummary.reduce((total, row) => total + pick(row), 0) * 100) / 100;
+  const total = sum((row) => row.amount);
+  return {
+    taxSummary,
+    taxable: sum((row) => row.taxable),
+    cgst: sum((row) => row.cgst),
+    sgst: sum((row) => row.sgst),
+    total,
+    discount,
+    payable: Math.round((total - discount) * 100) / 100,
+  };
+}
+
+/** An issued (or cancelled) invoice, from its row and snapshot. */
+export function printFromSnapshot(row: {
+  number: string;
+  status: string;
+  issued_on: string;
+  cancel_reason: string | null;
+  bill_to_name: string;
+  bill_to_gstin: string | null;
+  bill_to_address: string | null;
+  discount: number | string;
+  snapshot: unknown;
+}): InvoicePrint {
+  const snapshot = (row.snapshot ?? {}) as Record<string, unknown>;
+  const stay = (snapshot.stay ?? {}) as Record<string, unknown>;
+  const company = snapshot.company as Record<string, unknown> | null | undefined;
+  const lines: InvoiceLine[] = (Array.isArray(snapshot.lines) ? snapshot.lines : []).map(
+    (raw: Record<string, unknown>) => {
+      const amount = num(raw.amount);
+      const gstPct = num(raw.gst_pct);
+      return {
+        head: str(raw.head) ?? "Charge",
+        description: str(raw.description),
+        sac: str(raw.sac),
+        qty: num(raw.qty) || 1,
+        rate: num(raw.rate),
+        rateIncludesGst: raw.rate_includes_gst === true,
+        gstPct,
+        taxable: raw.taxable === undefined ? taxableOf(amount, gstPct) : num(raw.taxable),
+        amount,
+      };
+    },
+  );
+
+  return {
+    mode: row.status === "cancelled" ? "cancelled" : "issued",
+    number: row.number,
+    issuedOn: row.issued_on,
+    cancelReason: row.cancel_reason,
+    billTo: { name: row.bill_to_name, gstin: row.bill_to_gstin, address: row.bill_to_address },
+    company: company
+      ? {
+          name: str(company.name) ?? "",
+          legal_name: str(company.legal_name),
+          address: str(company.address),
+          gstin: str(company.gstin),
+          phone: str(company.phone),
+          email: str(company.email),
+        }
+      : null,
+    placeOfSupply: str(snapshot.place_of_supply),
+    stay: {
+      ref: str(stay.ref) ?? "",
+      arrival: str(stay.arrival) ?? "",
+      departure: str(stay.departure) ?? "",
+      guests: num(stay.guests),
+      guestName: str(stay.guest_name),
+      guestPhone: str(stay.guest_phone),
+    },
+    lines,
+    ...totalsOf(lines, num(row.discount)),
+    bankDetails: str(snapshot.bank_details),
+    upiId: str(snapshot.upi_id),
+    terms: str(snapshot.terms),
+  };
+}
+
+/** A draft: the stay's charges and today's settings, unnumbered. */
+export function printDraft(input: {
+  company: LetterheadCompany | null;
+  placeOfSupply: string | null;
+  bankDetails: string | null;
+  upiId: string | null;
+  terms: string | null;
+  stay: InvoicePrint["stay"];
+  discount: number;
+  charges: {
+    head: string;
+    description: string | null;
+    sac: string | null;
+    qty: number;
+    rate: number;
+    rateIncludesGst: boolean;
+    gstPct: number;
+    amount: number;
+  }[];
+}): InvoicePrint {
+  const lines = input.charges.map((charge) => ({
+    ...charge,
+    taxable: taxableOf(charge.amount, charge.gstPct),
+  }));
+  return {
+    mode: "draft",
+    number: null,
+    issuedOn: null,
+    cancelReason: null,
+    billTo: { name: input.stay.guestName ?? "", gstin: null, address: null },
+    company: input.company,
+    placeOfSupply: input.placeOfSupply,
+    stay: input.stay,
+    lines,
+    ...totalsOf(lines, input.discount),
+    bankDetails: input.bankDetails,
+    upiId: input.upiId,
+    terms: input.terms,
+  };
+}

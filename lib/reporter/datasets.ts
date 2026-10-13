@@ -29,6 +29,8 @@ import { selectionLines } from "./datasets/selection-lines";
 import { relayChains } from "./datasets/relay-chains";
 import { units } from "./datasets/units";
 import { planTargets } from "./datasets/plan-targets";
+import { birdwingStays } from "./datasets/birdwing-stays";
+import { birdwingExpenses } from "./datasets/birdwing-expenses";
 
 export const DATASETS: Record<string, DatasetDef> = {
   indent_lines: indentLines,
@@ -43,6 +45,8 @@ export const DATASETS: Record<string, DatasetDef> = {
   relay_chains: relayChains,
   units,
   plan_targets: planTargets,
+  birdwing_stays: birdwingStays,
+  birdwing_expenses: birdwingExpenses,
 };
 
 /** Where a blank or unrecognisable spec lands. */

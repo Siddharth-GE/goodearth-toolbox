@@ -1,0 +1,31 @@
+# Birdwing Stays — the rules
+
+Birdwing Farmstay's bookings, rooms, invoices and money in. Grant `/birdwing`. Migrations `0115` (and `0117`, the views Financial Management and Reporter read), staging only. Birdwing is a four-room guest house at Saarang run by Maloor Eco Farms Pvt Ltd; this tool and Birdwing Books (`app/(dashboard)/birdwing-books/PLAN.md`) form the **Hospitality** team. The caretaker and the hospitality lead use it daily, often on a phone.
+
+## The founder decisions (2026-10-13, the build plan, plan.md)
+
+1. **Every stay says who it is for** (`use`): a paying guest, or one of Goodearth's own — client, prospect, team, architect, director, vendor. **A Goodearth stay is closed by a cross-charge to a cost centre**, never left as money owed: in the old sheets 59% of the billed value was Goodearth's own use, and ₹6.45L of it sat as "pending" that nobody would pay. A guest's balance that will never come is written off with a reason.
+2. **Rooms are Birdwing's own master** (R1–R4), never `units` — inserting a unit seeds a CRM record and a payment schedule.
+3. **A room cannot be double-booked**: an exclusion constraint on the room's nights (`birdwing_stay_rooms_no_overlap`, btree_gist). Nights are `[first night, leaving day)`, so a departure morning is the next arrival's afternoon. A cancelled stay **releases** its rooms (`released_at`), never deletes them.
+4. **Invoice numbers are minted by the database at issue** — `MEF/GH/133` onward; `132` is the Kalidas draft from the old sheet. `birdwing_issue_invoice()` locks the stay, snapshots lines, letterhead, bank and terms, and mints in one transaction; a second press returns the same invoice. **An issued invoice freezes the charges**; a correction is cancel (with a reason, kept on the record) and issue again. Credit notes and IGST are out of scope.
+5. **The letterhead is a Masters company**, picked once in Settings; bank, UPI and the cancellation policy are typed there once. Nothing is seeded or invented (PRODUCT.md).
+6. **Receipts are their own rows** — amount, date, mode, reference — never an undated lump. OTA commission and a guest discount are two fields on the stay.
+7. **Check-in details are staff-entered.** The guest's own form link (the build plan's Phase 5) waits: it would be the first public prefix since `/deck/`, and `SECURITY.md` must carry the argument first.
+
+## How it is built
+
+- **Money is derived, never stored**: billed = Σ charges − OTA commission − discount; pending = billed − collected − cross-charged − written off (`lib/birdwing/money.ts`, tested). A charge's GST-inclusive `amount` is a generated column; `chargeAmount` mirrors it — change one, change both. The rate card's rates are **before GST** (₹3,800 + 5% = ₹3,990, the sheet's figure); a line may be entered GST-inclusive (an OTA's payout).
+- **The status machine lives in `birdwing_stays_guard`**: enquiry → confirmed → checked in → checked out, with one-step undo of check-in and check-out; enquiry or confirmed → cancelled (final); a room block (`is_block`: no guest, no use, no charges — a composite key makes the last one impossible) → removed. `lib/birdwing/workflow.ts` mirrors it for buttons only, tested.
+- **Every multi-step operation runs as the caller** (security invoker, the `issue_transmittal` shape), so RLS stays the boundary. Masters (rooms, rate card, cost centres, settings) are written by admins only; everything else by `/birdwing`. Stays, invoices and guests have no delete policy; receipts, cross-charges and documents are removed and entered again, never edited in place.
+- **Documents** (a guest's ID, a booking) live in the private `birdwing-stays` bucket, served only through `/birdwing/files/<id>` after an RLS lookup, `nosniff`. A guest's ID is never a column — its kind and last four characters only. Photos are shrunk in the browser first (`lib/uploads/`).
+- **The calendar** (`lib/birdwing/calendar.ts`, tested) shows each room's nights, turnover days (a departure and an arrival the same day) and blocks; a free night links to a new stay with room and date filled in. A new stay is two steps — dates first (a plain GET that shows which rooms are free and who holds the rest), then guest and rooms.
+- **The invoice PDF** (`lib/birdwing/invoice-document.tsx`) prints from the snapshot once issued; before that, a DRAFT from the charges as they stand. Tax summary per rate, CGST + SGST to the paisa, the amount in words (`amountInWords`, `lib/format.ts`).
+- **History** came from the laptop app's parsed data by `scripts/import-birdwing.ts` — one transaction, re-runnable by source key. Imported stays carry `review_flags` until someone marks them reviewed on **Review**, where Goodearth's unpaid stays are also given cost centres and closed in bulk. Imported months' occupancy is an estimate (the sheet counted rooms but never named them).
+
+## Reads outside itself
+
+The shared surfaces only: `profiles` (names), `companies` (the letterhead). Books reads Stays only through `birdwing_occupancy_facts` (counts per day); Financial Management and Reporter only through `0117`'s owner views.
+
+## Deliberately not built
+
+The guest's own check-in form (above), OTA channel sync, online payments, arrival reminders (no notification layer exists), credit notes, IGST, more than one property. Housekeeping and maintenance checklists run as Relay trails, not here.

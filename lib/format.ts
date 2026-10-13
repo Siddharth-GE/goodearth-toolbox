@@ -58,8 +58,15 @@ export function formatMoney(
  * Rounding happens here and nowhere earlier, so a column of rounded lines
  * still adds up to a total summed at full precision.
  */
-export function formatAmount(value: number | null | undefined): string {
+export function formatAmount(
+  value: number | null | undefined,
+  options?: { paise?: boolean },
+): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "—";
+  // A tax invoice states paise: its GST halves are worked to the paisa.
+  if (options?.paise) {
+    return value.toLocaleString(LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
   return Math.round(value).toLocaleString(LOCALE, { maximumFractionDigits: 0 });
 }
 
@@ -187,4 +194,74 @@ export function todayInIndia(): string {
 export function formatCount(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "—";
   return value.toLocaleString(LOCALE);
+}
+
+// ---------------------------------------------------------------------
+// Amounts in words
+// ---------------------------------------------------------------------
+
+const ONES = [
+  "",
+  "One",
+  "Two",
+  "Three",
+  "Four",
+  "Five",
+  "Six",
+  "Seven",
+  "Eight",
+  "Nine",
+  "Ten",
+  "Eleven",
+  "Twelve",
+  "Thirteen",
+  "Fourteen",
+  "Fifteen",
+  "Sixteen",
+  "Seventeen",
+  "Eighteen",
+  "Nineteen",
+];
+const TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+
+/** 0–999 in words; "" for zero, so the caller decides what nothing reads as. */
+function hundredsInWords(value: number): string {
+  const hundreds = Math.floor(value / 100);
+  const rest = value % 100;
+  const parts: string[] = [];
+  if (hundreds) parts.push(`${ONES[hundreds]} Hundred`);
+  if (rest >= 20)
+    parts.push([TENS[Math.floor(rest / 10)], ONES[rest % 10]].filter(Boolean).join(" "));
+  else if (rest) parts.push(ONES[rest]);
+  return parts.join(" ");
+}
+
+/**
+ * Rupees in words the way an Indian invoice prints them, in crore, lakh
+ * and thousand: `Rupees Twelve Thousand Six Hundred Seventy Two and Fifty
+ * Paise Only`. Paise are rounded to the nearest; missing is a dash.
+ */
+export function amountInWords(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "—";
+  const totalPaise = Math.round(Math.abs(value) * 100);
+  let rupees = Math.floor(totalPaise / 100);
+  const paise = totalPaise % 100;
+
+  const parts: string[] = [];
+  const crore = Math.floor(rupees / 10_000_000);
+  rupees %= 10_000_000;
+  const lakh = Math.floor(rupees / 100_000);
+  rupees %= 100_000;
+  const thousand = Math.floor(rupees / 1000);
+  rupees %= 1000;
+  // Above 999 crore the crore count is itself read in this system.
+  if (crore) parts.push(`${amountInWords(crore).replace(/^Rupees |\s*Only$/g, "")} Crore`);
+  if (lakh) parts.push(`${hundredsInWords(lakh)} Lakh`);
+  if (thousand) parts.push(`${hundredsInWords(thousand)} Thousand`);
+  if (rupees) parts.push(hundredsInWords(rupees));
+
+  const words = parts.join(" ") || "Zero";
+  const sign = value < 0 ? "Minus " : "";
+  const paiseWords = paise ? ` and ${hundredsInWords(paise)} Paise` : "";
+  return `${sign}Rupees ${words}${paiseWords} Only`;
 }

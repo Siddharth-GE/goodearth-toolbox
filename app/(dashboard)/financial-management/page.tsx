@@ -15,7 +15,7 @@ export default async function FinancialManagementPage() {
       icon="Landmark"
       intro={[
         "The company's money picture in one place, drawn from what the other tools record — client receipts from Client Relations, paid bills from Bills — plus the funding ledger kept here: every loan and investor, its drawdowns, repayments and interest.",
-        "Cash adds up money in against money out, month by month. Forward looks ahead at expected collections against the plan. Funding is the ledger of what has been raised.",
+        "Cash adds up money in against money out, month by month. Forward looks ahead at expected collections against the plan. Funding is the ledger of what has been raised. Birdwing is the guest house's own picture — billed, collected, spent and still pending.",
       ]}
       stats={[
         { label: "Funding facilities", value: counts.facilities, hint: "loans and investors" },
@@ -34,6 +34,7 @@ export default async function FinancialManagementPage() {
         { label: "Cash", href: "/financial-management/cash", primary: true },
         { label: "Forward", href: "/financial-management/forward" },
         { label: "Funding", href: "/financial-management/funding" },
+        { label: "Birdwing", href: "/financial-management/birdwing" },
       ]}
     />
   );

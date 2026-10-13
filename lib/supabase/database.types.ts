@@ -680,6 +680,1457 @@ export type Database = {
           },
         ]
       }
+      birdwing_attendance: {
+        Row: {
+          break_minutes: number
+          created_at: string
+          created_by: string | null
+          id: string
+          in_at: string | null
+          note: string | null
+          on_date: string
+          out_at: string | null
+          source_key: string | null
+          staff_id: string
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          break_minutes?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          in_at?: string | null
+          note?: string | null
+          on_date: string
+          out_at?: string | null
+          source_key?: string | null
+          staff_id: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          break_minutes?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          in_at?: string | null
+          note?: string | null
+          on_date?: string
+          out_at?: string | null
+          source_key?: string | null
+          staff_id?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "birdwing_attendance_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_attendance_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "birdwing_staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_attendance_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      birdwing_cost_centres: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "birdwing_cost_centres_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_cost_centres_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      birdwing_counters: {
+        Row: {
+          last_no: number
+          scope: string
+        }
+        Insert: {
+          last_no?: number
+          scope: string
+        }
+        Update: {
+          last_no?: number
+          scope?: string
+        }
+        Relationships: []
+      }
+      birdwing_cross_charges: {
+        Row: {
+          amount: number
+          charged_month: string
+          cost_centre_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          kind: string
+          note: string | null
+          source_key: string | null
+          stay_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          amount: number
+          charged_month: string
+          cost_centre_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind?: string
+          note?: string | null
+          source_key?: string | null
+          stay_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          amount?: number
+          charged_month?: string
+          cost_centre_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind?: string
+          note?: string | null
+          source_key?: string | null
+          stay_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "birdwing_cross_charges_cost_centre_id_fkey"
+            columns: ["cost_centre_id"]
+            isOneToOne: false
+            referencedRelation: "birdwing_cost_centres"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_cross_charges_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_cross_charges_stay_id_fkey"
+            columns: ["stay_id"]
+            isOneToOne: false
+            referencedRelation: "birdwing_stay_facts"
+            referencedColumns: ["stay_id"]
+          },
+          {
+            foreignKeyName: "birdwing_cross_charges_stay_id_fkey"
+            columns: ["stay_id"]
+            isOneToOne: false
+            referencedRelation: "birdwing_stays"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_cross_charges_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      birdwing_expense_files: {
+        Row: {
+          content_type: string
+          created_at: string
+          created_by: string | null
+          expense_id: string
+          file_name: string
+          id: string
+          size_bytes: number
+          storage_path: string
+        }
+        Insert: {
+          content_type: string
+          created_at?: string
+          created_by?: string | null
+          expense_id: string
+          file_name: string
+          id?: string
+          size_bytes: number
+          storage_path: string
+        }
+        Update: {
+          content_type?: string
+          created_at?: string
+          created_by?: string | null
+          expense_id?: string
+          file_name?: string
+          id?: string
+          size_bytes?: number
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "birdwing_expense_files_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_expense_files_expense_id_fkey"
+            columns: ["expense_id"]
+            isOneToOne: false
+            referencedRelation: "birdwing_expense_facts"
+            referencedColumns: ["expense_id"]
+          },
+          {
+            foreignKeyName: "birdwing_expense_files_expense_id_fkey"
+            columns: ["expense_id"]
+            isOneToOne: false
+            referencedRelation: "birdwing_expenses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      birdwing_expense_heads: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          is_salary: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          is_salary?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          is_salary?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "birdwing_expense_heads_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_expense_heads_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      birdwing_expenses: {
+        Row: {
+          accounting_month: string
+          amount: number
+          bill_ref: string | null
+          created_at: string
+          created_by: string | null
+          description: string
+          head_id: string
+          id: string
+          payee: string | null
+          payment_details: string | null
+          review_note: string | null
+          salary_run_id: string | null
+          source_key: string | null
+          spent_on: string | null
+          status: string
+          updated_at: string
+          updated_by: string | null
+          vendor_id: string | null
+        }
+        Insert: {
+          accounting_month: string
+          amount: number
+          bill_ref?: string | null
+          created_at?: string
+          created_by?: string | null
+          description: string
+          head_id: string
+          id?: string
+          payee?: string | null
+          payment_details?: string | null
+          review_note?: string | null
+          salary_run_id?: string | null
+          source_key?: string | null
+          spent_on?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          vendor_id?: string | null
+        }
+        Update: {
+          accounting_month?: string
+          amount?: number
+          bill_ref?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          head_id?: string
+          id?: string
+          payee?: string | null
+          payment_details?: string | null
+          review_note?: string | null
+          salary_run_id?: string | null
+          source_key?: string | null
+          spent_on?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          vendor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "birdwing_expenses_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_expenses_head_id_fkey"
+            columns: ["head_id"]
+            isOneToOne: false
+            referencedRelation: "birdwing_expense_heads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_expenses_salary_run_id_fkey"
+            columns: ["salary_run_id"]
+            isOneToOne: true
+            referencedRelation: "birdwing_salary_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_expenses_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_expenses_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      birdwing_guests: {
+        Row: {
+          city: string | null
+          created_at: string
+          created_by: string | null
+          email: string | null
+          id: string
+          id_last4: string | null
+          id_type: string | null
+          name: string
+          notes: string | null
+          phone: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          city?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          id_last4?: string | null
+          id_type?: string | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          city?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          id_last4?: string | null
+          id_type?: string | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "birdwing_guests_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_guests_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      birdwing_invoices: {
+        Row: {
+          bill_to_address: string | null
+          bill_to_gstin: string | null
+          bill_to_name: string
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          cgst: number
+          created_at: string
+          created_by: string | null
+          discount: number
+          historic: boolean
+          id: string
+          issued_by: string | null
+          issued_on: string
+          number: string
+          payable: number
+          sgst: number
+          snapshot: Json
+          source_key: string | null
+          status: string
+          stay_id: string
+          taxable: number
+          total: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          bill_to_address?: string | null
+          bill_to_gstin?: string | null
+          bill_to_name: string
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          cgst: number
+          created_at?: string
+          created_by?: string | null
+          discount?: number
+          historic?: boolean
+          id?: string
+          issued_by?: string | null
+          issued_on?: string
+          number: string
+          payable: number
+          sgst: number
+          snapshot: Json
+          source_key?: string | null
+          status?: string
+          stay_id: string
+          taxable: number
+          total: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          bill_to_address?: string | null
+          bill_to_gstin?: string | null
+          bill_to_name?: string
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          cgst?: number
+          created_at?: string
+          created_by?: string | null
+          discount?: number
+          historic?: boolean
+          id?: string
+          issued_by?: string | null
+          issued_on?: string
+          number?: string
+          payable?: number
+          sgst?: number
+          snapshot?: Json
+          source_key?: string | null
+          status?: string
+          stay_id?: string
+          taxable?: number
+          total?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "birdwing_invoices_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_invoices_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_invoices_issued_by_fkey"
+            columns: ["issued_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_invoices_stay_id_fkey"
+            columns: ["stay_id"]
+            isOneToOne: false
+            referencedRelation: "birdwing_stay_facts"
+            referencedColumns: ["stay_id"]
+          },
+          {
+            foreignKeyName: "birdwing_invoices_stay_id_fkey"
+            columns: ["stay_id"]
+            isOneToOne: false
+            referencedRelation: "birdwing_stays"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_invoices_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      birdwing_pay_rules: {
+        Row: {
+          base_salary: number
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          guest_day_rate: number
+          id: string
+          notes: string | null
+          ot_rate_per_hr: number
+          room_day_rate: number
+          shift_end: string | null
+          shift_start: string | null
+          staff_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          base_salary: number
+          created_at?: string
+          created_by?: string | null
+          effective_from: string
+          guest_day_rate?: number
+          id?: string
+          notes?: string | null
+          ot_rate_per_hr?: number
+          room_day_rate?: number
+          shift_end?: string | null
+          shift_start?: string | null
+          staff_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          base_salary?: number
+          created_at?: string
+          created_by?: string | null
+          effective_from?: string
+          guest_day_rate?: number
+          id?: string
+          notes?: string | null
+          ot_rate_per_hr?: number
+          room_day_rate?: number
+          shift_end?: string | null
+          shift_start?: string | null
+          staff_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "birdwing_pay_rules_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_pay_rules_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "birdwing_staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_pay_rules_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      birdwing_rate_card: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          default_rate: number
+          gst_pct: number
+          head: string
+          id: string
+          is_active: boolean
+          kind: string
+          sac: string | null
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          default_rate?: number
+          gst_pct?: number
+          head: string
+          id?: string
+          is_active?: boolean
+          kind: string
+          sac?: string | null
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          default_rate?: number
+          gst_pct?: number
+          head?: string
+          id?: string
+          is_active?: boolean
+          kind?: string
+          sac?: string | null
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "birdwing_rate_card_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_rate_card_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      birdwing_receipts: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          id: string
+          invoice_id: string | null
+          mode: string
+          note: string | null
+          received_on: string
+          reference: string | null
+          source_key: string | null
+          stay_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          invoice_id?: string | null
+          mode?: string
+          note?: string | null
+          received_on?: string
+          reference?: string | null
+          source_key?: string | null
+          stay_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          invoice_id?: string | null
+          mode?: string
+          note?: string | null
+          received_on?: string
+          reference?: string | null
+          source_key?: string | null
+          stay_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "birdwing_receipts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_receipts_invoice_id_stay_id_fkey"
+            columns: ["invoice_id", "stay_id"]
+            isOneToOne: false
+            referencedRelation: "birdwing_invoices"
+            referencedColumns: ["id", "stay_id"]
+          },
+          {
+            foreignKeyName: "birdwing_receipts_stay_id_fkey"
+            columns: ["stay_id"]
+            isOneToOne: false
+            referencedRelation: "birdwing_stay_facts"
+            referencedColumns: ["stay_id"]
+          },
+          {
+            foreignKeyName: "birdwing_receipts_stay_id_fkey"
+            columns: ["stay_id"]
+            isOneToOne: false
+            referencedRelation: "birdwing_stays"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_receipts_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      birdwing_rooms: {
+        Row: {
+          code: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          max_guests: number | null
+          name: string
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          max_guests?: number | null
+          name: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          max_guests?: number | null
+          name?: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "birdwing_rooms_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_rooms_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      birdwing_salary_runs: {
+        Row: {
+          base: number
+          confirmed_at: string
+          confirmed_by: string | null
+          created_at: string
+          deductions: number
+          guest_amount: number
+          guest_days: number
+          id: string
+          incentives: number
+          month: string
+          note: string | null
+          ot_amount: number
+          ot_hours: number
+          room_amount: number
+          room_days: number
+          staff_id: string
+          total: number
+        }
+        Insert: {
+          base: number
+          confirmed_at?: string
+          confirmed_by?: string | null
+          created_at?: string
+          deductions?: number
+          guest_amount?: number
+          guest_days?: number
+          id?: string
+          incentives?: number
+          month: string
+          note?: string | null
+          ot_amount?: number
+          ot_hours?: number
+          room_amount?: number
+          room_days?: number
+          staff_id: string
+          total: number
+        }
+        Update: {
+          base?: number
+          confirmed_at?: string
+          confirmed_by?: string | null
+          created_at?: string
+          deductions?: number
+          guest_amount?: number
+          guest_days?: number
+          id?: string
+          incentives?: number
+          month?: string
+          note?: string | null
+          ot_amount?: number
+          ot_hours?: number
+          room_amount?: number
+          room_days?: number
+          staff_id?: string
+          total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "birdwing_salary_runs_confirmed_by_fkey"
+            columns: ["confirmed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_salary_runs_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "birdwing_staff"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      birdwing_settings: {
+        Row: {
+          bank_details: string | null
+          checkin_time: string | null
+          checkout_time: string | null
+          company_id: string | null
+          id: boolean
+          invoice_terms: string | null
+          place_of_supply: string | null
+          updated_at: string
+          updated_by: string | null
+          upi_id: string | null
+        }
+        Insert: {
+          bank_details?: string | null
+          checkin_time?: string | null
+          checkout_time?: string | null
+          company_id?: string | null
+          id?: boolean
+          invoice_terms?: string | null
+          place_of_supply?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          upi_id?: string | null
+        }
+        Update: {
+          bank_details?: string | null
+          checkin_time?: string | null
+          checkout_time?: string | null
+          company_id?: string | null
+          id?: boolean
+          invoice_terms?: string | null
+          place_of_supply?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          upi_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "birdwing_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      birdwing_staff: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          joined_on: string | null
+          name: string
+          profile_id: string | null
+          role: string | null
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          joined_on?: string | null
+          name: string
+          profile_id?: string | null
+          role?: string | null
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          joined_on?: string | null
+          name?: string
+          profile_id?: string | null
+          role?: string | null
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "birdwing_staff_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_staff_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_staff_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      birdwing_stay_charges: {
+        Row: {
+          amount: number | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          gst_pct: number
+          head: string
+          id: string
+          is_block: boolean
+          kind: string
+          qty: number
+          rate: number
+          rate_card_id: string | null
+          rate_includes_gst: boolean
+          sac: string | null
+          sort_order: number
+          stay_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          amount?: number | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          gst_pct?: number
+          head: string
+          id?: string
+          is_block?: boolean
+          kind?: string
+          qty: number
+          rate: number
+          rate_card_id?: string | null
+          rate_includes_gst?: boolean
+          sac?: string | null
+          sort_order?: number
+          stay_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          amount?: number | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          gst_pct?: number
+          head?: string
+          id?: string
+          is_block?: boolean
+          kind?: string
+          qty?: number
+          rate?: number
+          rate_card_id?: string | null
+          rate_includes_gst?: boolean
+          sac?: string | null
+          sort_order?: number
+          stay_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "birdwing_stay_charges_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_stay_charges_rate_card_id_fkey"
+            columns: ["rate_card_id"]
+            isOneToOne: false
+            referencedRelation: "birdwing_rate_card"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_stay_charges_stay_id_is_block_fkey"
+            columns: ["stay_id", "is_block"]
+            isOneToOne: false
+            referencedRelation: "birdwing_stays"
+            referencedColumns: ["id", "is_block"]
+          },
+          {
+            foreignKeyName: "birdwing_stay_charges_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      birdwing_stay_files: {
+        Row: {
+          content_type: string
+          created_at: string
+          created_by: string | null
+          file_name: string
+          id: string
+          kind: string
+          size_bytes: number
+          stay_id: string
+          storage_path: string
+        }
+        Insert: {
+          content_type: string
+          created_at?: string
+          created_by?: string | null
+          file_name: string
+          id?: string
+          kind?: string
+          size_bytes: number
+          stay_id: string
+          storage_path: string
+        }
+        Update: {
+          content_type?: string
+          created_at?: string
+          created_by?: string | null
+          file_name?: string
+          id?: string
+          kind?: string
+          size_bytes?: number
+          stay_id?: string
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "birdwing_stay_files_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_stay_files_stay_id_fkey"
+            columns: ["stay_id"]
+            isOneToOne: false
+            referencedRelation: "birdwing_stay_facts"
+            referencedColumns: ["stay_id"]
+          },
+          {
+            foreignKeyName: "birdwing_stay_files_stay_id_fkey"
+            columns: ["stay_id"]
+            isOneToOne: false
+            referencedRelation: "birdwing_stays"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      birdwing_stay_rooms: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          extra_beds: number
+          from_date: string
+          id: string
+          released_at: string | null
+          room_id: string
+          stay_id: string
+          to_date: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          extra_beds?: number
+          from_date: string
+          id?: string
+          released_at?: string | null
+          room_id: string
+          stay_id: string
+          to_date: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          extra_beds?: number
+          from_date?: string
+          id?: string
+          released_at?: string | null
+          room_id?: string
+          stay_id?: string
+          to_date?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "birdwing_stay_rooms_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_stay_rooms_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "birdwing_rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_stay_rooms_stay_id_fkey"
+            columns: ["stay_id"]
+            isOneToOne: false
+            referencedRelation: "birdwing_stay_facts"
+            referencedColumns: ["stay_id"]
+          },
+          {
+            foreignKeyName: "birdwing_stay_rooms_stay_id_fkey"
+            columns: ["stay_id"]
+            isOneToOne: false
+            referencedRelation: "birdwing_stays"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_stay_rooms_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      birdwing_stays: {
+        Row: {
+          accounting_month: string
+          adults: number
+          allergies: string | null
+          arrival: string
+          cancel_reason: string | null
+          cancelled_at: string | null
+          channel: string
+          checkin_at: string | null
+          checkout_at: string | null
+          children: number
+          cost_centre_id: string | null
+          created_at: string
+          created_by: string | null
+          departure: string
+          discount: number
+          food_preferences: string | null
+          guest_id: string | null
+          guest_names: string | null
+          id: string
+          id_verified: boolean
+          is_block: boolean
+          legacy_room_count: number | null
+          notes: string | null
+          ota_commission: number
+          pets: number
+          ref: string
+          referred_by: string | null
+          requirements: string | null
+          review_flags: string[]
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source_key: string | null
+          status: string
+          updated_at: string
+          updated_by: string | null
+          use: string | null
+        }
+        Insert: {
+          accounting_month: string
+          adults?: number
+          allergies?: string | null
+          arrival: string
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          channel?: string
+          checkin_at?: string | null
+          checkout_at?: string | null
+          children?: number
+          cost_centre_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          departure: string
+          discount?: number
+          food_preferences?: string | null
+          guest_id?: string | null
+          guest_names?: string | null
+          id?: string
+          id_verified?: boolean
+          is_block?: boolean
+          legacy_room_count?: number | null
+          notes?: string | null
+          ota_commission?: number
+          pets?: number
+          ref: string
+          referred_by?: string | null
+          requirements?: string | null
+          review_flags?: string[]
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_key?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          use?: string | null
+        }
+        Update: {
+          accounting_month?: string
+          adults?: number
+          allergies?: string | null
+          arrival?: string
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          channel?: string
+          checkin_at?: string | null
+          checkout_at?: string | null
+          children?: number
+          cost_centre_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          departure?: string
+          discount?: number
+          food_preferences?: string | null
+          guest_id?: string | null
+          guest_names?: string | null
+          id?: string
+          id_verified?: boolean
+          is_block?: boolean
+          legacy_room_count?: number | null
+          notes?: string | null
+          ota_commission?: number
+          pets?: number
+          ref?: string
+          referred_by?: string | null
+          requirements?: string | null
+          review_flags?: string[]
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_key?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          use?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "birdwing_stays_cost_centre_id_fkey"
+            columns: ["cost_centre_id"]
+            isOneToOne: false
+            referencedRelation: "birdwing_cost_centres"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_stays_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_stays_guest_id_fkey"
+            columns: ["guest_id"]
+            isOneToOne: false
+            referencedRelation: "birdwing_guests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_stays_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birdwing_stays_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       brands: {
         Row: {
           created_at: string
@@ -8594,6 +10045,89 @@ export type Database = {
           },
         ]
       }
+      birdwing_expense_facts: {
+        Row: {
+          amount: number | null
+          description: string | null
+          expense_id: string | null
+          has_bill: boolean | null
+          head: string | null
+          is_salary: boolean | null
+          month: string | null
+          paid_to: string | null
+          spent_on: string | null
+          status: string | null
+        }
+        Relationships: []
+      }
+      birdwing_month_facts: {
+        Row: {
+          billed: number | null
+          billed_guest: number | null
+          billed_internal: number | null
+          charged: number | null
+          collected: number | null
+          cross_charged: number | null
+          days_in_month: number | null
+          discount: number | null
+          expenses: number | null
+          guest_nights: number | null
+          guest_stays: number | null
+          internal_stays: number | null
+          month: string | null
+          ota_commission: number | null
+          pending: number | null
+          pending_guest: number | null
+          pending_internal: number | null
+          room_nights: number | null
+          room_nights_estimated: boolean | null
+          room_revenue: number | null
+          rooms: number | null
+          salary_expenses: number | null
+          stays: number | null
+          written_off: number | null
+        }
+        Relationships: []
+      }
+      birdwing_occupancy_facts: {
+        Row: {
+          guests_in_house: number | null
+          on_date: string | null
+          rooms_occupied: number | null
+        }
+        Relationships: []
+      }
+      birdwing_stay_facts: {
+        Row: {
+          arrival: string | null
+          billed: number | null
+          channel: string | null
+          charged: number | null
+          collected: number | null
+          cost_centre: string | null
+          cross_charged: number | null
+          departure: string | null
+          discount: number | null
+          guest_name: string | null
+          guests: number | null
+          imported: boolean | null
+          invoice_number: string | null
+          month: string | null
+          nights: number | null
+          ota_commission: number | null
+          pending: number | null
+          ref: string | null
+          room_nights: number | null
+          room_nights_estimated: boolean | null
+          room_revenue: number | null
+          segment: string | null
+          status: string | null
+          stay_id: string | null
+          use: string | null
+          written_off: number | null
+        }
+        Relationships: []
+      }
       budget_report_lines: {
         Row: {
           approved_at: string | null
@@ -9256,6 +10790,33 @@ export type Database = {
         Returns: undefined
       }
       bill_approval_cap: { Args: { uid: string }; Returns: number }
+      birdwing_confirm_salary: {
+        Args: {
+          p_base: number
+          p_deductions: number
+          p_guest_amount: number
+          p_guest_days: number
+          p_incentives: number
+          p_month: string
+          p_note?: string
+          p_ot_amount: number
+          p_ot_hours: number
+          p_room_amount: number
+          p_room_days: number
+          p_staff_id: string
+        }
+        Returns: string
+      }
+      birdwing_issue_invoice: {
+        Args: {
+          p_bill_to_address?: string
+          p_bill_to_gstin?: string
+          p_bill_to_name: string
+          p_stay_id: string
+        }
+        Returns: string
+      }
+      birdwing_mint: { Args: { p_scope: string }; Returns: number }
       can_approve_bills: { Args: { uid: string }; Returns: boolean }
       can_approve_indents: { Args: { uid: string }; Returns: boolean }
       create_bill: {

@@ -1,4 +1,6 @@
 import {
+  Bed,
+  BookOpen,
   Boxes,
   Calculator,
   ClipboardList,
@@ -28,6 +30,8 @@ import {
 // stores a lookup key instead, resolved against this map wherever it's
 // actually rendered.
 export const TOOL_ICONS = {
+  Bed,
+  BookOpen,
   Boxes,
   Calculator,
   ClipboardList,
@@ -222,9 +226,10 @@ export const TOOLS: Tool[] = [
     icon: "FileChartColumn",
     built: true,
     // The founder's decision (Reporter PLAN.md, decisions 3 and 4;
-    // policies widened by 0055) and the copy that decision requires.
+    // policies widened by 0055; Birdwing's views by 0117) and the copy
+    // that decision requires.
     grantWarning:
-      "Shows all money: every vendor rate, every bill amount, and the margin on every quoted line.",
+      "Shows all money: every vendor rate, every bill amount, the margin on every quoted line, and Birdwing's stays, guests' bills and expenses.",
   },
   {
     name: "Client Relations",
@@ -240,9 +245,10 @@ export const TOOLS: Tool[] = [
     icon: "Landmark",
     built: true,
     // The founder's decision (Financial Management PLAN.md; views
-    // restated by 0058) and the copy that decision requires.
+    // restated by 0058; Birdwing's added by 0117) and the copy that
+    // decision requires.
     grantWarning:
-      "Shows the company's full money picture: every client's dues and receipts, every bill's amount, and every loan and investor with its terms.",
+      "Shows the company's full money picture: every client's dues and receipts, every bill's amount, every loan and investor with its terms, and Birdwing's takings and spending.",
   },
   {
     name: "Business Planning",
@@ -250,6 +256,24 @@ export const TOOLS: Tool[] = [
     href: "/business-planning",
     icon: "Target",
     built: true,
+  },
+  // The Hospitality pair (0115, 0116): Birdwing Farmstay's guest house.
+  // Two tools because the people differ — the caretaker books and bills,
+  // accounts keeps the books. 0115 puts both under a Hospitality team.
+  {
+    name: "Birdwing Stays",
+    description: "Bookings, rooms, invoices and collections at Birdwing Farmstay.",
+    href: "/birdwing",
+    icon: "Bed",
+    built: true,
+  },
+  {
+    name: "Birdwing Books",
+    description: "Birdwing's expenses, staff attendance and salaries.",
+    href: "/birdwing-books",
+    icon: "BookOpen",
+    built: true,
+    grantWarning: "Shows every Birdwing staff member's salary and pay rule.",
   },
 ];
 

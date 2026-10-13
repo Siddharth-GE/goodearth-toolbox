@@ -76,6 +76,8 @@ export const KNOWN_SOURCES = [
   "pusher_chain_state",
   "units",
   "business_plan_target_facts",
+  "birdwing_stay_facts",
+  "birdwing_expense_facts",
 ] as const;
 export type KnownSource = (typeof KNOWN_SOURCES)[number];
 

@@ -17,6 +17,7 @@ Everything below is on `staging.goodearthkannur.org`. Each ships only after the 
 
 - **Teams in the sidebar** (`0114`, 2026-10-13) — closed teams, Settings → Teams. The founder's checklist is `plan.md`, _Verification (fourth piece)_. Its Fable review was skipped on the founder's word for staging and **is due before production**.
 
+- **Birdwing — the Hospitality team** (`0115`–`0117`, 2026-10-13): Birdwing Stays, Birdwing Books, a Birdwing tab in Financial Management, two Reporter datasets, and the old sheets imported. **The founder's checklist is `plan.md`, _Verification (fifth piece)_.** Its Fable review was skipped on the founder's word for staging and **is due before production**. On production: `0115`–`0117`, then `scripts/import-birdwing.ts --project pajfrgnkapicdgangjey --seed data/birdwing-seed.json`, dry run first (it adds Maloor Eco Farms to Masters → Companies if missing). Before real use: switch on the rate card, give Amal, Appu and Bijeeth pay rules, grant the people.
 - **The final masters workbook** — loaded on staging 2026-10-07, after every record there was cleared. Waiting for the founder's look through Masters → Vendors, Works, Items and Stages. On ship day, on production: `scripts/import-masters-workbook.ts --project pajfrgnkapicdgangjey --xlsx <workbook>`, dry run first. It stops while production's own records point at masters it drops, and the wipe script refuses production by design, so what happens to those records is the founder's call that day.
 - **Catalogue pictures** — **vetted by the founder 2026-09-26**, and the close calls sorted in Masters. On ship day, on production: `scripts/import-catalogue-sheet.ts --project pajfrgnkapicdgangjey --xlsx <workbook>` and `scripts/fetch-catalogue-images.ts --project pajfrgnkapicdgangjey`, dry run first.
 - **The Estimator rework** (`0096`–`0098`). Its approval pass by Fable was deferred by the founder and is due before production.
@@ -42,6 +43,7 @@ Everything below is on `staging.goodearthkannur.org`. Each ships only after the 
 
 - **Set aside from the ERP corrections (founder, 2026-10-08), planned later:** subprojects; the works schedule (the PDF asked for a Gantt and cash flow — the founder: "I don't like Gantt", so its shape is open); drawing requests.
 - **The Google Chat door, round three** — three candidates in `lib/google-chat/PLAN.md`.
+- **Birdwing, later** (the build plan's own list): the guest's own check-in link (the first new public prefix since `/deck/` — `SECURITY.md` first), a Relay "Room turnover" trail type, arrival reminders, OTA channel sync, online payments, credit notes and IGST.
 - **Phone-first lists and forms** — tables that become stacked cards on a phone, sticky Save, bigger tap targets; Indents, Inventory, Supervisors and Directory first.
 - **A real sidebar search** — jump to any tool or screen over `lib/tools.ts`.
 - **The structure underneath** — one heading style (35 raw `<h2>`s in 28 files), one page rhythm, a shared notice banner, `PageTitle` in one place.

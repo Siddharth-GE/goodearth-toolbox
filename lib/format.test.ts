@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  amountInWords,
   formatAmount,
   formatCount,
   formatCrore,
@@ -119,4 +120,27 @@ test("crore formatting picks the scale a plan is discussed at", () => {
   assert.equal(formatCrore(null), "—");
   assert.equal(formatCrore(undefined), "—");
   assert.equal(formatCrore(Number.NaN), "—");
+});
+
+test("amounts in words, the Indian invoice way", () => {
+  assert.equal(amountInWords(3990), "Rupees Three Thousand Nine Hundred Ninety Only");
+  assert.equal(
+    amountInWords(12672.5),
+    "Rupees Twelve Thousand Six Hundred Seventy Two and Fifty Paise Only",
+  );
+  assert.equal(
+    amountInWords(2138120),
+    "Rupees Twenty One Lakh Thirty Eight Thousand One Hundred Twenty Only",
+  );
+  assert.equal(amountInWords(10_00_00_000), "Rupees Ten Crore Only");
+  assert.equal(amountInWords(105), "Rupees One Hundred Five Only");
+  assert.equal(amountInWords(0), "Rupees Zero Only");
+  assert.equal(amountInWords(0.07), "Rupees Zero and Seven Paise Only");
+  assert.equal(amountInWords(null), "—");
+});
+
+test("print amounts carry paise when a tax invoice asks", () => {
+  assert.equal(formatAmount(1234567.5), "12,34,568");
+  assert.equal(formatAmount(1234567.5, { paise: true }), "12,34,567.50");
+  assert.equal(formatAmount(null, { paise: true }), "—");
 });
