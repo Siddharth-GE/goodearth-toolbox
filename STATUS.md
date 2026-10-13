@@ -16,6 +16,7 @@ Production is `toolbox.goodearthkannur.org` (from `master`); staging is `staging
 - **Stack:** Next.js 16.2 (Turbopack) · React 19.2 · Tailwind 4 · Supabase Postgres. Vercel `bom1` + Supabase `ap-south-1`, both Mumbai.
 - **Migrations:** `0001`–`0093` on both databases; `0094`–`0113` on staging only. `applied_migrations` (`0067`) is the ledger, and CI checks it on every pull request.
 - **Access:** per-user grants (`user_apps`) + role bundles (`role_apps`), enforced in the database by `has_app()`.
+- **Navigation** (staging): tools sit under closed teams in the sidebar, arranged by the founder in Settings → Teams (`0114`, `lib/nav/`); a tool with no team sits under Other. Teams arrange, grants decide.
 - **Sign-in:** password → emailed 6-digit code (30-day trusted device), self-service reset, Google for existing team emails only; both steps rate-limited in the database. Mail rides Resend as `toolbox@goodearthkannur.org`. The rules are `SECURITY.md`.
 - **Performance:** warm TTFB ~0.2s, cold ~1.0s — cold starts are the one measured problem.
 - **Look:** "stone and glass" (on staging), rules in `DESIGN.md`.
@@ -26,7 +27,7 @@ Production unless marked. Each tool's rules are its `PLAN.md` (Google Chat door:
 
 - **Marathon** — race-day kiosk: PIN login, entries, bibs, admin. Own auth and service-role client — the one kiosk, not a pattern.
 - **Masters** — the shared reference data every tool reads: projects, plots, units, clients, vendors, stores, items (catalogue and materials), categories, brands, GST rates, construction stages, units of measure, works, item requests (on staging: companies, terms templates, and a material rate that rises with POs). Reads ungated, writes need `/masters`.
-- **Settings** — people, grants, roles, approver lists. Admin only.
+- **Settings** — people, grants, roles, approver lists (on staging: the sidebar's teams). Admin only.
 - **Selections** — what design specifies per room; revisions immutable once issued. Tiles and lines show the item's picture, description and product link (catalogue pictures on staging).
 - **Budgets** — prices an issued revision (interiors) and a construction stage tree; money gated.
 - **Indents** — site requests from a villa's official estimate, an approved interiors budget, or direct. No money (on staging: the indent's work's own materials, always in the Masters unit, what is still to buy, and a print; a line no estimate or budget covers says why and waits for the estimator's yes before the indent can be approved).

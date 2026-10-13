@@ -15,8 +15,10 @@ import {
   listIndentApprovers,
 } from "@/lib/settings/queries";
 import { effectiveApprovalLimit, effectiveGrant } from "@/lib/settings/access-model";
+import { arrangeTools } from "@/lib/nav/arrange";
+import { getToolArrangement } from "@/lib/nav/queries";
 import { getRole, listRoleApps, listRoles } from "@/lib/settings/roles";
-import { GRANTABLE_TOOLS, type ToolGroup } from "@/lib/tools";
+import { GRANTABLE_TOOLS } from "@/lib/tools";
 import { notFound } from "next/navigation";
 import { AccountSwitches } from "../../_components/account-switches";
 import { ApprovalLimitField } from "../../_components/approval-limit-field";
@@ -25,10 +27,9 @@ import { GrantCheckbox } from "../../_components/grant-checkbox";
 import { NameField } from "../../_components/name-field";
 import { RolePicker } from "../../_components/role-picker";
 
-// Grants read as groups here rather than as one long column: sixteen
-// tools in a flat list is a wall, and the groups are how the sidebar
-// already organises them.
-const GROUP_ORDER: ToolGroup[] = ["Operations", "Management", "People", "Events", "Admin"];
+// Grants read under teams here rather than as one long column: sixteen
+// tools in a flat list is a wall, and the teams (Settings → Teams) are
+// how the sidebar already organises them.
 
 export default async function PersonPage({ params }: { params: Promise<{ personId: string }> }) {
   const user = await requireUser();
@@ -50,6 +51,7 @@ export default async function PersonPage({ params }: { params: Promise<{ personI
     roles,
     roleApps,
     assignedRole,
+    arrangement,
   ] = await Promise.all([
     listGrantsForUser(personId),
     listIndentApprovers(),
@@ -59,6 +61,7 @@ export default async function PersonPage({ params }: { params: Promise<{ personI
     listRoles(),
     person.role_id ? listRoleApps(person.role_id) : Promise.resolve(new Set<string>()),
     person.role_id ? getRole(person.role_id) : Promise.resolve(null),
+    getToolArrangement(),
   ]);
 
   const isAdmin = person.role === "admin";
@@ -74,10 +77,7 @@ export default async function PersonPage({ params }: { params: Promise<{ personI
   const approvesIndents =
     indentApprovers.has(person.id) || (assignedRole?.can_approve_indents ?? false);
   const history = describeAccessHistory(historyRows);
-  const groups = GROUP_ORDER.map((group) => ({
-    group,
-    tools: GRANTABLE_TOOLS.filter((tool) => tool.group === group),
-  })).filter((entry) => entry.tools.length > 0);
+  const sections = arrangeTools(GRANTABLE_TOOLS, arrangement);
 
   return (
     <div className="space-y-4">
@@ -161,9 +161,9 @@ export default async function PersonPage({ params }: { params: Promise<{ personI
           <Badge variant="info">All apps (admin)</Badge>
         ) : (
           <div className="space-y-4">
-            {groups.map(({ group, tools }) => (
-              <div key={group} className="space-y-2">
-                <p className="text-foreground text-sm font-medium">{group}</p>
+            {sections.map(({ key, name, tools }) => (
+              <div key={key} className="space-y-2">
+                <p className="text-foreground text-sm font-medium">{name}</p>
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                   {tools.map((tool) => {
                     const effective = effectiveGrant(tool.href, grants, roleApps);

@@ -9,8 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatMoney } from "@/lib/format";
 import { addRoleApp, deleteRole, removeRoleApp, updateRole } from "@/lib/settings/roles-actions";
+import type { ToolSection } from "@/lib/nav/arrange";
 import type { RoleWithApps } from "@/lib/settings/roles";
-import type { Tool, ToolGroup } from "@/lib/tools";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 
 /**
@@ -22,13 +22,7 @@ import { useActionState, useEffect, useRef, useState, useTransition } from "reac
  * Editing a bundle changes what everyone holding the role can open, on
  * their very next page load — nothing is copied, so nothing can drift.
  */
-export function RoleCard({
-  role,
-  groups,
-}: {
-  role: RoleWithApps;
-  groups: { group: ToolGroup; tools: Tool[] }[];
-}) {
+export function RoleCard({ role, sections }: { role: RoleWithApps; sections: ToolSection[] }) {
   const [state, formAction, pending] = useActionState(updateRole.bind(null, role.id), undefined);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, startDelete] = useTransition();
@@ -117,9 +111,9 @@ export function RoleCard({
         <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
           Apps in this role
         </p>
-        {groups.map(({ group, tools }) => (
-          <div key={group} className="space-y-2">
-            <p className="text-foreground text-sm font-medium">{group}</p>
+        {sections.map(({ key, name, tools }) => (
+          <div key={key} className="space-y-2">
+            <p className="text-foreground text-sm font-medium">{name}</p>
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {tools.map((tool) => (
                 <RoleAppToggle

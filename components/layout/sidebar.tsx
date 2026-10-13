@@ -11,15 +11,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Logo } from "@/components/ui/logo";
 import { ThemeMenuItem } from "@/components/ui/theme-toggle";
-import { TOOL_ICONS, type Tool, type ToolGroup } from "@/lib/tools";
+import { isInTool, sectionKeyOf, type ToolSection } from "@/lib/nav/arrange";
+import { TOOL_ICONS } from "@/lib/tools";
 import { cn } from "@/lib/utils";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { LayoutGrid, LogOut, Menu, X } from "lucide-react";
+import { ChevronRight, LayoutGrid, LogOut, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
-
-const GROUP_ORDER: ToolGroup[] = ["Management", "Operations", "Events", "People", "Admin"];
+import { useId, useState } from "react";
 
 function NavRow({
   href,
@@ -48,8 +47,73 @@ function NavRow({
       )}
     >
       <Icon className={cn("size-4 shrink-0", active && "text-accent")} />
-      {label}
+      <span className="truncate">{label}</span>
     </Link>
+  );
+}
+
+/**
+ * One team: a row that opens and closes, and its tools under a hairline
+ * when open. No animation — the list simply appears (DESIGN.md: nothing
+ * moves outside the motion vocabulary).
+ */
+function TeamRow({
+  section,
+  open,
+  holdsPage,
+  pathname,
+  onToggle,
+  onNavigate,
+}: {
+  section: ToolSection;
+  open: boolean;
+  /** The page you are on is one of this team's tools. */
+  holdsPage: boolean;
+  pathname: string;
+  onToggle: () => void;
+  onNavigate?: () => void;
+}) {
+  // useId, not the team's key: the rail and the phone drawer both draw
+  // this row, and an id may appear only once on the page.
+  const listId = useId();
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-controls={listId}
+        className={cn(
+          "focus-visible:ring-accent flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] font-medium focus-visible:ring-2 focus-visible:outline-none",
+          open || holdsPage
+            ? "text-foreground hover:bg-foreground/[0.05]"
+            : "text-muted hover:text-foreground hover:bg-foreground/[0.05]",
+        )}
+      >
+        <ChevronRight className={cn("size-4 shrink-0", open && "rotate-90")} />
+        <span className="min-w-0 flex-1 truncate">{section.name}</span>
+        <span className="text-muted text-xs tabular-nums">{section.tools.length}</span>
+      </button>
+      {open && (
+        // The hairline sits under the chevron's centre, so the tools read
+        // as the team's contents.
+        <div
+          id={listId}
+          className="border-border mt-0.5 mb-1 ml-[17px] space-y-0.5 border-l pl-1.5"
+        >
+          {section.tools.map((tool) => (
+            <NavRow
+              key={tool.href}
+              href={tool.href}
+              active={isInTool(tool.href, pathname)}
+              icon={TOOL_ICONS[tool.icon]}
+              label={tool.name}
+              onNavigate={onNavigate}
+            />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -66,21 +130,22 @@ function Brand() {
 
 /** Everything inside the panel — shared by the desktop rail and the phone drawer. */
 function SidebarContent({
-  tools,
+  sections,
+  openKeys,
+  onToggle,
   userName,
   pathname,
   onNavigate,
 }: {
-  tools: Tool[];
+  sections: ToolSection[];
+  openKeys: string[];
+  onToggle: (key: string) => void;
   userName: string;
   pathname: string;
   /** The phone drawer closes itself when a link is tapped. */
   onNavigate?: () => void;
 }) {
-  const groups = GROUP_ORDER.map((group) => ({
-    group,
-    tools: tools.filter((t) => t.group === group),
-  })).filter((g) => g.tools.length > 0);
+  const pageKey = sectionKeyOf(sections, pathname);
 
   return (
     <>
@@ -97,27 +162,23 @@ function SidebarContent({
           onNavigate={onNavigate}
         />
 
-        {groups.map(({ group, tools: groupTools }) => (
-          <div key={group} className="mt-4">
-            <p className="text-muted mb-2 px-2.5 text-[11px] font-medium tracking-[0.14em] uppercase">
-              {group}
-            </p>
-            <div className="space-y-1">
-              {groupTools.map((tool) => (
-                <NavRow
-                  key={tool.href}
-                  href={tool.href}
-                  active={pathname === tool.href || pathname.startsWith(`${tool.href}/`)}
-                  icon={TOOL_ICONS[tool.icon]}
-                  label={tool.name}
-                  onNavigate={onNavigate}
-                />
-              ))}
-            </div>
+        {sections.length > 0 && (
+          <div className="mt-3 space-y-0.5">
+            {sections.map((section) => (
+              <TeamRow
+                key={section.key}
+                section={section}
+                open={openKeys.includes(section.key)}
+                holdsPage={section.key === pageKey}
+                pathname={pathname}
+                onToggle={() => onToggle(section.key)}
+                onNavigate={onNavigate}
+              />
+            ))}
           </div>
-        ))}
+        )}
 
-        {tools.length === 0 && (
+        {sections.length === 0 && (
           <p className="text-muted mt-4 px-2.5 text-sm">No tools assigned yet.</p>
         )}
       </nav>
@@ -159,16 +220,44 @@ function SidebarContent({
  * — Radix keeps it mounted while the closing animation runs, so both
  * directions are plain CSS on its data-state. It closes itself on
  * navigation.
+ *
+ * Tools sit under closed teams (Settings → Teams). The team holding the
+ * page you are on opens by itself — on arrival and whenever you move into
+ * another team's tool — and a person with only one team sees it open.
+ * Which teams are open is held here, not in each panel, so the rail and
+ * the drawer agree; it lasts while the app is open and resets on a reload.
  */
-export function Sidebar({ tools, userName }: { tools: Tool[]; userName: string }) {
+export function Sidebar({ sections, userName }: { sections: ToolSection[]; userName: string }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const pageKey = sectionKeyOf(sections, pathname);
+  const [openKeys, setOpenKeys] = useState<string[]>(() => {
+    const keys = sections.length === 1 ? [sections[0].key] : [];
+    return pageKey && !keys.includes(pageKey) ? [...keys, pageKey] : keys;
+  });
+  // Moving into another team's tool opens that team. Adjusted while
+  // rendering rather than in an effect, so the list never paints closed
+  // for a frame first.
+  const [seenPageKey, setSeenPageKey] = useState(pageKey);
+  if (pageKey !== seenPageKey) {
+    setSeenPageKey(pageKey);
+    if (pageKey && !openKeys.includes(pageKey)) setOpenKeys([...openKeys, pageKey]);
+  }
+
+  const toggle = (key: string) =>
+    setOpenKeys((keys) => (keys.includes(key) ? keys.filter((k) => k !== key) : [...keys, key]));
 
   return (
     <>
       {/* Desktop rail */}
       <aside className="border-border/60 bg-background sticky top-0 hidden h-screen w-60 shrink-0 flex-col self-start border-r md:flex">
-        <SidebarContent tools={tools} userName={userName} pathname={pathname} />
+        <SidebarContent
+          sections={sections}
+          openKeys={openKeys}
+          onToggle={toggle}
+          userName={userName}
+          pathname={pathname}
+        />
       </aside>
 
       {/* Phone top bar */}
@@ -203,7 +292,9 @@ export function Sidebar({ tools, userName }: { tools: Tool[]; userName: string }
                 onNavigate closes it, or the new page appears behind an
                 open menu. */}
             <SidebarContent
-              tools={tools}
+              sections={sections}
+              openKeys={openKeys}
+              onToggle={toggle}
               userName={userName}
               pathname={pathname}
               onNavigate={() => setOpen(false)}

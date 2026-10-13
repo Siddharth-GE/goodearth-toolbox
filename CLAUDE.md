@@ -24,7 +24,7 @@ Every conversation starts the same way: the founder says **"read CLAUDE.md"**, a
 
 ## The one principle
 
-**It's a toolbox.** Each tool is a self-contained instrument. Adding one touches only its own folders plus a registry entry; breaking one must not take the others down. Tools connect through exactly three threads: the shell (auth, `lib/tools.ts`, per-user grants), the shared database (including the line chain), and shared UI/utilities (`components/ui/*`, `components/masters/*`, `lib/masters/`, `lib/hooks/`, `lib/format.ts`, `lib/pdf/`, `lib/charts/`, `lib/design-views/`, `lib/drawings/`).
+**It's a toolbox.** Each tool is a self-contained instrument. Adding one touches only its own folders plus a registry entry; breaking one must not take the others down. Tools connect through exactly three threads: the shell (auth, `lib/tools.ts`, per-user grants, the sidebar's teams in `lib/nav/`), the shared database (including the line chain), and shared UI/utilities (`components/ui/*`, `components/masters/*`, `lib/masters/`, `lib/hooks/`, `lib/format.ts`, `lib/pdf/`, `lib/charts/`, `lib/design-views/`, `lib/drawings/`).
 
 **One tool never imports another tool's code, and shared code never imports a tool's.** When two tools want the same read, the answer is a shared module, not an import. `lib/overview/` is the shell's home, not a tool — the **one** module allowed to import other tools' queries (reads only, each call wrapped so one tool's failure can't take down the home page).
 
@@ -33,7 +33,7 @@ Every conversation starts the same way: the founder says **"read CLAUDE.md"**, a
 - A tool = `app/(dashboard)/<tool>/` (screens) + `lib/<tool>/` (`queries.ts` reads, `actions.ts` writes). `lib/masters/` uses `<entity>.ts` / `<entity>-actions.ts` pairs instead — sanctioned drift across its entities.
 - Every Operations and Management tool **opens on a welcome screen** (`_components/tool-welcome.tsx`): plain English, live counts, never rupees. The real first screen sits one click in, so actions must `revalidatePath("/<tool>", "layout")` — an exact-path call refreshes only the welcome and leaves the moved list stale.
 - Kiosk tools with their own auth live top-level. `app/marathon/` is the only one and **not the pattern to copy**.
-- New tool → register in `lib/tools.ts`, add its row to STATUS.md's contract table, and extend **both** `user_apps_app_known` and `role_apps_app_known` CHECKs in the same migration, or granting fails at the database. A stub ships by flipping `built: true` and replacing its `page.tsx`.
+- New tool → register in `lib/tools.ts`, add its row to STATUS.md's contract table, and extend **both** `user_apps_app_known` and `role_apps_app_known` CHECKs in the same migration, or granting fails at the database. A stub ships by flipping `built: true` and replacing its `page.tsx`. A new tool sits under "Other" in the sidebar until the founder gives it a team in Settings → Teams.
 
 ## Red lines — one-line form; `SECURITY.md` and `SHIPPING.md` carry the why
 

@@ -1,14 +1,18 @@
 import { Sidebar } from "@/components/layout/sidebar";
 import { requireUser } from "@/lib/auth/dal";
+import { arrangeTools } from "@/lib/nav/arrange";
+import { getToolArrangement } from "@/lib/nav/queries";
 import { visibleTools } from "@/lib/tools";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const user = await requireUser();
+  // Side by side: the teams read never waits on the profile read.
+  const [user, arrangement] = await Promise.all([requireUser(), getToolArrangement()]);
   // Admins ignore grantedApps entirely — the sidebar's admin bypass
   // never depends on user_apps, so a bug there can't lock out an
   // admin's own account.
   const grantedApps = user.profile?.role === "admin" ? [] : user.grantedApps;
-  const tools = visibleTools(user.profile, grantedApps);
+  // Teams arrange what visibleTools() allows — they never add a tool.
+  const sections = arrangeTools(visibleTools(user.profile, grantedApps), arrangement);
 
   return (
     // Column on phones (top bar above content), row from md up (rail
@@ -17,7 +21,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     // chrome behave normally. min-w-0 keeps a wide table inside main
     // from stretching the whole row instead of scrolling in place.
     <div className="flex min-h-screen flex-col md:flex-row">
-      <Sidebar tools={tools} userName={user.profile?.full_name || user.email} />
+      <Sidebar sections={sections} userName={user.profile?.full_name || user.email} />
       <main className="min-w-0 flex-1">
         <div className="mx-auto max-w-6xl px-5 py-6 md:px-10 md:py-10">{children}</div>
       </main>

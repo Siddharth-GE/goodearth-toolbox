@@ -69,3 +69,23 @@ The founder: "the batch id needs to be big and visible and copy as well as … a
 - [x] `[Opus]` `BatchId` on the delivery note, "Batches in this store" and the issue note. Rendered through a throwaway probe at a true 390px phone width, light and dark, inside the dashboard's own layout; the copy button pressed for real (the clipboard held the ID) and with the clipboard forced to fail (the fallback line showed). CI green.
 - [x] ~~`[Fable]` Review~~ — **skipped on the founder's explicit word for this merge** (2026-10-13: "merge"). In its place `[Opus]` re-reviewed the diff against `BUGCATCHER.md`: no database read, upload or permission touched; colours are tokens only (`text-success` for the tick), checked in dark mode (#4); the copy button is `type="button"`, so inside the issue form it never submits. One finding, fixed: the fallback said "tap the ID", but a phone selects on press and hold.
 - [ ] Founder — on staging: **Inventory → Receive → a delivery note**: the batch ID is large under each line; press the copy button and paste it into WhatsApp. The same on **Stock → a material in a store** and on an **issue note**. Once on a phone.
+
+# Fourth piece — teams in the sidebar (2026-10-13)
+
+The founder: "lets categorise and on the left they must just sit as a closed set, design, commercial, interiors etc and only when opened will you see all the tool under it, in settings each tool can get a team tag, and a place where you can make all the team tags so that we can rearrange as needed". Agreed before the build: it starts from today's five headings (nothing moves until the founder rearranges); one team per tool; the team of the page you are on opens by itself; a tool with no team sits under **Other**; teams arrange, grants still decide. Built by `[Opus]` on `feature/sidebar-teams`.
+
+- [x] `[Opus]` `0114`: `tool_teams` and `tool_team_apps` — read by every signed-in person, written by admins; seeded once with today's five headings. Dry-run on staging with `scripts/trials/tool-teams.sql` under RLS as the staff account and as the admin; proved to bite (with the insert policy loosened it fails at TRIAL 2).
+- [x] `[Opus]` `lib/nav/` (the shell's read and the pure arranging rule, seven tests); the sidebar's closed teams; the home page and Settings' grant lists follow the same teams; `group` leaves `lib/tools.ts`. The sidebar's read degrades to one list on failure, and re-throws Next's own signals (`unstable_rethrow` — the first build showed the catch swallowing them). Types for `0114` written by hand.
+- [x] `[Opus]` **Settings → Teams**: make, rename, reorder and delete teams; pick each tool's team. The sidebar and Teams screen rendered through a throwaway probe — desktop light and dark, a true 390px phone (drawer open; Teams with a delete confirmation). One fix from looking: on a phone, a team's buttons now wrap before its name is cut short. **No screen has been opened signed in.**
+- [ ] `[Fable]` Review `0114` before it is applied — or the founder waives it.
+- [ ] `[Opus]` Apply to staging, regenerate types, pull request to `staging`.
+- [ ] Founder — the checklist below, on staging.
+
+## Verification — the founder, on staging (fourth piece)
+
+1. Any page: the sidebar shows Overview, then **Management, Operations, Events, People, Admin** as closed rows with a count. Click one — its tools open under it; click again — it closes. Open a tool: its team stays open on the next page.
+2. **Settings → Teams** → **New team** "Design". Move it to the top with the arrows. Under _Tools_, set Design Management and Selections to Design — the sidebar moves them at once.
+3. Rename a team; delete one — its tools move to **Other** at the bottom of the sidebar, and nobody loses access to anything.
+4. The home page's tool cards and a person's apps in **Settings → People** are grouped the same way.
+5. On a phone: the menu shows the same closed teams.
+6. As the **probe** (it holds `/estimator` and `/inventory`): only the teams holding those two appear, and **Settings → Teams** is refused.
