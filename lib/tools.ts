@@ -1,4 +1,6 @@
 import {
+  Bed,
+  BookOpen,
   Boxes,
   Calculator,
   ClipboardList,
@@ -28,6 +30,8 @@ import {
 // stores a lookup key instead, resolved against this map wherever it's
 // actually rendered.
 export const TOOL_ICONS = {
+  Bed,
+  BookOpen,
   Boxes,
   Calculator,
   ClipboardList,
@@ -250,6 +254,24 @@ export const TOOLS: Tool[] = [
     href: "/business-planning",
     icon: "Target",
     built: true,
+  },
+  // The Hospitality pair (0115, 0116): Birdwing Farmstay's guest house.
+  // Two tools because the people differ — the caretaker books and bills,
+  // accounts keeps the books. 0115 puts both under a Hospitality team.
+  {
+    name: "Birdwing Stays",
+    description: "Bookings, rooms, invoices and collections at Birdwing Farmstay.",
+    href: "/birdwing",
+    icon: "Bed",
+    built: true,
+  },
+  {
+    name: "Birdwing Books",
+    description: "Birdwing's expenses, staff attendance and salaries.",
+    href: "/birdwing-books",
+    icon: "BookOpen",
+    built: false,
+    grantWarning: "Shows every Birdwing staff member's salary and pay rule.",
   },
 ];
 
