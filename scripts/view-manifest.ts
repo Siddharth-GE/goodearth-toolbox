@@ -419,4 +419,12 @@ export const VIEW_MANIFEST: Record<string, ViewExpectation> = {
     money: false,
     why: "What is left of each store batch (0108). Quantities only, open like stock_on_hand; a batch's rate lives in the gated goods_receipt_line_rates and must never be joined in here.",
   },
+  birdwing_occupancy_facts: {
+    columns: ["on_date", "rooms_occupied", "guests_in_house"],
+    guards: ["/birdwing", "/birdwing-books"],
+    barrier: true,
+    invoker: false,
+    money: false,
+    why: "Birdwing Books pays room-day and guest-day incentives (0116), and a /birdwing-books holder cannot read Stays' tables. Three counts per day and nothing else — never a guest's name, a stay or a rupee.",
+  },
 };
