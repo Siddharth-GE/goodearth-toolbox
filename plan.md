@@ -160,3 +160,60 @@ The founder, after the merge: "the calender in the birdwing tab dosent show the 
 4. **Grants** — Amal, Akshay on `/birdwing`; who on `/birdwing-books`?
 5. **The 67 unpaid internal stays** — bulk-assign cost centres on the Review screen, or one by one?
 6. **November 2026 salaries** already in the sheet — imported flagged "future", never confirmed, unless you say drop them.
+
+# Sixth piece — From the model: a SketchUp takeoff becomes a villa's estimate (2026-10-14)
+
+The founder: "i need to prepare a hand off system for this thing in one click to go the tool box as an estimate" — with `TOOLBOX-PLAN.md`, drafted by `[Opus]` beside the Goodearth QS SketchUp extension (`Documents\3Dqs_Sandbox\goodearth-qs`, built outside this repo). Reviewed against the code by `[Opus]` on the founder's word ("see if this plan works and then execute it"); the founder then chose, 2026-10-15: **Opus reviews and lands it** (the Fable review of `0118` is due before production), and **the plan's answers to its open questions 3–7**. Built on `feature/estimator-from-model`. When it is vetted, the rules move into `estimator/PLAN.md` as decision 12 and this section goes.
+
+**In SketchUp, Goodearth QS → Send to the toolbox** opens the Estimator's **From the model** page in SketchUp's own window, signed in as the person, holding the model's takeoff. Pick the villa (the model remembers it) → the preview says, work by work, _adds_, _replaces the model's rows_, _refused (why)_ or _to measure by hand_ → **Import** → the villa's working estimate has the works and their measurement sheets. Send again after changing the model: the model's rows are replaced, rows typed by hand never touched. Without SketchUp the page takes the takeoff file. **Rate book → Download works list for SketchUp** keeps the model's tags matching the rate book.
+
+## The rules (decision 12 once vetted)
+
+1. **Into the villa's working estimate only** (`0098`); with none, Import starts a blank one first.
+2. **Works match on code** — an active `work_items.code`; an unknown code is refused and named.
+3. **The unit must equal the rate book's** (`estimator_work_info.uom`), or that work is refused — a work with no rate-book unit too. Nothing converts (decision 7). The rest of the file imports (question 4).
+4. **A model row knows it came from the model** (`from_model`, `model_refs`). Re-import deletes this estimate's model rows and writes the new ones in one transaction; hand rows are never touched. A line whose rows were all the model's and which now has none goes back to _to measure_.
+5. **A model row is changed in the model, not on the sheet** (question 3): edit, remove and duplicate refuse it; _Copy to another work_ copies it as a hand row.
+6. **Works the model leaves to measure by hand go on as _to measure_ lines** if not already there (question 7).
+7. **Quantities come only from `calc.ts`**: the SQL writes rows and never sums; the action re-sums each touched line through the same `syncLineQty`.
+8. **The estimate remembers the model** (file, SketchUp's model id, when, who); the preview warns before a _different_ model lands on the same villa, and before the model's rows replace a typed quantity.
+9. **Every row is checked like a typed one** (`checkMeasurement`, now in a pure `measurement-rules.ts` both use).
+10. **The takeoff is untrusted input**: parsed and checked server-side by pure code; nothing in it decides identity or access. Anyone holding `/estimator` imports (question 6).
+11. **The toolbox says how each work is measured from the model** (`model_measure`, question 5); blank means "from the unit".
+
+## Where the plan was tweaked to the code
+
+- **The copy function carries the model flags** (`estimator_copy_estimate_contents`, re-created) — without it Make official or a villa started from another villa's estimate would turn model rows into hand rows, and the next send would count them twice.
+- **The works list keeps today's measuring rules.** The extension's bundled list marks 27 works not to measure by area — FD.15 base and sides; FD.16, FD.22, FD.29–FD.32 and the Superstructure and MEP package works (sqft shares of a package rate) by hand. `0118` writes those into `model_measure` (only where blank), and `scripts/import-masters-workbook.ts` does the same when it loads a rate book, so production gets them on ship day whichever comes first.
+- **A typed quantity is named before it is replaced**: the preview says _replaces the typed 12 cum_.
+- **An older extension leaves an unused box out instead of sending null**: both read as "not used".
+- **`plan.md` gains this section rather than being replaced** — it still holds five founder checklists.
+
+## Steps
+
+- [ ] `[Opus]` `0118` and `scripts/trials/estimator-from-model.sql`; dry-run on staging as the single-grant person, each trial proved to bite.
+- [ ] `[Opus]` Review `0118` (in place of Fable, on the founder's word); apply to staging; `db:types:staging`, `db:check`, `db:check-views`.
+- [ ] `[Opus]` `measurement-rules.ts`, `model-takeoff.ts` and its tests; `sheet-sync.ts`; the import reads and actions; the row actions refuse model rows.
+- [ ] `[Opus]` The From the model page; the estimate page's model line and _Model_ badges; the Estimates list button; Download works list; _Measured from the model as_ on the work page; the importer's measuring rules.
+- [ ] `[Opus]` Checks: prettier, lint, typecheck, `npm test`, `next build`, `check:actions`; every new `select` string at staging's PostgREST; the page looked at through a throwaway probe with a stand-in SketchUp bridge.
+- [ ] `[Opus]` Review the full diff against this plan, `SECURITY.md` and `BUGCATCHER.md`; pull request into `staging`; merge when CI is green.
+- [ ] Founder — the checklist below, on staging. Then production: Fable's review of `0118`, then `0118`, the merge, and the extension's default address switched to `toolbox.goodearthkannur.org` (a new `.rbz` for the team).
+
+## Verification — the founder, on staging (sixth piece)
+
+1. **SketchUp: Extensions → Goodearth QS → Toolbox address…** → `https://staging.goodearthkannur.org`.
+2. **Open `Sample villa.skp` → Send to the toolbox.** A window opens; sign in (password, then the code). If it lands on the home page, close it and press **Send to the toolbox** again.
+3. **From the model** shows the file, 18 works, 36 rows, its problem count and 3 to measure by hand. Pick a test villa → every work says _adds_; the hand-measured ones say _to measure_.
+4. **Import → Open the estimate.** Under the title: _Measured from Sample villa.skp_. FD.14 reads 0.392 cum from `2 × 1.4 × 1.4 × 0.1`; F.1.36 and F.1.37 read 1 nos each; PF.8 reads 365.542 sqft. The model's rows carry a _Model_ badge and no edit buttons.
+5. **On FD.9, add a hand row** `1 × 1 × 1 × 1` → 2.818 cum.
+6. **In SketchUp, shorten wall BW1 by a metre** (keep it a solid) → **Send to the toolbox.** The villa is already picked; FD.9 says _replaces the model's 2 rows with 2 · 1 typed row kept_ → Import → FD.9 = 2.548 cum.
+7. **Rate book → FD.6** (on no estimate) → set its unit to **sqm**. In SketchUp tag a closed block `FD.6` and send: _refused — the rate book measures FD.6 in sqm, the model sent cum_; the rest imports. Set FD.6 back to cum.
+8. **Make official** on that estimate → the official copy's sheets still show the _Model_ badges.
+9. **Start another villa's estimate from this one** (everything), then send the model to that villa: no work doubles.
+10. **Rate book → Download works list for SketchUp** → in SketchUp, **Choose works list…** → that file: the counts match the rate book. (Inside SketchUp's window, **Send the works list to SketchUp** on From the model does the same in one press.)
+11. **As the probe** (`/estimator` and `/inventory`): From the model imports. As someone without `/estimator`, the page sends them home.
+
+## Still open (the plan's questions 1–2 — rate-book data, not this build)
+
+1. **Superstructure materials.** SS and MEP works are shares of a package rate per sqft; their sub-works (SS.2a–SS.2g, SS.5a, SS.9b, SS.6a–SS.6e, SS.11a/b) have no unit. Give them physical units and recipes, so the model can drive blocks and cement for the superstructure?
+2. **FD.16, FD.22, FD.29–FD.32** are sqft: shuttering area (base + sides) or plan area? Until answered they are measured by hand.

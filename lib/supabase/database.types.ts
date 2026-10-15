@@ -4160,9 +4160,11 @@ export type Database = {
           created_by: string | null
           depth: number | null
           description: string | null
+          from_model: boolean
           id: string
           length: number | null
           line_id: string
+          model_refs: string[] | null
           nos: number | null
           sort_order: number
           updated_at: string
@@ -4174,9 +4176,11 @@ export type Database = {
           created_by?: string | null
           depth?: number | null
           description?: string | null
+          from_model?: boolean
           id?: string
           length?: number | null
           line_id: string
+          model_refs?: string[] | null
           nos?: number | null
           sort_order?: number
           updated_at?: string
@@ -4188,9 +4192,11 @@ export type Database = {
           created_by?: string | null
           depth?: number | null
           description?: string | null
+          from_model?: boolean
           id?: string
           length?: number | null
           line_id?: string
+          model_refs?: string[] | null
           nos?: number | null
           sort_order?: number
           updated_at?: string
@@ -4401,6 +4407,10 @@ export type Database = {
           id: string
           is_template: boolean
           is_working: boolean
+          model_file: string | null
+          model_guid: string | null
+          model_imported_at: string | null
+          model_imported_by: string | null
           name: string
           note: string | null
           project_id: string
@@ -4421,6 +4431,10 @@ export type Database = {
           id?: string
           is_template?: boolean
           is_working?: boolean
+          model_file?: string | null
+          model_guid?: string | null
+          model_imported_at?: string | null
+          model_imported_by?: string | null
           name: string
           note?: string | null
           project_id: string
@@ -4441,6 +4455,10 @@ export type Database = {
           id?: string
           is_template?: boolean
           is_working?: boolean
+          model_file?: string | null
+          model_guid?: string | null
+          model_imported_at?: string | null
+          model_imported_by?: string | null
           name?: string
           note?: string | null
           project_id?: string
@@ -4458,6 +4476,13 @@ export type Database = {
           {
             foreignKeyName: "estimator_estimates_created_by_fkey"
             columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimator_estimates_model_imported_by_fkey"
+            columns: ["model_imported_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -4922,6 +4947,7 @@ export type Database = {
           created_by: string | null
           id: string
           labour_rate: number | null
+          model_measure: string | null
           uom: string
           updated_at: string
           updated_by: string | null
@@ -4932,6 +4958,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           labour_rate?: number | null
+          model_measure?: string | null
           uom: string
           updated_at?: string
           updated_by?: string | null
@@ -4942,6 +4969,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           labour_rate?: number | null
+          model_measure?: string | null
           uom?: string
           updated_at?: string
           updated_by?: string | null
@@ -11001,6 +11029,10 @@ export type Database = {
         Returns: undefined
       }
       has_app: { Args: { slug: string }; Returns: boolean }
+      import_model_rows: {
+        Args: { p_estimate: string; p_lines: Json; p_model: Json }
+        Returns: string[]
+      }
       is_admin: { Args: never; Returns: boolean }
       is_bill_approver: { Args: never; Returns: boolean }
       issue_selection: { Args: { p_selection_id: string }; Returns: undefined }
