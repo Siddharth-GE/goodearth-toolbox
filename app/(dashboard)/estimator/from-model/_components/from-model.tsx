@@ -22,7 +22,7 @@ import {
   type ModelImportResult,
 } from "@/lib/estimator/model-import-actions";
 import {
-  MODEL_MEASURE_LABELS,
+  MODEL_MEASURE_SHORT,
   isModelMeasure,
   parseTakeoff,
   type PlanEntry,
@@ -242,9 +242,9 @@ export function FromModel({ villas }: { villas: VillaOption[] }) {
         </p>
 
         {!received && waiting && (
-          <p className="text-muted flex items-center gap-2 text-sm">
+          <div className="text-muted flex items-center gap-2 text-sm">
             <Spinner className="size-4 border-2" /> Asking SketchUp for the model&apos;s takeoff…
-          </p>
+          </div>
         )}
         {!received && !inSketchUp && (
           <p className="text-muted text-sm">
@@ -323,9 +323,9 @@ export function FromModel({ villas }: { villas: VillaOption[] }) {
       </Card>
 
       {previewing && (
-        <p className="text-muted flex items-center gap-2 text-sm">
+        <div className="text-muted flex items-center gap-2 text-sm">
           <Spinner className="size-4 border-2" /> Working out what the import would do…
-        </p>
+        </div>
       )}
       <FormMessage error={previewError} />
 
@@ -532,10 +532,10 @@ function Outcome({ entry }: { entry: PlanEntry }) {
   }
   if (entry.measuredDifferently) {
     const model = isModelMeasure(entry.measuredDifferently.model)
-      ? MODEL_MEASURE_LABELS[entry.measuredDifferently.model].toLowerCase()
-      : entry.measuredDifferently.model;
+      ? MODEL_MEASURE_SHORT[entry.measuredDifferently.model]
+      : entry.measuredDifferently.model.replace(/_/g, " ");
     notes.push(
-      `Measured by ${model} in the model; the rate book says ${MODEL_MEASURE_LABELS[entry.measuredDifferently.rateBook].toLowerCase()} — send the works list to SketchUp.`,
+      `The model measured it by ${model}; the rate book says by ${MODEL_MEASURE_SHORT[entry.measuredDifferently.rateBook]} — send the works list to SketchUp.`,
     );
   }
 
@@ -578,10 +578,12 @@ function Removal({ removal }: { removal: PlanRemoval }) {
     <div className="flex flex-wrap items-center gap-2">
       <Badge variant="warning">Comes off</Badge>
       <span className="text-muted">
-        the model no longer measures it: its {formatCount(removal.modelRows)}{" "}
-        {removal.modelRows === 1 ? "row" : "rows"} from the last send go
+        the model no longer measures it:{" "}
+        {removal.modelRows === 1
+          ? "its row from the last send comes off"
+          : `its ${formatCount(removal.modelRows)} rows from the last send come off`}
         {removal.backToMeasure
-          ? ", and it goes back to to measure"
+          ? ", and the work is to measure again"
           : ` · ${formatCount(removal.handRows)} typed ${removal.handRows === 1 ? "row stays" : "rows stay"}`}
       </span>
     </div>

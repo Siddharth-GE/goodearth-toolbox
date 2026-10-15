@@ -63,6 +63,16 @@ export const MODEL_MEASURE_LABELS: Record<ModelMeasure, string> = {
   manual: "By hand, on the estimate",
 };
 
+/** The same, short enough for a sentence: "measured it by area". */
+export const MODEL_MEASURE_SHORT: Record<ModelMeasure, string> = {
+  volume: "volume",
+  area: "area",
+  base_and_sides: "base and sides",
+  length: "length",
+  count: "count",
+  manual: "hand",
+};
+
 export function isModelMeasure(value: unknown): value is ModelMeasure {
   return typeof value === "string" && (MODEL_MEASURES as readonly string[]).includes(value);
 }
