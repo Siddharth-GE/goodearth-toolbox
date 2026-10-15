@@ -31,8 +31,8 @@ import {
   duplicateLineMeasurement,
   removeLineMeasurement,
   updateLineMeasurement,
-  type MeasurementFields,
 } from "@/lib/estimator/estimate-actions";
+import type { MeasurementFields } from "@/lib/estimator/measurement-rules";
 import type { MeasurementRow } from "@/lib/estimator/estimate-queries";
 import { formatQuantity } from "@/lib/format";
 import {
