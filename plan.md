@@ -160,3 +160,47 @@ The founder, after the merge: "the calender in the birdwing tab dosent show the 
 4. **Grants** — Amal, Akshay on `/birdwing`; who on `/birdwing-books`?
 5. **The 67 unpaid internal stays** — bulk-assign cost centres on the Review screen, or one by one?
 6. **November 2026 salaries** already in the sheet — imported flagged "future", never confirmed, unless you say drop them.
+
+# Sixth piece — From the model: a SketchUp takeoff becomes a villa's estimate (2026-10-14)
+
+The founder: "i need to prepare a hand off system for this thing in one click to go the tool box as an estimate" — with `TOOLBOX-PLAN.md`, drafted by `[Opus]` beside the Goodearth QS SketchUp extension (`Documents\3Dqs_Sandbox\goodearth-qs`, built outside this repo). Reviewed against the code by `[Opus]` on the founder's word ("see if this plan works and then execute it"); the founder then chose, 2026-10-15: **Opus reviews and lands it** (the Fable review of `0118` is due before production), and **the plan's answers to its open questions 3–7**. Built on `feature/estimator-from-model`. The rules live in `estimator/PLAN.md` (decision 12, and its _Things that will bite_); this section holds only what is open.
+
+**In SketchUp, Goodearth QS → Send to the toolbox** opens the Estimator's **From the model** page in SketchUp's own window, signed in as the person, holding the model's takeoff. Pick the villa (the model remembers it) → the preview says, work by work, _adds_, _replaces the model's rows_, _refused (why)_, _to measure_ or _comes off_ → **Import** → the villa's working estimate has the works and their measurement sheets. Send again after changing the model: the model's rows are replaced, rows typed by hand never touched. Without SketchUp the page takes the takeoff file.
+
+## Where the plan was tweaked to the code
+
+- **The copy function carries the model flags** (`estimator_copy_estimate_contents`, re-created) — without it Make official or a villa started from another villa's estimate would turn model rows into hand rows, and the next send would count them twice.
+- **The works list keeps today's measuring rules.** The extension's bundled list marks works not to measure by area — FD.15 base and sides; FD.16, FD.22, FD.29–FD.32 and the Superstructure and MEP package works by hand. `0118` writes those into `model_measure` where blank (on staging: 1 base and sides, 27 by hand — staging's rate book has 21 package works in sqft where the bundled list had 20), and `scripts/import-masters-workbook.ts` does the same when it loads a rate book.
+- **A typed quantity is named before it is replaced**: the preview says _Replaces the typed 12 cum._
+- **A work the model stops measuring is shown coming off**, since the import replaces the model's rows whole.
+- **An older extension leaves an unused box out instead of sending null**: both read as "not used".
+- **`plan.md` gains this section rather than being replaced** — it still holds five founder checklists.
+
+## Steps
+
+- [x] `[Opus]` `0118` and `scripts/trials/estimator-from-model.sql`: dry-run on staging under RLS as the single-grant person (`/estimator` alone, then `/inventory` alone), and proved to bite four ways — with no delete of the old model rows it fails at TRIAL 3 (doubled), with no return to _to measure_ at TRIAL 3 (stale), with a copy that drops the flag at TRIAL 4, with no working-estimate check at TRIAL 5.
+- [x] ~~`[Fable]` Review `0118`~~ — **skipped on the founder's explicit word for staging** (2026-10-15: "Opus reviews and lands it"). In its place `[Opus]` reviewed against `SECURITY.md` and `BUGCATCHER.md`: no table, view or policy added (the measurement table's four policies asserted); both functions security invoker, execute revoked from `public, anon` and granted to `authenticated`, asserted; the copy function diffed against `0098`'s — only the two columns differ, and the file asserts the copy carries `from_model`; no money column; nothing embeds `profiles` through `estimator_estimates`, so the new FK makes no select ambiguous. No findings. Applied to staging (`0001`–`0118`); types regenerated (additions only); `db:check` level, `db:check-views` 23 of 23; the migration re-run and the trial passed on the applied database. **The Fable review is due before production.**
+- [x] `[Opus]` `measurement-rules.ts`, `model-takeoff.ts` (17 tests), `sheet-sync.ts`, the import reads and actions; edit, remove and duplicate refuse a model row.
+- [x] `[Opus]` The From the model page; _Measured from …_ and the _Model_ rows on the estimate; **From a SketchUp model** on Estimates; **Download works list for SketchUp** on the Rate book; _Measured from the model as_ on a work's page; the importer's measuring rules.
+- [x] `[Opus]` Checks: prettier, lint, typecheck, 1,115 tests, `next build`, `check:actions`. Every new `select` string at staging's PostgREST (all valid). The extension's real sample takeoff, read by `planImport` against staging's real rate book and imported by `import_model_rows` as the single-grant person in a rolled-back transaction: 18 works, 36 rows, every total as planned (FD.9 1.81845 cum, PF.8 365.542 sqft), three to measure. The page rendered through a throwaway probe (deleted) with a stand-in SketchUp bridge at SketchUp's 1180px, light and dark: the takeoff arrived over the bridge; the preview showed every kind. That look caught a spinner inside a paragraph (a hydration error) and two clumsy sentences, all fixed. **No screen has been opened signed in, and no real SketchUp send has reached the toolbox** — a model session can't sign in; the founder's vet is the first look.
+- [x] ~~`[Fable]` Approval pass~~ — **skipped on the founder's explicit word for this merge** (2026-10-15: "Opus reviews and lands it"). In its place `[Opus]` reviewed the full diff against this plan, `SECURITY.md` and `BUGCATCHER.md`: every new read and action opens with `requireTool("/estimator")` (the works-list route through its read; signed out, both new routes answer 307 → `/login` on the preview); no admin or browser client; every read checks its error and lists read through `fetchAll`; actions answer in sentences and never throw; no `"use server"` re-export; tokens only, light and dark. Findings fixed before the merge: the spinner in a paragraph, two sentences. Pull request #95 into `staging`; CI green; merged.
+- [ ] Founder — the checklist below, on staging. Then production: Fable's review of `0118`, then `0118` (before the masters workbook import — the importer now writes `model_measure`), the merge, and the extension's default address switched to `toolbox.goodearthkannur.org` (a new `.rbz` for the team).
+
+## Verification — the founder, on staging (sixth piece)
+
+1. **SketchUp: Extensions → Goodearth QS → Toolbox address…** → `https://staging.goodearthkannur.org`.
+2. **Open `Sample villa.skp` → Send to the toolbox.** A window opens; sign in (password, then the code). If it lands on the home page, close it and press **Send to the toolbox** again.
+3. **From the model** shows the file, 18 works, 36 rows, its problem count and 3 to measure by hand. Pick a test villa → every work says _adds_; the hand-measured ones say _to measure_.
+4. **Import → Open the estimate.** Under the title: _Measured from Sample villa.skp_. FD.14 reads 0.392 cum from `2 × 1.4 × 1.4 × 0.1`; F.1.36 and F.1.37 read 1 nos each; PF.8 reads 365.542 sqft. The model's rows carry a _Model_ badge and no edit buttons.
+5. **On FD.9, add a hand row** `1 × 1 × 1 × 1` → 2.818 cum.
+6. **In SketchUp, shorten wall BW1 by a metre** (keep it a solid) → **Send to the toolbox.** The villa is already picked; FD.9 says _replaces the model's 2 rows with 2 · 1 typed row kept_ → Import → FD.9 = 2.548 cum.
+7. **Rate book → FD.6** (on no estimate) → set its unit to **sqm**. In SketchUp tag a closed block `FD.6` and send: _refused — the rate book measures FD.6 in sqm, the model sent cum_; the rest imports. Set FD.6 back to cum.
+8. **Make official** on that estimate → the official copy's sheets still show the _Model_ badges.
+9. **Start another villa's estimate from this one** (everything), then send the model to that villa: no work doubles.
+10. **Rate book → Download works list for SketchUp** → in SketchUp, **Choose works list…** → that file: the counts match the rate book. (Inside SketchUp's window, **Send the works list to SketchUp** on From the model does the same in one press.)
+11. **As the probe** (`/estimator` and `/inventory`): From the model imports. As someone without `/estimator`, the page sends them home.
+
+## Still open (the plan's questions 1–2 — rate-book data, not this build)
+
+1. **Superstructure materials.** SS and MEP works are shares of a package rate per sqft; their sub-works (SS.2a–SS.2g, SS.5a, SS.9b, SS.6a–SS.6e, SS.11a/b) have no unit. Give them physical units and recipes, so the model can drive blocks and cement for the superstructure?
+2. **FD.16, FD.22, FD.29–FD.32** are sqft: shuttering area (base + sides) or plan area? Until answered they are measured by hand.

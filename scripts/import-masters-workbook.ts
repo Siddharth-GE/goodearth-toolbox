@@ -695,6 +695,21 @@ async function main() {
        join work_items w on w.code = r.code
        on conflict (work_item_id) do update set uom = excluded.uom, labour_rate = excluded.labour_rate;`,
     );
+    // How a SketchUp model measures the works whose unit alone would
+    // mislead it — 0118's backfill, for a rate book loaded after it (on
+    // production, the workbook may arrive after the migration). Only
+    // where nobody has set it, so a person's choice in the rate book
+    // stands.
+    statements.push(
+      `update estimator_work_info i set model_measure = 'base_and_sides'
+       from work_items w
+       where w.id = i.work_item_id and w.code = 'FD.15' and i.model_measure is null;`,
+      `update estimator_work_info i set model_measure = 'manual'
+       from work_items w join work_categories c on c.id = w.category_id
+       where w.id = i.work_item_id and i.model_measure is null
+         and (w.code in ('FD.16', 'FD.22', 'FD.29', 'FD.30', 'FD.31', 'FD.32')
+              or (c.code in ('SS', 'MEP') and i.uom = 'sqft'));`,
+    );
   }
 
   const worksTouched =

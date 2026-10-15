@@ -1,6 +1,6 @@
 # Estimator — the rules
 
-Grant `/estimator`. Migrations `0074`–`0088` and `0096`–`0098` (`0078`–`0081` shared with Indents and Inventory; `0113`'s `decide_indent_line` is the Estimator's answer on Indents' table).
+Grant `/estimator`. Migrations `0074`–`0088`, `0096`–`0098` and `0118` (`0078`–`0081` shared with Indents and Inventory; `0113`'s `decide_indent_line` is the Estimator's answer on Indents' table).
 
 What a villa costs to build. Works come from the Masters vocabulary (`0073`); this tool adds what each is measured in, what its labour costs and what it consumes. Selections and Budgets are interiors and stay out of it.
 
@@ -27,6 +27,14 @@ What a villa costs to build. Works come from the Masters vocabulary (`0073`); th
 10. **No scheduling** — "this whole build is only estimation". If it is ever built, Relay's missing per-activity dates are where it goes.
 11. **An indent line outside the estimate waits for the estimator** (`0113`, founder 2026-10-11: "the first thing reconciled in the estimate … indent should wait for estimator approval for sure"). Site check opens with **Indents waiting for you**: each submitted indent's lines no estimate or budget covers, with site's reason, **Approve** (one press) and **Refuse** (a note the approver reads). The indent cannot be approved until every one is approved; an answer can be changed while the indent waits. Written through `decide_indent_line()` onto Indents' table — the cross-tool write in `SECURITY.md`; read from Indents' open tables (`lib/estimator/indent-queries.ts`). Approving is not adding: **putting the material on the estimate** is the villa's working estimate (the row links to it) and Make official, after which the next indent pulls it from there. An approval at the indent **counts in Site check** when that material reaches the villa, matched on (villa, the indent's work, item) — read-side, nothing copied into `estimator_reconciliation_approvals`; an indent naming no work matches nothing there. The welcome screen counts the lines waiting.
 
+12. **A SketchUp model measures a villa** (`0118`, founder 2026-10-14: "a hand off system … in one click to go the tool box as an estimate"). Goodearth QS for SketchUp (built outside this repo, `Documents\3Dqs_Sandbox\goodearth-qs`) opens **From the model** (`/estimator/from-model`) in SketchUp's own window and hands it the takeoff; elsewhere the page takes the saved file. `lib/estimator/model-takeoff.ts` is the contract — the file's shape, read and checked, and what an import would do. The founder's answers (2026-10-15):
+    - **Into the villa's working estimate only**; with none, Import starts a blank one. Works match on an active `work_items.code`, and **the unit must equal the rate book's or that work is refused** — nothing converts (decision 7). The rest of the file still imports.
+    - **Model rows are the model's** (`from_model`, `model_refs`): `import_model_rows()` replaces the estimate's model rows whole, in one transaction, and never touches a typed row; a line the model measured alone and no longer measures goes back to _to measure_. Edit, remove and duplicate refuse a model row — it changes in the model and is sent again. _Copy to another work_ makes it a typed row.
+    - **Works the rate book measures by hand** go on as _to measure_. Every model row passes the typed row's check (`measurement-rules.ts`), and the quantity comes from `calc.ts` through the same `syncLineQty` (`sheet-sync.ts`) — SQL never sums.
+    - **The estimate remembers its model** (file, SketchUp's id, when, who); the preview warns before a different model lands on the villa, and before the model's rows replace a typed quantity.
+    - **The rate book says how the model measures each work** (`estimator_work_info.model_measure`; blank follows the unit). **Download works list for SketchUp** (or _Send the works list to SketchUp_ inside its window) is how the model learns it. `0118` and `scripts/import-masters-workbook.ts` set FD.15 to base and sides, and FD.16, FD.22, FD.29–32 and every Superstructure/MEP sqft work (a package rate per sqft) to by hand, wherever blank.
+    - **Anyone holding `/estimator` imports.** The file is untrusted input, read again on the server before anything is written; nothing in it decides identity or access.
+
 ## The rules everything rests on
 
 - **Every table here is `/estimator`-gated, SELECT included** (`0074`). Masters reads are ungated, so a rate cannot live there — a work's unit and labour rate are in `estimator_work_info`, never on `work_items`. It reads Inventory's money-free `stock_issues(_lines)` and `goods_receipts(_lines)`; other tools see it only through its three views (`SECURITY.md`), and the two open ones carry no rate, ever.
@@ -43,6 +51,10 @@ What a villa costs to build. Works come from the Masters vocabulary (`0073`); th
 - **An official must not point back at the working estimate it came from.** `source_estimate_id` is ON DELETE SET NULL and a submitted header refuses updates, so deleting the working estimate would fail on the cascade. `make_estimate_official` leaves it null on purpose; a "made from" link needs its own column.
 - **Nothing converts units** — not the recipes (quantities are per one unit of the parent, and screens print "bags per cum") and not the measurement sheet (feet on a cum work gives a confident wrong number; the unit beside the total is the only guard). Nothing stops Masters holding two units that mean the same thing.
 - **A mix with nothing in it contributes nothing** rather than erroring; the "nothing in it yet" flag is all that stands between an empty mix and a quietly cheap estimate.
+- **`estimator_copy_estimate_contents` must carry `from_model` and `model_refs`** (`0118` asserts it). A copy that drops them turns model rows into typed rows in an official or a villa started from another, and the next send counts them twice.
+- **SketchUp's window keeps its own sign-in, and login doesn't return to the page asked for**: the first time, sign in, then press Send again. A `next=` for exactly this path would need `SECURITY.md`'s argument first.
+- **A unit changed in the rate book after SketchUp loaded its works list is refused on import** — the fix is sending the list again, never a conversion. `window.sketchup` exists only inside SketchUp, and the page trusts it for nothing beyond "here is a takeoff".
+- **`model_refs` are SketchUp element ids**: they survive saving and copying the file, not exploding and regrouping — for tracing a row back, never for matching.
 - **Cells still refresh the page on save.** Skipping it (Budgets' `saveLine` precedent) needs the whole BOQ computed in the browser — worth doing once the rework has settled.
 
 ## Later, if asked

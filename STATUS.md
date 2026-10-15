@@ -14,7 +14,7 @@ Production is `toolbox.goodearthkannur.org` (from `master`); staging is `staging
 ## Platform
 
 - **Stack:** Next.js 16.2 (Turbopack) · React 19.2 · Tailwind 4 · Supabase Postgres. Vercel `bom1` + Supabase `ap-south-1`, both Mumbai.
-- **Migrations:** `0001`–`0093` on both databases; `0094`–`0117` on staging only. `applied_migrations` (`0067`) is the ledger, and CI checks it on every pull request.
+- **Migrations:** `0001`–`0093` on both databases; `0094`–`0118` on staging only. `applied_migrations` (`0067`) is the ledger, and CI checks it on every pull request.
 - **Access:** per-user grants (`user_apps`) + role bundles (`role_apps`), enforced in the database by `has_app()`.
 - **Navigation** (staging): tools sit under closed teams in the sidebar, arranged by the founder in Settings → Teams (`0114`, `lib/nav/`); a tool with no team sits under Other. Teams arrange, grants decide.
 - **Sign-in:** password → emailed 6-digit code (30-day trusted device), self-service reset, Google for existing team emails only; both steps rate-limited in the database. Mail rides Resend as `toolbox@goodearthkannur.org`. The rules are `SECURITY.md`.
@@ -36,7 +36,7 @@ Production unless marked. Each tool's rules are its `PLAN.md` (Google Chat door:
 - **Bills** — PO, work-order and NMR bills (on staging: bills have lines and print; labour logs become bills with Send to Bill; work orders replace labour contracts; payments, advances and the weekly cash request).
 - **Relay** — the baton relay: trails, departments, schedules, a wave per villa. Stores no documents. The **Google Chat door** drives it from Chat (staging).
 - **Design Management** — drawing sets, revisions and transmittals per villa; released drawings reach Supervisors.
-- **Estimator** — what a villa costs: a rate book, each villa measured on its own, a frozen official copy, one site-check list (the rework on staging; there, Site check opens with the indent lines waiting for the estimator).
+- **Estimator** — what a villa costs: a rate book, each villa measured on its own, a frozen official copy, one site-check list (the rework on staging; there, Site check opens with the indent lines waiting for the estimator, and a SketchUp model's takeoff measures a villa's estimate — **From the model**).
 - **Supervisors** — the site's day on a phone: labour, material requests, drawn-vs-estimated per work (on staging: labour as daily wages or piece-work, and a request off the estimate asks why).
 - **Client Relations** — the plot register and the only money coming in: payment schedules and receipts.
 - **Business Planning** — the founder's JV business plan as a recalculating tool.

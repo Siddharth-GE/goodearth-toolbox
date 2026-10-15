@@ -18,7 +18,12 @@ import { floorTwins } from "@/lib/estimator/works-rules";
 import { formatMoney, formatQuantity } from "@/lib/format";
 import { notFound } from "next/navigation";
 import { ComponentQtyField, RemoveComponentButton } from "../../mixes/_components/mix-forms";
-import { AddWorkComponentForm, CopyRateForm, WorkInfoForm } from "../_components/work-setup-forms";
+import {
+  AddWorkComponentForm,
+  CopyRateForm,
+  ModelMeasureForm,
+  WorkInfoForm,
+} from "../_components/work-setup-forms";
 
 export default async function WorkSetupPage({
   params,
@@ -75,6 +80,26 @@ export default async function WorkSetupPage({
         </div>
         <WorkInfoForm work={work} uoms={uoms} />
       </Card>
+
+      {work.uom !== null && (
+        <Card className="space-y-3 p-4">
+          <div>
+            <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
+              From a SketchUp model
+            </p>
+            <p className="text-muted mt-1 text-sm">
+              What the model measures when something is tagged {work.code}. By hand means the model
+              lists it and the estimate measures it — a package rate per sqft of built-up area, or
+              an area nobody has defined yet.
+            </p>
+          </div>
+          <ModelMeasureForm
+            workItemId={work.workItemId}
+            uom={work.uom}
+            current={work.modelMeasure}
+          />
+        </Card>
+      )}
 
       {work.uom === null ? (
         <Card className="p-4">

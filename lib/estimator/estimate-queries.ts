@@ -324,6 +324,9 @@ export type MeasurementRow = {
   breadth: number | null;
   depth: number | null;
   sortOrder: number;
+  /** Written by an import from a SketchUp model (0118) — changed in the
+   * model, not on the sheet. */
+  fromModel: boolean;
 };
 
 /**
@@ -357,10 +360,11 @@ export async function getEstimateMeasurements(
     breadth: number | null;
     depth: number | null;
     sort_order: number;
+    from_model: boolean;
   }>((from, to) =>
     supabase
       .from("estimator_estimate_line_measurements")
-      .select("id, line_id, description, nos, length, breadth, depth, sort_order")
+      .select("id, line_id, description, nos, length, breadth, depth, sort_order, from_model")
       .in(
         "line_id",
         lines.map((line) => line.id),
@@ -381,6 +385,7 @@ export async function getEstimateMeasurements(
       breadth: row.breadth,
       depth: row.depth,
       sortOrder: row.sort_order,
+      fromModel: row.from_model,
     });
     byLine.set(row.line_id, bucket);
   }
@@ -553,6 +558,8 @@ export type EstimateDetail = {
   villaWorkingId: string | null;
   /** The same villa's current official estimate, when this is not it. */
   villaOfficial: { id: string; reference: string | null } | null;
+  /** The SketchUp model this working estimate was last measured from (0118). */
+  model: { file: string | null; importedAt: string; importedByName: string | null } | null;
   /**
    * The 0077 snapshot, present whenever the estimate is no longer a
    * draft. The screen renders THIS — costs frozen on the day of submit
@@ -571,7 +578,7 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
   const { data: estimate, error } = await supabase
     .from("estimator_estimates")
     .select(
-      "id, name, note, is_template, is_working, project_id, unit_id, source_estimate_id, status, reference, submitted_by, submitted_at, superseded_at",
+      "id, name, note, is_template, is_working, project_id, unit_id, source_estimate_id, status, reference, submitted_by, submitted_at, superseded_at, model_file, model_imported_at, model_imported_by",
     )
     .eq("id", estimateId)
     .maybeSingle();
@@ -617,9 +624,16 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
   // The lifecycle extras: who submitted, where the villa's working and
   // official estimates are, and the frozen snapshot for anything past
   // draft. Fetched after the header because all three hang off it.
-  const [submitter, siblings, frozenCosts, frozenTakeoff] = await Promise.all([
+  const [submitter, importer, siblings, frozenCosts, frozenTakeoff] = await Promise.all([
     estimate.submitted_by
       ? supabase.from("profiles").select("full_name").eq("id", estimate.submitted_by).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    estimate.model_imported_by
+      ? supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("id", estimate.model_imported_by)
+          .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
     estimate.unit_id
       ? supabase
@@ -665,6 +679,7 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
       : Promise.resolve([]),
   ]);
   if (siblings.error) fail("the villa's other estimates", siblings.error);
+  if (importer.error) fail("who imported the model", importer.error);
   const villaWorking = (siblings.data ?? []).find(
     (row) => row.is_working && row.id !== estimate.id,
   );
@@ -691,6 +706,13 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
     villaWorkingId: villaWorking?.id ?? null,
     villaOfficial: villaOfficial
       ? { id: villaOfficial.id, reference: villaOfficial.reference }
+      : null,
+    model: estimate.model_imported_at
+      ? {
+          file: estimate.model_file,
+          importedAt: estimate.model_imported_at,
+          importedByName: importer.data?.full_name ?? null,
+        }
       : null,
     frozen:
       estimate.status === "draft"

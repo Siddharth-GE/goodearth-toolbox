@@ -14,12 +14,13 @@ import {
   applyRateOverrides,
   computeLine,
   computeWorkTakeoff,
-  sheetTotal,
 } from "./calc";
 import { getEstimateVariations, getRecipeBook } from "./estimate-queries";
+import { checkMeasurement, type MeasurementFields } from "./measurement-rules";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { GRANT, NAME_LIMIT, TEXT_LIMIT } from "./shared";
+import { syncLineQty } from "./sheet-sync";
 
 // ---------------------------------------------------------------------
 // Estimates
@@ -246,73 +247,35 @@ export async function removeEstimateLine(id: string): Promise<ActionState> {
  * a blank box not used (founder, 2026-09-25). The line's qty stays the
  * one figure everything downstream reads; after every row change the
  * action re-sums the sheet through calc.ts and writes it there. The
- * draft-only trigger is the boundary; these actions speak plainly.
+ * draft-only trigger is the boundary; these actions speak plainly. The
+ * row rules are measurement-rules.ts and the re-sum sheet-sync.ts, the
+ * same ones an import from a SketchUp model goes through.
+ *
+ * A row the model wrote (0118, from_model) is changed in the model and
+ * sent again, never on the sheet (founder, 2026-10-15): edit, remove and
+ * duplicate refuse it, because the next send would replace the edit.
+ * Copying it to another work makes a hand row — that copy is the
+ * estimator's own.
  * ------------------------------------------------------------------ */
 
-export type MeasurementFields = {
-  description: string | null;
-  nos: number | null;
-  length: number | null;
-  breadth: number | null;
-  depth: number | null;
-};
+const MODEL_ROW =
+  "This row came from the SketchUp model — change it in the model and send it to the toolbox again.";
 
-/** The same rules for a new row and an edited one: blank is "not used",
- * anything typed must be a number above zero, and a row must measure
- * something. Returns the message, or undefined when the row is fine. */
-function checkMeasurement(fields: MeasurementFields): string | undefined {
-  const boxes = [
-    ["Nos", fields.nos],
-    ["Length", fields.length],
-    ["Breadth", fields.breadth],
-    ["Depth", fields.depth],
-  ] as const;
-  for (const [label, value] of boxes) {
-    if (value !== null && (!Number.isFinite(value) || value <= 0)) {
-      return `${label} must be a number more than zero, or left blank.`;
-    }
-  }
-  if (boxes.every(([, value]) => value === null)) {
-    return "Enter at least one of number, length, breadth or depth.";
-  }
-  if (fields.description && fields.description.length > TEXT_LIMIT) {
-    return "That description is too long.";
-  }
-  return undefined;
-}
-
-/** Re-sum a line's sheet and write the total onto the line. With no rows
- * left the line keeps its last quantity, typed from then on. */
-async function syncLineQty(
+/** Whether a row is the model's, before an edit or a removal. */
+async function readRowSource(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  lineId: string,
-  userId: string,
-): Promise<string | undefined> {
-  const { data: rows, error: readError } = await supabase
+  id: string,
+): Promise<{ fromModel: boolean } | null | "failed"> {
+  const { data, error } = await supabase
     .from("estimator_estimate_line_measurements")
-    .select("nos, length, breadth, depth")
-    .eq("line_id", lineId);
-  if (readError) {
-    console.error("syncLineQty (read) failed:", readError);
-    return "The row was saved, but the work's quantity could not be updated. Change any row to retry.";
-  }
-  if (!rows || rows.length === 0) return undefined;
-
-  const total = sheetTotal(rows);
-  if (!(total > 0)) {
-    return "The measurements add up to nothing — check the rows.";
-  }
-
-  const { error } = await supabase
-    .from("estimator_estimate_lines")
-    .update({ qty: total, updated_by: userId })
-    .eq("id", lineId);
+    .select("from_model")
+    .eq("id", id)
+    .maybeSingle();
   if (error) {
-    if (error.code === "P0001") return error.message;
-    console.error("syncLineQty (write) failed:", error);
-    return "The row was saved, but the work's quantity could not be updated. Change any row to retry.";
+    console.error("readRowSource failed:", error);
+    return "failed";
   }
-  return undefined;
+  return data ? { fromModel: data.from_model } : null;
 }
 
 export async function addLineMeasurement(
@@ -391,10 +354,16 @@ export async function updateLineMeasurement(
   if (problem) return { error: problem };
 
   const supabase = await createClient();
+  const source = await readRowSource(supabase, id);
+  if (source === "failed") return { error: "Could not save the row. Try again." };
+  if (!source) return { error: "That row is no longer on the sheet — reload the page." };
+  if (source.fromModel) return { error: MODEL_ROW };
+
   const { data: row, error } = await supabase
     .from("estimator_estimate_line_measurements")
     .update({ ...cleaned, updated_by: user.id })
     .eq("id", id)
+    .eq("from_model", false)
     .select("line_id")
     .maybeSingle();
   if (error) {
@@ -414,10 +383,15 @@ export async function removeLineMeasurement(id: string): Promise<ActionState> {
   if (!id) return { error: "Which row?" };
   const supabase = await createClient();
 
+  const source = await readRowSource(supabase, id);
+  if (source === "failed") return { error: "Could not remove the row. Try again." };
+  if (source?.fromModel) return { error: MODEL_ROW };
+
   const { data: row, error } = await supabase
     .from("estimator_estimate_line_measurements")
     .delete()
     .eq("id", id)
+    .eq("from_model", false)
     .select("line_id")
     .maybeSingle();
   if (error) {
@@ -444,7 +418,7 @@ export async function duplicateLineMeasurement(id: string): Promise<ActionState>
 
   const { data: row, error: rowError } = await supabase
     .from("estimator_estimate_line_measurements")
-    .select("line_id, description, nos, length, breadth, depth")
+    .select("line_id, description, nos, length, breadth, depth, from_model")
     .eq("id", id)
     .maybeSingle();
   if (rowError) {
@@ -452,6 +426,7 @@ export async function duplicateLineMeasurement(id: string): Promise<ActionState>
     return { error: "Could not duplicate the row. Try again." };
   }
   if (!row) return { error: "That row is no longer on the sheet — reload the page." };
+  if (row.from_model) return { error: MODEL_ROW };
 
   const { data: last, error: lastError } = await supabase
     .from("estimator_estimate_line_measurements")

@@ -16,9 +16,7 @@ import type { MaterialDef } from "./calc";
  */
 
 export const GRANT = "/estimator";
-export const NAME_LIMIT = 120;
-export const UOM_LIMIT = 20;
-export const TEXT_LIMIT = 2000;
+export { NAME_LIMIT, TEXT_LIMIT, UOM_LIMIT } from "./limits";
 
 export const fail = (context: string, error: { message: string }): never =>
   readFailed("estimator", context, error);
