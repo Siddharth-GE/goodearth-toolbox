@@ -99,9 +99,13 @@ export function MeasurementSheetDialog({
 
         {measured && !readOnly ? (
           <ul className="divide-border divide-y">
-            {rows.map((row) => (
-              <EditableMeasurementRow key={row.id} row={row} workUom={workUom} />
-            ))}
+            {rows.map((row) =>
+              row.fromModel ? (
+                <ModelMeasurementRow key={row.id} row={row} workUom={workUom} />
+              ) : (
+                <EditableMeasurementRow key={row.id} row={row} workUom={workUom} />
+              ),
+            )}
           </ul>
         ) : measured ? (
           <Table>
@@ -121,6 +125,11 @@ export function MeasurementSheetDialog({
                 <TableRow key={row.id}>
                   <TableCell className="text-foreground text-sm">
                     {row.description ?? "—"}
+                    {row.fromModel && (
+                      <Badge variant="info" className="ml-2">
+                        Model
+                      </Badge>
+                    )}
                   </TableCell>
                   {BOXES.map((box) => (
                     <TableCell key={box.key} className="text-right font-mono text-sm">
@@ -286,6 +295,43 @@ function EditableMeasurementRow({ row, workUom }: { row: MeasurementRow; workUom
   );
 }
 
+/**
+ * A row the SketchUp model wrote (0118): shown, never edited here. The
+ * next send replaces it, so an edit on the sheet would be lost — the
+ * model is where it changes (founder, 2026-10-15). Copy to another work
+ * still takes it, as a typed row.
+ */
+function ModelMeasurementRow({ row, workUom }: { row: MeasurementRow; workUom: string | null }) {
+  return (
+    <li className="space-y-2 py-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-foreground min-w-48 flex-1 text-sm">{row.description ?? "—"}</span>
+        <Badge variant="info">Model</Badge>
+      </div>
+      <div className="grid grid-cols-4 gap-2">
+        {BOXES.map((box) => (
+          <div key={box.key} className="space-y-1">
+            <span className="text-muted block text-xs">{box.label}</span>
+            <span className="text-foreground block text-right font-mono text-sm">
+              {row[box.key] === null ? "" : formatQuantity(row[box.key])}
+            </span>
+          </div>
+        ))}
+      </div>
+      <p className="text-muted text-right text-sm">
+        ={" "}
+        <span className="text-foreground font-mono">
+          {formatQuantity(measurementQuantity(row))}
+        </span>
+        {workUom ? ` ${workUom}` : ""}
+      </p>
+      <p className="text-muted text-xs">
+        From the SketchUp model — change it there and send it to the toolbox again.
+      </p>
+    </li>
+  );
+}
+
 /** A one-tap action on a row — Duplicate or Remove — that says why when
  * it is refused. */
 function RowActionButton({
@@ -428,7 +474,7 @@ function CopyRowsForm({
       <FormMessage error={result?.error} />
       <p className="text-muted text-xs">
         The sizes go across exactly as they are — plaster has no thickness, paint may count both
-        faces — so check them there.
+        faces — so check them there. Rows from the model arrive as typed rows, yours to change.
       </p>
     </div>
   );

@@ -10,6 +10,7 @@ import { requireTool } from "@/lib/auth/access";
 import { parseNumber, text } from "@/lib/form-data";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { isModelMeasure } from "./model-takeoff";
 import { GRANT, UOM_LIMIT } from "./shared";
 
 // ---------------------------------------------------------------------
@@ -75,6 +76,39 @@ export async function saveWorkInfo(
     console.error("saveWorkInfo failed:", error);
     return { error: "Could not save the work setup. Try again." };
   }
+
+  revalidatePath("/estimator", "layout");
+  return undefined;
+}
+
+/**
+ * How the SketchUp model measures this work (0118) — the rate book is the
+ * one place it is decided, and the works list SketchUp loads is
+ * downloaded from here. Null (blank) follows the unit. Only a work with a
+ * unit has a row to hold it.
+ */
+export async function setWorkModelMeasure(
+  workItemId: string,
+  measure: string | null,
+): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+  if (!workItemId) return { error: "Which work?" };
+  if (measure !== null && !isModelMeasure(measure)) {
+    return { error: "Pick how the model measures it from the list." };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("estimator_work_info")
+    .update({ model_measure: measure, updated_by: user.id })
+    .eq("work_item_id", workItemId)
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.error("setWorkModelMeasure failed:", error);
+    return { error: "Could not save that. Try again." };
+  }
+  if (!data) return { error: "Set the work's unit first." };
 
   revalidatePath("/estimator", "layout");
   return undefined;

@@ -62,14 +62,19 @@ export default async function VillasPage() {
 
   return (
     <div className="space-y-4">
-      <div className="max-w-2xl">
-        <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Villas</p>
-        <p className="text-muted mt-1 text-sm">
-          Each villa has one working estimate — list its works, measure them, tap a rate to see how
-          it is built. When it is ready, Make official takes a numbered, frozen copy: the one the
-          stores and site check against. {formatCount(started)} of {formatCount(villas.length)}{" "}
-          villas have one started.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="max-w-2xl">
+          <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Villas</p>
+          <p className="text-muted mt-1 text-sm">
+            Each villa has one working estimate — list its works, measure them, tap a rate to see
+            how it is built. When it is ready, Make official takes a numbered, frozen copy: the one
+            the stores and site check against. {formatCount(started)} of{" "}
+            {formatCount(villas.length)} villas have one started.
+          </p>
+        </div>
+        <LinkButton href="/estimator/from-model" variant="secondary">
+          From a SketchUp model
+        </LinkButton>
       </div>
 
       {villas.length === 0 ? (

@@ -105,6 +105,9 @@ export default async function RateBookPage({
         >
           Priced
         </LinkButton>
+        <LinkButton href="/estimator/works/export" variant="ghost" plain className="sm:ml-auto">
+          Download works list for SketchUp
+        </LinkButton>
       </div>
 
       {shown.length === 0 ? (

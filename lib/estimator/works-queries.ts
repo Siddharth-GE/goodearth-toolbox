@@ -5,6 +5,7 @@ import { listWorkCategories, listWorkGroups, listWorkItems } from "@/lib/masters
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { listMixes } from "./mixes-queries";
+import { isModelMeasure, type ModelMeasure } from "./model-takeoff";
 import { fail, GRANT, itemDefsByIds, OLDER_ROW_LABEL } from "./shared";
 
 // ---------------------------------------------------------------------
@@ -112,6 +113,8 @@ export type WorkSetup = {
   groupName: string | null;
   uom: string | null;
   labourRate: number | null;
+  /** How the SketchUp model measures it (0118); null = from the unit. */
+  modelMeasure: ModelMeasure | null;
   components: WorkComponentRow[];
   /** How many estimate lines use this work — changing its unit rewrites their meaning. */
   lineCount: number;
@@ -132,7 +135,7 @@ export async function getWorkSetup(workItemId: string): Promise<WorkSetup | null
   const [info, components, mixes, lines] = await Promise.all([
     supabase
       .from("estimator_work_info")
-      .select("uom, labour_rate")
+      .select("uom, labour_rate, model_measure")
       .eq("work_item_id", workItemId)
       .maybeSingle(),
     fetchAll<{
@@ -171,6 +174,7 @@ export async function getWorkSetup(workItemId: string): Promise<WorkSetup | null
     groupName: item.group_id ? (groups.find((g) => g.id === item.group_id)?.name ?? null) : null,
     uom: info.data?.uom ?? null,
     labourRate: info.data?.labour_rate ?? null,
+    modelMeasure: isModelMeasure(info.data?.model_measure) ? info.data.model_measure : null,
     lineCount: lines.count ?? 0,
     components: components.map((component) => {
       if (component.item_id || component.material_id) {

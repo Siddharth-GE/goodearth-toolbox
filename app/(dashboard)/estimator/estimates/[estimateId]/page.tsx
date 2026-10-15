@@ -458,6 +458,18 @@ export default async function EstimatePage({
       {estimate.isWorking && estimate.sourceName && (
         <p className="text-muted text-sm">Started from {estimate.sourceName}.</p>
       )}
+      {estimate.model && (
+        <p className="text-muted text-sm">
+          Measured from {estimate.model.file ?? "a SketchUp model"} ·{" "}
+          {formatDate(estimate.model.importedAt)}
+          {estimate.model.importedByName ? ` · ${estimate.model.importedByName}` : ""}. Rows marked
+          Model change in the model —{" "}
+          <Link className="underline underline-offset-2" href="/estimator/from-model">
+            send it again
+          </Link>{" "}
+          from SketchUp.
+        </p>
+      )}
 
       <Card className="space-y-2 p-5">
         <Figure
@@ -571,6 +583,10 @@ export default async function EstimatePage({
                               <span className="text-muted block text-xs">
                                 From {sheet.length}{" "}
                                 {sheet.length === 1 ? "measurement" : "measurements"}
+                                {sheet.some((row) => row.fromModel) &&
+                                  (sheet.every((row) => row.fromModel)
+                                    ? ", all from the model"
+                                    : `, ${sheet.filter((row) => row.fromModel).length} from the model`)}
                               </span>
                             </span>
                           ) : (

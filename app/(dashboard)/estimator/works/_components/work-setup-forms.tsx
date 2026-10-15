@@ -7,7 +7,19 @@ import { Label } from "@/components/ui/label";
 import { SearchSelect } from "@/components/ui/search-select";
 import { chosenUom, componentOptions } from "../../_components/component-options";
 import { Checkbox } from "@/components/ui/checkbox";
-import { addWorkComponent, copyWorkSetup, saveWorkInfo } from "@/lib/estimator/works-actions";
+import { Select } from "@/components/ui/select";
+import {
+  MODEL_MEASURE_LABELS,
+  MODEL_MEASURES,
+  measureFromUnit,
+  type ModelMeasure,
+} from "@/lib/estimator/model-takeoff";
+import {
+  addWorkComponent,
+  copyWorkSetup,
+  saveWorkInfo,
+  setWorkModelMeasure,
+} from "@/lib/estimator/works-actions";
 import { UomSelect } from "../../_components/uom-select";
 import type { MixRow } from "@/lib/estimator/mixes-queries";
 import type { MaterialItemRow } from "@/lib/estimator/shared";
@@ -76,6 +88,65 @@ export function WorkInfoForm({ work, uoms }: { work: WorkSetup; uoms: string[] }
       )}
       <FormMessage error={state?.error} />
     </form>
+  );
+}
+
+/**
+ * How the SketchUp model measures this work (0118). Saved on change; the
+ * works list SketchUp loads carries it, so the model follows the rate
+ * book once that list is sent again.
+ */
+export function ModelMeasureForm({
+  workItemId,
+  uom,
+  current,
+}: {
+  workItemId: string;
+  uom: string;
+  current: ModelMeasure | null;
+}) {
+  const [value, setValue] = useState<string>(current ?? "");
+  const [pending, startTransition] = useTransition();
+  const [result, setResult] = useState<{ error?: string; done?: string }>();
+  const fromUnit = measureFromUnit(uom);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="min-w-64 flex-1 space-y-1.5 sm:max-w-md">
+          <Label htmlFor="model-measure">Measured from the model as</Label>
+          <Select
+            id="model-measure"
+            value={value}
+            disabled={pending}
+            onChange={(event) => {
+              const next = event.target.value;
+              const previous = value;
+              setValue(next);
+              startTransition(async () => {
+                const outcome = await setWorkModelMeasure(workItemId, next || null);
+                if (outcome?.error) {
+                  setValue(previous);
+                  setResult({ error: outcome.error });
+                } else {
+                  setResult({ done: "Saved — send the works list to SketchUp to use it there." });
+                }
+              });
+            }}
+          >
+            <option value="">
+              From its unit, {uom}: {MODEL_MEASURE_LABELS[fromUnit].toLowerCase()}
+            </option>
+            {MODEL_MEASURES.map((measure) => (
+              <option key={measure} value={measure}>
+                {MODEL_MEASURE_LABELS[measure]}
+              </option>
+            ))}
+          </Select>
+        </div>
+      </div>
+      <FormMessage error={result?.error} success={result?.done} />
+    </div>
   );
 }
 
