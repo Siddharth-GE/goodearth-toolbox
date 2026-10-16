@@ -2756,7 +2756,6 @@ export type Database = {
           plot_value: number | null
           progress_stage_id: string | null
           project_id: string
-          working_drawing_on: string | null
           registration_note: string | null
           registration_on: string | null
           registration_stage: string
@@ -2767,6 +2766,7 @@ export type Database = {
           unit_id: string
           updated_at: string
           updated_by: string | null
+          working_drawing_on: string | null
         }
         Insert: {
           bottlenecks?: string[]
@@ -2790,7 +2790,6 @@ export type Database = {
           plot_value?: number | null
           progress_stage_id?: string | null
           project_id: string
-          working_drawing_on?: string | null
           registration_note?: string | null
           registration_on?: string | null
           registration_stage?: string
@@ -2801,6 +2800,7 @@ export type Database = {
           unit_id: string
           updated_at?: string
           updated_by?: string | null
+          working_drawing_on?: string | null
         }
         Update: {
           bottlenecks?: string[]
@@ -2824,7 +2824,6 @@ export type Database = {
           plot_value?: number | null
           progress_stage_id?: string | null
           project_id?: string
-          working_drawing_on?: string | null
           registration_note?: string | null
           registration_on?: string | null
           registration_stage?: string
@@ -2835,6 +2834,7 @@ export type Database = {
           unit_id?: string
           updated_at?: string
           updated_by?: string | null
+          working_drawing_on?: string | null
         }
         Relationships: [
           {
@@ -11010,6 +11010,13 @@ export type Database = {
       birdwing_mint: { Args: { p_scope: string }; Returns: number }
       can_approve_bills: { Args: { uid: string }; Returns: boolean }
       can_approve_indents: { Args: { uid: string }; Returns: boolean }
+      client_relations_team: {
+        Args: never
+        Returns: {
+          full_name: string
+          id: string
+        }[]
+      }
       create_bill: {
         Args: {
           p_gst_amount: number
@@ -11144,13 +11151,6 @@ export type Database = {
             }
             Returns: string
           }
-      client_relations_team: {
-        Args: never
-        Returns: {
-          full_name: string
-          id: string
-        }[]
-      }
       crm_assign_unit: {
         Args: { p_client_id: string; p_status: string; p_unit_id: string }
         Returns: undefined
