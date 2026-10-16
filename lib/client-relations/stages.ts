@@ -42,9 +42,10 @@ export const CLIENT_STAGES: Option<ClientStage>[] = [
 // Sale deed and construction agreement
 // ---------------------------------------------------------------------
 
-export type DeedStatus = "not_signed" | "signed";
-export type OriginalWith = "chess_cafe" | "client" | "bank";
-export type Acknowledgement = "with_bank" | "received";
+export type DeedStatus = "not_started" | "drafting" | "not_signed" | "signed";
+export type OriginalWith = "client" | "bank" | "chess_cafe" | "sreejayan" | "tarana";
+export type Acknowledgement =
+  "received" | "with_bank" | "with_sreejayan" | "requested_from_client" | "pending";
 
 /**
  * The sheet writes these as one value — "Signed, Bank Original" — but they
@@ -52,21 +53,33 @@ export type Acknowledgement = "with_bank" | "received";
  * hand-typed "Sale deed: 29" into a single equality rather than a growing
  * chain of ORs. Same vocabulary serves the construction agreement, which
  * is why neither is named for the document it belongs to.
+ *
+ * The Saarang tracker's lists, in its order (0120 widened every CHECK).
+ * 'not_signed' stays the database default, so an untouched plot reads
+ * "Not signed" — the honest reading of a deed nobody has recorded.
  */
 export const DEED_STATUSES: Option<DeedStatus>[] = [
+  { value: "not_started", label: "Not started", tone: "neutral" },
+  { value: "drafting", label: "Drafting", tone: "info" },
   { value: "not_signed", label: "Not signed", tone: "neutral" },
   { value: "signed", label: "Signed", tone: "success" },
 ];
 
+/** Who holds the signed original. Labels are short: they sit in chips. */
 export const ORIGINAL_WITH: Option<OriginalWith>[] = [
-  { value: "chess_cafe", label: "Chess Cafe original", tone: "info" },
-  { value: "client", label: "Client original", tone: "info" },
-  { value: "bank", label: "Bank original", tone: "warning" },
+  { value: "client", label: "Client", tone: "info" },
+  { value: "bank", label: "Bank", tone: "warning" },
+  { value: "chess_cafe", label: "Chess Cafe", tone: "info" },
+  { value: "sreejayan", label: "Sreejayan", tone: "info" },
+  { value: "tarana", label: "Tarana", tone: "info" },
 ];
 
 export const ACKNOWLEDGEMENTS: Option<Acknowledgement>[] = [
-  { value: "with_bank", label: "With bank", tone: "warning" },
   { value: "received", label: "Received", tone: "success" },
+  { value: "with_bank", label: "With bank", tone: "warning" },
+  { value: "with_sreejayan", label: "With Sreejayan", tone: "info" },
+  { value: "requested_from_client", label: "Requested from client", tone: "warning" },
+  { value: "pending", label: "Pending", tone: "neutral" },
 ];
 
 // ---------------------------------------------------------------------
@@ -91,20 +104,26 @@ export const REGISTRATION_STAGES: Option<RegistrationStage>[] = [
 // Bottlenecks — several at once
 // ---------------------------------------------------------------------
 
-export type Bottleneck = "design" | "client" | "payments" | "management" | "interiors";
+export type Bottleneck =
+  "design" | "client" | "payments" | "management" | "interiors" | "legal" | "bank_loan";
 
 /**
  * Stored as a `text[]`, because the sheet genuinely holds more than one at
  * a time ("Interior design, Payments"). Note that 'design' here means
  * "the design team is what this plot is waiting on" — it is not a design
- * STATUS. Design status comes from Relay and is never typed.
+ * STATUS; the three design checks on the plot are (0120).
+ *
+ * The tracker's last two are appended, not interleaved: the order here is
+ * the order a plot's chips render in, and existing plots keep theirs.
  */
 export const BOTTLENECKS: Option<Bottleneck>[] = [
   { value: "design", label: "Design", tone: "warning" },
   { value: "client", label: "Client", tone: "info" },
   { value: "payments", label: "Payments", tone: "danger" },
   { value: "management", label: "Management", tone: "warning" },
-  { value: "interiors", label: "Interiors", tone: "info" },
+  { value: "interiors", label: "Interior design", tone: "info" },
+  { value: "legal", label: "Legal / documents", tone: "warning" },
+  { value: "bank_loan", label: "Bank / loan", tone: "warning" },
 ];
 
 const BOTTLENECK_ORDER = new Map(BOTTLENECKS.map((b, i) => [b.value, i]));
@@ -211,6 +230,54 @@ export const RECEIPT_MODES: Option<ReceiptMode>[] = [
   { value: "upi", label: "UPI", tone: "default" },
   { value: "cash", label: "Cash", tone: "default" },
   { value: "other", label: "Other", tone: "neutral" },
+];
+
+// ---------------------------------------------------------------------
+// Kaadal interiors (0120)
+// ---------------------------------------------------------------------
+
+export type KaadalStage =
+  | "to_pitch"
+  | "pitch_done"
+  | "retainer_pending"
+  | "retainer_paid"
+  | "in_design"
+  | "execution"
+  | "closed";
+
+/** The tracker's interiors ladder, in its order. Closed ends it either way. */
+export const KAADAL_STAGES: Option<KaadalStage>[] = [
+  { value: "to_pitch", label: "To pitch", tone: "neutral" },
+  { value: "pitch_done", label: "Pitch done", tone: "info" },
+  { value: "retainer_pending", label: "Retainer pending", tone: "warning" },
+  { value: "retainer_paid", label: "Retainer paid", tone: "success" },
+  { value: "in_design", label: "In design", tone: "info" },
+  { value: "execution", label: "Execution", tone: "info" },
+  { value: "closed", label: "Closed – no interiors", tone: "neutral" },
+];
+
+// ---------------------------------------------------------------------
+// Actions — the next steps (0120)
+// ---------------------------------------------------------------------
+
+export type ActionStatus = "open" | "waiting_client" | "waiting_management" | "done";
+export type ActionTrack = "sales" | "kaadal";
+
+/**
+ * "Waiting on management" is the flag a team member raises when only a
+ * manager can clear it; it lifts the action into Needs management at the
+ * top of everyone's list.
+ */
+export const ACTION_STATUSES: Option<ActionStatus>[] = [
+  { value: "open", label: "Open", tone: "default" },
+  { value: "waiting_client", label: "Waiting on client", tone: "warning" },
+  { value: "waiting_management", label: "Waiting on management", tone: "danger" },
+  { value: "done", label: "Done", tone: "success" },
+];
+
+export const ACTION_TRACKS: Option<ActionTrack>[] = [
+  { value: "sales", label: "Sales", tone: "default" },
+  { value: "kaadal", label: "Kaadal", tone: "info" },
 ];
 
 // ---------------------------------------------------------------------

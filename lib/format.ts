@@ -164,6 +164,25 @@ export function formatLongDate(value: string | Date | null | undefined): string 
   });
 }
 
+/**
+ * `Fri, 17 Oct` — a date close enough that the weekday is the useful part
+ * and the year goes without saying (Client Relations' due dates).
+ */
+export function formatDayDate(value: string | Date | null | undefined): string {
+  if (!value) return "—";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString(LOCALE, { weekday: "short", day: "numeric", month: "short" });
+}
+
+/** `17 Oct` — a recent date in a caption, beside who did it. */
+export function formatShortDate(value: string | Date | null | undefined): string {
+  if (!value) return "—";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString(LOCALE, { day: "numeric", month: "short" });
+}
+
 /** `4:05 pm` — Marathon's entry lists, where only the time of day matters. */
 export function formatTime(value: string | Date | null | undefined): string {
   if (!value) return "—";
@@ -175,7 +194,7 @@ export function formatTime(value: string | Date | null | undefined): string {
 /**
  * Today in India, as "YYYY-MM-DD".
  *
- * The one clock-reading function in the toolbox. Asia/Kolkata is named
+ * The toolbox's clock, with hourInIndia below. Asia/Kolkata is named
  * explicitly because Vercel runs in UTC and the people using this do not
  * — for five and a half hours a day the two disagree about what day it
  * is. Pure modules never call it: they take `today` as an argument so
@@ -188,6 +207,20 @@ export function todayInIndia(): string {
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
+}
+
+/**
+ * The hour in India, 0–23 — todayInIndia's sibling, for "Good morning"
+ * on a server that lives in UTC. The same rule: pure modules take the
+ * hour as an argument and never call this.
+ */
+export function hourInIndia(): number {
+  const hour = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kolkata",
+    hour: "2-digit",
+    hourCycle: "h23",
+  }).format(new Date());
+  return Number(hour) % 24;
 }
 
 /** A plain grouped integer: counts, totals of things rather than money. */
