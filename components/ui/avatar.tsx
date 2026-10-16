@@ -1,7 +1,26 @@
 import { colorForName } from "@/lib/color-hash";
 
-export function Avatar({ name, size = 40 }: { name: string; size?: number }) {
-  const initial = name.trim().charAt(0).toUpperCase() || "?";
+/**
+ * A person's face where there is no photo: their colour, their initial.
+ *
+ * `letters={2}` shows the first two letters of the first name — for a
+ * small team whose names share an initial (Sayooj and Sebastina read "Sa"
+ * and "Se", not "S" and "S"; the Saarang tracker's reason for two).
+ */
+export function Avatar({
+  name,
+  size = 40,
+  letters = 1,
+}: {
+  name: string;
+  size?: number;
+  letters?: 1 | 2;
+}) {
+  const first = name.trim().split(/\s+/)[0] ?? "";
+  const initial =
+    (letters === 2
+      ? first.charAt(0).toUpperCase() + first.charAt(1).toLowerCase()
+      : first.charAt(0).toUpperCase()) || "?";
   return (
     <span
       className="flex shrink-0 items-center justify-center rounded-full font-bold text-white"
@@ -9,7 +28,7 @@ export function Avatar({ name, size = 40 }: { name: string; size?: number }) {
         backgroundColor: colorForName(name),
         width: size,
         height: size,
-        fontSize: size * 0.4,
+        fontSize: size * (letters === 2 ? 0.36 : 0.4),
       }}
     >
       {initial}
