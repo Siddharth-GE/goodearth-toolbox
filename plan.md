@@ -348,3 +348,22 @@ What carries the feel, read from the tracker:
 10. **Plots → Saarang West - Villas**: 27 cards, six with a buyer, each showing its configuration (1BHK Study …). In Saarang, **Plot 33 & 34** is one card; Plots 9 and 27 have no buyer; Plots 3, 35 and 43 have their new buyers. **Clients → Stage: Lost** lists the three who cancelled, each with its reason.
 11. **Anu, signed in on her phone**: she opens on her own list with the greeting; the composer, the menus, the chips and the tick work with a thumb; nothing scrolls sideways.
 12. As the **probe** (it holds `/estimator` and `/inventory`): Client Relations is not in the sidebar, and `/client-relations/actions` sends it home.
+
+# Eighth piece — only whoever set an action closes it (2026-10-16)
+
+The founder, after the seventh piece reached staging: "i would say you can only complete an action that you set, not everyone can". Asked, the founder chose all three recommendations: **whoever set it closes it, and so does a manager**; **the owner's tick marks it finished, waiting for the setter to confirm**; **an action brought in from the tracker counts its owner as the setter**. Built by `[Opus]` on `feature/client-relations-setter-closes`. The rule lives in Client Relations' `PLAN.md` (rule 13).
+
+- [x] `[Opus]` `0121`: a fifth status, `awaiting_confirmation`; the `client_actions_guard` trigger — the setter pinned on insert (a script's insert pins the owner) and never changed, and closing or reopening only by the setter or `is_admin()`; the 42 imported actions' setter pinned to their owner (`set_updated_at` stepping aside so none reads "Edited today"). `scripts/trials/client-actions-setter.sql` runs as two single-grant people and the admin, and is proved to bite three ways — without the closing check it fails at TRIAL 3, without the insert pin at TRIAL 2, with the setter left changeable at TRIAL 3.
+- [x] `[Opus]` `closeRight` and `setterOf` in `next-steps.ts` (13 tests): close, finish or none. A finished action is never overdue and never its owner's load; a plot's next action prefers real work to what waits to be confirmed.
+- [x] `[Opus]` The tick: the setter or a manager closes and reopens; the owner marks finished, and can take that back; anyone else's is dashed and locked, its title saying who closes it. **Waiting to confirm** tops the list; a person's own list holds what they set that waits for them; the greeting counts it; ••• greys out what you may not choose. `updateNextStep` checks the same rule and answers in a sentence. Rendered through a throwaway probe (deleted) with every state.
+- [ ] ~~`[Fable]` Review `0121`~~ (a guard on who may write — a permission change) — **or the founder's word**; then `0121` on staging, the merge.
+- [ ] Founder — the checklist below, on staging.
+- [ ] Production: with `0119`/`0120`, Fable's review, `0121`.
+
+## Verification — the founder, on staging (eighth piece)
+
+1. **Actions** → add "Trial: send the brochure" for **Anu**, Tomorrow. You set it.
+2. Ask Anu (or sign in as her) to open **Actions**: her tick on it says _Mark finished — Siddharth confirms_. She ticks it → it moves to **Waiting to confirm**, "Waiting for Siddharth to confirm".
+3. Back as you: it tops your list under **Waiting to confirm**, "Waiting for you to confirm". Tick it → closed. Undo works.
+4. Anu cannot open it again; on Sayooj's own actions her tick is dashed and locked.
+5. One of Anu's imported actions (from the tracker): she ticks it straight to done — she counts as its setter.

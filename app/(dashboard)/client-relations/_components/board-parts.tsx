@@ -66,6 +66,11 @@ const SECTIONS: Record<
   ActionBucket,
   { title: string; tone?: "danger" | "info" | "muted"; hint?: string }
 > = {
+  confirm: {
+    title: "Waiting to confirm",
+    tone: "info",
+    hint: "Finished by their owner. Tick to close, or send back with •••",
+  },
   management: { title: "Needs management", tone: "danger", hint: "Only a manager can clear these" },
   overdue: {
     title: "Overdue",
@@ -77,7 +82,7 @@ const SECTIONS: Record<
   done: { title: "Done", tone: "muted", hint: "The latest, newest first" },
 };
 
-const ORDER: ActionBucket[] = ["management", "overdue", "week", "later", "done"];
+const ORDER: ActionBucket[] = ["confirm", "management", "overdue", "week", "later", "done"];
 
 /** The tracker's sections, top to bottom; an empty one is left out. */
 export function StepSections({
@@ -319,7 +324,18 @@ export function TeamStrip({
   );
 }
 
-export function Greeting({ name, hour, load }: { name: string; hour: number; load: Load }) {
+export function Greeting({
+  name,
+  hour,
+  load,
+  toConfirm = 0,
+}: {
+  name: string;
+  hour: number;
+  load: Load;
+  /** Finished by their owners, waiting for this person's tick. */
+  toConfirm?: number;
+}) {
   const overdue = load.overdue;
   return (
     <div className="border-border bg-surface flex flex-wrap items-end justify-between gap-5 rounded-2xl border p-5 md:p-6">
@@ -331,6 +347,9 @@ export function Greeting({ name, hour, load }: { name: string; hour: number; loa
           {overdue
             ? `Start with the ${overdue} overdue item${overdue === 1 ? "" : "s"}. Clear each one, or set a real date.`
             : "Nothing overdue. Keep the dates honest and it stays that way."}
+          {toConfirm
+            ? ` ${toConfirm} finished action${toConfirm === 1 ? " waits" : "s wait"} for you to confirm.`
+            : ""}
         </p>
       </div>
       <div className="flex gap-7">

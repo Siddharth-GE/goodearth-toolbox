@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
-import { dueLabel, type DueTone } from "@/lib/client-relations/next-steps";
+import { closeRight, dueLabel, type DueTone } from "@/lib/client-relations/next-steps";
 import { updateNextStep, type StepPatch } from "@/lib/client-relations/next-steps-actions";
 import type { NextStep } from "@/lib/client-relations/next-steps-queries";
 import { ACTION_STATUSES, ACTION_TRACKS, optionFor } from "@/lib/client-relations/stages";
@@ -46,12 +46,12 @@ export function StepCard({
   /** On the Actions list a ticked card leaves; on a plot's page it stays, struck through. */
   hideWhenDone?: boolean;
 }) {
-  const { today, meId, team } = useBoard();
+  const { today, meId, isManager, team } = useBoard();
   const toast = useToast();
   const [, startTransition] = useTransition();
   // The tick shows at once, and the guess is dropped the moment the saved
   // status moves — saved, or undone — so the card ends on the server's word.
-  const [optimistic, setOptimistic] = useState<boolean | null>(null);
+  const [optimistic, setOptimistic] = useState<string | null>(null);
   const [seenStatus, setSeenStatus] = useState(step.status);
   if (seenStatus !== step.status) {
     setSeenStatus(step.status);
@@ -60,9 +60,15 @@ export function StepCard({
   const [notesOpen, setNotesOpen] = useState(false);
   const [moreMode, setMoreMode] = useState<"menu" | "move">("menu");
 
-  const done = optimistic ?? step.status === "done";
-  const due = dueLabel({ ...step, status: done ? "done" : step.status }, today);
-  const urgent = !done && (due.tone === "danger" || step.status === "waiting_management");
+  const status = optimistic ?? step.status;
+  const done = status === "done";
+  const finished = status === "awaiting_confirmation";
+  const due = dueLabel({ ...step, status }, today);
+  const urgent = !done && !finished && (due.tone === "danger" || status === "waiting_management");
+  // Only whoever set it, or a manager, closes it; its owner marks it
+  // finished for them (founder, 2026-10-16; 0121 holds the same line).
+  const right = closeRight(step, { id: meId, isManager });
+  const setter = step.createdBy === meId ? "you" : step.setterName.split(" ")[0];
 
   const save = (patch: StepPatch, message?: string, undo?: StepPatch) =>
     startTransition(async () => {
@@ -88,13 +94,36 @@ export function StepCard({
 
   const tick = () => {
     if (done) {
-      setOptimistic(false);
+      if (right !== "close") return;
+      setOptimistic("open");
       save({ status: "open" }, "Back on the list");
-    } else {
-      setOptimistic(true);
+    } else if (right === "close") {
+      setOptimistic("done");
       save({ status: "done" }, "Marked done", { status: step.status });
+    } else if (right === "finish" && finished) {
+      setOptimistic("open");
+      save({ status: "open" }, "Taken back — still yours");
+    } else if (right === "finish") {
+      setOptimistic("awaiting_confirmation");
+      save({ status: "awaiting_confirmation" }, `Sent to ${setter} to confirm`, {
+        status: step.status,
+      });
     }
   };
+  const locked = right === "none" || (done && right !== "close");
+  const tickLabel = locked
+    ? done
+      ? `Closed by ${setter}`
+      : `Only ${setter} or a manager can close this`
+    : done
+      ? "Open it again"
+      : right === "close"
+        ? finished
+          ? "Confirm it is done"
+          : "Mark done"
+        : finished
+          ? "Take it back — not finished yet"
+          : `Mark finished — ${setter} confirms`;
 
   if (hideWhenDone && done) return null;
 
@@ -113,18 +142,23 @@ export function StepCard({
       <button
         type="button"
         onClick={tick}
-        aria-label={done ? "Mark not done" : "Mark done"}
-        title={done ? "Mark not done" : "Mark done"}
-        className="group focus-visible:ring-accent/25 -m-1.5 grid size-9 place-items-center rounded-full focus-visible:ring-4 focus-visible:outline-none"
+        disabled={locked}
+        aria-label={tickLabel}
+        title={tickLabel}
+        className="group focus-visible:ring-accent/25 -m-1.5 grid size-9 place-items-center rounded-full focus-visible:ring-4 focus-visible:outline-none disabled:cursor-not-allowed"
       >
         <span
           className={cn(
             "grid size-6 place-items-center rounded-full border-2",
             done
               ? "border-success bg-success text-success-foreground"
-              : urgent
-                ? "border-danger group-hover:text-danger text-transparent"
-                : "border-foreground/25 group-hover:border-success group-hover:text-success text-transparent",
+              : finished
+                ? "border-success bg-success/10 text-success"
+                : locked
+                  ? "border-foreground/15 border-dashed text-transparent"
+                  : urgent
+                    ? "border-danger group-hover:text-danger text-transparent"
+                    : "border-foreground/25 group-hover:border-success group-hover:text-success text-transparent",
           )}
         >
           <Check className="size-3.5" strokeWidth={3} />
@@ -188,6 +222,7 @@ export function StepCard({
             {statusOption?.label}
           </Pill>
         ) : null}
+        {finished ? <Pill tone="success">Waiting for {setter} to confirm</Pill> : null}
 
         {step.notes && !notesOpen ? (
           <button
@@ -229,6 +264,13 @@ export function StepCard({
                 {ACTION_STATUSES.map((option) => (
                   <DropdownMenuItem
                     key={option.value}
+                    // Closing, or opening a closed one, is the setter's or a
+                    // manager's; marking it finished is its owner's (0121).
+                    disabled={
+                      ((option.value === "done" || step.status === "done") && right !== "close") ||
+                      (option.value === "awaiting_confirmation" && right !== "finish")
+                    }
+                    className="data-[disabled]:opacity-45"
                     onSelect={() => {
                       if (option.value === step.status) return;
                       save(

@@ -46,15 +46,21 @@ export function weekdayOf(iso: string): number {
 // An action's section and its date
 // ---------------------------------------------------------------------
 
-export type ActionBucket = "management" | "overdue" | "week" | "later" | "done";
+export type ActionBucket = "confirm" | "management" | "overdue" | "week" | "later" | "done";
 
 /** The sections of an open list, top to bottom. Done sits apart. */
-export const OPEN_BUCKETS = ["management", "overdue", "week", "later"] as const;
+export const OPEN_BUCKETS = ["confirm", "management", "overdue", "week", "later"] as const;
 
 export type BucketInput = { status: string; dueOn: string | null };
 
+/**
+ * "Finished, waiting to confirm" sits on its own: the owner's work is done
+ * and only the setter's tick closes it (founder, 2026-10-16: "you can only
+ * complete an action that you set"), so it is never overdue.
+ */
 export function actionBucket(action: BucketInput, today: string): ActionBucket {
   if (action.status === "done") return "done";
+  if (action.status === "awaiting_confirmation") return "confirm";
   if (action.status === "waiting_management") return "management";
   if (!action.dueOn || action.dueOn < today) return "overdue";
   if (action.dueOn <= addDays(today, 7)) return "week";
@@ -78,6 +84,8 @@ export function dueLabel(action: DueInput, today: string): DueLabel {
       tone: "success",
     };
   }
+  if (action.status === "awaiting_confirmation")
+    return { text: "Finished · to confirm", tone: "success" };
   if (!action.dueOn) return { text: "No date · overdue", tone: "danger" };
   const days = daysBetween(today, action.dueOn);
   if (days < 0) {
@@ -123,11 +131,45 @@ export function compareDone(a: { doneOn: string | null }, b: { doneOn: string | 
   return (b.doneOn ?? "").localeCompare(a.doneOn ?? "");
 }
 
-/** The open action a plot should do next: the earliest date, no date last. */
+/**
+ * The open action a plot should do next: the earliest date, no date last.
+ * A finished one waiting to be confirmed comes only when nothing else is open.
+ */
 export function nextAction<T extends BucketInput>(actions: readonly T[]): T | null {
   const open = actions.filter((a) => a.status !== "done");
   if (open.length === 0) return null;
-  return [...open].sort((a, b) => compareOpen(a, b))[0];
+  const waiting = (a: T) => (a.status === "awaiting_confirmation" ? 1 : 0);
+  return [...open].sort((a, b) => waiting(a) - waiting(b) || compareOpen(a, b))[0];
+}
+
+// ---------------------------------------------------------------------
+// Who may close an action
+// ---------------------------------------------------------------------
+
+/**
+ * The founder, 2026-10-16: "you can only complete an action that you set,
+ * not everyone can". Whoever set it closes it, and so does a manager; its
+ * owner, having done the work, marks it finished for the setter to
+ * confirm; anyone else only looks. An action brought in from the old
+ * tracker records no setter, so its owner counts as one.
+ *
+ *   close  — tick it done, or open it again
+ *   finish — tick it finished (waiting for the setter), or take that back
+ *   none   — the tick is locked
+ */
+export type CloseRight = "close" | "finish" | "none";
+
+export function setterOf(action: { createdBy: string | null; ownerId: string }): string {
+  return action.createdBy ?? action.ownerId;
+}
+
+export function closeRight(
+  action: { createdBy: string | null; ownerId: string },
+  me: { id: string; isManager: boolean },
+): CloseRight {
+  if (me.isManager || me.id === setterOf(action)) return "close";
+  if (me.id === action.ownerId) return "finish";
+  return "none";
 }
 
 // ---------------------------------------------------------------------
@@ -148,7 +190,8 @@ export function loadOf(actions: readonly DueInput[], today: string): Load {
   const load: Load = { open: 0, overdue: 0, week: 0, later: 0, management: 0, assumed: 0 };
   for (const action of actions) {
     const bucket = actionBucket(action, today);
-    if (bucket === "done") continue;
+    // Finished and waiting to be confirmed is the setter's to close, not the owner's load.
+    if (bucket === "done" || bucket === "confirm") continue;
     load.open += 1;
     load[bucket] += 1;
     if (bucket === "overdue" && action.dueAssumed) load.assumed += 1;

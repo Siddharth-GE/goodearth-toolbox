@@ -9,6 +9,7 @@ import { test } from "node:test";
 import {
   actionBucket,
   addDays,
+  closeRight,
   compareOpen,
   daysBetween,
   dueChoices,
@@ -20,6 +21,7 @@ import {
   plotNumber,
   plotRail,
   plotStatus,
+  setterOf,
   weekdayOf,
   type PlotInput,
 } from "./next-steps";
@@ -193,4 +195,34 @@ test("a plot's number, as the tracker printed it", () => {
   assert.equal(plotNumber(null, "Villa 7"), "7");
   assert.equal(plotNumber("  ", "Plot 9"), "9");
   assert.equal(plotNumber(null, "Plot"), "Plot");
+});
+
+test("only the setter, or a manager, closes an action", () => {
+  const set = { createdBy: "saurav", ownerId: "anu" };
+  assert.equal(closeRight(set, { id: "saurav", isManager: false }), "close");
+  assert.equal(closeRight(set, { id: "siddharth", isManager: true }), "close");
+  assert.equal(closeRight(set, { id: "anu", isManager: false }), "finish");
+  assert.equal(closeRight(set, { id: "sayooj", isManager: false }), "none");
+  // Set by its own owner: they close it themselves.
+  assert.equal(
+    closeRight({ createdBy: "anu", ownerId: "anu" }, { id: "anu", isManager: false }),
+    "close",
+  );
+  // Brought in from the tracker with no setter: the owner counts as one.
+  const imported = { createdBy: null, ownerId: "anu" };
+  assert.equal(setterOf(imported), "anu");
+  assert.equal(closeRight(imported, { id: "anu", isManager: false }), "close");
+  assert.equal(closeRight(imported, { id: "sayooj", isManager: false }), "none");
+});
+
+test("finished and waiting to confirm is never overdue, nor anyone's load", () => {
+  const finished = { status: "awaiting_confirmation", dueOn: "2026-09-01" };
+  assert.equal(actionBucket(finished, TODAY), "confirm");
+  assert.deepEqual(dueLabel(finished, TODAY), { text: "Finished · to confirm", tone: "success" });
+  assert.equal(loadOf([finished, { status: "open", dueOn: null }], TODAY).open, 1);
+  // A plot with only a finished action is on track, not overdue and not stepless.
+  assert.equal(plotHealth({ ...sold(), lastTouched: TODAY }, [finished], TODAY), "on_track");
+  // The next action prefers real work over what waits to be confirmed.
+  assert.equal(nextAction([finished, { status: "open", dueOn: "2026-12-01" }])?.status, "open");
+  assert.equal(nextAction([finished])?.status, "awaiting_confirmation");
 });

@@ -63,6 +63,7 @@ export default async function ActionsPage({
       plots={board.plots}
       openByOwner={openByOwner}
       meId={board.me.id}
+      isManager={board.me.isManager}
     >
       <div className="space-y-4">
         {board.me.isManager ? (
@@ -74,7 +75,12 @@ export default async function ActionsPage({
             kpis={board.kpis}
           />
         ) : (
-          <Greeting name={board.me.name} hour={board.hour} load={board.myLoad} />
+          <Greeting
+            name={board.me.name}
+            hour={board.hour}
+            load={board.myLoad}
+            toConfirm={board.myToConfirm}
+          />
         )}
 
         <div className="flex flex-wrap items-center justify-between gap-2">
