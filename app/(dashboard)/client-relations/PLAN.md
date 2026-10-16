@@ -43,7 +43,7 @@ The Saarang plot register, one record per villa; every promise to a client as an
 ## Known costs, accepted
 
 - **No live refresh.** The tracker polled every 20 seconds; here a colleague's change shows on the next click, as in every tool.
-- **Phase 3 is not in Masters yet**, so its 27 units and their buyers came in only as notes on their actions. They join once their project has them.
+- **Saarang West's configurations live in its villas' names** ("Villa 3 (1BHK Study)"), because Masters' unit type is only villa, apartment or duplex; the plot cards read it back from the name.
 - **The Relay panel is empty for most plots** until trails are filed; the build stage no longer waits on it.
 - **Most clients have a name and nothing else.** Blank is not a failed read. Joint names are one client; no co-applicant model without asking.
-- **The import fills blanks only**, and leaves alone any plot whose buyer the tracker and Masters disagree on — the founder settles those in Masters.
+- **The import fills blanks only**, and leaves alone any plot whose buyer the tracker and Masters disagree on. On 2026-10-16 the founder ruled the tracker right ("some buyers cancel some new buyers have come"), and `scripts/update-saarang-register.ts` brought Masters in line first: cancelled buyers marked lost with the reason, new buyers assigned, Plots 33 and 34 made one, Saarang West's plots added.

@@ -306,18 +306,20 @@ What carries the feel, read from the tracker:
 - **Phase 3's 27 units come in once their project has them in Masters.**
 - Staging first. Production on cutover day from a fresh `/api/export`; the tracker stops taking changes that morning.
 
-## Still open — the founder
+## The founder's second answers (2026-10-16)
 
-1. **Phase 3's project** — _Saarang West - Villas_ (one plot in Masters today)? Someone with Masters adds the 27 plots and units (type from the tracker: 1BHK G+1 and so on) before the import.
-2. **The register differences** above — which is right for Plots 3, 9, 27, 33/34, 35 and 43, and are 18–21 still held?
-3. **Plot payment** — kept worked out from Collections (above); say if it should be typed instead.
-4. **`0119` and `0120` onto staging** — Fable's review first (MODELS.md), or the founder's word for Opus to review and apply as in the last five pieces.
+"saarang west is the project, add that and do this, some buyers cancel some new buyers have come add them to masters and do this, put it on staging boss" — so **`scripts/update-saarang-register.ts` brings Masters in line with the tracker before the import runs**:
+
+1. **Phase 3 is _Saarang West - Villas_.** Its 27 plots went into Masters as W1 … W29 (W21-22 and W23-24 combined, as the tracker sells them), named "Plot 1" …, one villa each, V1 …, named with its configuration — "Villa 3 (1BHK Study)" — because a unit's type is only villa, apartment or duplex. Masters' own placeholder there ("Unit 1", no villa) is left as it was.
+2. **The tracker is right about the buyers.** Plots 9 and 27 are available again, and Plot 33 & 34's earlier buyer gave it up — each marked lost with the reason ("Booking cancelled — no longer holds Plot 9 …"), so Client Relations keeps the history. Plots 3, 35, 43 and 33 & 34 have new buyers. Plots 33 and 34 are one plot, "Plot 33 & 34" (P33-34, Villa 33) — the "Plot 22 & 23" precedent; Plot 34's empty villa and record were removed. Plot 9's draft design selection stays with its villa. Plots 18–21 are untouched.
+3. **"put it on staging"** is the founder's word for this merge in place of Fable's review and approval pass; Opus reviewed instead (Steps). **Fable's review of `0119`/`0120` and the code is due before production.**
+4. Plot payment was not raised again: it stays worked out from Collections.
 
 ## Steps
 
 - [x] Founder — answered the draft's questions (2026-10-16).
 - [x] `[Opus]` `0119`, `0120` and `scripts/trials/client-actions.sql`: dry-run on staging under RLS as the single-grant staff account, the probe and the admin, and proved to bite four ways — with a delete policy it fails at TRIAL 4, without the done-date CHECK at TRIAL 3, with the team function's grant check removed at TRIAL 7, without the stage foreign key at TRIAL 8.
-- [ ] `[Fable]` Review `0119` and `0120` (RLS, a definer function) before `db:apply` — or the founder's word. Then `[Opus]` applies them to staging and regenerates the types.
+- [x] ~~`[Fable]` Review `0119` and `0120`~~ — **skipped on the founder's word for staging** (2026-10-16: "put it on staging boss"). In its place `[Opus]` reviewed against `SECURITY.md` and `BUGCATCHER.md`: RLS on both tables, one SELECT policy each, writes gated (`/masters`, `/client-relations`), no anon policy, no DELETE policy on `client_actions` (all asserted); the one definer function checks `has_app('/client-relations')` in its body, execute revoked from `public, anon` (asserted), and is only ever called directly (#11); no view, so no write revokes owed (#3); `client_engagements`' CHECKs only widened and its three policies untouched; no money column. No findings. Applied to staging (`0001`–`0120`); `db:check` level, `db:check-views` clean; types regenerated — the hand-written ones, reordered; the trial re-run on the applied database. **The Fable review is due before production.**
 - [x] `[Opus]` `lib/client-relations/next-steps.ts` — pure, `today` passed in, 11 tests: an action's section and due label, the due menu's picks, a plot's status, health, rail and number, each person's load. `stages.ts` gains the tracker's lists; `lib/format.ts` gains `formatDayDate`, `formatShortDate` and `hourInIndia`. Types for `0119`/`0120` written by hand until applied.
 - [x] `[Opus]` `components/ui/choice-chips.tsx`, and its line in DESIGN.md; `Avatar` takes `letters={2}` (Sayooj and Sebastina read Sa and Se).
 - [x] `[Opus]` Masters → Stages: build progress beside construction stages (`lib/masters/progress-stages.ts`, `progress-stages-actions.ts`); the stage forms now take their actions as props, so both cards share them.
@@ -325,12 +327,12 @@ What carries the feel, read from the tracker:
 - [x] `[Opus]` The Actions tab.
 - [x] `[Opus]` The Plots grid and the plot page.
 - [x] `[Opus]` Clients, a client's page, Collections, the welcome, Actions first in the nav.
-- [ ] `[Opus]` Checks: prettier, lint, typecheck, 1,126 tests, `next build`, `check:actions` — all green. Rendered through a throwaway probe (deleted) with sample data from the export, on a desktop and a true 390px phone, light and dark — Actions as a manager and as a member, the Plots grid, the plot page's cards; nothing scrolls sideways. That look caught three things, fixed: a team card counted management items as overdue; a long date pill squeezed a lot card's action; the deed chips wrapped into narrow columns. **Still to do once applied: every new `select` string at staging's PostgREST. No screen has been opened signed in.**
-- [ ] `[Opus]` The import (`scripts/import-saarang-tracker.ts`): run twice inside a rolled-back transaction with `0119`/`0120` on staging — 42 actions (no doubling), 32 plots filled, 23 with a build stage, 25 with Kaadal, 30 sale deeds signed. `--commit` on staging after `0119`/`0120` are applied.
+- [x] `[Opus]` Checks: prettier, lint, typecheck, 1,130 tests, `next build`, `check:actions` — all green. Rendered through a throwaway probe (deleted) with sample data from the export, on a desktop and a true 390px phone, light and dark — Actions as a manager and as a member, the Plots grid, the plot page's cards; nothing scrolls sideways. That look caught three things, fixed: a team card counted management items as overdue; a long date pill squeezed a lot card's action; the deed chips wrapped into narrow columns. Once applied, every new `select` string ran at staging's PostgREST — all valid. **No screen has been opened signed in.**
+- [x] `[Opus]` `scripts/update-saarang-register.ts` (the second answers, above), then `scripts/import-saarang-tracker.ts` — both on staging, each run twice; the second run of each changes nothing. Saarang: 42 plots, 36 with a buyer, 30 sale deeds and 23 CAs signed, 23 with a build stage, 25 with Kaadal, all 42 actions on their plots. Saarang West: 27 plots, 6 with a buyer. Both read the export by `lib/client-relations/saarang-tracker.ts`, tested.
 - [x] `[Opus]` Docs: Client Relations' `PLAN.md` (decisions 4–7), Masters' `PLAN.md`, `STATUS.md`, `TODO.md`, SECURITY.md's line for `client_relations_team()`, DESIGN.md's chips.
-- [ ] `[Fable]` Approval pass on the full diff — or the founder's word; pull request into `staging`; CI green.
+- [ ] ~~`[Fable]` Approval pass~~ — skipped on the founder's word ("put it on staging boss"); `[Opus]` re-reviews the full diff; pull request into `staging`; CI green; merged.
 - [ ] Founder — the checklist below, on staging; grant `/client-relations` to Anu, Sayooj and Sebastina there.
-- [ ] Production: Fable's sign-off, `0119` and `0120`, the merge, the import from a fresh export, the self-hosted tracker switched off.
+- [ ] Production: Fable's review of `0119`/`0120` and the code; then on cutover day the tracker stops taking changes, a fresh `/api/export` into `/data`, `0119` and `0120`, `scripts/update-saarang-register.ts` and `scripts/import-saarang-tracker.ts` (dry run first — the register script refuses a plot whose old buyer left money or signed papers on it), the merge, and the self-hosted tracker switched off.
 
 ## Verification — the founder, on staging (seventh piece)
 
@@ -343,5 +345,6 @@ What carries the feel, read from the tracker:
 7. **••• → Waiting on management** — it moves to the top, and **Needs you** counts 1.
 8. **Plots**: lot cards with health pills; the **No next step** chip lists sold plots with nothing open. Open Plot 10 → **Next steps** on top; add one there; tap a Kaadal stage; step the build forward with ▶ — the card's rail fills.
 9. **Clients**: cards with faces and plot chips; open one — their plots and their actions. **Collections** reads like Actions: overdue first.
-10. **Anu, signed in on her phone**: she opens on her own list with the greeting; the composer, the menus, the chips and the tick work with a thumb; nothing scrolls sideways.
-11. As the **probe** (it holds `/estimator` and `/inventory`): Client Relations is not in the sidebar, and `/client-relations/actions` sends it home.
+10. **Plots → Saarang West - Villas**: 27 cards, six with a buyer, each showing its configuration (1BHK Study …). In Saarang, **Plot 33 & 34** is one card; Plots 9 and 27 have no buyer; Plots 3, 35 and 43 have their new buyers. **Clients → Stage: Lost** lists the three who cancelled, each with its reason.
+11. **Anu, signed in on her phone**: she opens on her own list with the greeting; the composer, the menus, the chips and the tick work with a thumb; nothing scrolls sideways.
+12. As the **probe** (it holds `/estimator` and `/inventory`): Client Relations is not in the sidebar, and `/client-relations/actions` sends it home.
