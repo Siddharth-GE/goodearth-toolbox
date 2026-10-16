@@ -1,32 +1,29 @@
 import { cn } from "@/lib/utils";
 
-// The Goodearth swirl, redrawn as vectors from the brand artwork: six
-// arms (three blue, three green) around a white eye, one arm path
-// rotated in 60° steps and the whole thing mirrored to match the
-// original's direction. Inline SVG so it stays crisp at any size and
-// needs no asset fetch; paths repeat instead of <use> because the brand
-// renders more than once per page (rail + phone bar) and duplicate ids
-// would be invalid. Brand artwork colors, not theme tokens — the mark
-// must not change with light/dark mode.
-const LOGO_ARM =
-  "M 196,100 A 96,96 0 0 1 161.71,173.54 A 64,64 0 0 1 76.82,106.21 " +
-  "A 24,24 0 0 0 89.86,121.75 A 64,64 0 0 0 196,100 Z";
-const LOGO_BLUE = "#1B5EA6";
-const LOGO_GREEN = "#8DC63F";
+// The Kaadal 'K' mark, quoted from the brand's own artwork
+// (`kaadal-k-*.svg`: one drawing, many fills — the same paths Dexter's
+// link preview draws). Change the paths only from that artwork. Inline
+// SVG so it stays crisp at any size and needs no asset fetch. Brand
+// colours, not theme tokens: burgundy on the light theme and blush on the
+// dark — the brand's own pair — so the mark is always Kaadal's and never
+// just the text colour. The tab icon (`app/favicon.ico`) is the same pair
+// as a tile: blush K on burgundy.
+const MARK_PATHS = [
+  "M36.57 0.00L63.77 0.00C61.11 9.14 46.99 20.49 30.44 26.74C46.30 9.72 36.57 0.00 36.57 0.00",
+  "M24.77 65.74L0.00 65.74C1.73 63.89 2.31 61.57 2.31 58.91L2.31 6.25C2.31 3.82 1.73 1.85 0.00 0.00L21.76 0.00L21.76 58.91C21.76 61.57 22.92 63.89 24.77 65.74",
+  "M53.82 65.74L67.13 65.74C61.11 62.73 54.40 40.28 52.78 35.53C52.78 35.53 44.10 41.90 30.44 29.74L39.35 56.25C41.78 64.00 49.54 65.74 53.82 65.74",
+];
 
 export function Logo({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 200 200" className={cn("size-7 shrink-0", className)} aria-hidden="true">
-      <g transform="translate(200 0) scale(-1 1)">
-        {[0, 60, 120, 180, 240, 300].map((angle, index) => (
-          <path
-            key={angle}
-            d={LOGO_ARM}
-            transform={`rotate(${angle} 100 100)`}
-            fill={index % 2 ? LOGO_GREEN : LOGO_BLUE}
-          />
-        ))}
-      </g>
+    <svg
+      viewBox="0 0 67.13 65.74"
+      className={cn("size-7 shrink-0 fill-[#521323] dark:fill-[#dec8b7]", className)}
+      aria-hidden="true"
+    >
+      {MARK_PATHS.map((d) => (
+        <path key={d} d={d} />
+      ))}
     </svg>
   );
 }

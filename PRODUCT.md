@@ -43,7 +43,7 @@ An internal system shaped tool by tool with the founder around Goodearth's real 
 
 ## Brand Commitments
 
-- **Goodearth Toolbox.** `DESIGN.md` is binding: Aman meets Apple — warm stone neutrals in three tones, Geist Sans alone, one green accent for actions, hairlines at rest and a shadow only on what floats, a small fixed motion vocabulary.
+- **Toolbox by Kaadal**, under the Kaadal K mark. `DESIGN.md` is binding: Aman meets Apple — warm stone neutrals in three tones, Geist Sans alone, one green accent for actions, hairlines at rest and a shadow only on what floats, a small fixed motion vocabulary.
 - Plain English everywhere — UI copy, errors, everything the founder reads.
 - A document's letterhead is its project's company and its terms a template, both entered by a person in Masters (Companies, Terms); never invent them or pass a placeholder off as real.
 

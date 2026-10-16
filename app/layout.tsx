@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Goodearth Toolbox",
-  description: "Internal tools platform for Goodearth",
+  title: "Toolbox by Kaadal",
+  description: "Kaadal's internal tools",
 };
 
 // Paints the phone browser's own address bar to match the page, so a dark

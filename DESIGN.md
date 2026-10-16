@@ -1,4 +1,4 @@
-# Goodearth Toolbox — design system
+# Toolbox by Kaadal — design system
 
 The shared visual language every tool is built from. Direction since the 2026-09-17 skin: **Aman meets Apple — stone, air, glass, precision.** Warm, not cold; minimal, not bare. Aman is the calm — warm stone neutrals, hairlines, whitespace, spaced small capitals. Apple is the precision — clear hierarchy, frosted bars, one confident title, and motion that behaves like a physical thing and then stops. The mode is _operate_: someone is here to finish a task, and the brand lives in the details, never on top of the task.
 
@@ -35,7 +35,7 @@ Both palettes live in `app/globals.css` only. Dark comes from `data-theme="dark"
 - **`color-scheme` is declared beside the tokens**, so date pickers, steppers, selects and scrollbars follow (BUGCATCHER #4).
 - **Don't read the cookie in the layout body** — it costs static rendering (BUGCATCHER #6).
 - The `themeColor` values in `app/layout.tsx` quote `--background`; move them with it.
-- PDFs (`lib/pdf/theme.ts`) and the logo (`components/ui/logo.tsx`) deliberately ignore the theme.
+- PDFs (`lib/pdf/theme.ts`) deliberately ignore the theme. The logo (`components/ui/logo.tsx`, the Kaadal K) uses brand colours, never tokens: burgundy on light, blush on dark; the tab icon is the same pair as a tile. The app is "Toolbox by Kaadal"; a document's letterhead is still its company's (`PRODUCT.md`).
 
 ### The other colour systems
 

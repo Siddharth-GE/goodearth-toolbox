@@ -133,7 +133,7 @@ export function SelectionDocument({
     <Document
       title={`Goodearth Selections — ${selection.unit_name} R${selection.revision_no}`}
       author="Goodearth"
-      creator="Goodearth Toolbox"
+      creator="Toolbox by Kaadal"
     >
       {/* Sheet 1 — what this document is, and what's in it. */}
       <DocumentPage meta={meta}>

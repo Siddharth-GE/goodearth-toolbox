@@ -122,7 +122,7 @@ function Brand() {
     <div className="flex items-center gap-2.5">
       <Logo />
       <span className="text-foreground text-sm font-semibold tracking-tight">
-        Goodearth <span className="text-muted">Toolbox</span>
+        Toolbox <span className="text-muted">by Kaadal</span>
       </span>
     </div>
   );
