@@ -51,6 +51,7 @@ export type Person = { id: string; name: string };
 
 /** Who an action or a plot can be given to — client_relations_team() (0120). */
 export async function readTeam(supabase: Supabase): Promise<Person[]> {
+  await requireTool(GRANT);
   const { data, error } = await supabase.rpc("client_relations_team");
   fail("the team", error);
   return (data ?? []).map((row) => ({ id: row.id, name: row.full_name ?? "—" }));
@@ -489,6 +490,7 @@ export async function readPlotCards(
   engagementIds: string[],
   today: string,
 ): Promise<Map<string, PlotCard>> {
+  await requireTool(GRANT);
   const [records, steps, stages] = await Promise.all([
     loadPlots(supabase, engagementIds),
     loadSteps(supabase, { engagementIds }),
@@ -518,6 +520,7 @@ export async function readPlotSteps(
   supabase: Supabase,
   engagementIds: string[],
 ): Promise<Map<string, NextStep[]>> {
+  await requireTool(GRANT);
   const [records, steps] = await Promise.all([
     loadPlots(supabase, engagementIds),
     loadSteps(supabase, { engagementIds }),
