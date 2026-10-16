@@ -248,10 +248,10 @@ What carries the feel, read from the tracker:
 | Option chips in the drawer                                       | **`components/ui/choice-chips.tsx`, new and shared** — it would be the fourth hand-rolled copy (Birdwing attendance, Relay's department picker, Reporter's builder) |
 | A pill that opens a popover (owner, due, status)                 | A chip-shaped trigger on `DropdownMenu` — Radix gives focus, Escape and the keyboard                                                                                |
 | The dark "Needs you" card                                        | The one ink card on the screen (`bg-foreground text-background`)                                                                                                    |
-| A load bar per person                                            | A three-part bar in `danger` / `info` / `border`, its numbers in the legend beside it                                                                               |
+| A load bar per person                                            | A bar of overdue (`danger`), waiting on management (ink), this week (`info`) and later, its numbers in the legend beside it                                         |
 | The slide-in plot drawer                                         | The plot page — the same cards in the same order; Back returns to the grid                                                                                          |
 | A toast with Undo                                                | A small Undo bar inside Client Relations (Relay holds the first copy; the third becomes shared)                                                                     |
-| Sticky tabs and phase chips                                      | `ToolNav` with project chips, in a frosted sticky bar (DESIGN.md's glass rule)                                                                                      |
+| Sticky tabs and phase chips                                      | `ToolNav` and project chips as every tool has them — not sticky                                                                                                     |
 | A ticked card sliding away                                       | No new motion: the tick fills, the card goes, the Undo bar appears                                                                                                  |
 | Refreshing every 20 seconds                                      | None — a colleague's change shows on the next click, as in every tool                                                                                               |
 
@@ -265,12 +265,12 @@ What carries the feel, read from the tracker:
    - **Everyone else sees the greeting** ("Good morning, Anu.", overdue / this week / later) over their own list, with a _Mine · Everyone_ switch.
    - Project chips and _Kaadal_ filter it.
 2. **Plots** — the lot-card grid, grouped by project. Each card: the plot number large, the client, a health pill (Overdue · Needs management · No next step · Not updated in 2 weeks · On track · Handed over), the five-step rail (buyer → sale deed → CA → build → handed over, the build step filling with progress), the build stage, the next action and its date, the owner, the Kaadal stage. Health chips with counts filter it; the headline band stays on top; search sits on the shared `list-toolbar`.
-3. **The plot page** — a header with the plot number large, the client's name editable in place, project, status and health; then cards in the tracker's order: **Next steps** (the plot's actions and a composer) · **Sales** (owner, bottleneck, the plot instalment from Collections) · **Sale deed** · **Construction agreement** (with the three design checks) · **Build progress** (◀ stage ▶ and a segment per Masters stage) · **Kaadal interiors** (stage, owner, note) · **Collections** (today's schedule and receipts) · **Context** (the notes, last updated by). Every dropdown becomes chips.
+3. **The plot page** — a header with the plot number large, the client's name editable in place, project, status and health; then cards in the tracker's order: **Next steps** (the plot's actions and a composer) · **Sales** (owner, bottleneck, the plot instalment from Collections) · **Sale deed** · **Construction agreement** (with the three design checks) · **Build progress** (◀ stage ▶ and a segment per Masters stage) · **Kaadal interiors** (stage, owner, note) · **Collections** (today's schedule and receipts) · **Context** (the notes, the values, when it last changed) · **Relay** (trails as filed, at the foot). Every dropdown becomes chips.
 4. **Clients** — client cards instead of the table: avatar, name, stage, their plots as monospaced chips, who handles them, open and overdue actions, mobile. Search and filters on `list-toolbar`; the new-client dialog stays.
 5. **A client's page** — avatar, name and stage on top; their plots as lot cards; their actions with a composer; contact details.
 6. **Collections** — the same sections as Actions (Overdue · Due in 7 days · Later): plot chip, client, instalment, amount in monospace, a due pill; totals over every matched row.
 7. **Welcome** — overdue, due this week and waiting on management (counts only, never rupees); Actions the main door.
-8. **Masters → Build progress** — new: the list in order; add, rename, reorder, switch off; deleting a stage in use is refused.
+8. **Masters → Stages** — build progress beside construction stages, each card saying what it is for: add, rename, reorder with arrows, deactivate. No delete: a stage a plot sits on cannot go.
 
 ## What it deliberately leaves out
 
@@ -302,39 +302,39 @@ What carries the feel, read from the tracker:
 - **Plots match by number** (_Plot 22-23_ → `P22-23`), people by email. **It fills blanks and never overwrites** what Client Relations already holds; every difference is printed instead.
 - The tracker's stage → the Masters stage of the same name; _Not started_ → none. A "Yes" design check is stamped with the tracker's last-updated day, the only date it has. The payment word goes into the notes.
 - **Actions**: all 42 (Anu 26, Sayooj 13, Sebastina 3; 22 Sales, 20 Kaadal), with owner, date, track and notes; the 30 with _date assumed_ keep the flag.
-- **Masters is never written by the import.** Where the tracker and Masters disagree on who holds a plot it skips that plot and lists it. Today: Plot 9 (Masters _Rashmi_, tracker _Available_), 27 (_Vidyakanth_ / _Available_), 33 and 34 (_Harman & Aman Pal_ on 33 / one combined deal for _Deepak Shah_), 35 (no client / _Nagaraja Prakasham_), 43 (no client / _Aravind Reddy_). Plots 18–21 are in Masters and not in the tracker.
+- **Masters is never written by the import.** Where the tracker and Masters disagree on who holds a plot it leaves the plot's fields alone and lists it; its actions still land on it. Today, six: Plots 3, 35 and 43 (the tracker names a buyer, Masters has none), 9 and 27 (Masters names a buyer, the tracker says available), and 33–34 (one combined deal in the tracker, two plots in Masters — its action lands with no plot). Plots 18–21 are in Masters and not in the tracker.
 - **Phase 3's 27 units come in once their project has them in Masters.**
 - Staging first. Production on cutover day from a fresh `/api/export`; the tracker stops taking changes that morning.
 
 ## Still open — the founder
 
 1. **Phase 3's project** — _Saarang West - Villas_ (one plot in Masters today)? Someone with Masters adds the 27 plots and units (type from the tracker: 1BHK G+1 and so on) before the import.
-2. **The register differences** above — which is right for Plots 9, 27, 33/34, 35 and 43, and are 18–21 still held?
+2. **The register differences** above — which is right for Plots 3, 9, 27, 33/34, 35 and 43, and are 18–21 still held?
 3. **Plot payment** — kept worked out from Collections (above); say if it should be typed instead.
 4. **`0119` and `0120` onto staging** — Fable's review first (MODELS.md), or the founder's word for Opus to review and apply as in the last five pieces.
 
 ## Steps
 
 - [x] Founder — answered the draft's questions (2026-10-16).
-- [ ] `[Opus]` `0119`, `0120` and the trial; dry run on staging as single-grant people.
+- [x] `[Opus]` `0119`, `0120` and `scripts/trials/client-actions.sql`: dry-run on staging under RLS as the single-grant staff account, the probe and the admin, and proved to bite four ways — with a delete policy it fails at TRIAL 4, without the done-date CHECK at TRIAL 3, with the team function's grant check removed at TRIAL 7, without the stage foreign key at TRIAL 8.
 - [ ] `[Fable]` Review `0119` and `0120` (RLS, a definer function) before `db:apply` — or the founder's word. Then `[Opus]` applies them to staging and regenerates the types.
-- [ ] `[Opus]` `lib/client-relations/next-steps.ts` — pure, `today` passed in, tested: an action's section and due label, a plot's health and rail, its next action, the team's counts. `stages.ts` gains the new lists.
-- [ ] `[Opus]` `components/ui/choice-chips.tsx`, and its line in DESIGN.md.
-- [ ] `[Opus]` Masters → Build progress (`lib/masters/progress-stages.ts`, `progress-stages-actions.ts`, the screen).
-- [ ] `[Opus]` Reads and writes — each opening with `requireTool("/client-relations")`, returning `ActionState`, revalidating `("/client-relations", "layout")`, reading lists through `fetchAll` and checking every `error`; the owner checked against `client_relations_team()` on every write.
-- [ ] `[Opus]` The Actions tab.
-- [ ] `[Opus]` The Plots grid and the plot page.
-- [ ] `[Opus]` Clients, a client's page, Collections, the welcome, Actions first in the nav.
-- [ ] `[Opus]` Rendered through a throwaway probe on a true 390px phone and a desktop, light and dark; prettier, lint, typecheck, test, build, `check:actions`; every new `select` string run at staging's PostgREST.
-- [ ] `[Opus]` The import: dry run on staging, its differences to the founder, then `--commit`.
-- [ ] `[Opus]` Docs: Client Relations' `PLAN.md` (the decisions above, decision 4 amended), Masters' `PLAN.md`, `STATUS.md`, SECURITY.md's line for `client_relations_team()`.
+- [x] `[Opus]` `lib/client-relations/next-steps.ts` — pure, `today` passed in, 11 tests: an action's section and due label, the due menu's picks, a plot's status, health, rail and number, each person's load. `stages.ts` gains the tracker's lists; `lib/format.ts` gains `formatDayDate`, `formatShortDate` and `hourInIndia`. Types for `0119`/`0120` written by hand until applied.
+- [x] `[Opus]` `components/ui/choice-chips.tsx`, and its line in DESIGN.md; `Avatar` takes `letters={2}` (Sayooj and Sebastina read Sa and Se).
+- [x] `[Opus]` Masters → Stages: build progress beside construction stages (`lib/masters/progress-stages.ts`, `progress-stages-actions.ts`); the stage forms now take their actions as props, so both cards share them.
+- [x] `[Opus]` Reads and writes (`next-steps-queries.ts`, `next-steps-actions.ts`, and `queries.ts` carrying the new fields, plot numbers and each client's open actions) — each opening with `requireTool("/client-relations")`, returning `ActionState`, revalidating `("/client-relations", "layout")`, reading lists through `fetchAll` and checking every `error`; the owner checked against `client_relations_team()` on every write. The old save-all form, its tabs and the paged plot list are gone.
+- [x] `[Opus]` The Actions tab.
+- [x] `[Opus]` The Plots grid and the plot page.
+- [x] `[Opus]` Clients, a client's page, Collections, the welcome, Actions first in the nav.
+- [ ] `[Opus]` Checks: prettier, lint, typecheck, 1,126 tests, `next build`, `check:actions` — all green. Rendered through a throwaway probe (deleted) with sample data from the export, on a desktop and a true 390px phone, light and dark — Actions as a manager and as a member, the Plots grid, the plot page's cards; nothing scrolls sideways. That look caught three things, fixed: a team card counted management items as overdue; a long date pill squeezed a lot card's action; the deed chips wrapped into narrow columns. **Still to do once applied: every new `select` string at staging's PostgREST. No screen has been opened signed in.**
+- [ ] `[Opus]` The import (`scripts/import-saarang-tracker.ts`): run twice inside a rolled-back transaction with `0119`/`0120` on staging — 42 actions (no doubling), 32 plots filled, 23 with a build stage, 25 with Kaadal, 30 sale deeds signed. `--commit` on staging after `0119`/`0120` are applied.
+- [x] `[Opus]` Docs: Client Relations' `PLAN.md` (decisions 4–7), Masters' `PLAN.md`, `STATUS.md`, `TODO.md`, SECURITY.md's line for `client_relations_team()`, DESIGN.md's chips.
 - [ ] `[Fable]` Approval pass on the full diff — or the founder's word; pull request into `staging`; CI green.
 - [ ] Founder — the checklist below, on staging; grant `/client-relations` to Anu, Sayooj and Sebastina there.
 - [ ] Production: Fable's sign-off, `0119` and `0120`, the merge, the import from a fresh export, the self-hosted tracker switched off.
 
 ## Verification — the founder, on staging (seventh piece)
 
-1. **Masters → Build progress** lists the nine stages in order. Add "Waterproofing" between the slabs, then switch it off.
+1. **Masters → Stages**: the Build progress card lists the nine stages in order, the last marked Handover. Add "Waterproofing", move it up between the slabs with the arrows, then deactivate it.
 2. **Client Relations** opens on its welcome: overdue, this week, waiting on management. **Actions** is the first door.
 3. **Actions**: the team strip shows Anu, Sayooj and Sebastina with the imported counts (Anu 26 open). Click Anu — only hers. **Needs you** is empty.
 4. Type "Share 3D with client", pick Plot 4, Sayooj, **Tomorrow** → **Add**: it appears under _Next 7 days_.
