@@ -49,14 +49,18 @@ export function StepCard({
   const { today, meId, team } = useBoard();
   const toast = useToast();
   const [, startTransition] = useTransition();
-  // The tick shows at once; it yields to the server the moment the
-  // status it was pressed against changes (saved, or undone).
-  const [optimistic, setOptimistic] = useState<{ from: string; done: boolean } | null>(null);
+  // The tick shows at once, and the guess is dropped the moment the saved
+  // status moves — saved, or undone — so the card ends on the server's word.
+  const [optimistic, setOptimistic] = useState<boolean | null>(null);
+  const [seenStatus, setSeenStatus] = useState(step.status);
+  if (seenStatus !== step.status) {
+    setSeenStatus(step.status);
+    setOptimistic(null);
+  }
   const [notesOpen, setNotesOpen] = useState(false);
   const [moreMode, setMoreMode] = useState<"menu" | "move">("menu");
 
-  const done =
-    optimistic && optimistic.from === step.status ? optimistic.done : step.status === "done";
+  const done = optimistic ?? step.status === "done";
   const due = dueLabel({ ...step, status: done ? "done" : step.status }, today);
   const urgent = !done && (due.tone === "danger" || step.status === "waiting_management");
 
@@ -84,10 +88,10 @@ export function StepCard({
 
   const tick = () => {
     if (done) {
-      setOptimistic({ from: step.status, done: false });
+      setOptimistic(false);
       save({ status: "open" }, "Back on the list");
     } else {
-      setOptimistic({ from: step.status, done: true });
+      setOptimistic(true);
       save({ status: "done" }, "Marked done", { status: step.status });
     }
   };
