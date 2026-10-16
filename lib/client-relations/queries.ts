@@ -390,18 +390,10 @@ export type EngagementRow = {
   kaadalStage: KaadalStage | null;
   kaadalOwnerId: string | null;
   kaadalNote: string | null;
+  /** When the plot's own record last changed. */
+  updatedAt: string;
   invoiceStage: MilestoneStage | null;
   dues: DuesSummary;
-};
-
-export type EngagementFilters = {
-  project?: string;
-  owner?: string;
-  bottleneck?: string;
-  deed?: string;
-  registration?: string;
-  search?: string;
-  page?: number;
 };
 
 function toRow(
@@ -446,100 +438,9 @@ function toRow(
     kaadalStage: record.kaadal_stage as KaadalStage | null,
     kaadalOwnerId: record.kaadal_owner_id,
     kaadalNote: record.kaadal_note,
+    updatedAt: record.updated_at,
     invoiceStage,
     dues,
-  };
-}
-
-/**
- * Search matches a client's name or a plot's name/code, none of which live
- * on client_engagements. PostgREST cannot `or` across an embedded table
- * without turning the join inner and losing the unassigned plots, so the
- * matching ids are resolved first and the list filtered by `in`.
- */
-async function unitIdsMatching(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  search: string,
-): Promise<string[]> {
-  const [byUnit, byClient] = await Promise.all([
-    supabase.from("units").select("id").or(`name.ilike.%${search}%,code.ilike.%${search}%`),
-    supabase.from("clients").select("id").ilike("name", `%${search}%`),
-  ]);
-  fail("plot search", byUnit.error);
-  fail("client search", byClient.error);
-
-  const clientIds = (byClient.data ?? []).map((row) => row.id);
-  let byClientUnits: { id: string }[] = [];
-  if (clientIds.length) {
-    const res = await supabase.from("units").select("id").in("client_id", clientIds);
-    fail("plot search", res.error);
-    byClientUnits = res.data ?? [];
-  }
-
-  return [...new Set([...(byUnit.data ?? []), ...byClientUnits].map((row) => row.id))];
-}
-
-export async function listEngagementsPage(
-  filters: EngagementFilters = {},
-): Promise<PagedResult<EngagementRow>> {
-  await requireTool(GRANT);
-  const supabase = await createClient();
-  const search = cleanSearch(filters.search);
-
-  let searchUnitIds: string[] | null = null;
-  if (search) {
-    searchUnitIds = await unitIdsMatching(supabase, search);
-    // Nothing matched: short-circuit rather than send an empty `in`, which
-    // PostgREST reads as "no filter" and would return every plot.
-    if (searchUnitIds.length === 0) {
-      return { rows: [], total: 0, page: 1, pageSize: CRM_PAGE_SIZE, pageCount: 1 };
-    }
-  }
-
-  const page = await pagedList<EngagementRecord>(
-    (pageNo) => {
-      let query = supabase
-        .from("client_engagements")
-        .select(ENGAGEMENT_SELECT, { count: "exact" })
-        .order("name", { referencedTable: "units" })
-        .order("id")
-        .range((pageNo - 1) * CRM_PAGE_SIZE, pageNo * CRM_PAGE_SIZE - 1);
-
-      if (filters.project) query = query.eq("project_id", filters.project);
-      if (filters.owner) query = query.eq("crm_owner_id", filters.owner);
-      if (filters.deed) query = query.eq("sale_deed_status", filters.deed);
-      if (filters.registration) query = query.eq("registration_stage", filters.registration);
-      // Containment, served by the GIN index in 0050 §4.
-      if (filters.bottleneck) query = query.contains("bottlenecks", [filters.bottleneck]);
-      if (searchUnitIds) query = query.in("unit_id", searchUnitIds);
-      return query;
-    },
-    filters.page ?? 1,
-    CRM_PAGE_SIZE,
-  );
-
-  const engagementIds = page.rows.map((row) => row.id);
-  const [money, owners] = await Promise.all([
-    loadMoney(supabase, engagementIds),
-    nameMap(
-      supabase,
-      page.rows.map((row) => row.crm_owner_id ?? ""),
-    ),
-  ]);
-
-  const today = todayInIndia();
-  return {
-    ...page,
-    rows: page.rows.map((record) => {
-      const milestones = money.milestones.get(record.id) ?? [];
-      const receipts = money.receipts.get(record.id) ?? [];
-      return toRow(
-        record,
-        owners,
-        summariseDues(milestones, receipts, today),
-        invoiceStageOf(milestones.map((m) => ({ stage: m.stage, invoicedOn: m.invoicedOn }))),
-      );
-    }),
   };
 }
 

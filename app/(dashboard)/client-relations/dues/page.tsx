@@ -1,9 +1,6 @@
-import { Badge } from "@/components/ui/badge";
-import { Button, LinkButton } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Figure, FigureBand, FigureBandCell } from "@/components/ui/figure";
-import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { ListToolbar } from "@/components/ui/list-toolbar";
 import {
   Table,
   TableBody,
@@ -12,11 +9,47 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/components/ui/table";
-import { getFilterOptions, listDues } from "@/lib/client-relations/queries";
+import { addDays, dueLabel } from "@/lib/client-relations/next-steps";
+import { getFilterOptions, listDues, type DueLine } from "@/lib/client-relations/queries";
 import { milestoneLabel } from "@/lib/client-relations/stages";
-import { formatCount, formatDate, formatMoney } from "@/lib/format";
+import { formatCount, formatDate, formatMoney, todayInIndia } from "@/lib/format";
 import { PiggyBank } from "lucide-react";
 import Link from "next/link";
+
+import { SectionHead } from "../_components/board-parts";
+import { Pill, PlotChip } from "../_components/pill";
+
+/**
+ * Who owes what — read the way Actions reads: overdue first, then the
+ * next seven days, then later (root plan.md, seventh piece, "edit the
+ * current tool to match the vibe"). Amounts stay in a table, monospaced,
+ * because a column of money reads as one (DESIGN.md).
+ */
+
+type Group = "overdue" | "week" | "later" | "undated";
+
+const GROUPS: { key: Group; title: string; tone?: "danger" | "info" | "muted"; hint?: string }[] = [
+  {
+    key: "overdue",
+    title: "Overdue",
+    tone: "danger",
+    hint: "Past the due date with money still to come",
+  },
+  { key: "week", title: "Due in the next 7 days", tone: "info" },
+  { key: "later", title: "Later" },
+  {
+    key: "undated",
+    title: "No due date yet",
+    tone: "muted",
+    hint: "Give the instalment a date on the plot's schedule",
+  },
+];
+
+function groupOf(line: DueLine, today: string): Group {
+  if (line.isOverdue) return "overdue";
+  if (!line.dueOn) return "undated";
+  return line.dueOn <= addDays(today, 7) ? "week" : "later";
+}
 
 export default async function DuesPage({
   searchParams,
@@ -25,11 +58,17 @@ export default async function DuesPage({
 }) {
   const { project, overdue } = await searchParams;
   const overdueOnly = overdue === "1";
+  const today = todayInIndia();
 
   const [board, options] = await Promise.all([
     listDues({ project, overdueOnly }),
     getFilterOptions(),
   ]);
+
+  const groups = GROUPS.map((group) => ({
+    ...group,
+    lines: board.lines.filter((line) => groupOf(line, today) === group.key),
+  })).filter((group) => group.lines.length > 0);
 
   return (
     <div className="space-y-4">
@@ -67,36 +106,26 @@ export default async function DuesPage({
         </FigureBandCell>
       </FigureBand>
 
-      <form action="/client-relations/dues" className="flex flex-wrap items-end gap-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="project">Project</Label>
-          <Select id="project" name="project" defaultValue={project ?? ""}>
-            <option value="">All</option>
-            {options.projects.map((one) => (
-              <option key={one.id} value={one.id}>
-                {one.name}
-              </option>
-            ))}
-          </Select>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="overdue">Show</Label>
-          <Select id="overdue" name="overdue" defaultValue={overdue ?? ""}>
-            <option value="">Everything outstanding</option>
-            <option value="1">Overdue only</option>
-          </Select>
-        </div>
-        <Button type="submit" variant="secondary">
-          Filter
-        </Button>
-        {(project || overdueOnly) && (
-          <LinkButton href="/client-relations/dues" variant="ghost">
-            Clear
-          </LinkButton>
-        )}
-      </form>
+      <ListToolbar
+        action="/client-relations/dues"
+        values={{ project, overdue }}
+        filters={[
+          {
+            param: "project",
+            label: "Project",
+            allLabel: "All projects",
+            options: options.projects.map((one) => ({ value: one.id, label: one.name })),
+          },
+          {
+            param: "overdue",
+            label: "Show",
+            allLabel: "Everything outstanding",
+            options: [{ value: "1", label: "Overdue only" }],
+          },
+        ]}
+      />
 
-      {board.lines.length === 0 ? (
+      {groups.length === 0 ? (
         <EmptyState
           icon={PiggyBank}
           title={overdueOnly ? "Nothing is overdue" : "Nothing is outstanding"}
@@ -107,65 +136,83 @@ export default async function DuesPage({
           }
         />
       ) : (
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableHeaderCell className="min-w-[140px]">Plot</TableHeaderCell>
-              <TableHeaderCell className="min-w-[160px]">Client</TableHeaderCell>
-              <TableHeaderCell>Instalment</TableHeaderCell>
-              <TableHeaderCell>Due</TableHeaderCell>
-              <TableHeaderCell>Invoiced</TableHeaderCell>
-              <TableHeaderCell className="text-right">Amount</TableHeaderCell>
-              <TableHeaderCell className="text-right">Outstanding</TableHeaderCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {board.lines.map((line) => (
-              <TableRow key={`${line.engagementId}-${line.stage}`}>
-                <TableCell className="text-foreground font-medium whitespace-nowrap">
-                  <Link
-                    href={`/client-relations/plots/${line.engagementId}`}
-                    className="hover:underline"
-                  >
-                    {line.unitName}
-                  </Link>
-                  <span className="text-muted block text-xs">{line.projectName}</span>
-                </TableCell>
-                <TableCell>
-                  {line.clientId ? (
-                    <Link
-                      href={`/client-relations/${line.clientId}`}
-                      className="text-foreground hover:underline"
-                    >
-                      {line.clientName}
-                    </Link>
-                  ) : (
-                    <span className="text-muted">—</span>
-                  )}
-                </TableCell>
-                <TableCell>{milestoneLabel(line.stage)}</TableCell>
-                <TableCell className="whitespace-nowrap">
-                  {line.isOverdue ? (
-                    <Badge variant="danger">{formatDate(line.dueOn)}</Badge>
-                  ) : (
-                    <span className="text-muted">{formatDate(line.dueOn)}</span>
-                  )}
-                </TableCell>
-                <TableCell className="text-muted whitespace-nowrap">
-                  {formatDate(line.invoicedOn)}
-                </TableCell>
-                <TableCell className="text-muted text-right font-mono text-xs">
-                  {formatMoney(line.dueAmount)}
-                </TableCell>
-                <TableCell className="text-right font-mono text-xs">
-                  <span className={line.isOverdue ? "text-danger" : undefined}>
-                    {formatMoney(line.outstanding)}
-                  </span>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        groups.map((group) => (
+          <section key={group.key} className="space-y-2">
+            <SectionHead
+              title={group.title}
+              count={group.lines.length}
+              hint={group.hint}
+              tone={group.tone}
+            />
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableHeaderCell className="min-w-[220px]">Plot</TableHeaderCell>
+                  <TableHeaderCell>Instalment</TableHeaderCell>
+                  <TableHeaderCell>Due</TableHeaderCell>
+                  <TableHeaderCell>Invoiced</TableHeaderCell>
+                  <TableHeaderCell className="text-right">Amount</TableHeaderCell>
+                  <TableHeaderCell className="text-right">Outstanding</TableHeaderCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {group.lines.map((line) => {
+                  const due = line.dueOn
+                    ? dueLabel({ status: "open", dueOn: line.dueOn }, today)
+                    : null;
+                  return (
+                    <TableRow key={`${line.engagementId}-${line.stage}`}>
+                      <TableCell>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <PlotChip
+                            number={line.plotNumber}
+                            href={`/client-relations/plots/${line.engagementId}`}
+                          />
+                          {line.clientId ? (
+                            <Link
+                              href={`/client-relations/${line.clientId}`}
+                              className="text-foreground text-sm hover:underline"
+                            >
+                              {line.clientName}
+                            </Link>
+                          ) : (
+                            <span className="text-muted text-sm">No buyer</span>
+                          )}
+                        </div>
+                        <span className="text-muted mt-0.5 block text-xs">{line.projectName}</span>
+                      </TableCell>
+                      <TableCell>{milestoneLabel(line.stage)}</TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {due ? (
+                          <Pill
+                            tone={
+                              line.isOverdue ? "danger" : due.tone === "info" ? "info" : "plain"
+                            }
+                          >
+                            {line.isOverdue ? due.text : formatDate(line.dueOn)}
+                          </Pill>
+                        ) : (
+                          <span className="text-muted">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-muted whitespace-nowrap">
+                        {formatDate(line.invoicedOn)}
+                      </TableCell>
+                      <TableCell className="text-muted text-right font-mono text-xs">
+                        {formatMoney(line.dueAmount)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-xs">
+                        <span className={line.isOverdue ? "text-danger font-semibold" : undefined}>
+                          {formatMoney(line.outstanding)}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </section>
+        ))
       )}
     </div>
   );

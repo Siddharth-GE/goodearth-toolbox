@@ -626,3 +626,33 @@ export async function getPlotBoard(filters: PlotFilters = {}): Promise<PlotBoard
     team,
   };
 }
+
+/**
+ * What a plot's or a client's page needs to host action cards and a
+ * composer: today, the team, every plot (for "move to another plot") and
+ * each person's open count (for the owner menu).
+ */
+export async function getBoardBasics(): Promise<{
+  today: string;
+  meId: string;
+  team: Person[];
+  plots: PlotRef[];
+  openByOwner: Record<string, number>;
+}> {
+  const user = await requireTool(GRANT);
+  const supabase = await createClient();
+  const [team, records, open] = await Promise.all([
+    readTeam(supabase),
+    loadPlots(supabase),
+    loadSteps(supabase, { open: true }),
+  ]);
+  const openByOwner: Record<string, number> = {};
+  for (const step of open) openByOwner[step.owner_id] = (openByOwner[step.owner_id] ?? 0) + 1;
+  return {
+    today: todayInIndia(),
+    meId: user.id,
+    team,
+    plots: records.map(toRef).sort(comparePlots),
+    openByOwner,
+  };
+}

@@ -1,27 +1,26 @@
-import { LinkButton } from "@/components/ui/button";
+import { Avatar } from "@/components/ui/avatar";
+import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { ListToolbar } from "@/components/ui/list-toolbar";
 import { Pagination } from "@/components/ui/pagination";
-import { Select } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeaderCell,
-  TableRow,
-} from "@/components/ui/table";
 import { getFilterOptions, listClientsPage } from "@/lib/client-relations/queries";
 import { CLIENT_STAGES } from "@/lib/client-relations/stages";
-import { Handshake } from "lucide-react";
+import { formatCount } from "@/lib/format";
+import { cn } from "@/lib/utils";
+import { Handshake, Phone } from "lucide-react";
 import Link from "next/link";
 
-import { ClientStageBadge } from "../_components/crm-badges";
 import { ClientFormDialog } from "../_components/client-form-dialog";
+import { ClientStageBadge } from "../_components/crm-badges";
+import { PersonName, Pill } from "../_components/pill";
 
-export default async function ClientRelationsPage({
+/**
+ * The people, as cards — a face, a name, their plots by number, who looks
+ * after them and how many promises are open (root plan.md, seventh piece:
+ * "edit the current tool to match the vibe"). Prospects and clients share
+ * one list (Client Relations' decision 1).
+ */
+export default async function ClientsPage({
   searchParams,
 }: {
   searchParams: Promise<{ q?: string; stage?: string; owner?: string; page?: string }>;
@@ -36,8 +35,7 @@ export default async function ClientRelationsPage({
   const isFiltered = Boolean(q || stage || owner);
 
   // Precomputed href STRINGS, not a callback: Pagination is a Client
-  // Component and a Server Component cannot pass it a function — that
-  // fails at runtime, and `next build` does not catch it.
+  // Component and a Server Component cannot pass it a function.
   const hrefForPage = (target: number) => {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
@@ -51,51 +49,28 @@ export default async function ClientRelationsPage({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-2">
-        {/* GET form: submitting drops `page`, so changing a filter returns
-            to page 1 rather than stranding you past the end. */}
-        <form action="/client-relations/clients" className="flex flex-wrap items-end gap-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="q">Search</Label>
-            <Input
-              id="q"
-              name="q"
-              defaultValue={q ?? ""}
-              placeholder="Name or mobile…"
-              autoComplete="off"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="stage">Stage</Label>
-            <Select id="stage" name="stage" defaultValue={stage ?? ""}>
-              <option value="">All</option>
-              {CLIENT_STAGES.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="owner">Handled by</Label>
-            <Select id="owner" name="owner" defaultValue={owner ?? ""}>
-              <option value="">Anyone</option>
-              {options.owners.map((person) => (
-                <option key={person.id} value={person.id}>
-                  {person.name}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <Button type="submit" variant="secondary">
-            Filter
-          </Button>
-          {isFiltered && (
-            <LinkButton href="/client-relations/clients" variant="ghost">
-              Clear
-            </LinkButton>
-          )}
-        </form>
-
+        <ListToolbar
+          action="/client-relations/clients"
+          values={{ q, stage, owner }}
+          search={{ placeholder: "Name or mobile…" }}
+          filters={[
+            {
+              param: "stage",
+              label: "Stage",
+              allLabel: "Everyone",
+              options: CLIENT_STAGES.map((option) => ({
+                value: option.value,
+                label: option.label,
+              })),
+            },
+            {
+              param: "owner",
+              label: "Handled by",
+              allLabel: "Anyone",
+              options: options.owners.map((person) => ({ value: person.id, label: person.name })),
+            },
+          ]}
+        />
         <ClientFormDialog owners={options.owners} />
       </div>
 
@@ -110,40 +85,64 @@ export default async function ClientRelationsPage({
           }
         />
       ) : (
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableHeaderCell>Name</TableHeaderCell>
-              <TableHeaderCell>Stage</TableHeaderCell>
-              <TableHeaderCell>Plots</TableHeaderCell>
-              <TableHeaderCell>Mobile</TableHeaderCell>
-              <TableHeaderCell>Handled by</TableHeaderCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {clients.map((client) => (
-              <TableRow key={client.id}>
-                <TableCell className="text-foreground font-medium">
-                  <Link href={`/client-relations/${client.id}`} className="hover:underline">
-                    {client.name}
-                  </Link>
-                </TableCell>
-                <TableCell>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {clients.map((client) => (
+            <Link
+              key={client.id}
+              href={`/client-relations/${client.id}`}
+              className="focus-visible:ring-accent/25 block rounded-2xl focus-visible:ring-4 focus-visible:outline-none"
+            >
+              <Card interactive className="flex h-full min-w-0 flex-col gap-3 p-4">
+                <div className="flex items-start gap-3">
+                  <Avatar name={client.name} size={40} />
+                  <div className="min-w-0 flex-1">
+                    <p className="line-clamp-2 text-[15px] leading-snug font-semibold tracking-tight">
+                      {client.name}
+                    </p>
+                    {client.mobile ? (
+                      <p className="text-muted mt-0.5 flex items-center gap-1 text-xs">
+                        <Phone className="size-3" /> {client.mobile}
+                      </p>
+                    ) : null}
+                  </div>
                   <ClientStageBadge stage={client.stage} />
-                </TableCell>
-                <TableCell className="text-muted text-xs">
-                  {client.plots.length === 0
-                    ? "—"
-                    : client.plots.map((plot) => plot.unitName).join(", ")}
-                </TableCell>
-                {/* Saarang's 34 imported clients carry a name and nothing
-                    else, so most of this column is a dash on purpose. */}
-                <TableCell className="text-muted">{client.mobile ?? "—"}</TableCell>
-                <TableCell className="text-muted">{client.ownerName ?? "—"}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+                </div>
+
+                {client.plots.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {client.plots.map((plot) => (
+                      <Pill key={plot.unitId} className="bg-foreground/[0.05] border-transparent">
+                        <span className="text-foreground font-mono font-bold">{plot.number}</span>
+                        <span className="text-muted font-normal">{plot.projectName}</span>
+                      </Pill>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-muted text-xs">No plot yet</p>
+                )}
+
+                <div className="text-muted mt-auto flex min-w-0 items-center gap-2 text-xs">
+                  {client.ownerName ? (
+                    <PersonName name={client.ownerName} size={18} />
+                  ) : (
+                    <span>Nobody assigned</span>
+                  )}
+                  {client.openSteps > 0 ? (
+                    <span className="ml-auto whitespace-nowrap">
+                      {formatCount(client.openSteps)} open
+                      {client.overdueSteps > 0 ? (
+                        <span className={cn("text-danger font-semibold")}>
+                          {" · "}
+                          {formatCount(client.overdueSteps)} overdue
+                        </span>
+                      ) : null}
+                    </span>
+                  ) : null}
+                </div>
+              </Card>
+            </Link>
+          ))}
+        </div>
       )}
 
       <Pagination
