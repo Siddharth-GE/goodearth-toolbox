@@ -17,8 +17,9 @@
  *
  * WHAT IT DECIDES
  *
- *   * A plot matches by number: "Plot 22-23" is Masters' P22-23. Phase 3's
- *     "P3 …" units, and any plot Masters does not have, match nothing.
+ *   * A plot matches by number: "Plot 22-23" is Saarang's P22-23 and
+ *     "P3 05" is Saarang West's W5 (lib/client-relations/saarang-tracker.ts).
+ *     Run scripts/update-saarang-register.ts first, so Masters has them.
  *   * IT FILLS BLANKS AND NEVER OVERWRITES. A field Client Relations
  *     already holds keeps its value; a deed or CA status counts as blank
  *     while it is the default 'not_signed'.
@@ -44,7 +45,15 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 
-import { isCommit, requireProjectRef, sql } from "./supabase-management";
+import {
+  SAARANG,
+  SAARANG_WEST,
+  TRACKER_PEOPLE,
+  sameName,
+  trackerBuyer,
+  trackerPlot,
+} from "../lib/client-relations/saarang-tracker";
+import { isCommit, literal, requireProjectRef, sql } from "./supabase-management";
 
 type Deal = {
   id: string;
@@ -88,13 +97,6 @@ type Action = {
 };
 
 type Export = { deals: Record<string, Deal>; actions: Record<string, Action> };
-
-/** The tracker's own team list (its server.js USERS). */
-const PEOPLE: Record<string, string> = {
-  Anu: "anu@goodearthkannur.org",
-  Sayooj: "sayooj@goodearthkannur.org",
-  Sebastina: "sebastina@goodearthkannur.org",
-};
 
 const SIGNED: Record<string, string> = {
   "Not started": "not_started",
@@ -142,32 +144,6 @@ const STATUS: Record<string, string> = {
 };
 const TRACK: Record<string, string> = { Sales: "sales", Kaadal: "kaadal" };
 
-/** "Plot 01" → "P1", "Plot 22-23" → "P22-23"; Phase 3 and anything else → null. */
-function plotCode(label: string): string | null {
-  const match = /^Plot\s+(\d+(?:-\d+)?)$/.exec(label.trim());
-  if (!match) return null;
-  return (
-    "P" +
-    match[1]
-      .split("-")
-      .map((n) => String(Number(n)))
-      .join("-")
-  );
-}
-
-/** Names compared the way a person reads them: case, titles, "&" and spacing aside. */
-function sameName(a: string, b: string): boolean {
-  const norm = (s: string) =>
-    s
-      .toLowerCase()
-      .replace(/&/g, " and ")
-      .replace(/\b(mr|mrs|ms|dr)\.?\s/g, " ")
-      .replace(/[^a-z0-9 ]/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-  return norm(a) === norm(b);
-}
-
 const isDate = (s: string | undefined) => Boolean(s && /^\d{4}-\d{2}-\d{2}$/.test(s));
 
 function pick<T extends string>(
@@ -195,15 +171,20 @@ if (!source.deals || !source.actions) throw new Error("That file is not a tracke
 
 void (async () => {
   try {
-    const plots = await sql<{ engagement_id: string; code: string | null; client: string | null }>(
+    const plots = await sql<{
+      engagement_id: string;
+      project: string;
+      code: string | null;
+      client: string | null;
+    }>(
       ref,
-      `select e.id as engagement_id, p.code, c.name as client
+      `select e.id as engagement_id, pr.name as project, p.code, c.name as client
          from client_engagements e
          join units u on u.id = e.unit_id
          join plots p on p.id = u.plot_id
          join projects pr on pr.id = e.project_id
          left join clients c on c.id = u.client_id
-        where pr.name = 'Saarang - Villas'`,
+        where pr.name in (${literal(SAARANG)}, ${literal(SAARANG_WEST)})`,
     );
     const people = await sql<{ id: string; email: string; on_team: boolean }>(
       ref,
@@ -216,10 +197,10 @@ void (async () => {
         where p.is_active`,
     );
 
-    const byCode = new Map(plots.map((plot) => [plot.code, plot]));
+    const byCode = new Map(plots.map((plot) => [`${plot.project}|${plot.code}`, plot]));
     const byEmail = new Map(people.map((person) => [person.email.toLowerCase(), person]));
     const personId = (name: string): string | null =>
-      name && PEOPLE[name] ? (byEmail.get(PEOPLE[name])?.id ?? null) : null;
+      name && TRACKER_PEOPLE[name] ? (byEmail.get(TRACKER_PEOPLE[name])?.id ?? null) : null;
 
     const differences: string[] = [];
     const notInMasters: string[] = [];
@@ -227,15 +208,15 @@ void (async () => {
     const plotRows: Record<string, unknown>[] = [];
 
     for (const deal of Object.values(source.deals)) {
-      const code = plotCode(deal.label);
-      const plot = code ? byCode.get(code) : undefined;
+      const where = trackerPlot(deal.label);
+      const plot = where ? byCode.get(`${where.project}|${where.code}`) : undefined;
       if (!plot) {
         notInMasters.push(deal.label);
         continue;
       }
       engagementOf.set(deal.id, plot.engagement_id);
 
-      const trackerClient = deal.client && deal.client !== "Available" ? deal.client : null;
+      const trackerClient = trackerBuyer(deal.client);
       if ((trackerClient ?? "") !== "" || plot.client) {
         if (!trackerClient || !plot.client || !sameName(trackerClient, plot.client)) {
           differences.push(

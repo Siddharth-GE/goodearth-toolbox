@@ -134,9 +134,7 @@ export default async function PlotDetailPage({
 
         <Card className="flex flex-wrap items-start gap-x-5 gap-y-3 p-5">
           <div className="shrink-0">
-            <p className="text-muted text-[10px] font-medium tracking-[0.14em] uppercase">
-              {engagement.unitType && !engagement.clientId ? engagement.unitType : "Plot"}
-            </p>
+            <p className="text-muted text-[10px] font-medium tracking-[0.14em] uppercase">Plot</p>
             <p className="text-foreground font-mono text-4xl leading-none font-bold tracking-tight">
               {engagement.plotNumber}
             </p>
@@ -149,7 +147,7 @@ export default async function PlotDetailPage({
             )}
             <div className="text-muted mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
               <span>
-                {[engagement.projectName, engagement.unitType, PLOT_STATUS_LABELS[card.status]]
+                {[engagement.projectName, engagement.unitName, PLOT_STATUS_LABELS[card.status]]
                   .filter(Boolean)
                   .join(" · ")}
               </span>

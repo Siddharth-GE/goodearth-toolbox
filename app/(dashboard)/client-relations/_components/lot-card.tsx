@@ -54,6 +54,8 @@ export function LotCard({ card, today }: { card: PlotCard; today: string }) {
   const hasBuyer = Boolean(card.clientName);
   const next = card.next ? dueLabel({ ...card.next }, today) : null;
   const kaadal = optionFor(KAADAL_STAGES, card.kaadalStage);
+  // Saarang West's villas carry their configuration in their name, "Villa 3 (1BHK Study)".
+  const configuration = /\(([^)]+)\)\s*$/.exec(card.unitName)?.[1] ?? null;
 
   return (
     <Link
@@ -63,9 +65,7 @@ export function LotCard({ card, today }: { card: PlotCard; today: string }) {
       <Card interactive className="flex h-full min-w-0 flex-col gap-3 p-4">
         <div className="flex items-start gap-2">
           <div className="min-w-0">
-            <p className="text-muted text-[10px] font-medium tracking-[0.14em] uppercase">
-              {card.unitType && !hasBuyer ? card.unitType : "Plot"}
-            </p>
+            <p className="text-muted text-[10px] font-medium tracking-[0.14em] uppercase">Plot</p>
             <p className="text-foreground font-mono text-2xl leading-none font-bold tracking-tight">
               {card.number}
             </p>
@@ -79,14 +79,17 @@ export function LotCard({ card, today }: { card: PlotCard; today: string }) {
           </span>
         </div>
 
-        <p
-          className={cn(
-            "line-clamp-2 text-[15px] leading-snug font-semibold tracking-tight",
-            !hasBuyer && "text-muted font-medium",
-          )}
-        >
-          {card.clientName ?? "No buyer yet"}
-        </p>
+        <div>
+          <p
+            className={cn(
+              "line-clamp-2 text-[15px] leading-snug font-semibold tracking-tight",
+              !hasBuyer && "text-muted font-medium",
+            )}
+          >
+            {card.clientName ?? "No buyer yet"}
+          </p>
+          {configuration ? <p className="text-muted mt-0.5 text-xs">{configuration}</p> : null}
+        </div>
 
         {hasBuyer ? (
           <div className="space-y-1.5">

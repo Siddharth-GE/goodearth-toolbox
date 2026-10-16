@@ -122,7 +122,8 @@ export type PlotRef = {
   projectId: string;
   projectName: string;
   unitStatus: string;
-  unitType: string | null;
+  /** Masters' villa name — "Villa 3 (1BHK Study)" carries its configuration. */
+  unitName: string;
 };
 
 function toRef(record: PlotRecord): PlotRef {
@@ -137,7 +138,7 @@ function toRef(record: PlotRecord): PlotRef {
     projectId: record.project_id,
     projectName: unit.projects?.name ?? "—",
     unitStatus: unit.status,
-    unitType: unit.unit_type,
+    unitName: unit.name,
   };
 }
 
