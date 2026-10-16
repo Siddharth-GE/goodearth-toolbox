@@ -2,17 +2,29 @@
 
 import { Button } from "@/components/ui/button";
 import { FormMessage } from "@/components/ui/form-message";
+import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  addConstructionStage,
-  renameConstructionStage,
-  setConstructionStageActive,
-} from "@/lib/masters/stages-actions";
+import type { ActionState } from "@/lib/action-state";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 
-export function StageForm() {
-  const [state, formAction, pending] = useActionState(addConstructionStage, undefined);
+/**
+ * The two stage lists on this screen — construction stages (0053) and
+ * build progress (0119) — share these controls; each page passes in its
+ * own server actions.
+ */
+
+export function StageForm({
+  action,
+  inputId,
+  placeholder,
+}: {
+  action: (state: ActionState, formData: FormData) => Promise<ActionState>;
+  inputId: string;
+  placeholder: string;
+}) {
+  const [state, formAction, pending] = useActionState(action, undefined);
   const formRef = useRef<HTMLFormElement>(null);
   const wasPending = useRef(false);
 
@@ -25,14 +37,8 @@ export function StageForm() {
     <form ref={formRef} action={formAction} className="space-y-2">
       <div className="flex items-end gap-2">
         <div className="flex-1 space-y-1.5">
-          <Label htmlFor="stage-name">Add a stage</Label>
-          <Input
-            id="stage-name"
-            name="name"
-            required
-            autoComplete="off"
-            placeholder="e.g. Waterproofing"
-          />
+          <Label htmlFor={inputId}>Add a stage</Label>
+          <Input id={inputId} name="name" required autoComplete="off" placeholder={placeholder} />
         </div>
         <Button type="submit" disabled={pending}>
           {pending ? "Adding…" : "Add"}
@@ -43,9 +49,16 @@ export function StageForm() {
   );
 }
 
-/** The name, editable in place. A rename follows through to every
- * indent and budget line carrying it, so the input says so. */
-export function StageNameField({ id, name }: { id: string; name: string }) {
+/** The name, editable in place. */
+export function StageNameField({
+  id,
+  name,
+  rename,
+}: {
+  id: string;
+  name: string;
+  rename: (id: string, name: string) => Promise<ActionState>;
+}) {
   const [value, setValue] = useState(name);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string>();
@@ -57,7 +70,7 @@ export function StageNameField({ id, name }: { id: string; name: string }) {
       return;
     }
     startTransition(async () => {
-      const result = await renameConstructionStage(id, next);
+      const result = await rename(id, next);
       if (result?.error) {
         setError(result.error);
         setValue(name);
@@ -86,7 +99,15 @@ export function StageNameField({ id, name }: { id: string; name: string }) {
   );
 }
 
-export function StageToggle({ id, isActive }: { id: string; isActive: boolean }) {
+export function StageToggle({
+  id,
+  isActive,
+  setActive,
+}: {
+  id: string;
+  isActive: boolean;
+  setActive: (id: string, isActive: boolean) => Promise<ActionState>;
+}) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string>();
 
@@ -100,13 +121,60 @@ export function StageToggle({ id, isActive }: { id: string; isActive: boolean })
         disabled={pending}
         onClick={() =>
           startTransition(async () => {
-            const result = await setConstructionStageActive(id, !isActive);
+            const result = await setActive(id, !isActive);
             setError(result?.error);
           })
         }
       >
         {pending ? "Saving…" : isActive ? "Deactivate" : "Activate"}
       </Button>
+    </div>
+  );
+}
+
+/** Up and down, for a list whose order means something. */
+export function StageMove({
+  id,
+  name,
+  first,
+  last,
+  move,
+}: {
+  id: string;
+  name: string;
+  first: boolean;
+  last: boolean;
+  move: (id: string, direction: "up" | "down") => Promise<ActionState>;
+}) {
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string>();
+  const go = (direction: "up" | "down") =>
+    startTransition(async () => {
+      const result = await move(id, direction);
+      setError(result?.error);
+    });
+
+  return (
+    <div className="flex items-center gap-1">
+      <IconButton
+        aria-label={`Move ${name} up`}
+        size="sm"
+        bordered
+        disabled={pending || first}
+        onClick={() => go("up")}
+      >
+        <ChevronUp className="size-4" />
+      </IconButton>
+      <IconButton
+        aria-label={`Move ${name} down`}
+        size="sm"
+        bordered
+        disabled={pending || last}
+        onClick={() => go("down")}
+      >
+        <ChevronDown className="size-4" />
+      </IconButton>
+      <FormMessage error={error} size="xs" />
     </div>
   );
 }
