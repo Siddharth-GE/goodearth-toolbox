@@ -1,77 +1,65 @@
-import { Button, LinkButton } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Figure, FigureBand, FigureBandCell } from "@/components/ui/figure";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Pagination } from "@/components/ui/pagination";
-import { Select } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeaderCell,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  getFilterOptions,
-  getHeadlines,
-  listEngagementsPage,
-} from "@/lib/client-relations/queries";
-import { BOTTLENECKS, DEED_STATUSES, REGISTRATION_STAGES } from "@/lib/client-relations/stages";
-import { formatCount, formatMoney } from "@/lib/format";
+import { ListToolbar } from "@/components/ui/list-toolbar";
+import { HEALTH, HEALTH_FILTERS } from "@/lib/client-relations/next-steps";
+import { getPlotBoard } from "@/lib/client-relations/next-steps-queries";
+import { getHeadlines } from "@/lib/client-relations/queries";
+import { formatCount, todayInIndia } from "@/lib/format";
 import { MapPin } from "lucide-react";
-import Link from "next/link";
 
-import {
-  AckBadge,
-  BottleneckChips,
-  DeedBadge,
-  InvoiceStageBadge,
-  OriginalWithBadge,
-  RegistrationBadge,
-  UnitStatusBadge,
-} from "../_components/crm-badges";
+import { FilterChips, SectionHead } from "../_components/board-parts";
+import { LotCard } from "../_components/lot-card";
 
+/**
+ * Every plot as a lot card, grouped by project — the tracker's Plots view
+ * (root plan.md, seventh piece). The headline band is the sheet's
+ * hand-typed header, computed; the health chips say which plots need a
+ * look, and only the ones with something in them show.
+ */
 export default async function PlotsPage({
   searchParams,
 }: {
-  searchParams: Promise<{
-    q?: string;
-    project?: string;
-    owner?: string;
-    bottleneck?: string;
-    deed?: string;
-    registration?: string;
-    page?: string;
-  }>;
+  searchParams: Promise<{ q?: string; project?: string; who?: string; health?: string }>;
 }) {
   const params = await searchParams;
-
-  const [result, options, headlines] = await Promise.all([
-    listEngagementsPage({ ...params, search: params.q, page: Number(params.page) || 1 }),
-    getFilterOptions(),
+  const [board, headlines] = await Promise.all([
+    getPlotBoard(params),
     getHeadlines(params.project),
   ]);
-  const { rows, total, page: currentPage, pageSize, pageCount } = result;
-  const isFiltered = Boolean(
-    params.q ||
-    params.project ||
-    params.owner ||
-    params.bottleneck ||
-    params.deed ||
-    params.registration,
-  );
+  const today = todayInIndia();
 
-  const hrefForPage = (target: number) => {
+  const href = (patch: Partial<typeof params>) => {
     const query = new URLSearchParams();
-    for (const [key, value] of Object.entries(params)) {
-      if (value && key !== "page") query.set(key, value);
+    for (const [key, value] of Object.entries({ ...params, ...patch })) {
+      if (value) query.set(key, value);
     }
-    if (target > 1) query.set("page", String(target));
     const search = query.toString();
     return search ? `/client-relations/plots?${search}` : "/client-relations/plots";
   };
+
+  const chips = [
+    {
+      key: "all",
+      label: <>All {formatCount(board.counts.all)}</>,
+      href: href({ health: undefined }),
+      on: !params.health,
+    },
+    ...HEALTH_FILTERS.filter((health) => board.counts[health] > 0 || params.health === health).map(
+      (health) => ({
+        key: health,
+        label: (
+          <>
+            {HEALTH[health].label}{" "}
+            <span className="tabular-nums opacity-60">{formatCount(board.counts[health])}</span>
+          </>
+        ),
+        href: href({ health: params.health === health ? undefined : health }),
+        on: params.health === health,
+      }),
+    ),
+  ];
+
+  const projects = [...new Set(board.cards.map((card) => card.projectId))];
 
   return (
     <div className="space-y-4">
@@ -113,193 +101,64 @@ export default async function PlotsPage({
         </FigureBandCell>
         <FigureBandCell>
           <Figure
-            label="Plots overdue"
+            label="Payments overdue"
             value={formatCount(headlines.overdue)}
+            hint="plots"
             tone={headlines.overdue > 0 ? "bad" : undefined}
             size="sm"
           />
         </FigureBandCell>
       </FigureBand>
 
-      <form action="/client-relations/plots" className="flex flex-wrap items-end gap-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="q">Search</Label>
-          <Input
-            id="q"
-            name="q"
-            defaultValue={params.q ?? ""}
-            placeholder="Plot or client…"
-            autoComplete="off"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="project">Project</Label>
-          <Select id="project" name="project" defaultValue={params.project ?? ""}>
-            <option value="">All</option>
-            {options.projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </Select>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="owner">Handled by</Label>
-          <Select id="owner" name="owner" defaultValue={params.owner ?? ""}>
-            <option value="">Anyone</option>
-            {options.owners.map((person) => (
-              <option key={person.id} value={person.id}>
-                {person.name}
-              </option>
-            ))}
-          </Select>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="deed">Sale deed</Label>
-          <Select id="deed" name="deed" defaultValue={params.deed ?? ""}>
-            <option value="">Any</option>
-            {DEED_STATUSES.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </Select>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="registration">Registration</Label>
-          <Select id="registration" name="registration" defaultValue={params.registration ?? ""}>
-            <option value="">Any</option>
-            {REGISTRATION_STAGES.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </Select>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="bottleneck">Waiting on</Label>
-          <Select id="bottleneck" name="bottleneck" defaultValue={params.bottleneck ?? ""}>
-            <option value="">Anything</option>
-            {BOTTLENECKS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </Select>
-        </div>
-        <Button type="submit" variant="secondary">
-          Filter
-        </Button>
-        {isFiltered && (
-          <LinkButton href="/client-relations/plots" variant="ghost">
-            Clear
-          </LinkButton>
-        )}
-      </form>
+      <ListToolbar
+        action="/client-relations/plots"
+        values={params}
+        keep={{ health: params.health }}
+        search={{ placeholder: "Plot number or client…" }}
+        filters={[
+          {
+            param: "project",
+            label: "Project",
+            allLabel: "All projects",
+            options: board.projects.map((project) => ({ value: project.id, label: project.name })),
+          },
+          {
+            param: "who",
+            label: "Whose",
+            allLabel: "Everyone",
+            options: [
+              ...board.team.map((person) => ({ value: person.id, label: person.name })),
+              { value: "mgmt", label: "Waiting on management" },
+            ],
+          },
+        ]}
+      />
 
-      {rows.length === 0 ? (
+      <FilterChips label="How the plots are doing" items={chips} />
+
+      {board.cards.length === 0 ? (
         <EmptyState
           icon={MapPin}
-          title={isFiltered ? "No plots match those filters" : "No plots yet"}
-          description={
-            isFiltered
-              ? "Try a wider search, or clear the filters."
-              : "Plots appear here as soon as they exist in Masters."
-          }
+          title="No plots match"
+          description="Try another chip, or clear the search."
         />
       ) : (
-        // Wide on purpose — this IS the sheet. It scrolls inside the
-        // shared Table's own overflow wrapper rather than reflowing, so
-        // the page body never scrolls sideways on a phone.
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableHeaderCell className="min-w-[120px]">Plot</TableHeaderCell>
-              <TableHeaderCell className="min-w-[180px]">Client</TableHeaderCell>
-              <TableHeaderCell>Status</TableHeaderCell>
-              <TableHeaderCell>Sale deed</TableHeaderCell>
-              <TableHeaderCell>Original</TableHeaderCell>
-              <TableHeaderCell>Ack</TableHeaderCell>
-              <TableHeaderCell>Agreement</TableHeaderCell>
-              <TableHeaderCell>Registration</TableHeaderCell>
-              <TableHeaderCell>Invoice stage</TableHeaderCell>
-              <TableHeaderCell className="min-w-[160px]">Waiting on</TableHeaderCell>
-              <TableHeaderCell className="text-right">Outstanding</TableHeaderCell>
-              <TableHeaderCell>Handled by</TableHeaderCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {rows.map((row) => (
-              <TableRow key={row.id}>
-                <TableCell className="text-foreground font-medium whitespace-nowrap">
-                  <Link href={`/client-relations/plots/${row.id}`} className="hover:underline">
-                    {row.unitName}
-                  </Link>
-                  <span className="text-muted block text-xs">{row.projectName}</span>
-                </TableCell>
-                <TableCell>
-                  {row.clientId ? (
-                    <Link
-                      href={`/client-relations/${row.clientId}`}
-                      className="text-foreground hover:underline"
-                    >
-                      {row.clientName}
-                    </Link>
-                  ) : (
-                    <span className="text-muted">—</span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <UnitStatusBadge status={row.unitStatus} />
-                </TableCell>
-                <TableCell>
-                  <DeedBadge status={row.saleDeedStatus} />
-                </TableCell>
-                <TableCell>
-                  <OriginalWithBadge value={row.saleDeedOriginalWith} />
-                </TableCell>
-                <TableCell>
-                  <AckBadge value={row.saleDeedAck} />
-                </TableCell>
-                <TableCell>
-                  <DeedBadge status={row.caStatus} />
-                </TableCell>
-                <TableCell>
-                  <RegistrationBadge stage={row.registrationStage} />
-                </TableCell>
-                <TableCell>
-                  <InvoiceStageBadge stage={row.invoiceStage} />
-                </TableCell>
-                <TableCell>
-                  <BottleneckChips values={row.bottlenecks} />
-                </TableCell>
-                <TableCell className="text-right font-mono text-xs whitespace-nowrap">
-                  {row.dues.outstanding > 0 ? (
-                    <span className={row.dues.overdue > 0 ? "text-danger" : undefined}>
-                      {formatMoney(row.dues.outstanding)}
-                    </span>
-                  ) : (
-                    <span className="text-muted">—</span>
-                  )}
-                </TableCell>
-                <TableCell className="text-muted whitespace-nowrap">
-                  {row.ownerName ?? "—"}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        projects.map((projectId) => {
+          const cards = board.cards.filter((card) => card.projectId === projectId);
+          return (
+            <section key={projectId} className="space-y-3">
+              {projects.length > 1 || !params.project ? (
+                <SectionHead title={cards[0].projectName} count={cards.length} />
+              ) : null}
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(15.5rem,1fr))] gap-3">
+                {cards.map((card) => (
+                  <LotCard key={card.engagementId} card={card} today={today} />
+                ))}
+              </div>
+            </section>
+          );
+        })
       )}
-
-      <Pagination
-        page={currentPage}
-        pageCount={pageCount}
-        total={total}
-        pageSize={pageSize}
-        unit="plots"
-        prevHref={currentPage > 1 ? hrefForPage(currentPage - 1) : null}
-        nextHref={currentPage < pageCount ? hrefForPage(currentPage + 1) : null}
-      />
     </div>
   );
 }

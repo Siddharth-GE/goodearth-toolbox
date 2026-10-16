@@ -14,7 +14,7 @@ Production is `toolbox.goodearthkannur.org` (from `master`); staging is `staging
 ## Platform
 
 - **Stack:** Next.js 16.2 (Turbopack) · React 19.2 · Tailwind 4 · Supabase Postgres. Vercel `bom1` + Supabase `ap-south-1`, both Mumbai.
-- **Migrations:** `0001`–`0093` on both databases; `0094`–`0118` on staging only. `applied_migrations` (`0067`) is the ledger, and CI checks it on every pull request.
+- **Migrations:** `0001`–`0093` on both databases; `0094`–`0120` on staging only. `applied_migrations` (`0067`) is the ledger, and CI checks it on every pull request.
 - **Access:** per-user grants (`user_apps`) + role bundles (`role_apps`), enforced in the database by `has_app()`.
 - **Navigation** (staging): tools sit under closed teams in the sidebar, arranged by the founder in Settings → Teams (`0114`, `lib/nav/`); a tool with no team sits under Other. Teams arrange, grants decide.
 - **Sign-in:** password → emailed 6-digit code (30-day trusted device), self-service reset, Google for existing team emails only; both steps rate-limited in the database. Mail rides Resend as `toolbox@goodearthkannur.org`. The rules are `SECURITY.md`.
@@ -26,7 +26,7 @@ Production is `toolbox.goodearthkannur.org` (from `master`); staging is `staging
 Production unless marked. Each tool's rules are its `PLAN.md` (Google Chat door: `lib/google-chat/PLAN.md`).
 
 - **Marathon** — race-day kiosk: PIN login, entries, bibs, admin. Own auth and service-role client — the one kiosk, not a pattern.
-- **Masters** — the shared reference data every tool reads: projects, plots, units, clients, vendors, stores, items (catalogue and materials), categories, brands, GST rates, construction stages, units of measure, works, item requests (on staging: companies, terms templates, and a material rate that rises with POs). Reads ungated, writes need `/masters`.
+- **Masters** — the shared reference data every tool reads: projects, plots, units, clients, vendors, stores, items (catalogue and materials), categories, brands, GST rates, construction stages, units of measure, works, item requests (on staging: companies, terms templates, a material rate that rises with POs, and build progress beside construction stages). Reads ungated, writes need `/masters`.
 - **Settings** — people, grants, roles, approver lists (on staging: the sidebar's teams). Admin only.
 - **Selections** — what design specifies per room; revisions immutable once issued. Tiles and lines show the item's picture, description and product link (catalogue pictures on staging).
 - **Budgets** — prices an issued revision (interiors) and a construction stage tree; money gated.
@@ -38,7 +38,7 @@ Production unless marked. Each tool's rules are its `PLAN.md` (Google Chat door:
 - **Design Management** — drawing sets, revisions and transmittals per villa; released drawings reach Supervisors.
 - **Estimator** — what a villa costs: a rate book, each villa measured on its own, a frozen official copy, one site-check list (the rework on staging; there, Site check opens with the indent lines waiting for the estimator, and a SketchUp model's takeoff measures a villa's estimate — **From the model**).
 - **Supervisors** — the site's day on a phone: labour, material requests, drawn-vs-estimated per work (on staging: labour as daily wages or piece-work, and a request off the estimate asks why).
-- **Client Relations** — the plot register and the only money coming in: payment schedules and receipts.
+- **Client Relations** — the plot register and the only money coming in: payment schedules and receipts (on staging: the Saarang tracker brought in — **Actions**, every promise to a client with an owner and a date, overdue first; a Plots grid of lot cards; each plot's deed, agreement, build progress, design checks and Kaadal interiors as one-tap chips).
 - **Business Planning** — the founder's JV business plan as a recalculating tool.
 - **Financial Management** — cash, forward view and funding facilities, read from views.
 - **Reporter** — a report builder over a dataset registry; carries money by founder decision (on staging: a search box, a totals row and quick filters).
@@ -66,7 +66,7 @@ The chain runs end to end: design → price → indent → PO → goods in / sto
 | Overview (home page) | `indents`, `indent_lines`, `po_facts`, `bill_facts`, `goods_receipts`, `staff_departments` (counts only) + `lib/marathon/queries`                                                               |
 | Relay                | nothing outside the shared surfaces                                                                                                                                                             |
 | Google Chat door     | Relay's own `pusher_*` tables and `pusher_chain_state`, through the admin client (`SECURITY.md`)                                                                                                |
-| Client Relations     | `pusher_chain_state`, `selections`                                                                                                                                                              |
+| Client Relations     | `pusher_chain_state`, `selections`; who holds its grant, names only, through `client_relations_team()` (`0120`)                                                                                 |
 | Reporter             | `lib/reporter/datasets.ts` is the list: indents, POs, bills, budget report lines, CRM facts, goods receipts, stock, selections, `pusher_chain_state`, plan targets, Birdwing stays and expenses |
 | Financial Management | `crm_milestone_facts`, `crm_receipt_facts`, `bill_money_facts`, `business_plan_target_facts`, `birdwing_month_facts`, `birdwing_stay_facts`, `birdwing_expense_facts`                           |
 | Estimator            | `stock_issues(_lines)`, `goods_receipts(_lines)` (issued-vs-estimated), `issue_requests` (site's off-estimate reason, `0110`), `indents`, `indent_lines` (lines waiting for its answer, `0113`) |

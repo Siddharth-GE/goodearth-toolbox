@@ -2653,6 +2653,86 @@ export type Database = {
           },
         ]
       }
+      client_actions: {
+        Row: {
+          action: string
+          created_at: string
+          created_by: string | null
+          done_on: string | null
+          due_assumed: boolean
+          due_on: string | null
+          engagement_id: string | null
+          id: string
+          notes: string | null
+          owner_id: string
+          status: string
+          track: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          created_by?: string | null
+          done_on?: string | null
+          due_assumed?: boolean
+          due_on?: string | null
+          engagement_id?: string | null
+          id?: string
+          notes?: string | null
+          owner_id: string
+          status?: string
+          track?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          created_by?: string | null
+          done_on?: string | null
+          due_assumed?: boolean
+          due_on?: string | null
+          engagement_id?: string | null
+          id?: string
+          notes?: string | null
+          owner_id?: string
+          status?: string
+          track?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_actions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_actions_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "client_engagements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_actions_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_actions_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_engagements: {
         Row: {
           bottlenecks: string[]
@@ -2665,10 +2745,16 @@ export type Database = {
           created_at: string
           created_by: string | null
           crm_owner_id: string | null
+          design_confirmed_on: string | null
           design_support: string | null
           details: string | null
           id: string
+          kaadal_note: string | null
+          kaadal_owner_id: string | null
+          kaadal_stage: string | null
+          permit_on: string | null
           plot_value: number | null
+          progress_stage_id: string | null
           project_id: string
           registration_note: string | null
           registration_on: string | null
@@ -2680,6 +2766,7 @@ export type Database = {
           unit_id: string
           updated_at: string
           updated_by: string | null
+          working_drawing_on: string | null
         }
         Insert: {
           bottlenecks?: string[]
@@ -2692,10 +2779,16 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           crm_owner_id?: string | null
+          design_confirmed_on?: string | null
           design_support?: string | null
           details?: string | null
           id?: string
+          kaadal_note?: string | null
+          kaadal_owner_id?: string | null
+          kaadal_stage?: string | null
+          permit_on?: string | null
           plot_value?: number | null
+          progress_stage_id?: string | null
           project_id: string
           registration_note?: string | null
           registration_on?: string | null
@@ -2707,6 +2800,7 @@ export type Database = {
           unit_id: string
           updated_at?: string
           updated_by?: string | null
+          working_drawing_on?: string | null
         }
         Update: {
           bottlenecks?: string[]
@@ -2719,10 +2813,16 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           crm_owner_id?: string | null
+          design_confirmed_on?: string | null
           design_support?: string | null
           details?: string | null
           id?: string
+          kaadal_note?: string | null
+          kaadal_owner_id?: string | null
+          kaadal_stage?: string | null
+          permit_on?: string | null
           plot_value?: number | null
+          progress_stage_id?: string | null
           project_id?: string
           registration_note?: string | null
           registration_on?: string | null
@@ -2734,6 +2834,7 @@ export type Database = {
           unit_id?: string
           updated_at?: string
           updated_by?: string | null
+          working_drawing_on?: string | null
         }
         Relationships: [
           {
@@ -2748,6 +2849,20 @@ export type Database = {
             columns: ["crm_owner_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_engagements_kaadal_owner_id_fkey"
+            columns: ["kaadal_owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_engagements_progress_stage_id_fkey"
+            columns: ["progress_stage_id"]
+            isOneToOne: false
+            referencedRelation: "progress_stages"
             referencedColumns: ["id"]
           },
           {
@@ -7040,6 +7155,54 @@ export type Database = {
           },
         ]
       }
+      progress_stages: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "progress_stages_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "progress_stages_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_stages: {
         Row: {
           created_at: string
@@ -10847,6 +11010,13 @@ export type Database = {
       birdwing_mint: { Args: { p_scope: string }; Returns: number }
       can_approve_bills: { Args: { uid: string }; Returns: boolean }
       can_approve_indents: { Args: { uid: string }; Returns: boolean }
+      client_relations_team: {
+        Args: never
+        Returns: {
+          full_name: string
+          id: string
+        }[]
+      }
       create_bill: {
         Args: {
           p_gst_amount: number

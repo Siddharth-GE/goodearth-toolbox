@@ -6,7 +6,6 @@ import { requireTool } from "@/lib/auth/access";
 import { guardError } from "@/lib/db-error";
 import { optionalText, text } from "@/lib/form-data";
 import { createClient } from "@/lib/supabase/server";
-import { normaliseBottlenecks } from "./stages";
 
 // Type-only import, and deliberately NOT re-exported. A bare
 // `export type { X }` in a "use server" file crashes every action in its
@@ -220,104 +219,9 @@ export async function assignPlot(
   return undefined;
 }
 
-// ---------------------------------------------------------------------
-// The plot record
-// ---------------------------------------------------------------------
-
-export type EngagementInput = {
-  ownerId: string | null;
-  saleDeedStatus: string;
-  saleDeedOriginalWith: string | null;
-  saleDeedAck: string | null;
-  saleDeedSignedOn: string | null;
-  caStatus: string;
-  caOriginalWith: string | null;
-  caAck: string | null;
-  caSignedOn: string | null;
-  registrationStage: string;
-  registrationNote: string | null;
-  registrationOn: string | null;
-  designSupport: string | null;
-  details: string | null;
-  checkInOn: string | null;
-  plotValue: number | null;
-  constructionValue: number | null;
-};
-
-export async function saveEngagement(
-  engagementId: string,
-  input: EngagementInput,
-): Promise<ActionState> {
-  const user = await requireTool(GRANT);
-
-  if (!["not_signed", "signed"].includes(input.saleDeedStatus)) {
-    return { error: "Pick whether the sale deed is signed." };
-  }
-  if (!["not_signed", "signed"].includes(input.caStatus)) {
-    return { error: "Pick whether the construction agreement is signed." };
-  }
-  // Mirrors client_engagements_deed_original_check. Catching it here means
-  // a sentence rather than a constraint name.
-  if (input.saleDeedStatus !== "signed" && input.saleDeedOriginalWith) {
-    return { error: "Only a signed sale deed can have an original with someone." };
-  }
-  if (input.caStatus !== "signed" && input.caOriginalWith) {
-    return { error: "Only a signed construction agreement can have an original with someone." };
-  }
-  for (const value of [input.plotValue, input.constructionValue]) {
-    if (value !== null && (!Number.isFinite(value) || value < 0)) {
-      return { error: "Values must be zero or more." };
-    }
-  }
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("client_engagements")
-    .update({
-      crm_owner_id: input.ownerId,
-      sale_deed_status: input.saleDeedStatus,
-      sale_deed_original_with: input.saleDeedOriginalWith || null,
-      sale_deed_ack: input.saleDeedAck || null,
-      sale_deed_signed_on: input.saleDeedSignedOn || null,
-      ca_status: input.caStatus,
-      ca_original_with: input.caOriginalWith || null,
-      ca_ack: input.caAck || null,
-      ca_signed_on: input.caSignedOn || null,
-      registration_stage: input.registrationStage,
-      registration_note: input.registrationNote?.trim() || null,
-      registration_on: input.registrationOn || null,
-      design_support: input.designSupport?.trim() || null,
-      details: input.details?.trim() || null,
-      check_in_on: input.checkInOn || null,
-      plot_value: input.plotValue,
-      construction_value: input.constructionValue,
-      updated_by: user.id,
-    })
-    .eq("id", engagementId);
-  if (error) return friendly(error, "Could not save this plot. Try again.");
-
-  revalidateAll();
-  return undefined;
-}
-
-/**
- * Bottlenecks are saved on their own because they are tick-boxes, not a
- * field in the save-on-blur block — clicking one and waiting for a blur
- * that never comes is how a change gets lost.
- */
-export async function setBottlenecks(engagementId: string, values: string[]): Promise<ActionState> {
-  await requireTool(GRANT);
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("client_engagements")
-    .update({ bottlenecks: normaliseBottlenecks(values) })
-    .eq("id", engagementId);
-  if (error) return friendly(error, "Could not save what this plot is waiting on.");
-
-  revalidateAll();
-  return undefined;
-}
+// The plot record itself is saved one field at a time by updatePlot in
+// next-steps-actions.ts — chips that save when tapped (root plan.md,
+// seventh piece).
 
 // ---------------------------------------------------------------------
 // The payment schedule
