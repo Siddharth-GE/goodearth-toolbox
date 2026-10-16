@@ -7,6 +7,7 @@ import { guardError } from "@/lib/db-error";
 import { todayInIndia } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 
+import { closeRight } from "./next-steps";
 import {
   ACKNOWLEDGEMENTS,
   ACTION_STATUSES,
@@ -42,7 +43,11 @@ function revalidateAll(): void {
 }
 
 function friendly(error: { message: string }, fallback: string): ActionState {
-  const state = guardError(error, fallback, ["You need the Client Relations app"]);
+  const state = guardError(error, fallback, [
+    "You need the Client Relations app",
+    "Only whoever set this action",
+    "Who set an action cannot be changed",
+  ]);
   if (state?.error === fallback) console.error("Client Relations write failed:", error);
   return state;
 }
@@ -150,6 +155,32 @@ export async function updateNextStep(stepId: string, patch: StepPatch): Promise<
   }
   if (patch.status !== undefined) {
     if (!known(ACTION_STATUSES, patch.status)) return { error: "Pick a status from the list." };
+    // Only whoever set it, or a manager, closes it or opens it again; its
+    // owner marks it finished for them (0121 — the database holds the same
+    // line, this says it in a sentence first).
+    const { data: current, error: readError } = await supabase
+      .from("client_actions")
+      .select("status, owner_id, created_by")
+      .eq("id", stepId)
+      .maybeSingle();
+    if (readError) return friendly(readError, "Could not read that action. Try again.");
+    if (!current) return { error: "That action no longer exists." };
+    const right = closeRight(
+      { createdBy: current.created_by, ownerId: current.owner_id },
+      { id: user.id, isManager: user.profile?.role === "admin" },
+    );
+    const closing = patch.status === "done" || current.status === "done";
+    if (closing && patch.status !== current.status && right !== "close") {
+      return {
+        error:
+          right === "finish"
+            ? "Only whoever set this action, or a manager, can close it. Tick it to mark it finished for them."
+            : "Only whoever set this action, or a manager, can close it.",
+      };
+    }
+    if (patch.status === "awaiting_confirmation" && right === "none") {
+      return { error: "Only its owner marks an action finished." };
+    }
     update.status = patch.status;
     update.done_on = patch.status === "done" ? todayInIndia() : null;
   }

@@ -17,6 +17,7 @@ import {
   plotNumber,
   plotRail,
   plotStatus,
+  setterOf,
   type Health,
   type Load,
   type PlotStatus,
@@ -196,6 +197,9 @@ export type NextStep = {
   track: ActionTrack;
   notes: string | null;
   doneOn: string | null;
+  /** Who set it — the one who closes it, with a manager (0121). */
+  createdBy: string | null;
+  setterName: string;
   /** "Edited 15 Oct by Saurav", or "Added 29 Sep by Anu". */
   stamp: { edited: boolean; on: string; by: string | null };
   plot: PlotRef | null;
@@ -243,6 +247,8 @@ function toStep(
     track: record.track as ActionTrack,
     notes: record.notes,
     doneOn: record.done_on,
+    createdBy: record.created_by,
+    setterName: names.get(record.created_by ?? record.owner_id) ?? "—",
     stamp: stampOf(record, names),
     plot: record.engagement_id ? (plots.get(record.engagement_id) ?? null) : null,
   };
@@ -278,6 +284,8 @@ export type ActionsBoard = {
   /** Each team member's load across the scope (project / Kaadal), whatever `who` shows. */
   loads: { person: Person; load: Load }[];
   myLoad: Load;
+  /** Finished by their owners, waiting for my tick. */
+  myToConfirm: number;
   management: number;
   /** Every plot, for the composer's plot picker. */
   plots: PlotRef[];
@@ -333,7 +341,10 @@ export async function getActionsBoard(filters: BoardFilters = {}): Promise<Actio
   const shown = scoped.filter((step) => {
     if (who === "mgmt") return step.status === "waiting_management";
     if (who === "all") return true;
-    return step.ownerId === who;
+    // A person's list holds what they own, and what they set that waits for their tick.
+    return (
+      step.ownerId === who || (step.status === "awaiting_confirmation" && setterOf(step) === who)
+    );
   });
 
   const openShown = shown.filter((step) => step.status !== "done");
@@ -377,6 +388,9 @@ export async function getActionsBoard(filters: BoardFilters = {}): Promise<Actio
       scopedOpen.filter((step) => step.ownerId === user.id),
       today,
     ),
+    myToConfirm: scopedOpen.filter(
+      (step) => step.status === "awaiting_confirmation" && setterOf(step) === user.id,
+    ).length,
     management: scopedOpen.filter((step) => actionBucket(step, today) === "management").length,
     plots: scopedPlots.sort(comparePlots),
     projects: [...projects]
@@ -639,6 +653,7 @@ export async function getPlotBoard(filters: PlotFilters = {}): Promise<PlotBoard
 export async function getBoardBasics(): Promise<{
   today: string;
   meId: string;
+  isManager: boolean;
   team: Person[];
   plots: PlotRef[];
   openByOwner: Record<string, number>;
@@ -655,6 +670,7 @@ export async function getBoardBasics(): Promise<{
   return {
     today: todayInIndia(),
     meId: user.id,
+    isManager: user.profile?.role === "admin",
     team,
     plots: records.map(toRef).sort(comparePlots),
     openByOwner,

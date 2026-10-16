@@ -260,7 +260,8 @@ export const KAADAL_STAGES: Option<KaadalStage>[] = [
 // Actions — the next steps (0120)
 // ---------------------------------------------------------------------
 
-export type ActionStatus = "open" | "waiting_client" | "waiting_management" | "done";
+export type ActionStatus =
+  "open" | "waiting_client" | "waiting_management" | "awaiting_confirmation" | "done";
 export type ActionTrack = "sales" | "kaadal";
 
 /**
@@ -272,6 +273,8 @@ export const ACTION_STATUSES: Option<ActionStatus>[] = [
   { value: "open", label: "Open", tone: "default" },
   { value: "waiting_client", label: "Waiting on client", tone: "warning" },
   { value: "waiting_management", label: "Waiting on management", tone: "danger" },
+  // Finished by its owner; only its setter or a manager closes it (0121).
+  { value: "awaiting_confirmation", label: "Finished — waiting to confirm", tone: "success" },
   { value: "done", label: "Done", tone: "success" },
 ];
 

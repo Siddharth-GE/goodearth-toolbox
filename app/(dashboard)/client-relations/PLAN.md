@@ -26,6 +26,7 @@ The Saarang plot register, one record per villa; every promise to a client as an
 10. **An action's owner is on the team** — `client_relations_team()`: active, non-admin people holding the grant. Every write checks it, so a step is never given to someone who could not see it. Admins are the managers: they clear "waiting on management" rather than own the list.
 11. **Chips save when tapped; text saves when you leave the box.** One field per write (`updatePlot`, `updateNextStep`), the tracker's PATCH — there is no form to half-fill.
 12. **Build progress reads its meaning from Masters' order**: the first stage is the paperwork before ground is broken (the rail's build step starts filling from the second); the last active stage is the handover.
+13. **Only whoever set an action, or a manager, closes it** (`0121`; founder 2026-10-16: "you can only complete an action that you set, not everyone can"). Its owner's tick marks it **finished — waiting to confirm**, which tops the setter's list until they tick it closed or send it back; anyone else's tick is locked. Opening a closed action again is the setter's or a manager's too. Every other change — words, date, owner, plot — stays open to the whole grant. `closeRight` in `next-steps.ts` says who may do what; the `client_actions_guard` trigger holds the same line in the database.
 
 ## Things that will bite
 
@@ -39,6 +40,7 @@ The Saarang plot register, one record per villa; every promise to a client as an
 - **A plot's page sends its cards a slim set of fields** (`plotFields`), not the whole record — six client cards would otherwise each carry its actions, payments and Relay trails to the browser.
 - **The board's shared data rides in one context** (`BoardProvider`): today, the team, every plot, each person's open count — handed down once, not repeated on every action card.
 - **The import keys each action to `md5('saarang-tracker:<id>')`** — a second run adds nothing; never reuse that prefix for anything else.
+- **`created_by` is the setter, and it is pinned** (`0121`): on insert it is whoever is signed in, whatever the request sent; a script's insert (no session) pins the owner; afterwards it never changes. Without the pin, an action with no setter could be handed to yourself and then closed. The guard lets a session with no `auth.uid()` (db:apply, the import scripts) through.
 
 ## Known costs, accepted
 

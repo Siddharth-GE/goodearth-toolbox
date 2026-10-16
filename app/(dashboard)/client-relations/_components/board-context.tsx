@@ -28,6 +28,8 @@ export type Board = {
   /** Open actions per person, for the owner menu. */
   openByOwner: Record<string, number>;
   meId: string;
+  /** An admin: closes any action (0121). */
+  isManager: boolean;
 };
 
 const BoardContext = createContext<Board | null>(null);
