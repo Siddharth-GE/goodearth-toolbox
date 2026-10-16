@@ -204,3 +204,90 @@ The founder: "i need to prepare a hand off system for this thing in one click to
 
 1. **Superstructure materials.** SS and MEP works are shares of a package rate per sqft; their sub-works (SS.2a–SS.2g, SS.5a, SS.9b, SS.6a–SS.6e, SS.11a/b) have no unit. Give them physical units and recipes, so the model can drive blocks and cement for the superstructure?
 2. **FD.16, FD.22, FD.29–FD.32** are sqft: shuttering area (base + sides) or plan area? Until answered they are measured by hand.
+
+# Seventh piece — the Saarang tracker, inside Client Relations (DRAFT, 2026-10-16)
+
+The founder: "i need to add this module, with this kind of flow and ux for my CRM users on the tool box, it can either be in the client management tool or an additional tool, where it gets linked etc so make a build plan" — with `saarang-tracker-preview.standalone.html`, the self-hosted Saarang Tracker (`server.js` and `data.json`, exported 15 Oct, in Downloads). Drafted by `[Opus]` against the code and staging's real rows. **Not approved yet**: the founder answers _Questions before the build_ and approves; Fable reviews `0119` before it reaches `db:apply` (MODELS.md). Branch `feature/client-relations-actions`.
+
+## Where it goes: Client Relations, not a new tool
+
+- **Same people, same plots.** The tracker's users are the CRM team (Anu, Sayooj, Sebastina) and two managers (Saurav and Siddharth — both admins here). Its "deal" is Client Relations' engagement: one per plot, with a sales owner, sale deed and CA status, who holds the original, the acknowledgement, the bottleneck, the plot-amount due date and notes — every one already a column of `client_engagements` or its plot instalment.
+- **A separate tool would have to copy those columns or read them across a boundary** — two registers of who bought which plot, the thing the toolbox exists to end. Inside Client Relations it is one new table, one grant, and no new row in STATUS.md's contract table.
+- **What is genuinely new is the to-do list** — an owner, a date and a status on every promise to a client — and screens that make overdue impossible to miss.
+
+## What the team gets
+
+1. **Actions** — a new first tab and the welcome's main door; the tracker's main screen.
+   - A one-line **composer**: type the step, pick plot, owner, due date, Sales or Kaadal; Enter adds it.
+   - Sections **Needs management · Overdue · Next 7 days · Later**, and _Show done_. No date counts as overdue (the tracker's rule — it forces a real date). An imported date the old sheet never had says _date assumed_ until someone sets one.
+   - Each card: a round **tick** (done — it leaves the list, with **Undo** for five seconds), the text edited in place, and chips that open a menu — **due** (Today, Tomorrow, This Friday, Next Monday, In 2 weeks, or a date), **owner**, **status** (Open, Waiting on client, Waiting on management, Done), the track, notes, move to another plot.
+   - **Admins see the team strip**: a _Needs you_ card (everything waiting on management) and a card per team member with overdue / this week / later; click one to see only theirs. **Everyone else opens on their own list** under a greeting ("Start with the 3 overdue items"), and Question 1 decides whether they can switch to everyone's.
+   - Filters: project, and _Kaadal only_.
+2. **Plots** becomes the lot-card grid: the plot number large, the client, a health pill (Overdue · Needs management · No next step · Not updated in 2 weeks · On track · Handed over), the five-step rail (buyer → sale deed → CA → construction → handover), the next action and its date, the owner and the Kaadal stage. Health chips filter it; today's search and project and owner filters stay on the toolbar.
+3. **The plot page** (`plots/[engagementId]`, also reached from a client) opens with **Next steps** — the plot's actions and its own composer — then today's cards with the wider lists, a **Kaadal interiors** card (stage, owner, note) and, if Question 2 says so, a **Construction** stepper and a permit date. A page, not the tracker's slide-in drawer: the toolbox has no drawer, a page works on a phone, and Back returns to the grid.
+4. **The welcome** counts overdue, due this week and waiting on management — counts only, never rupees.
+
+Clients and Collections are unchanged.
+
+## What it deliberately leaves out
+
+- **Fix first** — the old sheets' conflicts list; all 11 are resolved. The import's difference list (below) does that job for the move.
+- **Combine plots** — combined plots are already one Masters plot (_Plot 22 & 23_); combining is a Masters edit, not a CRM button.
+- **Refreshing every 20 seconds** — a colleague's change shows on the next page load or click, as in every other tool.
+- Reminders by email or Google Chat, a _Your next steps_ panel on the home page, a Reporter dataset of actions — each a later piece if wanted.
+
+## The database — `0119_client_actions.sql`
+
+- **`client_actions`**: `engagement_id` (null is a general action with no plot), `action` (1–500 characters), `owner_id`, `due_on`, `due_assumed`, `status` (`open`, `waiting_client`, `waiting_management`, `done`), `track` (`sales`, `kaadal`), `notes`, `done_on` (set exactly when done — a CHECK), who and when. RLS on; one SELECT, one INSERT and one UPDATE policy, each `has_app('/client-relations')`; **no DELETE policy — an action is marked done, never deleted** (the tracker's rule). A plot with actions refuses deletion (a plain FK).
+- **`client_engagements` gains** `kaadal_stage` (To pitch, Pitch done, Retainer pending, Retainer paid, In design, Execution, Closed – no interiors), `kaadal_owner_id`, `kaadal_note` — and, by Question 2, `construction_stage` and `permit_on`.
+- **Its lists widen to the tracker's** — each CHECK dropped and re-added wider, so nothing stored becomes invalid: deed and CA status + _Not started_, _Drafting_; original with + _Sreejayan_, _Tarana_; acknowledgement + _With Sreejayan_, _Requested from client_, _Pending_; bottlenecks + _Legal / documents_, _Bank / loan_. `stages.ts` mirrors each in the same commit.
+- **`client_relations_team()`** — who an action can be given to: active, non-admin people holding `/client-relations` directly or through a role. A member cannot read anyone else's grants (`user_apps` is own-row), so this is a small `security definer` function that checks `has_app('/client-relations')` in its body and returns id and name only; execute revoked from `public, anon`. It reads the shell's grant tables, so it gets a line in SECURITY.md's cross-tool section.
+- **No view changes.** `crm_milestone_facts` and `crm_receipt_facts` stay as they are; actions are prose and never join a facts view (Client Relations' rule 6).
+- It ends asserting all of the above. `scripts/trials/client-actions.sql` runs as a single-grant person and is proved to bite (a delete refused, a no-grant person refused, `done_on` out of step refused).
+
+## The move from the self-hosted tracker — `scripts/import-saarang-tracker.ts`
+
+`--project <ref> --json <data.json>`, a dry run unless `--commit`, matched on natural keys so a second run writes nothing.
+
+- **Plots match by number** (_Plot 22-23_ → `P22-23`), people by email. **It fills blanks and never overwrites** what Client Relations already holds; every difference is printed instead.
+- **Actions**: all 42 (Anu 26, Sayooj 13, Sebastina 3; 22 Sales, 20 Kaadal), with owner, date, track and notes; the 30 with _date assumed_ keep the flag.
+- **Masters is never written by the import.** Where the tracker and Masters disagree on who holds a plot, it skips that plot and lists it for the founder (Question 5). Today: Plot 9 (Masters _Rashmi_, tracker _Available_), 27 (_Vidyakanth_ / _Available_), 33 and 34 (_Harman & Aman Pal_ on 33 / one combined deal for _Deepak Shah_), 35 (no client / _Nagaraja Prakasham_), 43 (no client / _Aravind Reddy_). Plots 18–21 are in Masters and not in the tracker.
+- **Phase 3's 27 units are not in Masters** — they come in once Masters has them (Question 4).
+- Staging first, after the answers. Production on cutover day from a fresh `/api/export`; the tracker stops taking changes that morning, so nothing is typed into it after the export.
+
+## Questions before the build — the founder
+
+1. **Who sees what?** The tracker sends a team member only their own actions and plots. In the toolbox the grant is the boundary, and anyone with Client Relations sees every plot today. _Recommended:_ everyone with the grant sees everything; each person opens on their own list with a _Mine · Everyone_ switch. The alternative — a wall in the database so Anu cannot see Sayooj's work — is a new kind of rule here, would hide plots in Clients and Collections too, and is a bigger build.
+2. **Construction stage and the design checks.** Client Relations was told "design and site status come from Relay only, never typed here" (its decision 4). But Relay knows only whether a whole trail is done, never "ground floor slab", so today the toolbox holds no construction stage at all. _Recommended:_ amend decision 4 narrowly — the CRM types the **construction stage** (the tracker's ten steps, as the team last heard it, until the site records it) and the **permit date** (a document, like the deed). _Client confirmed design_ and _Working drawing_ stay out — they belong to Relay and Design Management — and the import writes them into the plot's notes so nothing is lost.
+3. **Plot payment.** The tracker types _Completed / Pending – registration / Partly paid / Loan – awaiting bank_; Client Relations works it out from the plot instalment and its receipts (Collections). _Recommended:_ keep it worked out. "Pending – registration" is already the registration stage, "Loan – awaiting bank" the _Bank / loan_ bottleneck, and the tracker's word goes into the notes until the receipts are entered. A typed column could disagree with the receipts.
+4. **Phase 3.** Are P3 01–29 the project _Saarang West - Villas_ (one plot in Masters today) or a phase of _Saarang - Villas_? Someone with Masters adds the 27 plots and units (type from the tracker: 1BHK G+1 and so on) before the import; the six with buyers become clients, and the "Prospects:" names stay in notes.
+5. **The register differences** above — which is right for Plots 9, 27, 33/34, 35 and 43, and are 18–21 still held?
+6. **Phases 1 and 2.** The tracker filters by phase; Masters has projects, not phases. Are project filters enough, or should a Masters plot carry its phase?
+
+## Steps
+
+- [ ] Founder — answer the six questions; approve this plan.
+- [ ] `[Opus]` `0119` and its trial; dry run on staging as a single-grant person.
+- [ ] `[Fable]` Review `0119` (RLS and a definer function) before `db:apply`. Then `[Opus]` applies it to staging and regenerates the types.
+- [ ] `[Sonnet]` `lib/client-relations/next-steps.ts` — pure, `today` passed in, tested: an action's section and due label, a plot's health and rail, its next action. `stages.ts` gains the new lists.
+- [ ] `[Opus]` Reads and writes: `listActions`, `getActionCounts`, `listPlotCards`, `getTeam`; `addAction`, `updateAction`, `setActionStatus` and the new plot fields — each opening with `requireTool("/client-relations")`, returning `ActionState`, revalidating `("/client-relations", "layout")`, reading lists through `fetchAll` and checking every `error`. The owner is checked against `client_relations_team()` on every write.
+- [ ] `[Sonnet]` The Actions tab: composer, sections, card, the due / owner / status menus on `DropdownMenu`, the team strip, the greeting, the done-with-Undo bar (the tool's own — Relay holds the first copy; the third becomes shared). `[Opus]` reviews.
+- [ ] `[Sonnet]` The Plots grid; the plot page's Next steps, Kaadal and Construction cards; the welcome's counts; Actions first in the nav. `[Opus]` reviews.
+- [ ] `[Opus]` Rendered through a throwaway probe on a true 390px phone and a desktop, light and dark; prettier, lint, typecheck, test, build, `check:actions`; every new `select` string run at staging's PostgREST.
+- [ ] `[Opus]` The import: dry run on staging, its differences to the founder, then `--commit`.
+- [ ] `[Opus]` Docs: Client Relations' `PLAN.md` (the new rules, and decision 4's amendment if made), `STATUS.md`, SECURITY.md's line for `client_relations_team()`.
+- [ ] `[Fable]` Approval pass on the full diff; pull request into `staging`; CI green.
+- [ ] Founder — the checklist below, on staging; grant `/client-relations` to Anu, Sayooj and Sebastina there.
+- [ ] Production: Fable's sign-off, `0119`, the merge, the import from a fresh export, the self-hosted tracker switched off.
+
+## Verification — the founder, on staging (seventh piece)
+
+1. **Client Relations** opens on its welcome: overdue, this week, waiting on management. **Actions** is the first door.
+2. **Actions**: the team strip shows Anu, Sayooj and Sebastina with the imported counts (Anu 26 open). Click Anu — only hers. **Needs you** is empty.
+3. Type "Share 3D with client", pick Plot 4, Sayooj, **Tomorrow** → **Add**: it appears under _Next 7 days_.
+4. Tick it — it leaves the list; **Undo** brings it back. Tick an overdue one, then _Show done_.
+5. On a _date assumed_ action pick **This Friday** — the flag goes and it moves to _Next 7 days_.
+6. **••• → Waiting on management** — it moves to the top, and **Needs you** counts 1.
+7. **Plots**: lot cards with health pills; the **No next step** chip lists sold plots with nothing open. Open Plot 10 → **Next steps** at the top; add one there; set the Kaadal stage; step the construction stage.
+8. **Anu, signed in on her phone**: she opens on her own list with the greeting; the composer, the menus and the tick work with a thumb; nothing scrolls sideways.
+9. As the **probe** (it holds `/estimator` and `/inventory`): Client Relations is not in the sidebar, and `/client-relations/actions` sends it home.
