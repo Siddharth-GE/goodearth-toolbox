@@ -166,7 +166,7 @@ export function PoDocument({ data }: { data: PoPdfData }) {
     <Document
       title={`Goodearth Purchase Order — ${po.reference}`}
       author="Goodearth"
-      creator="Goodearth Toolbox"
+      creator="Toolbox by Kaadal"
     >
       <DocumentPage meta={meta}>
         <DocumentHeading

@@ -101,7 +101,7 @@ export function TransmittalDocument({ transmittal }: { transmittal: TransmittalD
     <Document
       title={`Goodearth Transmittal — ${reference} — ${transmittal.villaName}`}
       author="Goodearth"
-      creator="Goodearth Toolbox"
+      creator="Toolbox by Kaadal"
     >
       <DocumentPage meta={meta}>
         <Text style={styles.h1}>{transmittal.villaName}</Text>
