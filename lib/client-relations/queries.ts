@@ -16,7 +16,15 @@ import {
   type MilestoneInput,
   type ReceiptInput,
 } from "./dues";
-import { invoiceStageOf, type Bottleneck, type ClientStage, type MilestoneStage } from "./stages";
+import { actionBucket, plotNumber } from "./next-steps";
+import { readPlotCards, readPlotSteps, type NextStep, type PlotCard } from "./next-steps-queries";
+import {
+  invoiceStageOf,
+  type Bottleneck,
+  type ClientStage,
+  type KaadalStage,
+  type MilestoneStage,
+} from "./stages";
 
 /**
  * Reads for Client Relations.
@@ -116,8 +124,17 @@ export type ClientListRow = {
   stage: ClientStage;
   isActive: boolean;
   ownerName: string | null;
-  /** Every plot this client holds, for the chips on the row. */
-  plots: { unitId: string; unitName: string; projectName: string }[];
+  /** Every plot this client holds, for the chips on the card. */
+  plots: {
+    unitId: string;
+    unitName: string;
+    projectName: string;
+    engagementId: string | null;
+    number: string;
+  }[];
+  /** Their plots' open actions, and how many of those are overdue. */
+  openSteps: number;
+  overdueSteps: number;
 };
 
 export type ClientFilters = {
@@ -170,7 +187,7 @@ export async function listClientsPage(
     clientIds.length
       ? supabase
           .from("units")
-          .select("id, name, client_id, projects(name)")
+          .select("id, name, code, client_id, projects(name), plots!units_plot_id_fkey(name, code)")
           .in("client_id", clientIds)
           .order("name")
           .order("id")
@@ -182,16 +199,64 @@ export async function listClientsPage(
   ]);
   fail("plots", units.error);
 
+  // Each plot's engagement, and the open actions on it — two small reads
+  // rather than an embed, so a client with no plot still lists.
+  const unitIds = (units.data ?? []).map((unit) => unit.id);
+  const engagementByUnit = new Map<string, string>();
+  const stepsByEngagement = new Map<string, { status: string; dueOn: string | null }[]>();
+  if (unitIds.length) {
+    const engagements = await supabase
+      .from("client_engagements")
+      .select("id, unit_id")
+      .in("unit_id", unitIds);
+    fail("plots", engagements.error);
+    for (const row of engagements.data ?? []) engagementByUnit.set(row.unit_id, row.id);
+
+    const engagementIds = [...engagementByUnit.values()];
+    if (engagementIds.length) {
+      const steps = await fetchAll<{
+        engagement_id: string | null;
+        status: string;
+        due_on: string | null;
+      }>((from, to) =>
+        supabase
+          .from("client_actions")
+          .select("engagement_id, status, due_on")
+          .in("engagement_id", engagementIds)
+          .neq("status", "done")
+          .order("id")
+          .range(from, to),
+      );
+      for (const step of steps) {
+        if (!step.engagement_id) continue;
+        const list = stepsByEngagement.get(step.engagement_id) ?? [];
+        list.push({ status: step.status, dueOn: step.due_on });
+        stepsByEngagement.set(step.engagement_id, list);
+      }
+    }
+  }
+
+  const today = todayInIndia();
   const plotsByClient = new Map<string, ClientListRow["plots"]>();
+  const stepsByClient = new Map<string, { status: string; dueOn: string | null }[]>();
   for (const unit of units.data ?? []) {
     if (!unit.client_id) continue;
+    const engagementId = engagementByUnit.get(unit.id) ?? null;
     const list = plotsByClient.get(unit.client_id) ?? [];
     list.push({
       unitId: unit.id,
       unitName: unit.name,
       projectName: unit.projects?.name ?? "—",
+      engagementId,
+      number: plotNumber(unit.plots?.code ?? unit.code, unit.plots?.name ?? unit.name),
     });
     plotsByClient.set(unit.client_id, list);
+    if (engagementId) {
+      stepsByClient.set(unit.client_id, [
+        ...(stepsByClient.get(unit.client_id) ?? []),
+        ...(stepsByEngagement.get(engagementId) ?? []),
+      ]);
+    }
   }
 
   return {
@@ -205,6 +270,10 @@ export async function listClientsPage(
       isActive: row.is_active,
       ownerName: row.crm_owner_id ? (owners.get(row.crm_owner_id) ?? null) : null,
       plots: plotsByClient.get(row.id) ?? [],
+      openSteps: (stepsByClient.get(row.id) ?? []).length,
+      overdueSteps: (stepsByClient.get(row.id) ?? []).filter(
+        (step) => actionBucket(step, today) === "overdue",
+      ).length,
     })),
   };
 }
@@ -234,8 +303,10 @@ const ENGAGEMENT_SELECT = `
   registration_stage, registration_note, registration_on,
   bottlenecks, design_support, details, check_in_on,
   plot_value, construction_value, updated_at,
+  progress_stage_id, design_confirmed_on, permit_on, working_drawing_on,
+  kaadal_stage, kaadal_owner_id, kaadal_note,
   units!inner (
-    id, name, code, status, client_id,
+    id, name, code, status, client_id, unit_type,
     plots!units_plot_id_fkey ( name, code ),
     clients ( id, name ),
     projects ( id, name )
@@ -265,12 +336,20 @@ type EngagementRecord = {
   plot_value: number | null;
   construction_value: number | null;
   updated_at: string;
+  progress_stage_id: string | null;
+  design_confirmed_on: string | null;
+  permit_on: string | null;
+  working_drawing_on: string | null;
+  kaadal_stage: string | null;
+  kaadal_owner_id: string | null;
+  kaadal_note: string | null;
   units: {
     id: string;
     name: string;
     code: string | null;
     status: string;
     client_id: string | null;
+    unit_type: string | null;
     plots: { name: string; code: string | null } | null;
     clients: { id: string; name: string } | null;
     projects: { id: string; name: string } | null;
@@ -283,11 +362,15 @@ export type EngagementRow = {
   unitName: string;
   unitCode: string | null;
   unitStatus: string;
+  unitType: string | null;
   plotName: string | null;
+  /** "10", "22-23" — the tracker's plot number, set in monospace. */
+  plotNumber: string;
   projectId: string;
   projectName: string;
   clientId: string | null;
   clientName: string | null;
+  ownerId: string | null;
   ownerName: string | null;
   saleDeedStatus: string;
   saleDeedOriginalWith: string | null;
@@ -300,6 +383,13 @@ export type EngagementRow = {
   designSupport: string | null;
   details: string | null;
   checkInOn: string | null;
+  progressStageId: string | null;
+  designConfirmedOn: string | null;
+  permitOn: string | null;
+  workingDrawingOn: string | null;
+  kaadalStage: KaadalStage | null;
+  kaadalOwnerId: string | null;
+  kaadalNote: string | null;
   invoiceStage: MilestoneStage | null;
   dues: DuesSummary;
 };
@@ -326,11 +416,17 @@ function toRow(
     unitName: record.units.name,
     unitCode: record.units.code,
     unitStatus: record.units.status,
+    unitType: record.units.unit_type,
     plotName: record.units.plots?.name ?? null,
+    plotNumber: plotNumber(
+      record.units.plots?.code ?? record.units.code,
+      record.units.plots?.name ?? record.units.name,
+    ),
     projectId: record.project_id,
     projectName: record.units.projects?.name ?? "—",
     clientId: record.units.clients?.id ?? null,
     clientName: record.units.clients?.name ?? null,
+    ownerId: record.crm_owner_id,
     ownerName: record.crm_owner_id ? (owners.get(record.crm_owner_id) ?? null) : null,
     saleDeedStatus: record.sale_deed_status,
     saleDeedOriginalWith: record.sale_deed_original_with,
@@ -343,6 +439,13 @@ function toRow(
     designSupport: record.design_support,
     details: record.details,
     checkInOn: record.check_in_on,
+    progressStageId: record.progress_stage_id,
+    designConfirmedOn: record.design_confirmed_on,
+    permitOn: record.permit_on,
+    workingDrawingOn: record.working_drawing_on,
+    kaadalStage: record.kaadal_stage as KaadalStage | null,
+    kaadalOwnerId: record.kaadal_owner_id,
+    kaadalNote: record.kaadal_note,
     invoiceStage,
     dues,
   };
@@ -629,13 +732,16 @@ export type EngagementDetail = EngagementRow & {
   caSignedOn: string | null;
   plotValue: number | null;
   constructionValue: number | null;
-  ownerId: string | null;
   milestones: MilestoneRow[];
   receipts: ReceiptRow[];
   trails: RelayTrail[];
   /** Latest issued design revision, the one design fact that is real data. */
   issuedRevision: number | null;
   issuedAt: string | null;
+  /** The plot's next steps — open first by date, then done. */
+  steps: NextStep[];
+  /** The same plot as a lot card: status, health, rail, build stage. */
+  card: PlotCard;
 };
 
 async function buildDetail(records: EngagementRecord[]): Promise<EngagementDetail[]> {
@@ -644,7 +750,8 @@ async function buildDetail(records: EngagementRecord[]): Promise<EngagementDetai
   const ids = records.map((r) => r.id);
   const unitIds = records.map((r) => r.unit_id);
 
-  const [money, owners, trails, selections] = await Promise.all([
+  const today = todayInIndia();
+  const [money, owners, trails, selections, steps, cards] = await Promise.all([
     loadMoney(supabase, ids),
     nameMap(
       supabase,
@@ -656,6 +763,8 @@ async function buildDetail(records: EngagementRecord[]): Promise<EngagementDetai
       .select("unit_id, revision_no, issued_at")
       .in("unit_id", unitIds)
       .eq("status", "issued"),
+    readPlotSteps(supabase, ids),
+    readPlotCards(supabase, ids, today),
   ]);
   fail("issued designs", selections.error);
 
@@ -702,8 +811,6 @@ async function buildDetail(records: EngagementRecord[]): Promise<EngagementDetai
       .range(from, to),
   );
 
-  const today = todayInIndia();
-
   return records.map((record) => {
     const milestones = money.milestones.get(record.id) ?? [];
     const receipts = money.receipts.get(record.id) ?? [];
@@ -726,7 +833,6 @@ async function buildDetail(records: EngagementRecord[]): Promise<EngagementDetai
       caSignedOn: record.ca_signed_on,
       plotValue: record.plot_value,
       constructionValue: record.construction_value,
-      ownerId: record.crm_owner_id,
       milestones: allocated.map((row) => ({
         ...row,
         invoiceNo: extraByMilestone.get(row.id)?.invoice_no ?? null,
@@ -748,6 +854,8 @@ async function buildDetail(records: EngagementRecord[]): Promise<EngagementDetai
       trails: trails.get(record.unit_id) ?? [],
       issuedRevision: issued?.revision ?? null,
       issuedAt: issued?.at ?? null,
+      steps: steps.get(record.id) ?? [],
+      card: cards.get(record.id)!,
     };
   });
 }
@@ -859,6 +967,7 @@ export async function getClientDetail(clientId: string): Promise<ClientDetail | 
 export type DueLine = {
   engagementId: string;
   unitName: string;
+  plotNumber: string;
   projectName: string;
   clientId: string | null;
   clientName: string | null;
@@ -919,6 +1028,10 @@ export async function listDues(
       lines.push({
         engagementId: record.id,
         unitName: record.units.name,
+        plotNumber: plotNumber(
+          record.units.plots?.code ?? record.units.code,
+          record.units.plots?.name ?? record.units.name,
+        ),
         projectName: record.units.projects?.name ?? "—",
         clientId: record.units.clients?.id ?? null,
         clientName: record.units.clients?.name ?? null,

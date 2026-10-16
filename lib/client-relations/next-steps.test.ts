@@ -17,6 +17,7 @@ import {
   loadOf,
   nextAction,
   plotHealth,
+  plotNumber,
   plotRail,
   plotStatus,
   weekdayOf,
@@ -183,4 +184,13 @@ test("a plot's rail", () => {
   assert.equal(done.build, 1);
   // An empty Masters list hands nothing over.
   assert.equal(plotRail(sold({ stageIndex: -1, finalIndex: -1 })).steps[4], false);
+});
+
+test("a plot's number, as the tracker printed it", () => {
+  assert.equal(plotNumber("P10", "Plot 10"), "10");
+  assert.equal(plotNumber("P22-23", "Plot 22 & 23"), "22-23");
+  assert.equal(plotNumber("SW-03", "Plot 3"), "SW-03");
+  assert.equal(plotNumber(null, "Villa 7"), "7");
+  assert.equal(plotNumber("  ", "Plot 9"), "9");
+  assert.equal(plotNumber(null, "Plot"), "Plot");
 });
