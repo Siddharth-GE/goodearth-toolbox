@@ -101,16 +101,14 @@ export function LotCard({ card, today }: { card: PlotCard; today: string }) {
         ) : null}
 
         {hasBuyer || card.next ? (
-          <div className="border-border flex items-start gap-2 border-t pt-2.5 text-sm">
+          <div className="border-border flex flex-col items-start gap-1.5 border-t pt-2.5 text-sm">
             {card.next ? (
               <>
-                <span className="text-foreground/80 line-clamp-2 min-w-0 flex-1">
-                  {card.next.action}
-                </span>
+                <span className="text-foreground/80 line-clamp-2 min-w-0">{card.next.action}</span>
                 {next ? (
                   <Pill
                     tone={next.tone === "neutral" ? "plain" : next.tone}
-                    className="h-6 shrink-0 px-2 text-[11px]"
+                    className="h-6 max-w-full px-2 text-[11px]"
                   >
                     {next.text}
                   </Pill>

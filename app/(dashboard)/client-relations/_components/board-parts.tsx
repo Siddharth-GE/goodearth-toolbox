@@ -161,7 +161,8 @@ export function FilterChips({
 function LoadBar({ load }: { load: Load }) {
   const total = Math.max(load.open, 1);
   const parts = [
-    { value: load.overdue + load.management, className: "bg-danger" },
+    { value: load.overdue, className: "bg-danger" },
+    { value: load.management, className: "bg-foreground" },
     { value: load.week, className: "bg-info" },
     { value: load.later, className: "bg-foreground/20" },
   ].filter((part) => part.value > 0);
@@ -183,7 +184,7 @@ function LoadBar({ load }: { load: Load }) {
 
 function Legend({ load }: { load: Load }) {
   const items = [
-    { label: "overdue", value: load.overdue + load.management, dot: "bg-danger" },
+    { label: "overdue", value: load.overdue, dot: "bg-danger" },
     { label: "this week", value: load.week, dot: "bg-info" },
     { label: "later", value: load.later, dot: "bg-foreground/20" },
   ];
@@ -195,6 +196,13 @@ function Legend({ load }: { load: Load }) {
           <b className="text-foreground/80 font-semibold">{item.value}</b> {item.label}
         </span>
       ))}
+      {load.management ? (
+        <span className="inline-flex items-center gap-1.5">
+          <span aria-hidden="true" className="bg-foreground size-1.5 rounded-full" />
+          <b className="text-foreground/80 font-semibold">{load.management}</b> waiting on
+          management
+        </span>
+      ) : null}
       {load.assumed ? <span>{load.assumed} with an assumed date</span> : null}
     </p>
   );
@@ -250,7 +258,7 @@ export function TeamStrip({
 
         {loads.map(({ person, load }) => {
           const on = who === person.id;
-          const overdue = load.overdue + load.management;
+          const overdue = load.overdue;
           return (
             <Link
               key={person.id}
@@ -312,7 +320,7 @@ export function TeamStrip({
 }
 
 export function Greeting({ name, hour, load }: { name: string; hour: number; load: Load }) {
-  const overdue = load.overdue + load.management;
+  const overdue = load.overdue;
   return (
     <div className="border-border bg-surface flex flex-wrap items-end justify-between gap-5 rounded-2xl border p-5 md:p-6">
       <div className="min-w-0">

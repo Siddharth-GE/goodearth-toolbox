@@ -367,7 +367,7 @@ export function DocumentCard({
             }}
           />
         </Field>
-        <div className="grid gap-5 lg:grid-cols-2">
+        <div className="space-y-5">
           <Field label="Original is with" hint={signed ? undefined : "once it is signed"}>
             <ChoiceChips
               label="Original is with"
