@@ -367,3 +367,12 @@ The founder, after the seventh piece reached staging: "i would say you can only 
 3. Back as you: it tops your list under **Waiting to confirm**, "Waiting for you to confirm". Tick it → closed. Undo works.
 4. Anu cannot open it again; on Sayooj's own actions her tick is dashed and locked.
 5. One of Anu's imported actions (from the tracker): she ticks it straight to done — she counts as its setter.
+
+# Ninth piece — Toolbox by Kaadal (2026-10-16)
+
+The founder: the app is "Toolbox by Kaadal" under the Kaadal K; Goodearth stays the company on each document's letterhead. Screens, the tab icon and PDF file details only, no migration; the rule is in `DESIGN.md` (the logo) and `PRODUCT.md`. Built by `[Opus]` on `feature/kaadal-brand` (#99).
+
+- [x] `[Opus]` The K mark (`components/ui/logo.tsx`), the sidebar and sign-in names, the tab title and icon, the PDFs' creator and the report footer.
+- [x] ~~`[Fable]` Review~~ — **skipped on the founder's explicit word for this merge** (2026-10-16: "merge"). In its place `[Opus]` re-reviewed the diff against `BUGCATCHER.md`: no database read, upload or permission touched; the logo's two hex fills are the one sanctioned exception (`DESIGN.md`), and its `dark:` follows `data-theme` as the tokens do (#4); the icon is a valid four-size `.ico`; no "Goodearth Toolbox" left on screen. The preview's sign-in page rendered light and dark — burgundy K, blush K. No findings. CI green.
+- [ ] Founder — on staging: the sidebar's K and name, the tab icon (hard refresh), the sign-in page, and one PDF (Goodearth letterhead, "Toolbox by Kaadal" in its details or the report footer).
+- [ ] At the switch to the new production: the practice banner's link (`lib/environment.ts`) and the sign-in emails' "Goodearth Toolbox (PRACTICE SITE)" change with the domain.
