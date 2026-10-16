@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { drawnPercent, materialTotals, siteCheckEntries } from "./site-check";
+import { drawnPercent, materialTotals, siteCheckEntries, villaSummaries } from "./site-check";
 
 const row = (work: string, item: string | null, estimated: number, issued: number | null) => ({
   workItemId: work,
@@ -60,4 +60,38 @@ test("one villa's figures, and a percentage that is never a divide by zero", () 
   assert.equal(villa11.find((total) => total.itemId === "cement")?.reached, 55);
   assert.equal(drawnPercent(0, 30), null);
   assert.equal(drawnPercent(200, 50), 25);
+});
+
+test("the villa list: waiting for you first, then past the estimate, then the rest", () => {
+  const withVilla9 = [
+    ...officials,
+    {
+      estimateId: "est-9",
+      unitId: "villa-9",
+      comparison: { rows: [row("slab", "sand", 10, 12)], unmatched: [] },
+    },
+    { estimateId: "est-2", unitId: "villa-2", comparison: { rows: [], unmatched: [] } },
+  ];
+  const names: Record<string, string> = {
+    "villa-2": "Villa 2",
+    "villa-9": "Villa 9",
+    "villa-10": "Villa 10",
+    "villa-11": "Villa 11",
+  };
+  const summaries = villaSummaries(
+    withVilla9,
+    siteCheckEntries(withVilla9),
+    (entry) => entry.unitId === "villa-11",
+    (unitId) => names[unitId] ?? "",
+  );
+  assert.deepEqual(
+    summaries.map((s) => `${s.unitId} over ${s.over} waiting ${s.waiting} approved ${s.approved}`),
+    [
+      "villa-10 over 1 waiting 1 approved 0",
+      "villa-9 over 1 waiting 0 approved 0",
+      // Nothing waiting and nothing over: name order, 2 before 11.
+      "villa-2 over 0 waiting 0 approved 0",
+      "villa-11 over 0 waiting 0 approved 1",
+    ],
+  );
 });

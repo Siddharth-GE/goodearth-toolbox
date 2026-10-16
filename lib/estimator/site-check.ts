@@ -2,10 +2,10 @@
  * The Site check list — pure, import-free, tested.
  *
  * Every villa's official estimate has already been lined up against what
- * reached the villa (compare.ts). This turns those comparisons into the
- * one list the founder asked for — what needs a look, across every villa
- * — and into "where does all the cement go": each material, estimated
- * against reached, across the whole project.
+ * reached the villa (compare.ts). This turns those comparisons into
+ * what needs a look, counted villa by villa for the front list, and into
+ * "where does all the cement go": each material, estimated against
+ * reached, for one villa or across the whole project.
  */
 
 type ComparedRow = {
@@ -134,6 +134,49 @@ export function materialTotals(officials: Official[], unitId?: string): Material
     ...total,
     villas: villaSet.size,
   }));
+}
+
+export type VillaSummary = {
+  estimateId: string;
+  unitId: string;
+  /** Materials past the estimate. */
+  over: number;
+  /** Arrived outside the estimate, no estimator has looked yet. */
+  waiting: number;
+  /** Arrived outside the estimate and approved — flagged forever (0083). */
+  approved: number;
+};
+
+/**
+ * Site check's front list (founder, 2026-10-16: "a villa wise list you
+ * click in and see"): one row per official estimate, counting what needs
+ * a look there. Villas waiting for an approval first, then those past
+ * their estimate, then the rest — each group in villa-name order.
+ */
+export function villaSummaries(
+  officials: Official[],
+  entries: SiteCheckEntry[],
+  isApproved: (entry: SiteCheckEntry) => boolean,
+  nameOf: (unitId: string) => string,
+): VillaSummary[] {
+  const summaries = officials.map((official) => {
+    const own = entries.filter((entry) => entry.estimateId === official.estimateId);
+    const outside = own.filter((entry) => entry.kind === "outside");
+    const approved = outside.filter(isApproved).length;
+    return {
+      estimateId: official.estimateId,
+      unitId: official.unitId,
+      over: own.length - outside.length,
+      waiting: outside.length - approved,
+      approved,
+    };
+  });
+  const rank = (summary: VillaSummary) => (summary.waiting > 0 ? 0 : summary.over > 0 ? 1 : 2);
+  return summaries.sort(
+    (a, b) =>
+      rank(a) - rank(b) ||
+      nameOf(a.unitId).localeCompare(nameOf(b.unitId), undefined, { numeric: true }),
+  );
 }
 
 /** Reached as a share of estimated; null when nothing was estimated. */
