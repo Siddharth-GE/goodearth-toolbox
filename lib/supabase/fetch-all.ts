@@ -3,35 +3,11 @@ import "server-only";
 import { withRetry } from "./transient";
 
 /**
- * Reads a query to completion, page by page.
- *
- * PostgREST silently caps any un-ranged select at 1,000 rows. For a list
- * on screen that's a display decision and the query should say its own
- * limit (and the screen should say "showing N of M" — see
- * MARATHON_LIST_LIMIT). But some reads are only correct when they are
- * COMPLETE — carry-forward, merge-before-insert, the Settings grants
- * grid — and for those a silent cap is a data-loss bug: the same one
- * this codebase has now shipped four separate times. Those reads go
- * through here.
- *
- * The caller supplies the query as a function of a range, ordered by
- * something with a unique tiebreaker (`.order("id")` at minimum) —
- * without a total order, rows can repeat or vanish between pages.
- *
- * THROWS if a page fails, and hands back the rows directly. A page that
- * fails for a connection-level reason is retried first (withRetry, in
- * transient.ts) — the throw is for a database that really won't answer,
- * not for one dropped socket. A refusal or a constraint is not retried.
- *
- * It used to return `{ data, error }` with whatever had been read so
- * far. Of roughly seventy call sites, four checked the error; the rest
- * carried on with a partial array — reintroducing, at the point of
- * failure, the exact bug this helper exists to prevent at the point of
- * truncation. A read that is only correct when complete has no sensible
- * half-answer, so there is no longer a way to ask for one: every row, or
- * it raises. Screens land on app/(dashboard)/error.tsx; the two Server
- * Actions that call this catch it themselves, because an action must
- * return an ActionState rather than throw.
+ * Reads a query to completion. PostgREST silently caps a select at 1,000 rows, so
+ * any read that is only correct when complete comes through here. The query must
+ * order by a unique tiebreaker (`.order("id")`) or rows repeat or vanish between
+ * pages. Every row or it throws (a dropped connection is retried first): a partial
+ * array is the very bug this exists to prevent. Actions catch it themselves.
  */
 export async function fetchAll<Row>(
   page: (

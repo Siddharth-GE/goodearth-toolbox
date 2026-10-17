@@ -1,22 +1,13 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 /**
- * HMAC-signed cookie payloads for the sign-in flow — the same shape as
- * the Marathon kiosk session (lib/marathon/session.ts), extracted pure
- * so it can be tested without Next's cookie machinery. This file may
- * import node:crypto and nothing else.
- *
- * A signed payload is `base64url(json).base64url(hmac)`. The signature
- * means the browser can hold the statement without being able to write
- * it; the `exp` inside means a copied cookie dies on schedule. The
- * comparison is timingSafeEqual so verification time never leaks how
- * close a forgery was.
+ * Signed cookie payloads, `base64url(json).base64url(hmac)`: the browser holds the
+ * statement but cannot write it, `exp` kills a copied cookie, and the comparison is
+ * timing-safe. Pure, so it is tested.
  */
 
 export type SignedPayload = {
-  /** What this cookie asserts: which flow step it belongs to. A verified
-   * cookie can never be replayed as a challenge cookie — the kind is
-   * inside the signature. */
+  /** The flow step, inside the signature, so a verified cookie can't replay as a challenge. */
   kind: "challenge" | "verified" | "trusted";
   /** The subject: an email for a challenge, a user id afterwards. */
   subject: string;

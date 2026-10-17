@@ -3,13 +3,8 @@ import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
 
-// Bypasses Row Level Security entirely — only ever call this from trusted
-// server code (Server Actions, Server Components). Never expose the
-// service role key to the browser. Used by Marathon, which has no
-// Supabase Auth session to scope RLS policies to, and by the Google Chat
-// door (`lib/google-chat/identity.ts`), which has none either — Google
-// posts straight to it, so the sender's email is looked up here to
-// decide who typed.
+// Bypasses RLS: trusted server code only, for callers with no session (Marathon,
+// the Google Chat door, the sanctioned uses in SECURITY.md). Never in the browser.
 export function createAdminClient() {
   return createClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

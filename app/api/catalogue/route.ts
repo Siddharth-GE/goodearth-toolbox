@@ -5,48 +5,21 @@ import { getCurrentUser } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
 
 /**
- * Catalogue search for the Selections picker.
- *
- * A Route Handler rather than a Server Action, on the framework's own
- * advice: "do not rely on Promise.all to parallelize Server Actions from
- * the client... use a Route Handler for non-mutation requests."
- *
- * Two things made the action version slow. Actions dispatch one at a time
- * per client, so keystrokes queued behind each other; and an action that
- * revalidates also re-renders the whole editor route server-side, meaning
- * every search re-ran four unrelated page queries. This is a plain GET —
- * no queue, no re-render, and abortable from the client.
- *
- * Not cached: results depend on the signed-in user's grant.
+ * Catalogue search for the item pickers. A GET, not a Server Action: actions queue
+ * one at a time per client and re-render the page, so keystrokes would stack up.
+ * Not cached: results depend on the person's grants.
  */
 export async function GET(request: Request) {
   const user = await getCurrentUser();
   if (!user) return new Response("Unauthorized", { status: 401 });
-  // The tools that browse the catalogue are the ones flagged `catalogue`
-  // in lib/tools.ts — designers picking items, Masters checking a request
-  // against what exists, Budgets setting a default margin, Indents and
-  // Purchase Orders adding direct lines, Inventory choosing the item an
-  // adjustment applies to, Supervisors requesting material. The list used
-  // to be typed here by hand and drifted: a missing grant fails as an
-  // unparseable fetch inside the dialog, not as a friendly refusal (found
-  // by the Phase 7 store-keeper smoke, where /inventory was absent).
-  //
-  // hasApp rather than requireApp because a redirect is meaningless in a
-  // fetch response.
-  //
-  // Note what this returns: name, code, description, brand, thumbnail,
-  // the vendor's product link and the indicative price. No cost and no
-  // margin — those live in tables only /budgets can read, and this
-  // endpoint never touches them.
+  // Admits the tools flagged `catalogue` in lib/tools.ts; hasApp, since a redirect
+  // means nothing to a fetch. Returns no cost or margin: those are /budgets' tables.
   const grants = await Promise.all(CATALOGUE_TOOLS.map((href) => hasApp(user, href)));
   const allowed = grants.some(Boolean);
   if (!allowed) return new Response("Forbidden", { status: 403 });
 
   const { searchParams } = new URL(request.url);
-  // Passed through whole. The term used to have `,` `(` `)` stripped out
-  // of it, because it was spliced unquoted into PostgREST's `or` filter
-  // below; catalogueSearchFilter quotes it instead, so the search now
-  // means what was typed. See lib/masters/catalogue.ts.
+  // Passed whole: catalogueSearchFilter quotes it for PostgREST's `or`.
   const search = (searchParams.get("q") ?? "").trim();
   const categoryId = searchParams.get("category") ?? "";
   const brandId = searchParams.get("brand") ?? "";
@@ -56,10 +29,7 @@ export async function GET(request: Request) {
 
   const supabase = await createClient();
 
-  // Typing "Jaquar" should find Jaquar's items even though the brand name
-  // lives on another table. Resolving matching brands to ids first keeps
-  // this a single flat or-filter — PostgREST can't mix a joined table's
-  // column into a top-level `or` against the items table.
+  // Brands resolve to ids first: PostgREST can't put a joined column in a top-level `or`.
   let brandMatchIds: string[] = [];
   if (search) {
     const { data: brands } = await supabase
@@ -79,8 +49,7 @@ export async function GET(request: Request) {
       },
     )
     .eq("is_active", true)
-    // Hundreds of items share a name ("Hanging Light"); without a unique
-    // tiebreaker rows repeat across pages while others never appear.
+    // Names repeat by the hundred; without a unique tiebreaker, pages skip and repeat.
     .order("name")
     .order("id")
     .range((page - 1) * pageSize, page * pageSize - 1);
@@ -98,8 +67,6 @@ export async function GET(request: Request) {
 
   const total = count ?? 0;
   return Response.json({
-    // Flatten the brand embed — the picker wants a name to show, not a
-    // nested object to unwrap.
     items: (data ?? []).map(({ brands, ...item }) => ({
       ...item,
       brand_name: (brands as { name: string } | null)?.name ?? null,

@@ -2,21 +2,9 @@ import { createClient } from "@/lib/supabase/server";
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
- * Where the emailed password-reset link lands.
- *
- * The Recovery email template links here with ?token_hash=...&type=recovery
- * (the server-side pattern — a token_hash works in whichever browser the
- * link is opened in, unlike the PKCE code flow, which silently fails when
- * the email is read on a different device from the one that asked).
- *
- * verifyOtp consumes the token: single-use, and dead after the expiry
- * set on the project (10 minutes). Success mints a recovery session in
- * the cookies and moves on to /reset-password; anything wrong lands back
- * on /forgot-password with a plain message and no detail an attacker
- * could use.
- *
- * Only 'recovery' is accepted. Sign-in codes are typed into the verify
- * screen, never clicked, so any other type arriving here is a mistake.
+ * The emailed reset link lands here with a token_hash, which works in any browser
+ * (the PKCE flow fails on another device). Single-use, 10 minutes; failures say
+ * nothing an attacker could use. Only 'recovery': sign-in codes are typed, never clicked.
  */
 export async function GET(request: NextRequest) {
   const url = request.nextUrl;

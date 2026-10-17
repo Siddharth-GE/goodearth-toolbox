@@ -1,15 +1,7 @@
 /**
- * The sign-in lockout arithmetic — pure, so it can be tested without a
- * database (the house rule), mirroring lib/marathon/pin.ts. This file
- * may import nothing.
- *
- * The numbers copy the kiosk's (0015): ten wrong attempts inside a
- * rolling ten-minute window is far more slack than an honest mistake
- * needs, and still turns a scripted guess into weeks. Here the target is
- * an email address rather than an agent id, and the same limits guard
- * three different steps: the password, the emailed code, and reset
- * requests (where "failure" is simply "another email asked for" — the
- * limit is what stops a prankster hosing a colleague's inbox).
+ * Sign-in lockout arithmetic, pure and tested. Ten wrong attempts in a rolling ten
+ * minutes locks for ten, for the password, the code and reset requests (where it
+ * stops a prankster flooding a colleague's inbox).
  */
 
 export const MAX_FAILURES = 10;
@@ -29,12 +21,7 @@ export type NextAttempt = {
   lockedUntil: Date | null;
 };
 
-/**
- * Given the stored row (or null on a first failure) and the clock,
- * decide the row to store and whether this failure locks the target.
- * The window rolls: failures older than WINDOW_MINUTES don't count, so
- * someone who mistypes once a day never accumulates a lockout.
- */
+/** The row to store, and whether this failure locks. Old failures roll out of the window. */
 export function nextAttempt(existing: AttemptRow | null, now: Date): NextAttempt {
   const windowStart = existing ? new Date(existing.window_started_at) : now;
   const windowExpired = now.getTime() - windowStart.getTime() > WINDOW_MINUTES * 60_000;
