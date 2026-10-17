@@ -91,6 +91,7 @@ The one scoped tool (_Auth and permissions_ above). Its rules are the founder's 
 - **The buyer doors stop at what the caller sees**: `crm_assign_unit` and `crm_release_unit` refuse a plot with a buyer the caller cannot see. An unsold plot can be sold by anyone on the team, and if nobody owns it, it goes to the client's handler or else the seller — so it does not leave their sight as they sell it.
 - **The client list is not scoped.** `clients` is Masters' shared surface, readable by every signed-in person, prospects' contact details and notes included. The Clients screen lists a member's own (`clientScope` in `lib/client-relations/queries.ts`) as a convenience, not a boundary.
 - **No view admits `/client-relations`** — the two CRM facts views are Reporter's and Financial Management's (_Money stays confined_). A new view over these tables either keeps it out or carries the same "mine".
+- **One owner per side** (`0125`): every open step on a plot's side is that side's owner's. Two `security definer` triggers hold it — `client_actions_follow_side` refuses a step on a side with no owner or for anyone else, and `client_engagements_hand_over` moves a side's open steps with its owner and refuses leaving a side with open steps to nobody. Execute is revoked from every client role, so the grant is their boundary; they move only `owner_id` on steps of the plot being written, never a policy's answer. A session with no `auth.uid()` (scripts) is never refused and fills a blank side from its step.
 
 ## Cross-tool reads and writes
 

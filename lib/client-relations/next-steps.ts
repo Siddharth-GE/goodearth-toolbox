@@ -132,6 +132,18 @@ export function compareDone(a: { doneOn: string | null }, b: { doneOn: string | 
 }
 
 /**
+ * Who a step on this side of this plot belongs to — the side's owner, and
+ * nobody else (founder, 2026-10-17: "1 track 1 owner"; 0125 holds the same
+ * line). Null when the side has no owner yet, which refuses the step.
+ */
+export function ownerOfSide(
+  plot: { constructionOwnerId: string | null; interiorOwnerId: string | null },
+  track: "sales" | "kaadal",
+): string | null {
+  return track === "kaadal" ? plot.interiorOwnerId : plot.constructionOwnerId;
+}
+
+/**
  * Whether a plot belongs on the Plots grid filtered by side and person — a
  * plot's two sides each have their own owner and their own actions
  * (Construction is `sales`, Interior is `kaadal`; stages.ts says why).

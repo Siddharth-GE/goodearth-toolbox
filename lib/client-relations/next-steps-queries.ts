@@ -129,6 +129,9 @@ export type PlotRef = {
   unitStatus: string;
   /** Masters' villa name — "Villa 3 (1BHK Study)" carries its configuration. */
   unitName: string;
+  /** Each side's owner, who every open step on that side belongs to (0125). */
+  constructionOwnerId: string | null;
+  interiorOwnerId: string | null;
 };
 
 function toRef(record: PlotRecord): PlotRef {
@@ -144,6 +147,8 @@ function toRef(record: PlotRecord): PlotRef {
     projectName: unit.projects?.name ?? "—",
     unitStatus: unit.status,
     unitName: unit.name,
+    constructionOwnerId: record.crm_owner_id,
+    interiorOwnerId: record.kaadal_owner_id,
   };
 }
 

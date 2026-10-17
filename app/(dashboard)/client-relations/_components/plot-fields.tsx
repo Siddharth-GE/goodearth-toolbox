@@ -62,6 +62,7 @@ export type PlotFields = Pick<
   | "progressStageId"
   | "kaadalStage"
   | "kaadalOwnerId"
+  | "kaadalOwnerName"
   | "kaadalNote"
   | "details"
   | "designSupport"
@@ -275,6 +276,7 @@ export function ConstructionCard({ engagement }: { engagement: PlotFields }) {
         <SavedChoice
           engagementId={engagement.id}
           label="Construction owner"
+          hint="owns every construction step here; change it to hand them all over"
           options={peopleOptions(team, engagement.ownerId, engagement.ownerName)}
           initial={engagement.ownerId}
           patch={(value) => ({ ownerId: value })}
@@ -575,7 +577,8 @@ export function InteriorCard({ engagement }: { engagement: PlotFields }) {
         <SavedChoice
           engagementId={engagement.id}
           label="Interior owner"
-          options={peopleOptions(team, engagement.kaadalOwnerId, null)}
+          hint="owns every interior step here; change it to hand them all over"
+          options={peopleOptions(team, engagement.kaadalOwnerId, engagement.kaadalOwnerName)}
           initial={engagement.kaadalOwnerId}
           patch={(value) => ({ kaadalOwnerId: value })}
         />

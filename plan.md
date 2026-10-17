@@ -513,3 +513,25 @@ On staging, 11 of the 24 plots with both owners have a different person on each 
 3. On a step's **•••** → Side: move it to Construction; Undo brings it back.
 4. **Actions** → **Interior**: only interior steps, and the team strip counts only interior work.
 5. Nowhere in Client Relations says "Kaadal" or "Sales" any more (the plot record's **Construction** and **Interior** cards).
+
+# Thirteenth piece — one owner per side (2026-10-17)
+
+The founder, trying the twelfth piece on staging: "for the same track i did 2 actions for 2 different owners, that shoudnt work right? the plot for different tracks different owner is ok, but 1 track 1 owner get it?" Asked: a side with no owner **refuses a step** until one is set ("Refuse until an owner is set"), and a step's owner is **locked to its side's owner** — to hand over, change the side's owner on the plot and its open steps move with it. Built by `[Opus]` on `feature/client-relations-one-owner`, migration `0125`. The rule is Client Relations' `PLAN.md`, decision 9.
+
+On staging two open steps were already off the rule, both on sides with no owner: Plot 17's interior step ("Share interior design with budget?", Anu's) and W14's construction step ("Booking amount follow up - David", Sayooj's). `0125` gives each side its step's person as owner.
+
+- [x] `[Opus]` `0125`: `client_actions_follow_side` (a step on a side must be its owner's; none without an owner; moved or reopened, it takes the side's owner) and `client_engagements_hand_over` (a side's open steps follow its owner; never left with nobody) — definers reached only by their triggers, execute revoked from every client role; a script (no `auth.uid()`) fills a blank side and is never refused, so the tracker import still lands; the two steps settled; asserts that no open step is off its side's owner. `scripts/trials/client-actions-one-owner-per-side.sql`, dry-run on staging under RLS as a single-grant member — nine trials pass; proved to bite three ways (a step to anyone fails TRIAL 1; no hand-over fails at setup; a side left with nobody fails TRIAL 7).
+- [x] `[Opus]` The screens: once a plot is chosen the composer shows the side's owner instead of a picker (amber "No interior owner" when there is none, and Add says to set one); a plot step's owner chip is no longer a menu; moving a step to the other side says whose it is now ("Moved to Interior · Sayooj's now"); the plot's owner chips say they own every step on their side. The database's sentences reach the screen as written. `ownerOfSide` (one test).
+- [ ] `[Fable]` Review `0125` — two new `security definer` trigger functions and a backfill (MODELS.md). Or the founder's word to skip it for staging.
+- [ ] `[Opus]` Apply to staging; types (no change expected — triggers only); `db:check`; the trial re-run on the applied database; pull request to `staging`; CI green; the founder merges.
+- [ ] Founder — the checklist below, on staging.
+
+## Verification — the founder, on staging (thirteenth piece)
+
+1. Open **Plot 17**: its Interior owner now reads **Anu** (from her step). **W14**'s Construction owner reads **Sayooj**.
+2. On a plot with no Interior owner: **Next steps → Interior** — the owner chip reads "No interior owner" in amber; type a step and Add — it asks you to give the plot an Interior owner first.
+3. Give that plot an Interior owner (the Interior card). Add the step — it is theirs; the owner chip on it is not a menu.
+4. Change the plot's **Interior owner** to someone else: every open interior step on it moves to them; a done one keeps who did it.
+5. Try to set the Interior owner to nobody while it has open steps — refused, in a sentence.
+6. On a step's **•••** → Side → Construction: "Moved to Construction · (the Construction owner)'s now".
+7. On **Actions**, a step with **no plot** still lets you pick any owner.
