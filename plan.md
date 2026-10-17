@@ -1,3 +1,166 @@
+# The refactor before production (approved 2026-10-17)
+
+The founder, 2026-10-17: **"the refactor must happen"**, and "since we're moving to production, cut the fat in all code". Built from the audit of `staging` at `053c329`. The report, with every finding's file and line, is the Claude doc _Toolbox code report and refactor plan_ (https://claude.ai/code/artifact/4abfd7b7-9c57-43dd-9d1f-7932f56b3f80). `[Opus]` wrote this plan in place of Fable's planning session, on the founder's word. MODELS.md's hard rules still stand: every migration below reaches `db:apply` only after a Fable review, and each merge to `staging` waits for Fable's pass unless the founder waives it for that merge.
+
+How it runs:
+
+- Work on branch `feature/refactor`, in its own worktree, because another session may share the main folder (the worktree recipe is in memory).
+- Each step is one commit with a plain-English message, ticked here as it lands.
+- Each phase, or sooner, goes to `staging` as a pull request, and the founder vets it before the next phase starts.
+- No step adds a library.
+- Feature work pauses or rebases while a phase is in flight, because the thinning touches every file.
+
+## Phase 0: before staging becomes production
+
+Switch day is the founder's to run. Before it, three things must be done:
+
+1. This phase, landed and vetted.
+2. TODO.md's vet list, tried or accepted as is.
+3. One `[Fable]` pass over what staging has that Fable never saw. That is most of `0096`–`0126` and PR #81; each piece's section below marks its skip. Any fix to an applied migration is a new migration.
+
+- [x] `[Opus]` **H1: Dexter.** The deck route (`app/deck/[token]/[[...path]]/route.ts:263`) sandboxes only HTML and SVG, so an uploaded `.xml` runs script on our origin.
+  - Sandbox every response.
+  - Move the header choice into a pure function in `lib/dexter/`, with a test.
+  - _Check:_ a deck still plays, and its "visit our website" button opens.
+  - Done: `lib/dexter/headers.ts` (tested). Locally against staging, the "Experience_Sample" deck played under the sandbox, with its preview tags, picture and answers intact. Staging's four decks are single HTML files, so none changes. The website button is the founder's check.
+- [x] `[Opus]` **Make the sign-in cookies unreadable by script.** Set `httpOnly` through `cookieOptions` in `lib/supabase/server.ts` and `proxy.ts`. The `@supabase/ssr` default is readable by script, and no browser client needs it.
+  - _Check, as the probe:_ password and code, Google, sign-out, and the theme switch.
+  - Done: one `AUTH_COOKIE_OPTIONS` in `lib/supabase/cookie-options.ts`. A real probe session on staging (an admin sign-in link, its password untouched) wrote its session cookie `httpOnly`, and sign-out cleared it; Google's three verifier cookies came out `httpOnly` too. The theme cookie is the app's own and stays readable. Signing in through the screens is the founder's check.
+- [ ] `[Fable]` **H2: `user_apps`.** Its grant, revoke and admin-read policies (`0003:20–39`, confirmed live) check `profiles.role` directly. That skips `session_is_verified()` and `is_active`.
+  - New migration: `is_admin()` in each, and one SELECT policy, `user_id = auth.uid() or is_admin()`.
+  - Trial: an admin session with no verified-session row is refused.
+  - _Check:_ in Settings, grant `/indents` to the probe, then take it away.
+- [x] `[Opus]` **H3: one place names the databases.** After the switch, the real site would wear the practice banner, and the "staging only" wipe script would accept the real database.
+  - `lib/environment.ts` exports each ref with its role (production, practice).
+  - `scripts/wipe-staging-records.ts`, `dry-run-migrations.ts`, `google-chat-usage-test.ts` and the practice banner's link import it.
+  - `lib/environment.test.ts` reads `.github/workflows/ci.yml` and `package.json` (`db:types`) and fails if their refs disagree.
+  - Switch day then changes one constant.
+  - Done: `DATABASES` and `PRODUCTION_SITE`, also read by `check-migrations.ts`; no other file in code names a ref. `dry-run-migrations` now runs on the practice database only, instead of refusing only production. The test was proven to bite with a wrong ref in `ci.yml`.
+- [x] `[Opus]` **H4: Budgets.** `lib/budgets/queries.ts:241` (margins) and `:220` (spaces) must check `error`. A failed read is the error screen, never blank margins saved at cost.
+  - Done through the shared `assertRead`. Budgets' other unchecked reads are Phase 2's.
+- [x] `[Opus]` **M1: lockouts fail closed.** `lib/auth/rate-limit.ts:52, 61, 78` and `lib/marathon/rate-limit.ts:57, 70, 88`.
+  - _Check:_ 10 wrong passwords still lock the account for 10 minutes.
+  - Done: each function returns a refusal ready to show; a count it cannot read or write refuses ("Could not check…"), and a failed clear is logged. Run against staging with a made-up address: the 10th wrong password and the 10th wrong PIN lock for 10 minutes, a correct one clears it, and with the database unreachable every check refuses.
+- [x] `[Sonnet]` **M7: rotate the Marathon admin PIN.** `0002` seeds "2026" in this public repo. `scripts/rotate-marathon-pins.ts` must also rotate `marathon_config`'s admin PIN, and SHIPPING.md runs it on every new database.
+  - Done by `[Opus]` in Sonnet's place, on the founder's "keep going". The script checks and rotates the admin PIN (to six random digits), with `2026` added to the published list; checked against `0002`'s own seed. Staging's admin PIN is already off it (dry run: nothing to do).
+- [ ] `[Opus]` **BUGCATCHER #21 and #22.**
+  - [x] #21: a sandbox that lists the types it covers leaves every other type open.
+  - #22: a policy written before the second factor existed never learned it.
+
+## Phase 1: cut the fat
+
+The founder wants the code thinned massively, and every note and TODO that will never get done, or has lost relevance, cut. Measured at `053c329`:
+
+- about 19,000 comment lines in app code, 12,500 of them in `lib/` (one line in five);
+- 641 lines of this file;
+- 1,016 lines across 22 tool `PLAN.md` files.
+
+Applied migrations are never edited, so their comments stay.
+
+- [ ] `[Opus]` **The rule comes first, so the fat doesn't grow back.** Add to CLAUDE.md, _Structure_: "A comment says why in a line or two, never the story, the date or the incident: history is git, incidents are BUGCATCHER. Delete what the code already says."
+- [ ] `[Opus]` **Thin the docs.**
+  - This file: each finished piece's story goes. Its vet checklist stays only while the founder hasn't tried it, and git keeps the rest (`git show 88749ab:plan.md`).
+  - Tool `PLAN.md` files: the rules and the founder's decisions only, no build history.
+  - At the switch, STATUS.md and SHIPPING.md change: the "(on staging)" qualifiers go, and the two-database protocol becomes one production database and one practice database.
+  - Fix the stale facts the audit found:
+    - the CI comment says 14 views; there are 23;
+    - SECURITY.md says three views carry money; 11 do;
+    - DESIGN.md's colour-transition line means the theme switch, not hover fades;
+    - STATUS.md's contract table: Budgets reads Selections' `space_views`, and the Chat door's row needs fixing.
+  - List every cut in the commit message, so the founder can veto any of them.
+- [ ] `[Haiku]` **Dead code.**
+  - Remove 5 unused exports: `getTeam`, `OPEN_BUCKETS`, `DECK_PATH_PREFIX`, `DOCUMENT_TYPES`, `DOCUMENT_UPLOAD_LIMIT`.
+  - Remove Design Management's own `confirm-dialog.tsx`.
+  - Delete 7 superseded scripts (git keeps them): `import-material-master`, `import-vendors`, `import-contractors`, `import-works`, `import-catalogue`, `import-saarang`, `import-staff`.
+  - Drop `csv-parse` once nothing needs it.
+  - `[Opus]` decides the three rules only tests call (`canEditDetails`, `isContractBillable`, `canApproveEffective`): wire each where it belongs, or delete the rule and its test.
+- [ ] `[Sonnet]` **Thin the comments, one tool per commit** (`lib/<tool>` with `app/(dashboard)/<tool>`), shared code last.
+  - Keep a comment only where it says a non-obvious why or rule, in two lines at most.
+  - Cut history, dates, incident stories (point at BUGCATCHER #n instead), restated code, banners and commented-out code.
+  - Security reasoning keeps its why, shortened: the deck sandbox, act-as, the proxy, rate limits, the environment.
+  - **Proof each commit is comment-only:** every changed file transpiles to the same output before and after (`ts.transpileModule` with `removeComments: true`). Write it as a short `scripts/check-comment-only.ts` and run it on every commit.
+  - Target: under 6,000 comment lines.
+- [ ] Founder: **the cuts only you can make.** TODO.md, _Open questions_, has three: is Marathon finished, are the construction budget screens retired, does the Training stub stay. Each yes becomes its own step here.
+- [ ] Founder: **delete the 15 feature branches** on GitHub that are already merged into `staging`.
+
+## Phase 2: make failures visible
+
+- [ ] `[Opus]` **One way to read.** `pagedList` (`lib/masters/paged.ts:39`, and its last-page retry) and the head counts go through the existing `readFailed` instead of returning empty. BUGCATCHER #9's retry then covers them.
+- [ ] `[Sonnet]` **M2: the 151 results that never read `error`**, one tool per commit, worst first:
+  1. PO billed (`purchase-orders/queries.ts:478`);
+  2. the Selections export (`selections/queries.ts:202`);
+  3. Masters lists and items;
+  4. the home page and welcome counts (46);
+  5. single-row reads (35);
+  6. writes and storage removes (18).
+- [ ] `[Sonnet]` **M6: six actions return `ActionState` instead of throwing.** They are `birdwing/actions.ts:776`, `birdwing-books/actions.ts:167, 177, 323`, `purchase-orders/actions.ts:487` and `relay/actions.ts:652`.
+- [ ] `[Sonnet]` **M9: one "today".** The 12 copies of `new Date().toISOString().slice(0, 10)` become `todayInIndia()`. Before 05:30 they give yesterday's date.
+- [ ] `[Opus]` **Unknown stays unknown.**
+  - M4: Client Relations dues are `null` when a step has no amount (`dues.ts:134`).
+  - M5: the Estimator's in-use check goes through `fetchAll` (`works-actions.ts:222`).
+  - M8: Birdwing checks its booking rollback (`birdwing/actions.ts:214, 278`).
+  - Inventory's over-issued flag survives a failed read.
+- [ ] `[Sonnet]` **Lists refresh after line edits.**
+  - `revalidatePath(…, "layout")` in `indents/actions.ts:259, 413, 511`, `purchase-orders/actions.ts:170, 182, 272, 312` and `selections/actions.ts:333, 377`.
+  - The spinner moves out of the paragraph in `budgets/_components/margins-browser.tsx:102`.
+
+## Phase 3: checks that keep it fixed
+
+Keep `npm test` pure. Its 103 files (16,900 lines, `node:test`) are the right kind of test, and there are enough of them. Every high finding passed all of them by nature: a missing header type, a policy, a hard-coded ref, an unread `error`. What's missing is checks: small `tsx` scripts in CI beside `check:actions`, with no new library.
+
+- [ ] `[Opus]` **`check:errors`.** No Supabase result leaves `error` unread. Base it on the audit's scanner; after Phase 2 the count is zero, and it can only stay zero.
+- [ ] `[Opus]` **`check:selects`.** Every literal `select` string's columns and embeds must exist in `database.types.ts`, and a table with two keys to one target must name the key. Four dead screens shipped through this gap (BUGCATCHER #2).
+- [ ] `[Sonnet]` **`check:boundaries`.** No tool imports another tool, and shared code imports no tool; only `lib/overview/` may.
+- [ ] `[Sonnet]` **Two ESLint `no-restricted-syntax` rules** (core ESLint, no plugin): no `toISOString().slice(0, 10)` outside `lib/format.ts`, and no raw palette classes in `app/(dashboard)/**` or `components/**`.
+- [ ] `[Fable]` **`db:check-policies`**, run on every pull request beside `db:check-views`:
+  - row-level security on every table;
+  - no policy checks `profiles.role` directly;
+  - one permissive SELECT policy per table;
+  - every definer sets `search_path`, and either checks a grant or is trigger-only with execute revoked;
+  - after Phase 4, nothing callable by `anon`.
+- [ ] `[Fable]` **Keep the trials running after the switch.** The 19 in `scripts/trials/` need the staff and probe accounts and Saarang's plots, which today only staging has. Decide whether the practice database gets built with them (`scripts/clone-data.ts`, whose table list is out of date), and whether CI runs a migration's own trial there.
+- Not added, on purpose: a browser test. Sign-in needs an emailed code, so CI would need a real login. The founder's vet and the probe cover it.
+
+## Phase 4: database hardening
+
+Fable designs this as one migration.
+
+- [ ] `[Fable]` **M3: the 63 `using (true)` read policies ignore the second factor.** A stolen password alone reads every profile, clients' contact details and notes, indents, stock and Relay trails. Decide whether they ask for `session_is_verified()`.
+- [ ] `[Opus]` **Tidy-up.**
+  - Revoke execute from `anon` on the 81 functions from before `0109`.
+  - Revoke SELECT from `anon` on the four Birdwing views (`0116:408`; `0117:115, 140, 215`).
+  - Document `pusher_current_stage`, `stock_qty_on_hand`, `profile_is_active` and `session_is_verified` in SECURITY.md as definer functions that skip the grant check.
+
+## Phase 5: one home for each helper
+
+- [ ] `[Sonnet]` **`lib/dates.ts`**, with a test: add days, days between, shift month, month label. The Birdwing calendar, Books, Financial Management's cash flow, Relay and `lib/next-steps` move onto it.
+- [ ] `[Sonnet]` **`roundPaise` in `lib/line-money.ts`.** 22 copies disagree on half a paisa. `[Fable]` picks the rule, and a test pins 1.005.
+- [ ] `[Sonnet]` **`pdfResponse()` in `lib/pdf/`** for 10 routes, and one stored-file route helper in `lib/uploads/` for 3.
+- [ ] `[Sonnet]` **Form and number reading through `lib/form-data.ts`**: 118 inline reads, and 10 client-side number parsers moved onto `parseNumber`.
+- [ ] `[Sonnet]` **`lib/hooks/use-action-runner.ts`** replaces the 15 local runners. That also fixes Indents, POs and Bills never clearing an old error.
+- [ ] `[Opus]` **Shared pieces.**
+  - Client Relations moves onto `lib/next-steps/`, `lib/masters/plot-number.ts`, `components/ui/pill.tsx` and `undo-bar.tsx`.
+  - Relay's `celebrate.tsx` toast moves onto the Undo bar.
+  - The chip styling hand-written in six files moves onto `choice-chips`.
+
+## Phase 6: split the big files
+
+These are pure moves.
+
+- [ ] `[Sonnet]` `lib/indents/queries.ts` (1,314 lines) splits into list, indent detail and pull queries.
+- [ ] `[Sonnet]` `lib/purchase-orders/queries.ts` (1,150): ordering from indents moves out.
+- [ ] `[Sonnet]` `lib/design-management/actions.ts` (964) splits into stages, revisions and transmittals.
+- [ ] `[Opus]` `estimator/estimates/[estimateId]/page.tsx` (878) becomes a pure, tested view model plus section components.
+- [ ] `[Sonnet]` `reporter/_components/report-builder.tsx` (one 554-line function) splits into its five sections.
+
+**Leave alone:**
+
+- Business Planning's model and the Chat door's cards. They are long, but pure and well tested; their comments thin like everywhere else.
+- Each tool's `workflow.ts`.
+- The Chat door's copy of Relay's refusal wording.
+- Applied migrations.
+- Indexes, until a table nears 100,000 rows.
+
 # plan.md — the ERP corrections
 
 The founder's team's "ERP Corrections and Clarifications", built by `[Opus]` 2026-10-08 → 10-10. The founder's ruling over all of it: **indent, PO and bill are one chain — everything a person would otherwise pick is derived from the step before.** Three earlier decisions were reversed on purpose (2026-10-08): bills have lines; Inventory carries rates, for `/inventory` holders only; labour logs carry piece-work quantities, never rupees on the phone. Set aside for later: `TODO.md`, _Next builds_.

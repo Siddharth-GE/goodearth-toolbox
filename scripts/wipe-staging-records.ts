@@ -26,8 +26,7 @@
  * Every table in the database must be on one of the lists — a table
  * added since this was written stops the run until someone decides which.
  *
- * STAGING ONLY: it refuses any other ref. Production carries real work
- * and has no backups.
+ * PRACTICE DATABASE ONLY (`lib/environment.ts`): it refuses any other ref.
  *
  * Before deleting, every row and file it deletes is written to
  * data/backups/ (gitignored), and it refuses if a kept table points at a
@@ -49,10 +48,9 @@ import { createClient } from "@supabase/supabase-js";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
+import { DATABASES } from "../lib/environment";
 import { backupTables } from "./backup-tables";
 import { isCommit, literal, requireProjectRef, serviceRoleKey, sql } from "./supabase-management";
-
-const STAGING = "ipstebqawrvhkyntctrv";
 
 const CLEARED = [
   // Indents → POs → goods in and out → stock → bills
@@ -278,9 +276,9 @@ async function listAll(storage: Storage, bucket: string, prefix = ""): Promise<s
 async function main() {
   const argv = process.argv.slice(2);
   const ref = requireProjectRef(argv);
-  if (ref !== STAGING) {
+  if (ref !== DATABASES.practice) {
     throw new Error(
-      `This clears every record in the tools and runs on staging (${STAGING}) only — not ${ref}.`,
+      `This clears every record in the tools and runs on the practice database (${DATABASES.practice}) only — not ${ref}.`,
     );
   }
 

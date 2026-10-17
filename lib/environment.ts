@@ -1,34 +1,23 @@
 /**
- * Which database is this deployment talking to?
- *
- * There are two, and they look identical through the app: the same
- * screens, the same 49 people, the same Saarang plots. The only visible
- * difference is that one holds real work and the other holds practice.
- *
- * That is a hazard, not a curiosity. A site engineer who raises a genuine
- * indent on the practice site has done real work that will never reach
- * anybody — the material is not ordered, and nothing anywhere says so.
- * The failure is silent and it is only found when something does not
- * arrive.
- *
- * So: anything that is not production says so, loudly, on every page.
+ * The one place that names the databases. Switch day changes these
+ * constants; `environment.test.ts` fails until CI and `package.json`
+ * agree. Refs are public (they ship in NEXT_PUBLIC_SUPABASE_URL).
  */
+export const DATABASES = {
+  /** Real work. The only database treated as real. */
+  production: "pajfrgnkapicdgangjey",
+  /** Practice: staging's site, previews and `npm run dev`. */
+  practice: "ipstebqawrvhkyntctrv",
+} as const;
+
+/** Where the real toolbox lives, for the practice banner's link. */
+export const PRODUCTION_SITE = "toolbox.goodearthkannur.org";
 
 /**
- * The production Supabase project. Public by nature — it is the hostname
- * in NEXT_PUBLIC_SUPABASE_URL, which ships to every browser anyway — so
- * naming it here reveals nothing.
- *
- * Deliberately compared against rather than trusting a "this is staging"
- * flag someone has to remember to set. A flag that is missing means no
- * banner, which is the dangerous direction. This way, ONLY the real
- * production database is treated as real: a new preview, a new
- * environment, a misconfigured variable and a blank value all fail
- * towards showing the warning.
+ * True unless this deployment is pointed at the production database.
+ * Compared against the production ref, never a "this is staging" flag:
+ * a new preview, a typo or a blank value all fail towards the warning.
  */
-const PRODUCTION_SUPABASE_REF = "pajfrgnkapicdgangjey";
-
-/** True unless this deployment is pointed at the production database. */
 export function isPracticeSite(): boolean {
-  return !(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").includes(PRODUCTION_SUPABASE_REF);
+  return !(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").includes(DATABASES.production);
 }

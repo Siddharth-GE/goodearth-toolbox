@@ -11,22 +11,22 @@
  * trial's own "ALL TRIALS PASSED") is success; any other error is the
  * first thing that failed.
  *
- * Staging only: it refuses the production ref by design, however safe
- * the rollback.
+ * Practice database only, however safe the rollback.
  *
  *   npx tsx scripts/dry-run-migrations.ts --project <ref> \
  *     supabase/migrations/0101_x.sql … [--trial scripts/trials/erp-chain.sql]
  */
 import { readFileSync } from "node:fs";
 
+import { DATABASES } from "../lib/environment";
 import { requireProjectRef, sql } from "./supabase-management";
-
-const PRODUCTION = "pajfrgnkapicdgangjey";
 
 const argv = process.argv.slice(2);
 const ref = requireProjectRef(process.argv);
-if (ref === PRODUCTION) {
-  throw new Error("dry-run-migrations refuses production — run it on staging.");
+if (ref !== DATABASES.practice) {
+  throw new Error(
+    `dry-run-migrations runs on the practice database (${DATABASES.practice}) only — not ${ref}.`,
+  );
 }
 
 const trialAt = argv.indexOf("--trial");

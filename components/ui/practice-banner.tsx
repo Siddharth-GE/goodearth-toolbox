@@ -1,4 +1,4 @@
-import { isPracticeSite } from "@/lib/environment";
+import { isPracticeSite, PRODUCTION_SITE } from "@/lib/environment";
 
 /**
  * A strip across the top of every page on any deployment that is not
@@ -27,10 +27,10 @@ export function PracticeBanner() {
       <span className="font-normal opacity-90">
         Work done here will not reach anyone. The real toolbox is{" "}
         <a
-          href="https://toolbox.goodearthkannur.org"
+          href={`https://${PRODUCTION_SITE}`}
           className="underline underline-offset-2 hover:no-underline"
         >
-          toolbox.goodearthkannur.org
+          {PRODUCTION_SITE}
         </a>
         .
       </span>
