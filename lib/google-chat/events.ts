@@ -1,29 +1,8 @@
-/**
- * The shape of what Google posts, and the small pure readers that pull
- * the facts the door needs out of it: who sent this, in which space,
- * which slash command (if any), and — since Phase 4 — whether a dialog
- * is being asked for, submitted or cancelled, and what was picked in
- * it.
- *
- * Add-on-style Chat apps — which is what Google's console registers now
- * — wrap everything in a `chat` payload with one member per kind of
- * interaction, and the same fact can sit in more than one place
- * depending on the interaction. Keeping the digging here leaves
- * route.ts reading as dispatch only, and lets the awkward cases (a bot
- * talking to us, an email that never arrived, a numeric id sent as a
- * string) be pinned by tests instead of discovered in production.
- *
- * This file may import nothing: it is types and string handling.
- */
+// The shape of what Google posts and small pure readers over it. Imports nothing. The same fact
+// can sit in several places depending on the interaction; the tests pin the awkward cases.
 
-/**
- * A person (or app) as Google names them. Google's `User` resource
- * documents no email for add-on-style events, and the classic events
- * did carry one for same-Workspace senders — so `email` is optional
- * here on purpose and its absence is a decision the door makes
- * politely, not a crash. `name` is the `users/<id>` resource name,
- * which is what a private reply has to be addressed to.
- */
+// `email` is optional: Google documents none for add-on-style events. `name` is the
+// `users/<id>` a private reply is addressed to.
 export type ChatUser = {
   name?: string;
   displayName?: string;
@@ -36,18 +15,12 @@ export type ChatMessage = {
   argumentText?: string;
   slashCommand?: { commandId?: number | string };
   sender?: ChatUser;
-  // Google's `spaces/<id>/messages/<id>` resource name — present on the
-  // card a button press rides in on, so a later call can rewrite it.
+  // Present on the card a button press rides in on, so it can be rewritten.
   name?: string;
 };
 
-/**
- * A space as Google names it. `name` is the stable `spaces/<id>` — the
- * thing a link is stored against, because it survives a rename;
- * `displayName` is what people see and what the bot matches on when it
- * joins. Google marks a one-to-one chat in two different fields
- * depending on the payload, so both are read.
- */
+// `name` is the stable `spaces/<id>` links are stored against (it survives a rename). Google
+// marks a DM in two different fields depending on the payload.
 export type ChatSpace = {
   name?: string;
   displayName?: string;
@@ -66,14 +39,11 @@ export type ChatEvent = {
       appCommandMetadata?: { appCommandId?: number | string; appCommandType?: string };
       message?: ChatMessage;
       space?: ChatSpace;
-      // Only set when "Opens a dialog" is ticked on that command in the
-      // Chat app's configuration; without the tick the command arrives
-      // as an ordinary one and a dialog answer goes nowhere.
+      // Set only when "Opens a dialog" is ticked on the command.
       isDialogEvent?: boolean;
       dialogEventType?: string;
     };
-    // A tap on a card button — including the Save button of a dialog,
-    // which arrives here with dialogEventType "SUBMIT_DIALOG".
+    // A card button tap, including a dialog's Save (dialogEventType SUBMIT_DIALOG).
     buttonClickedPayload?: {
       message?: ChatMessage;
       space?: ChatSpace;
@@ -81,8 +51,7 @@ export type ChatEvent = {
       dialogEventType?: string;
     };
   };
-  // What the person typed into a card's inputs, plus which button they
-  // pressed. Google puts this beside `chat`, not inside it.
+  // Beside `chat`, not inside it.
   commonEventObject?: {
     formInputs?: Record<string, { stringInputs?: { value?: string[] } }>;
     invokedFunction?: string;
@@ -90,9 +59,7 @@ export type ChatEvent = {
   };
 };
 
-// The slash commands as declared in the Chat app's configuration —
-// Google sends only the numeric id, so the id → name map lives here and
-// must match that form.
+// Google sends only the numeric id; this must match the Chat app's configuration.
 export const COMMANDS: Record<number, string> = {
   1: "/court",
   2: "/push",
@@ -126,26 +93,13 @@ function spaces(event: ChatEvent): (ChatSpace | undefined)[] {
   ];
 }
 
-/**
- * The sender's email, normalised for matching — trimmed, lower-cased,
- * and only if it actually looks like an address. Null means "Google
- * didn't tell us who this is", which is a polite refusal, not a bug.
- *
- * A bot sender is null too, and refused before any lookup: an app
- * talking to us is never a person we can act for, whatever address
- * happens to sit elsewhere in the envelope.
- */
+// Null is a polite refusal, not a bug. A bot sender is null too: an app is never a person we can act for.
 export function senderEmail(event: ChatEvent): string | null {
-  // The person Google names on the event itself. A bot there is a bot
-  // talking to us, and is refused outright.
+  // A bot on the event itself is refused outright.
   if (event.chat?.user?.type === "BOT") return null;
 
-  // The message positions are fallbacks only, and a bot in one of them
-  // is skipped rather than fatal: when someone presses a button on the
-  // bot's OWN card, Google sends that card as the message behind the
-  // press — whose sender is the bot — with the person in `chat.user`.
-  // Refusing on that shape turned every court-card button into "Google
-  // didn't tell me who you are" (the founder's first Bounce, 2026-09-03).
+  // Later positions are fallbacks and a bot there is skipped: a press on the bot's OWN card sends
+  // that card (sender: the bot) with the person in `chat.user`.
   for (const user of senders(event)) {
     if (user?.type === "BOT") continue;
     const email = typeof user?.email === "string" ? user.email.trim().toLowerCase() : "";
@@ -154,11 +108,6 @@ export function senderEmail(event: ChatEvent): string | null {
   return null;
 }
 
-/**
- * The sender's `users/<id>` resource name — what a private reply is
- * addressed to. Null when Google didn't name them, in which case the
- * reply simply goes to the space.
- */
 export function senderName(event: ChatEvent): string | null {
   for (const user of senders(event)) {
     const name = typeof user?.name === "string" ? user.name.trim() : "";
@@ -167,7 +116,6 @@ export function senderName(event: ChatEvent): string | null {
   return null;
 }
 
-/** The space this event happened in, or "" when the shape has none. */
 export function spaceName(event: ChatEvent): string {
   for (const space of spaces(event)) {
     const name = typeof space?.name === "string" ? space.name.trim() : "";
@@ -176,11 +124,6 @@ export function spaceName(event: ChatEvent): string {
   return "";
 }
 
-/**
- * The space's human name — what the bot matches against villa and
- * project names when it joins. "" when Google sent none, which simply
- * means nothing to match on.
- */
 export function spaceDisplayName(event: ChatEvent): string {
   for (const space of spaces(event)) {
     const name = typeof space?.displayName === "string" ? space.displayName.trim() : "";
@@ -189,27 +132,15 @@ export function spaceDisplayName(event: ChatEvent): string {
   return "";
 }
 
-/**
- * Is this a one-to-one chat with the bot? A DM is never linked to a
- * villa — commands there already span everything — so this is the first
- * question both joining and /link ask. Google marks it as `type: "DM"`
- * on some payloads and `spaceType: "DIRECT_MESSAGE"` on others, so
- * either field counts.
- */
+// Google marks a DM as `type: "DM"` or `spaceType: "DIRECT_MESSAGE"` depending on the payload.
 export function isDirectMessage(event: ChatEvent): boolean {
   return spaces(event).some(
     (space) => space?.type === "DM" || space?.spaceType === "DIRECT_MESSAGE",
   );
 }
 
-/**
- * Which step of a dialog this is, if any: Google asks for the dialog
- * (REQUEST_DIALOG), sends the filled-in form (SUBMIT_DIALOG), or says
- * the person walked away (CANCEL_DIALOG). Null means this event has
- * nothing to do with a dialog — including a /link that arrived without
- * "Opens a dialog" ticked in the console, which is a misconfiguration
- * the door explains rather than a shape it guesses at.
- */
+// Null also covers a command that arrived without "Opens a dialog" ticked, which the door
+// explains rather than guesses at.
 export function dialogEventType(
   event: ChatEvent,
 ): "REQUEST_DIALOG" | "SUBMIT_DIALOG" | "CANCEL_DIALOG" | null {
@@ -219,24 +150,15 @@ export function dialogEventType(
   return null;
 }
 
-/**
- * One value the person picked or typed in a card, by input name. Google
- * nests every form value as an array of strings however single the
- * input is. Null when the input is absent or blank — an empty string is
- * never a choice.
- */
+// Google nests every form value as an array. Blank is never a choice.
 export function formValue(event: ChatEvent, name: string): string | null {
   const raw = event.commonEventObject?.formInputs?.[name]?.stringInputs?.value?.[0];
   const value = typeof raw === "string" ? raw.trim() : "";
   return value || null;
 }
 
-/**
- * The slash command id, as a number. A typed command arrives as an
- * appCommandPayload; Google's older shape tags the message itself
- * instead, and either can send the int64 id as a string — so both are
- * read and both are normalised. Null means "no command here".
- */
+// A typed command arrives as appCommandPayload, the older shape tags the message; either may
+// send the int64 id as a string.
 export function commandId(event: ChatEvent): number | null {
   const chat = event.chat ?? {};
   const raw =
@@ -247,14 +169,7 @@ export function commandId(event: ChatEvent): number | null {
   return Number.isFinite(id) ? id : null;
 }
 
-/**
- * The parameters a card button carries — set by whoever built the card
- * (cards.ts's action buttons and Save buttons both put `action`, `chain`
- * and `leg` here), read back as a plain string record. `{}` when Google
- * sent none, so a caller can destructure it without a null check; every
- * value that isn't a string is dropped rather than coerced, since a
- * button never has any reason to carry anything else.
- */
+// Non-string values are dropped, not coerced.
 export function buttonParams(event: ChatEvent): Record<string, string> {
   const params = event.commonEventObject?.parameters;
   if (!params) return {};
@@ -266,28 +181,14 @@ export function buttonParams(event: ChatEvent): Record<string, string> {
   return result;
 }
 
-/**
- * The pressed card's own resource name — the handle the door needs to
- * rewrite it after a press (plan.md round two). Read only from a button
- * click: only a press rides in on the card that was pressed, so a
- * slash-command's message name (which names the person's own typed
- * message, not a card) is never read here. Null means Google didn't say,
- * which simply means the card is left as it is.
- */
+// Read only from a button click: a slash command's message name is the person's own message, not a card.
 export function messageName(event: ChatEvent): string | null {
   const raw = event.chat?.buttonClickedPayload?.message?.name;
   const name = typeof raw === "string" ? raw.trim() : "";
   return /^spaces\/[^/]+\/messages\/[^/]+$/.test(name) ? name : null;
 }
 
-/**
- * The words typed after a slash command — "villa 12" out of "/trail
- * villa 12". Google's own `argumentText` is what it is meant for, and is
- * read from wherever the command arrived; a command posted through the
- * older message shape carries no `argumentText` at all, so the message's
- * raw `text` is the last resort, with the leading `/word` cut off by
- * hand. Trimmed; "" when there is nothing after the command.
- */
+// Falls back to the raw `text` minus the leading /word: the older message shape has no argumentText.
 export function commandText(event: ChatEvent): string {
   const chat = event.chat ?? {};
 

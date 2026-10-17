@@ -1,9 +1,4 @@
-/**
- * The space-name rule, pinned example by example from plan.md's Phase 4.
- * The one that matters most is "Saarang Villa 12" never landing on Villa
- * 1: a wrong link is worse than no link, because every later command in
- * that space would quietly scope to the wrong villa.
- */
+// Never link "Saarang Villa 12" to Villa 1: a wrong link scopes every later command wrongly.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

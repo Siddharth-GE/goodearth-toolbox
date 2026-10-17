@@ -4,37 +4,16 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { projectLabel, unitLabel, type MatchProject, type MatchUnit } from "./space-match";
 
-/**
- * Which villa or project a chat space is for: the four things the door
- * does with `google_chat_spaces`, and the two name reads that give the
- * bot something to match against.
- *
- * Admin-client use, sanctioned in SECURITY.md alongside identity.ts:
- * `google_chat_spaces` is a deny-all table (`0094`) that only this door
- * owns — RLS on, zero policies, every privilege revoked from the client
- * roles — so the service-role client is the only thing that can reach
- * it. The project and unit names read here are visible to every
- * signed-in person anyway; the door simply has no browser session to
- * read them with.
- *
- * Nothing here throws. The door must always answer Google with a card
- * within its ~30 seconds, so a failed read comes back as null and a
- * failed write as false, each already logged — and the door says a
- * plain sentence rather than showing a raw error in the space.
- */
+// Admin client, sanctioned in SECURITY.md: google_chat_spaces is a deny-all table (0094) only this
+// door owns (RLS on, no policies, client privileges revoked). Project and unit names are visible
+// to everyone, but the door has no session. Nothing throws: a failed read is null, a failed write
+// false, already logged.
 
-/** Everything the /link dropdown and the join match are built from. */
 export type LinkTargets = { projects: MatchProject[]; units: MatchUnit[] };
 
-/** A space's current link, with the label the bot uses to say it out loud. */
 export type SpaceLink = { projectId: string; unitId: string | null; label: string };
 
-/**
- * Every project and every villa, by name. Read to completion — the
- * dropdown and the join match are both only correct when they see all
- * of them, and a silently truncated page would link a space to the
- * wrong villa or to none at all. Null means the read failed.
- */
+// Read to completion (fetchAll): a truncated page would link a space to the wrong villa.
 export async function listLinkTargets(): Promise<LinkTargets | null> {
   try {
     const admin = createAdminClient();
@@ -61,16 +40,9 @@ export async function listLinkTargets(): Promise<LinkTargets | null> {
   }
 }
 
-/**
- * What this space is linked to, or null when it is linked to nothing —
- * and also null when the read failed, which the log distinguishes. Both
- * mean the same thing to the door: treat the space as unlinked, which
- * is the safe answer in every case (commands span everything).
- *
- * The units embed names its foreign key: `google_chat_spaces` has two
- * of them pointing at `units` (the plain one and the 0036 composite),
- * and PostgREST refuses an ambiguous embed outright (BUGCATCHER #2).
- */
+// Null on a failed read too (the log tells them apart); either way the space is treated as
+// unlinked, the safe answer. The units embed names its FK: two point at `units` (plain and 0036
+// composite) and PostgREST refuses the ambiguity (BUGCATCHER #2).
 export async function getSpaceLink(spaceId: string): Promise<SpaceLink | null> {
   if (!spaceId) return null;
 
@@ -104,15 +76,8 @@ export async function getSpaceLink(spaceId: string): Promise<SpaceLink | null> {
   }
 }
 
-/**
- * Link this space to a project, or to one villa of it. One row per
- * space, so re-linking overwrites rather than piling up: the space id
- * is the primary key and Google keeps it stable across renames.
- *
- * `linkedBy` is null when the bot did this itself on joining, and the
- * person when /link did. False means the write failed and the door says
- * so; it never throws.
- */
+// One row per space (the id is the primary key and survives renames), so re-linking overwrites.
+// `linkedBy` is null when the bot linked it on joining.
 export async function linkSpace({
   spaceId,
   spaceName,
@@ -151,12 +116,7 @@ export async function linkSpace({
   }
 }
 
-/**
- * Forget this space's link — commands here go back to spanning
- * everything. Deleting a space that was never linked is a success, not
- * an error: the person asked for "not linked" and that is what they now
- * have.
- */
+// Deleting a never-linked space is a success: they asked for "not linked".
 export async function unlinkSpace(spaceId: string): Promise<boolean> {
   try {
     const admin = createAdminClient();
