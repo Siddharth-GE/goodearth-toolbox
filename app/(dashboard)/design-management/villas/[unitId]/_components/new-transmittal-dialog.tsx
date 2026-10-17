@@ -83,7 +83,8 @@ export function NewTransmittalDialog({
         <DialogHeader>
           <DialogTitle>New transmittal</DialogTitle>
           <DialogDescription>
-            One transmittal sends one drawing set of one stage to site, with all its sheets.
+            One transmittal sends one drawing set of one stage to site, as the WorkDrive link to its
+            sheets.
           </DialogDescription>
         </DialogHeader>
 

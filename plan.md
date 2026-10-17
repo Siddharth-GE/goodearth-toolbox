@@ -410,7 +410,89 @@ With `/client-relations` given to Anu, Sayooj and Sebastina:
 7. As yourself: everything as before. **Financial Management** and **Reporter** still show every plot's payments.
 8. As the **probe**: Client Relations is still refused.
 
-# Eleventh piece — Construction and Interior, two sides of a plot (2026-10-17)
+# Eleventh piece — transmittals the design team can use (2026-10-17)
+
+The design team's first day on staging (2026-10-16: six transmittals issued on Villas 1, 26, 40 and 41, two drafts) came back as four points: the transmittal number cannot be changed; the revision number cannot be changed; "only Sheet 9 is being uploaded" — the founder: "in a drawing set only 9 sheets are getting uploaded when there are almost 30-40"; the transmittal sheet shows only the drawing set's name. The data shows the workaround: set names carrying the Excel number, revision and date ("Transmittal - 018 - Plot 26 - Plumbing Layout R0- 15102026"), and the team's own Excel cover sheet uploaded as one of the sheets (Villa 26 sheet 1, Villa 40 sheet 5). Planned by `[Opus]` at the founder's request — `MODELS.md` gives planning to Fable, so the migration still waits for a Fable review. Branch `feature/design-management`, migration `0124`.
+
+## The founder's decisions (2026-10-17)
+
+1. **The number stays the toolbox's, marked as the toolbox's.** "its ok if transmittal number can't be changed just make a tool box id addition, since we had an already ongoing series from excel … a tb or something with the rest of the transmittal number will make it unique anyway". So Issue mints **`TB-0003`** where it minted `TR-0003`: still counted per villa, each villa's counter carrying on, and never mistakable for the Excel series.
+2. **No more file handling: a revision's drawings are a Zoho WorkDrive link.** Told the upload errors, the founder: "lets not get into file handling, new transmittal is created and they paste a link of our drive into it and that link can be shared with supervisors" — and the drive is **Zoho WorkDrive**. The drawings live there; the toolbox keeps the record — number, stage, set, revision, what changed, who, when — and the link. It also keeps the app inside Supabase's free file storage (about 1 GB), which 30–40 sheets a set, every revision, across the villas would outgrow.
+3. **The link is "anyone can view"** (founder: "its a zohoworkdrive link with anyone can view"). Whoever holds the link sees the drawings, without signing in — a supervisor's phone needs no Zoho account, and a forwarded link works for anyone it reaches. The toolbox shows it only to the design team and supervisors; past that, the link is the team's to keep.
+
+The team rule that comes with decision 2, which the toolbox cannot enforce: **one WorkDrive folder per revision, never touched once issued — the next revision is a new folder.** The toolbox freezes the link on Issue and keeps the folder's list (below); what is in the folder afterwards is the team's word.
+
+## What it does
+
+**1. TB numbers** (`0124`)
+
+- `issue_transmittal()` restated whole from `0093`, one change: `'TB-'` for `'TR-'`. Its grants restated (`revoke … from public, anon`; `grant … to authenticated`).
+- The six already issued keep `TR-0001`/`TR-0002` — an issued transmittal never changes (`0092`'s precedent). Villa 41's next is `TB-0003`.
+- The cover sheet's file name gains the villa: `Goodearth-Transmittal-Villa41-TB-0003.pdf` — a per-villa number is unique only with it.
+- `sheet-name.ts` (the names of sheets uploaded before) takes the number as given; its tests and comments move to TB.
+
+**2. The revision number is the designer's to set, while draft** (`0124`)
+
+- On a draft transmittal, beside _What changed_: **Revision R[ n ]**, saved on leaving the field like the note. Any number above every revision the set already has on this villa — a set the team had at R2 in Excel starts here at R3. A number that went to site is never re-used or undercut.
+- `drawing_revisions_guard` restated whole from `0093`, one change: `revision_no` may move while the revision is a draft, and only above the set's other revisions on that villa; the refusal names the highest one ("Pick a number above R2 — R2 has already been used for this set."). Released or superseded, it stays frozen. The unique `(unit_id, drawing_set_id, revision_no)` still settles a race.
+- `setDraftRevisionNumber(revisionId, n)` in `actions.ts`: `requireTool`, a whole number 0–99, the database's sentence on refusal, `revalidatePath("/design-management", "layout")`.
+- R1 and above still need _What changed_ before Issue (`0093`): a set brought in at R3 says what changed since the Excel R2.
+
+**3. The WorkDrive link replaces the upload** (`0124`)
+
+- `drawing_revisions.drawings_url text` — a Zoho WorkDrive address only: a CHECK in the database on the shape (`^https://workdrive\.zohoexternal\.com/external/[0-9a-f]{64}$`), and a pure `parseWorkDriveLink` with tests on the screen's side, which trims it, finds the link's id, and says plainly what is wrong. A folder's own WorkDrive address (`workdrive.zoho.com/…`) is refused with "Paste the folder's share link — the one anyone can view": site could not open it without a Zoho login. The team's links are **`https://workdrive.zohoexternal.com/external/<64 hex>`** — an "anyone can view" link to a folder, on Zoho's `.com` servers (the founder's real one, 2026-10-17). Frozen with the note once the revision leaves draft (the guard's freeze list gains it).
+- The release gate (`0093`'s "no drawing without a file", founder 2026-08-22) becomes **a WorkDrive link or an uploaded sheet**, in both places it lives: the guard's draft → released check and `issue_transmittal`'s pre-check, which names the set ("… has no WorkDrive link — paste the folder's link before issuing"). `readiness.ts` mirrors it; its tests follow.
+- **The draft workspace**: _WorkDrive link_ (saves on leaving the field, like the note), an **Open** beside it to check it, and under it "Make a new folder for each revision, and never change it once issued." The upload control goes; `uploadDrawingRevisionFile` is deleted, and with it this tool's only use of `sharp`.
+- **What was uploaded stays.** The six issued transmittals keep their sheets, opened and downloaded as today (the files route, `lib/drawings/sheet-name.ts`). The two drafts (Villas 1 and 41, ARCHITECTURE-GFC) keep theirs, each still removable; either can issue with its sheets, a link, or both.
+- Every link out opens in a new tab with `rel="noreferrer"`.
+
+**4. The toolbox reads the folder: the count and every sheet's name, automatically** (`0124`)
+
+The founder: "is there a way that an uploaded link autocounts and extracts the name etc to make the transmittal list?" — and, Goodearth having no Zoho API access: "i can view the folder without zoho access … can u help me out?" Yes: **the toolbox reads the link exactly as a browser does, with no key and no Zoho account.** Everything in section 3 works without it.
+
+Proved on the founder's real link (2026-10-17, plain Node, the way the server will run it — 1.6 s): the link's page names what is shared (`resourceId`, `resourceName` "11", `resourceType` `1001` = a folder) and hands the visitor the link's own viewing cookies; with those, `api/v1/files/<resourceId>/files` on the same host answers the folder's list — "Saarang - Plot 17 - Electrical SLD - R0 - 05022026.pdf" (224,691 bytes) and "Transmittal - 011 - Saarang - Plot 17 - Electrical Dwg - R0 - 05022026.pdf", each with its name, size and last-changed time. Without the cookies the same request is refused (`401`); a made-up link is refused at the page (`500`).
+
+- **The honest risk**: this is Zoho's own page and the address its page calls — not a published promise. If Zoho changes either, the list stops and **the toolbox falls back to link only** (section 3), saying so in a sentence, with one log line naming which step failed. A broken read never stops a transmittal.
+- **Reading**: `lib/design-management/workdrive.ts` (this tool's own — nothing else needs it): fetch the link's page, take `resourceId`/`resourceType` and the cookies, list the folder 50 at a time; five-second ceiling per call, never throws, never logs a cookie. No library: `fetch` and `getSetCookie()`. A link to a single file reads as that one sheet. A sub-folder is listed as skipped, not opened.
+- **The server only ever calls Zoho.** The address fetched is **rebuilt from the link's id** — `https://workdrive.zohoexternal.com/external/<64 hex>` — never the pasted text, so a typed address can never make the server call anywhere else. A `SECURITY.md` line says so.
+- **On the draft**, once a link is saved: "38 sheets" and the list of names, in name order (PLOT 01 FIRST FLOOR -R0, PLOT 01 GROUND FLOOR -R0 …), with **Read the folder again**. A sub-folder is named as skipped. A folder the toolbox cannot read says so in a sentence.
+- **At Issue, the list is kept**: the action reads the folder once more and writes it — each file's WorkDrive id, name, size and last-changed time — to a new table, `drawing_revision_folder_sheets`, before `issue_transmittal`. RLS on, the same SELECT shape as `drawing_revision_files` (design team, or `/supervisors` once not draft), writes `/design-management` while draft only, through the same draft-only trigger, so once issued it never changes. **This puts back what the link alone gives up**: the toolbox again answers "what did site have on the 22nd", sheet by sheet, whatever later happens in the folder. If WorkDrive cannot be read at that moment, Issue still goes, with the link only and the reason on screen — Zoho being slow never stops a drawing reaching site.
+- **The cover sheet**: set, revision, stage, issued, by whom, what changed, and **Drawings: the link** (printed in full, clickable in the PDF); then **one row per sheet** — # · Sheet name · Last changed. A transmittal with uploaded sheets lists those the same way, so the six already issued answer "only the drawing set name" too. A forty-sheet set runs onto a second page and is rendered and looked at that way (BUGCATCHER #8). The PDF's file name gains the villa.
+- **Supervisors** (through `lib/drawings/`, which gains the link and the kept list on a released set): each set at its latest revision has **Open drawings** (the folder, in the browser or the WorkDrive app) and its sheets by name; the revision history as today. Sets from before keep their uploaded sheets.
+- Not in this build, and easy after it: a line on an issued transmittal when its folder no longer matches what was kept ("3 sheets changed in WorkDrive since this was issued").
+
+What was checked before the upload was dropped (2026-10-17): nothing in the toolbox stopped a set at 9 — the database took sheets 10–40 on Villa 1's draft from a single-grant designer (a rolled-back trial), no upload died half-way, and the error log is empty since 13 October; the 10th sheet was refused on screen (over 4 MB, wrong type, or a code used) or never tried.
+
+**Worth knowing for the team**: folder "11" holds the Excel transmittal beside the drawing, so today it would be listed as a sheet. Once the toolbox makes the cover sheet, the Excel one need not go in the folder.
+
+## Steps
+
+- [x] Founder — one real link (2026-10-17).
+- [x] Founder — approved: "build it" (2026-10-17).
+- [x] `[Opus]` The spike: the founder's link read with plain Node, no key — the folder's name and both files (above).
+- [x] `[Opus]` `0124` — the TB mint, the movable draft number, `drawings_url`, the gate "a link or a sheet", `drawing_revision_folder_sheets`, and `delete_draft_revision` clearing it — and `scripts/trials/design-links-as-designer.sql`, dry-run on staging (at `0123`) as a single-grant `/design-management` person and a single-grant `/supervisors` person under RLS: nine trials pass. Proved to bite: without the "above" check it fails at TRIAL 6, without the link freeze at TRIAL 5, without `0124` at all at TRIAL 1. Numbered `0122` while drafted; staging took `0122`/`0123` meanwhile, so it moved (never applied anywhere).
+- [x] ~~`[Fable]` Review `0124`~~ — **skipped on the founder's explicit word for this merge** (2026-10-17: "merge this is my explicit order"). In its place `[Opus]` reviewed against `SECURITY.md` and `BUGCATCHER.md`: RLS on the new table, three policies, exactly one SELECT (site only off drafts), no UPDATE policy, no anon policy (all asserted); the draft-only trigger and audit on it; `drawing_revisions_guard`, `issue_transmittal` and `delete_draft_revision` restated whole from `0093`/`0091`, each invoker, the two functions' execute revoked from `public, anon` (asserted); the released_at freeze carried forward; no view, no money, no definer. One finding, fixed: the WorkDrive read followed redirects, which could take the server off Zoho's share host — every call now refuses one. **The Fable review of `0124` is due before production.**
+- [x] `[Opus]` Applied to staging (`0001`–`0124`); `db:check` level, `db:check-views` clean; the regenerated types are the hand-written ones exactly; the trial re-run on the applied database passes.
+- [x] `[Opus]` The draft workspace: the revision field, the WorkDrive link with `parseWorkDriveLink`, `readiness.ts` (tests follow); the upload goes, and with it `sharp` from this tool. Sheets uploaded before stay, viewable and removable on a draft.
+- [x] `[Opus]` `workdrive.ts` and the folder read: the list when the link is used, **Read again**, and once more at Issue; a failed read keeps the last good list and never stops Issue; an empty folder or one holding only folders says so. Pure parts tested (7 tests); the server read run against the founder's real link — both files — and a dead one (a sentence). `SECURITY.md` has its section.
+- [x] `[Opus]` (in `[Sonnet]`'s place, one session) The cover sheet — link and one row per sheet — rendered from staging's Villa 41 TR-0002 (nine uploaded sheets) and a forty-sheet WorkDrive list, and looked at: the list runs to a second page with its header repeated. The PDF's file name carries the villa; the issued transmittal page and Supervisors' **Open drawings** show the link and the sheets by name.
+- [x] `[Opus]` prettier, lint, typecheck, 1,143 tests, `next build`, `check:actions` — green; every changed `select` answers 200 at staging's PostgREST. **No screen has been opened signed in** — a model session cannot sign in; the founder's vet is the first look.
+- [x] `[Opus]` Docs: Design Management's `PLAN.md` (decisions 3, 6, 8–10; the WorkDrive folder; the guard table), `SECURITY.md`, `STATUS.md`, `TODO.md`; the new table on both wipe scripts' lists.
+- [x] ~~`[Fable]` Approval pass~~ — **skipped on the founder's explicit word for this merge**, as above. Pull request #101 into `staging`; CI green; signed out, the new routes answer 307 → `/login` on the preview; merged.
+- [ ] Founder — the checklist below, on staging.
+
+## Verification — the founder, on staging (eleventh piece)
+
+Staging is becoming the real database, so this checklist issues nothing — an issued transmittal can never be deleted. The TB mint and the kept list are proved by the trial; the team's next real issue shows them.
+
+1. **Villa 41 → TR-0002 → Cover sheet (PDF)**: its nine uploaded sheets listed by name; the file is named `Goodearth-Transmittal-Villa41-TR-0002.pdf`.
+2. **Villa 40 → New transmittal → Structural → Foundation Layout → Revise to R1.** On the draft, set Revision to **0** — refused, in a sentence. Set **3** — saved; it reads R3.
+3. Paste a Google Drive or WhatsApp link as the WorkDrive link — refused, in a sentence.
+4. Paste a real WorkDrive share link: in two seconds or so, "38 sheets" and their names. Paste the folder's own WorkDrive address instead — refused, asking for the share link. Add a file to the folder in WorkDrive, press **Read the folder again** — 39.
+5. Type _What changed_ — the line under the title says it is ready. **Don't issue: delete the draft.**
+6. After the team's next real issue: it reads **TB-000n**; its cover sheet carries the link and every sheet's name; on a supervisor's phone, **Supervisors → that villa → Open drawings** opens the folder.
+
+# Twelfth piece — Construction and Interior, two sides of a plot (2026-10-17)
 
 The founder: "in crm there are two tabs per plot kaadal and villas some people may get the interiors or construction, of the same plot so it needs to basically maybe be assigned twice and treated a bit differently … call it interior and construction kaadal can be avoided". Asked what each side's owner sees: **the whole plot** for an Interior owner, and **all of the Interior side** for the Construction owner — so `0123`'s visibility stands and this is screens only, no migration. Built by `[Opus]` on `feature/client-relations-sides`. The rule is Client Relations' `PLAN.md`, decision 8.
 
@@ -424,7 +506,7 @@ On staging, 11 of the 24 plots with both owners have a different person on each 
 - [ ] `[Opus]` Pull request to `staging`; CI green; the founder merges.
 - [ ] Founder — the checklist below, on staging.
 
-## Verification — the founder, on staging (eleventh piece)
+## Verification — the founder, on staging (twelfth piece)
 
 1. **Plots**: each card shows two owners — a hard hat for Construction, a sofa for Interior, with the interior stage beside it. The **Side** filter → Interior lists only plots with interior work; pick Interior + Sayooj — only plots where he owns the interiors or holds an interior step.
 2. Open a plot with both owners: the header names both. **Next steps** → **Interior**: only interior steps; type a step — the owner chip already says the Interior owner, and the side chip says Interior. Switch it to Construction: the owner becomes the Construction owner.

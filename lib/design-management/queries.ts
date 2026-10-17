@@ -1,6 +1,7 @@
 import "server-only";
 
 import { requireTool } from "@/lib/auth/access";
+import { readFolderSheets, type FolderSheet } from "@/lib/drawings/folder-sheets";
 import { sheetNamingContext } from "@/lib/drawings/sheet-context";
 import { sheetFileName } from "@/lib/drawings/sheet-name";
 import { fetchAll } from "@/lib/supabase/fetch-all";
@@ -211,7 +212,7 @@ export type DrawingRevisionFileRow = {
   fileName: string;
   /** GFP — typed at upload; null only for sheets from before 0099. */
   sheetCode: string | null;
-  /** The name it downloads under: SAA-Saarang-Villa12-WD-TR0003-GFP.pdf. */
+  /** The name it downloads under: SAA-Saarang-Villa12-WD-TB0003-GFP.pdf. */
   displayName: string;
   contentType: string;
   sortOrder: number;
@@ -223,7 +224,12 @@ export type DrawingRevisionRow = {
   status: "draft" | "released" | "superseded";
   note: string | null;
   releasedAt: string | null;
+  /** Sheets uploaded before 0124 — none on a revision started since. */
   files: DrawingRevisionFileRow[];
+  /** The WorkDrive share link of this revision's folder (0124). */
+  drawingsUrl: string | null;
+  /** That folder's sheets as the toolbox last read them. */
+  folderSheets: FolderSheet[];
   /**
    * Null for released/superseded revisions — those work links are frozen
    * and the screen never offers to edit them, so there is nothing to
@@ -530,20 +536,31 @@ export async function listVillaDrawingSetStates(unitId: string): Promise<VillaDr
   const countableIds = revisions
     .filter((revision) => revision.status !== "superseded")
     .map((revision) => revision.id);
-  const files =
+  // Uploaded sheets (before 0124) and a folder's kept list both count.
+  const [files, folderSheets] =
     countableIds.length > 0
-      ? await fetchAll<{ drawing_revision_id: string }>((from, to) =>
-          supabase
-            .from("drawing_revision_files")
-            .select("drawing_revision_id")
-            .in("drawing_revision_id", countableIds)
-            .order("id")
-            .range(from, to),
-        )
-      : [];
+      ? await Promise.all([
+          fetchAll<{ drawing_revision_id: string }>((from, to) =>
+            supabase
+              .from("drawing_revision_files")
+              .select("drawing_revision_id")
+              .in("drawing_revision_id", countableIds)
+              .order("id")
+              .range(from, to),
+          ),
+          fetchAll<{ drawing_revision_id: string }>((from, to) =>
+            supabase
+              .from("drawing_revision_folder_sheets")
+              .select("drawing_revision_id")
+              .in("drawing_revision_id", countableIds)
+              .order("id")
+              .range(from, to),
+          ),
+        ])
+      : [[], []];
 
   const fileCounts = new Map<string, number>();
-  for (const file of files) {
+  for (const file of [...files, ...folderSheets]) {
     fileCounts.set(file.drawing_revision_id, (fileCounts.get(file.drawing_revision_id) ?? 0) + 1);
   }
 
@@ -650,7 +667,12 @@ export type TransmittalLineRow = {
   revisionNo: number;
   revisionStatus: "draft" | "released" | "superseded";
   revisionNote: string | null;
+  /** Sheets uploaded before 0124. */
   files: DrawingRevisionFileRow[];
+  /** The WorkDrive share link (0124), if the revision carries one. */
+  drawingsUrl: string | null;
+  /** Its folder's sheets — as last read on a draft, as kept on Issue once issued. */
+  folderSheets: FolderSheet[];
   /**
    * The draft's work links, for the editor that now sits inline on this
    * page. Null for a released or superseded line — those are frozen, so
@@ -748,10 +770,11 @@ export async function getTransmittalDetail(
           revision_no: number;
           status: string;
           note: string | null;
+          drawings_url: string | null;
         }>((from, to) =>
           supabase
             .from("drawing_revisions")
-            .select("id, drawing_set_id, revision_no, status, note")
+            .select("id, drawing_set_id, revision_no, status, note, drawings_url")
             .in("id", revisionIds)
             .order("id")
             .range(from, to),
@@ -838,7 +861,10 @@ export async function getTransmittalDetail(
 
   // The same naming path as the download (lib/drawings/sheet-context.ts),
   // so the name on this screen is the name the file saves under.
-  const naming = await sheetNamingContext(supabase, revisionIds);
+  const [naming, folderSheets] = await Promise.all([
+    sheetNamingContext(supabase, revisionIds),
+    readFolderSheets(supabase, revisionIds),
+  ]);
 
   const setsById = new Map(sets.map((set) => [set.id, set]));
   const revisionsById = new Map(revisions.map((revision) => [revision.id, revision]));
@@ -899,6 +925,8 @@ export async function getTransmittalDetail(
         revisionStatus: status,
         revisionNote: revision?.note ?? null,
         files: filesByRevision.get(line.drawing_revision_id) ?? [],
+        drawingsUrl: revision?.drawings_url ?? null,
+        folderSheets: folderSheets.get(line.drawing_revision_id) ?? [],
         draftWorkItemIds:
           status === "draft" ? (worksByRevision.get(line.drawing_revision_id) ?? []) : null,
         revisionLog: revision ? (logBySet.get(revision.drawing_set_id) ?? []) : [],

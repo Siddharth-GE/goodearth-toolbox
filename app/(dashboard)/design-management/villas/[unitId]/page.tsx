@@ -75,7 +75,7 @@ export default async function VillaDesignPage({ params }: { params: Promise<{ un
         <EmptyState
           icon={Send}
           title="Nothing has been sent to site for this villa yet"
-          description="Press New transmittal, pick the stage and the drawing set, upload its sheets and issue it."
+          description="Press New transmittal, pick the stage and the drawing set, paste the WorkDrive link to its sheets and issue it."
         />
       ) : (
         <Section title="Transmittals" note="Newest first. Open one to see what went out on it.">

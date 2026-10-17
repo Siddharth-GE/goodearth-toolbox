@@ -1,39 +1,41 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
+import { Button, LinkButton } from "@/components/ui/button";
 import { FormMessage } from "@/components/ui/form-message";
 import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
-import { setDrawingRevisionWorks, updateDraftRevisionNote } from "@/lib/design-management/actions";
 import {
-  deleteDrawingRevisionFile,
-  uploadDrawingRevisionFile,
-} from "@/lib/design-management/files-actions";
+  readDraftFolder,
+  setDraftDrawingsLink,
+  setDraftRevisionNumber,
+  setDrawingRevisionWorks,
+  updateDraftRevisionNote,
+} from "@/lib/design-management/actions";
+import { deleteDrawingRevisionFile } from "@/lib/design-management/files-actions";
 import type { DrawingRevisionRow } from "@/lib/design-management/queries";
-import { normaliseSheetCode } from "@/lib/drawings/sheet-name";
+import { parseWorkDriveLink } from "@/lib/design-management/workdrive-link";
+import { formatShortDate } from "@/lib/format";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
 import type { WorksTreeCategory } from "@/lib/masters/works";
-import { ChevronDown, ChevronUp, FileText, Trash2, UploadCloud } from "lucide-react";
-import { useMemo, useRef, useState, useTransition } from "react";
+import { ChevronDown, ChevronUp, ExternalLink, FileText, RefreshCw, Trash2 } from "lucide-react";
+import { useMemo, useState, useTransition } from "react";
 
+import { FolderSheetList } from "./folder-sheet-list";
 import { WorksCheckboxTree } from "./works-checkbox-tree";
 
-const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
+const LABEL = "text-muted text-[11px] font-medium tracking-[0.14em] uppercase";
 
 /**
- * The draft's own workspace: note, sheets, and the works it serves — the
+ * The draft's own workspace: its number, what changed, its drawings (a
+ * WorkDrive link and the folder's sheets), and the works it serves — the
  * only revision status this tool ever offers an edit surface for. Once
- * released or superseded, the guard triggers in 0091 refuse every one of
- * these writes anyway; this component simply never renders for that row.
+ * released or superseded, the guard triggers refuse every one of these
+ * writes anyway; this component simply never renders for that row.
  *
- * It sits INSIDE a transmittal line (founder, 2026-08-22: "under new
- * transmittal you either upload a new set of drawings or you revise a
- * set"). Which is why it has no delete button of its own: on a
- * transmittal, discarding a draft is the second half of taking its line
- * off, and `delete_draft_revision` refuses while the line is still
- * there. The line's own Remove control offers both.
+ * It sits INSIDE a transmittal line, which is why it has no delete button
+ * of its own: discarding a draft is the transmittal's Delete this draft.
  */
 export function DraftRevisionEditor({
   revision,
@@ -43,12 +45,65 @@ export function DraftRevisionEditor({
   tree: WorksTreeCategory[];
 }) {
   return (
-    // No warning tint: the line's own Draft badge says what it is, and a
-    // status colour that only decorates stops meaning anything.
-    <div className="border-border space-y-3 rounded-xl border p-3">
+    // No warning tint: the Draft badge says what it is, and a status
+    // colour that only decorates stops meaning anything.
+    <div className="border-border space-y-4 rounded-xl border p-3">
+      <RevisionNumberField revisionId={revision.id} revisionNo={revision.revisionNo} />
       <NoteField revisionId={revision.id} revisionNo={revision.revisionNo} note={revision.note} />
-      <FilesEditor revisionId={revision.id} files={revision.files} />
+      <DrawingsField
+        revisionId={revision.id}
+        drawingsUrl={revision.drawingsUrl}
+        sheets={revision.folderSheets}
+      />
+      {revision.files.length > 0 && <UploadedSheets files={revision.files} />}
       <WorksEditor revisionId={revision.id} tree={tree} workItemIds={revision.workItemIds ?? []} />
+    </div>
+  );
+}
+
+/**
+ * The revision number, the designer's while draft (0124; founder,
+ * 2026-10-17): a set the team had at R2 in Excel starts here at R3. The
+ * database refuses a number at or below one the set already used, and its
+ * sentence shows under the field.
+ */
+function RevisionNumberField({
+  revisionId,
+  revisionNo,
+}: {
+  revisionId: string;
+  revisionNo: number;
+}) {
+  const [value, setValue] = useState(String(revisionNo));
+  const save = useSaveOnBlur<string>({
+    initial: String(revisionNo),
+    validate: (next) =>
+      /^\d{1,2}$/.test(next.trim()) ? undefined : "A revision is a whole number from 0 to 99.",
+    save: (next) => setDraftRevisionNumber(revisionId, Number(next.trim())),
+  });
+
+  return (
+    <div className="space-y-1.5">
+      <label htmlFor={`revision-no-${revisionId}`} className={LABEL}>
+        Revision
+      </label>
+      <div className="flex items-center gap-2">
+        <span className="text-foreground text-sm font-semibold">R</span>
+        <Input
+          id={`revision-no-${revisionId}`}
+          inputMode="numeric"
+          autoComplete="off"
+          maxLength={2}
+          className="w-20 tabular-nums"
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          onBlur={() => save.flush(value)}
+        />
+      </div>
+      <p className="text-muted text-xs">
+        Already at R2 in Excel? Make this R3. It can only go above the numbers this set has used.
+      </p>
+      <FormMessage error={save.error} success={save.saved ? "Saved" : null} size="xs" />
     </div>
   );
 }
@@ -70,10 +125,7 @@ function NoteField({
 
   return (
     <div className="space-y-1.5">
-      <label
-        htmlFor={`revision-note-${revisionId}`}
-        className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase"
-      >
+      <label htmlFor={`revision-note-${revisionId}`} className={LABEL}>
         {revisionNo === 0 ? "Note" : "What changed"}
       </label>
       <Textarea
@@ -96,144 +148,162 @@ function NoteField({
 }
 
 /**
- * The set's sheets. Each one is uploaded under a sheet code the person
- * types first — GFP for ground floor plan — which ends the name it
- * downloads under (founder, 2026-09-27: "when uploading a sheet user has
- * to enter it"). One file per code, so the code and the sheet can never
- * be paired wrongly.
+ * The drawings: the share link of this revision's WorkDrive folder (0124;
+ * founder, 2026-10-17: "lets not get into file handling"). Using a link
+ * reads the folder there and then, so the count and the names show before
+ * anything else; Read again picks up a sheet added in WorkDrive since.
+ * Issue reads it once more and keeps that list with the record.
  */
-function FilesEditor({
+function DrawingsField({
   revisionId,
-  files,
+  drawingsUrl,
+  sheets,
 }: {
   revisionId: string;
-  files: DrawingRevisionRow["files"];
+  drawingsUrl: string | null;
+  sheets: DrawingRevisionRow["folderSheets"];
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [code, setCode] = useState("");
-  const [uploading, startUpload] = useTransition();
-  const [uploadError, setUploadError] = useState<string>();
-  const [removingId, setRemovingId] = useState<string>();
-  const [removeError, setRemoveError] = useState<string>();
-  const [removing, startRemove] = useTransition();
+  const [value, setValue] = useState(drawingsUrl ?? "");
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string>();
 
-  const sheetCode = normaliseSheetCode(code);
-  const taken = sheetCode !== null && files.some((file) => file.sheetCode === sheetCode);
+  // Compared as the server will store it, so a pasted link with a slash or
+  // a query on the end still reads as the saved one.
+  const parsed = parseWorkDriveLink(value);
+  const changed = (parsed.ok ? parsed.url : value.trim()) !== (drawingsUrl ?? "");
+  const readAt = sheets[0]?.readAt ?? null;
 
-  const upload = (file: File | undefined) => {
-    if (!file || !sheetCode) return;
-    setUploadError(undefined);
-    startUpload(async () => {
-      if (file.size > MAX_UPLOAD_BYTES) {
-        setUploadError(`"${file.name}" is over 4 MB — split it into two sheets.`);
-      } else {
-        const formData = new FormData();
-        formData.set("sheet_code", sheetCode);
-        formData.set("file", file);
-        const result = await uploadDrawingRevisionFile(revisionId, formData);
-        if (result?.error) {
-          setUploadError(result.error);
-        } else {
-          setCode("");
-          document.getElementById(`sheet-code-${revisionId}`)?.focus();
-        }
-      }
-      if (inputRef.current) inputRef.current.value = "";
-    });
-  };
-
-  const remove = (fileId: string) => {
-    setRemoveError(undefined);
-    setRemovingId(fileId);
-    startRemove(async () => {
-      const result = await deleteDrawingRevisionFile(fileId);
-      if (result?.error) setRemoveError(result.error);
-      setRemovingId(undefined);
+  const run = (action: () => Promise<{ error?: string } | undefined>) => {
+    setError(undefined);
+    startTransition(async () => {
+      const result = await action();
+      if (result?.error) setError(result.error);
     });
   };
 
   return (
     <div className="space-y-2">
-      <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
-        Sheets ({files.length})
-      </p>
-
-      {files.length === 0 ? (
-        <p className="text-muted text-xs">
-          No sheets yet. The set can&apos;t go to site without at least one.
-        </p>
-      ) : (
-        <ul className="divide-border divide-y">
-          {files.map((file) => (
-            <li key={file.id} className="flex items-center justify-between gap-2 py-1.5 text-sm">
-              <a
-                href={`/design-management/files/${file.id}`}
-                target="_blank"
-                rel="noreferrer"
-                className="text-foreground flex min-w-0 items-center gap-2 hover:underline"
-              >
-                <FileText className="text-muted size-3.5 shrink-0" />
-                <span className="min-w-0 break-all">{file.displayName}</span>
-              </a>
-              {/* No confirmation: one sheet, on a draft, put back with one
-                  upload. Everything that loses more than that asks first. */}
-              <IconButton
-                aria-label={`Remove ${file.sheetCode ?? file.fileName}`}
-                tone="danger"
-                disabled={removing && removingId === file.id}
-                onClick={() => remove(file.id)}
-              >
-                <Trash2 className="size-3.5" />
-              </IconButton>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="w-40 space-y-1.5">
-          <label
-            htmlFor={`sheet-code-${revisionId}`}
-            className="text-foreground text-sm font-medium"
-          >
-            Sheet code
-          </label>
-          <Input
-            id={`sheet-code-${revisionId}`}
-            value={code}
-            onChange={(event) => setCode(event.target.value)}
-            maxLength={24}
-            autoComplete="off"
-            placeholder="e.g. GFP"
-            className="font-mono uppercase"
-            disabled={uploading}
-          />
-        </div>
-        <input
-          ref={inputRef}
-          type="file"
-          accept="application/pdf,image/jpeg,image/png"
-          hidden
-          onChange={(event) => upload(event.target.files?.[0])}
+      <label htmlFor={`drawings-link-${revisionId}`} className={LABEL}>
+        Drawings — WorkDrive link
+      </label>
+      <form
+        className="flex flex-wrap gap-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          run(() => setDraftDrawingsLink(revisionId, value));
+        }}
+      >
+        <Input
+          id={`drawings-link-${revisionId}`}
+          inputMode="url"
+          autoComplete="off"
+          spellCheck={false}
+          className="min-w-0 flex-1 basis-64"
+          placeholder="https://workdrive.zohoexternal.com/external/…"
+          value={value}
+          disabled={pending}
+          onChange={(event) => setValue(event.target.value)}
         />
-        <Button
-          type="button"
-          variant="secondary"
-          className="h-11"
-          disabled={uploading || !sheetCode || taken}
-          onClick={() => inputRef.current?.click()}
-        >
-          {uploading ? <Spinner className="size-4 border-2" /> : <UploadCloud className="size-4" />}
-          {uploading ? "Uploading…" : "Choose the sheet"}
+        <Button type="submit" variant="secondary" className="h-11" disabled={pending || !changed}>
+          {pending && <Spinner className="size-4 border-2" />}
+          {pending
+            ? "Reading the folder…"
+            : !value.trim() && drawingsUrl
+              ? "Take the link off"
+              : "Use this link"}
         </Button>
-      </div>
+      </form>
       <p className="text-muted text-xs">
-        {taken
-          ? `This set already has ${sheetCode}. Use another code.`
-          : "A short code for the sheet, like GFP for ground floor plan. Then pick its PDF or photo, up to 4 MB."}
+        The share link of this revision&apos;s folder — the one anyone can view. Make a new folder
+        for each revision, and leave it as it is once issued.
       </p>
-      <FormMessage error={uploadError} size="xs" />
-      <FormMessage error={removeError} size="xs" />
+      <FormMessage error={error} size="xs" />
+
+      {drawingsUrl && !changed && (
+        <div className="space-y-1.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-foreground text-sm font-medium">
+              {sheets.length} {sheets.length === 1 ? "sheet" : "sheets"} in the folder
+              {readAt && (
+                <span className="text-muted font-normal"> · read {formatShortDate(readAt)}</span>
+              )}
+            </p>
+            <div className="flex gap-1">
+              <LinkButton href={drawingsUrl} newTab variant="ghost" size="sm">
+                <ExternalLink className="size-3.5" />
+                Open
+              </LinkButton>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={pending}
+                onClick={() => run(() => readDraftFolder(revisionId))}
+              >
+                <RefreshCw className="size-3.5" />
+                Read again
+              </Button>
+            </div>
+          </div>
+          <FolderSheetList sheets={sheets} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Sheets uploaded before 0124, on a draft started then. They go to site
+ * with it unless taken off; nothing new is uploaded any more.
+ */
+function UploadedSheets({ files }: { files: DrawingRevisionRow["files"] }) {
+  const [removingId, setRemovingId] = useState<string>();
+  const [error, setError] = useState<string>();
+  const [removing, startRemove] = useTransition();
+
+  const remove = (fileId: string) => {
+    setError(undefined);
+    setRemovingId(fileId);
+    startRemove(async () => {
+      const result = await deleteDrawingRevisionFile(fileId);
+      if (result?.error) setError(result.error);
+      setRemovingId(undefined);
+    });
+  };
+
+  return (
+    <div className="space-y-1.5">
+      <p className={LABEL}>Uploaded sheets ({files.length})</p>
+      <p className="text-muted text-xs">
+        Uploaded before WorkDrive links. They go to site with this revision unless you take them
+        off.
+      </p>
+      <ul className="divide-border divide-y">
+        {files.map((file) => (
+          <li key={file.id} className="flex items-center justify-between gap-2 py-1.5 text-sm">
+            <a
+              href={`/design-management/files/${file.id}`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-foreground flex min-w-0 items-center gap-2 hover:underline"
+            >
+              <FileText className="text-muted size-3.5 shrink-0" />
+              <span className="min-w-0 break-all">{file.fileName}</span>
+            </a>
+            {/* No confirmation: one sheet, on a draft. Everything that loses
+                more than that asks first. */}
+            <IconButton
+              aria-label={`Take off ${file.fileName}`}
+              tone="danger"
+              disabled={removing && removingId === file.id}
+              onClick={() => remove(file.id)}
+            >
+              <Trash2 className="size-3.5" />
+            </IconButton>
+          </li>
+        ))}
+      </ul>
+      <FormMessage error={error} size="xs" />
     </div>
   );
 }

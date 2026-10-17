@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { LinkButton } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { PageTitle } from "@/components/ui/page-title";
 import { Section } from "@/components/ui/section";
@@ -21,7 +22,7 @@ import {
   type IssueRequestRow,
   type VillaDetail,
 } from "@/lib/supervisors/queries";
-import { FileText } from "lucide-react";
+import { ExternalLink, FileText } from "lucide-react";
 import { notFound } from "next/navigation";
 import { DrawingHistory } from "./_components/drawing-history";
 import { DeleteLabourLogButton, LabourLogDialog } from "./_components/labour-forms";
@@ -106,20 +107,49 @@ export default async function VillaPage({ params }: { params: Promise<{ plotId: 
                       Released {formatDate(set.revision.releasedAt)}
                     </p>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {set.files.map((file) => (
-                      <a
-                        key={file.id}
-                        href={`/design-management/files/${file.id}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="border-border bg-background text-foreground hover:border-accent hover:text-accent inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-xl border px-3 text-sm font-medium break-all"
+                  {/* Since 0124 the drawings are a WorkDrive folder: one
+                      button opens it, and the sheets it held when issued
+                      are listed by name so site can count them. */}
+                  {set.drawingsUrl && (
+                    <div className="space-y-1.5">
+                      <LinkButton
+                        href={set.drawingsUrl}
+                        newTab
+                        variant="secondary"
+                        className="w-full sm:w-auto"
                       >
-                        <FileText className="size-4 shrink-0" aria-hidden />
-                        {file.displayName}
-                      </a>
-                    ))}
-                  </div>
+                        <ExternalLink className="size-4" aria-hidden />
+                        Open drawings
+                        {set.folderSheets.length > 0 &&
+                          ` · ${set.folderSheets.length} ${set.folderSheets.length === 1 ? "sheet" : "sheets"}`}
+                      </LinkButton>
+                      {set.folderSheets.length > 0 && (
+                        <ol className="text-muted space-y-0.5 text-xs">
+                          {set.folderSheets.map((sheet, index) => (
+                            <li key={sheet.id} className="break-words">
+                              {index + 1}. {sheet.name}
+                            </li>
+                          ))}
+                        </ol>
+                      )}
+                    </div>
+                  )}
+                  {set.files.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {set.files.map((file) => (
+                        <a
+                          key={file.id}
+                          href={`/design-management/files/${file.id}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="border-border bg-background text-foreground hover:border-accent hover:text-accent inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-xl border px-3 text-sm font-medium break-all"
+                        >
+                          <FileText className="size-4 shrink-0" aria-hidden />
+                          {file.displayName}
+                        </a>
+                      ))}
+                    </div>
+                  )}
                   <DrawingHistory
                     history={[
                       {

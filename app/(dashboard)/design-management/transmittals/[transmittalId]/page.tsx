@@ -9,10 +9,11 @@ import { getTransmittalDetail, type DrawingRevisionRow } from "@/lib/design-mana
 import { transmittalReadiness } from "@/lib/design-management/readiness";
 import { formatDate } from "@/lib/format";
 import { getWorksTree, type WorksTreeCategory } from "@/lib/masters/works";
-import { FileText } from "lucide-react";
+import { ExternalLink, FileText } from "lucide-react";
 import { notFound } from "next/navigation";
 
 import { DraftRevisionEditor } from "../../_components/draft-revision-editor";
+import { FolderSheetList } from "../../_components/folder-sheet-list";
 import { RevisionLog } from "../../_components/revision-log";
 import {
   DeleteDraftTransmittalButton,
@@ -21,15 +22,15 @@ import {
 } from "./_components/transmittal-forms";
 
 /**
- * One transmittal: one stage, one drawing set, and that set's sheets.
+ * One transmittal: one stage, one drawing set, and that set's drawings.
  *
- * Founder, 2026-09-27: "one transmittal contains only one stage and you
- * upload a drawing set and inside that sheets … so each time a full set
- * gets to site to avoid confusion". The stage and the set are chosen when
- * the transmittal starts and never change here (0099 holds both), so a
- * draft is only: the note for site, what changed, the sheets, and Issue.
- * An issued one is the record — what went out, when and by whom, with
- * nothing to press but the cover sheet.
+ * Founder, 2026-09-27: "one transmittal contains only one stage … so each
+ * time a full set gets to site to avoid confusion". The stage and the set
+ * are chosen when the transmittal starts and never change here (0099), so
+ * a draft is only: the note for site, the revision, what changed, the
+ * drawings — since 0124 a WorkDrive link whose folder the toolbox reads —
+ * and Issue. An issued one is the record: what went out, when and by
+ * whom, the link and the sheets the folder held, and the cover sheet.
  */
 export default async function TransmittalDetailPage({
   params,
@@ -59,9 +60,11 @@ export default async function TransmittalDetailPage({
       revisionNo: row.revisionNo,
       revisionStatus: row.revisionStatus,
       fileCount: row.files.length,
+      hasLink: row.drawingsUrl !== null,
       note: row.revisionNote,
     })),
   );
+  const sheetCount = line ? line.files.length + line.folderSheets.length : 0;
 
   return (
     <div className="space-y-4">
@@ -92,7 +95,7 @@ export default async function TransmittalDetailPage({
         <IssueBar
           transmittalId={transmittal.id}
           problem={readiness.problem}
-          sheetCount={line.files.length}
+          sheetCount={sheetCount}
         />
       )}
 
@@ -140,20 +143,31 @@ export default async function TransmittalDetailPage({
         />
       ) : isDraft && line.revisionStatus === "draft" ? (
         <Section
-          title="Sheets"
-          note="Upload every sheet of the set — the whole set goes to site together when you issue."
+          title="Drawings"
+          note="Paste the share link of this revision's WorkDrive folder — the toolbox lists its sheets, and the whole folder goes to site when you issue."
         >
           <DraftRevisionEditor revision={draftRevision(line)} tree={tree} />
         </Section>
       ) : (
         <Section
-          title="Sheets"
-          note={`${line.files.length} ${line.files.length === 1 ? "sheet" : "sheets"}. Each opens under the name it saves as.`}
+          title="Drawings"
+          note={
+            sheetCount === 0
+              ? "No sheet list was kept for this revision."
+              : `${sheetCount} ${sheetCount === 1 ? "sheet" : "sheets"}, as they went to site.`
+          }
         >
           <RevisionLog entries={line.revisionLog} />
-          {line.files.length === 0 ? (
-            <p className="text-muted mt-1 text-xs">No sheets on this revision.</p>
-          ) : (
+          {line.drawingsUrl && (
+            <div className="mt-2 space-y-2">
+              <LinkButton href={line.drawingsUrl} newTab variant="secondary" size="sm">
+                <ExternalLink className="size-3.5" />
+                Open the folder in WorkDrive
+              </LinkButton>
+              {line.folderSheets.length > 0 && <FolderSheetList sheets={line.folderSheets} />}
+            </div>
+          )}
+          {line.files.length > 0 && (
             <ul className="divide-border mt-2 divide-y">
               {line.files.map((file) => (
                 <li key={file.id} className="py-2">
@@ -164,7 +178,7 @@ export default async function TransmittalDetailPage({
                     className="text-foreground hover:text-accent flex min-w-0 items-center gap-2 text-sm break-all"
                   >
                     <FileText className="text-muted size-4 shrink-0" />
-                    {file.displayName}
+                    {file.fileName}
                   </a>
                 </li>
               ))}
@@ -206,6 +220,8 @@ function draftRevision(
     note: line.revisionNote,
     releasedAt: null,
     files: line.files,
+    drawingsUrl: line.drawingsUrl,
+    folderSheets: line.folderSheets,
     workItemIds: line.draftWorkItemIds ?? [],
   };
 }

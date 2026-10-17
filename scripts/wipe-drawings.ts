@@ -42,6 +42,7 @@ const TABLES = [
   "transmittal_counters",
   "drawing_revision_works",
   "drawing_revision_files",
+  "drawing_revision_folder_sheets",
   "drawing_revisions",
   "drawing_set_works",
   "drawing_sets",

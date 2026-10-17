@@ -3,6 +3,7 @@ import "server-only";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 
+import { readFolderSheets, type FolderSheet } from "./folder-sheets";
 import { sheetNamingContext, type SheetContext } from "./sheet-context";
 import { sheetFileName } from "./sheet-name";
 
@@ -44,7 +45,7 @@ import { sheetFileName } from "./sheet-name";
 export type ReleasedDrawingFile = {
   id: string;
   fileName: string;
-  /** The sheet's name as it downloads: SAA-Saarang-Villa12-WD-TR0003-GFP.pdf. */
+  /** The sheet's name as it downloads: SAA-Saarang-Villa12-WD-TB0003-GFP.pdf. */
   displayName: string;
   contentType: string;
 };
@@ -65,7 +66,12 @@ export type ReleasedDrawingSet = {
     note: string | null;
     releasedAt: string;
   };
+  /** Sheets uploaded before 0124; a revision since carries a link instead. */
   files: ReleasedDrawingFile[];
+  /** The WorkDrive share link the revision went out with (0124), if any. */
+  drawingsUrl: string | null;
+  /** That folder's sheets as the toolbox kept them on Issue. */
+  folderSheets: FolderSheet[];
   workItemIds: string[];
   /**
    * The change log: SUPERSEDED revisions, newest first — revision
@@ -107,6 +113,7 @@ export async function listReleasedDrawingsForUnit(unitId: string): Promise<Relea
     note: string | null;
     released_at: string | null;
     status: string;
+    drawings_url: string | null;
   }[];
   let sets: { id: string; code: string | null; name: string; sort_order: number }[];
   let files: {
@@ -117,13 +124,14 @@ export async function listReleasedDrawingsForUnit(unitId: string): Promise<Relea
     sheet_code: string | null;
   }[];
   let naming: Map<string, SheetContext>;
+  let folderSheets: Map<string, FolderSheet[]>;
   let works: { drawing_revision_id: string; work_item_id: string }[];
 
   try {
     revisions = await fetchAll((from, to) =>
       supabase
         .from("drawing_revisions")
-        .select("id, drawing_set_id, revision_no, note, released_at, status")
+        .select("id, drawing_set_id, revision_no, note, released_at, status, drawings_url")
         .eq("unit_id", unitId)
         .neq("status", "draft")
         .order("drawing_set_id")
@@ -169,7 +177,10 @@ export async function listReleasedDrawingsForUnit(unitId: string): Promise<Relea
           .range(from, to),
       ),
     ]);
-    naming = await sheetNamingContext(supabase, releasedIds);
+    [naming, folderSheets] = await Promise.all([
+      sheetNamingContext(supabase, releasedIds),
+      readFolderSheets(supabase, releasedIds),
+    ]);
   } catch (error) {
     throw new Error(
       `Could not read the released drawings for this villa: ${(error as Error).message}`,
@@ -250,6 +261,8 @@ export async function listReleasedDrawingsForUnit(unitId: string): Promise<Relea
         releasedAt: revision.released_at,
       },
       files: filesByRevision.get(revision.id) ?? [],
+      drawingsUrl: revision.drawings_url,
+      folderSheets: folderSheets.get(revision.id) ?? [],
       workItemIds: workIdsByRevision.get(revision.id) ?? [],
       history: historyBySet.get(revision.drawing_set_id) ?? [],
     };
