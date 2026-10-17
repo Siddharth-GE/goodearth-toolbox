@@ -13,6 +13,7 @@ import {
   compareOpen,
   loadOf,
   nextAction,
+  plotInList,
   plotHealth,
   plotNumber,
   plotRail,
@@ -23,7 +24,7 @@ import {
   type PlotStatus,
   type Rail,
 } from "./next-steps";
-import type { ActionStatus, ActionTrack, KaadalStage } from "./stages";
+import { trackForSide, type ActionStatus, type ActionTrack, type KaadalStage } from "./stages";
 
 /**
  * Reads for the Saarang tracker's screens inside Client Relations — the
@@ -266,8 +267,8 @@ function stepPeople(records: StepRecord[]): string[] {
 
 export type BoardFilters = {
   project?: string;
-  /** Only the Kaadal track. */
-  kaadal?: boolean;
+  /** One side only — Construction (`sales`) or Interior (`kaadal`). */
+  side?: ActionTrack | null;
   /** "" = the default (a manager sees everyone, a member their own), "all", "mgmt", or a person's id. */
   who?: string;
   showDone?: boolean;
@@ -287,7 +288,7 @@ export type ActionsBoard = {
   /** The list on screen: open steps, plus the latest done when asked. */
   steps: NextStep[];
   doneCount: number;
-  /** Each team member's load across the scope (project / Kaadal), whatever `who` shows. */
+  /** Each team member's load across the scope (project / side), whatever `who` shows. */
   loads: { person: Person; load: Load }[];
   myLoad: Load;
   /** Finished by their owners, waiting for my tick. */
@@ -337,7 +338,7 @@ export async function getActionsBoard(filters: BoardFilters = {}): Promise<Actio
   const all = [...open, ...done].map((record) => toStep(record, names, plots));
 
   const inScope = (step: NextStep) => {
-    if (filters.kaadal && step.track !== "kaadal") return false;
+    if (filters.side && step.track !== filters.side) return false;
     if (filters.project && step.plot?.projectId !== filters.project) return false;
     return true;
   };
@@ -440,14 +441,24 @@ export async function getActionCounts(): Promise<{
 // ---------------------------------------------------------------------
 
 export type PlotCard = PlotRef & {
+  /** The Construction owner (`crm_owner_id`). */
   ownerId: string | null;
   ownerName: string | null;
+  /** The Interior owner (`kaadal_owner_id`). */
+  interiorOwnerId: string | null;
+  interiorOwnerName: string | null;
   kaadalStage: KaadalStage | null;
   stageName: string | null;
   status: PlotStatus;
   health: Health | null;
   rail: Rail;
-  next: { action: string; dueOn: string | null; dueAssumed: boolean; status: string } | null;
+  next: {
+    action: string;
+    dueOn: string | null;
+    dueAssumed: boolean;
+    status: string;
+    track: ActionTrack;
+  } | null;
   openCount: number;
 };
 
@@ -468,6 +479,8 @@ function buildCard(
   stages: ReturnType<typeof stageIndex>,
   names: Map<string, string>,
   today: string,
+  /** On a grid filtered to one side, the card's next action is that side's. */
+  side: ActionTrack | null = null,
 ): PlotCard {
   const ref = toRef(record);
   const plot = {
@@ -487,12 +500,18 @@ function buildCard(
     .sort()
     .at(-1)!
     .slice(0, 10);
-  const next = nextAction(steps.map((s) => ({ ...s, status: s.status, dueOn: s.due_on })));
+  const next = nextAction(
+    steps
+      .filter((s) => !side || s.track === side)
+      .map((s) => ({ ...s, status: s.status, dueOn: s.due_on })),
+  );
 
   return {
     ...ref,
     ownerId: record.crm_owner_id,
     ownerName: record.crm_owner_id ? (names.get(record.crm_owner_id) ?? null) : null,
+    interiorOwnerId: record.kaadal_owner_id,
+    interiorOwnerName: record.kaadal_owner_id ? (names.get(record.kaadal_owner_id) ?? null) : null,
     kaadalStage: record.kaadal_stage as KaadalStage | null,
     stageName: stages.nameOf(record.progress_stage_id),
     status: plotStatus(plot),
@@ -504,6 +523,7 @@ function buildCard(
           dueOn: next.due_on,
           dueAssumed: next.due_assumed,
           status: next.status,
+          track: next.track as ActionTrack,
         }
       : null,
     openCount: steps.filter((s) => s.status !== "done").length,
@@ -525,7 +545,7 @@ export async function readPlotCards(
   const index = stageIndex(stages);
   const names = await namesFor(
     supabase,
-    records.map((r) => r.crm_owner_id ?? ""),
+    records.flatMap((r) => [r.crm_owner_id ?? "", r.kaadal_owner_id ?? ""]),
   );
   return new Map(
     records.map((record) => [
@@ -571,7 +591,14 @@ export async function readPlotSteps(
   return byPlot;
 }
 
-export type PlotFilters = { project?: string; who?: string; health?: string; q?: string };
+export type PlotFilters = {
+  project?: string;
+  who?: string;
+  health?: string;
+  q?: string;
+  /** "construction" or "interior", as the URL says it. */
+  side?: string;
+};
 
 export type PlotBoard = {
   cards: PlotCard[];
@@ -598,7 +625,7 @@ export async function getPlotBoard(filters: PlotFilters = {}): Promise<PlotBoard
   const index = stageIndex(stages);
   const names = await namesFor(
     supabase,
-    records.map((r) => r.crm_owner_id ?? ""),
+    records.flatMap((r) => [r.crm_owner_id ?? "", r.kaadal_owner_id ?? ""]),
   );
 
   const stepsByPlot = new Map<string, StepRecord[]>();
@@ -611,23 +638,28 @@ export async function getPlotBoard(filters: PlotFilters = {}): Promise<PlotBoard
 
   const projects = new Map<string, string>();
   const search = filters.q?.trim().toLowerCase() ?? "";
+  const side = trackForSide(filters.side);
 
   let cards = records
     .map((record) => {
       projects.set(record.project_id, record.units.projects?.name ?? "—");
-      return buildCard(record, stepsByPlot.get(record.id) ?? [], index, names, today);
+      return buildCard(record, stepsByPlot.get(record.id) ?? [], index, names, today, side);
     })
     .filter((card) => !filters.project || card.projectId === filters.project)
     .filter((card) => {
-      const who = filters.who;
-      if (!who || who === "all") return true;
-      const open = (stepsByPlot.get(card.engagementId) ?? []).filter((s) => s.status !== "done");
-      if (who === "mgmt") return open.some((s) => s.status === "waiting_management");
       const record = records.find((r) => r.id === card.engagementId)!;
-      return (
-        record.crm_owner_id === who ||
-        record.kaadal_owner_id === who ||
-        open.some((s) => s.owner_id === who)
+      const open = (stepsByPlot.get(card.engagementId) ?? [])
+        .filter((s) => s.status !== "done")
+        .map((s) => ({ track: s.track, ownerId: s.owner_id, status: s.status }));
+      return plotInList(
+        {
+          constructionOwner: record.crm_owner_id,
+          interiorOwner: record.kaadal_owner_id,
+          interiorStage: record.kaadal_stage,
+        },
+        open,
+        side,
+        filters.who ?? null,
       );
     })
     .filter(

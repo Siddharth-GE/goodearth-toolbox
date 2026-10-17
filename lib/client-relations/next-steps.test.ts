@@ -18,6 +18,7 @@ import {
   loadOf,
   nextAction,
   plotHealth,
+  plotInList,
   plotNumber,
   plotRail,
   plotStatus,
@@ -225,4 +226,54 @@ test("finished and waiting to confirm is never overdue, nor anyone's load", () =
   // The next action prefers real work over what waits to be confirmed.
   assert.equal(nextAction([finished, { status: "open", dueOn: "2026-12-01" }])?.status, "open");
   assert.equal(nextAction([finished])?.status, "awaiting_confirmation");
+});
+
+test("the Plots grid by side: Interior lists only plots with interior work", () => {
+  const sold = { constructionOwner: "anu", interiorOwner: null, interiorStage: null };
+  const pitched = {
+    constructionOwner: "anu",
+    interiorOwner: "sayooj",
+    interiorStage: "pitch_done",
+  };
+  const construction = [{ track: "sales", ownerId: "anu", status: "open" }];
+  const interior = [{ track: "kaadal", ownerId: "sebastina", status: "open" }];
+
+  assert.equal(plotInList(sold, construction, null, null), true);
+  assert.equal(plotInList(sold, construction, "sales", null), true);
+  assert.equal(plotInList(sold, construction, "kaadal", null), false, "no interior work at all");
+  assert.equal(
+    plotInList(sold, interior, "kaadal", null),
+    true,
+    "an open interior action is interior work",
+  );
+  assert.equal(plotInList({ ...sold, interiorStage: "to_pitch" }, [], "kaadal", null), true);
+  assert.equal(plotInList(pitched, [], "kaadal", null), true);
+});
+
+test("the Plots grid by side and person: each side has its own owner", () => {
+  const plot = { constructionOwner: "anu", interiorOwner: "sayooj", interiorStage: "pitch_done" };
+  const open = [
+    { track: "sales", ownerId: "sebastina", status: "open" },
+    { track: "kaadal", ownerId: "anu", status: "waiting_management" },
+  ];
+
+  // Either side, with no side picked.
+  assert.equal(plotInList(plot, open, null, "anu"), true);
+  assert.equal(plotInList(plot, open, null, "sayooj"), true);
+  // Construction: its owner, or whoever holds a construction action.
+  assert.equal(plotInList(plot, open, "sales", "anu"), true);
+  assert.equal(
+    plotInList(plot, open, "sales", "sayooj"),
+    false,
+    "the interior owner is not construction's",
+  );
+  assert.equal(plotInList(plot, open, "sales", "sebastina"), true);
+  // Interior: its owner, or whoever holds an interior action.
+  assert.equal(plotInList(plot, open, "kaadal", "sayooj"), true);
+  assert.equal(plotInList(plot, open, "kaadal", "anu"), true, "anu holds an interior action");
+  assert.equal(plotInList(plot, open, "kaadal", "sebastina"), false);
+  // Waiting on management, on the side asked about.
+  assert.equal(plotInList(plot, open, "kaadal", "mgmt"), true);
+  assert.equal(plotInList(plot, open, "sales", "mgmt"), false);
+  assert.equal(plotInList(plot, open, null, "all"), true);
 });

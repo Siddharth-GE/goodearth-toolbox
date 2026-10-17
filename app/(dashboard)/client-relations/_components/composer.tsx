@@ -3,12 +3,14 @@
 import { Button } from "@/components/ui/button";
 import { dueLabel, type DueTone } from "@/lib/client-relations/next-steps";
 import { addNextStep } from "@/lib/client-relations/next-steps-actions";
+import type { ActionTrack } from "@/lib/client-relations/stages";
 import { cn } from "@/lib/utils";
-import { CalendarDays, Leaf, MapPin, Plus, UserRound } from "lucide-react";
+import { CalendarDays, MapPin, Plus, UserRound } from "lucide-react";
 import { useRef, useState, useTransition } from "react";
 
 import { useBoard, useToast } from "./board-context";
 import { PersonName, PillButton, type PillTone } from "./pill";
+import { SideMark } from "./side-mark";
 import { DueMenu, OwnerMenu, PlotMenu } from "./step-menus";
 
 const DUE_TONE: Record<DueTone, PillTone> = {
@@ -20,7 +22,8 @@ const DUE_TONE: Record<DueTone, PillTone> = {
 
 /**
  * The tracker's one-line composer: type the step, tap plot, owner, date,
- * Sales or Kaadal, press Enter. On a plot's page the plot is fixed.
+ * Construction or Interior, press Enter. On a plot's page the plot is
+ * fixed, and the owner follows the side: each side has its own owner.
  *
  * No date is allowed — it lands with the overdue ones, and the line says
  * so, because the tracker's rule is that every promise gets a real date.
@@ -28,11 +31,17 @@ const DUE_TONE: Record<DueTone, PillTone> = {
 export function Composer({
   fixedPlot,
   defaultOwner,
+  defaultTrack = "sales",
+  ownerFor,
 }: {
   /** A plot's page: every step it adds is that plot's. */
   fixedPlot?: string;
   /** Who it goes to until someone picks: you, the person being viewed, or the plot's owner. */
   defaultOwner: string | null;
+  /** The side it starts on, and goes back to after each add. */
+  defaultTrack?: ActionTrack;
+  /** A plot's page: each side's owner, who a step on that side goes to until someone picks. */
+  ownerFor?: Partial<Record<ActionTrack, string | null>>;
 }) {
   const { plots, team, today } = useBoard();
   const toast = useToast();
@@ -41,9 +50,13 @@ export function Composer({
   const [plot, setPlot] = useState<string | null>(fixedPlot ?? null);
   const [owner, setOwner] = useState<string | null>(null);
   const [due, setDue] = useState<string | null>(null);
-  const [track, setTrack] = useState<"sales" | "kaadal">("sales");
+  const [track, setTrack] = useState<ActionTrack>(defaultTrack);
 
-  const ownerId = owner ?? (team.some((p) => p.id === defaultOwner) ? defaultOwner : null);
+  const onTeam = (id: string | null | undefined): id is string =>
+    Boolean(id && team.some((p) => p.id === id));
+  const sideOwner = ownerFor?.[track];
+  const ownerId =
+    owner ?? (onTeam(sideOwner) ? sideOwner : onTeam(defaultOwner) ? defaultOwner : null);
   const ownerName = team.find((person) => person.id === ownerId)?.name ?? null;
   const chosenPlot = plots.find((p) => p.engagementId === plot) ?? null;
   const dueText = due ? dueLabel({ status: "open", dueOn: due }, today) : null;
@@ -79,7 +92,7 @@ export function Composer({
       if (input.current) input.current.value = "";
       setDue(null);
       setOwner(null);
-      setTrack("sales");
+      setTrack(defaultTrack);
       if (!fixedPlot) setPlot(null);
       input.current?.focus();
     });
@@ -150,16 +163,10 @@ export function Composer({
         <PillButton
           tone={track === "kaadal" ? "info" : "plain"}
           onClick={() => setTrack((t) => (t === "kaadal" ? "sales" : "kaadal"))}
-          aria-label={`Track: ${track === "kaadal" ? "Kaadal" : "Sales"}. Switch`}
-          title="Switch between Sales and Kaadal"
+          aria-label={`Side: ${track === "kaadal" ? "Interior" : "Construction"}. Switch`}
+          title="Switch between Construction and Interior"
         >
-          {track === "kaadal" ? (
-            <>
-              <Leaf className="size-3.5" /> Kaadal
-            </>
-          ) : (
-            "Sales"
-          )}
+          <SideMark track={track} />
         </PillButton>
         <Button type="submit" disabled={pending} className={cn("h-9 px-4")}>
           {pending ? "Adding…" : "Add"}

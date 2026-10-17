@@ -1,12 +1,13 @@
 import { chipClassName } from "@/components/ui/choice-chips";
 import { getActionsBoard } from "@/lib/client-relations/next-steps-queries";
+import { trackForSide } from "@/lib/client-relations/stages";
 import { formatCount } from "@/lib/format";
-import { Leaf } from "lucide-react";
 import Link from "next/link";
 
 import { BoardProvider } from "../_components/board-context";
 import { FilterChips, Greeting, StepSections, TeamStrip } from "../_components/board-parts";
 import { Composer } from "../_components/composer";
+import { SideMark } from "../_components/side-mark";
 
 /**
  * The Saarang tracker's main screen: every promise to a client, with an
@@ -16,17 +17,19 @@ import { Composer } from "../_components/composer";
  * else sees only the work assigned to them (0123) and opens on their own
  * list, under a greeting, with a switch to everything they can see — what
  * they set for others and what sits on their plots. Every filter lives in
- * the URL.
+ * the URL — the side too: each plot has a Construction and an Interior
+ * side, with their own owners and their own actions.
  */
 export default async function ActionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ project?: string; kaadal?: string; who?: string; done?: string }>;
+  searchParams: Promise<{ project?: string; side?: string; who?: string; done?: string }>;
 }) {
   const params = await searchParams;
+  const side = trackForSide(params.side);
   const board = await getActionsBoard({
     project: params.project,
-    kaadal: params.kaadal === "1",
+    side,
     who: params.who,
     showDone: params.done === "1",
   });
@@ -50,7 +53,7 @@ export default async function ActionsPage({
   const mine = board.who === board.me.id;
 
   const whoLine = mine
-    ? `Your actions${params.project || params.kaadal ? " here" : ""}. Stuck on something only a manager can clear? Use ••• → Waiting on management.`
+    ? `Your actions${params.project || side ? " here" : ""}. Stuck on something only a manager can clear? Use ••• → Waiting on management.`
     : board.who === "mgmt"
       ? "What is waiting on management"
       : viewing
@@ -88,37 +91,45 @@ export default async function ActionsPage({
         )}
 
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <FilterChips
-            label="Which plots"
-            items={[
-              ...(board.projects.length > 1
-                ? [
-                    {
-                      key: "all",
-                      label: "All projects",
-                      href: href({ project: undefined }),
-                      on: !params.project,
-                    },
-                    ...board.projects.map((project) => ({
-                      key: project.id,
-                      label: project.name,
-                      href: href({ project: project.id }),
-                      on: params.project === project.id,
-                    })),
-                  ]
-                : []),
-              {
-                key: "kaadal",
-                label: (
-                  <>
-                    <Leaf className="size-3.5" /> Kaadal only
-                  </>
-                ),
-                href: href({ kaadal: params.kaadal === "1" ? undefined : "1" }),
-                on: params.kaadal === "1",
-              },
-            ]}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            {board.projects.length > 1 ? (
+              <FilterChips
+                label="Which plots"
+                items={[
+                  {
+                    key: "all",
+                    label: "All projects",
+                    href: href({ project: undefined }),
+                    on: !params.project,
+                  },
+                  ...board.projects.map((project) => ({
+                    key: project.id,
+                    label: project.name,
+                    href: href({ project: project.id }),
+                    on: params.project === project.id,
+                  })),
+                ]}
+              />
+            ) : null}
+            <FilterChips
+              label="Which side"
+              items={[
+                { key: "both", label: "Both sides", href: href({ side: undefined }), on: !side },
+                {
+                  key: "construction",
+                  label: <SideMark track="sales" />,
+                  href: href({ side: "construction" }),
+                  on: side === "sales",
+                },
+                {
+                  key: "interior",
+                  label: <SideMark track="kaadal" />,
+                  href: href({ side: "interior" }),
+                  on: side === "kaadal",
+                },
+              ]}
+            />
+          </div>
           {board.me.seesAll ? null : (
             <FilterChips
               label="Whose actions"
@@ -135,7 +146,11 @@ export default async function ActionsPage({
           )}
         </div>
 
-        <Composer key={board.who} defaultOwner={defaultOwner} />
+        <Composer
+          key={`${board.who}-${side ?? "both"}`}
+          defaultOwner={defaultOwner}
+          defaultTrack={side ?? "sales"}
+        />
 
         <div className="text-muted flex flex-wrap items-center justify-between gap-2 text-sm">
           <span>

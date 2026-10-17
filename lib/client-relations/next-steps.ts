@@ -132,6 +132,41 @@ export function compareDone(a: { doneOn: string | null }, b: { doneOn: string | 
 }
 
 /**
+ * Whether a plot belongs on the Plots grid filtered by side and person — a
+ * plot's two sides each have their own owner and their own actions
+ * (Construction is `sales`, Interior is `kaadal`; stages.ts says why).
+ *
+ * Interior lists only plots with interior work: an Interior owner, an
+ * interior stage, or an open interior action. A person matches a side by
+ * owning it or holding one of its open actions; with no side, by either.
+ * `who` is a person's id, "mgmt" (waiting on management) or "all"/null.
+ */
+export function plotInList(
+  plot: {
+    constructionOwner: string | null;
+    interiorOwner: string | null;
+    interiorStage: string | null;
+  },
+  open: readonly { track: string; ownerId: string; status: string }[],
+  side: "sales" | "kaadal" | null,
+  who: string | null,
+): boolean {
+  const onSide = side ? open.filter((action) => action.track === side) : open;
+  if (side === "kaadal" && !plot.interiorOwner && !plot.interiorStage && onSide.length === 0) {
+    return false;
+  }
+  if (!who || who === "all") return true;
+  if (who === "mgmt") return onSide.some((action) => action.status === "waiting_management");
+  const owns =
+    side === "sales"
+      ? plot.constructionOwner === who
+      : side === "kaadal"
+        ? plot.interiorOwner === who
+        : plot.constructionOwner === who || plot.interiorOwner === who;
+  return owns || onSide.some((action) => action.ownerId === who);
+}
+
+/**
  * The open action a plot should do next: the earliest date, no date last.
  * A finished one waiting to be confirmed comes only when nothing else is open.
  */

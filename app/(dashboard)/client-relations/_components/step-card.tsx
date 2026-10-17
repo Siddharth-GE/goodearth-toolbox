@@ -14,12 +14,13 @@ import type { NextStep } from "@/lib/client-relations/next-steps-queries";
 import { ACTION_STATUSES, ACTION_TRACKS, optionFor } from "@/lib/client-relations/stages";
 import { formatShortDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { CalendarDays, Check, Leaf, MoreHorizontal, StickyNote } from "lucide-react";
+import { CalendarDays, Check, MoreHorizontal, StickyNote } from "lucide-react";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 
 import { useBoard, useToast } from "./board-context";
 import { Pill, PillButton, PersonName, PlotChip, type PillTone } from "./pill";
+import { SideIcon, SideMark } from "./side-mark";
 import { DueMenu, MenuCheck, MenuLabel, OwnerMenu, PlotList } from "./step-menus";
 
 const DUE_TONE: Record<DueTone, PillTone> = {
@@ -215,9 +216,10 @@ export function StepCard({
           </PillButton>
         </OwnerMenu>
 
+        {/* Construction is the plot's usual side; only Interior is marked. */}
         {step.track === "kaadal" ? (
           <Pill tone="info">
-            <Leaf className="size-3.5" /> Kaadal
+            <SideMark track="kaadal" />
           </Pill>
         ) : null}
         {step.status === "waiting_client" || step.status === "waiting_management" ? (
@@ -243,8 +245,8 @@ export function StepCard({
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              aria-label="More: status, track, notes, plot"
-              title="Status, track, notes, plot"
+              aria-label="More: status, side, notes, plot"
+              title="Status, side, notes, plot"
               className="text-muted hover:bg-foreground/[0.05] focus-visible:ring-accent/25 grid size-7 place-items-center rounded-full focus-visible:ring-4 focus-visible:outline-none"
             >
               <MoreHorizontal className="size-4" />
@@ -295,12 +297,18 @@ export function StepCard({
                   </DropdownMenuItem>
                 ))}
                 <DropdownMenuSeparator />
-                <MenuLabel>Track</MenuLabel>
+                <MenuLabel>Side</MenuLabel>
                 {ACTION_TRACKS.map((option) => (
                   <DropdownMenuItem
                     key={option.value}
-                    onSelect={() => option.value !== step.track && save({ track: option.value })}
+                    onSelect={() =>
+                      option.value !== step.track &&
+                      save({ track: option.value }, `Moved to ${option.label}`, {
+                        track: step.track,
+                      })
+                    }
                   >
+                    <SideIcon track={option.value} className="text-muted" />
                     <span>{option.label}</span>
                     <MenuCheck on={step.track === option.value} />
                   </DropdownMenuItem>

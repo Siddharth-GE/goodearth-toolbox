@@ -13,8 +13,26 @@ import {
   milestoneLabel,
   normaliseBottlenecks,
   optionFor,
+  sideForTrack,
+  trackForSide,
+  ACTION_TRACKS,
   DEED_STATUSES,
 } from "./stages";
+
+test("a plot's two sides read as Construction and Interior, over the tracker's stored values", () => {
+  assert.equal(optionFor(ACTION_TRACKS, "sales")?.label, "Construction");
+  assert.equal(optionFor(ACTION_TRACKS, "kaadal")?.label, "Interior");
+  assert.equal(trackForSide("construction"), "sales");
+  assert.equal(trackForSide("interior"), "kaadal");
+  assert.equal(sideForTrack("kaadal"), "interior");
+  assert.equal(sideForTrack("sales"), "construction");
+});
+
+test("an unknown side in a URL means both sides, never a crash or a stored value", () => {
+  for (const param of [undefined, null, "", "kaadal", "sales", "toString", "Interior"]) {
+    assert.equal(trackForSide(param), null, String(param));
+  }
+});
 
 test("the nine seeded milestone stages match what create_client_engagement inserts", () => {
   assert.deepEqual(

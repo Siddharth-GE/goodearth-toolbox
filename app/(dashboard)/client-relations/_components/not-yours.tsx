@@ -15,7 +15,7 @@ export function NotYours({ kind }: { kind: "plot" | "client" }) {
       title={kind === "plot" ? "This plot is not one of yours" : "This client is not one of yours"}
       description={
         kind === "plot"
-          ? "A plot shows to its Sales and Kaadal owners, to whoever holds an open action on it, and to team leads. If you just handed it on, it is with your colleague now."
+          ? "A plot shows to its Construction and Interior owners, to whoever holds an open action on it, and to team leads. If you just handed it on, it is with your colleague now."
           : "A client shows to whoever looks after them, to the owners of their plots, and to team leads."
       }
       action={
