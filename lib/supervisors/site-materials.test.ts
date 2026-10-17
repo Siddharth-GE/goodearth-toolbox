@@ -74,7 +74,7 @@ test("an unlinked material never matches and shows zero drawn", () => {
     itemUoms,
   );
   assert.equal(result.rows[0].issued, 0);
-  // The movement still shows — as unplanned, not nowhere.
+  // The movement still shows, as unplanned.
   assert.deepEqual(result.unplanned, [{ workItemId: "w1", itemId: "i-cem", quantity: 40 }]);
 });
 

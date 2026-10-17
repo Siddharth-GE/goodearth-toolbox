@@ -14,13 +14,7 @@ import { useState, useTransition } from "react";
 
 type ChosenItem = { id: string; name: string; uom: string };
 
-/**
- * "Request an issue": pick the work, then the material — from the
- * official estimate's list for that work (the common case, one tap) or
- * from the whole catalogue when the site needs something the estimate
- * never named. The chosen item lives OUTSIDE the dialog content (Radix
- * unmounts it on close), so onOpen resets it.
- */
+/** "Request an issue": the work, then the material, from the estimate's list for it or the whole catalogue. The chosen item lives OUTSIDE the dialog content (Radix unmounts it on close), so onOpen resets it. */
 export function RequestIssueDialog({
   plotId,
   works,
@@ -32,7 +26,6 @@ export function RequestIssueDialog({
   plotId: string;
   works: WorkOption[];
   quickPicks: EstimateQuickPick[];
-  /** The villa has an official estimate, so anything outside it needs a reason. */
   hasEstimate: boolean;
   categories: { id: string; name: string }[];
   brands: { id: string; name: string }[];

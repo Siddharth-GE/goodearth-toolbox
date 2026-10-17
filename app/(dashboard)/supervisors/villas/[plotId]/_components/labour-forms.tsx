@@ -12,7 +12,6 @@ import { LABOUR_KIND_LABEL, LABOUR_KINDS, type LabourKind } from "@/lib/supervis
 import type { ContractorOption, LabourLogRow, WorkOption } from "@/lib/supervisors/queries";
 import { useState, useTransition } from "react";
 
-/** Works flattened server-side; the select groups them by category. */
 function WorkSelect({
   works,
   name,
@@ -88,7 +87,6 @@ export function LabourLogDialog({
   plotId: string;
   works: WorkOption[];
   contractors: ContractorOption[];
-  /** Present = edit that entry; absent = log a new day. */
   log?: LabourLogRow;
   workItemId?: string;
   trigger?: React.ReactNode;

@@ -6,13 +6,7 @@ import type { DrawingHistoryEntry } from "@/lib/drawings/queries";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
 
-/**
- * The change list behind a button (founder, 2026-08-22: history must be
- * seen, "a button that expands the change list not just some dumped
- * text"). Notes and dates only — never the old sheets: site builds from
- * the latest drawing, so a superseded file is deliberately not one tap
- * away here.
- */
+/** The change list behind a button. Notes and dates only, never the old sheets: site builds from the latest drawing. */
 export function DrawingHistory({ history }: { history: DrawingHistoryEntry[] }) {
   const [open, setOpen] = useState(false);
   if (history.length === 0) return null;

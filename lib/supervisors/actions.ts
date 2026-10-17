@@ -1,7 +1,6 @@
 "use server";
 
-// Type-only import, never re-exported from a "use server" file — the
-// 2026-08-03 outage rule, enforced by npm run check:actions.
+// Type-only import, never re-exported from a "use server" file (check:actions enforces it).
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { text } from "@/lib/form-data";
@@ -17,14 +16,8 @@ import { revalidatePath } from "next/cache";
 const GRANT = "/supervisors";
 const NOTE_LIMIT = 2000;
 
-/**
- * Writes for the Supervisors app. Two tables, both its own: labour_logs
- * and issue_requests. Nothing here writes another tool's table — the
- * store-keeper's fulfil/decline lives in lib/inventory (Step H), the
- * documented exception. Every action opens with requireTool and
- * revalidates the layout, or the welcome counts go stale while the
- * moved list refreshes (the exact-path trap in CLAUDE.md).
- */
+/** Writes to this tool's own tables (labour_logs, issue_requests) only. Every action opens with requireTool
+ * and revalidates the layout, or the welcome counts go stale (the exact-path trap in CLAUDE.md). */
 
 function count(formData: FormData, field: string): number {
   const raw = String(formData.get(field) ?? "").trim();
@@ -40,11 +33,7 @@ type LabourFields = LabourShape & {
   note: string | null;
 };
 
-/**
- * The form as a row (0104): daily wages, piece-work by quantity, or a
- * lump sum. A measured log takes the work's unit from the rate book
- * (work_unit_facts, money-free), never a unit typed on the phone.
- */
+/** The form as a row (0104). A measured log takes the work's unit from the rate book (money-free work_unit_facts), never from the phone. */
 async function readLabourFields(
   supabase: Awaited<ReturnType<typeof createClient>>,
   formData: FormData,
@@ -103,7 +92,6 @@ async function readLabourFields(
 const sameDayMessage = (kind: LabourKind) =>
   `That day already has a ${LABOUR_KIND_LABEL[kind].toLowerCase()} entry for this contractor and work — edit that one instead.`;
 
-/** The guard's refusal for a log already on a bill (0104). */
 const BILLED_MESSAGE = "This log is on a bill now, so it can't be changed or deleted.";
 
 export async function recordLabourLog(
@@ -187,10 +175,6 @@ export async function deleteLabourLog(id: string): Promise<ActionState> {
   return undefined;
 }
 
-// ---------------------------------------------------------------------
-// Requests for issue
-// ---------------------------------------------------------------------
-
 export async function createIssueRequest(
   _prev: ActionState,
   formData: FormData,
@@ -215,10 +199,8 @@ export async function createIssueRequest(
 
   const supabase = await createClient();
 
-  // Off the estimate (0104, founder: "allowed with a reason"): the villa
-  // has an official estimate, and it does not list this material for this
-  // work. Decided here from the estimate, never from the phone; a villa
-  // with no official estimate has nothing to be off.
+  // Off the estimate (0104): the villa has an official estimate that does not list this material for this work.
+  // Decided here from the estimate, never from the phone; no official estimate means nothing to be off.
   const { data: unit, error: unitError } = await supabase
     .from("units")
     .select("id")
@@ -282,8 +264,7 @@ export async function withdrawIssueRequest(id: string): Promise<ActionState> {
   if (!id) return { error: "Which request?" };
 
   const supabase = await createClient();
-  // The delete policy only reaches rows still 'requested'; a resolved
-  // request matches nothing and the count says so honestly.
+  // The delete policy only reaches rows still 'requested'; a resolved request matches nothing.
   const { error, count: deleted } = await supabase
     .from("issue_requests")
     .delete({ count: "exact" })

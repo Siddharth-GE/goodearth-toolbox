@@ -15,35 +15,14 @@ import {
   type SiteTakeoffRow,
 } from "./site-materials";
 
-/**
- * Reads for the Supervisors app.
- *
- * Every function opens with `requireTool("/supervisors")`. What this
- * tool reads from outside itself, all SELECTs (STATUS.md contract row):
- * `estimate_takeoff_facts` (the official estimate's frozen quantities —
- * no rates; the view's WHERE admits /supervisors since 0084),
- * `stock_issues(_lines)` and `goods_receipts(_lines)` (open
- * quantity-only reads since 0023 — what the plot has drawn), the works
- * vocabulary and vendors/plots/units/projects/items from Masters, and —
- * since Design Management (0091) — the villa's released drawings via
- * `lib/drawings/listReleasedDrawingsForUnit`, the shared module Design
- * Management's own screens read too (Design Management owns every
- * write; this tool only reads what has already been released). Never a
- * rupee anywhere: labour is heads, materials are quantities.
- *
- * No embeds except plots→projects (single FK path): units has had two
- * paths to plots since 0029, so unit and plot names merge through Maps
- * instead (the Directory pattern, BUGCATCHER #2).
- */
+/** Every function opens with requireTool("/supervisors"). Outside reads are SELECTs only (STATUS.md contract row), never a rupee:
+ * estimate_takeoff_facts (no rates; its WHERE admits /supervisors since 0084), open quantity-only issues and receipts (0023),
+ * and released drawings via lib/drawings (0091). units has two paths to plots, so names merge through Maps (BUGCATCHER #2). */
 
 const GRANT = "/supervisors";
 
 const fail = (context: string, error: { message: string }): never =>
   readFailed("supervisors", context, error);
-
-// ---------------------------------------------------------------------
-// Welcome
-// ---------------------------------------------------------------------
 
 export async function getWelcomeCounts(): Promise<{
   villas: number;
@@ -87,10 +66,6 @@ export async function getWelcomeCounts(): Promise<{
   };
 }
 
-// ---------------------------------------------------------------------
-// Villas
-// ---------------------------------------------------------------------
-
 export type VillaRow = {
   plotId: string;
   unitId: string;
@@ -132,16 +107,11 @@ export async function listVillas(): Promise<VillaRow[]> {
   }));
 }
 
-// ---------------------------------------------------------------------
-// One villa: materials per work, labour, requests
-// ---------------------------------------------------------------------
-
 export type VillaWorkGroup = {
   workItemId: string;
   workLabel: string;
   categoryName: string;
   rows: SiteMaterialRow[];
-  /** Reached the plot for this work but outside the estimate. */
   unplanned: { itemName: string; quantity: number; uom: string }[];
 };
 
@@ -152,7 +122,6 @@ export type LabourLogRow = {
   workLabel: string;
   contractorId: string;
   contractorName: string;
-  /** 0104: daily wages, piece-work by quantity, or a lump sum. */
   kind: LabourKind;
   masons: number;
   helpers: number;
@@ -161,9 +130,7 @@ export type LabourLogRow = {
   uom: string | null;
   description: string | null;
   note: string | null;
-  /** Set once Bills has sent it to a bill — the log is then frozen. */
   billId: string | null;
-  /** The bill's number, from the money-free bill_facts. */
   billReference: string | null;
 };
 
@@ -185,7 +152,6 @@ export type EstimateQuickPick = {
   workItemId: string;
   workLabel: string;
   materialName: string;
-  /** The estimate's figure in the material's unit, for display. */
   estimatedLabel: string;
   itemId: string;
   itemName: string;
@@ -201,14 +167,11 @@ export type VillaDetail = {
   /** Null when no official estimate exists for the villa. */
   estimate: { reference: string; submittedAt: string } | null;
   workGroups: VillaWorkGroup[];
-  /** Untagged history — reached the plot with no work recorded. */
   untagged: { itemName: string; quantity: number; uom: string }[];
   labourLogs: LabourLogRow[];
   labourTotal: number;
   requests: IssueRequestRow[];
-  /** The estimate's linked materials, ready to prefill a request. */
   quickPicks: EstimateQuickPick[];
-  /** Released drawing sets for this villa — empty when there is no unit row. */
   drawings: ReleasedDrawingSet[];
 };
 
@@ -233,9 +196,7 @@ export async function getVillaDetail(plotId: string): Promise<VillaDetail | null
     .maybeSingle();
   if (unitError) fail("the villa", unitError);
 
-  // The frozen takeoff — empty when no official estimate exists. The
-  // generated view types are all-nullable (Postgres can't promise a
-  // view column), so the read narrows with a guard, the indents idiom.
+  // The generated view types are all-nullable, so the read narrows with a guard (the indents idiom).
   const takeoffRaw = unit
     ? await fetchAll<{
         reference: string | null;
@@ -278,11 +239,8 @@ export async function getVillaDetail(plotId: string): Promise<VillaDetail | null
       row.quantity !== null,
   );
 
-  // Every movement onto the plot: store issues, plus direct-to-site
-  // deliveries matched on the plot OR the unit — a to-site GRN carries
-  // whichever its PO named (0023). The villa's released drawings ride
-  // along in the same Promise.all — skipped gracefully with no unit row,
-  // the same guard the takeoff read above already uses.
+  // Every movement onto the plot: store issues plus direct-to-site GRNs matched on the plot OR the unit (0023).
+  // Released drawings ride in the same Promise.all, skipped with no unit row.
   const [issues, receipts, drawings] = await Promise.all([
     fetchAll<{ id: string; work_item_id: string | null }>((from, to) =>
       supabase
@@ -347,7 +305,6 @@ export async function getVillaDetail(plotId: string): Promise<VillaDetail | null
     })),
   ];
 
-  // Labour (recent, with a real count) and requests for this plot.
   const [logsPage, requestRows] = await Promise.all([
     supabase
       .from("labour_logs")
@@ -365,7 +322,7 @@ export async function getVillaDetail(plotId: string): Promise<VillaDetail | null
       item_id: string;
       quantity: number;
       note: string | null;
-      /** Narrowed on mapping — the CHECK allows exactly three values. */
+      /** The CHECK allows exactly three values. */
       status: string;
       declined_reason: string | null;
       off_estimate_reason: string | null;
@@ -385,8 +342,7 @@ export async function getVillaDetail(plotId: string): Promise<VillaDetail | null
   if (logsPage.error) fail("the labour logs", logsPage.error);
   const logs = logsPage.data ?? [];
 
-  // A billed log names its bill — through bill_facts, the money-free view
-  // every signed-in person may read; the bills table itself is /bills only.
+  // A billed log names its bill through bill_facts, the money-free view; the bills table itself is /bills only.
   const billIds = [...new Set(logs.flatMap((log) => (log.bill_id ? [log.bill_id] : [])))];
   const billRefs = new Map<string, string>();
   if (billIds.length) {
@@ -400,7 +356,6 @@ export async function getVillaDetail(plotId: string): Promise<VillaDetail | null
     }
   }
 
-  // Names: items (name + unit), works (label + category), contractors.
   const itemIds = [
     ...new Set([
       ...issued.map((line) => line.itemId),
@@ -432,7 +387,6 @@ export async function getVillaDetail(plotId: string): Promise<VillaDetail | null
   };
   const vendorNames = new Map(vendors.map((vendor) => [vendor.id, vendor.name]));
 
-  // Line the drawn quantities up against the estimate, per work.
   const takeoff: SiteTakeoffRow[] = takeoffRows.map((row) => ({
     workItemId: row.work_item_id,
     materialId: row.material_id,
@@ -542,10 +496,6 @@ export async function getVillaDetail(plotId: string): Promise<VillaDetail | null
   };
 }
 
-// ---------------------------------------------------------------------
-// Form data
-// ---------------------------------------------------------------------
-
 export type ContractorOption = { id: string; name: string };
 
 export async function listContractors(): Promise<ContractorOption[]> {
@@ -560,11 +510,9 @@ export type WorkOption = {
   id: string;
   label: string;
   categoryName: string;
-  /** The work's unit in the rate book (work_unit_facts), for piece-work. */
   uom: string | null;
 };
 
-/** Active works flattened for a phone-first single select, category optgroups. */
 export async function listWorkOptions(): Promise<WorkOption[]> {
   await requireTool(GRANT);
   const supabase = await createClient();
