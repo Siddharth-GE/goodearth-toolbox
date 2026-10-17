@@ -2,46 +2,27 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { AUTH_COOKIE_OPTIONS } from "./cookie-options";
 
-// Exact strings, matched with includes() below — never prefixes. Every
-// new unauthenticated route must be listed here or it 302s to /login
-// before it can run, an invisible loop during development.
-// /reset-password is deliberately absent: it needs the recovery session
-// the emailed link mints, so the default redirect is the right answer
-// for anyone arriving without one.
+// Exact strings, never prefixes. An unauthenticated route not listed here 302s to
+// /login. /reset-password is absent on purpose: it needs the emailed link's session.
 const PUBLIC_PATHS = [
   "/login",
   "/login/verify",
   "/forgot-password",
   "/auth/confirm",
   "/auth/callback",
-  // Google Chat posts events here directly — there is no browser session
-  // to check. The real gate is the Google-signed JWT verified inside the
-  // route (lib/google-chat/verify.ts); this entry only stops the login
-  // redirect from swallowing the request.
+  // Google Chat: no session; the gate is the signed token checked in the route.
   "/api/google-chat",
-  // Vercel's weekly cron calls this to keep the free-tier database from
-  // pausing. The real gate is CRON_SECRET, checked inside the route;
-  // this entry only stops the login redirect from swallowing the call.
+  // The weekly keep-alive cron; the gate is CRON_SECRET, checked in the route.
   "/api/keep-alive",
 ];
 
-// THE ONE PREFIX. Dexter's public deck viewer (app/deck/[token]/…) serves
-// an uploaded presentation and its assets to a client with no account:
-// the HTML at /deck/<token>/index.html loads `assets/a.css` relative to
-// itself, so the whole folder under the token has to be reachable, and
-// an exact list cannot name paths it has never seen. The real gate is
-// the 22-character random token, matched inside the route before a row
-// is read (SECURITY.md, _Dexter's public door_). Nothing else goes here:
-// a second prefix needs the same argument written down first.
+// THE ONE PREFIX: Dexter's deck viewer must reach every file under its token,
+// which no exact list can name. The gate is the token, checked in the route
+// (SECURITY.md). A second prefix needs the same argument written down first.
 const PUBLIC_PREFIXES = ["/deck/"];
 
-/**
- * The request's headers with any client-supplied identity removed.
- *
- * lib/auth/dal.ts trusts x-user-id, so this file is the only thing
- * standing between a forged header and a Server Component believing it.
- * Every path through updateSession must pass through here.
- */
+/** Client-supplied identity headers removed. lib/auth/dal.ts trusts x-user-id, so
+ * every path through updateSession must pass through here. */
 function strippedHeaders(request: NextRequest) {
   const headers = new Headers(request.headers);
   headers.delete("x-user-id");
@@ -50,15 +31,8 @@ function strippedHeaders(request: NextRequest) {
 }
 
 export async function updateSession(request: NextRequest) {
-  // Marathon has no Supabase Auth session at all — it manages its own
-  // kiosk PIN login separately (see lib/marathon/session.ts). Skip the
-  // Supabase Auth work entirely rather than just allow-listing the path,
-  // since there's nothing for it to do here on every kiosk request.
-  //
-  // The identity headers are still stripped on the way through. Nothing
-  // under /marathon reads them today, but "this path skips auth" and
-  // "this path forwards whatever the client claimed about its identity"
-  // must never be the same statement.
+  // The kiosk has its own PIN login, so no Supabase work here. Identity headers are
+  // still stripped: skipping auth must never mean forwarding a claimed identity.
   if (request.nextUrl.pathname.startsWith("/marathon")) {
     return NextResponse.next({ request: { headers: strippedHeaders(request) } });
   }
@@ -85,20 +59,13 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  // getClaims verifies the JWT locally against the project's public
-  // signing key (ES256, JWKS cached in-process) instead of getUser()'s
-  // network round trip to Supabase Auth — which sat on the critical
-  // path of every navigation, prefetch and asset request. Expired
-  // tokens still refresh through the cookie handlers above, and if the
-  // token can't be verified locally supabase-js falls back to the
-  // server check itself.
+  // Verified locally against the public key, not a network round trip on every
+  // request; expired tokens still refresh through the cookie handlers above.
   const { data } = await supabase.auth.getClaims();
   const claims = data?.claims ?? null;
 
-  // Exact match, not startsWith — a prefix match would make any future
-  // /login-adjacent route silently public. PUBLIC_PREFIXES is the single
-  // argued exception, and it is a prefix ending in "/" so that "/deck"
-  // itself, or "/decks-of-anything", is not swept in with it.
+  // Exact match, so no /login-adjacent route turns public by accident. The prefix
+  // ends in "/", so "/deck" and "/decks-…" are not swept in.
   const path = request.nextUrl.pathname;
   const isPublicPath =
     PUBLIC_PATHS.includes(path) || PUBLIC_PREFIXES.some((prefix) => path.startsWith(prefix));
@@ -109,26 +76,11 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Deliberately NOT redirecting a claims-holder away from /login.
-  //
-  // A valid JWT does not mean the app will let you in: lib/auth/dal.ts
-  // still turns you away if your profile row is missing or your account
-  // has been switched off, and it turns you away by redirecting to
-  // /login. Bouncing that back to "/" made the two rules chase each
-  // other — an unbounded redirect loop, ending in ERR_TOO_MANY_REDIRECTS
-  // with the whole toolbox unreachable. Deactivating a signed-in
-  // colleague was enough to trigger it.
-  //
-  // What we lose: someone already signed in who types /login sees the
-  // login page instead of being sent home. That is a fair price, and
-  // the page they land on is honest about where they are.
+  // A claims-holder is NOT sent away from /login: dal.ts sends a switched-off or
+  // profile-less account to /login, and bouncing it back loops forever.
 
-  // Hand the identity we just verified down to Server Components via a
-  // request header, so lib/auth/dal.ts doesn't need to re-verify the
-  // same token with a second Supabase Auth round trip on every request.
-  // Starts from stripped headers and sets only what was actually
-  // verified — this is the only place in the app allowed to set it, so
-  // nothing a client sends can survive to reach a Server Component.
+  // Hands the verified identity to Server Components, so dal.ts needn't re-verify.
+  // Starts from stripped headers: the only place allowed to set it.
   const requestHeaders = strippedHeaders(request);
   if (claims) {
     requestHeaders.set("x-user-id", claims.sub);

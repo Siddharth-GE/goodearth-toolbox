@@ -23,53 +23,22 @@ import { contentTypeFor, safeDeckPath } from "@/lib/dexter/unpack";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
- * Dexter's public door: serves an uploaded presentation to a client who
- * has the link and no account, and keeps the answers they type into it.
+ * Dexter's public door: a client with the link and no account opens the
+ * deck and saves answers. SECURITY.md, _Dexter's public door_, is the
+ * boundary.
  *
  *   /deck/<token>                → 302 to the deck's entry file
- *   /deck/<token>/index.html     → the page
- *   /deck/<token>/assets/a.css   → an asset, relative to the page
- *   /deck/<token>/.dexter.js     → our script (any depth), never a file
- *   /deck/<token>/.state         → GET the deck's answers, POST to save
+ *   /deck/<token>/<file>         → a deck file, sandboxed (lib/dexter/headers.ts)
+ *   /deck/<token>/.dexter.js     → our script, from any depth
+ *   /deck/<token>/.state         → GET the answers, POST to save
  *   /deck/<token>/.preview.png   → the picture WhatsApp shows for the link
  *
- * Every HTML page is served with our link-preview tags added to the
- * RESPONSE: the Kaadal mark on the page's own background colour, the
- * page's own title. The stored file is never changed, so decks uploaded
- * before this existed, and links already sent, get the preview too. The
- * tags are inert `<meta>` elements — nothing that runs — and the page
- * they are added to is still sandboxed exactly as below.
- *
- * There is no session here, by design, so this is the one place in a
- * tool that reads AND writes through the service-role client — the reads
- * above, and exactly one write: an upsert of the deck's own
- * `dexter_answers` row, sanctioned in SECURITY.md (_Dexter's public
- * door_). The gate is the token: 22 random base64url characters, checked
- * against the shape before a row is read, and a deck whose sharing is
- * off answers exactly like a token that never existed. The write cannot
- * reach any other row (the deck id comes from the token lookup, never
- * from the request), and its body is capped and validated field by field
- * by `lib/dexter/answers.ts` before anything is stored.
- *
- * The page is UNTRUSTED HTML served from the app's own origin, so every
- * deck file carries a CSP `sandbox` WITHOUT `allow-same-origin`
- * (`lib/dexter/headers.ts`):
- * the page runs with an opaque origin — its scripts and relative assets
- * work, but it cannot read cookies, reach localStorage, or make a
- * credentialed request to the toolbox as whoever is viewing it. That
- * word must never be added to the header.
- *
- * The same opaque origin is why `.state` answers with
- * `Access-Control-Allow-Origin: *`: to the browser the sandboxed page is
- * cross-origin to us, and without that header it could not read the
- * reply. `*` is exact rather than generous — it forbids credentials, and
- * no credential is ever involved (the browser sends none from an opaque
- * origin, and the route reads none). Only the `.state` responses carry
- * it; the page and its assets do not.
- *
- * The two reserved names begin with a dot because `planZip` drops every
- * dot-prefixed segment at upload, so no deck can contain a file by
- * either name — there is nothing for ours to shadow.
+ * No session, so the service-role client, gated by the token alone. Its
+ * one write is the deck's own answers row: the deck id comes from the
+ * token lookup, never from the request. The sandboxed page has an opaque
+ * origin, so only `.state` carries `Access-Control-Allow-Origin: *`;
+ * no credential is ever involved. The reserved names start with a dot
+ * because uploads drop dot-prefixed paths, so no deck file can shadow them.
  */
 
 const STATE_HEADERS = {
@@ -95,12 +64,9 @@ type Admin = ReturnType<typeof createAdminClient>;
 const PREVIEW_COLOR_PARAM = /^[0-9a-f]{6}$/i;
 
 /**
- * The page's bytes with our link-preview tags added, or the bytes exactly
- * as stored when anything at all goes wrong. The colour and the title are
- * read from a UTF-8 decoding; the tags (pure ASCII) are spliced into a
- * latin1 decoding, one character per byte, so a page in any other charset
- * comes back byte for byte outside the few lines we add. A title that
- * did not decode cleanly is not used — the preview says "Kaadal" instead.
+ * The page with inert preview tags added to the response (the stored file
+ * never changes), or its bytes as stored on any failure. Spliced through
+ * latin1 so a page in any charset comes back byte for byte.
  */
 function withPreview(raw: Buffer, requestUrl: string, token: string): Buffer {
   try {
@@ -127,11 +93,8 @@ function withPreview(raw: Buffer, requestUrl: string, token: string): Buffer {
   }
 }
 
-/**
- * The token's shape, then the one row it names. Both doors (GET and
- * POST) go through here, so a missing deck, a switched-off link and a
- * malformed token are indistinguishable from outside on every verb.
- */
+/** A missing deck, a switched-off link and a malformed token all answer
+ * the same 404, on every verb. */
 async function lookupDeck(
   admin: Admin,
   token: string,
@@ -144,7 +107,7 @@ async function lookupDeck(
     .eq("share_token", token)
     .maybeSingle();
   if (error) {
-    // The status only — never the token.
+    // Never log the token.
     console.error("deck viewer: lookup failed:", error.message);
     return { response: new Response("Something went wrong", { status: 500 }) };
   }
@@ -169,10 +132,7 @@ export async function GET(
   const relative = safeDeckPath(path);
   if (!relative) return notFound();
 
-  // Our script, from any depth — a page in a subfolder writes the same
-  // `src=".dexter.js"` and resolves it beside itself. Not a document, so
-  // no sandbox header; cached like an asset, so a fix shows within five
-  // minutes on a machine that had the deck open.
+  // From any depth, so a page in a subfolder finds it beside itself.
   if (relative.split("/").pop() === DEXTER_SCRIPT_PATH) {
     return new Response(DEXTER_CLIENT_SCRIPT, {
       headers: {
@@ -184,12 +144,8 @@ export async function GET(
     });
   }
 
-  // The preview picture, root only: the Kaadal mark on the colour named
-  // in the link our own tags wrote (anything else gets the brand
-  // burgundy). The generator is loaded HERE, lazily — a deploy that
-  // cannot load it loses this picture and nothing else; the deck still
-  // opens (BUGCATCHER #15). Rendered to bytes inside the try, so a
-  // failed render is a 404 here and never a broken stream.
+  // Loaded lazily, so a deploy that cannot load the generator loses only
+  // this picture (BUGCATCHER #15).
   if (relative === DEXTER_PREVIEW_PATH) {
     const requested = new URL(request.url).searchParams.get("bg") ?? "";
     const background = PREVIEW_COLOR_PARAM.test(requested)
@@ -215,8 +171,7 @@ export async function GET(
     }
   }
 
-  // The deck's answers, root only. No row yet reads as empty, not as an
-  // error — a fresh deck has simply not been answered.
+  // No row yet is an unanswered deck, not an error.
   if (relative === DEXTER_STATE_PATH) {
     const { data: row, error } = await admin
       .from("dexter_answers")
@@ -238,12 +193,10 @@ export async function GET(
     .download(`${deckFolder(deck.id)}/${relative}`);
   if (downloadError || !object) return notFound();
 
-  // From the extension, never from Storage's guess — the bucket has no
-  // MIME list, and nosniff makes the browser take our word for it.
+  // From the extension, never Storage's guess; nosniff holds the browser to it.
   const contentType = contentTypeFor(relative);
   const headers = deckFileHeaders(contentType);
 
-  // Every HTML page gets the preview tags, in the response only.
   if (contentType.startsWith("text/html")) {
     const raw = Buffer.from(await object.arrayBuffer());
     return new Response(new Uint8Array(withPreview(raw, request.url, token)), { headers });
@@ -253,12 +206,9 @@ export async function GET(
 }
 
 /**
- * The one write. Only `/deck/<token>/.state` answers it; every other
- * path is a 404, the same as a file that does not exist. The body is
- * refused by declared length, then by actual length, then field by
- * field — and `submitted_at` only ever moves from null to now here.
- * Clearing it is a staff action inside Dexter, never something the
- * public side can do.
+ * The one write, on `.state` only. The body is refused by declared length,
+ * actual length, then field by field. `submitted_at` only moves from null
+ * to now here; clearing it is a staff action inside Dexter.
  */
 export async function POST(
   request: Request,

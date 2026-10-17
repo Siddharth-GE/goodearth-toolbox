@@ -1,9 +1,6 @@
 "use server";
 
-// app/actions/ is for platform-level concerns shared by every tool
-// (today: just login/logout) — not where a tool's own actions go.
-// Tool-specific actions belong in lib/<tool>/actions.ts instead,
-// alongside that tool's queries.ts (see lib/marathon/actions.ts).
+// Platform actions shared by every tool (sign-in); a tool's own go in lib/<tool>/actions.ts.
 
 import { checkLockout, clearFailures, recordFailure } from "@/lib/auth/rate-limit";
 import {
@@ -24,27 +21,16 @@ import { redirect } from "next/navigation";
 
 export type LoginState = { error?: string } | undefined;
 
-// Stated here rather than imported from lib/settings/invite.ts: the shell
-// never imports a tool's code, and 8 is Supabase's own minimum — if one
-// changes, the other must anyway.
+// Not imported from lib/settings: the shell never imports a tool. 8 is Supabase's minimum.
 const MIN_PASSWORD_LENGTH = 8;
 
-// Deliberately loose, same as lib/settings/invite.ts: catch a missing
-// "@", not adjudicate RFC 5322.
+// Catches a missing "@", nothing more.
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
- * The absolute URL this request arrived at — so reset links and the
- * Google callback come back to the deployment that started them
- * (production, a preview, localhost) instead of to a hardcoded address.
- * A preview pointing its Google flow at production, where old code
- * silently dropped it, is how this function earned its shape.
- *
- * Trusting the host header is safe HERE only because Supabase's
- * redirect allow-list is the real gate: a forged host produces a
- * redirect_to that isn't allow-listed, and GoTrue falls back to the
- * configured Site URL. SITE_URL remains as the fallback when no header
- * is present.
+ * This request's origin, so reset links and Google come back to the deployment
+ * that started them. Trusting the host header is safe only because Supabase's
+ * redirect allow-list is the gate: a forged host falls back to the Site URL.
  */
 async function requestOrigin() {
   const h = await headers();
@@ -59,16 +45,9 @@ async function requestOrigin() {
 }
 
 /**
- * Step one of signing in: the password.
- *
- * The password is checked on a throwaway in-memory client, NOT the
- * cookie-backed one — so no session ever reaches the browser before the
- * code step is passed. The discarded session is harmless: it holds no
- * verified-sessions row, so after 0063 it can reach nothing gated, and
- * it expires on its own.
- *
- * A trusted device (this browser finished a code inside 30 days) signs
- * in directly; anything else is owed a code screen.
+ * Step one, the password, checked on a throwaway in-memory client so no session
+ * reaches the browser before the code. That session has no verified-sessions
+ * row, so it reaches nothing gated (0063). A trusted device skips the code.
  */
 export async function login(_state: LoginState, formData: FormData): Promise<LoginState> {
   const email = String(formData.get("email") ?? "").trim();
@@ -78,8 +57,7 @@ export async function login(_state: LoginState, formData: FormData): Promise<Log
     return { error: "Enter your email and password." };
   }
 
-  // Locked out? Say only that — not whether the password would have been
-  // right. checkLockout before the guess is examined, like the kiosk.
+  // Checked before the guess, so a locked-out guesser learns nothing.
   const locked = await checkLockout(email, "password");
   if (locked) return locked;
 
@@ -95,10 +73,8 @@ export async function login(_state: LoginState, formData: FormData): Promise<Log
   }
   await clearFailures(email, "password");
 
-  // The credentials are right, but the account may have been switched
-  // off. Refusing here is clearer than letting them in to a dashboard
-  // where every screen redirects (0032). The bare client still holds
-  // the throwaway session in memory, so RLS lets it read the row.
+  // Switched-off accounts are refused here, not let into a dashboard that
+  // redirects everywhere (0032). The throwaway session can read its own row.
   const { data: profile } = await bare
     .from("profiles")
     .select("is_active")
@@ -108,8 +84,8 @@ export async function login(_state: LoginState, formData: FormData): Promise<Log
     return { error: "This account has been deactivated. Ask an admin to switch it back on." };
   }
 
-  // A remembered device skips the code, never the password. This is the
-  // one place the real (cookie-backed) session is minted without a code.
+  // A remembered device skips the code, never the password: the one session
+  // minted without a code.
   if (await isTrustedDevice(data.user.id)) {
     const supabase = await createClient();
     const { error: sessionError } = await supabase.auth.signInWithPassword({ email, password });
@@ -119,8 +95,7 @@ export async function login(_state: LoginState, formData: FormData): Promise<Log
     redirect("/");
   }
 
-  // Everyone else gets a code. Supabase generates, hashes and emails it;
-  // this code never passes through our hands.
+  // Supabase makes, hashes and emails the code; it never passes through us.
   const supabase = await createClient();
   const { error: otpError } = await supabase.auth.signInWithOtp({
     email,
@@ -138,13 +113,9 @@ export async function login(_state: LoginState, formData: FormData): Promise<Log
 export type VerifyState = { error?: string } | undefined;
 
 /**
- * Step two: the emailed 6-digit code.
- *
- * Only reachable behind a challenge cookie, which only the login action
- * sets, and only after a correct password — so a right code from
- * someone who never proved the password gets nothing here. verifyOtp
- * mints the real session; the verified-sessions row minted right after
- * is what the database trusts (0063), not the cookie.
+ * Step two, the emailed code, reachable only behind the challenge cookie a
+ * correct password sets. The verified-sessions row (0063) is what the
+ * database trusts, not the cookie.
  */
 export async function verifyLoginCode(
   _state: VerifyState,
@@ -175,8 +146,7 @@ export async function verifyLoginCode(
   }
   await clearFailures(email, "otp");
 
-  // Re-checked with the real session: the account could have been
-  // switched off between the password step and now.
+  // Re-checked: the account could have been switched off since the password.
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("is_active")
@@ -219,10 +189,8 @@ export async function resendLoginCode(): Promise<VerifyState> {
 }
 
 /**
- * Starts the Google sign-in. Supabase links a verified Google email to
- * its existing account automatically, and the project refuses signups —
- * so only an email that already belongs to the team comes back from
- * this with a session. /auth/callback finishes the trip.
+ * Google sign-in. Signups are refused, so only an email already on the team
+ * comes back with a session; /auth/callback finishes it.
  */
 export async function signInWithGoogle() {
   const supabase = await createClient();
@@ -230,8 +198,7 @@ export async function signInWithGoogle() {
     provider: "google",
     options: {
       redirectTo: `${await requestOrigin()}/auth/callback`,
-      // Always show the account chooser — on a shared site phone, the
-      // previous person's Google account must not be silently reused.
+      // Always ask: a shared site phone must not reuse the last person's Google.
       queryParams: { prompt: "select_account" },
     },
   });
@@ -245,9 +212,7 @@ export async function signInWithGoogle() {
 export async function logout() {
   const supabase = await createClient();
   await supabase.auth.signOut();
-  // The verified marker and any half-finished challenge go with the
-  // session. The trusted-device cookie deliberately stays — it only
-  // skips the code, never the password.
+  // The trusted-device cookie stays: it skips only the code, never the password.
   await clearVerified();
   await clearChallenge();
   redirect("/login");
@@ -256,13 +221,9 @@ export async function logout() {
 export type ResetRequestState = { error?: string; success?: string } | undefined;
 
 /**
- * Emails a password-reset link.
- *
- * The response is the same neutral sentence whether or not the email has
- * an account, so this form can't be used to test which addresses exist.
- * The rate limit runs per email BEFORE anything is sent — its job here
- * is stopping a prankster hosing a colleague's inbox — and a locked-out
- * requester gets the same neutral sentence, for the same reason.
+ * Emails a reset link. The answer is the same whether or not the account exists,
+ * and the per-email limit runs before sending, so the form can't probe
+ * addresses or flood a colleague's inbox.
  */
 export async function sendPasswordReset(
   _state: ResetRequestState,
@@ -284,8 +245,7 @@ export async function sendPasswordReset(
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${await requestOrigin()}/auth/confirm`,
   });
-  // A failed send (rate limit, SMTP trouble) is logged for us but never
-  // shown — the message must not vary by whether the account exists.
+  // Logged, never shown: the message must not depend on whether the account exists.
   if (error) console.error("sendPasswordReset failed:", error.message);
 
   return neutral;
@@ -294,12 +254,8 @@ export async function sendPasswordReset(
 export type ResetPasswordState = { error?: string } | undefined;
 
 /**
- * Sets the new password, for someone holding a recovery session (they
- * arrived through the emailed link via /auth/confirm).
- *
- * Ends by signing out EVERY session everywhere, including this one — if
- * the password was changed because it leaked, whoever else holds it is
- * holding a dead session afterwards. The owner signs back in fresh.
+ * Sets the new password for a recovery session (/auth/confirm), then signs out
+ * every session everywhere: a leaked password leaves only dead sessions behind.
  */
 export async function completePasswordReset(
   _state: ResetPasswordState,
@@ -321,9 +277,7 @@ export async function completePasswordReset(
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // A deactivated person can open the emailed link (deactivation doesn't
-  // kill mail delivery) but must not be able to set a password and walk
-  // back in. Same wording as the login screen.
+  // A switched-off person can still open the emailed link, but must not walk back in.
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("is_active")
@@ -349,7 +303,6 @@ export async function completePasswordReset(
   // A fresh password wipes the lockout slate for the sign-in ahead.
   if (user.email) await clearFailures(user.email, "password");
 
-  // Kill every session on every device — this one included.
   await supabase.auth.signOut({ scope: "global" });
   redirect("/login?reset=done");
 }
