@@ -80,17 +80,31 @@ test("the rail has a segment per board stage, in order", () => {
   );
 });
 
-test("pass on offers later stages not yet done, the next first", () => {
+test("pass on moves a villa forward from where it sits, the next stage first", () => {
   const steps = [
-    { stageId: "design", status: "done" },
+    { stageId: "design", status: "revising" },
     { stageId: "permit", status: "working" },
-    { stageId: "str", status: "done" },
   ];
   assert.deepEqual(
     passTargets(STAGES, steps, "permit").map((stage) => stage.id),
-    ["wd", "int"],
+    ["wd", "str", "int"],
   );
-  assert.deepEqual(passTargets(STAGES, steps, "int"), []);
+  // Design is being revised behind it: it finishes with Done, not a pass.
+  assert.deepEqual(passTargets(STAGES, steps, "design"), []);
+  // A finished stage waiting to be handed on still offers it.
+  assert.deepEqual(
+    passTargets(
+      STAGES,
+      [
+        { stageId: "design", status: "done" },
+        { stageId: "permit", status: "done" },
+      ],
+      "permit",
+    ).map((stage) => stage.id),
+    ["wd", "str", "int"],
+  );
+  // The last stage has nowhere to go; a stage off the board offers nothing.
+  assert.deepEqual(passTargets(STAGES, [{ stageId: "int", status: "working" }], "int"), []);
   assert.deepEqual(passTargets(STAGES, steps, "mep"), []);
 });
 

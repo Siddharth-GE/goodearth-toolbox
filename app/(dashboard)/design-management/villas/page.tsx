@@ -7,8 +7,8 @@ import { formatCount } from "@/lib/format";
 import { ChevronRight, HardHat, LayoutGrid } from "lucide-react";
 import Link from "next/link";
 
-import { FilterChips, SectionHead } from "../_components/board-parts";
-import { LotCard } from "../_components/lot-card";
+import { BoardColumns } from "../_components/board-columns";
+import { FilterChips } from "../_components/board-parts";
 
 /**
  * The Board — every villa in design, one column per board stage (root
@@ -73,10 +73,6 @@ export default async function DesignBoardPage({
     ),
   ];
 
-  const columns = board.stages.map((stage, index) => ({
-    stage,
-    cards: board.cards.filter((card) => card.place.index === index),
-  }));
   const filtered = Boolean(params.q || params.project || params.health);
 
   return (
@@ -139,26 +135,7 @@ export default async function DesignBoardPage({
           }
         />
       ) : (
-        <div className="space-y-2 lg:grid lg:auto-cols-[minmax(0,1fr)] lg:grid-flow-col lg:gap-3 lg:space-y-0">
-          {columns.map(({ stage, cards }) => (
-            <section
-              key={stage.id}
-              aria-label={stage.name}
-              className="lg:bg-foreground/[0.025] min-w-0 lg:rounded-2xl lg:p-2"
-            >
-              <SectionHead title={stage.name} count={cards.length} />
-              {cards.length === 0 ? (
-                <p className="text-muted px-0.5 pb-2 text-xs">No villa here.</p>
-              ) : (
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(15.5rem,1fr))] gap-3 lg:flex lg:flex-col lg:gap-2">
-                  {cards.map((card) => (
-                    <LotCard key={card.unitId} card={card} today={board.today} />
-                  ))}
-                </div>
-              )}
-            </section>
-          ))}
-        </div>
+        <BoardColumns stages={board.stages} cards={board.cards} today={board.today} />
       )}
 
       {board.notStarted.length > 0 ? (

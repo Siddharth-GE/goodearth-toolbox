@@ -74,19 +74,21 @@ export function placeOf(stages: readonly BoardStage[], steps: readonly StepLite[
 }
 
 /**
- * The stages Pass on offers from `fromStageId`: every later board stage
- * not yet done, the next one first. The board is not a straight line, so
- * any of them can take it; going back is Send back, not a pass.
+ * The stages Pass on offers from `fromStageId`. Passing on moves a villa
+ * forward from where it sits, so only the stage it sits at offers it —
+ * done or not, since a finished stage waiting to be handed on is the
+ * point. Every later board stage can take it (the board is not a straight
+ * line), the next one first. An earlier stage under revision finishes with
+ * Done, and going back is Send back, never a pass.
  */
 export function passTargets(
   stages: readonly BoardStage[],
   steps: readonly StepLite[],
   fromStageId: string,
 ): BoardStage[] {
-  const rail = railOf(stages, steps);
-  const from = rail.findIndex((segment) => segment.stageId === fromStageId);
-  if (from === -1) return [];
-  return stages.filter((_, at) => at > from && rail[at].status !== "done");
+  const from = stages.findIndex((stage) => stage.id === fromStageId);
+  if (from === -1 || from !== placeOf(stages, steps).index) return [];
+  return stages.slice(from + 1);
 }
 
 // ---------------------------------------------------------------------

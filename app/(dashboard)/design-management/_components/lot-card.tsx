@@ -129,7 +129,7 @@ export function LotCard({ card, today }: { card: VillaCard; today: string }) {
               <span className="shrink-0">
                 {current.label}
                 {card.daysInStage !== null && card.currentStatus !== "done"
-                  ? ` · ${card.daysInStage === 0 ? "today" : `${card.daysInStage} d`}`
+                  ? ` · ${card.daysInStage === 0 ? "since today" : `${card.daysInStage} day${card.daysInStage === 1 ? "" : "s"}`}`
                   : ""}
               </span>
             ) : null}

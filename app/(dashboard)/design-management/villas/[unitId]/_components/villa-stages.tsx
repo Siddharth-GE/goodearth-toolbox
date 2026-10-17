@@ -127,7 +127,7 @@ function StageCard({
     : step.status === "done" && step.doneOn
       ? `Done ${formatShortDate(step.doneOn)}`
       : step.startedOn
-        ? `Started ${formatShortDate(step.startedOn)}${since ? ` · ${since} d` : ""}`
+        ? `Started ${formatShortDate(step.startedOn)}${since ? ` · ${since} day${since === 1 ? "" : "s"}` : ""}`
         : "";
 
   return (
@@ -203,7 +203,7 @@ function StageCard({
           <StageNote step={step} />
 
           <div className="flex flex-wrap gap-2">
-            {step.status !== "done" && targets.length > 0 ? (
+            {targets.length > 0 ? (
               <PassDialog unitId={unitId} step={step} targets={targets} />
             ) : null}
             <Button variant="secondary" size="sm" onClick={() => setSendBackOpen(true)}>
@@ -430,7 +430,9 @@ function PassDialog({
         <DialogHeader>
           <DialogTitle>Pass {step.stageName} on</DialogTitle>
           <DialogDescription>
-            {step.stageName} is marked done and {toName} starts with the people you pick.
+            {step.status === "done"
+              ? `${toName} starts with the people you pick.`
+              : `${step.stageName} is marked done and ${toName} starts with the people you pick.`}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
