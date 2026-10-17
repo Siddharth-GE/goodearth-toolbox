@@ -60,6 +60,7 @@ export default async function PlotsPage({
   ];
 
   const projects = [...new Set(board.cards.map((card) => card.projectId))];
+  const filtered = Boolean(params.q || params.project || params.who || params.health);
 
   return (
     <div className="space-y-4">
@@ -125,7 +126,7 @@ export default async function PlotsPage({
           {
             param: "who",
             label: "Whose",
-            allLabel: "Everyone",
+            allLabel: board.seesAll ? "Everyone" : "All of mine",
             options: [
               ...board.team.map((person) => ({ value: person.id, label: person.name })),
               { value: "mgmt", label: "Waiting on management" },
@@ -139,8 +140,12 @@ export default async function PlotsPage({
       {board.cards.length === 0 ? (
         <EmptyState
           icon={MapPin}
-          title="No plots match"
-          description="Try another chip, or clear the search."
+          title={board.seesAll || filtered ? "No plots match" : "No plots of yours yet"}
+          description={
+            board.seesAll || filtered
+              ? "Try another chip, or clear the search."
+              : "A plot shows here once you are its Sales or Kaadal owner, or hold an open action on it. A team lead gives plots out."
+          }
         />
       ) : (
         projects.map((projectId) => {

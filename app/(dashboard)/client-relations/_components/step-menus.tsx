@@ -100,7 +100,7 @@ export function OwnerMenu({
   children: ReactNode;
   title?: string;
 }) {
-  const { team, openByOwner } = useBoard();
+  const { team, openByOwner, seesAll } = useBoard();
 
   return (
     <DropdownMenu>
@@ -116,9 +116,11 @@ export function OwnerMenu({
             <DropdownMenuItem key={person.id} onSelect={() => onPick(person.id)}>
               <Avatar name={person.name} size={24} letters={2} />
               <span className="truncate">{person.name}</span>
-              <span className="text-muted ml-auto text-xs whitespace-nowrap">
-                {openByOwner[person.id] ?? 0} open
-              </span>
+              {seesAll ? (
+                <span className="text-muted ml-auto text-xs whitespace-nowrap">
+                  {openByOwner[person.id] ?? 0} open
+                </span>
+              ) : null}
               <MenuCheck on={value === person.id} />
             </DropdownMenuItem>
           ))

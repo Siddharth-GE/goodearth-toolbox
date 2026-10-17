@@ -33,10 +33,16 @@ type ClientLike = {
 export function ClientFormDialog({
   client,
   owners,
+  defaultOwnerId,
   trigger,
 }: {
   client?: ClientLike;
   owners: Person[];
+  /**
+   * Who a NEW prospect is handled by unless changed — the team member
+   * adding them, who would otherwise not see them in their own list (0123).
+   */
+  defaultOwnerId?: string | null;
   trigger?: React.ReactNode;
 }) {
   const isEdit = !!client;
@@ -92,7 +98,11 @@ export function ClientFormDialog({
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="ownerId">Handled by</Label>
-          <Select id="ownerId" name="ownerId" defaultValue={client?.ownerId ?? ""}>
+          <Select
+            id="ownerId"
+            name="ownerId"
+            defaultValue={(client ? client.ownerId : defaultOwnerId) ?? ""}
+          >
             <option value="">Nobody yet</option>
             {owners.map((person) => (
               <option key={person.id} value={person.id}>

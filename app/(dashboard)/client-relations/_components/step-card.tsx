@@ -175,6 +175,9 @@ export function StepCard({
               clientName={step.plot.clientName}
               href={`/client-relations/plots/${step.plot.engagementId}`}
             />
+          ) : step.engagementId ? (
+            // On a plot this viewer does not see (0123) — say so, never "General".
+            <Pill tone="dashed">A colleague&apos;s plot</Pill>
           ) : (
             <Pill tone="dashed">General</Pill>
           )

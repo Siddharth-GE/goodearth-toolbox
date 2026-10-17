@@ -33,6 +33,26 @@ test("a grant and a revoke read as opposites, named by their app", () => {
   assert.equal(revoked?.what, "Removed Bills");
 });
 
+test("a team lead tick and its removal read as opposites, never as a grant", () => {
+  const made = describeAccessEvent({
+    ...base,
+    table_name: "tool_leads",
+    action: "INSERT",
+    old_data: null,
+    new_data: { app: "/client-relations", user_id: "anu" },
+  });
+  assert.equal(made?.what, "Made team lead in Client Relations");
+
+  const removed = describeAccessEvent({
+    ...base,
+    table_name: "tool_leads",
+    action: "DELETE",
+    old_data: { app: "/client-relations", user_id: "anu" },
+    new_data: null,
+  });
+  assert.equal(removed?.what, "No longer team lead in Client Relations");
+});
+
 test("the actor and time carry through untouched", () => {
   const event = describeAccessEvent({
     ...base,

@@ -12,10 +12,11 @@ import { Composer } from "../_components/composer";
  * The Saarang tracker's main screen: every promise to a client, with an
  * owner and a date, sorted by how late it is (root plan.md, seventh piece).
  *
- * A manager (an admin) opens on everyone, with the team strip; everyone
- * else opens on their own list, under a greeting, and can switch to
- * everyone's (founder, 2026-10-16: "anyone with access can see is ok").
- * Every filter lives in the URL.
+ * An admin or a team lead opens on everyone, with the team strip; everyone
+ * else sees only the work assigned to them (0123) and opens on their own
+ * list, under a greeting, with a switch to everything they can see — what
+ * they set for others and what sits on their plots. Every filter lives in
+ * the URL.
  */
 export default async function ActionsPage({
   searchParams,
@@ -30,7 +31,7 @@ export default async function ActionsPage({
     showDone: params.done === "1",
   });
 
-  const defaultWho = board.me.isManager ? "all" : board.me.id;
+  const defaultWho = board.me.seesAll ? "all" : board.me.id;
   const href = (patch: Partial<typeof params>) => {
     const next = { ...params, ...patch };
     const query = new URLSearchParams();
@@ -54,7 +55,9 @@ export default async function ActionsPage({
       ? "What is waiting on management"
       : viewing
         ? `${viewing.name.split(" ")[0]}'s actions`
-        : "Everyone's actions";
+        : board.me.seesAll
+          ? "Everyone's actions"
+          : "Everything you can see: your actions, the ones you set, and those on your plots";
 
   return (
     <BoardProvider
@@ -64,9 +67,10 @@ export default async function ActionsPage({
       openByOwner={openByOwner}
       meId={board.me.id}
       isManager={board.me.isManager}
+      seesAll={board.me.seesAll}
     >
       <div className="space-y-4">
-        {board.me.isManager ? (
+        {board.me.seesAll ? (
           <TeamStrip
             loads={board.loads}
             management={board.management}
@@ -115,12 +119,17 @@ export default async function ActionsPage({
               },
             ]}
           />
-          {board.me.isManager ? null : (
+          {board.me.seesAll ? null : (
             <FilterChips
               label="Whose actions"
               items={[
                 { key: "mine", label: "Mine", href: hrefForWho(board.me.id), on: mine },
-                { key: "all", label: "Everyone", href: hrefForWho("all"), on: board.who === "all" },
+                {
+                  key: "all",
+                  label: "All I see",
+                  href: hrefForWho("all"),
+                  on: board.who === "all",
+                },
               ]}
             />
           )}
@@ -138,7 +147,7 @@ export default async function ActionsPage({
                   href={hrefForWho(defaultWho)}
                   className="text-accent font-medium hover:underline"
                 >
-                  {board.me.isManager ? "Show everyone" : "Show mine"}
+                  {board.me.seesAll ? "Show everyone" : "Show mine"}
                 </Link>
               </>
             ) : null}

@@ -54,6 +54,16 @@ export function describeAccessEvent(row: AccessAuditRow): AccessEvent | null {
     return null;
   }
 
+  if (row.table_name === "tool_leads") {
+    const app = field(row.new_data, "app") ?? field(row.old_data, "app");
+    if (!app) return null;
+    if (row.action === "INSERT") return { ...base, what: `Made team lead in ${appLabel(app)}` };
+    if (row.action === "DELETE") {
+      return { ...base, what: `No longer team lead in ${appLabel(app)}` };
+    }
+    return null;
+  }
+
   if (row.table_name === "profiles") {
     // An UPDATE can touch several columns at once; report each real
     // change rather than the first one found, so nothing goes unseen.

@@ -30,11 +30,12 @@
  *            order the view's SELECT declares.
  *   guards   Every distinct app slug appearing in a `has_app('…')` call in
  *            the view's definition, sorted. For the owner views this IS
- *            the gate. CLAUDE.md warns twice that redefining
- *            crm_milestone_facts, crm_receipt_facts or
- *            business_plan_target_facts must carry their three-way WHERE
- *            forward — re-running the older migration as-is silently
- *            strips Financial Management's access. This field is that
+ *            the gate. SECURITY.md warns that redefining
+ *            crm_milestone_facts or crm_receipt_facts must carry their
+ *            two-way WHERE forward (0123), and business_plan_target_facts
+ *            its three-way one — re-running an older migration as-is
+ *            silently strips Financial Management's access, or hands every
+ *            Client Relations member every plot's money. This field is that
  *            warning made enforceable.
  *   barrier  `security_barrier=true`: stops the planner leaking rows past
  *            the WHERE through a cheap, side-effecting function.
@@ -306,11 +307,11 @@ export const VIEW_MANIFEST: Record<string, ViewExpectation> = {
       "received_amount",
       "created_at",
     ],
-    guards: ["/client-relations", "/financial-management", "/reporter"],
+    guards: ["/financial-management", "/reporter"],
     barrier: true,
     invoker: false,
     money: true,
-    why: "Client payment milestones, three ways. The column list omits the CRM's prose — details, notes, bottlenecks — because that, not the money, is its stronger secret. THE THREE-WAY WHERE IS LOAD-BEARING.",
+    why: "Client payment milestones, for Reporter and Financial Management. The column list omits the CRM's prose — details, notes, bottlenecks — because that, not the money, is its stronger secret. /client-relations left the WHERE in 0123: a member sees only their own plots' money, through the tables, and this view would hand them every plot's. THE TWO-WAY WHERE IS LOAD-BEARING.",
   },
   crm_receipt_facts: {
     columns: [
@@ -330,11 +331,11 @@ export const VIEW_MANIFEST: Record<string, ViewExpectation> = {
       "reference",
       "created_at",
     ],
-    guards: ["/client-relations", "/financial-management", "/reporter"],
+    guards: ["/financial-management", "/reporter"],
     barrier: true,
     invoker: false,
     money: true,
-    why: "Money actually received, three ways. THE THREE-WAY WHERE IS LOAD-BEARING.",
+    why: "Money actually received, for Reporter and Financial Management. /client-relations left the WHERE in 0123, for crm_milestone_facts' reason. THE TWO-WAY WHERE IS LOAD-BEARING.",
   },
   budget_report_lines: {
     columns: [

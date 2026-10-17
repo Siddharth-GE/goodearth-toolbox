@@ -20,6 +20,7 @@ import { ClientFormDialog } from "../_components/client-form-dialog";
 import { ClientStageBadge } from "../_components/crm-badges";
 import { Composer } from "../_components/composer";
 import { LotCard } from "../_components/lot-card";
+import { NotYours } from "../_components/not-yours";
 import { Pill } from "../_components/pill";
 import { StepCard } from "../_components/step-card";
 
@@ -41,7 +42,10 @@ export default async function ClientDetailPage({
     getFilterOptions(),
     getBoardBasics(),
   ]);
-  if (!detail) notFound();
+  if (!detail) {
+    if (!basics.seesAll) return <NotYours kind="client" />;
+    notFound();
+  }
 
   const { client, engagements, totals } = detail;
   // Only fetched when it can actually be used — the dialog is the whole
