@@ -1,7 +1,3 @@
-/**
- * The room calendar's model: whose night each cell is, and the turnover
- * days the housekeeping must know about.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

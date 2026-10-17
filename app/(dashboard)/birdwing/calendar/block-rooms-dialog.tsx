@@ -8,11 +8,6 @@ import { Label } from "@/components/ui/label";
 import { createBlock } from "@/lib/birdwing/actions";
 import { addDays } from "@/lib/birdwing/calendar";
 
-/**
- * Taking rooms out of use — painting, a leak, the owner's own nights. A
- * block holds the rooms like a stay does (nobody can book over it) and
- * carries no guest and no money.
- */
 export function BlockRoomsDialog({
   rooms,
   defaultFrom,

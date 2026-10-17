@@ -9,12 +9,7 @@ import { listBookings, listCostCentres, listGuestOptions, listRooms } from "@/li
 import { todayInIndia } from "@/lib/format";
 import { NewStayForm } from "./new-stay-form";
 
-/**
- * A new stay in two steps, neither needing JavaScript to begin: the dates
- * first (a plain GET), so the page can say which rooms are free on those
- * nights and who holds the rest; then the guest and the rooms. A free
- * night on the calendar lands straight on the second step.
- */
+/** Two steps, neither needing JavaScript to begin: dates first (a plain GET) so the page can say which rooms are free, then guest and rooms. */
 export default async function NewStayPage({
   searchParams,
 }: {

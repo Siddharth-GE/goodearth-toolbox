@@ -1,8 +1,4 @@
-/**
- * The stay status machine's button rules. birdwing_stays_guard (0115) is
- * the real boundary — these pin the mirror that decides what renders,
- * and must list exactly the guard's moves.
- */
+// birdwing_stays_guard (0115) is the real boundary; these pin the mirror and must list exactly the guard's moves.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

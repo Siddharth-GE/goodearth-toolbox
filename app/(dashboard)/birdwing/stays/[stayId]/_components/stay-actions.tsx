@@ -8,11 +8,6 @@ import type { StayStatus } from "@/lib/birdwing/shared";
 import { isUndo, moveLabel, nextStatuses } from "@/lib/birdwing/workflow";
 import { useState, useTransition } from "react";
 
-/**
- * The moves a stay can make from where it is — the guard's list
- * (lib/birdwing/workflow.ts). Cancelling asks why and says the rooms are
- * let go; the undo moves are quiet buttons.
- */
 export function StayActions({
   stayId,
   stayRef,
@@ -75,7 +70,6 @@ export function StayActions({
   );
 }
 
-/** The import's doubts about this stay, and the press that clears them. */
 export function ReviewedButton({ stayId }: { stayId: string }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string>();

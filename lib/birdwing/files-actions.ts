@@ -1,7 +1,6 @@
 "use server";
 
-// Type-only import, never re-exported from a "use server" file — the
-// 2026-08-03 outage rule, enforced by npm run check:actions.
+// Type-only import, not re-exported from a "use server" file (npm run check:actions).
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { dbErrorMessage } from "@/lib/db-error";
@@ -11,12 +10,7 @@ import { revalidatePath } from "next/cache";
 import { FILE_KINDS, GRANT, oneOf } from "./shared";
 import { STAYS_BUCKET } from "./storage";
 
-/**
- * A stay's documents — a photo of the guest's ID, a booking confirmation
- * — in the private `birdwing-stays` bucket (0115). Object first, then the
- * row; a failed row write removes the object, so nothing ever points at a
- * missing file. Deleting goes the other way: row first, then the object.
- */
+/** Documents go to the private `birdwing-stays` bucket (0115). Object first, then row, removing the object if the row fails; delete goes row first. */
 
 export async function uploadStayFile(stayId: string, formData: FormData): Promise<ActionState> {
   const user = await requireTool(GRANT);

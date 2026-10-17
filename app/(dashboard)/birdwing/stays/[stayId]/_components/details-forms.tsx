@@ -22,7 +22,6 @@ import {
 } from "@/lib/birdwing/shared";
 import { useActionState, useEffect, useRef, useState } from "react";
 
-/** "Saved" for a moment after a save that worked — a form that stays open needs it. */
 function useSaved(pending: boolean, error: string | undefined) {
   const [saved, setSaved] = useState(false);
   const was = useRef(false);
@@ -37,7 +36,6 @@ function useSaved(pending: boolean, error: string | undefined) {
   return saved;
 }
 
-/** Who, when, how many, and the money adjustments. */
 export function StayDetailsForm({
   stay,
   costCentres,
@@ -202,12 +200,7 @@ export function StayDetailsForm({
   );
 }
 
-/**
- * Check-in: the guest's contact, their ID — its kind and last four
- * characters only, never the number — and what the kitchen and the room
- * need to know. Staff type it at arrival (the guest's own form waits for
- * a security decision, plan.md).
- */
+/** Check-in keeps the ID's kind and last four characters only, never the number. */
 export function CheckinForm({ stay }: { stay: StayDetail }) {
   const guest = stay.guest;
   const [state, formAction, pending] = useActionState(

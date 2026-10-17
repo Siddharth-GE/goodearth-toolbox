@@ -17,12 +17,7 @@ import { useActionState, useState } from "react";
 
 const money = (value: number) => formatMoney(value, { paise: value % 1 !== 0 });
 
-/**
- * Money in: each receipt with its date, how it came and its reference —
- * never an undated lump, so a collection can be found in the bank or the
- * UPI app. A wrong one is removed and entered again (the audit log keeps
- * both); nobody edits a receipt in place.
- */
+/** Each receipt has a date, how it came and a reference, so it can be found in the bank. A wrong one is removed and re-entered (audit keeps both). */
 export function ReceiptsPanel({
   stayId,
   receipts,
@@ -184,12 +179,7 @@ function ReceiptForm({
   );
 }
 
-/**
- * Closing what nobody will pay. An internal stay — a client, a prospect,
- * the team — is charged to the Goodearth cost centre that carries it: a
- * transfer, never income. A guest's balance that will not come is
- * written off with a reason. Both are counted in a month.
- */
+/** An internal stay is charged to its Goodearth cost centre (a transfer, never income); a guest's lost balance is written off with a reason. */
 export function SettlePanel({
   stayId,
   internal,

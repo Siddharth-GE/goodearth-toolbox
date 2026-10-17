@@ -28,13 +28,8 @@ import { useActionState, useState, useTransition } from "react";
 
 const OTHER = "__other";
 
-/**
- * What the stay is charged — the lines the invoice prints. A head from
- * the rate card brings its rate, GST and SAC (copied onto the line, so a
- * rate changed next year leaves this one alone); "Something else" is
- * typed in full. Rates are before GST unless the box says otherwise — an
- * OTA's payout is usually GST-inclusive. An issued invoice freezes them.
- */
+/** A rate-card head brings its rate, GST and SAC, copied onto the line. Rates are before GST unless the box says
+ * otherwise (an OTA's payout is usually GST-inclusive). An issued invoice freezes them. */
 export function ChargesPanel({
   stayId,
   charges,
@@ -47,9 +42,7 @@ export function ChargesPanel({
   charges: StayCharge[];
   rateCard: RateCardRow[];
   editable: boolean;
-  /** The issued invoice's number, when that is what freezes them. */
   frozenBy: string | null;
-  /** Σ nights across the stay's rooms — the room line's natural quantity. */
   roomNights: number;
 }) {
   const [adding, setAdding] = useState(false);

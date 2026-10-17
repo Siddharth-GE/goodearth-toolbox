@@ -1,7 +1,6 @@
 "use server";
 
-// Type-only import, never re-exported from a "use server" file — the
-// 2026-08-03 outage rule, enforced by npm run check:actions.
+// Type-only import, not re-exported from a "use server" file (npm run check:actions).
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { dbErrorMessage } from "@/lib/db-error";
@@ -33,18 +32,8 @@ import {
   oneOf,
 } from "./shared";
 
-/**
- * Writes for Birdwing Stays — bookings and their rooms, charges, the
- * invoice, money in and money closed, check-in details and the review
- * queue. Settings are lib/birdwing/settings-actions.ts (admin only);
- * documents lib/birdwing/files-actions.ts.
- *
- * Every action opens with requireTool and ends by revalidating the
- * layout — the welcome counts sit one screen away from every list
- * (CLAUDE.md's exact-path trap). The guards in 0115 refuse in plain
- * English; those sentences pass through (`GUARD_PHRASES`), anything else
- * the database says is replaced by the action's own fallback.
- */
+/** Every action opens with requireTool and revalidates the layout (the welcome counts sit one screen away).
+ * The 0115 guards refuse in plain English; `GUARD_PHRASES` lets those through, else the action's fallback shows. */
 
 const GUARD_PHRASES = [
   "never change",
@@ -74,7 +63,6 @@ function fromDb(error: { message: string; code?: string }, fallback: string): Ac
   return { error: dbErrorMessage(error, fallback, GUARD_PHRASES) };
 }
 
-/** "R2 is already booked on those nights (BW-0012)." — or null when free. */
 async function roomClash(
   supabase: Client,
   rooms: { roomId: string; from: string; to: string }[],
@@ -105,15 +93,9 @@ async function roomClash(
 
 const OVERLAP = "23P01";
 
-// birdwing_stays_guard mints the BW- reference on every insert and
-// overwrites whatever is sent; the generated insert type still asks for
-// the column, so this is the placeholder it overwrites.
+// The 0115 guard mints the BW- reference and overwrites this placeholder; the insert type still demands the column.
 const MINTED_BY_DATABASE = "";
 const overlapMessage = "That room was booked on those nights a moment ago. Pick another room.";
-
-// ---------------------------------------------------------------------
-// A new stay, or a room block
-// ---------------------------------------------------------------------
 
 export async function createStay(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireTool(GRANT);
@@ -149,7 +131,6 @@ export async function createStay(_prev: ActionState, formData: FormData): Promis
   );
   if (clash) return { error: clash };
 
-  // The guest: one picked from the list, or a new one typed in.
   let guestId = optionalText(formData, "guest_id");
   if (!guestId) {
     const name = text(formData, "guest_name");
@@ -183,7 +164,6 @@ export async function createStay(_prev: ActionState, formData: FormData): Promis
       status,
       arrival,
       departure,
-      // The arrival's month, which the guard would set too.
       accounting_month: `${arrival.slice(0, 7)}-01`,
       adults: adults.value,
       children: children.value,
@@ -208,9 +188,7 @@ export async function createStay(_prev: ActionState, formData: FormData): Promis
       })),
     );
     if (roomError) {
-      // Two people booked the same room in the same second. The stay
-      // keeps no room it did not get: it is cancelled with the reason,
-      // and the person tries again with another room.
+      // Two people booked the same room in the same second: the stay is cancelled with the reason, keeping no room it did not get.
       await supabase
         .from("birdwing_stays")
         .update({
@@ -291,10 +269,6 @@ export async function createBlock(_prev: ActionState, formData: FormData): Promi
   redirect("/birdwing/calendar");
 }
 
-// ---------------------------------------------------------------------
-// The stay's details and status
-// ---------------------------------------------------------------------
-
 export async function updateStay(
   stayId: string,
   _prev: ActionState,
@@ -370,8 +344,7 @@ export async function moveStay(
     return { error: "The stay has moved on since this page was opened. Reload it." };
   }
 
-  // No .eq("status") filter: a stale button then meets the guard's own
-  // sentence rather than a silent nothing (the Bills lesson).
+  // No .eq("status") filter: a stale button meets the guard's own sentence, not a silent nothing.
   const { error } = await supabase
     .from("birdwing_stays")
     .update({
@@ -438,10 +411,6 @@ export async function saveCheckinDetails(
   return undefined;
 }
 
-// ---------------------------------------------------------------------
-// Rooms on a stay
-// ---------------------------------------------------------------------
-
 export async function addStayRoom(
   stayId: string,
   _prev: ActionState,
@@ -500,10 +469,6 @@ export async function removeStayRoom(stayRoomId: string): Promise<ActionState> {
   return undefined;
 }
 
-// ---------------------------------------------------------------------
-// Charges
-// ---------------------------------------------------------------------
-
 export async function addCharge(
   stayId: string,
   _prev: ActionState,
@@ -519,8 +484,7 @@ export async function addCharge(
   if (rate.value === null) return { error: "Type the rate." };
   const inclusive = formData.get("rate_includes_gst") === "on";
 
-  // From the rate card: its head, kind, GST and SAC are COPIED onto the
-  // line, so next year's rate card never rewrites this year's invoice.
+  // From the rate card: head, kind, GST and SAC are COPIED onto the line, so a new rate card never rewrites an old invoice.
   const rateCardId = optionalText(formData, "rate_card_id");
   let line: { head: string; kind: string; gst_pct: number; sac: string | null };
   if (rateCardId) {
@@ -584,10 +548,6 @@ export async function deleteCharge(chargeId: string): Promise<ActionState> {
   return undefined;
 }
 
-// ---------------------------------------------------------------------
-// The invoice
-// ---------------------------------------------------------------------
-
 export async function issueInvoice(
   stayId: string,
   _prev: ActionState,
@@ -633,10 +593,6 @@ export async function cancelInvoice(invoiceId: string, reason: string): Promise<
   return undefined;
 }
 
-// ---------------------------------------------------------------------
-// Money in, and money closed
-// ---------------------------------------------------------------------
-
 export async function addReceipt(
   stayId: string,
   _prev: ActionState,
@@ -652,7 +608,6 @@ export async function addReceipt(
   if (!mode) return { error: "Pick how it was paid." };
 
   const supabase = await createClient();
-  // Against the live invoice, when there is one.
   const { data: invoice, error: invoiceError } = await supabase
     .from("birdwing_invoices")
     .select("id")
@@ -732,10 +687,6 @@ export async function deleteSettlement(settlementId: string): Promise<ActionStat
   return undefined;
 }
 
-// ---------------------------------------------------------------------
-// The review queue — what the import could not decide
-// ---------------------------------------------------------------------
-
 export async function markReviewed(stayIds: string[]): Promise<ActionState> {
   const user = await requireTool(GRANT);
   if (stayIds.length === 0) return { error: "Tick at least one stay." };
@@ -749,7 +700,6 @@ export async function markReviewed(stayIds: string[]): Promise<ActionState> {
   return undefined;
 }
 
-/** Gives the ticked internal stays their cost centre (a paying guest's is left alone). */
 export async function assignCostCentre(
   stayIds: string[],
   costCentreId: string,
@@ -768,11 +718,7 @@ export async function assignCostCentre(
   return undefined;
 }
 
-/**
- * Closes each ticked stay's pending balance in one go: a cross-charge to
- * the stay's own cost centre (an internal stay without one is skipped and
- * named), or a write-off. Counted in the stay's own accounting month.
- */
+/** Closes each ticked stay's pending balance: a cross-charge to its own cost centre (skipped and named if none) or a write-off. */
 export async function settleStays(
   stayIds: string[],
   kind: "cross_charge" | "write_off",

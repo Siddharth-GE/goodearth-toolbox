@@ -1,10 +1,4 @@
-/**
- * Reading Birdwing's forms — pure, so the rules a person meets when a
- * form refuses them are tested without a database. Each returns the
- * cleaned value or a sentence saying what is wrong.
- *
- * Import-free but for the shared vocabulary: "use server" files import it.
- */
+// Pure, so the sentences forms refuse with are tested without a database. Import-free: "use server" files import it.
 import { CHANNELS, STAY_USES, oneOf, type Channel, type StayUse } from "./shared";
 
 export type Parsed<T> = { ok: true; value: T } | { ok: false; error: string };
@@ -14,7 +8,6 @@ const no = <T>(error: string): Parsed<T> => ({ ok: false, error });
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-/** A real YYYY-MM-DD date — 2026-02-31 is not one. */
 export function isRealDate(value: string): boolean {
   if (!ISO_DATE.test(value)) return false;
   const parsed = new Date(`${value}T00:00:00Z`);
@@ -35,7 +28,6 @@ export function parseStayDates(
   return ok({ arrival, departure });
 }
 
-/** A room's nights: at least one, inside the stay. */
 export function parseRoomNights(
   from: string,
   to: string,
@@ -53,9 +45,6 @@ export function parseRoomNights(
   return ok({ from, to });
 }
 
-/**
- * A count of people or things: blank is 0, junk or a negative is refused.
- */
 export function parseCount(raw: string, label: string, max = 500): Parsed<number> {
   const cleaned = raw.trim();
   if (!cleaned) return ok(0);
@@ -65,10 +54,7 @@ export function parseCount(raw: string, label: string, max = 500): Parsed<number
   return ok(value);
 }
 
-/**
- * Rupees as people type them ("1,20,000", "₹ 450"). Blank is `blank`
- * (0 or null, the caller's choice); paise beyond two places are refused.
- */
+/** Rupees as typed ("1,20,000", "₹ 450"); blank gives the caller's `blank`; paise beyond two places are refused. */
 export function parseRupees<B extends number | null>(
   raw: string,
   label: string,
@@ -85,7 +71,6 @@ export function parseRupees<B extends number | null>(
   return ok(value);
 }
 
-/** A quantity on a charge line: more than zero, two decimals at most. */
 export function parseQty(raw: string): Parsed<number> {
   const cleaned = raw.replace(/[,\s]/g, "");
   if (!/^\d+(\.\d{1,2})?$/.test(cleaned) || Number(cleaned) <= 0) {
@@ -113,7 +98,6 @@ export function parseChannel(raw: string): Parsed<Channel> {
   return channel ? ok(channel) : no("Pick how the stay was booked.");
 }
 
-/** "YYYY-MM" to the first of the month, as the database stores it. */
 export function parseMonth(raw: string): Parsed<string> {
   if (!/^\d{4}-\d{2}$/.test(raw) || !isRealDate(`${raw}-01`)) return no("Pick a month.");
   return ok(`${raw}-01`);

@@ -20,18 +20,6 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { BlockRoomsDialog } from "./block-rooms-dialog";
 import { Legend, Night, UnplacedLane } from "./calendar-rows";
 
-/**
- * The rooms against the days: every cell is one room's NIGHT. A free
- * night is a link to book that room from that day; a taken one opens its
- * stay. A turnover — somebody leaving that morning and somebody arriving
- * that afternoon — is marked, because housekeeping has hours, not a day.
- *
- * Below the rooms, the stays that hold no room: the old income sheet's,
- * which counted rooms but never named them, drawn as bars over their
- * nights with the sheet's room count — never guessed into a room.
- *
- * Month by default; a week at a time fits a phone without scrolling.
- */
 export default async function CalendarPage({
   searchParams,
 }: {
@@ -55,7 +43,6 @@ export default async function CalendarPage({
   ]);
   const lanes = packUnplaced(unplaced, days);
   const unnamed = unnamedRoomsByDay(lanes, days.length);
-  // A switched-off room still shows while it holds a booking in view.
   const booked = new Set(bookings.map((booking) => booking.roomId));
   const shown = rooms.filter((room) => room.isActive || booked.has(room.id));
   const grid = buildCalendar(
@@ -134,9 +121,7 @@ export default async function CalendarPage({
         </Card>
       ) : (
         <div className="border-border bg-surface overflow-x-auto rounded-2xl border">
-          {/* Fixed layout: every day column the same width whatever a
-              guest's name is (a long name truncates in its bar), and a
-              month too wide for the screen scrolls rather than squeezes. */}
+          {/* Fixed layout keeps day columns equal; a long name truncates and a wide month scrolls. */}
           <table
             className="w-full table-fixed border-collapse text-xs"
             style={{ minWidth: 104 + days.length * 36 }}

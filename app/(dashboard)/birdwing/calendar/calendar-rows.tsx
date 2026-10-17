@@ -4,12 +4,6 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-/**
- * The calendar's cells and rows (the page lays out the table). A room's
- * night is a link — to book it when free, to its stay when taken; a stay
- * with no room named is a dashed bar across its nights.
- */
-
 export function Night({
   cell,
   roomId,
@@ -77,10 +71,6 @@ export function Night({
   );
 }
 
-/**
- * One row of stays with no room. Each bar spans its nights; the row is
- * filled with empty cells between bars so the days stay in their columns.
- */
 export function UnplacedLane({ lane, dayCount }: { lane: UnplacedBar[]; dayCount: number }) {
   const cells: ReactNode[] = [];
   let cursor = 0;
@@ -95,7 +85,6 @@ export function UnplacedLane({ lane, dayCount }: { lane: UnplacedBar[]; dayCount
           title={`${bar.label}${unplacedNote(bar)}`}
           className={cn(
             "border-border focus-visible:ring-accent flex h-8 items-center gap-1 overflow-hidden rounded-md border border-dashed px-1 text-[11px] leading-tight hover:brightness-95 focus-visible:ring-2 focus-visible:outline-none",
-            // A day visit has no night: a hollow outline, not a filled bar.
             bar.dayVisit
               ? "text-foreground bg-transparent"
               : bar.status === "checked_out"
@@ -107,7 +96,6 @@ export function UnplacedLane({ lane, dayCount }: { lane: UnplacedBar[]; dayCount
             bar.continuesAfter && "rounded-r-none border-r-0",
           )}
         >
-          {/* The name comes first; a one-night bar is one column wide. */}
           {!bar.dayVisit && bar.span > 1 && bar.roomCount && bar.roomCount > 1 ? (
             <span className="text-muted shrink-0 tabular-nums">×{bar.roomCount}</span>
           ) : null}

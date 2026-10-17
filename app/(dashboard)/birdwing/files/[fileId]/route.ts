@@ -4,18 +4,12 @@ import { STAYS_BUCKET } from "@/lib/birdwing/storage";
 import { idParam } from "@/lib/list-params";
 import { createClient } from "@/lib/supabase/server";
 
-/**
- * Serves one stay document — a guest's ID, a booking confirmation — from
- * the private `birdwing-stays` bucket. The row is looked up BY ID through
- * the RLS-scoped client first (the Design Management shape), so a path
- * never leaves the server for anyone without /birdwing; the bucket's own
- * policy says the same again. Private cache only, and nosniff, because a
- * file's type is what the row says it is, nothing a browser guesses.
- */
+/** The row is looked up BY ID through the RLS-scoped client first, so a path never leaves the server for anyone without
+ * /birdwing. Private cache and nosniff: the file's type is what the row says, nothing a browser guesses. */
 export async function GET(_request: Request, { params }: { params: Promise<{ fileId: string }> }) {
   const user = await getCurrentUser();
   if (!user) return new Response("Unauthorized", { status: 401 });
-  // hasApp, not requireTool — a redirect means nothing to a file request.
+  // hasApp, not requireTool: a redirect means nothing to a file request.
   if (!(await hasApp(user, "/birdwing"))) return new Response("Forbidden", { status: 403 });
 
   const fileId = idParam((await params).fileId);

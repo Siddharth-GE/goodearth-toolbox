@@ -1,6 +1,3 @@
-/**
- * What Birdwing's forms accept and the sentence they refuse with.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

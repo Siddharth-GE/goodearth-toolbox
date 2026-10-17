@@ -12,13 +12,7 @@ import { saveInvoiceSettings } from "@/lib/birdwing/settings-actions";
 import Link from "next/link";
 import { useActionState } from "react";
 
-/**
- * What every invoice prints besides its lines. The letterhead is a Masters
- * company — its legal name, address and GSTIN are kept there, once, and
- * never typed here (PRODUCT.md). Bank, UPI and the cancellation policy
- * are typed here once. An issued invoice keeps what was printed on it;
- * a change here reaches only the next one.
- */
+/** The letterhead is a Masters company, never typed here (PRODUCT.md). An issued invoice keeps what was printed; a change reaches only the next one. */
 export function InvoiceSettingsForm({
   settings,
   companies,

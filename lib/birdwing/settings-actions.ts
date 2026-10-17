@@ -1,7 +1,6 @@
 "use server";
 
-// Type-only import, never re-exported from a "use server" file — the
-// 2026-08-03 outage rule, enforced by npm run check:actions.
+// Type-only import, not re-exported from a "use server" file (npm run check:actions).
 import type { ActionState } from "@/lib/action-state";
 import { requireAdmin } from "@/lib/auth/access";
 import { requireUser } from "@/lib/auth/dal";
@@ -12,14 +11,8 @@ import { revalidatePath } from "next/cache";
 import { parseCount, parseGstPct, parseRupees } from "./forms";
 import { CHARGE_KINDS, oneOf } from "./shared";
 
-/**
- * Birdwing → Settings: the rooms, the rate card, the cost centres and
- * what prints on an invoice. ADMIN ONLY — the 0115 policies say
- * is_admin() on every write here, and each action checks first, so a
- * /birdwing holder can read these and never change them. Nothing is
- * deleted: a room, a head or a cost centre is switched off, because
- * stays already name it.
- */
+/** ADMIN ONLY: the 0115 policies check is_admin() on every write and each action checks first, so a /birdwing holder can read but never change.
+ * Nothing is deleted: stays already name a room, head or cost centre, so it is switched off. */
 
 const refresh = () => revalidatePath("/birdwing", "layout");
 

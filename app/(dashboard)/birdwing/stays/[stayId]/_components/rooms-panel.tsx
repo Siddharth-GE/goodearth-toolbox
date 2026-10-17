@@ -13,11 +13,6 @@ import { formatDate } from "@/lib/format";
 import { Trash2 } from "lucide-react";
 import { useActionState, useState, useTransition } from "react";
 
-/**
- * The rooms a stay holds, each with its own nights. Adding one the
- * database finds taken on any of those nights is refused with the stay
- * that holds it; a stay that has ended keeps its rooms as its record.
- */
 export function RoomsPanel({
   stayId,
   arrival,
