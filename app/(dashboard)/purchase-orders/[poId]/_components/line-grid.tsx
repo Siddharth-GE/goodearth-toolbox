@@ -32,15 +32,8 @@ import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
 import { PackageOpen, Trash2 } from "lucide-react";
 import { useState, useTransition, type KeyboardEvent } from "react";
 
-/**
- * The PO's lines with their money. Quantity, rate, discount (a % or ₹),
- * GST and other charges are editable in draft; the uom is not — it stays
- * the indent line's unit, because the over-ordering guard compares
- * quantities in that unit. Totals react as figures are typed (each row
- * reports its money up), so the figure at the bottom is always the
- * figure being agreed to. `interState` — the vendor's GST state against
- * the company's, worked out on the server — decides CGST + SGST or IGST.
- */
+// The uom is not editable: the over-ordering guard compares quantities in the indent line's unit.
+// `interState` (vendor's GST state vs the company's) picks CGST + SGST or IGST.
 const moneyOf = (line: PoLineRow): PoLineMoney => ({
   quantity: line.quantity,
   rate: line.rate,
@@ -61,10 +54,8 @@ export function LineGrid({
   lines: PoLineRow[];
   editable: boolean;
   interState: boolean;
-  /** Active gst_rates from Masters, plus any inactive rate a line holds. */
   gstRates: number[];
 }) {
-  // Live money per line, so the roll-up follows typing before a refresh.
   const [money, setMoney] = useState<Record<string, PoLineMoney>>(() =>
     Object.fromEntries(lines.map((line) => [line.id, moneyOf(line)])),
   );
@@ -87,8 +78,6 @@ export function LineGrid({
           <span className="text-muted text-xs">
             {formatCount(lines.length)} {lines.length === 1 ? "line" : "lines"}
           </span>
-          {/* A line always comes from an approved indent (0113, founder
-              2026-10-11) — the catalogue path is gone. */}
           {editable && (
             <LinkButton href={`/purchase-orders/${poId}/pull`} size="sm" variant="secondary">
               From approved indents
@@ -154,8 +143,7 @@ export function LineGrid({
             </div>
             {totals.pendingCount > 0 && (
               <p className="text-warning text-xs font-medium">
-                {/* One string: split across JSX lines, the space before
-                    "a rate" was dropped in the built page. */}
+                {/* One string: split across JSX lines, the space before "a rate" was dropped. */}
                 {`${formatCount(totals.pendingCount)} ${
                   totals.pendingCount === 1 ? "line still needs" : "lines still need"
                 } a rate and GST — they're not in these totals.`}
@@ -177,9 +165,7 @@ function TotalRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** What the item is and where it came from — the same in both modes. A
- * line added directly before 0113 says so; on a draft it can no longer be
- * saved, so it says what to do instead. */
+/** A line added directly before 0113 says so; on a draft it can no longer be saved. */
 function ItemDetails({ line, editable }: { line: PoLineRow; editable: boolean }) {
   const meta = [line.item_code, line.item_brand, line.item_category].filter(Boolean);
   return (
@@ -204,7 +190,6 @@ function ItemDetails({ line, editable }: { line: PoLineRow; editable: boolean })
   );
 }
 
-/** The amount, and what it is made of beneath — one short part a line. */
 function AmountCell({
   figures,
   interState,
@@ -228,7 +213,6 @@ function AmountCell({
 
 type DiscountMode = "pct" | "amount";
 
-/** Blank is null; anything else is the number typed (NaN if it isn't one). */
 const typed = (text: string) => (text.trim() === "" ? null : Number(text.trim()));
 const finiteOrNull = (value: number | null) =>
   value !== null && Number.isFinite(value) ? value : null;
@@ -306,8 +290,7 @@ function LineRow({
     save: (value) => updatePoLine(line.id, { ...value, note: value.note || null }),
   });
 
-  // Every field as it stands, with the one just changed passed in — the
-  // state setter has not landed yet when its onChange reports.
+  // Every field as it stands, with the changed one passed in (the state setter hasn't landed yet).
   const fields = (
     changed: Partial<{
       quantity: string;
@@ -428,8 +411,6 @@ function LineRow({
         />
       </TableCell>
       <TableCell className="px-3">
-        {/* The input gets the full column; the uom sits under it —
-            squeezing them side by side hid the number itself. */}
         <Input
           type="number"
           step="any"
@@ -487,8 +468,7 @@ function LineRow({
             className="h-9 min-w-16"
             aria-label={`Discount for ${line.item_name}`}
           />
-          {/* Saved immediately on change — a select has no meaningful
-              blur (the uom-select rule from the indent grid). */}
+          {/* Saved on change: a select has no meaningful blur. */}
           <Select
             value={discountMode}
             onChange={(event) => {

@@ -16,11 +16,6 @@ import { listIndentsToOrder } from "@/lib/purchase-orders/queries";
 import { ClipboardList } from "lucide-react";
 import Link from "next/link";
 
-/**
- * Step one of a PO from an indent (plan.md, B3): the approved indents
- * with anything still to buy. Picking one opens its lines, where each
- * gets a vendor and Create makes the draft POs.
- */
 export default async function IndentsToOrderPage({
   searchParams,
 }: {

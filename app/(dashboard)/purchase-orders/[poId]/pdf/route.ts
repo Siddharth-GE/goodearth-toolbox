@@ -3,14 +3,7 @@ import { PoDocument } from "@/lib/purchase-orders/po-document";
 import { getPoPdfData } from "@/lib/purchase-orders/queries";
 import { createElement, type ReactElement } from "react";
 
-/**
- * Document D — the purchase order, as a PDF download.
- *
- * getPoPdfData enforces the /purchase-orders grant, so someone without
- * it gets redirected rather than a file. Generated on demand rather
- * than stored, so it can never drift from the figures it represents —
- * and a draft always prints with its watermark.
- */
+// getPoPdfData enforces the /purchase-orders grant. On demand, so it never drifts; a draft prints with its watermark.
 export async function GET(_request: Request, { params }: { params: Promise<{ poId: string }> }) {
   const { poId } = await params;
 

@@ -28,12 +28,6 @@ import {
 import type { IndentOrderLine } from "@/lib/purchase-orders/queries";
 import { useMemo, useState, useTransition } from "react";
 
-/**
- * Every line left to buy, ticked, with its vendor, rate and GST already
- * suggested from the last purchase of that item. Nothing is written until
- * Create, which makes one draft PO per vendor — the bar at the foot says
- * how many before it is pressed.
- */
 type Row = {
   picked: boolean;
   quantity: string;
@@ -56,10 +50,8 @@ export function IndentOrderForm({
   indentId: string;
   lines: IndentOrderLine[];
   vendors: { id: string; name: string }[];
-  /** Each vendor's last price per item, keyed by priceKey(item, vendor). */
   prices: Record<string, PriceSuggestion>;
   gstRates: number[];
-  /** Why no PO can be numbered for this indent yet, or null. */
   blocked: string | null;
 }) {
   const [rows, setRows] = useState<Record<string, Row>>(() =>
@@ -135,7 +127,6 @@ export function IndentOrderForm({
   const create = () =>
     startCreating(async () => {
       setError(undefined);
-      // A success lands on the first PO; only a refusal comes back.
       const result = await createPosFromIndent(indentId, picks);
       if (result?.error) setError(result.error);
     });
@@ -298,7 +289,6 @@ export function IndentOrderForm({
         the expected date are set there too.
       </p>
 
-      {/* Nothing has been written yet — this bar is the commit point. */}
       <div className="border-border bg-surface fixed inset-x-0 bottom-0 z-10 mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 border-t px-5 py-3 md:rounded-t-2xl md:border">
         <div className="min-w-0">
           {picks.length === 0 ? (

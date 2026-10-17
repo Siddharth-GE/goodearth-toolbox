@@ -1,8 +1,3 @@
-/**
- * A PO from an indent: what is left to buy (cancelled POs give their
- * quantity back), which vendor and rate to suggest (only real purchases,
- * newest first), and the split into one PO per vendor.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

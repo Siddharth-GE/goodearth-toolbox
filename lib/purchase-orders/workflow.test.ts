@@ -1,8 +1,3 @@
-/**
- * The PO status machine's button rules — who may do what, at which
- * status. The trigger (migration 0021) is the real boundary; these pin
- * the mirror that decides what renders.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

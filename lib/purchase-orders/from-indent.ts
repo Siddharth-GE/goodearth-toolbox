@@ -1,16 +1,7 @@
-/**
- * A PO from an indent (plan.md, B3) — the pure rules, no database.
- *
- * The founder's chain: you don't make a PO, you pick an approved indent
- * and go. Its remaining lines appear, each gets a vendor (the last one
- * that item was bought from suggested, with that vendor's last rate),
- * and Create makes one draft PO per vendor.
- */
+// Pure rules, no database. Pick an approved indent: each remaining line gets a vendor (last bought from, at their last rate), and Create makes one draft PO per vendor.
 
-/** A PO line pointing at an indent line, with its PO's status. */
 export type OrderedRow = { indent_line_id: string | null; quantity: number; status: string };
 
-/** Ordered so far per indent line, across every PO that is not cancelled. */
 export function orderedByIndentLine(rows: OrderedRow[]): Map<string, number> {
   const ordered = new Map<string, number>();
   for (const row of rows) {
@@ -25,13 +16,11 @@ export function leftToBuy(approved: number, ordered: number): number {
   return Math.max(0, Math.round((approved - ordered) * 1e6) / 1e6);
 }
 
-/** One past purchase of an item: which vendor, at what price, when. */
 export type PurchaseRow = {
   item_id: string;
   vendor_id: string;
   rate: number | null;
   gst_pct: number | null;
-  /** When the PO was issued (or made, if never issued). */
   at: string;
   status: string;
 };
@@ -39,18 +28,12 @@ export type PurchaseRow = {
 export type PriceSuggestion = { rate: number | null; gstPct: number | null };
 export type VendorSuggestion = PriceSuggestion & { vendorId: string };
 
-/** The key of one vendor's price for one item. */
 export const priceKey = (itemId: string, vendorId: string) => `${itemId}|${vendorId}`;
 
 /** POs that went to a vendor: a draft was never a purchase, a cancelled one was undone. */
 const BOUGHT = new Set(["issued", "deletion_requested", "completed"]);
 
-/**
- * What was last paid: per item, the vendor it was last bought from with
- * that rate and GST; and per item and vendor, that vendor's last price —
- * so picking another vendor suggests their rate. Only issued POs count,
- * and only lines that carried a rate.
- */
+/** Per item, the vendor last bought from with that rate and GST; per item and vendor, that vendor's last price. Only issued POs and lines with a rate count. */
 export function purchaseHistory(rows: PurchaseRow[]): {
   lastVendor: Map<string, VendorSuggestion>;
   lastPrice: Map<string, PriceSuggestion>;
@@ -71,7 +54,6 @@ export function purchaseHistory(rows: PurchaseRow[]): {
   return { lastVendor, lastPrice };
 }
 
-/** One ticked line on the from-indent screen. */
 export type IndentPick = {
   indentLineId: string;
   quantity: number;
@@ -80,7 +62,6 @@ export type IndentPick = {
   gstPct: number | null;
 };
 
-/** What stops Create, in words — or undefined. `left` is per indent line. */
 export function picksProblem(picks: IndentPick[], left: Map<string, number>): string | undefined {
   if (picks.length === 0) return "Tick at least one line to order.";
   const seen = new Set<string>();
@@ -105,7 +86,6 @@ export function picksProblem(picks: IndentPick[], left: Map<string, number>): st
   return undefined;
 }
 
-/** The picks as one draft PO per vendor, vendors in the order they first appear. */
 export function splitByVendor(picks: IndentPick[]): { vendorId: string; lines: IndentPick[] }[] {
   const groups = new Map<string, IndentPick[]>();
   for (const pick of picks) {

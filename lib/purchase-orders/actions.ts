@@ -15,21 +15,12 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-// Type-only import, and deliberately NOT re-exported — see the note in
-// lib/budgets/actions.ts: a bare `export type { X };` in a "use server"
-// file crashes every action in its compiled chunk at load time.
+// Type-only and not re-exported: `export type { X }` in a "use server" file crashes the chunk at load.
 import type { ActionState } from "@/lib/action-state";
 
-/**
- * Writes for Purchase Orders. The real rules live in the database
- * (purchase_orders_guard, po_lines_draft_only, po_lines_qty_guard,
- * migration 0021) — these actions validate first so refusals arrive as
- * friendly messages, but a write that slips past the UI is still
- * stopped DB-side.
- */
+// The rules live in the database (purchase_orders_guard, po_lines_draft_only, po_lines_qty_guard, 0021); actions pre-check so refusals read as sentences.
 
-/** The guards raise human-readable messages (written for exactly this).
- * Surface the known ones instead of a generic "try again". */
+/** The guards raise human-readable messages; surface the known ones. */
 const PO_GUARD_PHRASES = [
   "draft",
   "permanent",
@@ -45,8 +36,7 @@ const PO_GUARD_PHRASES = [
   "deletion request",
   "admin can approve",
   "receiving its goods",
-  // Migration 0023: an issued PO whose goods are already in a store
-  // can no longer be cancelled.
+  // 0023: an issued PO whose goods are already in a store cannot be cancelled.
   "already been received",
   "still outstanding",
 ] as const;
@@ -74,9 +64,7 @@ export async function createPurchaseOrder(input: CreatePoInput): Promise<ActionS
 
   const supabase = await createClient();
 
-  // The casts paper over a typegen limitation (the create_indent
-  // precedent): it types every function argument non-null, but these
-  // are genuinely optional and PostgREST passes the JSON null through.
+  // The casts paper over typegen typing every RPC argument non-null; PostgREST passes null through.
   const { data: poId, error } = await supabase.rpc("create_purchase_order", {
     p_project_id: input.projectId,
     p_plot_id: (input.plotId || null) as unknown as string,
@@ -103,14 +91,7 @@ export type PoolLineInput = {
   quantity: number;
 };
 
-/**
- * Commits the pool basket onto a draft PO. Everything except which lines
- * and how many is re-read server-side: the item and uom come from the
- * indent line, never from the client. Lines already on this PO are
- * skipped rather than merged — the unique (po_id, indent_line_id) pair
- * means one row per indent line, and the over-ordering guard
- * (po_lines_qty_guard) holds the quantity cap even against a race.
- */
+// Item and uom come from the indent line, never the client. Lines already on the PO are skipped (unique (po_id, indent_line_id)); po_lines_qty_guard holds the cap even in a race.
 export async function addPoolLines(poId: string, lines: PoolLineInput[]): Promise<ActionState> {
   const user = await requireTool("/purchase-orders");
 
@@ -159,9 +140,7 @@ export async function addPoolLines(poId: string, lines: PoolLineInput[]): Promis
     return { error: "Every one of those lines is already on this purchase order." };
   }
 
-  // One at a time, deliberately: the qty guard raises per line with the
-  // item's remaining figure, and a batch insert would fail wholesale on
-  // the first refusal — losing the lines that were fine.
+  // One at a time: the qty guard raises per line, and a batch insert would fail wholesale.
   let added = 0;
   for (const insert of inserts) {
     const { error } = await supabase.from("purchase_order_lines").insert(insert);
@@ -182,8 +161,7 @@ export async function addPoolLines(poId: string, lines: PoolLineInput[]): Promis
   revalidatePath(`/purchase-orders/${poId}`);
   revalidatePath(`/purchase-orders/${poId}/pull`);
   if (skipped > 0) {
-    // Only reachable if the PO changed underneath (another tab, a
-    // colleague): the screen disables lines it already holds.
+    // Only reachable if the PO changed underneath; the screen disables lines it holds.
     return {
       error: `Added ${added}. ${skipped} ${skipped === 1 ? "line was" : "lines were"} already on this purchase order and ${skipped === 1 ? "was" : "were"} not added again.`,
     };
@@ -191,11 +169,7 @@ export async function addPoolLines(poId: string, lines: PoolLineInput[]): Promis
   return undefined;
 }
 
-/** Save-on-blur target for a row: quantity, rate, GST %, discount, other
- * charges, note. The uom is NOT editable — it stays the indent line's
- * unit, because the over-ordering guard compares quantities in that unit.
- * No revalidate — the values are already on screen (the updateLine
- * pattern). */
+// uom is not editable: the over-ordering guard compares quantities in the indent line's unit. No revalidate: the values are on screen.
 export async function updatePoLine(
   lineId: string,
   input: {
@@ -246,8 +220,7 @@ export async function updatePoLine(
     .eq("id", lineId);
   if (error) {
     console.error("updatePoLine failed:", error);
-    // 0113: a line added directly before PO lines came only from indents
-    // cannot be saved again on a draft.
+    // 0113: a direct line added before PO lines came only from indents can't be saved again on a draft.
     if (error.message.includes("purchase_order_lines_from_an_indent")) {
       return {
         error:
@@ -273,10 +246,7 @@ export async function removePoLine(poId: string, lineId: string): Promise<Action
   return undefined;
 }
 
-/** Save-on-blur target for the header fields editable in draft (the
- * scope and number are permanent — re-scope means delete and re-raise).
- * Unlike a line save it refreshes the page: a new vendor can move the
- * order between CGST + SGST and IGST, which the server works out. */
+// Scope and number are permanent (re-scope = delete and re-raise). Refreshes the page: a new vendor can switch CGST + SGST to IGST.
 export async function updatePoHeader(
   poId: string,
   input: {
@@ -313,11 +283,7 @@ export async function updatePoHeader(
   return undefined;
 }
 
-/**
- * Issues a draft to the vendor. The guard re-checks under the row lock
- * that every line is priced (rate + GST) and at least one exists — the
- * checks here only make the refusal read well in the common case.
- */
+// The guard re-checks under the row lock that every line is priced (rate + GST); the checks here are for the message.
 export async function issuePo(poId: string): Promise<ActionState> {
   const user = await requireTool("/purchase-orders");
   const supabase = await createClient();
@@ -355,9 +321,7 @@ export async function issuePo(poId: string): Promise<ActionState> {
       issued_at: new Date().toISOString(),
       updated_by: user.id,
     })
-    // No status filter — filtering to drafts would make an issue on a
-    // locked PO match zero rows and "succeed" silently. The guard's
-    // refusal is worth showing (the submitIndent rule).
+    // No status filter: filtering to drafts would make an issue on a locked PO match zero rows and "succeed".
     .eq("id", poId);
   if (error) {
     console.error("issuePo failed:", error);
@@ -369,10 +333,7 @@ export async function issuePo(poId: string): Promise<ActionState> {
   return undefined;
 }
 
-/**
- * Asks for an issued PO to be removed — the founder's rule: anyone with
- * the app can ask (with a reason), only an admin's yes cancels it.
- */
+// Anyone with the app can ask (with a reason); only an admin's yes cancels.
 export async function requestPoDeletion(poId: string, note: string): Promise<ActionState> {
   const user = await requireTool("/purchase-orders");
 
@@ -402,8 +363,7 @@ export async function requestPoDeletion(poId: string, note: string): Promise<Act
   return undefined;
 }
 
-/** Takes a deletion request back (the requester) or refuses it (an
- * admin) — either way the PO reads as plainly issued again. */
+/** The requester withdraws, or an admin refuses; either way the PO reads as issued. */
 export async function withdrawPoDeletion(poId: string): Promise<ActionState> {
   const user = await requireTool("/purchase-orders");
   const supabase = await createClient();
@@ -428,11 +388,7 @@ export async function withdrawPoDeletion(poId: string): Promise<ActionState> {
   return undefined;
 }
 
-/**
- * The admin's yes: cancels a deletion-requested PO. Its quantities
- * return to the unordered pool (the qty guard skips cancelled POs), and
- * its number stays burnt. Admin-only, enforced by the guard DB-side.
- */
+// Quantities return to the unordered pool (the qty guard skips cancelled POs); the number stays burnt. Admin-only, enforced by the guard.
 export async function approvePoDeletion(poId: string): Promise<ActionState> {
   const user = await requireTool("/purchase-orders");
   const supabase = await createClient();
@@ -456,9 +412,7 @@ export async function approvePoDeletion(poId: string): Promise<ActionState> {
   return undefined;
 }
 
-/** Only a draft can go, and only its creator's (or an admin's) — the RPC
- * re-checks both under a row lock. The number stays burnt (gaps are
- * accepted and expected). */
+/** Only a draft, by its creator or an admin; the RPC re-checks under a row lock. The number stays burnt. */
 export async function deleteDraftPo(poId: string): Promise<ActionState> {
   await requireTool("/purchase-orders");
   const supabase = await createClient();
@@ -466,7 +420,7 @@ export async function deleteDraftPo(poId: string): Promise<ActionState> {
   const { error } = await supabase.rpc("delete_draft_purchase_order", { p_po_id: poId });
   if (error) {
     console.error("deleteDraftPo failed:", error);
-    // Written for a person to read by the RAISE EXCEPTION in the function.
+    // The function's RAISE EXCEPTION text is written for people.
     return { error: dbErrorMessage(error, "Could not delete this purchase order.") };
   }
 
@@ -474,16 +428,8 @@ export async function deleteDraftPo(poId: string): Promise<ActionState> {
   redirect("/purchase-orders/list");
 }
 
-/**
- * A PO from an indent (plan.md, B3): one draft PO per vendor, scoped to
- * the indent's unit or plot, delivering to its site, terms from the
- * default template. The client says only which lines, how many, which
- * vendor and what rate; the item and unit come from the indent line, and
- * what is left to buy is re-read here. Lines go in row by row (the
- * addPoolLines reason: the quantity guard refuses per line, and a batch
- * would lose the lines that were fine). Lands on the first PO with the
- * others named; a refusal part-way says what was made.
- */
+// One draft PO per vendor, scoped to the indent's unit or plot. The client sends lines, quantities, vendor and rate; item and unit come from the indent line and what is left is re-read here.
+// Lines go in row by row (see addPoolLines). A refusal part-way says what was made.
 export async function createPosFromIndent(
   indentId: string,
   picks: IndentPick[],
@@ -554,7 +500,6 @@ export async function createPosFromIndent(
   };
 
   for (const group of splitByVendor(picks)) {
-    // The casts paper over the typegen limitation createPurchaseOrder notes.
     const { data: poId, error } = await supabase.rpc("create_purchase_order", {
       p_project_id: indent.project_id,
       p_plot_id: (indent.unit_id ? null : indent.plot_id) as unknown as string,

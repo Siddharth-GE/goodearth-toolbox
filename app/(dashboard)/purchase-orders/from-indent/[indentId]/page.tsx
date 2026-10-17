@@ -8,10 +8,6 @@ import { PackageCheck } from "lucide-react";
 import { notFound } from "next/navigation";
 import { IndentOrderForm } from "./_components/indent-order-form";
 
-/**
- * Step two of a PO from an indent (plan.md, B3): the indent's remaining
- * lines, a vendor for each, and Create — one draft PO per vendor.
- */
 export default async function OrderIndentPage({
   params,
 }: {

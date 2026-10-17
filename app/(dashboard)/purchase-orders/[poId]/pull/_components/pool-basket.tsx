@@ -19,13 +19,7 @@ import type { PoolIndentGroup } from "@/lib/purchase-orders/queries";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
-/**
- * The PullBasket pattern (Indents M4), adapted for ordering: approved
- * indent lines laid out indent by indent, quantities prefilled with
- * what's still unordered, a local basket and one commit. Nothing is
- * written until Add. Lines already on this PO, and lines fully ordered
- * elsewhere, show disabled-and-labelled — never hidden.
- */
+// Nothing is written until Add. Lines already on this PO, or fully ordered elsewhere, show disabled, never hidden.
 export function PoolBasket({
   poId,
   reference,
@@ -84,8 +78,7 @@ export function PoolBasket({
       const result = await addPoolLines(poId, lines);
       if (result?.error) {
         setError(result.error);
-        // A partial add still changed the PO: drop what went in so a
-        // second press can't ask for it twice.
+        // A partial add still changed the PO: refresh so a second press can't ask twice.
         router.refresh();
         setPicked({});
         return;
@@ -215,7 +208,6 @@ export function PoolBasket({
         );
       })}
 
-      {/* Nothing has been written yet — this bar is the commit point. */}
       <div className="border-border bg-surface fixed inset-x-0 bottom-0 z-10 mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 border-t px-5 py-3 md:rounded-t-2xl md:border">
         <div className="min-w-0">
           {pickedEntries.length === 0 ? (

@@ -12,23 +12,12 @@ import type { PoStoreOption, PoVendorOption } from "@/lib/purchase-orders/querie
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
 import { useState } from "react";
 
-/**
- * The PO's own fields — vendor, deliver-to, expected-by, terms, remarks —
- * editable on blur while it's a draft, read-only once issued. Above them,
- * what the order is derived from and never picked here: the company (the
- * project's), the project, the location (its plot or unit, or General)
- * and the date. The project and scope are part of the number and
- * permanent (re-scoping means delete and re-raise). The database guard
- * refuses header edits past draft, so read-only here is honesty, not
- * enforcement.
- */
+// Project and scope are part of the number and permanent (re-scope = delete and re-raise).
+// The guard refuses header edits past draft, so read-only here is honesty, not enforcement.
 export type PoFacts = {
-  /** The project's company, or null while the project has none. */
   company: string | null;
   project: string;
-  /** The plot or unit's name, or "General". */
   location: string;
-  /** Issued on, or raised on while a draft. */
   date: string;
 };
 
@@ -160,8 +149,7 @@ export function HeaderFields({
       <div className="border-border grid gap-4 border-t pt-4 sm:grid-cols-3">
         <div className="space-y-1.5">
           <Label htmlFor="po-header-vendor">Vendor</Label>
-          {/* Saved immediately on change — a select has no meaningful
-              blur (the uom-select rule from the indent grid). */}
+          {/* Saved on change: a select has no meaningful blur. */}
           <Select
             id="po-header-vendor"
             value={vendorValue}
@@ -231,8 +219,7 @@ export function HeaderFields({
           <div className="flex flex-wrap items-end justify-between gap-2">
             <Label htmlFor="po-header-terms">Terms and conditions</Label>
             {termsTemplates.length > 0 && (
-              // A picker that resets itself: choosing a template replaces
-              // the text below, which is then this order's own to edit.
+              // Choosing a template replaces the text below, which is then this order's own to edit.
               <Select
                 value=""
                 onChange={(event) => applyTemplate(event.target.value)}

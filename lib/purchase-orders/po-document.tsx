@@ -16,22 +16,8 @@ import { DEFAULT_COMPANY_STATE, gstRegime } from "@/lib/line-money";
 import { lineFigures, rollUpPo, summaryRows, type PoLineMoney } from "./math";
 import type { PoLineRow, PoPdfData } from "./queries";
 
-/**
- * Document D — the purchase order, the paper a vendor supplies against.
- *
- * Built on the shared shell and blocks (letterhead, heading, details band,
- * table, notes, signatures), so it looks like the same company as every
- * other Goodearth document, and it prints what the PO screen shows: per
- * line the code, material, indent and its work, quantity, rate, discount,
- * taxable value, GST and other charges; then the GST split — CGST + SGST
- * when the vendor is in the company's state, IGST otherwise. Amounts via
- * formatAmount, digits only — Helvetica has no ₹ glyph — with the currency
- * stated once. A draft carries the DRAFT watermark and no signature block.
- *
- * The money here is the vendor's purchase price and its GST. Nothing from
- * Budgets exists on the underlying tables, so nothing from Budgets can
- * appear here — the QuoteData principle, held by the schema itself.
- */
+// Prints the money the PO screen shows: the vendor's price and GST only; nothing from Budgets exists on these tables. Digits only: Helvetica has no ₹ glyph.
+// CGST + SGST in the company's state, IGST otherwise. A draft carries the DRAFT watermark and no signature block.
 
 const styles = StyleSheet.create({
   partyRow: { flexDirection: "row", marginTop: pdf.space.block },

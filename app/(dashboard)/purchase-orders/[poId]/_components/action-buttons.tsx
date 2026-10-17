@@ -29,12 +29,7 @@ import {
 } from "@/lib/purchase-orders/workflow";
 import { useState, useTransition } from "react";
 
-/**
- * Everything that changes a PO's status, in one place. Which buttons
- * appear comes from lib/purchase-orders/workflow.ts; every rule is
- * enforced again by purchase_orders_guard in the database, so a hidden
- * button is a courtesy and the trigger is the actual boundary.
- */
+// Buttons come from lib/purchase-orders/workflow.ts; purchase_orders_guard enforces every rule, so a hidden button is a courtesy.
 export function ActionButtons({
   poId,
   status,
@@ -66,7 +61,6 @@ export function ActionButtons({
       else setRequesting(false);
     });
 
-  // ---- Deletion requested: the admin's decision, or a withdrawal -----
   if (status === "deletion_requested") {
     const mayWithdraw = canWithdrawDeletion(status, actor, deletionRequestedBy);
     const mayApprove = canApproveDeletion(status, actor);
@@ -128,7 +122,6 @@ export function ActionButtons({
     );
   }
 
-  // ---- Issued: anyone with the app may ask for its removal ----------
   if (canRequestDeletion(status)) {
     return (
       <div className="space-y-1 text-right">
@@ -186,17 +179,11 @@ export function ActionButtons({
     );
   }
 
-  // ---- Draft: issue it, or throw it away ----------------------------
   if (status !== "draft") return null;
   const mayDelete = canDeleteDraft(status, actor, createdBy);
 
-  // fullyPriced is the server's snapshot, and rate edits save on blur
-  // WITHOUT revalidating — so right after pricing the lines this prop
-  // still says unpriced, and a button disabled on it stays dead until
-  // an unrelated navigation refreshes the page (a real founder-found
-  // bug). The button therefore only needs lines to exist (adding lines
-  // does revalidate); the pricing rule is checked at click time by the
-  // action and the database guard, where the saved rates are visible.
+  // fullyPriced is the server's snapshot and rate edits save without revalidating, so disabling on it leaves the button dead after pricing.
+  // Only lines must exist here; pricing is checked at click time by the action and the guard.
 
   return (
     <div className="space-y-1 text-right">

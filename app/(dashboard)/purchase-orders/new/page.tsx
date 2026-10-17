@@ -4,7 +4,6 @@ import { PoForm } from "./_components/po-form";
 
 export default async function NewPurchaseOrderPage() {
   const [options, templates] = await Promise.all([getPoFormOptions(), getPoTermsTemplates()]);
-  // The default template leads the list; a new order starts from its text.
   const defaultTerms = templates[0]?.is_default ? templates[0].body : null;
 
   return (

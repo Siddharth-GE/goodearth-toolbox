@@ -12,8 +12,7 @@ export default async function PoPullPage({ params }: { params: Promise<{ poId: s
   const [po, pool] = await Promise.all([getPurchaseOrder(poId), getIndentPool(poId)]);
   if (!po || !pool) notFound();
 
-  // Lines only change while it's a draft — past that, the pool screen
-  // has nothing to offer (and the database would refuse anyway).
+  // Lines only change on a draft (the database would refuse anyway).
   if (!canEditPo(po.status)) redirect(`/purchase-orders/${poId}`);
 
   return (

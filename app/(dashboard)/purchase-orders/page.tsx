@@ -3,9 +3,7 @@ import { getWelcomeCounts } from "@/lib/purchase-orders/queries";
 
 import { ToolWelcome } from "../_components/tool-welcome";
 
-// The welcome screen (founder, 2026-08-13: every Operations and
-// Management tool opens on one). The list lives one click in at
-// /purchase-orders/list. Counts only — PO money stays behind the doors.
+// Counts only: PO money stays behind the doors.
 export default async function PurchaseOrdersPage() {
   const counts = await getWelcomeCounts();
 
