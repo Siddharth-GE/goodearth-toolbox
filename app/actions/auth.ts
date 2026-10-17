@@ -5,7 +5,7 @@
 // Tool-specific actions belong in lib/<tool>/actions.ts instead,
 // alongside that tool's queries.ts (see lib/marathon/actions.ts).
 
-import { checkLockout, clearFailures, lockoutMessage, recordFailure } from "@/lib/auth/rate-limit";
+import { checkLockout, clearFailures, recordFailure } from "@/lib/auth/rate-limit";
 import {
   clearChallenge,
   clearVerified,
@@ -81,7 +81,7 @@ export async function login(_state: LoginState, formData: FormData): Promise<Log
   // Locked out? Say only that — not whether the password would have been
   // right. checkLockout before the guess is examined, like the kiosk.
   const locked = await checkLockout(email, "password");
-  if (locked) return { error: lockoutMessage(locked.lockedUntil) };
+  if (locked) return locked;
 
   const bare = createBareClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -91,9 +91,7 @@ export async function login(_state: LoginState, formData: FormData): Promise<Log
   const { data, error } = await bare.auth.signInWithPassword({ email, password });
 
   if (error || !data.user) {
-    const nowLocked = await recordFailure(email, "password");
-    if (nowLocked) return { error: lockoutMessage(nowLocked.lockedUntil) };
-    return { error: "Incorrect email or password." };
+    return (await recordFailure(email, "password")) ?? { error: "Incorrect email or password." };
   }
   await clearFailures(email, "password");
 
@@ -163,15 +161,17 @@ export async function verifyLoginCode(
   }
 
   const locked = await checkLockout(email, "otp");
-  if (locked) return { error: lockoutMessage(locked.lockedUntil) };
+  if (locked) return locked;
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.verifyOtp({ email, token: code, type: "email" });
 
   if (error || !data.user) {
-    const nowLocked = await recordFailure(email, "otp");
-    if (nowLocked) return { error: lockoutMessage(nowLocked.lockedUntil) };
-    return { error: "That code isn't right — check the latest email." };
+    return (
+      (await recordFailure(email, "otp")) ?? {
+        error: "That code isn't right — check the latest email.",
+      }
+    );
   }
   await clearFailures(email, "otp");
 

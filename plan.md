@@ -38,8 +38,9 @@ Switch day is the founder's to run. Before it, three things must be done:
   - Done: `DATABASES` and `PRODUCTION_SITE`, also read by `check-migrations.ts`; no other file in code names a ref. `dry-run-migrations` now runs on the practice database only, instead of refusing only production. The test was proven to bite with a wrong ref in `ci.yml`.
 - [x] `[Opus]` **H4: Budgets.** `lib/budgets/queries.ts:241` (margins) and `:220` (spaces) must check `error`. A failed read is the error screen, never blank margins saved at cost.
   - Done through the shared `assertRead`. Budgets' other unchecked reads are Phase 2's.
-- [ ] `[Opus]` **M1: lockouts fail closed.** `lib/auth/rate-limit.ts:52, 61, 78` and `lib/marathon/rate-limit.ts:57, 70, 88`.
+- [x] `[Opus]` **M1: lockouts fail closed.** `lib/auth/rate-limit.ts:52, 61, 78` and `lib/marathon/rate-limit.ts:57, 70, 88`.
   - _Check:_ 10 wrong passwords still lock the account for 10 minutes.
+  - Done: each function returns a refusal ready to show; a count it cannot read or write refuses ("Could not check…"), and a failed clear is logged. Run against staging with a made-up address: the 10th wrong password and the 10th wrong PIN lock for 10 minutes, a correct one clears it, and with the database unreachable every check refuses.
 - [ ] `[Sonnet]` **M7: rotate the Marathon admin PIN.** `0002` seeds "2026" in this public repo. `scripts/rotate-marathon-pins.ts` must also rotate `marathon_config`'s admin PIN, and SHIPPING.md runs it on every new database.
 - [ ] `[Opus]` **BUGCATCHER #21 and #22.**
   - [x] #21: a sandbox that lists the types it covers leaves every other type open.

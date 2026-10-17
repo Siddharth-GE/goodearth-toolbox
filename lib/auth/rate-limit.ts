@@ -5,29 +5,28 @@ import { lockoutMessage, nextAttempt } from "./lockout";
 
 /**
  * DB-backed guessing limits for the sign-in flow — the password step,
- * the emailed code, and reset requests. The shape is lib/marathon/
- * rate-limit.ts (0015), pointed at login_attempts (0062): a table
- * rather than in-memory counters because Vercel's serverless functions
- * share no memory between invocations, so an in-process counter would
- * reset with every cold start and protect nothing.
- *
- * login_attempts is deny-all under RLS (0062) — the service-role client
- * is the only way in, on purpose: the people being counted are exactly
- * the people who must not be able to reset the count.
+ * the emailed code, and reset requests — in `login_attempts` (0062): a
+ * table, because serverless functions share no memory between calls.
+ * Deny-all under RLS, so only the service-role client reaches it: the
+ * people being counted must not be able to reset the count.
  *
  * checkLockout is called BEFORE the guess is examined, so a locked-out
- * attacker isn't even told whether it was right.
+ * attacker isn't even told whether it was right. Every function fails
+ * closed: a count it cannot read or write refuses the attempt.
  */
 
 export type AttemptKind = "password" | "otp" | "reset";
 
-export type LockoutState = { lockedUntil: Date } | null;
+/** A refusal ready to show, or null to carry on. */
+export type Refusal = { error: string } | null;
+
+const UNAVAILABLE: Refusal = { error: "Could not check your sign-in just now. Try again." };
 
 function normalize(email: string) {
   return email.trim().toLowerCase();
 }
 
-export async function checkLockout(email: string, kind: AttemptKind): Promise<LockoutState> {
+export async function checkLockout(email: string, kind: AttemptKind): Promise<Refusal> {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("login_attempts")
@@ -35,30 +34,37 @@ export async function checkLockout(email: string, kind: AttemptKind): Promise<Lo
     .eq("target", normalize(email))
     .eq("kind", kind)
     .maybeSingle();
-  if (error) console.error("checkLockout failed:", error);
+  if (error) {
+    console.error("checkLockout failed:", error);
+    return UNAVAILABLE;
+  }
 
   if (!data?.locked_until) return null;
   const lockedUntil = new Date(data.locked_until);
-  return lockedUntil > new Date() ? { lockedUntil } : null;
+  return lockedUntil > new Date() ? { error: lockoutMessage(lockedUntil) } : null;
 }
 
 /** Records a failure (or, for 'reset', another request) and locks the
  * target if there have been too many inside the rolling window. */
-export async function recordFailure(email: string, kind: AttemptKind): Promise<LockoutState> {
+export async function recordFailure(email: string, kind: AttemptKind): Promise<Refusal> {
   const supabase = createAdminClient();
   const now = new Date();
   const target = normalize(email);
 
-  const { data: existing } = await supabase
+  const { data: existing, error: readError } = await supabase
     .from("login_attempts")
     .select("failed_count, window_started_at")
     .eq("target", target)
     .eq("kind", kind)
     .maybeSingle();
+  if (readError) {
+    console.error("recordFailure read failed:", readError);
+    return UNAVAILABLE;
+  }
 
-  const next = nextAttempt(existing ?? null, now);
+  const next = nextAttempt(existing, now);
 
-  await supabase.from("login_attempts").upsert(
+  const { error: writeError } = await supabase.from("login_attempts").upsert(
     {
       target,
       kind,
@@ -68,14 +74,22 @@ export async function recordFailure(email: string, kind: AttemptKind): Promise<L
     },
     { onConflict: "target,kind" },
   );
+  if (writeError) {
+    console.error("recordFailure write failed:", writeError);
+    return UNAVAILABLE;
+  }
 
-  return next.lockedUntil ? { lockedUntil: next.lockedUntil } : null;
+  return next.lockedUntil ? { error: lockoutMessage(next.lockedUntil) } : null;
 }
 
-/** A correct guess wipes the slate — nothing to carry forward. */
+/** A correct guess wipes the slate. A failure to wipe only leaves old
+ * failures counting, so it is logged, not refused. */
 export async function clearFailures(email: string, kind: AttemptKind) {
   const supabase = createAdminClient();
-  await supabase.from("login_attempts").delete().eq("target", normalize(email)).eq("kind", kind);
+  const { error } = await supabase
+    .from("login_attempts")
+    .delete()
+    .eq("target", normalize(email))
+    .eq("kind", kind);
+  if (error) console.error("clearFailures failed:", error);
 }
-
-export { lockoutMessage };
