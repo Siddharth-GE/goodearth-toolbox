@@ -16,11 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { approveReconciliation } from "@/lib/estimator/estimate-actions";
 import { useState, useTransition } from "react";
 
-/**
- * Approve one "outside the estimate" arrival. Approval never clears
- * the flag — the entry sits in the estimate forever with its badge;
- * this records that an estimator has seen it, and why it was needed.
- */
+/** Approve one "outside the estimate" arrival. Approval never clears the flag; it records that an estimator has seen it, and why it was needed. */
 export function ApproveReconciliationButton({
   estimateId,
   itemId,

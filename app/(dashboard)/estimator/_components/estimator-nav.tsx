@@ -1,10 +1,6 @@
 import { ToolNav } from "@/components/ui/tool-nav";
 
-/**
- * Separate routes with their own data and their own loading.tsx, not
- * panels of one page (the FmNav reasoning). Ordered by how
- * often they are opened, not by how they are set up.
- */
+/** Separate routes with their own data and loading.tsx, not panels of one page. Ordered by how often they are opened. */
 const TABS = [
   { key: "estimates", href: "/estimator/estimates", label: "Estimates" },
   { key: "works", href: "/estimator/works", label: "Rate book" },

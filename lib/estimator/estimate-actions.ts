@@ -1,10 +1,7 @@
 "use server";
 
-// Type-only import, and deliberately NOT re-exported: a bare
-// `export type { ActionState }` in a "use server" file survives into the
-// compiled module's runtime export list, where the type doesn't exist —
-// every action in the chunk then dies at module load (the 2026-08-03
-// production outage). Import it from "@/lib/action-state" instead.
+// Type-only import, deliberately not re-exported: a re-exported type in a "use server" file kills every action
+// in the chunk at module load. Import it from "@/lib/action-state".
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { parseNumber, text } from "@/lib/form-data";
@@ -22,18 +19,8 @@ import { redirect } from "next/navigation";
 import { GRANT, NAME_LIMIT, TEXT_LIMIT } from "./shared";
 import { syncLineQty } from "./sheet-sync";
 
-// ---------------------------------------------------------------------
-// Estimates
-// ---------------------------------------------------------------------
-
-/**
- * Start a villa's working estimate (0098) — blank, or from another
- * estimate: another villa's (its works, as a head start — every villa is
- * different, so quantities come across only when asked), or this villa's
- * own official one (everything, to carry on from it). One database call,
- * so a half-made copy can't be left behind; the database refuses a second
- * working estimate for the same villa.
- */
+/** Start a villa's working estimate (0098), blank or copied from another estimate (quantities come across only when asked).
+ * One database call, so no half-made copy; the database refuses a second working estimate per villa. */
 export async function startVillaEstimate(
   _state: ActionState,
   formData: FormData,
@@ -50,8 +37,7 @@ export async function startVillaEstimate(
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("start_villa_estimate", {
     p_unit: unitId,
-    // Null starts it blank; the generated types can't say an argument
-    // may be null.
+    // Null starts it blank; the generated types cannot say an argument may be null.
     p_source: (sourceId || null) as string,
     p_everything: everything,
     p_name: (name || null) as string,
@@ -100,9 +86,7 @@ export async function deleteEstimate(id: string): Promise<ActionState> {
   await requireTool(GRANT);
   const supabase = await createClient();
 
-  // Only drafts delete (the 0077 policy); delete_draft_estimate (0098)
-  // takes the snapshot, prices, sheets, materials and lines first, in one
-  // transaction — a failure leaves the draft whole, never half-stripped.
+  // Only drafts delete (0077). delete_draft_estimate (0098) strips everything in one transaction.
   const { error } = await supabase.rpc("delete_draft_estimate", { p_estimate: id });
   if (error) {
     if (error.code === "P0001") return { error: error.message };
@@ -114,13 +98,8 @@ export async function deleteEstimate(id: string): Promise<ActionState> {
   redirect("/estimator/estimates");
 }
 
-/**
- * Put works on an estimate — any works, set up in the rate book or not,
- * all at once. They arrive "to measure" (0097: no quantity yet), so
- * nobody types a throwaway number to get past the form; the measurement
- * sheet or the quantity box fills them in. Works already on the estimate
- * are skipped, not doubled (one line per work, 0074).
- */
+/** Put works on an estimate, set up or not. They arrive "to measure" (0097: no quantity yet).
+ * Works already on the estimate are skipped (one line per work, 0074). */
 export async function addEstimateLines(
   estimateId: string,
   workItemIds: string[],
@@ -167,7 +146,7 @@ export async function addEstimateLines(
   return undefined;
 }
 
-/** A typed quantity — or blank, which puts the work back to "to measure". */
+/** A typed quantity, or blank to put the work back to "to measure". */
 export async function updateEstimateLineQty(id: string, qty: number | null): Promise<ActionState> {
   const user = await requireTool(GRANT);
   if (qty !== null && (typeof qty !== "number" || !Number.isFinite(qty) || qty <= 0)) {
@@ -176,8 +155,7 @@ export async function updateEstimateLineQty(id: string, qty: number | null): Pro
 
   const supabase = await createClient();
 
-  // A measured line's quantity IS its sheet's total (0096) — typing over
-  // it would leave the rows saying one thing and the BOQ another.
+  // A measured line's quantity IS its sheet total (0096); typing over it would split the sheet from the BOQ.
   const { count, error: countError } = await supabase
     .from("estimator_estimate_line_measurements")
     .select("id", { count: "exact", head: true })
@@ -209,8 +187,7 @@ export async function removeEstimateLine(id: string): Promise<ActionState> {
   await requireTool(GRANT);
   const supabase = await createClient();
 
-  // The line's measurement sheet (0096) and variation (0087) go with
-  // it — RESTRICT, not cascade.
+  // The line's measurement sheet (0096) and variation (0087) go with it: RESTRICT, not cascade.
   const { error: measurementError } = await supabase
     .from("estimator_estimate_line_measurements")
     .delete()
@@ -240,28 +217,13 @@ export async function removeEstimateLine(id: string): Promise<ActionState> {
   return undefined;
 }
 
-/* ------------------------------------------------------------------ *
- * The measurement sheet (0096) — the QS layer under a line
- *
- * One row per wall, slab or footing: Nos × Length × Breadth × Depth,
- * a blank box not used (founder, 2026-09-25). The line's qty stays the
- * one figure everything downstream reads; after every row change the
- * action re-sums the sheet through calc.ts and writes it there. The
- * draft-only trigger is the boundary; these actions speak plainly. The
- * row rules are measurement-rules.ts and the re-sum sheet-sync.ts, the
- * same ones an import from a SketchUp model goes through.
- *
- * A row the model wrote (0118, from_model) is changed in the model and
- * sent again, never on the sheet (founder, 2026-10-15): edit, remove and
- * duplicate refuse it, because the next send would replace the edit.
- * Copying it to another work makes a hand row — that copy is the
- * estimator's own.
- * ------------------------------------------------------------------ */
+/* Measurement sheet actions (0096). The line's qty stays the one figure downstream; each row change re-sums
+ * the sheet through calc.ts. Row rules: measurement-rules.ts; re-sum: sheet-sync.ts (shared with the SketchUp import).
+ * A row from the model (0118, from_model) is changed in the model and re-sent, so edit, remove and duplicate refuse it. */
 
 const MODEL_ROW =
   "This row came from the SketchUp model — change it in the model and send it to the toolbox again.";
 
-/** Whether a row is the model's, before an edit or a removal. */
 async function readRowSource(
   supabase: Awaited<ReturnType<typeof createClient>>,
   id: string,
@@ -298,7 +260,6 @@ export async function addLineMeasurement(
 
   const supabase = await createClient();
 
-  // New rows go to the bottom of the sheet.
   const { data: last, error: lastError } = await supabase
     .from("estimator_estimate_line_measurements")
     .select("sort_order")
@@ -336,11 +297,8 @@ export async function updateLineMeasurement(
   const user = await requireTool(GRANT);
   if (!id) return { error: "Which row?" };
 
-  // A server action's argument is whatever the caller sent, not what the
-  // type says. Build the update from exactly these five fields — never a
-  // spread — so extra keys (line_id, created_by, …) can't ride along
-  // and move a row onto another work. A box that isn't a number or null
-  // becomes NaN, which checkMeasurement refuses.
+  // A server action's argument is whatever the caller sent. Build the update from exactly these five fields, never a
+  // spread, so extra keys cannot move a row onto another work. A non-number becomes NaN, which checkMeasurement refuses.
   const box = (value: unknown): number | null =>
     value === null ? null : typeof value === "number" ? value : Number.NaN;
   const cleaned: MeasurementFields = {
@@ -405,12 +363,7 @@ export async function removeLineMeasurement(id: string): Promise<ActionState> {
   return syncError ? { error: syncError } : undefined;
 }
 
-/**
- * Duplicate one row onto the bottom of its own sheet — the second
- * identical wall or footing is one tap, then the person changes what
- * differs. Read from the database, not the browser, so only a row
- * already on the sheet can be copied, and only onto its own line.
- */
+/** Duplicate a row onto its own sheet. Read from the database, so only a row already there can be copied. */
 export async function duplicateLineMeasurement(id: string): Promise<ActionState> {
   const user = await requireTool(GRANT);
   if (!id) return { error: "Which row?" };
@@ -462,13 +415,7 @@ export async function duplicateLineMeasurement(id: string): Promise<ActionState>
   return syncError ? { error: syncError } : undefined;
 }
 
-/**
- * Copy one work's measurement rows onto another work of the same
- * estimate — a wall measured once for brickwork is the same wall for its
- * plaster and its paint. The rows land at the bottom of the other sheet
- * as they are; the person then adjusts what differs (plaster has no
- * thickness), because the app never converts units.
- */
+/** Copy one work's rows onto another work of the same estimate. They land as they are; the app never converts units. */
 export async function copyMeasurementRows(
   fromLineId: string,
   toLineId: string,
@@ -537,23 +484,11 @@ export async function copyMeasurementRows(
   return syncError ? { error: syncError } : undefined;
 }
 
-/* ------------------------------------------------------------------ *
- * This villa's materials for a work (0087) — "every house is different"
- *
- * The rate book (the Works tab) is the standard. A villa line follows it
- * until something about its materials is changed: the FIRST change
- * copies the rate book's list onto the line (copy-on-write — there is no
- * separate "Customise" step any more), and from then on that list —
- * whole, not a delta — is what the line means. Back to the rate book
- * deletes it. Removing the last material does the same: an empty own
- * list is not something the database can tell from "follow the rate
- * book". The draft-only trigger is the boundary; these actions just
- * speak plainly.
- * ------------------------------------------------------------------ */
+/* This villa's materials for a work (0087). A line follows the rate book until the FIRST change copies its list onto
+ * the line (copy-on-write); that list is then the whole truth, not a delta. Removing the last material also returns
+ * to the rate book, since an empty own list is indistinguishable from "follow". */
 
-/** What can change in a villa's list, addressed by what a row names —
- * "material:<item id>" or "mix:<mix id>" — because a row that still
- * follows the rate book has no id of its own on this line. */
+/** Addressed as "material:<item id>" or "mix:<mix id>": a row still following the rate book has no id on this line. */
 export type RecipeChange =
   | { op: "add"; ref: string; qty: number }
   | { op: "qty"; ref: string; qty: number }
@@ -571,8 +506,7 @@ function parseRef(ref: unknown): { item_id: string | null; mix_id: string | null
   return null;
 }
 
-/** Copy the rate book's list onto the line if it has none of its own
- * yet. A message on failure, undefined when the line now owns its list. */
+/** Copy the rate book's list onto the line if it has none. Message on failure, undefined when the line owns its list. */
 async function ensureOwnRecipe(
   supabase: Awaited<ReturnType<typeof createClient>>,
   lineId: string,
@@ -607,8 +541,7 @@ async function ensureOwnRecipe(
     console.error("ensureOwnRecipe (rate book) failed:", standardError);
     return "Could not read the rate book. Try again.";
   }
-  // A row from before 0086 names neither an item nor a mix; it counts for
-  // nothing in the rate book, so it is not carried into the villa's copy.
+  // A pre-0086 row names neither an item nor a mix, so it is not carried into the villa's copy.
   const rows = (standard ?? []).filter((row) => row.item_id || row.mix_id);
   if (rows.length === 0) return undefined; // labour only: the first add starts the list
 
@@ -703,12 +636,7 @@ export async function changeLineRecipe(lineId: string, change: RecipeChange): Pr
   return undefined;
 }
 
-/**
- * This villa's labour rate for one work (0088) — null clears it and the
- * work's standard rate shows through again. Zero is a real rate (labour
- * inside a contract), not "unpriced", so it is saved as 0 and only an
- * empty box clears. The 0077 draft-only line guard is the boundary.
- */
+/** This villa's labour rate (0088); null clears it. Zero is a real rate (labour in a contract), so only an empty box clears. */
 export async function updateEstimateLineLabourRate(
   lineId: string,
   rate: number | null,
@@ -734,12 +662,7 @@ export async function updateEstimateLineLabourRate(
   return undefined;
 }
 
-/**
- * This villa's price for one material (0088). Per ESTIMATE, not per
- * line: cement costing more at a far plot costs more for every work
- * that uses it, and one row per material makes two works disagreeing
- * impossible.
- */
+/** This villa's price for one material (0088). Per ESTIMATE, not per line, so two works cannot disagree. */
 export async function setEstimateItemRate(
   estimateId: string,
   itemId: string,
@@ -751,7 +674,7 @@ export async function setEstimateItemRate(
 
   const supabase = await createClient();
 
-  // Blank clears the override — back to the price in Masters.
+  // Blank clears the override.
   if (rate === null) {
     const { error } = await supabase
       .from("estimator_estimate_item_rates")
@@ -771,11 +694,8 @@ export async function setEstimateItemRate(
     return { error: "The price must be a number, or left blank to use the price in Masters." };
   }
 
-  // Update-then-insert, not upsert: the uniqueness is a PARTIAL index
-  // (one per source column, because a table-level UNIQUE over nullable
-  // columns allows duplicates), and PostgREST cannot infer a conflict
-  // target from a partial index. This order also never leaves the
-  // material momentarily unpriced, which delete-then-insert would.
+  // Update-then-insert, not upsert: the uniqueness is a PARTIAL index and PostgREST cannot infer a conflict target from it.
+  // This order also never leaves the material momentarily unpriced.
   const { error: updateError, count } = await supabase
     .from("estimator_estimate_item_rates")
     .update({ rate, updated_by: user.id }, { count: "exact" })
@@ -824,20 +744,9 @@ export async function resetEstimateLine(lineId: string): Promise<ActionState> {
   return undefined;
 }
 
-/**
- * Make official (0098) — the villa's working estimate becomes a numbered,
- * frozen estimate, the one the stores and site check against, and the
- * working estimate stays open for the next change.
- *
- * The arithmetic lives in calc.ts and nowhere else, so the app computes
- * the snapshot here — per-work costs and the per-(work, item) takeoff —
- * and make_estimate_official() does the rest in one transaction: copies
- * the working estimate into a new header with its sheets, materials and
- * prices, writes the snapshot, refuses if the snapshot no longer matches
- * what it copied (an edit made in between), then mints the number and
- * supersedes the villa's previous official through 0077's
- * submit_estimate().
- */
+/** Make official (0098): the working estimate becomes a numbered, frozen one; the working one stays open.
+ * calc.ts is the only arithmetic, so the app computes the snapshot and make_estimate_official() copies and
+ * freezes in one transaction, refusing if the snapshot no longer matches what it copied. */
 export async function makeOfficial(workingId: string): Promise<ActionState> {
   await requireTool(GRANT);
   const supabase = await createClient();
@@ -856,8 +765,7 @@ export async function makeOfficial(workingId: string): Promise<ActionState> {
     return { error: "Only a villa's working estimate can be made official." };
   }
 
-  // The recipe book and the variations read to completion and throw on
-  // a failed page (fetchAll); an action answers with ActionState instead.
+  // These reads throw on a failed page (fetchAll); an action answers with ActionState instead.
   let book: Awaited<ReturnType<typeof getRecipeBook>>;
   let variations: Awaited<ReturnType<typeof getEstimateVariations>>;
   try {
@@ -884,8 +792,7 @@ export async function makeOfficial(workingId: string): Promise<ActionState> {
     };
   }
 
-  // This villa's own figures replace the rate book's before any
-  // arithmetic runs — the freeze captures what THIS house means.
+  // This villa's own figures replace the rate book's before any arithmetic, so the freeze captures this house.
   const materialsById = new Map(
     applyRateOverrides(
       [...book.materials, ...variations.extraMaterials],
@@ -918,8 +825,7 @@ export async function makeOfficial(workingId: string): Promise<ActionState> {
       total_cost: cost.totalCost,
     };
   });
-  // Every material a recipe can name is a master item (0086), so the
-  // snapshot anchors on item_id and leaves the retired column null.
+  // Every recipe material is a master item (0086), so the snapshot anchors on item_id.
   const takeoff = computeWorkTakeoff(lineInputs, recipesByWork, mixesById).map((row) => {
     const material = materialsById.get(row.materialId);
     return {
@@ -953,18 +859,8 @@ export async function makeOfficial(workingId: string): Promise<ActionState> {
   return undefined;
 }
 
-// ---------------------------------------------------------------------
-// Reconciliation approvals (0083)
-// ---------------------------------------------------------------------
-
-/**
- * Acknowledge material that reached the villa outside the official
- * estimate. It counts for the villa's later official estimates too
- * (founder, 2026-09-26). The approval does NOT clear the flag — the founder's rule
- * is that an unplanned arrival sits in the estimate forever with its
- * badge; approving records that an estimator has seen it and stands by
- * it, with an optional note saying why it was needed.
- */
+/** Acknowledge material that reached the villa outside the official estimate; it counts for later officials too.
+ * It does NOT clear the flag: the arrival stays badged forever, approval records that an estimator stands by it. */
 export async function approveReconciliation(input: {
   estimateId: string;
   itemId: string;
@@ -981,9 +877,7 @@ export async function approveReconciliation(input: {
 
   const supabase = await createClient();
 
-  // Only the villa's OFFICIAL estimate carries the comparison, so only
-  // it can be reconciled against — a draft has nothing frozen to be
-  // outside of, and a superseded estimate has been replaced.
+  // Only an OFFICIAL estimate has a frozen plan to be outside of.
   const { data: estimate, error: readError } = await supabase
     .from("estimator_estimates")
     .select("status")
@@ -1008,7 +902,7 @@ export async function approveReconciliation(input: {
   });
   if (error) {
     if (error.code === "23505") {
-      // Two estimators looked at once; the first approval stands.
+      // Two estimators at once: the first approval stands.
       revalidatePath("/estimator", "layout");
       return undefined;
     }

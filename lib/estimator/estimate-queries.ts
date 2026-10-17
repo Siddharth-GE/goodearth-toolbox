@@ -8,40 +8,8 @@ import type { FrozenLineRow, FrozenTakeoffRow, MaterialDef, MixDef, WorkRecipe }
 import { compareIssuesToEstimate, type Comparison } from "./compare";
 import { fail, GRANT, itemDefsByIds } from "./shared";
 
-/**
- * Reads for the Estimator — the welcome counts, the recipe book, per-villa
- * variations, and estimates themselves (mixes and works have their own
- * files: mixes-queries.ts, works-queries.ts; shared.ts carries the
- * materials/uom reads both of those lean on).
- *
- * Every function opens with `requireTool("/estimator")`. The 0074
- * policies gate SELECT as well as writes, so an ungranted person would
- * get an empty list rather than an error — which reads as "no materials
- * set up yet" instead of "not for you". The explicit check redirects
- * them instead of lying (the Financial Management reasoning, kept).
- *
- * From outside this tool it reads the shared surfaces — the works
- * vocabulary (`lib/masters/works.ts`), items, projects, units, profiles —
- * and, for issued-against-estimate, Inventory's open quantity tables
- * (stock issues and direct-to-site receipts: no money in either).
- * Inventory never reads the Estimator's tables.
- *
- * No embeds: the estimates list needs villa names, and `units` has had
- * two foreign keys to `plots` since 0029, so a bare embed answers HTTP
- * 300 at runtime while compiling perfectly (BUGCATCHER #2). Names are
- * merged through a Map instead — the Directory pattern.
- *
- * Since 0086 the material vocabulary IS the items master (founder:
- * "materials are exactly the same as in the items master") — the rate
- * is `items.indicative_price` and the unit is `items.default_uom`.
- * The retired `estimator_materials` list is no longer read at all: a
- * recipe row from before that day counts for nothing, and a frozen
- * takeoff row from before it shows by its frozen name, uncompared.
- */
-
-// ---------------------------------------------------------------------
-// Welcome
-// ---------------------------------------------------------------------
+// Every function opens with requireTool: 0074 gates SELECT too, so an ungranted person would see empty lists, not an error.
+// No embeds: units has two FKs to plots (BUGCATCHER #2), so names merge through a Map.
 
 export async function getWelcomeCounts(): Promise<{
   estimates: number;
@@ -62,7 +30,7 @@ export async function getWelcomeCounts(): Promise<{
       .select("id", { count: "exact", head: true })
       .eq("status", "submitted"),
     supabase.from("estimator_work_info").select("id", { count: "exact", head: true }),
-    // Since 0086 the material list IS the items master's material band.
+    // The material list is the items master's material band (0086).
     supabase
       .from("items")
       .select("id", { count: "exact", head: true })
@@ -78,12 +46,7 @@ export async function getWelcomeCounts(): Promise<{
   };
 }
 
-// ---------------------------------------------------------------------
-// The recipe book — everything calc.ts needs, in one read
-// ---------------------------------------------------------------------
-
 export type RecipeBook = {
-  /** Every material a recipe or mix names — master items, since 0086. */
   materials: MaterialDef[];
   mixes: MixDef[];
   recipes: WorkRecipe[];
@@ -129,8 +92,7 @@ export async function getRecipeBook(): Promise<RecipeBook> {
     ),
   ]);
 
-  // A row from before 0086 names neither an item nor a mix — it counts
-  // for nothing (the screens label it so it can be removed).
+  // A pre-0086 row names neither an item nor a mix, so it counts for nothing.
   const itemDefs = await itemDefsByIds(supabase, [
     ...new Set(
       [...mixComponents, ...workComponents].flatMap((row) => (row.item_id ? [row.item_id] : [])),
@@ -177,12 +139,6 @@ export async function getRecipeBook(): Promise<RecipeBook> {
   };
 }
 
-// ---------------------------------------------------------------------
-// Per-villa variations (0087)
-// ---------------------------------------------------------------------
-
-/** One row of a line's own recipe, raw — the screen resolves names
- * through the book and extraMaterials. */
 export type LineVariationRow = {
   id: string;
   itemId: string | null;
@@ -191,16 +147,13 @@ export type LineVariationRow = {
 };
 
 export type EstimateVariations = {
-  /** line_id → its components. A line present here IS customised: its
-   * list replaces the standard whole (0087 — no deltas). */
+  /** A line present here IS customised: its list replaces the standard whole (0087). */
   byLine: Map<string, LineVariationRow[]>;
-  /** work_item_id → calc-ready components, for merging into recipes. */
   byWork: Map<string, WorkRecipe["components"]>;
   /** work_item_id → this villa's labour rate (0088). Absent = standard. */
   labourRateByWork: Map<string, number>;
   /** item id → this villa's price (0088). Absent = Masters'. */
   rateByMaterialId: Map<string, number>;
-  /** Defs for variation items the global book may not know. */
   extraMaterials: MaterialDef[];
 };
 
@@ -235,8 +188,7 @@ export async function getEstimateVariations(estimateId: string): Promise<Estimat
     ),
   ]);
 
-  // Prices are per (estimate, material) — no line needed, so they stand
-  // even on an estimate whose works carry no recipe variation.
+  // Prices are per (estimate, material), so they stand without a recipe variation.
   const rateByMaterialId = new Map<string, number>();
   for (const row of itemRates) {
     if (row.item_id) rateByMaterialId.set(row.item_id, row.rate);
@@ -274,7 +226,6 @@ export async function getEstimateVariations(estimateId: string): Promise<Estimat
 
   const byLine = new Map<string, LineVariationRow[]>();
   for (const row of components) {
-    // A row from before 0086 names neither — it counts for nothing.
     if (!row.item_id && !row.mix_id) continue;
     const bucket = byLine.get(row.line_id) ?? [];
     bucket.push({
@@ -310,12 +261,7 @@ export async function getEstimateVariations(estimateId: string): Promise<Estimat
   };
 }
 
-// ---------------------------------------------------------------------
-// The measurement sheet (0096) — the QS layer under a line
-// ---------------------------------------------------------------------
-
-/** One measurement row, raw — the screen works out its quantity through
- * calc.ts (measurementQuantity), never here. A blank box is null. */
+/** Raw row; its quantity comes from calc.ts measurementQuantity, never here. Blank box = null. */
 export type MeasurementRow = {
   id: string;
   description: string | null;
@@ -324,17 +270,11 @@ export type MeasurementRow = {
   breadth: number | null;
   depth: number | null;
   sortOrder: number;
-  /** Written by an import from a SketchUp model (0118) — changed in the
-   * model, not on the sheet. */
+  /** Set by a SketchUp import (0118): change it in the model, not on the sheet. */
   fromModel: boolean;
 };
 
-/**
- * line_id → its measurement rows, in sheet order. A line present here
- * is MEASURED: its quantity is the sheet's total, kept on the line by
- * the actions after every change. A line absent here keeps the quantity
- * that was typed for it.
- */
+/** line_id → its rows in sheet order. A line present here is MEASURED: its quantity is the sheet total. */
 export async function getEstimateMeasurements(
   estimateId: string,
 ): Promise<Map<string, MeasurementRow[]>> {
@@ -392,13 +332,7 @@ export async function getEstimateMeasurements(
   return byLine;
 }
 
-// ---------------------------------------------------------------------
-// Estimates
-// ---------------------------------------------------------------------
-
-/** One villa, as the estimates screen lists it (0098): its working
- * estimate, its official one, and any older drafts left from before a
- * villa had exactly one working estimate. */
+/** One villa: its working estimate, its official one, and older drafts from before one-working-estimate (0098). */
 export type VillaEstimates = {
   unitId: string;
   unitName: string;
@@ -415,11 +349,7 @@ export type VillaEstimates = {
   olderDrafts: { id: string; name: string }[];
 };
 
-/**
- * Every villa of every project with what the Estimator holds for it.
- * Names are merged through Maps rather than embedded — see the module
- * note (units has two paths to plots).
- */
+/** Names merge through Maps, not embeds (units has two paths to plots). */
 export async function listVillas(): Promise<VillaEstimates[]> {
   await requireTool(GRANT);
   const supabase = await createClient();
@@ -541,7 +471,6 @@ export type EstimateDetail = {
   name: string;
   note: string | null;
   isTemplate: boolean;
-  /** The villa's working estimate (0098). */
   isWorking: boolean;
   projectId: string;
   projectName: string;
@@ -554,17 +483,10 @@ export type EstimateDetail = {
   submittedByName: string | null;
   submittedAt: string | null;
   supersededAt: string | null;
-  /** The same villa's working estimate, when this is not it. */
   villaWorkingId: string | null;
-  /** The same villa's current official estimate, when this is not it. */
   villaOfficial: { id: string; reference: string | null } | null;
-  /** The SketchUp model this working estimate was last measured from (0118). */
   model: { file: string | null; importedAt: string; importedByName: string | null } | null;
-  /**
-   * The 0077 snapshot, present whenever the estimate is no longer a
-   * draft. The screen renders THIS — costs frozen on the day of submit
-   * — through the same calc.ts grouping as a live draft.
-   */
+  /** The 0077 snapshot, present once past draft. The screen renders it: costs frozen at submit. */
   frozen: {
     lineCosts: FrozenLineRow[];
     takeoff: FrozenTakeoffRow[];
@@ -621,9 +543,6 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
   const itemById = new Map(items.map((item) => [item.id, item]));
   const categoryById = new Map(categories.map((c) => [c.id, c]));
 
-  // The lifecycle extras: who submitted, where the villa's working and
-  // official estimates are, and the frozen snapshot for anything past
-  // draft. Fetched after the header because all three hang off it.
   const [submitter, importer, siblings, frozenCosts, frozenTakeoff] = await Promise.all([
     estimate.submitted_by
       ? supabase.from("profiles").select("full_name").eq("id", estimate.submitted_by).maybeSingle()
@@ -728,8 +647,7 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
             })),
             takeoff: frozenTakeoff.map((row) => ({
               workItemId: row.work_item_id,
-              // A row frozen before 0086 names no item; it groups by its
-              // own retired id and shows by its frozen name.
+              // A pre-0086 row names no item: it groups by its retired id and shows its frozen name.
               materialId: row.item_id ?? `older:${row.material_id ?? ""}`,
               itemId: row.item_id,
               materialName: row.material_name,
@@ -752,41 +670,26 @@ export async function getEstimate(estimateId: string): Promise<EstimateDetail | 
           note: line.note,
         };
       })
-      // Sheet order: the works vocabulary is already sorted, so sorting
-      // by code keeps an estimate reading the way the site team reads it.
+      // Sorted by work code, the order the site team reads.
       .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true })),
   };
 }
 
-// ---------------------------------------------------------------------
-// Issued against the official estimate (0080)
-// ---------------------------------------------------------------------
-
 export type IssuedAgainstEstimate = {
-  /** One line per issue line to the villa's plot, work included. */
   lines: { workItemId: string | null; itemId: string; quantity: number }[];
-  /** Item names and units for the outside-the-estimate list. */
   itemNamesById: Map<string, string>;
   itemUomById: Map<string, string>;
 };
 
-/**
- * Every quantity that reached the estimate's villa, with the work it
- * was tagged with: stock issues out of a store (0080) AND deliveries
- * received straight to site (0081) — a to-site GRN never passes
- * through a store, so skipping it would under-count everything bought
- * in bulk and unloaded at the plot. Inventory's reads are open to all
- * signed-in staff (no money anywhere in that tool), so this needs no
- * view — the one-way rule stays: Inventory never reads the estimator's
- * tables, the estimator reads Inventory's open quantities.
- */
+/** Stock issues AND direct-to-site GRNs (0080, 0081); a to-site GRN never passes a store.
+ * Inventory's reads are open to all staff (no money), so no view is needed. */
 export async function getIssuedAgainstEstimate(
   unitId: string,
 ): Promise<IssuedAgainstEstimate | null> {
   await requireTool(GRANT);
   const supabase = await createClient();
 
-  // The villa's plot: strictly 1:1 since 0029.
+  // The villa's plot: 1:1 (0029).
   const { data: unit, error: unitError } = await supabase
     .from("units")
     .select("plot_id")
@@ -804,8 +707,7 @@ export async function getIssuedAgainstEstimate(
         .order("id")
         .range(from, to),
     ),
-    // Direct-to-site deliveries: matched on the plot OR the unit — a
-    // to-site GRN carries whichever its PO named (0023).
+    // To-site GRNs carry the plot or the unit, whichever the PO named (0023).
     fetchAll<{ id: string; work_item_id: string | null }>((from, to) =>
       supabase
         .from("goods_receipts")
@@ -877,10 +779,6 @@ export async function getIssuedAgainstEstimate(
   };
 }
 
-// ---------------------------------------------------------------------
-// Reconciliation approvals (0083)
-// ---------------------------------------------------------------------
-
 export type ReconciliationApproval = {
   workItemId: string | null;
   itemId: string;
@@ -889,17 +787,8 @@ export type ReconciliationApproval = {
   approvedAt: string;
 };
 
-/**
- * The estimator's acknowledgements of material that reached the villa
- * outside the official estimate's plan — from ANY of the villa's official
- * estimates (founder, 2026-09-26: once Make official is routine, an
- * approved arrival stays approved; re-asking on every new official would
- * bury the list). Matched by (work, item), the same as before. The PENDING side is never
- * stored — compare.ts derives it from what actually arrived — so this
- * reads only the approvals and the page lines the two up by
- * (work, item). The flag itself is permanent either way; an approval
- * changes who has looked, not what happened.
- */
+/** Approvals from ANY of the villa's official estimates, so an approved arrival stays approved.
+ * The pending side is derived in compare.ts, never stored. */
 export async function getReconciliationApprovals(
   estimateId: string,
 ): Promise<ReconciliationApproval[]> {
@@ -953,16 +842,8 @@ export async function getReconciliationApprovals(
   }));
 }
 
-/* ------------------------------------------------------------------ *
- * Every official estimate against what reached its villa — the Site
- * check list and the welcome's over-estimate count (Phase 2 Step I).
- *
- * Derived fresh from the frozen takeoffs and the plots' movements, never
- * stored (the 0083 principle), so a revision that now covers the
- * material clears an entry by itself. Batched: a handful of reads for
- * ALL officials, not several per villa — the welcome renders on every
- * visit.
- * ------------------------------------------------------------------ */
+/* Derived fresh from frozen takeoffs and plot movements, never stored (0083).
+ * Batched for all officials because the welcome renders on every visit. */
 
 export type OfficialComparison = {
   estimateId: string;
@@ -1071,7 +952,6 @@ export async function getOfficialComparisons(): Promise<OfficialComparison[]> {
       : Promise.resolve([]),
   ]);
 
-  // Movements keyed to the estimate whose villa they landed on.
   const estimateByUnit = new Map(
     officials.flatMap((estimate) => (estimate.unit_id ? [[estimate.unit_id, estimate.id]] : [])),
   );
@@ -1139,18 +1019,12 @@ export async function getOfficialComparisons(): Promise<OfficialComparison[]> {
   return results;
 }
 
-/** How many villas have drawn past their official estimate. */
 export async function countVillasOverEstimate(): Promise<number> {
   const comparisons = await getOfficialComparisons();
   return comparisons.filter((official) => official.comparison.rows.some((row) => row.over)).length;
 }
 
-/**
- * Every approval of an outside-the-estimate entry on the given villas'
- * estimates, keyed "unitId work item" — the Site check list's Approved
- * column. An approval given on any of a villa's official estimates
- * counts for its later ones too (founder, 2026-09-26).
- */
+/** Keyed "unitId work item". An approval on any official estimate of a villa counts for its later ones. */
 export async function getApprovalsFor(
   unitIds: string[],
 ): Promise<Map<string, ReconciliationApproval>> {
@@ -1206,14 +1080,8 @@ export async function getApprovalsFor(
   );
 }
 
-/**
- * Why site asked for material the estimate does not list (0104): each
- * request's reason, keyed "unitId work item" like the approvals, so Site
- * check shows it beside the "outside the estimate" row. Read from
- * Supervisors' issue_requests (0110 admits /estimator to its one SELECT
- * policy — before 0110 this simply finds nothing). A request names the
- * plot; the villa's unit is found through the 1:1.
- */
+/** Why site asked for material off the estimate (0104), keyed "unitId work item".
+ * Reads Supervisors' issue_requests; 0110 admits /estimator to its SELECT policy. */
 export async function getOffEstimateReasons(
   units: { id: string; plot_id: string | null }[],
 ): Promise<Map<string, string[]>> {
@@ -1251,8 +1119,6 @@ export async function getOffEstimateReasons(
   return reasons;
 }
 
-/** Names and units of the given items — for material that reached a
- * villa outside any estimate, which carries only its item id. */
 export async function getItemLabels(
   ids: string[],
 ): Promise<Map<string, { name: string; uom: string }>> {

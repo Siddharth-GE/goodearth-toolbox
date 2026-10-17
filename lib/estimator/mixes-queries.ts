@@ -5,10 +5,6 @@ import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { fail, GRANT, itemDefsByIds, OLDER_ROW_LABEL } from "./shared";
 
-// ---------------------------------------------------------------------
-// Mixes
-// ---------------------------------------------------------------------
-
 export type MixRow = {
   id: string;
   name: string;
@@ -16,7 +12,6 @@ export type MixRow = {
   description: string | null;
   isActive: boolean;
   componentCount: number;
-  /** How many work recipes use it. */
   useCount: number;
 };
 

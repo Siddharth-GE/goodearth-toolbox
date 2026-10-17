@@ -29,9 +29,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { chosenUom, componentOptions } from "../../../_components/component-options";
 
-/** One row of what a unit of the work uses — a mix or a material, as
- * written in the list (mixes not expanded). `ref` is "mix:<id>" or
- * "material:<id>", the address the recipe action takes. */
+/** One row of what a unit of the work uses, as written in the list (mixes not expanded). `ref` is "mix:<id>" or "material:<id>". */
 export type RateComponentView = {
   ref: string;
   kind: "material" | "mix";
@@ -40,18 +38,14 @@ export type RateComponentView = {
   qtyPerUnit: number;
 };
 
-/** One material the rate is built from, mixes expanded — where the
- * money is. */
+/** One material the rate is built from, mixes expanded. */
 export type RatePriceView = {
   itemId: string;
   name: string;
   uom: string;
   qtyPerUnit: number;
-  /** Masters' price; null = nobody has priced it. */
   mastersPrice: number | null;
-  /** This villa's own price, when it has one. */
   villaPrice: number | null;
-  /** qtyPerUnit × the price in use; null when unpriced. */
   cost: number | null;
 };
 
@@ -60,12 +54,10 @@ export type LineRateView = {
   workItemId: string;
   workName: string;
   workUom: string | null;
-  /** The villa has its own materials list for this work. */
   own: boolean;
   labour: { villa: number | null; rateBook: number | null; inUse: number | null };
   components: RateComponentView[];
   prices: RatePriceView[];
-  /** Per one unit; null when anything is unpriced. */
   rate: number | null;
 };
 
@@ -74,7 +66,6 @@ export type RateOptions = {
   mixes: { id: string; name: string; uom: string }[];
 };
 
-/** The rate in a BOQ row, and the button that explains it. */
 function RateTrigger({ rate, uom }: { rate: number | null; uom: string | null }) {
   return (
     <DialogTrigger asChild>
@@ -89,14 +80,8 @@ function RateTrigger({ rate, uom }: { rate: number | null; uom: string | null })
   );
 }
 
-/**
- * "Why is this rate what it is?" — the rate of one work on this villa,
- * built up in front of you: labour, then what one unit uses, then what
- * each material costs. Everything here is THIS VILLA's: an edit gives the
- * villa its own figure (black, with Back to the rate book), and a figure
- * that follows the rate book says so. The rate book itself — what every
- * villa starts from — is one link away.
- */
+/** The rate of one work on this villa, built up: labour, what one unit uses, what each material costs.
+ * An edit gives the villa its own figure (black, with Back to the rate book); a figure following the rate book says so. */
 export function LineRateDialog({
   estimateId,
   view,
@@ -253,10 +238,7 @@ export function LineRateDialog({
   );
 }
 
-/**
- * A submitted estimate's rate, read back from what it froze: the same
- * build-up, nothing editable.
- */
+/** A submitted estimate's rate read back from what it froze; nothing editable. */
 export function FrozenRateDialog({
   workName,
   workUom,
@@ -495,10 +477,7 @@ function AddComponentForm({
   );
 }
 
-/**
- * This villa's labour rate for the work (0088) — blank follows the rate
- * book, and says what that is. Zero is a real rate, not "unpriced".
- */
+/** This villa's labour rate (0088); blank follows the rate book. Zero is a real rate, not "unpriced". */
 function LabourRateField({
   lineId,
   villaRate,
@@ -578,8 +557,7 @@ function LabourRateField({
   );
 }
 
-/** This villa's price for one material (0088) — per estimate, so every
- * work in the villa that uses it pays the same. Blank uses Masters'. */
+/** This villa's price for one material (0088), per estimate so every work pays the same. Blank uses Masters'. */
 export function VillaPriceField({
   estimateId,
   itemId,
@@ -636,8 +614,7 @@ export function VillaPriceField({
   );
 }
 
-/** Set a missing Masters price from here — for people who hold Masters.
- * It is the company's price, used by every villa and every tool. */
+/** Set a missing Masters price from here, for people who hold Masters. It is the company's price, used by every villa and tool. */
 function MastersPriceField({ itemId, label, uom }: { itemId: string; label: string; uom: string }) {
   const router = useRouter();
   const [value, setValue] = useState("");

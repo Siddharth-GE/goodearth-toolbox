@@ -83,8 +83,7 @@ export function MixFormDialog({
   );
 }
 
-/** Add one material — a master item since 0086 — to a mix. Lives on
- * the mix's own screen, not in a dialog. */
+/** Add one master item to a mix; lives on the mix's own screen, not in a dialog. */
 export function AddMixComponentForm({
   mixId,
   mixUom,
@@ -156,11 +155,7 @@ export function AddMixComponentForm({
   );
 }
 
-/**
- * A component's quantity, editable in place (the StageNameField shape).
- * One field serves both editors — a mix's materials and a work's recipe
- * differ only in which action saves them.
- */
+/** A component's quantity, editable in place; a mix and a work recipe differ only in which action saves it. */
 export function ComponentQtyField({
   id,
   qty,

@@ -1,14 +1,8 @@
 import { listVillas } from "@/lib/estimator/estimate-queries";
 import { FromModel } from "./_components/from-model";
 
-/**
- * From the model (0118; root plan.md, sixth piece): a SketchUp model's
- * takeoff becomes a villa's working estimate. SketchUp opens this page in
- * its own window (Goodearth QS → Send to the toolbox) and hands the
- * takeoff over the window's bridge; anywhere else it takes the takeoff
- * file. The villa is picked here; the preview writes nothing; Import
- * reads the file again on the server before it writes.
- */
+/** From the model (0118): a SketchUp takeoff becomes a villa's working estimate. SketchUp opens this page and hands the takeoff over its bridge; elsewhere it takes the file.
+ * The preview writes nothing; Import re-reads the file on the server. */
 export default async function FromModelPage() {
   const villas = await listVillas();
 

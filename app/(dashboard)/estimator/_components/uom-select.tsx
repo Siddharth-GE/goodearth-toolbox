@@ -2,22 +2,13 @@
 
 import { Select } from "@/components/ui/select";
 
-/**
- * Every unit-of-measure field in the tool, fed from the shared Masters
- * list (0082; the tool's own 0075 list is retired) —
- * a select, not a text box, because the first real session typed cft,
- * Sqft and cum by hand and the founder called it: "we cant have people
- * type all this". A saved value that has since left the master (or was
- * typed before the master existed) is still offered, once, so an old
- * row can be reopened and saved without being forced onto a new unit.
- */
+/** Every unit field, fed from the shared Masters list (0082) as a select, not free text. A saved value that left the master is still offered once, so an old row can be reopened. */
 export function UomSelect({
   uoms,
   current,
   ...props
 }: {
   uoms: string[];
-  /** The value already saved on the row being edited, if any. */
   current?: string | null;
 } & Omit<React.ComponentProps<typeof Select>, "children">) {
   const options =

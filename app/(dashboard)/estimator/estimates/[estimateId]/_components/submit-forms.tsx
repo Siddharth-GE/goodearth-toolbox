@@ -14,11 +14,7 @@ import { FormMessage } from "@/components/ui/form-message";
 import { makeOfficial } from "@/lib/estimator/estimate-actions";
 import { useState, useTransition } from "react";
 
-/**
- * Make official (0098), behind a confirm that says exactly what happens —
- * a numbered copy is frozen and becomes what the stores and site check
- * against, while this working estimate stays open for the next change.
- */
+/** Make official (0098), behind a confirm saying exactly what happens: a numbered copy is frozen for the stores and site check, and the working estimate stays open. */
 export function MakeOfficialButton({
   estimateId,
   villaName,

@@ -62,17 +62,8 @@ import { MakeOfficialButton } from "./_components/submit-forms";
 import { hasApp } from "@/lib/auth/access";
 import { requireUser } from "@/lib/auth/dal";
 
-// The estimate reads as a BOQ, because that is the document an
-// estimator already knows: works gathered under their categories, one
-// amount per line, a subtotal per category, the grand total on top. A
-// future PDF export prints groupLineCosts' output — the same structure
-// this page renders, never a second grouping.
-//
-// The page has two lives. The villa's WORKING estimate (0098) is the
-// calculator: costs computed live from today's rates, always editable.
-// An OFFICIAL (or superseded) one — the numbered copy Make official froze
-// — renders from its snapshot instead: same grouping, same totals
-// arithmetic, numbers that no longer move.
+// Reads as a BOQ: works under categories, a subtotal per category, the grand total on top.
+// The WORKING estimate (0098) computes live from today's rates; an OFFICIAL one renders from its frozen snapshot, same grouping.
 export default async function EstimatePage({
   params,
 }: {
@@ -85,29 +76,22 @@ export default async function EstimatePage({
       getEstimate(estimateId),
       getRecipeBook(),
       listWorkStatus(),
-      // Per-villa variations (0087) — replace the standard recipe whole
-      // for customised lines, so this page's live costs mean THIS house.
+      // Per-villa variations (0087) replace the standard recipe whole, so live costs mean THIS house.
       getEstimateVariations(estimateId),
       listMaterialItems(),
       listMixes(),
-      // The measurement sheets (0096): a line present here is MEASURED —
-      // its quantity is the sheet's total, kept on the line by the actions.
+      // A line present here is MEASURED: its quantity is the sheet's total (0096).
       getEstimateMeasurements(estimateId),
     ]);
   if (!estimate) notFound();
-  // Whoever holds Masters can set a missing Masters price from the rate
-  // panel; everyone else sets this villa's price only.
+  // Whoever holds Masters can set a missing Masters price here; everyone else sets this villa's price only.
   const canEditMasters = await hasApp(user, "/masters");
 
   const isDraft = estimate.status === "draft";
-  // After submit the sheets stay openable, read-only, as the record of
-  // where each quantity came from — one extra column, only if any exist.
+  // After submit the sheets stay openable, read-only, as the record of where each quantity came from.
   const showSheetColumn = !isDraft && measurements.size > 0;
 
-  // Issued-vs-estimated, for the villa's OFFICIAL estimate only: what
-  // the store has issued to its plot, per work, lined up against the
-  // frozen takeoff. Inventory's reads are open (no money there), so
-  // this crosses no gate — see getIssuedAgainstEstimate.
+  // Issued-vs-estimated is for the OFFICIAL estimate only. Inventory's reads are open (no money), so this crosses no gate.
   const issuedData =
     estimate.status === "submitted" && estimate.unitId
       ? await getIssuedAgainstEstimate(estimate.unitId)
@@ -126,9 +110,7 @@ export default async function EstimatePage({
         )
       : null;
 
-  // Reconciliation (0083): every unmatched arrival is an entry the
-  // estimator must approve, and the flag never clears — approved rows
-  // keep their badge with who looked and when.
+  // Reconciliation (0083): every unmatched arrival needs the estimator's approval; the flag never clears.
   const approvals =
     comparison && comparison.unmatched.length > 0
       ? await getReconciliationApprovals(estimateId)
@@ -137,13 +119,8 @@ export default async function EstimatePage({
     approvals.map((approval) => [`${approval.workItemId ?? ""} ${approval.itemId}`, approval]),
   );
 
-  // One calculator for the whole tool: per-line costs, per-unit rates,
-  // category subtotals, estimate totals and the takeoff all come out of
-  // lib/estimator/calc.ts, so they can never disagree with each other.
-  // The frozen branch feeds the SAME grouping from the snapshot.
-  // This villa's variations, laid over the master before any
-  // arithmetic runs: its own recipe per customised line (0087), its own
-  // labour rates and material prices (0088).
+  // One calculator (calc.ts) so costs, rates, subtotals, totals and takeoff cannot disagree; the frozen branch feeds the SAME grouping.
+  // This villa's variations (0087, 0088) are laid over the master before any arithmetic.
   const materialsById = new Map<string, MaterialDef>(
     applyRateOverrides(
       [...book.materials, ...variations.extraMaterials],
@@ -201,8 +178,7 @@ export default async function EstimatePage({
     takeoffRows = aggregateFrozenTakeoff(estimate.frozen.takeoff);
     for (const row of estimate.frozen.lineCosts) {
       uomByWork.set(row.workItemId, row.uom);
-      // The frozen per-unit rate is derived, not stored: the arithmetic
-      // is linear, so total ÷ quantity is exactly what it was.
+      // The frozen per-unit rate is derived: the arithmetic is linear, so total ÷ quantity is exactly what it was.
       unitRateByWork.set(
         row.workItemId,
         row.totalCost === null || row.qty === 0 ? null : row.totalCost / row.qty,
@@ -213,7 +189,6 @@ export default async function EstimatePage({
 
   const totals = computeEstimateTotals(lineCosts);
 
-  // The BOQ grouping: category vocabulary and order come from Masters.
   const categoryByWork = new Map(
     works.map((work) => [work.workItemId, { code: work.categoryCode, name: work.categoryName }]),
   );
@@ -221,15 +196,12 @@ export default async function EstimatePage({
   const boq = groupLineCosts(lineCosts, categoryByWork, categoryOrder);
   const lineByWork = new Map(estimate.lines.map((line) => [line.workItemId, line]));
 
-  // What Masters says, before this villa's price overrides — the
-  // placeholder in each price box, so "blank means standard" is visible.
+  // What Masters says before this villa's overrides: the placeholder in each price box.
   const standardRateById = new Map(
     [...book.materials, ...variations.extraMaterials].map((m) => [m.id, m.rate]),
   );
 
-  // The rate panel (tap a rate): what the pickers offer, and each line's
-  // build-up — labour, what one unit uses, what each material costs —
-  // with where every figure comes from.
+  // The rate panel: what the pickers offer, and each line's build-up.
   const rateOptions = {
     materials: materialItems
       .filter((material) => material.isActive)

@@ -1,11 +1,6 @@
 import { TEXT_LIMIT } from "./limits";
 
-/**
- * What makes a measurement row (0096) acceptable — one rule for a row
- * typed on the sheet and a row the SketchUp model sends (0118), so the
- * model can never write a row a person could not have typed. Pure: the
- * actions and the takeoff contract (model-takeoff.ts) both call it.
- */
+/** One rule for a row typed on the sheet and a row the SketchUp model sends (0118): the model can never write a row a person could not type. */
 
 export type MeasurementFields = {
   description: string | null;
@@ -15,9 +10,7 @@ export type MeasurementFields = {
   depth: number | null;
 };
 
-/** Blank is "not used", anything typed must be a number above zero, and
- * a row must measure something. Returns the message, or undefined when
- * the row is fine. */
+/** Blank is "not used"; anything typed must be a number above zero, and a row must measure something. */
 export function checkMeasurement(fields: MeasurementFields): string | undefined {
   const boxes = [
     ["Nos", fields.nos],

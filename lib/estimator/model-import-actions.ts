@@ -12,24 +12,12 @@ import { parseTakeoff, planImport, type ImportPlan, type Takeoff } from "./model
 import { GRANT } from "./shared";
 import { syncLineQty } from "./sheet-sync";
 
-/**
- * Importing a SketchUp takeoff into a villa's working estimate (0118;
- * root plan.md, sixth piece). Two steps, the Birdwing Books upload's
- * shape: a preview that writes nothing, then the import — which reads the
- * file again, here, and plans again against the database as it is now.
- * What the browser showed is never trusted.
- *
- * The file is untrusted input: model-takeoff.ts reads and checks it, and
- * nothing in it decides identity or access — the villa is the person's
- * choice, the grant is /estimator, RLS is the boundary underneath.
- */
+/** Import a SketchUp takeoff into a villa's working estimate (0118): a preview that writes nothing, then the import,
+ * which re-reads the file and re-plans against the database as it is now. The file is untrusted; the grant and RLS are the boundary. */
 
-/** What the page shows before anything is written. */
 export type ModelImportPreview = {
   villa: { unitId: string; name: string };
-  /** The villa has no working estimate yet — Import starts a blank one. */
   startsEstimate: boolean;
-  /** The plan without its payload: the rows stay on the server. */
   plan: Omit<ImportPlan, "payload">;
 };
 
@@ -38,7 +26,6 @@ export type ModelImportResult = {
   villa: { unitId: string; name: string };
   counts: ImportPlan["counts"];
   rows: number;
-  /** Works whose quantity could not be re-summed — sending again fixes it. */
   unsynced: number;
 };
 
@@ -53,8 +40,6 @@ type Inputs =
       working: Awaited<ReturnType<typeof getWorkingEstimateForModel>>;
     };
 
-/** The file read and checked, the villa found, the rate book and the
- * villa's working estimate read — or the one sentence saying why not. */
 async function readInputs(text: unknown, unitId: unknown): Promise<Inputs> {
   if (typeof unitId !== "string" || !UUID.test(unitId)) return { error: "Pick the villa first." };
   const parsed = parseTakeoff(text);
@@ -108,8 +93,7 @@ export async function importModelTakeoff(
   const { takeoff, villa, works } = inputs;
   const supabase = await createClient();
 
-  // A villa with no working estimate gets a blank one first (0098). Two
-  // imports racing for the same villa: the second finds the first's.
+  // A villa with no working estimate gets a blank one first (0098); in a race, the second import finds the first's.
   let working = inputs.working;
   if (!working) {
     if (!planImport(takeoff, works, null).canImport) {
@@ -117,8 +101,7 @@ export async function importModelTakeoff(
     }
     const { error } = await supabase.rpc("start_villa_estimate", {
       p_unit: villa.unitId,
-      // Null starts it blank; the generated types can't say an argument
-      // may be null.
+      // Null starts it blank; the generated types cannot say an argument may be null.
       p_source: null as unknown as string,
       p_everything: false,
       p_name: null as unknown as string,
@@ -153,8 +136,7 @@ export async function importModelTakeoff(
     return { error: "Could not import the takeoff. Nothing was changed — try again." };
   }
 
-  // The quantities: every touched line re-summed through calc.ts, the
-  // same as after a row typed by hand. A few at a time.
+  // Every touched line is re-summed through calc.ts, as after a hand-typed row.
   const lineIds = touched ?? [];
   let unsynced = 0;
   for (let index = 0; index < lineIds.length; index += 8) {

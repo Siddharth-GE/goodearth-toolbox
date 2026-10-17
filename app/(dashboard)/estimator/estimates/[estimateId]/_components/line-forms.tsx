@@ -28,16 +28,10 @@ export type PickableWork = {
   groupName: string | null;
   categoryCode: string;
   categoryName: string;
-  /** Null = not in the rate book yet; it can still be listed. */
   uom: string | null;
 };
 
-/**
- * Put works on the estimate — any of them, all at once, ticked from a
- * searchable list (0097). They arrive "to measure": no throwaway number
- * to get past the form, and a work not yet in the rate book can be listed
- * and priced later. Works already on the estimate show ticked and fixed.
- */
+/** Put works on the estimate, ticked from a searchable list (0097). They arrive "to measure", and a work not yet in the rate book can be listed and priced later. */
 export function AddWorksDialog({
   estimateId,
   works,
@@ -45,7 +39,6 @@ export function AddWorksDialog({
 }: {
   estimateId: string;
   works: PickableWork[];
-  /** Work ids already on this estimate. */
   onEstimate: string[];
 }) {
   const [open, setOpen] = useState(false);

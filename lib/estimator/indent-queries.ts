@@ -6,17 +6,8 @@ import { createClient } from "@/lib/supabase/server";
 import type { ReconciliationApproval } from "./estimate-queries";
 import { fail, GRANT } from "./shared";
 
-/* ------------------------------------------------------------------ *
- * Indent lines outside the estimate (0113)
- *
- * Founder, 2026-10-11: an indent line no estimate or budget covers is
- * "the first thing reconciled in the estimate" — the indent waits for the
- * estimator's yes. Indents' own tables are open to every signed-in
- * person (0019), so these are plain reads (STATUS.md's contract row);
- * the answer is written through decide_indent_line() (indent-actions.ts).
- * A line outside the estimate is a DIRECT line: no budget, construction
- * or estimate anchor — the same test indents_guard makes.
- * ------------------------------------------------------------------ */
+/* Indent lines outside the estimate (0113): the indent waits for the estimator's yes. Indents' tables are open to every signed-in person (0019),
+ * so these are plain reads; the answer is written through decide_indent_line(). A DIRECT line has no budget, construction or estimate anchor (same test as indents_guard). */
 
 type Client = Awaited<ReturnType<typeof createClient>>;
 
@@ -38,17 +29,14 @@ export type IndentForEstimator = {
   id: string;
   reference: string;
   project_name: string;
-  /** The villa — unit or plot name; null for an indent for no villa. */
   villa: string | null;
   work_label: string | null;
   submitted_by_name: string | null;
   submitted_at: string | null;
-  /** The villa's working estimate, where a material is added properly. */
   working_estimate_id: string | null;
   lines: IndentLineForEstimator[];
 };
 
-/** The direct-line filter, in one place. */
 const DIRECT_LINE = <T extends { is: (column: string, value: null) => T }>(query: T): T =>
   query.is("budget_id", null).is("construction_line_id", null).is("estimate_id", null);
 
@@ -77,11 +65,7 @@ async function submittedIndents(supabase: Client) {
   );
 }
 
-/**
- * Every submitted indent with lines outside the estimate, oldest first —
- * answered lines included until the indent moves on, so the estimator
- * sees what it has said and can change it.
- */
+/** Submitted indents with lines outside the estimate, oldest first; answered lines stay until the indent moves on. */
 export async function getIndentsForEstimator(): Promise<IndentForEstimator[]> {
   await requireTool(GRANT);
   const supabase = await createClient();
@@ -121,7 +105,6 @@ export async function getIndentsForEstimator(): Promise<IndentForEstimator[]> {
 
   const waiting = indents.filter((indent) => lines.some((line) => line.indent_id === indent.id));
 
-  // Names, works and each villa's working estimate — one read each.
   const personIds = [
     ...new Set(
       [
@@ -208,8 +191,6 @@ export async function getIndentsForEstimator(): Promise<IndentForEstimator[]> {
   });
 }
 
-/** How many lines outside the estimate wait for an answer — the welcome
- * screen's count. */
 export async function countIndentLinesWaiting(): Promise<number> {
   await requireTool(GRANT);
   const supabase = await createClient();
@@ -229,12 +210,7 @@ export async function countIndentLinesWaiting(): Promise<number> {
   return count ?? 0;
 }
 
-/**
- * Lines the estimator approved at the indent, keyed "unitId work item"
- * like getApprovalsFor — so Site check does not ask again when that
- * material reaches the villa. Read-side only; nothing is copied into the
- * reconciliation table.
- */
+/** Lines the estimator approved at the indent, keyed "unitId work item" like getApprovalsFor, so Site check does not ask again. */
 export async function getIndentApprovalsFor(
   units: { id: string; plot_id: string | null }[],
 ): Promise<Map<string, ReconciliationApproval>> {
@@ -247,8 +223,7 @@ export async function getIndentApprovalsFor(
     units.flatMap((unit) => (unit.plot_id ? [[unit.plot_id, unit.id] as const] : [])),
   );
 
-  // The approved lines first — few, however many indents the villas have —
-  // then only their indents, so no request carries a long list of ids.
+  // Approved lines first (few), then only their indents, so no request carries a long id list.
   const lines = await fetchAll<{
     indent_id: string;
     item_id: string;

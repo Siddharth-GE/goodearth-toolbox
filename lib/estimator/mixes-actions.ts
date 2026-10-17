@@ -1,10 +1,7 @@
 "use server";
 
-// Type-only import, and deliberately NOT re-exported: a bare
-// `export type { ActionState }` in a "use server" file survives into the
-// compiled module's runtime export list, where the type doesn't exist —
-// every action in the chunk then dies at module load (the 2026-08-03
-// production outage). Import it from "@/lib/action-state" instead.
+// Type-only import, deliberately not re-exported: a re-exported type in a "use server" file kills every action
+// in the chunk at module load. Import it from "@/lib/action-state".
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { parseNumber, text } from "@/lib/form-data";
@@ -13,18 +10,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { GRANT, NAME_LIMIT, TEXT_LIMIT, UOM_LIMIT } from "./shared";
 
-/**
- * A foreign key refusing a delete is not a bug — it is the house rule
- * that reference data in use is deactivated, never removed. Say so.
- */
+/** A foreign key refusing a delete is the house rule: reference data in use is deactivated, never removed. */
 function deleteError(error: { code?: string }, what: string, instead: string): string {
   if (error.code === "23503") return `This ${what} is in use, so it can't be deleted. ${instead}`;
   return `Could not delete the ${what}. Try again.`;
 }
-
-// ---------------------------------------------------------------------
-// Mixes
-// ---------------------------------------------------------------------
 
 type MixFields = { name: string; uom: string; description: string | null; is_active: boolean };
 
@@ -94,8 +84,7 @@ export async function deleteMix(id: string): Promise<ActionState> {
   await requireTool(GRANT);
   const supabase = await createClient();
 
-  // Its own composition goes with it; a mix used by a work recipe is
-  // refused by the FK, which is the answer we want.
+  // Its composition goes with it; a mix used by a work recipe is refused by the FK, which is wanted.
   const { error: componentError } = await supabase
     .from("estimator_mix_components")
     .delete()
@@ -121,8 +110,7 @@ export async function addMixComponent(
   formData: FormData,
 ): Promise<ActionState> {
   const user = await requireTool(GRANT);
-  // Since 0086 a mix is a combination of master ITEMS (founder: the
-  // items master is the one material list) — material_id is legacy.
+  // A mix is a combination of master ITEMS (0086); material_id is legacy.
   const itemId = text(formData, "item_id");
   const qty = parseNumber(formData.get("qty_per_unit"));
 

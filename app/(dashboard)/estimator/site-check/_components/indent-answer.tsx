@@ -16,12 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { decideIndentLine } from "@/lib/estimator/indent-actions";
 import { useState, useTransition } from "react";
 
-/**
- * Approve or refuse one indent line outside the estimate (0113). Approve
- * is one press; a refusal asks why, because the indent's approver reads
- * it and sends the indent back. An answer can be changed while the indent
- * still waits.
- */
+/** Approve or refuse one indent line outside the estimate (0113). A refusal asks why, because the indent's approver reads it. An answer can change while the indent waits. */
 export function IndentLineAnswer({
   lineId,
   itemName,

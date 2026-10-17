@@ -1,20 +1,4 @@
-/**
- * The Estimator's arithmetic, and nothing else.
- *
- * Pure and import-free so it can be unit-tested without a database —
- * the same reason lib/budgets/carry-forward.ts and
- * lib/indents/pull-rules.ts are shaped this way. Every decision about
- * what a number MEANS lives here; the screens only render what these
- * functions return.
- *
- * THE ONE RULE WORTH STATING: a missing rate produces `null`, never 0.
- * A material nobody has priced yet, or a work with no labour rate, must
- * read as "not priced" on screen — a confident ₹0 in a total is the
- * failure this codebase keeps naming, and a nullable return type is the
- * only version of that rule the compiler can enforce. Quantities are
- * still computed and shown: how much cement a villa needs is knowable
- * whether or not anyone has priced a bag.
- */
+/** Pure and import-free so it unit-tests without a database. A missing rate yields null, never 0: a confident ₹0 in a total is the failure BUGCATCHER keeps naming. */
 
 export type MaterialDef = {
   id: string;
@@ -44,22 +28,7 @@ export type WorkRecipe = {
 /** A line of an estimate. qty null = listed but not yet measured (0097). */
 export type LineInput = { workItemId: string; qty: number | null };
 
-/**
- * A work's material needs per ONE unit of the work, with mixes expanded
- * into their materials and duplicates merged — a material reached both
- * directly and through a mix is one row, not two.
- */
-/**
- * The estimate's own view of the recipe book: the standard everywhere,
- * with this villa's variations laid over it (0087 recipes, 0088 labour
- * rates). An override REPLACES — a customised component list is the
- * whole list, not a delta — and anything with no override keeps
- * following the master, which is what makes "reset" mean something.
- *
- * Applied before any arithmetic runs, so computeLine, computeTakeoff
- * and the submit snapshot all see one already-correct recipe book and
- * none of them needs to know overrides exist.
- */
+/** The estimate's recipe book: the standard with this villa's variations laid over it (0087, 0088). An override REPLACES, it is not a delta. Applied before any arithmetic. */
 export function applyEstimateOverrides(
   recipes: WorkRecipe[],
   componentsByWork: Map<string, WorkRecipe["components"]>,
@@ -72,15 +41,13 @@ export function applyEstimateOverrides(
     return {
       ...recipe,
       components: components ?? recipe.components,
-      // `?? recipe.labourRate` would be wrong: a villa rate of 0 is a
-      // real answer (labour included in a contract), not "unpriced".
+      // A villa rate of 0 is real (labour included in a contract), so do not fall back on falsy.
       labourRate: labourRate === undefined ? recipe.labourRate : labourRate,
     };
   });
 }
 
-/** This villa's material prices (0088) over Masters' — one price per
- * material per estimate, so no two works can disagree. */
+/** This villa's prices (0088) over Masters': one price per material per estimate. */
 export function applyRateOverrides(
   materials: MaterialDef[],
   rateByMaterialId: Map<string, number>,
@@ -109,9 +76,7 @@ export function expandRecipe(
     }
     if (!component.mixId) continue;
     const mix = mixesById.get(component.mixId);
-    // A mix that has been deleted, or one nobody has given a composition
-    // yet, contributes nothing rather than throwing — the screens flag
-    // an empty mix separately, where the person can act on it.
+    // A deleted or empty mix contributes nothing; the screens flag an empty mix.
     if (!mix) continue;
     for (const part of mix.components) {
       add(part.materialId, part.qtyPerUnit * component.qtyPerUnit);
@@ -124,13 +89,11 @@ export function expandRecipe(
 export type LineCost = {
   workItemId: string;
   qty: number | null;
-  /** Listed but not yet measured — no quantity, so no cost yet. */
   toMeasure: boolean;
   /** false = no estimator_work_info row: no unit, no labour rate, nothing. */
   isSetUp: boolean;
   /** false = set up, but nobody has said what it consumes. Labour only. */
   hasRecipe: boolean;
-  /** null when the work has no labour rate. */
   labourCost: number | null;
   /** null when ANY material this line needs is unpriced. */
   materialCost: number | null;
@@ -182,8 +145,7 @@ export function computeLine(
   for (const need of needs) {
     const material = materialsById.get(need.materialId);
     if (!material || material.rate === null) {
-      // Keep collecting the rest: the screen wants to name every
-      // unpriced material, not just the first one found.
+      // Keep going: the screen names every unpriced material.
       if (material) missingRateMaterialIds.push(material.id);
       materialCost = null;
       continue;
@@ -204,14 +166,8 @@ export function computeLine(
   };
 }
 
-/**
- * How ONE unit of a work is priced — the answer to "why is this rate
- * what it is?": the labour rate, then every material it consumes (mixes
- * expanded) at its price, each one's share of the rate, and the rate
- * itself. Same null rule as everywhere: an unpriced material, or no
- * labour rate, makes the rate unknown — each known part still shows.
- * Null when the work has no setup at all.
- */
+/** How ONE unit of a work is priced: labour, then each material at its price. Unpriced parts make the rate
+ * null; known parts still show. Null when the work has no setup. */
 export type RateBuildUp = {
   labourRate: number | null;
   materials: {
@@ -219,10 +175,8 @@ export type RateBuildUp = {
     qtyPerUnit: number;
     /** The price this estimate uses — the villa's own, else Masters'. */
     price: number | null;
-    /** qtyPerUnit × price; null when unpriced. */
     cost: number | null;
   }[];
-  /** Labour + every material, per one unit. */
   rate: number | null;
 };
 
@@ -252,11 +206,7 @@ export function rateBuildUp(
   };
 }
 
-/**
- * The same build-up read back from a submitted estimate's snapshot: the
- * frozen labour cost and takeoff rows of one work, divided back to one
- * unit (the arithmetic is linear, so that is exactly what it was).
- */
+/** The same build-up from a submitted snapshot, divided back to one unit (the arithmetic is linear). */
 export function frozenRateBuildUp(line: FrozenLineRow, takeoff: FrozenTakeoffRow[]): RateBuildUp {
   const perUnit = (value: number) => (line.qty > 0 ? value / line.qty : 0);
   const materials = takeoff
@@ -277,11 +227,7 @@ export function frozenRateBuildUp(line: FrozenLineRow, takeoff: FrozenTakeoffRow
   };
 }
 
-/**
- * What one unit of a mix costs: every material at its price. Unknown —
- * never low — when anything in it is unpriced, and when it is empty: a
- * mix with nothing in it costing ₹0 is the lying zero of BUGCATCHER #13.
- */
+/** Unit cost of a mix. Unknown when anything is unpriced or the mix is empty: an empty mix at ₹0 is BUGCATCHER #13. */
 export function mixUnitCost(
   components: { rate: number | null; qtyPerUnit: number }[],
 ): number | null {
@@ -301,7 +247,6 @@ export type TakeoffRow = {
   missingRate: boolean;
 };
 
-/** Every material an estimate needs, summed across all its lines. */
 export function computeTakeoff(
   lines: LineInput[],
   recipesByWork: Map<string, WorkRecipe>,
@@ -339,14 +284,8 @@ export type WorkTakeoffRow = {
   quantity: number;
 };
 
-/**
- * The takeoff kept per (work, material) — what the submit snapshot
- * stores (0077). computeTakeoff above answers "how much cement does the
- * villa need"; this answers "how much cement does the Foundation
- * excavation need", which is the granularity issued-vs-estimated
- * comparison happens at. Summing these rows per material must always
- * equal computeTakeoff's quantities — a test pins that.
- */
+/** Takeoff per (work, material), as the submit snapshot stores it (0077).
+ * Summing per material must equal computeTakeoff; a test pins that. */
 export function computeWorkTakeoff(
   lines: LineInput[],
   recipesByWork: Map<string, WorkRecipe>,
@@ -377,16 +316,8 @@ export function computeWorkTakeoff(
 }
 
 export type EstimateTotals = {
-  /**
-   * Sums of what IS known — a floor, not an answer, whenever
-   * `isComplete` is false.
-   *
-   * `null` means nothing in that column is known at all. It is NOT the
-   * same as 0, and the difference is the whole point: a screen that
-   * printed `₹0` for "every material here is unpriced" would be saying
-   * the materials are free. Zero is reserved for a column that really
-   * does cost nothing, like a labour-only estimate's materials.
-   */
+  /** Sums of what IS known: a floor while isComplete is false. null means nothing in the column is known,
+   * which is NOT 0 (zero would say the materials are free). */
   labour: number | null;
   material: number | null;
   grand: number | null;
@@ -395,7 +326,6 @@ export type EstimateTotals = {
   missingLabourCount: number;
   missingMaterialRateCount: number;
   notSetUpCount: number;
-  /** Listed but not yet measured. */
   toMeasureCount: number;
 };
 
@@ -423,11 +353,8 @@ export function computeEstimateTotals(lineCosts: LineCost[]): EstimateTotals {
     else material += line.materialCost;
   }
 
-  // A column with nothing known in it hands back null rather than 0 —
-  // otherwise "every material is unpriced" and "the materials are free"
-  // print identically. A line with no setup at all counts as unknown on
-  // BOTH sides, which is why it can't be judged by the two missing-rate
-  // counters alone (they only see lines that got as far as being set up).
+  // A column with nothing known hands back null, not 0. A line with no setup counts as unknown on BOTH sides,
+  // so the missing-rate counters alone cannot judge it.
   const nothingUnknown =
     missingLabourCount === 0 &&
     missingMaterialRateCount === 0 &&
@@ -448,11 +375,6 @@ export function computeEstimateTotals(lineCosts: LineCost[]): EstimateTotals {
   };
 }
 
-// ---------------------------------------------------------------------
-// The frozen side: a submitted estimate renders from its snapshot
-// ---------------------------------------------------------------------
-
-/** One estimator_estimate_line_costs row, as the queries hand it over. */
 export type FrozenLineRow = {
   workItemId: string;
   qty: number;
@@ -463,13 +385,11 @@ export type FrozenLineRow = {
   totalCost: number | null;
 };
 
-/** One estimator_estimate_takeoff row — per (work, material), frozen. */
 export type FrozenTakeoffRow = {
   workItemId: string;
   /** The item id since 0086; a legacy estimator_materials id before. */
   materialId: string;
-  /** Set when the row is item-keyed (0086) — its quantity is already in
-   * the item's unit, so comparisons need no conversion. */
+  /** Set when item-keyed (0086): the quantity is already in the item's unit, so no conversion. */
   itemId?: string | null;
   materialName: string;
   uom: string;
@@ -478,14 +398,8 @@ export type FrozenTakeoffRow = {
   rate: number | null;
 };
 
-/**
- * Rebuild LineCost[] from the 0077 snapshot, so a submitted estimate
- * renders through the SAME groupLineCosts/computeEstimateTotals path as
- * a draft — never a second grouping. What the snapshot does not store
- * is derived: a work was set up iff its uom was frozen; it had a recipe
- * iff any takeoff row names it; its unpriced materials are its takeoff
- * rows with no rate.
- */
+/** Rebuild LineCost[] from the 0077 snapshot so a submitted estimate renders through the SAME grouping as a draft.
+ * Unstored facts are derived: set up iff its uom was frozen; had a recipe iff a takeoff row names it. */
 export function frozenLineCosts(lines: FrozenLineRow[], takeoff: FrozenTakeoffRow[]): LineCost[] {
   const takeoffByWork = new Map<string, FrozenTakeoffRow[]>();
   for (const row of takeoff) {
@@ -510,12 +424,8 @@ export function frozenLineCosts(lines: FrozenLineRow[], takeoff: FrozenTakeoffRo
   });
 }
 
-/**
- * The frozen takeoff card: per-work rows summed back to per material,
- * with the same null-not-zero cost rule as the live computeTakeoff.
- * Name and uom were copied into the snapshot at submit, so a renamed
- * material changes nothing here.
- */
+/** Frozen takeoff per material, with the live null-not-zero cost rule.
+ * Name and uom were copied at submit, so a renamed material changes nothing. */
 export function aggregateFrozenTakeoff(takeoff: FrozenTakeoffRow[]): {
   materialId: string;
   name: string;
@@ -554,22 +464,14 @@ export type BoqCategory = {
   code: string;
   name: string;
   lineCosts: LineCost[];
-  /** The category's own honest subtotal — same null rules as the estimate's. */
   totals: EstimateTotals;
 };
 
-/**
- * The BOQ shape: lines gathered under their work category, in the
- * category order the site team reads (ENC, SM, FD, …), each group with
- * its own computeEstimateTotals subtotal. The estimate screen renders
- * this, and a future PDF export renders THIS SAME STRUCTURE — that is
- * the point of it living here rather than in the page: the paper and
- * the screen can never group or add differently.
- */
+/** BOQ shape: lines under their work category in the order the site team reads, each with its own subtotal.
+ * Lives here so screen and any PDF group and add identically. */
 export function groupLineCosts(
   lineCosts: LineCost[],
   categoryByWork: Map<string, { code: string; name: string }>,
-  /** Category codes in display order, from the works vocabulary. */
   categoryOrder: string[],
 ): BoqCategory[] {
   const groups = new Map<string, { code: string; name: string; lineCosts: LineCost[] }>();
@@ -590,10 +492,6 @@ export function groupLineCosts(
     .map((group) => ({ ...group, totals: computeEstimateTotals(group.lineCosts) }));
 }
 
-// ---------------------------------------------------------------------
-// The measurement sheet (0096) — the QS layer under a line
-// ---------------------------------------------------------------------
-
 /** One measurement row: a blank box is null and means "not used". */
 export type MeasurementInput = {
   nos: number | null;
@@ -602,14 +500,8 @@ export type MeasurementInput = {
   depth: number | null;
 };
 
-/**
- * Nos × Length × Breadth × Depth, with every blank box skipped — the
- * founder's standard sheet (2026-09-25): "12 nos" is 12, "12 × 3.0" is
- * 36, "1 × 4 × 3 × 0.15" is 1.8. A row with nothing in it measures 0
- * (the database refuses such a row; this only keeps the maths total).
- * No unit conversion ever happens here — the boxes are in whatever the
- * work is measured in, and the screen says so.
- */
+/** Nos × Length × Breadth × Depth, blank boxes skipped ("12 × 3.0" is 36). A row with nothing measures 0;
+ * the database refuses such a row. No unit conversion here. */
 export function measurementQuantity(row: MeasurementInput): number {
   const boxes = [row.nos, row.length, row.breadth, row.depth].filter(
     (value): value is number => value !== null,
@@ -618,12 +510,7 @@ export function measurementQuantity(row: MeasurementInput): number {
   return roundQuantity(boxes.reduce((product, value) => product * value, 1));
 }
 
-/**
- * The sheet's total — what the line's quantity becomes. Rounded to six
- * decimals so floating-point dust (4 × 3 × 0.15 = 1.7999999999999998)
- * never reaches the database or the screen; six is far past anything a
- * site measurement carries (formatQuantity shows three).
- */
+/** The sheet's total, rounded to six decimals so float dust (4 × 3 × 0.15 = 1.7999999999999998) never reaches the database. */
 export function sheetTotal(rows: MeasurementInput[]): number {
   return roundQuantity(rows.reduce((sum, row) => sum + measurementQuantity(row), 0));
 }

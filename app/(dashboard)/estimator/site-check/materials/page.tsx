@@ -16,13 +16,7 @@ import { listUnits } from "@/lib/masters/units";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
-/**
- * "Where does all the cement go": each material across every villa's
- * official estimate, estimated against what reached the villas — planned
- * or not. Tap one to see it villa by villa; a villa opens its own site
- * check. One tap off Site check's villa list, so the front screen stays a
- * way into a villa. Quantities only.
- */
+/** "Where does all the cement go": each material across every villa's official estimate against what reached the villas, planned or not. Quantities only. */
 export default async function SiteCheckMaterialsPage({
   searchParams,
 }: {
