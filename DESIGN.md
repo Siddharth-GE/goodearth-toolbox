@@ -94,7 +94,7 @@ Easing `ease-out-quint` (`ease-spring` is reserved); 150–280ms, nothing slower
 
 - **Relay is the one stated exception**: moving a baton is the product, so it has four namespaced keyframes confined to `app/(dashboard)/relay/`. A stuck trail **breathes rather than blinks** — unmissable and calm. Marathon keeps its bib card's entrance on its own kiosk.
 - **`prefers-reduced-motion` is honoured globally.** Dialogs simply appear; confetti and floats are skipped; the toast still shows. The one opt-out is `Spinner` (`spinner-keeps-turning`) — a stopped spinner looks broken.
-- **Never add a `transition` on colours** — it would fade every hover and focus ring. And `::view-transition-*` pseudo-elements are outside `*`, so the reduced-motion block names them again and the switch checks reduced-motion in JavaScript too.
+- **The theme switch is a view transition, never a global `transition` on colours** — that would fade every hover and focus ring in the app as well. A component's own `transition-colors` on hover is fine. And `::view-transition-*` pseudo-elements are outside `*`, so the reduced-motion block names them again and the switch checks reduced-motion in JavaScript too.
 
 ## Loading states
 

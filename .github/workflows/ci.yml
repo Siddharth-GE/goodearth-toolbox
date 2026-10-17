@@ -1,25 +1,10 @@
-# Runs on every push and pull request.
+# Every push and pull request. The four static checks each run even when
+# one fails, so one push shows every verdict; the build and everything
+# after it wait for all four.
 #
-# This project deliberately had no CI while it was one person pushing to
-# master. That changed on two counts: a second person is joining, and
-# master auto-deploys to production on every push — so until now the only
-# thing standing between a mistake and the live site was remembering to
-# run four commands by hand.
-#
-# It runs exactly the checks that were already being run manually. No new
-# tools, no coverage thresholds, nothing to argue with.
-#
-# The four static checks (formatting, lint, types, tests) each run even
-# when an earlier one fails, so one push shows every verdict instead of
-# only the first; the build and everything after it still wait for all
-# four to pass.
-#
-# ONE SECRET LIVES HERE: SUPABASE_ACCESS_TOKEN, the management API key,
-# used by the migration check below and nothing else. It is account-level
-# — Supabase has no way to narrow it — so it reaches both databases with
-# full rights. That is a real cost, accepted on 2026-08-17 because the
-# alternative was a rule nobody can enforce. If it is ever rotated,
-# rotate it here too or every pull request goes red.
+# One secret: SUPABASE_ACCESS_TOKEN, the management API key, for the two
+# database checks at the end. It is account-level and reaches both
+# databases; rotating it means rotating it here too.
 
 name: CI
 
@@ -40,9 +25,7 @@ jobs:
           node-version: 22
           cache: npm
 
-      # Next's build cache, keyed on the lockfile and the source, so a push
-      # that changes a few files does not rebuild the whole app. Sits before
-      # npm ci so the hash never walks node_modules.
+      # Before npm ci, so the source hash never walks node_modules.
       - uses: actions/cache@v4
         with:
           path: .next/cache
@@ -50,9 +33,6 @@ jobs:
           restore-keys: |
             nextjs-${{ hashFiles('package-lock.json') }}-
 
-      # `npm ci` rather than `npm install`: it installs exactly what the
-      # lockfile says, so CI can't pass on a different set of packages
-      # than a developer has.
       - run: npm ci
 
       - name: Formatting
@@ -70,71 +50,27 @@ jobs:
         if: ${{ !cancelled() }}
         run: npm test
 
-      # Second-to-last, because it's the slowest and the ones above catch
-      # most problems faster and with clearer messages.
       - name: Build
         run: npm run build
         env:
-          # Build-time only. next.config.ts reads the URL to allow the
-          # Supabase image host, and the pages themselves are all dynamic,
-          # so no real data is fetched during a build. Placeholders keep
-          # the secrets out of CI entirely.
+          # Build-time only: every page is dynamic, so no data is fetched.
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
 
-      # After the build on purpose: it inspects the compiled output as
-      # well as the source. Every check above was green during the
-      # 2026-08-03 outage, when a type re-export in a "use server" file
-      # left every write-button on production dead for two days. This is
-      # the one check that would have caught it.
-      #
-      # Deliberately NOT a browser test that signs in and clicks: that
-      # would need a real login in GitHub secrets and would write to the
-      # live database on every push. See PLAN.md for that decision.
+      # After the build: it reads the compiled output (BUGCATCHER #5).
       - name: Server actions
         run: npm run check:actions
 
-      # ---------------------------------------------------------------
-      # LAST: the two steps that talk to a real database.
-      # ---------------------------------------------------------------
-      # Everything above is about the code in this branch and is decided
-      # on this machine. These two are about the world the branch is
-      # merging into, and they are the final gate before the merge button.
+      # LAST: the two read-only checks against the database the base branch
+      # deploys to. A pull request into master sits red until its migration
+      # is applied, and that expected red must not hide the checks above.
+      # They never fix what they find: that would apply an unreviewed
+      # migration from CI.
       #
-      # THEY RUN LAST FOR A REASON, learnt by running them first. CI stops
-      # at the first failure, and a pull request into master is SUPPOSED to
-      # sit red for a while — from the moment the migration is written
-      # until it is applied to production. With these steps at the front,
-      # that expected red hid lint, types, tests and the build for the
-      # whole of that window, which is the same trap as a trivial
-      # formatting error skipping every check that matters, just pointing
-      # the other way. Last means a pending migration still tells you
-      # whether the code is sound.
-      #
-      # 1. HAS THIS DATABASE HAD EVERY MIGRATION IN THIS BRANCH?
-      #    "Apply the migration, THEN merge the code that needs it" was a
-      #    rule kept by remembering it. This is the rule with a gate under
-      #    it. Each PR is checked against the database its base branch
-      #    deploys to; `github.base_ref` is set only for pull_request
-      #    events, so these skip on a push to master, where it would be too
-      #    late anyway.
-      #
-      # 2. ARE THE VIEWS STILL THE SHAPE THEY CLAIM?
-      #    The fourteen views in `public` are owned by postgres, so they
-      #    BYPASS row-level security: each one's column list, WHERE clause
-      #    and grants are its entire permission boundary, with no policy
-      #    behind it to refuse a careless change. Until this existed the
-      #    only guard was a comment saying "NEVER add a money column". It
-      #    pins the five things that go wrong in silence — a column added
-      #    to a money-free fact view, a has_app check lost from a WHERE,
-      #    security_invoker lost from the one view carrying margins, write
-      #    privileges handed back by `drop view`, and a new view nobody
-      #    pinned. See scripts/view-manifest.ts for why each view is the
-      #    shape it is.
-      #
-      # Both are READ-ONLY and neither can change anything. A check that
-      # fixed what it found would be applying an unreviewed migration to
-      # production from CI, on a database with no backups.
+      # 1. Has this database had every migration in this branch?
+      # 2. Are the views still the shape they claim? Views bypass row-level
+      #    security, so each one's columns, WHERE and grants are its whole
+      #    boundary (scripts/view-manifest.ts pins them).
       - name: Production has every migration (PRs into master)
         if: github.base_ref == 'master'
         run: npm run db:check -- --project pajfrgnkapicdgangjey
