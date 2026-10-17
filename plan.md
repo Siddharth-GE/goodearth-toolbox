@@ -376,3 +376,69 @@ The founder: the app is "Toolbox by Kaadal" under the Kaadal K; Goodearth stays 
 - [x] ~~`[Fable]` Review~~ — **skipped on the founder's explicit word for this merge** (2026-10-16: "merge"). In its place `[Opus]` re-reviewed the diff against `BUGCATCHER.md`: no database read, upload or permission touched; the logo's two hex fills are the one sanctioned exception (`DESIGN.md`), and its `dark:` follows `data-theme` as the tokens do (#4); the icon is a valid four-size `.ico`; no "Goodearth Toolbox" left on screen. The preview's sign-in page rendered light and dark — burgundy K, blush K. No findings. CI green.
 - [ ] Founder — on staging: the sidebar's K and name, the tab icon (hard refresh), the sign-in page, and one PDF (Goodearth letterhead, "Toolbox by Kaadal" in its details or the report footer).
 - [ ] At the switch to the new production: the practice banner's link (`lib/environment.ts`) and the sign-in emails' "Goodearth Toolbox (PRACTICE SITE)" change with the domain.
+
+# Tenth piece — transmittals the design team can use (2026-10-17)
+
+The design team's first day on staging (2026-10-16: six transmittals issued on Villas 1, 26, 40 and 41, two drafts) came back as four points: the transmittal number cannot be changed; the revision number cannot be changed; "only Sheet 9 is being uploaded"; the transmittal sheet shows only the drawing set's name. The data shows the workaround: set names carrying the Excel number, revision and date ("Transmittal - 018 - Plot 26 - Plumbing Layout R0- 15102026"), and the team's own Excel cover sheet uploaded as one of the sheets (Villa 26 sheet 1, Villa 40 sheet 5). Planned by `[Opus]` at the founder's request — `MODELS.md` gives planning to Fable, so the migration still waits for a Fable review. Branch `feature/design-management`, migration `0122`.
+
+## The founder's decision (2026-10-17)
+
+**The number stays the toolbox's, marked as the toolbox's.** "its ok if transmittal number can't be changed just make a tool box id addition, since we had an already ongoing series from excel … a tb or something with the rest of the transmittal number will make it unique anyway". So Issue mints **`TB-0003`** where it minted `TR-0003`: still counted per villa, each villa's counter carrying on, and never mistakable for the Excel series.
+
+## What it does
+
+**1. TB numbers** (`0122`)
+
+- `issue_transmittal()` restated whole from `0093`, one change: `'TB-'` for `'TR-'`. Its grants restated (`revoke … from public, anon`; `grant … to authenticated`).
+- The six already issued keep `TR-0001`/`TR-0002` — an issued transmittal never changes (`0092`'s precedent). Villa 41's next is `TB-0003`.
+- The cover sheet's file name gains the villa: `Goodearth-Transmittal-Villa41-TB-0003.pdf` — a per-villa number is unique only with it.
+- Sheet downloads follow by themselves: `SAA-Saarang-Villa41-WD-TB0003-GFP.pdf` (`sheet-name.ts` takes the number as given; its tests and comments move to TB).
+
+**2. The revision number is the designer's to set, while draft** (`0122`)
+
+- On a draft transmittal, beside _What changed_: **Revision R[ n ]**, saved on leaving the field like the note. Any number above every revision the set already has on this villa — a set the team had at R2 in Excel starts here at R3. A number that went to site is never re-used or undercut.
+- `drawing_revisions_guard` restated whole from `0093`, one change: `revision_no` may move while the revision is a draft, and only above the set's other revisions on that villa; the refusal names the highest one ("Pick a number above R2 — R2 has already been used for this set."). Released or superseded, it stays frozen. The unique `(unit_id, drawing_set_id, revision_no)` still settles a race.
+- `setDraftRevisionNumber(revisionId, n)` in `actions.ts`: `requireTool`, a whole number 0–99, the database's sentence on refusal, `revalidatePath("/design-management", "layout")`.
+- R1 and above still need _What changed_ before Issue (`0093`): a set brought in at R3 says what changed since the Excel R2.
+
+**3. Every sheet by its name — on screen and on the cover sheet** (no migration)
+
+- A sheet's **title** is the name its file was uploaded under, less the extension ("Plot 41,42 - Plinth beam Layout") — already stored as `file_name`, so no column. Renaming a title is not in this build.
+- **The cover sheet**: the set, its revision, the stage and _What changed_ in the header block; then **one row per sheet** — # · Sheet (code) · Title · Rev. Today it has one row per set with a count, which is what "only the drawing set name" describes — and very likely "only Sheet 9": Villa 41's TR-0002 shows its set with **9** in the Sheets column. Issued transmittals get the new layout too (the PDF is built on demand).
+- **On screen** — the draft workspace, an issued transmittal, and Supervisors' drawings (through `lib/drawings/`, which already returns `fileName`): each sheet shows its title, with the name it downloads under beneath it, small. Today only the download name shows, so a sheet uploaded as "Plinth beam Layout" with code 9 reads as `…-DRAFT-9.pdf`.
+
+**4. Pick every sheet at once** (no migration)
+
+- **Choose sheets** takes one file or many. They line up in a short list: each with its title, a code box filled with the next free number (1, 2, 3 … after the highest number there — what the team typed by hand on every set), and a ×. A code can be changed (GFP) before **Upload 9 sheets**.
+- Each file still goes up on its own request — the 4 MB cap per file stays (Design Management's `PLAN.md` never raises it) — one after another, saying "Uploading 3 of 9". A refused file says why, by name, and the rest carry on. On day one the nine Villa 41 sheets went up one at a time, each code typed.
+- The next-free-number rule is a pure helper with tests.
+
+## Open — for the founder to ask the designer
+
+- If "only Sheet 9 is being uploaded" means **a revision should send only the changed sheet** (sheet 9 at R1, the others staying at R0), that reverses decision 5 ("each time a full set gets to site to avoid confusion", 2026-09-27) and moves the revision from the set to each sheet. That is a build of its own, not this one.
+
+## Steps
+
+- [ ] Founder — approve this plan.
+- [ ] `[Opus]` `0122` and `scripts/trials/design-numbers-as-designer.sql`, dry-run on staging as a single-grant `/design-management` person under RLS: Issue mints TB; a draft's number moves up, never to or below one already used, never once released. Proved to bite: with the TR mint, and with the "above" check removed, it fails.
+- [ ] `[Fable]` Review `0122` — it restates a function's grants and a guard trigger. Or the founder's word to skip it for staging, with `[Opus]` reviewing in its place.
+- [ ] `[Opus]` Apply to staging; `db:check`, `db:check-views`; types unchanged (no new column).
+- [ ] `[Opus]` The revision field and `setDraftRevisionNumber`.
+- [ ] `[Sonnet]` The cover sheet one row per sheet, the PDF's file name, titles on the three screens. Rendered from staging's Villa 41 TR-0002 (nine sheets) and looked at (BUGCATCHER #8).
+- [ ] `[Opus]` Choose sheets, many at once.
+- [ ] `[Opus]` prettier, lint, typecheck, tests, `next build`, `check:actions`; every changed `select` run at staging's PostgREST.
+- [ ] `[Opus]` Docs: Design Management's `PLAN.md` (decisions 8–10, the number rule, the guard table), `STATUS.md` (migrations), `TODO.md`.
+- [ ] `[Fable]` Approval pass, or the founder's word; pull request to `staging`; CI green; merge.
+- [ ] Founder — the checklist below, on staging.
+
+## Verification — the founder, on staging (tenth piece)
+
+Staging is becoming the real database, so this checklist issues nothing — an issued transmittal can never be deleted. The TB mint is proved by the trial; the team's next real issue shows it.
+
+1. **Villa 41 → TR-0002 → Cover sheet (PDF)**: all nine sheets listed, each with its code and title; the file is named `Goodearth-Transmittal-Villa41-TR-0002.pdf`.
+2. **Villa 40 → New transmittal → Structural → Foundation Layout → Revise to R1.** On the draft, set Revision to **0** — refused, in a sentence. Set **3** — saved; the label reads R3.
+3. **Choose sheets** → pick three PDFs at once → they line up as 1, 2, 3 with their titles. Change one code to GFP. **Upload 3 sheets** → "Uploading 2 of 3", then each is listed by title with its download name beneath.
+4. Pick a file over 4 MB with two others — it is refused by name; the other two go up.
+5. **Delete the draft** (bottom of the page): nothing issued, nothing burned.
+6. **Supervisors → Villa 41 → Drawings**: each sheet shows its title.
+7. After the team's next real issue: it reads **TB-000n**, and its cover sheet lists every sheet.
