@@ -99,6 +99,10 @@ const CLEARED = [
   "space_views",
   "spaces",
   // Design Management
+  "design_step_events",
+  "design_step_people",
+  "design_steps",
+  "design_actions",
   "transmittal_lines",
   "transmittals",
   "transmittal_counters",

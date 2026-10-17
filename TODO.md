@@ -31,12 +31,13 @@ Everything below is on `staging.goodearthkannur.org`. Each ships only after the 
 - **Design Management's simpler transmittal flow** (PR #81, on staging) — waiting for the founder's vet and the Fable review it skipped.
 - **Design Management: sets by stage, sheets by code** (`0099`) — on staging, waiting for the founder's vet. Staging's drawings were wiped for it. **The Fable review of `0099` was skipped for staging and is due before production**; production then needs `scripts/wipe-drawings.ts` (dry run first) and `0099`.
 - **Design Management: WorkDrive links, TB numbers, the designer's revision number** (`0124`) — the founder's checklist is `plan.md`, _Verification (eleventh piece)_. The folder is read the way WorkDrive's own share page does it, with no key: if Zoho changes that page, the list stops and the link alone still issues (Design Management's `PLAN.md`).
+- **Design Management: the Board** (`0126`, branch `feature/design-pipeline`) — each villa passed from stage to stage, people on each stage, send-backs, history, the design team's Actions. **Not on staging yet: `0126` waits for Fable's review or the founder's word**, then staging, then the founder's checklist, `plan.md`, _Verification (thirteenth piece)_. Before the team uses it: bring each villa already under way in with **Set where it is**.
 
 **Getting it to `master`.** `staging` is ~185 commits ahead and carries `0094`–`0118`. Either the Chat door's ship checklist runs first and everything goes together, or a piece travels alone on a release branch cut from `master` (the skin: cherry-pick `a096e58`…`3fe4c95`, skip the sweep `f8a9e5c` and re-run it on `master`). Every route needs production restored first, then the migrations applied there and `db:compare` empty.
 
 ## Setup the tools are waiting on
 
-3. **Grant `/design-management` to the whole design team** — some of them already issue on staging (six transmittals, 2026-10-16).
+3. **Grant `/design-management` to the whole design team** — some of them already issue on staging (six transmittals, 2026-10-16); Jiljith, Navarang and Vaishnav hold it (2026-10-17). Only grant holders can be put on a stage or own a design action.
 4. **Grant `/supervisors` to the site supervisors** — nothing is visible to staff, and drawings reach site through it.
 5. **Rebuild the rate book's materials** (staging) — no work has any material today, so no estimate can carry a material to Indents or Supervisors until a person enters them (Estimator → Works). 135 of 270 works have a labour rate; the Rate book's "Used but not priced" list shows the rest as estimates use them.
 6. **The workbook's "Project IDs" sheet** — projects, plots and cost centres such as Rent House and Access Road (subprojects were set aside by the founder 2026-10-08). Its own step, not loaded: it renames Saarang to "Saarang Villas" and leaves out Plots 11–16, which have villas and clients.
@@ -44,6 +45,9 @@ Everything below is on `staging.goodearthkannur.org`. Each ships only after the 
 8. **Production only: re-enter 74 material rates** — superseded on ship day by the workbook, which prices every material.
 
 ## Next builds — the founder picks
+
+- **Client Relations onto the shared action pieces** — `lib/next-steps/`, `lib/masters/plot-number.ts`, `components/ui/pill.tsx` and `undo-bar.tsx`, born from its own copies in the thirteenth piece. Wait until Client Relations' work in flight has landed (`feature/client-relations-one-owner`, 2026-10-17, edits those files); behaviour and tests unchanged. Relay's `celebrate.tsx` toast moves onto the Undo bar when next touched.
+- **Client Relations' design checks from the board** — the CRM team types "client confirmed design", "permit" and "working drawing" on each plot; the design board now knows them. A cross-tool read with its contract-table row.
 
 - **Set aside from the ERP corrections (founder, 2026-10-08), planned later:** subprojects; the works schedule (the PDF asked for a Gantt and cash flow — the founder: "I don't like Gantt", so its shape is open); drawing requests.
 - **The Google Chat door, round three** — three candidates in `lib/google-chat/PLAN.md`.

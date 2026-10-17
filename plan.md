@@ -513,3 +513,106 @@ On staging, 11 of the 24 plots with both owners have a different person on each 
 3. On a step's **•••** → Side: move it to Construction; Undo brings it back.
 4. **Actions** → **Interior**: only interior steps, and the team strip counts only interior work.
 5. Nowhere in Client Relations says "Kaadal" or "Sales" any more (the plot record's **Construction** and **Interior** cards).
+
+# Thirteenth piece — the design board: each villa passed from stage to stage (2026-10-17)
+
+The founder: "in design management we need a setup with a similar ui like crm, where each plot can be passed from one stage to another and so to different people, like design, permit, wd, structure, interiors … there may be revisions here and its not a clean linear line it can go back and forth but the stage that a house is in is marked by the latest stage even tho revisions may happen backwards etc, each house will have multiple people working on it, and then you need actions". Drafted by `[Opus]` at the founder's request ("make a plan and then wel execute"), against the code and staging's real rows. `MODELS.md` gives planning to Fable, so the migration waits for a Fable review unless the founder waives it. Branch `feature/design-pipeline`; migration `0126` — drafted as `0125`, it moved because Client Relations' parallel `feature/client-relations-one-owner` pushed its own `0125` first (neither touches the other's tables, and the ledger check asks only that a branch's files are applied, not their order). This piece was drafted as the twelfth; Client Relations' sides landed first and took the number.
+
+**The founder's answer (2026-10-17): "build it full forget relay".** Question 1 is answered in so many words; the other four take their recommendations, as the draft said "yes to all" would, and Concept and Approvals are renamed Design and Permit — the founder's own words for them. The Fable review was not waived, so `0126` reaches `db:apply` only after it, or the founder's word in its place.
+
+## The founder's questions
+
+Each has a recommendation; "yes to all" builds it as written.
+
+1. **Relay or here?** Design Management's rule today is "Relay keeps who-has-the-baton; nothing here has a holder or a due date". On staging Relay has **no trails at all** (checked 2026-10-17). _Recommended:_ the hand-offs and to-dos live here, the boundary is amended, Relay is left as it is and nothing links the two — the call the founder made for Client Relations ("forget relay for this build").
+2. **Where a villa sits = the furthest stage that has started**, even while an earlier one is being revised. A villa in Working Drawings whose design goes back for revision stays in the WD column, with "Revising Design" on its card. _Recommended:_ yes — this is our reading of "marked by the latest stage".
+3. **Which stages are on the board.** The tool's Design stages list is Concept, Approvals, Working Drawings, Structural, MEP, Interiors, Typical Details, Landscape. _Recommended:_ the board shows Concept, Approvals, WD, Structural and Interiors; MEP, Typical Details and Landscape stay for filing transmittals only, and any of them can be switched onto the board later. Rename **Concept → Design** and **Approvals → Permit**? (Sheet file names use the stage code, CON and APP, so nothing already issued changes.)
+4. **Who sees what.** CLAUDE.md says a tool whose work is assigned is _scoped_ (only your own, admins and team leads everything), and the founder said "for apps we decide". _Recommended:_ **open** — everyone holding Design Management sees every villa, as with the drawings today; each person opens on their own villas and actions, with a switch to everyone. A three-person team reviewing each other's drawings gains nothing from walls, and Supervisors already read the released drawings. If yes, CLAUDE.md's line becomes "a tool the founder makes scoped". If no, the board's tables get Client Relations' mechanism (`0122`/`0123`) and the drawings stay open to the team either way.
+5. **Closing an action**: _Recommended:_ the Client Relations rule — whoever set it closes it, or an admin; its owner's tick marks it finished, waiting for the setter.
+
+## Where it goes: Design Management, not a new tool
+
+- **Same people, same villas, same stages.** Transmittals are already filed under these stages; a villa's page already holds its drawings. One grant, no new tool, no new CHECK, no new row in STATUS.md's contract table (villas, plots, projects and clients are Masters' shared surface).
+- **What is new** is a status and people per villa per stage, a history of every move, and the design team's to-do list.
+
+## How a villa moves
+
+- **A step per villa per board stage** (`design_steps`): **Not started · Working · With the client · Waiting on others · Revising · Done**, a one-line note ("Permit office asked for the setback drawing"), started and done dates. One tap on a status chip saves it (Client Relations' rule 11).
+- **Several people on each step** (`design_step_people`). A villa's people are everyone on any of its steps. "So to different people" is choosing who takes the next stage.
+- **Pass on**: on the current step, **Pass to Permit →** asks who takes it and an optional note, then marks this step Done and starts Permit with those people. The next board stage is offered first; any later one can be picked.
+- **Start early**: any stage can be started at any time — Structural alongside WD, Interiors before Permit comes back. Stages run side by side.
+- **Send back for revision**: on any started step, with a reason the database insists on ("Client changed the staircase"). That step goes to Revising; later steps carry on unless someone changes them. The card says "Revising Design · 2nd time".
+- **Where it sits**: the furthest board stage whose step has started. Every board stage Done reads **Design complete**.
+- **Bringing a villa in**: work already under way on 71 villas cannot start from zero. On a villa with nothing started, **Set where it is** picks its stage and people: earlier board stages are marked Done in the same move, this one Working.
+- **History** (`design_step_events`): every status change, pass, send-back and person added or removed is written **by the database**, never by the screen, into an append-only log. The villa page shows it as a timeline ("17 Oct · Anu sent Design back for revision — client changed the staircase"); revision counts come from it.
+- **No drag-and-drop.** A move that needs a reason or people goes through its dialog; a drag would skip both.
+
+## Actions
+
+Client Relations' Actions, for the design team (`design_actions`): the step, the villa (or none, for a general to-do), the stage it belongs to (optional, shown as a chip), owner, due date, notes; **Open · Waiting on client · Waiting on management · Finished, to confirm · Done**. The tracker's rules come with it: no date counts as overdue, waiting on management tops the list, never deleted (Done, with Undo), the closing rule of question 5.
+
+## The screens — Client Relations' flow, in the toolbox's materials
+
+1. **Welcome**: villas in design, revising now, with the client, actions overdue (counts only). Doors: the **Board** (main), **Actions**, **Design stages**.
+2. **The Board** — the Villas screen becomes it. One column per board stage on a desktop, stacked sections on a phone; villas not started are a closed line beneath ("33 not started"), with search. A **lot card** per villa: the plot number large and monospaced, the client, a health pill (Overdue action · Revising · Nobody on it · Not updated in 2 weeks · On track · Design complete), a rail with a segment per board stage coloured by its status (words beside, never colour alone), the faces of the people on its current stage, the next action and its date. Project chips, health chips with counts, and _Mine · Everyone_ filter it.
+3. **A villa's page** — the plot number large, client, project, where it sits; then cards: **Stages** (one per board stage: status chips, people, dates, revisions, note, Pass on / Send back / Start), **Next steps** (its actions and a composer), **Transmittals** (exactly today's list and New transmittal), **History**. Back goes to the Board; a transmittal still goes back to its villa.
+4. **Actions** — the composer; sections Waiting to confirm · Needs management · Overdue · Next 7 days · Later; _Show done_. Admins see the team strip (a card per person: open, overdue, the load bar); everyone else the greeting over their own list.
+5. **Design stages** — each stage gains an **On the board** switch; the board's columns follow the list's order.
+
+Indents-style phone use is not the brief here (designers sit at desks), but every screen is checked at a true 390px phone with nothing scrolling sideways.
+
+## The database — `0126_design_board.sql` (Design Management)
+
+- `design_stages.on_board boolean not null default false`, switched on by code for CON, APP, WD, STR, INT where present (renames only if question 3 says so).
+- `design_steps`: `unit_id`, `design_stage_id`, `status` (CHECK of the six), `note`, `reason` (the latest send-back's), `started_on`, `done_on` (set exactly when Done — a CHECK), who and when; unique `(unit_id, design_stage_id)`; FKs restrict. A guard trigger refuses Revising without a reason. No DELETE policy: a step started by mistake goes back to Not started, and the log says so.
+- `design_step_people`: `(step_id, profile_id)`, who added and when; insert and delete, no update.
+- `design_step_events`: append-only, **written only by triggers** on the two tables above — a trigger-only `security definer` with execute revoked from every client role, and **no insert, update or delete policy**, so nobody writes history by hand.
+- `design_actions`: `client_actions`' shape after `0121` — `unit_id` (null allowed), `design_stage_id` (null allowed), `action` (1–500), `owner_id`, `due_on`, `status`, `notes`, `done_on` (CHECK), the setter pinned by a guard (`client_actions_guard`'s rule, its own copy), no DELETE policy.
+- `design_team()`: active people holding `/design-management` directly or through a role — an admin only if they hold it too — id and name only; `security definer` with `has_app('/design-management')` in its body, execute revoked from `public, anon`. The second function reading other people's grants after `client_relations_team()`: SECURITY.md's line changes from "one" to "two". Every write that names a person checks them against it.
+- RLS on every table, one SELECT policy each, `has_app('/design-management')` (narrowed in place if question 4 says scoped). No view, no money, no anon policy. The file ends asserting all of it.
+- `scripts/trials/design-board.sql` under RLS as a single-grant designer, a single-grant supervisor and a no-grant person, proved to bite: a send-back without a reason, a hand-written history row, a delete, a closed action by someone who did not set it, an owner off the team — each refused, and each check removed makes its trial fail.
+
+## Shared code
+
+- **`lib/next-steps/`** (new, shared): the action rules from `lib/client-relations/next-steps.ts` — sections, date words, the due menu's picks, who may close, a person's load, the greeting — with their tests. Design Management reads it from the start.
+- **`components/ui/pill.tsx`** and **`components/ui/undo-bar.tsx`**: the Undo bar is the third copy (Relay, Client Relations, this), so DESIGN.md's rule makes it shared now; the Pill comes with it.
+- **Client Relations moves onto all three last**, once its own work in flight has landed (`feature/client-relations-sides` merged 2026-10-17; `feature/client-relations-one-owner` still open) — those branches edit its composer, action card and rules, and this build does not touch them until then. Its behaviour and tests do not change.
+- Design Management's own: `lib/design-management/board.ts` (pure, tested: where a villa sits, its rail, its health, revision counts from the log, what Pass on offers), `board-queries.ts`, `board-actions.ts`, and the screens.
+
+## Deliberately left out
+
+- **Dates per stage or a plan per villa** (the founder: "I don't like Gantt") — the actions carry the dates; a card shows days in its stage.
+- Reminders by email or Google Chat; a Reporter dataset; a link to Relay.
+- **Client Relations' three design checks** (client confirmed design, permit, working drawing — typed by the CRM team on 19, 13 and 12 plots) **filled from the board**: the obvious next piece, a cross-tool read with its contract-table row.
+- **Outside consultants as people** — a structural consultant with no toolbox account is named in the step's note.
+
+## Steps
+
+- [x] Founder — "build it full forget relay" (2026-10-17).
+- [x] `[Opus]` `0126` and `scripts/trials/design-board.sql`: dry-run on staging (at `0124`) under RLS as a single-grant `/design-management` person, a colleague on the design team, a single-grant `/supervisors` person and the admin — ten trials pass, and the migration runs twice cleanly. Proved to bite five ways: without the people guard's team check it fails at TRIAL 7, without the close check at TRIAL 8 (the owner closed it), without the owner check at TRIAL 8 (an owner off the team), without the board check at TRIAL 6; without the guard's reason sentence the table's own CHECK still refuses the send-back (two layers), so the run fails.
+- [x] ~~`[Fable]` Review `0126`~~ — **skipped on the founder's explicit word** (2026-10-17: "you can ship it its my explicit command, but see that it dosnet interrupt the other agents working on other branches"). A ship instruction covers only what the founder has seen, so this is staging; production waits for the founder's vet. In its place `[Opus]` reviewed against `SECURITY.md` and `BUGCATCHER.md`: RLS on all four tables, exactly one SELECT policy each, every policy `has_app('/design-management')`, no anon policy, no DELETE on steps or actions and nothing but SELECT on the history (all asserted); `design_team()` a definer whose body checks the grant, execute revoked from `public, anon`; the two logs trigger-only definers no client role may execute, the three guards invokers (asserted); the two moves invokers, revoked from `public, anon`; no view (no write revokes owed), no money, `has_app()`/`is_admin()` untouched; the guards call `design_team()` as the caller and no other tool's trigger reaches these tables (#11, #19); names through Maps, the one embed naming its key (#2). No findings. **Not interrupting the parallel work:** Client Relations' open `feature/client-relations-one-owner` holds `0125`, so this is `0126`; both rehearsed together on staging in both orders (each passes), and this applies with `--only`, leaving their `0125` for them.
+- [x] `[Opus]` Applied to staging with `--only 0126_design_board.sql` (`0001`–`0124` and `0126`; Client Relations' `0125` is theirs to apply); the regenerated types are the hand-written ones exactly; `db:check` level, `db:check-views` clean; the trial re-run on the applied database passes; every `select` string the board sends answers at staging's PostgREST, and the villa embed `units → plots!units_plot_id_fkey, clients, projects` too. Staging's stages read Design, Permit, Working Drawings, Structural, Interiors on the board; MEP, Typical Details, Landscape off.
+- [x] `[Opus]` `lib/next-steps/rules.ts` (shared, 9 tests), `lib/masters/plot-number.ts` (shared, 1 test), `lib/design-management/board.ts` (7 tests); `board-queries.ts` and `board-actions.ts` — every export behind `requireTool("/design-management")`, writes returning `ActionState` and revalidating `("/design-management", "layout")`, lists through `fetchAll`, every `error` checked, names through Maps (no `profiles` embed).
+- [x] `[Opus]` (in `[Sonnet]`'s place, one session) `components/ui/pill.tsx` and `undo-bar.tsx`; the Board (the Villas screen, at its address), the villa page, Actions, the welcome, the tab strip, Design stages' On the board switch. The old villa grid and two unused reads are gone.
+- [x] `[Opus]` prettier, lint, typecheck, 1,160 tests, `next build`, `check:actions` — green. The Board, a villa's stages and history, and Actions rendered through a throwaway probe (deleted) with sample villas — desktop light and dark, a true 390px phone light and dark; nothing scrolls sideways. That look caught a Pass on offered on a stage under revision behind the villa (now only the stage it sits at offers it, done or not — `passTargets`, tested) and "12 d" (now "12 days"). **No screen has been opened signed in, and none has met real rows** — the founder's vet is the first look.
+- [x] `[Opus]` Docs: Design Management's `PLAN.md` (the Relay boundary amended, decisions 11–15, the board, the guard table), `STATUS.md`, `SECURITY.md` (`design_team()`; scoped is the founder's choice), CLAUDE.md's scoped line, Settings' `PLAN.md`, `DESIGN.md` (pill, undo bar), `TODO.md`, `lib/tools.ts`'s description; the four tables on `scripts/wipe-staging-records.ts`'s list.
+- [ ] `[Fable]` Approval pass — or the founder's word. Pull request to `staging`.
+- [ ] `[Opus]` Once Client Relations' work in flight has landed: Client Relations onto `lib/next-steps/`, the plot number, the Pill and the Undo bar (`TODO.md`).
+- [ ] Founder — the checklist below, on staging.
+- [ ] Production: Fable's review of `0126` if it was skipped, then `0126` after `0124`.
+
+## Verification — the founder, on staging (thirteenth piece)
+
+Staging is becoming the real database, so use villas the team is really working on — what goes in is real from day one, and an action is never deleted. You are admin: you see everything, but you are offered as a person on a stage or an action's owner only if you hold `/design-management` yourself (Settings → People).
+
+1. **Design management** opens on its welcome: villas in design, revising, with the client, actions overdue. The tabs are **Board · Actions · Design stages**.
+2. **Design stages**: Design, Permit, Working Drawings, Structural and Interiors are ticked **On the board**; MEP, Typical Details and Landscape are not. Tick MEP, open the Board — it has an MEP column; untick it.
+3. **Board**: "No villa has started yet", and **Not started** lists every villa. Open **Villa 41** → **Set where it is** → Working Drawings, with Jiljith and Navarang → the Board shows it in the Working Drawings column; on its page Design and Permit read Done.
+4. On Villa 41's Working Drawings, tap **With the client** — the card says so; **Undo** puts it back. **Pass to Structural →** pick Vaishnav → Working Drawings Done, Structural Working with Vaishnav; Villa 41 moves to the Structural column.
+5. On its **Design** card, **Send back for revision** — the button waits until you say why. "Client changed the staircase" → Villa 41 stays in Structural; its card reads **Revising Design**, red; the villa's **History** has the line with the reason. Tap **Done** on Design — the revision is over.
+6. On Villa 40, **Set where it is** → Design; then **Start Interiors** beside it — both Working; Villa 40 sits in the Interiors column.
+7. On a stage, **+ Add** puts someone on; the cross takes them off, with Undo. **•••** → Take back the start returns a stage started by mistake to Not started.
+8. **Actions**: the team strip (you are admin). Type "Send the revised plan to the client", pick Villa 41, **Design**, Jiljith, **Tomorrow** → **Add**: under _Next 7 days_, and on Villa 41's page under Next steps. As Jiljith (or ask him), tick it — "Waiting for Siddharth to confirm"; as you, tick it closed; Undo works.
+9. Villa 41's page still lists its transmittals, and **New transmittal** works as before.
+10. On a phone: the Board stacks a stage at a time; a lot card opens its villa; nothing scrolls sideways.
+11. As the **probe** (`/estimator`, `/inventory`): Design Management is not in the sidebar, and `/design-management/actions` sends it home.
