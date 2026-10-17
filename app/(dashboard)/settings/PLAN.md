@@ -21,7 +21,7 @@ The headings in everyone's sidebar, on the home page and over the grant lists he
 
 ## Team leads
 
-In a tool whose work is assigned (`scoped` in `lib/tools.ts` — today Client Relations), each person sees only their own work; a **team lead** sees everyone's (founder, 2026-10-17: "admin and team lead"). The mechanics are SECURITY.md's; the screen's rules are here.
+In a tool the founder makes scoped (`scoped` in `lib/tools.ts` — today Client Relations), each person sees only their own work; a **team lead** sees everyone's (founder, 2026-10-17: "admin and team lead"). The mechanics are SECURITY.md's; the screen's rules are here.
 
 - **The tick sits under the grant it belongs to**, on a person's page, and only for a scoped tool they hold — personally or through their role. Without the grant it does nothing (`is_lead()`), so it is never offered alone.
 - **Per person, not per role.** Leading is a judgement about one person; a role that made everyone holding it a lead would undo the point.

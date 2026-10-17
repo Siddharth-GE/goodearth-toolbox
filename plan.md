@@ -566,28 +566,31 @@ Indents-style phone use is not the brief here (designers sit at desks), but ever
 
 ## Steps
 
-- [ ] Founder — answer the five questions.
-- [ ] `[Opus]` `0125` and `scripts/trials/design-board.sql`: dry-run on staging under RLS as single-grant people, proved to bite.
+- [x] Founder — "build it full forget relay" (2026-10-17).
+- [x] `[Opus]` `0125` and `scripts/trials/design-board.sql`: dry-run on staging (at `0124`) under RLS as a single-grant `/design-management` person, a colleague on the design team, a single-grant `/supervisors` person and the admin — ten trials pass, and the migration runs twice cleanly. Proved to bite five ways: without the people guard's team check it fails at TRIAL 7, without the close check at TRIAL 8 (the owner closed it), without the owner check at TRIAL 8 (an owner off the team), without the board check at TRIAL 6; without the guard's reason sentence the table's own CHECK still refuses the send-back (two layers), so the run fails.
 - [ ] `[Fable]` Review `0125` — or the founder's word in its place.
-- [ ] `[Opus]` Applied to staging; types; `db:check`, `db:check-views`; the trial re-run on the applied database.
-- [ ] `[Opus]` `lib/next-steps/`, `board.ts` and their tests; the reads and writes, each behind `requireTool("/design-management")`, returning `ActionState`, revalidating `("/design-management", "layout")`, lists through `fetchAll`, every `error` checked.
-- [ ] `[Sonnet]` The shared Pill and Undo bar; the Board, the villa page, Actions, the welcome, the Design stages switch. `[Opus]` vets each before it is committed.
-- [ ] `[Opus]` Checks; every new `select` string at staging's PostgREST; the screens through a throwaway probe on a desktop and a true 390px phone, light and dark.
-- [ ] `[Opus]` Docs: Design Management's `PLAN.md` (the Relay boundary amended, the new decisions, the guard table), `STATUS.md`, `SECURITY.md`, `DESIGN.md`, `TODO.md`, and CLAUDE.md's scoped line if question 4 says open.
+- [ ] `[Opus]` Applied to staging; types regenerated (written by hand until then); `db:check`, `db:check-views`; the trial re-run on the applied database; every new `select` string at staging's PostgREST (the villa embed `units → plots!units_plot_id_fkey, clients, projects` already answers; the four new tables cannot until applied).
+- [x] `[Opus]` `lib/next-steps/rules.ts` (shared, 9 tests), `lib/masters/plot-number.ts` (shared, 1 test), `lib/design-management/board.ts` (7 tests); `board-queries.ts` and `board-actions.ts` — every export behind `requireTool("/design-management")`, writes returning `ActionState` and revalidating `("/design-management", "layout")`, lists through `fetchAll`, every `error` checked, names through Maps (no `profiles` embed).
+- [x] `[Opus]` (in `[Sonnet]`'s place, one session) `components/ui/pill.tsx` and `undo-bar.tsx`; the Board (the Villas screen, at its address), the villa page, Actions, the welcome, the tab strip, Design stages' On the board switch. The old villa grid and two unused reads are gone.
+- [x] `[Opus]` prettier, lint, typecheck, 1,160 tests, `next build`, `check:actions` — green. The Board, a villa's stages and history, and Actions rendered through a throwaway probe (deleted) with sample villas — desktop light and dark, a true 390px phone light and dark; nothing scrolls sideways. That look caught a Pass on offered on a stage under revision behind the villa (now only the stage it sits at offers it, done or not — `passTargets`, tested) and "12 d" (now "12 days"). **No screen has been opened signed in, and none has met real rows** — the founder's vet is the first look.
+- [x] `[Opus]` Docs: Design Management's `PLAN.md` (the Relay boundary amended, decisions 11–15, the board, the guard table), `STATUS.md`, `SECURITY.md` (`design_team()`; scoped is the founder's choice), CLAUDE.md's scoped line, Settings' `PLAN.md`, `DESIGN.md` (pill, undo bar), `TODO.md`, `lib/tools.ts`'s description; the four tables on `scripts/wipe-staging-records.ts`'s list.
 - [ ] `[Fable]` Approval pass — or the founder's word. Pull request to `staging`.
-- [ ] `[Opus]` After `feature/client-relations-sides` lands: Client Relations onto `lib/next-steps/`, the Pill and the Undo bar.
+- [ ] `[Opus]` After `feature/client-relations-sides` lands: Client Relations onto `lib/next-steps/`, the plot number, the Pill and the Undo bar (`TODO.md`).
 - [ ] Founder — the checklist below, on staging.
+- [ ] Production: Fable's review of `0125` if it was skipped, then `0125` after `0124`.
 
-## Verification — the founder, on staging (twelfth piece, draft)
+## Verification — the founder, on staging (twelfth piece)
 
-Staging is becoming the real database, so use villas the team is really working on — what goes in is real from day one, and an action is never deleted.
+Staging is becoming the real database, so use villas the team is really working on — what goes in is real from day one, and an action is never deleted. You are admin: you see everything, but you are offered as a person on a stage or an action's owner only if you hold `/design-management` yourself (Settings → People).
 
-1. **Design stages**: Concept, Approvals, WD, Structural and Interiors are on the board (renamed, if question 3 said so); switch MEP on and off — the Board gains and loses its column.
-2. **Board**: no villa has started; the closed line counts them all. Open **Villa 41** → **Set where it is** → WD, with two people → it sits in the WD column; Design and Permit read Done.
-3. On Villa 41's WD step, **With the client** — the card says so. **Pass to Structural →** pick someone → WD Done, Structural Working.
-4. On its Design step, **Send back for revision** without a reason — refused, in a sentence. With "Client changed the staircase" — Villa 41 stays in the Structural column, its card reads "Revising Design"; History has the line.
-5. On Villa 40, start Interiors early, beside Design — both Working; it sits in Interiors.
-6. **Actions**: "Send the revised plan to the client", Villa 41, stage Design, owner a colleague, Tomorrow → under Next 7 days, and on Villa 41's page. The colleague ticks it finished; you close it; Undo works.
-7. Villa 41's page still lists its transmittals; **New transmittal** works as before.
-8. On a phone: the Board stacks by stage; a lot card opens its villa; nothing scrolls sideways.
-9. As the **probe** (`/estimator`, `/inventory`): Design Management is not in the sidebar, and `/design-management/actions` sends it home.
+1. **Design management** opens on its welcome: villas in design, revising, with the client, actions overdue. The tabs are **Board · Actions · Design stages**.
+2. **Design stages**: Design, Permit, Working Drawings, Structural and Interiors are ticked **On the board**; MEP, Typical Details and Landscape are not. Tick MEP, open the Board — it has an MEP column; untick it.
+3. **Board**: "No villa has started yet", and **Not started** lists every villa. Open **Villa 41** → **Set where it is** → Working Drawings, with Jiljith and Navarang → the Board shows it in the Working Drawings column; on its page Design and Permit read Done.
+4. On Villa 41's Working Drawings, tap **With the client** — the card says so; **Undo** puts it back. **Pass to Structural →** pick Vaishnav → Working Drawings Done, Structural Working with Vaishnav; Villa 41 moves to the Structural column.
+5. On its **Design** card, **Send back for revision** — the button waits until you say why. "Client changed the staircase" → Villa 41 stays in Structural; its card reads **Revising Design**, red; the villa's **History** has the line with the reason. Tap **Done** on Design — the revision is over.
+6. On Villa 40, **Set where it is** → Design; then **Start Interiors** beside it — both Working; Villa 40 sits in the Interiors column.
+7. On a stage, **+ Add** puts someone on; the cross takes them off, with Undo. **•••** → Take back the start returns a stage started by mistake to Not started.
+8. **Actions**: the team strip (you are admin). Type "Send the revised plan to the client", pick Villa 41, **Design**, Jiljith, **Tomorrow** → **Add**: under _Next 7 days_, and on Villa 41's page under Next steps. As Jiljith (or ask him), tick it — "Waiting for Siddharth to confirm"; as you, tick it closed; Undo works.
+9. Villa 41's page still lists its transmittals, and **New transmittal** works as before.
+10. On a phone: the Board stacks a stage at a time; a lot card opens its villa; nothing scrolls sideways.
+11. As the **probe** (`/estimator`, `/inventory`): Design Management is not in the sidebar, and `/design-management/actions` sends it home.

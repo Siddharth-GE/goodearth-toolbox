@@ -202,10 +202,11 @@ export const TOOLS: Tool[] = [
   // Relay replaced both the planned Design Management AND
   // project-management layers when it shipped — but 2026-08-22 revived
   // Design Management to hold the artefacts Relay deliberately refuses
-  // to store. The boundary now: Relay keeps accountability (who is
-  // holding the baton); Design Management holds the artefacts
-  // themselves (the drawings). Both slugs stay legal in the database
-  // CHECKs (0036 §1 says why).
+  // to store, and since 0125 (founder, 2026-10-17: "build it full forget
+  // relay") it also passes each villa from stage to stage, with people
+  // and actions. Relay keeps whatever trails are filed in it; nothing
+  // links the two. Both slugs stay legal in the database CHECKs (0036 §1
+  // says why).
   {
     name: "Relay",
     description: "Who is holding each task, and for how long.",
@@ -216,7 +217,7 @@ export const TOOLS: Tool[] = [
   {
     name: "Design Management",
     description:
-      "Drawing sets and their revisions for each villa, and the transmittals that send them to site.",
+      "Each villa's design from stage to stage, who is on it, and the drawings that go to site.",
     href: "/design-management",
     icon: "DraftingCompass",
     built: true,

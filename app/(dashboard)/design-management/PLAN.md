@@ -1,32 +1,56 @@
 # Design Management — the rules
 
-The drawings themselves: sets, revisions and the transmittals that send them to site. Grant `/design-management`. Migrations `0091`–`0093`, `0099` and `0124`.
+Each villa's design from stage to stage — who is on it, what is next, what went back for revision — and the drawings themselves: sets, revisions and the transmittals that send them to site. Grant `/design-management`. Migrations `0091`–`0093`, `0099`, `0124` and `0125`.
 
 ## The boundary with Relay
 
-> **Relay keeps who-has-the-baton. Design Management keeps the artefacts.** Project Management stays replaced.
+> **The design team's hand-offs and to-dos live here** (founder, 2026-10-17: "build it full forget relay"). Relay keeps whatever trails are filed in it; **nothing links the two**.
 
-A drawing approval is a Relay activity, with a holder and a clock. The drawing that was approved, its revision, its sheets and the transmittal that sent it are this tool's. Nothing here has a holder or a due date; nothing in Relay stores a file. **Nothing links the two** — a `'transmittal'` link kind in Relay was considered and left out on purpose.
+Until `0125` this tool kept only the artefacts and Relay the baton. The board (below) reversed that for design, the call the founder made for Client Relations' build progress (its decision 4) — on staging Relay held no trails at all. Nothing in Relay stores a file, and a `'transmittal'` link kind in Relay stays left out.
 
 ## The founder's decisions
 
-1. **Its own design-stage list** (Concept, Approvals, Working Drawings, Structural, MEP, Interiors), renameable and retirable — what a transmittal is filed under, not Relay's stages even where the words match.
+1. **Its own design-stage list** (Design, Permit, Working Drawings, Structural, MEP, Interiors, Typical Details, Landscape), renameable and retirable — what a transmittal is filed under, and, for the stages **on the board**, the columns a villa moves through. Concept and Approvals became Design and Permit in `0125`, the founder's words.
 2. **Revisions live per drawing set per villa** — R0, R1, … each with a note. The Selections model one level finer.
 3. **A revision's drawings are a Zoho WorkDrive share link** (2026-10-17: "lets not get into file handling, new transmittal is created and they paste a link of our drive into it"), "anyone can view", so site needs no Zoho login. Before `0124` a revision held uploaded sheet files; those stay, and nothing new is uploaded.
 4. **Sharing is in-app plus a letterhead PDF cover sheet**, forwarded by hand. No outbound email.
 5. **One transmittal is one stage, one drawing set and its sheets** (2026-09-27): a set belongs to a stage, several named sets may share one, and each issue sends the set's full set of sheets — a whole WorkDrive folder.
 6. **The cover sheet lists every sheet by name** (2026-10-17: "the transmittal sheet displays only the drawing set name"), after the set, its revision and the link. Sheet codes typed at upload (GFP) and the download name built from them (`SAA-Saarang-Villa12-WD-TB0003-GFP.pdf`) belong to the uploaded sheets only.
-7. **Plot level, everything** (2026-08-22): villas as cards → a villa's transmittals → a transmittal, and every screen goes back exactly one step. No company-wide transmittals list and no project-wide set catalogue.
+7. **Plot level, everything** (2026-08-22): the board → a villa → a transmittal, and every screen goes back exactly one step. No company-wide transmittals list and no project-wide set catalogue.
 8. **The number is the toolbox's own series, TB** (2026-10-17: "just make a tool box id addition, since we had an already ongoing series from excel") — `TB-0003`, never mistaken for the Excel numbers. The `TR-` numbers issued before `0124` stay as they are.
 9. **The revision number is the designer's while draft** (2026-10-17) — any number above every revision the set already has on that villa, so a set the team had at R2 in Excel starts here at R3.
 10. **The toolbox counts and names the sheets itself** (2026-10-17: "is there a way that an uploaded link autocounts and extracts the name") — by reading the shared folder, below.
+11. **Each villa is passed from stage to stage, and to different people** (2026-10-17: "a setup with a similar ui like crm, where each plot can be passed from one stage to another and so to different people, like design, permit, wd, structure, interiors") — the board, below, in Client Relations' look.
+12. **A villa sits at the furthest stage that has started**, even while an earlier one is revised ("the stage that a house is in is marked by the latest stage even tho revisions may happen backwards"). It is not a straight line: stages run side by side and any stage can start at any time.
+13. **Several people on each stage** ("each house will have multiple people working on it").
+14. **Everyone holding the grant sees every villa** — the plan's recommendation, taken ("build it full"). Not `scoped`: a small team reviewing each other's drawings gains nothing from walls, and Supervisors already read the released drawings. Each person opens on their own work, with a switch to everyone.
+15. **Actions are Client Relations' Actions for the design team** — an owner, a date, overdue first; whoever set one closes it, or an admin; never deleted.
 
-| Screen                           | What it is                                                            | Back to     |
-| -------------------------------- | --------------------------------------------------------------------- | ----------- |
-| `/design-management`             | welcome: plot-level counts, doors to Villas and Design stages         | the sidebar |
-| `…/villas`                       | a card per villa: issued, drafts, last issued                         | welcome     |
-| `…/villas/[unitId]`              | its transmittals with stage chips, New transmittal, its sets by stage | Villas      |
-| `…/transmittals/[transmittalId]` | the workspace while draft; the record once issued                     | its villa   |
+| Screen                           | What it is                                                                                                    | Back to     |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------- | ----------- |
+| `/design-management`             | welcome: villas in design, revising, with the client, actions overdue; doors to Board, Actions, Design stages | the sidebar |
+| `…/villas`                       | **the Board**: a column per board stage, a lot card per villa; villas not started underneath                  | welcome     |
+| `…/villas/[unitId]`              | the villa: where it sits, its stages, next steps, transmittals, drawing sets, history                         | the Board   |
+| `…/transmittals/[transmittalId]` | the workspace while draft; the record once issued                                                             | its villa   |
+| `…/actions`                      | the design team's actions: the team strip for an admin, the greeting for everyone else                        | welcome     |
+| `…/stages`                       | the stage list: name, code, **On the board**, retire, reorder                                                 | welcome     |
+
+The Board keeps the Villas screen's address, so every link into a villa and its transmittals still works.
+
+## The board — each villa from stage to stage
+
+The rules are `lib/design-management/board.ts`, pure and tested; the reads `board-queries.ts`; the writes `board-actions.ts`.
+
+- **The columns are the stages switched On the board** (`design_stages.on_board`, `0125`), in the list's order. Switching one off hides its column and keeps every step and line of history on it.
+- **A step per villa per board stage** (`design_steps`): Working · With the client · Waiting on others · Revising · Done, a one-line note, started and done dates the guard keeps in line with the status. No row is "not started"; a step started by mistake goes back to not started (••• → Take back the start), never deleted.
+- **Where a villa sits is worked out, never stored**: the furthest board stage whose step has started. Every board stage Done reads Design complete.
+- **Pass on** is offered only on the stage a villa sits at — done or not, since a finished stage waiting to be handed on is the point — to any later stage, the next first; it marks this stage Done and starts that one with the people picked (`design_pass_step`, one transaction). An earlier stage under revision finishes with its Done chip.
+- **Send back for revision** works on any started stage and needs a reason; the villa stays where it sits, and its card says "Revising Design · 2nd time". The reason belongs to that revision: the guard clears it when the stage leaves Revising.
+- **Start** any stage at any time with its people; **Set where it is** brings in a villa already under way — only on one with nothing started, every board stage before the chosen one Done (`design_set_where`).
+- **People** (`design_step_people`) are put on and taken off, never edited — only people on `design_team()`: active holders of the grant, an admin only by holding it too.
+- **The history** (`design_step_events`) is written **only by the database** — two trigger-only definers on the steps and people, and no insert, update or delete policy for anyone. One move is one line on the villa's page; revisions are counted from it.
+- **A villa's health**: an overdue action, then a revision under way, then Design complete, then a finished stage nobody has passed on, then nobody on its stage, then two weeks untouched, else on track.
+- **Actions** (`design_actions`) are `client_actions`' shape after `0121`, this tool's own copy: the villa (or none), the stage (optional), owner, date, status, notes; the setter pinned; closing the setter's or an admin's; the owner on `design_team()`. The action rules are shared with Client Relations (`lib/next-steps/`).
 
 ## Drawing sets are born on a plot
 
@@ -64,8 +88,11 @@ A drawing approval is a Relay activity, with a holder and a clock. The drawing t
 | `transmittal_lines_stage_match`             | a set on a transmittal of another stage, or a set with no stage (`0099`)                                                                                             |
 | `transmittals_stage_locked`                 | moving a draft's stage once it carries a set (`0099`)                                                                                                                |
 | `drawing_sets_stage_locked`                 | moving a set's stage once given (`0099`)                                                                                                                             |
+| `design_steps_guard`                        | a step on a stage off the board; a step moving villa or stage; a send-back with no reason; who started it changing (`0125`)                                          |
+| `design_step_people_guard`                  | putting someone who does not hold the grant on a stage (`0125`)                                                                                                      |
+| `design_actions_guard`                      | the setter changing; closing or reopening by anyone but the setter or an admin; an owner off the team (`0125`)                                                       |
 
-Screens hide the buttons that would fail; the database decides. The RAISE messages are written for a designer and pass through verbatim. All the functions are `security invoker` on direct paths, so RLS still applies.
+Screens hide the buttons that would fail; the database decides. The RAISE messages are written for a designer and pass through verbatim. All the functions are `security invoker` on direct paths, so RLS still applies — except `design_team()`, a definer whose `has_app` check is its boundary, and the two history logs, definers no client role may call.
 
 ## The WorkDrive folder
 
@@ -94,7 +121,9 @@ Supervisors shows released drawings (a Drawings section on the villa page — **
 - **No money, no view.** A drawing is never priced here.
 - **Names merge through `Map`s, never embeds** (BUGCATCHER #2).
 - Per-stage counts are derived each render, never stored.
+- **The board reads its slice whole** (~70 villas, a few hundred steps and actions) and works in memory; every count is over complete reads.
+- **The shared pieces**: the action rules (`lib/next-steps/`), the plot number (`lib/masters/plot-number.ts`), the pill and the Undo bar (`components/ui/`). The board's screens are this tool's own; Client Relations holds its copies until it moves onto the shared ones (`TODO.md`).
 
 ## Deliberately not built
 
-Outbound email (fire-and-forget if ever); uploads of any kind; a line on an issued transmittal when its folder no longer matches the kept list (easy now — the ids are kept); a Relay link. **Per-supervisor plot assignment** is Supervisors' open question, but its answer decides who sees which villa's drawings — the two must match.
+Outbound email (fire-and-forget if ever); uploads of any kind; a line on an issued transmittal when its folder no longer matches the kept list (easy now — the ids are kept); a Relay link. **Dates per stage or a plan per villa** (the founder: "I don't like Gantt") — the actions carry the dates. **Drag-and-drop on the board** — a move that needs a reason or people goes through its dialog. **Outside consultants as people** — without a toolbox account they are named in the stage's note. **Client Relations' three design checks filled from the board** — the next piece, a cross-tool read with its contract row. **Per-supervisor plot assignment** is Supervisors' open question, but its answer decides who sees which villa's drawings — the two must match.
