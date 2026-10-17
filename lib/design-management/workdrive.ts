@@ -37,9 +37,12 @@ export type FolderRead =
 export async function readWorkDriveFolder(linkId: string): Promise<FolderRead> {
   let step = "page";
   try {
+    // Every call refuses a redirect: the server talks to Zoho's share host
+    // and nowhere else, so a link Zoho sends elsewhere fails here, in a
+    // sentence, and goes as a link alone.
     const page = await fetch(`${SHARE_ORIGIN}/external/${encodeURIComponent(linkId)}`, {
       cache: "no-store",
-      redirect: "follow",
+      redirect: "error",
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (!page.ok) {
@@ -64,6 +67,7 @@ export async function readWorkDriveFolder(linkId: string): Promise<FolderRead> {
       const answer = await fetch(`${SHARE_ORIGIN}/api/v1/files/${id}`, {
         headers,
         cache: "no-store",
+        redirect: "error",
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
       if (!answer.ok) return refused(step, answer.status);
@@ -78,7 +82,7 @@ export async function readWorkDriveFolder(linkId: string): Promise<FolderRead> {
         `${SHARE_ORIGIN}/api/v1/files/${id}/files?page%5Blimit%5D=${PAGE_SIZE}&page%5Boffset%5D=${
           pageNo * PAGE_SIZE
         }`,
-        { headers, cache: "no-store", signal: AbortSignal.timeout(TIMEOUT_MS) },
+        { headers, cache: "no-store", redirect: "error", signal: AbortSignal.timeout(TIMEOUT_MS) },
       );
       if (!answer.ok) return refused(step, answer.status);
       const rows = folderEntries(await answer.json());
