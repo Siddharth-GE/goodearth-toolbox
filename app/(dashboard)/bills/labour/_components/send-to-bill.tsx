@@ -30,15 +30,7 @@ import type { LabourBillingOptions, UnbilledEntry } from "@/lib/bills/labour-que
 import { formatCount, formatDate, formatMoney, formatQuantity } from "@/lib/format";
 import { useMemo, useState, useTransition } from "react";
 
-/**
- * Send to Bill: tick the entries, give the rates, press once. Daily
- * wages: a day rate per trade (the contractor's last bill's suggested),
- * heads × rates, and a total that may be set by hand with a reason.
- * Piece-work: the contractor's approved work order, and a rate per entry
- * (the work order's for that work, else the rate book's; a lump sum
- * typed). The figure shown is the figure the bill will carry.
- */
-
+// The figure shown is the figure the bill will carry. Piece-work rate: the work order's for that work, else the rate book's; a lump sum is typed.
 const asEntry = (row: UnbilledEntry): LabourEntry => ({
   id: row.id,
   kind: row.kind,

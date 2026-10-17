@@ -23,11 +23,6 @@ const STATUS_VARIANT: Record<CashRequestStatus, "neutral" | "warning" | "info" |
   closed: "success",
 };
 
-/**
- * The weekly cash request (0107, plan.md B8): accounts lists the bills
- * and advances to pay this week, a bill approver releases it (cutting
- * amounts if they choose), then each payment is recorded against it.
- */
 export default async function CashRequestsPage() {
   const requests = await listCashRequests();
 

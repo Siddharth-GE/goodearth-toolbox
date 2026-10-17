@@ -3,12 +3,7 @@ import { WorkOrderDocument } from "@/lib/bills/work-order-document";
 import { getWorkOrder } from "@/lib/bills/work-order-queries";
 import { createElement, type ReactElement } from "react";
 
-/**
- * The work order, as a PDF to print. getWorkOrder enforces the /bills
- * grant. Opened in the browser rather than downloaded, because the ask
- * is to print it; generated on demand so it never drifts from the order,
- * and a pending order carries its DRAFT watermark.
- */
+// getWorkOrder enforces the /bills grant. On demand, so it never drifts; a pending order carries its DRAFT watermark.
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 

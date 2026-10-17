@@ -14,11 +14,6 @@ import { useState, useTransition } from "react";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-/**
- * Paying an approved bill (0107): a payment of all or part of what is
- * pending, or part of an open advance recovered against it. When the two
- * reach the total, the database marks the bill paid by itself.
- */
 export function SettlementPanel({
   billId,
   pending,
@@ -26,7 +21,6 @@ export function SettlementPanel({
 }: {
   billId: string;
   pending: number;
-  /** The contractor's advances with something left to recover. */
   advances: OpenAdvance[];
 }) {
   const router = useRouter();

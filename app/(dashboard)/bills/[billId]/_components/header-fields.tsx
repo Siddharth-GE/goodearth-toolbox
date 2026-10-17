@@ -8,14 +8,8 @@ import { formatDate, formatMoney } from "@/lib/format";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
 import { useState } from "react";
 
-/**
- * The bill's own fields — invoice number/date, the paper's three
- * figures, the note — editable on blur while it's recorded, read-only
- * once approved. The anchor, vendor and scope are NOT here: they're
- * part of the number and permanent (a wrong anchor means delete and
- * re-record). The database guard refuses edits past recorded, so
- * read-only here is honesty, not enforcement.
- */
+// The anchor, vendor and scope are permanent (part of the number); a wrong anchor means delete and re-record.
+// The database guard refuses edits past recorded, so read-only here is honesty, not enforcement.
 export function HeaderFields({
   billId,
   invoiceNo,

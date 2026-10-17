@@ -10,7 +10,6 @@ import type { BillLineRow } from "@/lib/bills/line-queries";
 import { billLineMoney } from "@/lib/bills/math";
 import { formatMoney, formatPercent, formatQuantity } from "@/lib/format";
 
-/** An approved or paid bill's lines, as they stand — no longer editable. */
 export function BillLinesTable({ lines }: { lines: BillLineRow[] }) {
   return (
     <Table>

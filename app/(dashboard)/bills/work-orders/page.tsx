@@ -26,11 +26,6 @@ const STATUSES: { value: ContractStatus; label: string }[] = [
   { value: "approved", label: "Approved" },
 ];
 
-/**
- * Work orders (plan.md B6) — the labour contracts, renamed and made
- * richer: numbered, with their works and terms. The A4 bar: search,
- * filters, and totals over every matched order.
- */
 export default async function WorkOrdersPage({
   searchParams,
 }: {

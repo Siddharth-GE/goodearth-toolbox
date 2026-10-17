@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { createCashRequest } from "@/lib/bills/payment-actions";
 import { useState, useTransition } from "react";
 
-/** Start a cash request for the week a day falls in — this week by default. */
 export function StartRequest() {
   const [day, setDay] = useState(() => new Date().toISOString().slice(0, 10));
   const [error, setError] = useState<string>();

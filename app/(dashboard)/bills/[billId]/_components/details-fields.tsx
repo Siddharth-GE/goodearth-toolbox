@@ -10,11 +10,7 @@ import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-/**
- * An itemised bill's own fields. The invoice number, date and note are
- * edited on blur while it is recorded; the taxable, GST and total are the
- * lines' sums (the database writes them), so they are shown, not typed.
- */
+// The taxable, GST and total are the lines' sums (the database writes them), so they are shown, not typed.
 export function DetailsFields({
   billId,
   invoiceNo,
@@ -118,10 +114,7 @@ export function DetailsFields({
   );
 }
 
-/**
- * A daily-wages bill whose muster roll totals differently from heads ×
- * rates: a different total, with a note saying why (0106).
- */
+/** For a muster roll that totals differently from heads × rates: a total with a reason (0106). */
 export function TotalOverride({
   billId,
   currentTotal,

@@ -41,7 +41,6 @@ import { useState, useTransition } from "react";
 type Result = { error?: string } | undefined;
 type Option = { id: string; name: string };
 
-/** Runs an action, shows its refusal, refreshes the page on success. */
 function useRun() {
   const router = useRouter();
   const [error, setError] = useState<string>();
@@ -60,11 +59,6 @@ function useRun() {
   return { run, error, pending };
 }
 
-/**
- * The lines of one week's request, and what can be done with them at
- * its stage: asked amounts while drafting, released amounts while with
- * the approver, payments once released.
- */
 export function RequestLines({
   request,
   isApprover,
@@ -246,7 +240,6 @@ function LineRow({
   );
 }
 
-/** Paying a released line: a bill payment, or the advance itself. */
 function PayForm({
   item,
   cap,
@@ -341,7 +334,6 @@ function PayForm({
   );
 }
 
-/** Approved bills with something pending, ticked onto a draft request. */
 export function AddBills({ requestId, bills }: { requestId: string; bills: PayableBill[] }) {
   const { run, error, pending } = useRun();
   const [picked, setPicked] = useState<Record<string, string>>({});
@@ -437,7 +429,6 @@ export function AddBills({ requestId, bills }: { requestId: string; bills: Payab
   );
 }
 
-/** An advance onto a draft request: contractor, project, optionally a work order. */
 export function AddAdvance({
   requestId,
   contractors,
@@ -562,7 +553,6 @@ export function AddAdvance({
   );
 }
 
-/** The request's next step: submit, release or send back, close. */
 export function RequestActions({
   request,
   isApprover,

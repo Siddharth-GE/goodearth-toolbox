@@ -1,17 +1,5 @@
-/**
- * A bill's lines (0106, plan.md B7) — pure, no database.
- *
- * A line is a material from the bill's PO, daily wages by trade (nmr),
- * piece-work by quantity (pw_qty) or as a lump sum (pw_lump), or anything
- * else (other). Its money is the shared line formula (lib/line-money.ts):
- * quantity × rate − discount, GST on that, other charges after tax; a
- * lump sum's rate is its amount. The database rewrites the bill's header
- * from its lines (bill_lines_roll_up), and lib/bills/math.ts rolls them
- * up the same way for the screen.
- *
- * Here: what is wrong with a line in words, and the lines a bill starts
- * with — the PO's materials still to bill, or a work order's works.
- */
+// Pure, no database. Line money is the shared lib/line-money.ts formula (a lump sum's rate is its amount); the database rolls the header up (bill_lines_roll_up, 0106) and lib/bills/math.ts mirrors it.
+// Kinds: a PO material, daily wages by trade (nmr), piece-work by quantity (pw_qty) or lump sum (pw_lump), other.
 
 import type { BillLineMoney } from "./math";
 
@@ -78,7 +66,6 @@ export function billLineProblem(line: BillLineDraft): string | undefined {
   return undefined;
 }
 
-/** What stops a bill's lines being saved, in words — or undefined. */
 export function billLinesProblem(lines: BillLineDraft[]): string | undefined {
   if (lines.length === 0) return "A bill needs at least one line.";
   for (const line of lines) {
@@ -88,7 +75,6 @@ export function billLinesProblem(lines: BillLineDraft[]): string | undefined {
   return undefined;
 }
 
-/** A PO line as po_line_billing_facts gives it, with the material's name. */
 export type PoLineForBill = {
   po_line_id: string;
   item_id: string;
@@ -105,17 +91,10 @@ export type PoLineForBill = {
   other_charges: number | null;
 };
 
-/** Received but not yet billed — what a new material bill offers. */
 export const leftToBill = (line: PoLineForBill) =>
   Math.max(0, Math.round((line.received - line.billed) * 1e6) / 1e6);
 
-/**
- * A material bill's starting lines: every PO line with something received
- * and not yet billed, at that quantity, with the PO's rate and GST. A
- * percentage discount becomes rupees on the quantity billed; a rupee
- * discount and other charges are shared out by the quantity billed of
- * the quantity ordered. Every figure is editable to match the invoice.
- */
+/** Every PO line with something received and not yet billed. A % discount becomes rupees on the quantity billed; a rupee discount and other charges are shared by billed over ordered. */
 export function linesFromPo(poLines: PoLineForBill[]): BillLineDraft[] {
   return poLines
     .filter((line) => leftToBill(line) > 0)
@@ -147,7 +126,6 @@ export function linesFromPo(poLines: PoLineForBill[]): BillLineDraft[] {
     });
 }
 
-/** A work order's work, as a bill against it starts from it. */
 export type WorkOrderLineForBill = {
   work_item_id: string | null;
   description: string;
@@ -156,11 +134,7 @@ export type WorkOrderLineForBill = {
   rate: number;
 };
 
-/**
- * A bill against a work order starts from its works: a measured work at
- * its rate with the quantity left for the billing team to enter, a lump
- * sum at its full amount to cut to the stage being billed.
- */
+/** A measured work at its rate with the quantity left to enter; a lump sum at its full amount, to cut to the stage billed. */
 export function linesFromWorkOrder(workLines: WorkOrderLineForBill[]): BillLineDraft[] {
   return workLines.map((line) => ({
     kind: line.is_lump_sum ? ("pw_lump" as const) : ("pw_qty" as const),
@@ -181,14 +155,12 @@ export function linesFromWorkOrder(workLines: WorkOrderLineForBill[]): BillLineD
 
 export type DayRates = { mason: number | null; helper: number | null; other: number | null };
 
-/** The trades a Send to Bill daily-wages bill writes (0106), by line description. */
 const TRADE_BY_DESCRIPTION: Record<string, keyof DayRates> = {
   "Masons (man-days)": "mason",
   "Helpers (man-days)": "helper",
   "Other labour (man-days)": "other",
 };
 
-/** The day rates on a contractor's last daily-wages bill — what the next one suggests. */
 export function dayRatesFromLines(lines: { description: string; rate: number }[]): DayRates {
   const rates: DayRates = { mason: null, helper: null, other: null };
   for (const line of lines) {

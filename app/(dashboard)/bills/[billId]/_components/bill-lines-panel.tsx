@@ -34,10 +34,6 @@ const toEditor = (row: BillLineRow): EditorLine =>
     row.id,
   );
 
-/**
- * A recorded bill's lines, edited and saved together. Saving refreshes
- * the page so the header shows the totals the database rolled up.
- */
 export function BillLinesPanel({
   billId,
   lines,

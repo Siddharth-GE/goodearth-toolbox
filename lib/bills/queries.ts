@@ -13,10 +13,7 @@ import { createClient } from "@/lib/supabase/server";
 
 import type { BillKind, BillStatus } from "./workflow";
 
-// Bills reads the masters tables and the money-free PO views DIRECTLY,
-// under its own /bills grant — never another tool's gated queries
-// module (the lib/purchase-orders/queries.ts rule). Bill money lives on
-// the bills table and its RLS requires this tool's grant to SELECT.
+// Reads masters and the money-free PO views directly under the /bills grant, never another tool's queries. Bill money lives on the bills table, whose RLS needs this grant.
 
 const BILL_LIST_LIMIT = 50;
 
@@ -44,8 +41,6 @@ export type BillListPage = {
   sums: { taxable: number; gst: number; total: number };
 };
 
-/** Headline counts for the tool's welcome screen. Counts only — bill
- * money stays on the screens behind the doors. */
 export async function getWelcomeCounts() {
   await requireTool("/bills");
   const supabase = await createClient();
@@ -55,7 +50,6 @@ export async function getWelcomeCounts() {
   startOfMonth.setHours(0, 0, 0, 0);
   const since = startOfMonth.toISOString();
 
-  // Exact database counts, head-only — never rows.length.
   const [recorded, unpaid, paid] = await Promise.all([
     supabase.from("bills").select("id", { count: "exact", head: true }).eq("status", "recorded"),
     supabase.from("bills").select("id", { count: "exact", head: true }).neq("status", "paid"),
@@ -80,9 +74,7 @@ export type BillListFilters = {
   unpaid?: boolean;
   vendorId?: string;
   projectId?: string;
-  /** Bill number, invoice number or vendor name — already made safe by searchParam. */
   q?: string;
-  /** Invoice date range, YYYY-MM-DD, already checked by dateParam. */
   from?: string;
   to?: string;
 };
@@ -103,8 +95,7 @@ export async function listBills({
   const pageSize = BILL_LIST_LIMIT;
   const currentPage = Math.max(1, page);
 
-  // A vendor-name search becomes a list of vendor ids (vendors is an open
-  // Masters read), so one or() can cover number, invoice and vendor.
+  // A vendor-name search becomes vendor ids, so one or() covers number, invoice and vendor.
   let vendorIdsForSearch: string[] = [];
   if (q) {
     const { data: matched, error: vendorError } = await supabase
@@ -119,7 +110,6 @@ export async function listBills({
     vendorIdsForSearch = (matched ?? []).map((row) => row.id);
   }
 
-  // Every filter, applied identically to the page and to the totals.
   const filtered = <T extends Filterable<T>>(query: T): T => {
     let next = query;
     if (status) next = next.eq("status", status);
@@ -136,8 +126,6 @@ export async function listBills({
     return next;
   };
 
-  // A stated limit with an exact database count — the total is never
-  // derived from the rows that happened to arrive.
   const [{ data, count, error }, sumRows] = await Promise.all([
     filtered(
       supabase
@@ -157,8 +145,7 @@ export async function listBills({
           .range(rangeFrom, rangeTo),
     ),
   ]);
-  // A failed read is an error screen, never an empty list — "no bills"
-  // and "could not read the bills" mean opposite things.
+  // A failed read is an error screen, never an empty list.
   if (error) {
     console.error("listBills failed:", error);
     throw new Error("Could not read the bills.", { cause: error });
@@ -195,9 +182,6 @@ export async function listBills({
   };
 }
 
-/** The list page's filter dropdowns — every vendor and project by
- * name. Light on purpose; the record form's options bag is the heavy
- * one. */
 export async function getBillFilterOptions(): Promise<{
   vendors: { id: string; name: string }[];
   projects: { id: string; name: string }[];
@@ -210,10 +194,6 @@ export async function getBillFilterOptions(): Promise<{
   };
 }
 
-/* ------------------------------------------------------------------ *
- * One bill, in full
- * ------------------------------------------------------------------ */
-
 export type BillDetail = {
   id: string;
   reference: string;
@@ -221,17 +201,14 @@ export type BillDetail = {
   kind: BillKind;
   project_id: string;
   project_name: string;
-  /** The plot/unit the bill's anchor is for, or null for General. */
   scope_name: string | null;
   scope_code: string;
-  /** Null on a directly-paid NMR bill — there is no vendor. */
   vendor_id: string | null;
   vendor_name: string | null;
   po_id: string | null;
   po_reference: string | null;
   labour_contract_id: string | null;
   contract_description: string | null;
-  /** The work order's number (0105), when the bill is against one. */
   contract_reference: string | null;
   invoice_no: string;
   invoice_date: string;
@@ -263,24 +240,18 @@ export const getBill = cache(async (billId: string): Promise<BillDetail | null> 
     )
     .eq("id", billId)
     .maybeSingle();
-  // A failed read is an error screen, never "not found".
   if (billError) {
     console.error("getBill failed:", billError);
     throw new Error("Could not read the bill.", { cause: billError });
   }
   if (!bill) return null;
 
-  // The PO reference comes from the money-free po_facts view, NOT an
-  // embedded purchase_orders join: a /bills-only user has no SELECT on
-  // the PO tables, so the embed would silently come back null for
-  // exactly the people this tool is for.
+  // PO reference from the money-free po_facts view, NOT an embed: a /bills-only user has no SELECT on the PO tables, so it would come back null.
   const [{ data: poFact }, { data: profiles }] = await Promise.all([
     bill.po_id
       ? supabase.from("po_facts").select("reference").eq("id", bill.po_id).maybeSingle()
       : Promise.resolve({ data: null }),
-    // One profiles read resolves every actor on the document — simpler
-    // and safer than three embedded joins on a table with several FKs
-    // to profiles (Supabase would need each constraint named).
+    // One profiles read, not embeds (several FKs to profiles).
     (async () => {
       const actorIds = [
         ...new Set(
@@ -336,20 +307,7 @@ export const getBill = cache(async (billId: string): Promise<BillDetail | null> 
   };
 });
 
-/**
- * Whether the current user may decide bills, plus their id for the
- * recorder-ownership delete rule. Admins short-circuit — has_app() and
- * the guard both treat them as approvers, and no limit applies to them
- * (0033).
- *
- * The right can come from being named on `bill_approvers` OR from the
- * person's role (0034), so this asks the database's own helpers rather
- * than reading either source directly — they are the same functions
- * `bills_guard()` calls, so the button and the trigger cannot drift
- * apart. Reading `bill_approvers` alone was the bug: a role that
- * granted bill approval was honoured by the database but never showed
- * anyone a button.
- */
+/** Admins short-circuit (no limit applies, 0033). Approval can come from bill_approvers OR the role (0034), so this asks the database's own helpers, the ones bills_guard() calls, and button and trigger cannot drift. */
 export async function getCurrentBillActor(): Promise<{
   isAdmin: boolean;
   isApprover: boolean;
@@ -364,9 +322,7 @@ export async function getCurrentBillActor(): Promise<{
   }
 
   const supabase = await createClient();
-  // Both are needed: bill_approval_cap returns null for "unlimited" AND
-  // for "not an approver at all", so can_approve_bills is what tells
-  // those two apart.
+  // bill_approval_cap returns null for both "unlimited" and "not an approver"; can_approve_bills tells them apart.
   const [approver, cap] = await Promise.all([
     supabase.rpc("can_approve_bills", { uid: user.id }),
     supabase.rpc("bill_approval_cap", { uid: user.id }),
@@ -391,10 +347,6 @@ export async function getCurrentBillActor(): Promise<{
   };
 }
 
-/* ------------------------------------------------------------------ *
- * The record-a-bill form
- * ------------------------------------------------------------------ */
-
 export type BillVendorOption = { id: string; name: string };
 
 export type BillAnchorPo = {
@@ -402,20 +354,16 @@ export type BillAnchorPo = {
   vendor_id: string;
   reference: string;
   project_name: string;
-  /** Full-precision PO value (lines × rate + GST) from po_billing_totals. */
   ordered_total: number;
-  /** Sum of every bill already recorded against this PO, any status. */
   billed_total: number;
 };
 
 export type BillAnchorContract = {
   id: string;
   vendor_id: string;
-  /** The work order's number, WO/SAA/004 (0105). */
   reference: string | null;
   description: string;
   project_name: string;
-  /** The plot/unit the contract is for, or "General". */
   scope_name: string;
   contract_value: number;
   billed_total: number;
@@ -432,15 +380,12 @@ export type BillFormOptions = {
   vendors: BillVendorOption[];
   pos: BillAnchorPo[];
   contracts: BillAnchorContract[];
-  /** For the NMR branch: the scope is picked directly, like a PO's. */
   projects: { id: string; name: string; code: string | null }[];
   plots: BillScopedOption[];
   units: (BillScopedOption & { plot_id: string | null })[];
 };
 
-// What's been billed against each labour contract, summed. Shared by
-// the record form and the contracts list — cache()d so a page calling
-// both never pages the bills table twice in one request.
+// Summed per labour contract; cache()d so one request never pages the bills table twice.
 export const billedByContractTotals = cache(async function billedByContractTotals() {
   const supabase = await createClient();
   const data = await fetchAll((from, to) =>
@@ -463,12 +408,7 @@ export const billedByContractTotals = cache(async function billedByContractTotal
   return totals;
 });
 
-/**
- * The masters lists the contract dialog's pickers need — and nothing
- * else. The contracts page used to load getBillFormOptions for these
- * four lists and paid for every PO and billing total in the database
- * along the way.
- */
+/** Just the four masters lists the contract dialog needs, not the PO totals getBillFormOptions loads. */
 export async function getContractFormOptions() {
   await requireTool("/bills");
   const [vendors, projects, plots, units] = await Promise.all([
@@ -491,14 +431,7 @@ export async function getContractFormOptions() {
   };
 }
 
-/**
- * Everything the record form needs, in one gated call: every vendor,
- * their billable POs (issued or completed — from the money-free
- * po_facts, with totals from the po_billing_totals window), their
- * APPROVED active labour contracts (each carrying what's already been
- * billed so the over-billing warning can be derived client-side), and
- * the project/plot/unit lists the NMR branch picks its scope from.
- */
+/** Billable POs (issued or completed) from the money-free po_facts with totals from po_billing_totals; APPROVED active contracts carry what is billed, so the over-billing warning works client-side. */
 export async function getBillFormOptions(): Promise<BillFormOptions> {
   await requireTool("/bills");
   const supabase = await createClient();
@@ -509,8 +442,7 @@ export async function getBillFormOptions(): Promise<BillFormOptions> {
       listProjects(),
       listPlots(),
       listUnits(),
-      // Only approved, active contracts take bills (guarded DB-side in
-      // create_bill too — this filter is the courtesy).
+      // Only approved, active contracts take bills (create_bill guards it too).
       fetchAll((from, to) =>
         supabase
           .from("labour_contracts")
@@ -523,8 +455,7 @@ export async function getBillFormOptions(): Promise<BillFormOptions> {
           .order("id")
           .range(from, to),
       ),
-      // fetchAll throughout: these promise completeness — a capped read
-      // would silently hide a real PO or under-count what's billed.
+      // fetchAll: a capped read would hide a real PO or under-count what is billed.
       fetchAll((from, to) =>
         supabase
           .from("po_facts")
@@ -544,15 +475,12 @@ export async function getBillFormOptions(): Promise<BillFormOptions> {
       billedByContractTotals(),
     ]);
 
-  // Map lookups, not per-row .find() — with every PO and contract in
-  // the list, the linear scans were quadratic in practice.
   const projectNames = new Map(projects.map((p) => [p.id, p.name]));
   const unitNames = new Map(units.map((u) => [u.id, u.name]));
   const plotNames = new Map(plots.map((p) => [p.id, p.name]));
   const projectName = (id: string | null) => (id ? (projectNames.get(id) ?? "—") : "—");
 
-  // Every view column comes back nullable from the type generator, so
-  // the shapes are normalised once here (the inventory queries rule).
+  // View columns are all nullable: normalise once here.
   const totalsByPo = new Map(
     totalRows.map((row) => [
       row.po_id ?? "",

@@ -32,17 +32,7 @@ import {
 
 export type FormKind = "po" | "contract" | "nmr";
 
-/**
- * What is this bill for? A purchase order, an approved work order, or
- * NMR — daily wages. A PO bill starts from the PO's materials received
- * and not yet billed; a work-order bill from its works; each line's
- * figures can be changed to match the paper, and the totals are the
- * lines' (plan.md B7). The kind, vendor and anchor live in the address,
- * so picking an anchor loads its lines. Daily wages logged on site are
- * billed from Bills → Labour (Send to Bill); this NMR form is for a
- * muster roll that never went through the log. Over-billing warns,
- * never blocks (founder decision).
- */
+// Daily wages logged on site are billed from Bills → Labour (Send to Bill); this NMR form is for a muster roll that never went through the log. Over-billing warns, never blocks.
 export function BillForm({
   options,
   initial,
@@ -81,7 +71,6 @@ export function BillForm({
     router.replace(`/bills/new?${params}`, { scroll: false });
   };
 
-  // Only vendors with something to bill against in the chosen mode.
   const vendors = useMemo(() => {
     if (kind === "nmr") return options.vendors;
     const billable = new Set(

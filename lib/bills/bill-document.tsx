@@ -18,14 +18,7 @@ import { billLineMoney, rollUpBill } from "./math";
 import type { BillSettlement } from "./payment-queries";
 import type { BillDetail } from "./queries";
 
-/**
- * A bill on paper (plan.md B7): the company's letterhead, the bill number
- * with the vendor or contractor's name beside it, the project, villa and
- * what it is against, its lines, the totals, and what has been paid and
- * is pending. A bill not yet approved prints with the DRAFT watermark.
- * Amounts in digits only (Helvetica has no ₹ glyph), the currency said
- * once.
- */
+// A bill not yet approved prints with the DRAFT watermark. Digits only: Helvetica has no ₹ glyph.
 
 export type BillPdfData = {
   bill: BillDetail;

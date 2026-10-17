@@ -32,15 +32,6 @@ import { Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
-/**
- * The work order, being written: who, where, what it covers, its works
- * and its terms. Works come from the Masters list, each offered at the
- * rate book's unit and labour rate; a template fills the works and terms
- * in one go. Nothing is saved until Create (or Save, on a pending order)
- * — the value at the foot is always the lines' sum, which is what the
- * database stores.
- */
-
 type LineState = {
   key: string;
   workItemId: string | null;
@@ -54,7 +45,6 @@ type LineState = {
 export type WorkOrderEditorInitial = {
   vendorId: string;
   projectId: string;
-  /** "unit:<id>", "plot:<id>" or "" — the SitePicker value. */
   site: string;
   description: string;
   terms: string;
@@ -83,7 +73,6 @@ export function WorkOrderEditor({
 }: {
   options: WorkOrderFormOptions;
   initial: WorkOrderEditorInitial;
-  /** Present: saving a pending order. Absent: making a new one. */
   orderId?: string;
 }) {
   const router = useRouter();
@@ -121,7 +110,6 @@ export function WorkOrderEditor({
   const update = (key: string, patch: Partial<LineState>) =>
     setLines((current) => current.map((line) => (line.key === key ? { ...line, ...patch } : line)));
 
-  /** A picked work brings its name, unit and labour rate from the rate book. */
   const pickWork = (line: LineState, workItemId: string) => {
     const work = workById.get(workItemId);
     const previous = line.workItemId ? workById.get(line.workItemId) : undefined;

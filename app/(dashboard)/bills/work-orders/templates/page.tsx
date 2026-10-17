@@ -7,12 +7,6 @@ import { formatCount } from "@/lib/format";
 import { ClipboardList } from "lucide-react";
 import { TemplateSwitch } from "../_components/work-order-buttons";
 
-/**
- * Work-order templates (0105): a name, terms and a list of works with no
- * quantities or rates. Made with "Save as template" on any work order;
- * offered by "Start from a template" on a new one. Never deleted —
- * switched off, a template stops being offered.
- */
 export default async function WorkOrderTemplatesPage() {
   const templates = await listWorkOrderTemplates();
 

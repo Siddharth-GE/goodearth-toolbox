@@ -6,12 +6,7 @@ import { getBill } from "@/lib/bills/queries";
 import { getProjectCompany } from "@/lib/masters/companies";
 import { createElement, type ReactElement } from "react";
 
-/**
- * The bill, as a PDF to print. getBill enforces the /bills grant. Opened
- * in the browser rather than downloaded, because the ask is to print it;
- * generated on demand so it never drifts from the bill, and a bill not
- * yet approved carries its DRAFT watermark.
- */
+// getBill enforces the /bills grant. On demand, so it never drifts; a bill not yet approved carries its DRAFT watermark.
 export async function GET(_request: Request, { params }: { params: Promise<{ billId: string }> }) {
   const { billId } = await params;
 

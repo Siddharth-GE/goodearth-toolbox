@@ -1,26 +1,14 @@
-/**
- * Work orders (0105, plan.md B6) — the pure rules, no database.
- *
- * The labour contract IS the work order, made richer: a number, terms,
- * and its works — each a work from the Masters list with a quantity in
- * its unit at a labour rate, or a lump sum. While it has lines, the
- * order's value is their sum (the database writes it, rounded to paise);
- * this module says the same sum before anything is saved.
- */
+// Pure rules. While an order has lines its value is their sum (the database writes it, rounded to paise); this says the same sum before saving.
 
 export type WorkOrderLineInput = {
-  /** A work from the Masters list, or null for a line typed in words. */
   workItemId: string | null;
   description: string;
   isLumpSum: boolean;
-  /** Null for a lump sum. */
   quantity: number | null;
   uom: string | null;
-  /** Per unit, or the whole amount for a lump sum. */
   rate: number | null;
 };
 
-/** One line's amount, or null while it has no rate (or no quantity). */
 export function workOrderLineAmount(line: WorkOrderLineInput): number | null {
   if (line.rate === null || !Number.isFinite(line.rate)) return null;
   if (line.isLumpSum) return line.rate;
@@ -28,7 +16,6 @@ export function workOrderLineAmount(line: WorkOrderLineInput): number | null {
   return line.quantity * line.rate;
 }
 
-/** The order's value as the database stores it: the lines' sum, to paise. */
 export function workOrderTotal(lines: WorkOrderLineInput[]): number {
   const sum = lines.reduce((total, line) => total + (workOrderLineAmount(line) ?? 0), 0);
   return Math.round(sum * 100) / 100;
@@ -57,7 +44,6 @@ export type WorkOrderInput = {
   lines: WorkOrderLineInput[];
 };
 
-/** What stops a work order being saved, in words — or undefined. */
 export function workOrderProblem(order: WorkOrderInput): string | undefined {
   if (!order.vendorId) return "Choose the contractor.";
   if (!order.projectId) return "Choose the project.";

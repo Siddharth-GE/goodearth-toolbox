@@ -1,7 +1,6 @@
 "use server";
 
-// Type-only import, never re-exported from a "use server" file — the
-// 2026-08-03 outage rule, enforced by npm run check:actions.
+// Type-only, never re-exported from a "use server" file (npm run check:actions).
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { dbErrorMessage } from "@/lib/db-error";
@@ -11,16 +10,8 @@ import { redirect } from "next/navigation";
 
 import { mondayOf } from "./ledger";
 
-/**
- * Writes for payments (0107, plan.md B8). The database holds the rules:
- * bill_settlement_guard (money only against an approved bill, never past
- * its total, an advance recovered only from the same contractor's bills
- * and never past what is left of it), the trigger that marks a bill paid
- * once settled in full, and the cash-request guards (who may submit,
- * release, cut or send back, and when). Money is append-only: payments,
- * advances and recoveries are never edited or deleted. Each guard's
- * refusal is written for a person, so it is passed on as it is.
- */
+// Rules live in the database: bill_settlement_guard (money only against an approved bill, never past its total; an advance only from the same contractor and never past what is left), the paid-in-full trigger, and the cash-request guards.
+// Money is append-only. Each guard's refusal is written for a person, so it is passed on as is.
 
 const done = (): ActionState => {
   revalidatePath("/bills", "layout");
@@ -34,7 +25,6 @@ const refused = (where: string, error: { message: string } | null): ActionState 
 
 const cleanRef = (value: string) => value.trim();
 
-/** Money out against an approved bill — a part or the rest of what is pending. */
 export async function recordBillPayment(
   billId: string,
   input: {
@@ -67,7 +57,6 @@ export async function recordBillPayment(
   return done();
 }
 
-/** Part of a contractor's advance set against one of their approved bills. */
 export async function recoverAdvance(
   billId: string,
   input: { advanceId: string; amount: number; recoveredOn: string; note: string | null },
@@ -93,7 +82,6 @@ export async function recoverAdvance(
   return done();
 }
 
-/** Money out to a contractor before any bill — from a cash request line, or directly. */
 export async function recordAdvance(input: {
   vendorId: string;
   projectId: string;
@@ -130,11 +118,6 @@ export async function recordAdvance(input: {
   return done();
 }
 
-/* ------------------------------------------------------------------ *
- * The weekly cash request
- * ------------------------------------------------------------------ */
-
-/** A new draft request for the week a day falls in (its Monday). */
 export async function createCashRequest(day: string): Promise<ActionState> {
   const user = await requireTool("/bills");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return { error: "Pick the week." };
@@ -150,7 +133,6 @@ export async function createCashRequest(day: string): Promise<ActionState> {
   redirect(`/bills/cash-requests/${data.id}`);
 }
 
-/** Approved bills onto a draft request, each asking for an amount (default: what is pending). */
 export async function addBillsToCashRequest(
   requestId: string,
   bills: { billId: string; amount: number }[],
@@ -179,7 +161,6 @@ export async function addBillsToCashRequest(
   return done();
 }
 
-/** An advance onto a draft request: a contractor, a project, an amount. */
 export async function addAdvanceToCashRequest(
   requestId: string,
   input: {
@@ -260,7 +241,6 @@ export async function setCashRequestNote(requestId: string, note: string): Promi
   return done();
 }
 
-/** draft → submitted: to the bill approvers. */
 export async function submitCashRequest(requestId: string): Promise<ActionState> {
   const user = await requireTool("/bills");
   const supabase = await createClient();
@@ -296,7 +276,6 @@ export async function releaseCashRequest(requestId: string): Promise<ActionState
   return done();
 }
 
-/** submitted → draft, with what needs changing. */
 export async function sendBackCashRequest(requestId: string, note: string): Promise<ActionState> {
   const user = await requireTool("/bills");
   if (!note.trim()) return { error: "Say what needs changing." };
@@ -309,7 +288,6 @@ export async function sendBackCashRequest(requestId: string, note: string): Prom
   return done();
 }
 
-/** released → closed: the week is done. */
 export async function closeCashRequest(requestId: string): Promise<ActionState> {
   const user = await requireTool("/bills");
   const supabase = await createClient();

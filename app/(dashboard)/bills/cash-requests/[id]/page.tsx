@@ -10,11 +10,7 @@ import { listVendors } from "@/lib/masters/vendors";
 import { notFound } from "next/navigation";
 import { AddAdvance, AddBills, RequestActions, RequestLines } from "./_components/request-board";
 
-/**
- * One week's cash request (0107): drafted by accounts, released by a
- * bill approver (who may cut any line), then paid line by line. "Pending"
- * on a bill is what is left after every payment and recovery so far.
- */
+// "Pending" on a bill is what is left after every payment and recovery so far.
 export default async function CashRequestPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const [request, actor] = await Promise.all([getCashRequest(id), getCurrentBillActor()]);

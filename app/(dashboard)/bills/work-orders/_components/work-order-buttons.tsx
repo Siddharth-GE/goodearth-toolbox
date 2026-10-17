@@ -12,11 +12,7 @@ import { useState, useTransition } from "react";
 
 type Result = { error?: string } | undefined;
 
-/**
- * A work order's actions: approve (bill approvers only — the database
- * re-checks, limit included) and the off-switch. Correcting an approved
- * order is switching it off and making a new one.
- */
+// Approve is for bill approvers only (the database re-checks, limit included). Correcting an approved order means switching it off and making a new one.
 export function WorkOrderActions({
   orderId,
   isActive,
@@ -62,7 +58,6 @@ export function WorkOrderActions({
   );
 }
 
-/** "Save as template": a name, and the order's works and terms are kept for next time. */
 export function SaveAsTemplate({ orderId }: { orderId: string }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -115,7 +110,6 @@ export function SaveAsTemplate({ orderId }: { orderId: string }) {
   );
 }
 
-/** The templates screen's on/off switch. */
 export function TemplateSwitch({
   templateId,
   isActive,

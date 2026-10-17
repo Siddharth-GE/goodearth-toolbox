@@ -1,11 +1,3 @@
-/**
- * The bill reference is what accounts writes on the paper invoice and
- * quotes in payment records, so its exact shape is pinned here —
- * including the lpad-truncation case where the TS mirror and the SQL
- * mint (migration 0025) could drift apart, and the scope-resolution
- * order (unit before plot before GEN) that decides which code enters
- * the number.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

@@ -13,13 +13,7 @@ import {
 } from "./ledger";
 import { pendingOnBill } from "./math";
 
-/**
- * Reads for payments (0107, plan.md B8). A bill's paid state is derived:
- * what was paid against it plus what advances recovered, against its
- * total. Money goes out through the week's cash request — asked for,
- * released by a bill approver, then paid line by line. All of it
- * /bills-gated (or /reporter on read).
- */
+// A bill's paid state is derived: payments plus advance recoveries against its total. All /bills-gated (or /reporter on read).
 
 type Client = Awaited<ReturnType<typeof createClient>>;
 
@@ -29,7 +23,6 @@ export type BillSettlement = {
   pending: number;
 };
 
-/** What has been paid and recovered against one bill, and what is still pending. */
 export async function getBillSettlement(billId: string, total: number): Promise<BillSettlement> {
   await requireTool("/bills");
   const supabase = await createClient();
@@ -61,13 +54,11 @@ export type BillMoneyEvent = {
   kind: "payment" | "recovery";
   amount: number;
   on: string;
-  /** The UTR / cheque / UPI reference, or the advance it came from. */
   reference: string;
   note: string | null;
   by: string | null;
 };
 
-/** Every payment and advance recovery against one bill, oldest first. */
 export async function getBillMoneyEvents(billId: string): Promise<BillMoneyEvent[]> {
   await requireTool("/bills");
   const supabase = await createClient();
@@ -135,7 +126,6 @@ export type OpenAdvance = {
   work_order: string | null;
 };
 
-/** A contractor's advances with something still to recover. */
 export async function getOpenAdvances(vendorId: string): Promise<OpenAdvance[]> {
   await requireTool("/bills");
   const supabase = await createClient();
@@ -182,10 +172,6 @@ async function recoveredByAdvance(supabase: Client, advanceIds?: string[]) {
   return sums;
 }
 
-/* ------------------------------------------------------------------ *
- * Settlement across every approved or paid bill
- * ------------------------------------------------------------------ */
-
 type BillMoney = {
   id: string;
   reference: string;
@@ -201,7 +187,6 @@ type BillMoney = {
   pending: number;
 };
 
-/** Approved and paid bills with what has been settled on each. */
 async function billsWithSettlement(supabase: Client): Promise<BillMoney[]> {
   const [bills, payments, recoveries] = await Promise.all([
     fetchAll((from, to) =>
@@ -251,7 +236,6 @@ async function billsWithSettlement(supabase: Client): Promise<BillMoney[]> {
 
 export type PayableBill = BillMoney;
 
-/** Approved bills with something still pending — what a cash request asks for. */
 export async function listPayableBills(): Promise<PayableBill[]> {
   await requireTool("/bills");
   const supabase = await createClient();
@@ -259,10 +243,6 @@ export async function listPayableBills(): Promise<PayableBill[]> {
     (bill) => bill.status === "approved" && bill.pending > 0,
   );
 }
-
-/* ------------------------------------------------------------------ *
- * The weekly cash request
- * ------------------------------------------------------------------ */
 
 export type CashRequestRow = {
   id: string;
@@ -319,7 +299,6 @@ async function paidByItem(supabase: Client, itemIds: string[]) {
   return paid;
 }
 
-/** Every cash request, newest week first, with its figures. */
 export async function listCashRequests(): Promise<CashRequestRow[]> {
   await requireTool("/bills");
   const supabase = await createClient();
@@ -372,7 +351,6 @@ export type CashRequestItem = {
   project_id: string | null;
   project_name: string;
   work_order: string | null;
-  /** A bill line: the bill's total and what it still has pending (now). */
   bill_total: number | null;
   bill_pending: number | null;
   requested: number;
@@ -396,7 +374,6 @@ export type CashRequestDetail = {
   figures: ReturnType<typeof cashRequestFigures>;
 };
 
-/** One cash request with its lines, each with what has been paid against it. */
 export async function getCashRequest(id: string): Promise<CashRequestDetail | null> {
   await requireTool("/bills");
   const supabase = await createClient();
@@ -484,10 +461,6 @@ export async function getCashRequest(id: string): Promise<CashRequestDetail | nu
   };
 }
 
-/* ------------------------------------------------------------------ *
- * Payments ledger and contractors
- * ------------------------------------------------------------------ */
-
 export type LedgerRow = {
   id: string;
   kind: "payment" | "advance" | "recovery";
@@ -511,7 +484,6 @@ export type LedgerFilters = {
   to?: string;
 };
 
-/** Every payment, advance and advance recovery, newest first, filtered. */
 export async function listPaymentsLedger(filters: LedgerFilters = {}): Promise<LedgerRow[]> {
   await requireTool("/bills");
   const supabase = await createClient();
@@ -629,10 +601,6 @@ export type ContractorRow = {
   position: ContractorPosition;
 };
 
-/**
- * Each contractor (or vendor) with approved bills or advances: billed,
- * paid, recovered from advances, pending; advances given, recovered, out.
- */
 export async function listContractorPositions(projectId?: string): Promise<ContractorRow[]> {
   await requireTool("/bills");
   const supabase = await createClient();

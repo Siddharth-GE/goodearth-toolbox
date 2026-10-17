@@ -1,7 +1,3 @@
-/**
- * Send to Bill: the grouping rules the database function enforces, and
- * the totals it computes — said and shown before the press.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

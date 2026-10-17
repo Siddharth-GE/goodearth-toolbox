@@ -1,7 +1,6 @@
 "use server";
 
-// Type-only import, never re-exported from a "use server" file — the
-// 2026-08-03 outage rule, enforced by npm run check:actions.
+// Type-only, never re-exported from a "use server" file (npm run check:actions).
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { guardError } from "@/lib/db-error";
@@ -12,13 +11,7 @@ import { redirect } from "next/navigation";
 import { billLinesProblem, lineMoneyOf, type BillLineDraft } from "./lines";
 import { rollUpBill } from "./math";
 
-/**
- * Writes for a bill's lines (0106, plan.md B7). The database holds the
- * rules: bill_lines_guard (lines move only while the bill is recorded; a
- * material names a line of the bill's own PO — 0111), and
- * bill_lines_roll_up, which rewrites the bill's taxable, GST and total
- * from its lines, to the paisa. These actions say the same things first.
- */
+// Rules live in the database: bill_lines_guard (lines move only while the bill is recorded; a material names a line of the bill's own PO, 0111) and bill_lines_roll_up (header from lines, to the paisa).
 
 const LINE_GUARD_PHRASES = [
   "can no longer change",
@@ -32,7 +25,6 @@ const LINE_GUARD_PHRASES = [
   "issued purchase order",
 ] as const;
 
-/** A line as the editor sends it: an id when it is already saved. */
 export type BillLineSave = BillLineDraft & { id?: string };
 
 const row = (billId: string, userId: string, line: BillLineDraft, sortOrder: number) => ({
@@ -54,13 +46,7 @@ const row = (billId: string, userId: string, line: BillLineDraft, sortOrder: num
   updated_by: userId,
 });
 
-/**
- * Saves a recorded bill's lines: existing lines updated in place, new
- * ones added, missing ones removed. A bill made from labour entries
- * (Send to Bill) keeps its lines and their quantities — they come from
- * the entries, which stay stamped with this bill; only the money on them
- * may change. To change those, delete the bill and send the entries again.
- */
+/** Updates in place, adds new, removes missing. A Send-to-Bill bill keeps its lines and quantities (they come from stamped labour entries); only the money may change. */
 export async function saveBillLines(billId: string, lines: BillLineSave[]): Promise<ActionState> {
   const user = await requireTool("/bills");
   const problem = billLinesProblem(lines);
@@ -129,7 +115,6 @@ export async function saveBillLines(billId: string, lines: BillLineSave[]): Prom
   return undefined;
 }
 
-/** A bill with lines: its invoice number, date and note — the figures follow the lines. */
 export async function updateBillDetails(
   billId: string,
   input: { invoiceNo: string; invoiceDate: string; note: string | null },
@@ -155,12 +140,7 @@ export async function updateBillDetails(
   return undefined;
 }
 
-/**
- * An NMR bill whose muster roll totals differently from heads × rates
- * (founder: "total can be overwritten with a note"). A total with a note
- * sets the override; no total clears it, and the total goes back to the
- * lines' sum.
- */
+/** An NMR muster roll can total differently from heads × rates: a total with a note sets the override, no total clears it. */
 export async function setBillTotalOverride(
   billId: string,
   input: { total: number | null; note: string | null },
@@ -215,7 +195,6 @@ export type BillWithLinesInput = {
   labourContractId: string | null;
   /** NMR only: the contractor, or null when the muster roll is paid directly. */
   vendorId: string | null;
-  /** NMR only: the scope picked directly. */
   projectId: string | null;
   plotId: string | null;
   unitId: string | null;
@@ -225,12 +204,7 @@ export type BillWithLinesInput = {
   lines: BillLineDraft[];
 };
 
-/**
- * Records a bill with its lines: the header is minted (create_bill or
- * create_nmr_bill) at the lines' figures, then the lines go in and the
- * database rolls the header up from them — the same figures, to the
- * paisa. Lands on the new bill.
- */
+/** Header minted at the lines' figures (create_bill or create_nmr_bill), then lines go in and the database rolls the header up, same figures to the paisa. */
 export async function createBillWithLines(input: BillWithLinesInput): Promise<ActionState> {
   const user = await requireTool("/bills");
   if (!input.invoiceNo.trim()) return { error: "Type the invoice number as printed on the bill." };
@@ -251,7 +225,7 @@ export async function createBillWithLines(input: BillWithLinesInput): Promise<Ac
   if (totals.total <= 0) return { error: "The bill's total must be more than zero." };
 
   const supabase = await createClient();
-  // The casts paper over the typegen limitation createBill notes.
+  // The casts paper over typegen (see createBill).
   const minted =
     input.kind === "nmr"
       ? await supabase.rpc("create_nmr_bill", {

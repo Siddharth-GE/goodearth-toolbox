@@ -22,9 +22,7 @@ import { Receipt } from "lucide-react";
 import Link from "next/link";
 import { BillStatusBadge } from "../_components/status-badge";
 
-// "Unpaid" is a derived view (everything not yet paid — recorded and
-// approved together), not a fourth status; it rides the same query
-// param with its own value.
+// "Unpaid" is a derived view (recorded + approved), not a fourth status; it rides the same query param.
 const TABS: { key: string; label: string; param?: string; status?: BillStatus; unpaid?: true }[] = [
   { key: "all", label: "All" },
   { key: "recorded", label: "Recorded", param: "recorded", status: "recorded" },

@@ -18,11 +18,6 @@ import { listProjects } from "@/lib/masters/projects";
 import { Users } from "lucide-react";
 import Link from "next/link";
 
-/**
- * Where each contractor (and vendor) stands (0107, plan.md B8): what was
- * billed and approved, paid, recovered from advances and still pending;
- * and the advance summary — given, recovered, still out.
- */
 export default async function ContractorsPage({
   searchParams,
 }: {

@@ -1,7 +1,6 @@
 "use server";
 
-// Type-only import, never re-exported from a "use server" file — the
-// 2026-08-03 outage rule, enforced by npm run check:actions.
+// Type-only, never re-exported from a "use server" file (npm run check:actions).
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { guardError } from "@/lib/db-error";
@@ -11,15 +10,8 @@ import { redirect } from "next/navigation";
 
 import { workOrderProblem, workOrderTotal, type WorkOrderLineInput } from "./work-orders";
 
-/**
- * Writes for work orders (0105, plan.md B6). The database holds the
- * rules — labour_contracts_guard (number permanent, terms and value
- * permanent once approved, who may approve), the lines' pending-only
- * trigger, and the trigger that makes the value the lines' sum. These
- * actions say the same things first, in words. Approving and switching
- * an order off are the existing approveLabourContract and
- * setLabourContractActive.
- */
+// Rules live in the database: labour_contracts_guard (number permanent; terms and value permanent once approved; who approves), the lines' pending-only trigger, and the value-is-the-lines'-sum trigger.
+// Approving and switching off are approveLabourContract and setLabourContractActive.
 
 const WO_GUARD_PHRASES = [
   "permanent",
@@ -59,7 +51,6 @@ const lineRows = (contractId: string, userId: string, lines: WorkOrderLineInput[
     updated_by: userId,
   }));
 
-/** A new work order, pending approval, numbered by the database. */
 export async function createWorkOrder(input: WorkOrderSaveInput): Promise<ActionState> {
   const user = await requireTool("/bills");
   const problem = invalid(input);
@@ -100,12 +91,7 @@ export async function createWorkOrder(input: WorkOrderSaveInput): Promise<Action
   redirect(`/bills/work-orders/${data.id}`);
 }
 
-/**
- * Saves a pending order: its header, then its works as given — the new
- * list goes in first and the old lines come out after, so a refusal
- * part-way never leaves the order with nothing. The project is part of
- * the number and stays as it was made.
- */
+/** The new list goes in first and the old lines come out after, so a refusal part-way never leaves the order empty. The project is part of the number. */
 export async function saveWorkOrder(id: string, input: WorkOrderSaveInput): Promise<ActionState> {
   const user = await requireTool("/bills");
   const problem = invalid(input);

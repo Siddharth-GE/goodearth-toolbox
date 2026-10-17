@@ -29,11 +29,6 @@ const KIND: Record<
   recovery: { label: "Recovered", variant: "warning" },
 };
 
-/**
- * Every rupee out (0107, plan.md B8): payments against bills, advances
- * to contractors, and advances recovered from bills — searchable,
- * filtered, and summed over every match (the A4 bar).
- */
 export default async function PaymentsPage({
   searchParams,
 }: {
