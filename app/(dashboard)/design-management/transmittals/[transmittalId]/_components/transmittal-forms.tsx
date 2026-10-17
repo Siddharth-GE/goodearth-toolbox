@@ -83,7 +83,11 @@ export function IssueBar({
           <p className="text-warning text-sm font-medium">{problem}</p>
         ) : (
           <FormMessage
-            success={`Ready to issue · ${sheetCount} ${sheetCount === 1 ? "sheet" : "sheets"}`}
+            success={
+              sheetCount === 0
+                ? "Ready to issue"
+                : `Ready to issue · ${sheetCount} ${sheetCount === 1 ? "sheet" : "sheets"}`
+            }
           />
         )}
       </div>

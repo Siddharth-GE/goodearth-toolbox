@@ -6,7 +6,7 @@
  * groundfloorplan something abbreviated — when uploading a sheet user has
  * to enter it)". So:
  *
- *   SAA-Saarang-Villa12-WD-TR0003-GFP.pdf
+ *   SAA-Saarang-Villa12-WD-TB0003-GFP.pdf
  *   project code · project · villa · stage code · transmittal · sheet
  *
  * Built when the sheet is downloaded, never stored: the transmittal
@@ -25,7 +25,7 @@ export type SheetNameParts = {
   villaName: string;
   stageCode: string | null;
   stageName: string;
-  /** "TR-0003", or null while the transmittal is a draft. */
+  /** "TB-0003", or null while the transmittal is a draft. */
   transmittalNumber: string | null;
   /** "GFP"; null only for sheets uploaded before sheet codes existed. */
   sheetCode: string | null;
@@ -34,7 +34,7 @@ export type SheetNameParts = {
   contentType: string;
 };
 
-/** Letters and digits only: "Villa 12" → "Villa12", "TR-0003" → "TR0003". */
+/** Letters and digits only: "Villa 12" → "Villa12", "TB-0003" → "TB0003". */
 function compact(value: string): string {
   return value.replace(/[^A-Za-z0-9]+/g, "");
 }

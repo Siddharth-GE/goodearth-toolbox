@@ -8,6 +8,8 @@ import { dbErrorMessage } from "@/lib/db-error";
 import { GRANT } from "@/lib/design-management/shared";
 import { normaliseStageCode } from "@/lib/drawings/sheet-name";
 import { DRAWINGS_BUCKET } from "@/lib/design-management/storage";
+import { readWorkDriveFolder } from "@/lib/design-management/workdrive";
+import { parseWorkDriveLink } from "@/lib/design-management/workdrive-link";
 import { text } from "@/lib/form-data";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
@@ -393,16 +395,184 @@ export async function setDrawingRevisionWorks(
   return undefined;
 }
 
+/**
+ * The revision number, the designer's while the revision is a draft
+ * (0122; founder, 2026-10-17): a set the team had at R2 in Excel starts
+ * here at R3. The guard refuses a number at or below one the set already
+ * used on this villa, and any change once it has gone to site — its
+ * sentence ("Pick a number above R2 …") is passed through.
+ */
+export async function setDraftRevisionNumber(
+  revisionId: string,
+  revisionNo: number,
+): Promise<ActionState> {
+  await requireTool(GRANT);
+  if (!Number.isInteger(revisionNo) || revisionNo < 0 || revisionNo > 99) {
+    return { error: "A revision is a whole number from 0 to 99." };
+  }
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("drawing_revisions")
+    .update({ revision_no: revisionNo })
+    .eq("id", revisionId)
+    .eq("status", "draft");
+  if (error) {
+    if (error.code === "23505") {
+      return { error: `R${revisionNo} is already used for this set. Pick a higher number.` };
+    }
+    console.error("setDraftRevisionNumber failed:", error);
+    return { error: dbErrorMessage(error, "Could not change the revision number. Try again.") };
+  }
+
+  revalidatePath("/design-management", "layout");
+  return undefined;
+}
+
+/**
+ * The drawings, as a WorkDrive share link (0122; founder, 2026-10-17:
+ * "lets not get into file handling … they paste a link of our drive").
+ * Saving it reads the folder straight away, so the designer sees the
+ * count and the names before anything else. An empty link takes the link
+ * and its list off the draft.
+ *
+ * The link is stored as rebuilt from its id (`parseWorkDriveLink`), never
+ * as typed. A folder that cannot be read still keeps its link — the
+ * transmittal can go with the link alone — and says why.
+ */
+export async function setDraftDrawingsLink(
+  revisionId: string,
+  input: string,
+): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+  const supabase = await createClient();
+
+  if (!input.trim()) {
+    const { error: clearError } = await supabase
+      .from("drawing_revision_folder_sheets")
+      .delete()
+      .eq("drawing_revision_id", revisionId);
+    if (clearError) {
+      console.error("setDraftDrawingsLink list clear failed:", clearError);
+      return { error: dbErrorMessage(clearError, "Could not take the link off. Try again.") };
+    }
+    const { error } = await supabase
+      .from("drawing_revisions")
+      .update({ drawings_url: null })
+      .eq("id", revisionId)
+      .eq("status", "draft");
+    if (error) {
+      console.error("setDraftDrawingsLink clear failed:", error);
+      return { error: dbErrorMessage(error, "Could not take the link off. Try again.") };
+    }
+    revalidatePath("/design-management", "layout");
+    return undefined;
+  }
+
+  const parsed = parseWorkDriveLink(input);
+  if (!parsed.ok) return { error: parsed.error };
+
+  const { error } = await supabase
+    .from("drawing_revisions")
+    .update({ drawings_url: parsed.url })
+    .eq("id", revisionId)
+    .eq("status", "draft");
+  if (error) {
+    console.error("setDraftDrawingsLink failed:", error);
+    return { error: dbErrorMessage(error, "Could not save the link. Try again.") };
+  }
+
+  const read = await keepFolderList(supabase, user.id, revisionId, parsed.linkId);
+  revalidatePath("/design-management", "layout");
+  return read.error
+    ? { error: `The link is saved, but the folder could not be read: ${read.error}` }
+    : undefined;
+}
+
+/** Reads the draft's folder again — after a sheet was added in WorkDrive. */
+export async function readDraftFolder(revisionId: string): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+  const supabase = await createClient();
+
+  const { data: revision, error } = await supabase
+    .from("drawing_revisions")
+    .select("drawings_url, status")
+    .eq("id", revisionId)
+    .maybeSingle();
+  if (error) {
+    console.error("readDraftFolder read failed:", error);
+    return { error: "Could not read the folder. Try again." };
+  }
+  if (!revision || revision.status !== "draft") {
+    return { error: "This drawing has gone to site — its list is fixed." };
+  }
+  const parsed = revision.drawings_url ? parseWorkDriveLink(revision.drawings_url) : null;
+  if (!parsed?.ok) return { error: "Paste the folder's WorkDrive share link first." };
+
+  const read = await keepFolderList(supabase, user.id, revisionId, parsed.linkId);
+  revalidatePath("/design-management", "layout");
+  return read.error ? { error: read.error } : undefined;
+}
+
+/**
+ * Reads the folder and replaces the draft's kept list with what it holds
+ * (0122: delete, then insert — the table has no UPDATE policy). On a
+ * failed read nothing is touched, so the last good list stays. Not an
+ * action: its callers gate and revalidate.
+ */
+async function keepFolderList(
+  supabase: DesignClient,
+  userId: string,
+  revisionId: string,
+  linkId: string,
+): Promise<{ error?: string }> {
+  const read = await readWorkDriveFolder(linkId);
+  if (!read.ok) return { error: read.reason };
+
+  const { error: clearError } = await supabase
+    .from("drawing_revision_folder_sheets")
+    .delete()
+    .eq("drawing_revision_id", revisionId);
+  if (clearError) {
+    console.error("keepFolderList clear failed:", clearError);
+    return { error: dbErrorMessage(clearError, "Could not keep the folder's list. Try again.") };
+  }
+  if (read.sheets.length === 0) {
+    return {
+      error:
+        read.skippedFolders.length > 0
+          ? `The folder holds only other folders (${read.skippedFolders.join(", ")}). Share the folder the sheets are in.`
+          : "The folder is empty. Put the sheets in it, then read it again.",
+    };
+  }
+
+  const { error } = await supabase.from("drawing_revision_folder_sheets").insert(
+    read.sheets.map((sheet, index) => ({
+      drawing_revision_id: revisionId,
+      workdrive_id: sheet.workdriveId,
+      name: sheet.name,
+      size_bytes: sheet.sizeBytes,
+      modified_at: sheet.modifiedAt,
+      sort_order: index,
+      created_by: userId,
+    })),
+  );
+  if (error) {
+    console.error("keepFolderList insert failed:", error);
+    return { error: dbErrorMessage(error, "Could not keep the folder's list. Try again.") };
+  }
+  return {};
+}
+
 // ---------------------------------------------------------------------
 // Transmittals — the formal record of what went to site
 // ---------------------------------------------------------------------
 
 /**
  * Starts a transmittal: one villa, one stage, one drawing set — that
- * set's next revision, whose full set of sheets is uploaded on the
- * transmittal and goes to site together (founder, 2026-09-27: "one
- * transmittal contains only one stage and you upload a drawing set and
- * inside that sheets … so each time a full set gets to site").
+ * set's next revision, whose full set of sheets goes to site together
+ * (founder, 2026-09-27: "one transmittal contains only one stage … so
+ * each time a full set gets to site"), since 0122 as a WorkDrive link.
  *
  * The person picks the stage, then either a set of THAT stage already on
  * this villa or a new name. 0099 refuses a set of another stage and a
@@ -640,8 +810,39 @@ export async function setDraftTransmittalNote(
  * button stays pressable on an empty draft instead of quietly hiding.
  */
 export async function issueTransmittal(transmittalId: string): Promise<ActionState> {
-  await requireTool(GRANT);
+  const user = await requireTool(GRANT);
   const supabase = await createClient();
+
+  // 0122: the folder is read once more, so the list kept with the record
+  // is what the folder held when it went to site. A read that fails keeps
+  // the last good list (or none) and never stops the issue — the link
+  // itself is the drawings.
+  const { data: lines, error: linesError } = await supabase
+    .from("transmittal_lines")
+    .select("drawing_revision_id")
+    .eq("transmittal_id", transmittalId);
+  if (linesError) {
+    console.error("issueTransmittal lines read failed:", linesError);
+    return { error: "Could not issue this transmittal. Try again." };
+  }
+  const revisionIds = (lines ?? []).map((line) => line.drawing_revision_id);
+  if (revisionIds.length > 0) {
+    const { data: drafts, error: draftsError } = await supabase
+      .from("drawing_revisions")
+      .select("id, drawings_url")
+      .in("id", revisionIds)
+      .eq("status", "draft");
+    if (draftsError) {
+      console.error("issueTransmittal revisions read failed:", draftsError);
+      return { error: "Could not issue this transmittal. Try again." };
+    }
+    for (const draft of drafts ?? []) {
+      const parsed = draft.drawings_url ? parseWorkDriveLink(draft.drawings_url) : null;
+      if (!parsed?.ok) continue;
+      const read = await keepFolderList(supabase, user.id, draft.id, parsed.linkId);
+      if (read.error) console.error("issueTransmittal kept the last list:", read.error);
+    }
+  }
 
   const { data: number, error } = await supabase.rpc("issue_transmittal", {
     p_transmittal_id: transmittalId,

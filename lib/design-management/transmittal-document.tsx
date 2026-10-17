@@ -1,18 +1,20 @@
-import { Document, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Document, Link, StyleSheet, Text, View } from "@react-pdf/renderer";
 import { DocumentPage, DocumentTable, type Column, type DocumentMeta } from "@/lib/pdf/document";
 import { pdf } from "@/lib/pdf/theme";
 import { formatDate } from "@/lib/format";
 import type { TransmittalDetail, TransmittalLineRow } from "./queries";
 
 /**
- * The transmittal cover sheet — one page, on the company letterhead.
+ * The transmittal cover sheet, on the company letterhead.
  *
- * It is a COVER SHEET and not the drawings: the sheets themselves are
- * PDFs, react-pdf embeds only images, and a transmittal is forwarded by
- * hand with the drawing files attached beside it (founder decision,
- * plan.md). What this page has to answer is "which drawings, at which
- * revision, went out on which date, at which design stage" — so it
- * lists them and counts their files rather than reproducing them.
+ * It is a COVER SHEET and not the drawings: since 0122 the drawings are a
+ * WorkDrive folder, printed here as its link, and before that they were
+ * PDFs forwarded beside it. What this page has to answer is "which
+ * drawings, at which revision, went out on which date, at which design
+ * stage" — so after the set and its revision it lists every sheet by
+ * name, one row each (the design team, 2026-10-17: "the transmittal sheet
+ * displays only the drawing set name"). A forty-sheet set runs onto a
+ * second page, the table's header repeating.
  *
  * No money anywhere, because this tool has none.
  */
@@ -30,6 +32,7 @@ const styles = StyleSheet.create({
     marginTop: pdf.space.block,
   },
   metaItem: { width: "25%", paddingRight: 8, marginBottom: 4 },
+  metaItemWide: { width: "50%", paddingRight: 8, marginBottom: 4 },
   metaLabel: {
     fontSize: pdf.size.tiny,
     letterSpacing: 0.6,
@@ -51,6 +54,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   noteText: { fontSize: pdf.size.body, marginTop: 3, lineHeight: 1.5 },
+  link: { fontSize: pdf.size.body, marginTop: 3, color: pdf.color.accent },
 
   sectionLabel: {
     fontFamily: pdf.fontBold,
@@ -61,6 +65,7 @@ const styles = StyleSheet.create({
     marginTop: pdf.space.block * 1.6,
     marginBottom: 6,
   },
+  empty: { fontSize: pdf.size.body, color: pdf.color.muted },
 
   signatureRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 44 },
   signatureBox: { width: "42%" },
@@ -68,20 +73,20 @@ const styles = StyleSheet.create({
   signatureLabel: { fontSize: pdf.size.tiny, color: pdf.color.muted },
 });
 
-/** Sheet order — the same order the screen lists the lines in. */
-const columns: Column<TransmittalLineRow>[] = [
-  { header: "#", width: 0.4, render: (_row, index) => String(index + 1) },
-  { header: "Code", width: 1.1, render: (row) => row.setCode ?? "—" },
-  { header: "Drawing set", width: 3.2, render: (row) => row.setName },
-  { header: "Rev", width: 0.6, render: (row) => `R${row.revisionNo}` },
-  { header: "What changed", width: 3.2, render: (row) => row.revisionNote ?? "" },
-  {
-    header: "Sheets",
-    width: 0.7,
-    align: "right",
-    render: (row) => String(row.files.length),
-  },
-];
+/** One row per sheet, whichever way the revision carries its drawings. */
+type SheetRow = { set: string; name: string; detail: string };
+
+function sheetRows(line: TransmittalLineRow): SheetRow[] {
+  const set = `${line.setName} · R${line.revisionNo}`;
+  if (line.folderSheets.length > 0) {
+    return line.folderSheets.map((sheet) => ({
+      set,
+      name: sheet.name,
+      detail: sheet.modifiedAt ? formatDate(sheet.modifiedAt) : "",
+    }));
+  }
+  return line.files.map((file) => ({ set, name: file.fileName, detail: file.sheetCode ?? "" }));
+}
 
 export function TransmittalDocument({ transmittal }: { transmittal: TransmittalDetail }) {
   const isDraft = transmittal.status !== "issued";
@@ -89,6 +94,23 @@ export function TransmittalDocument({ transmittal }: { transmittal: TransmittalD
   // number before it is issued — so the reference says so in words and
   // the watermark says it again across the page.
   const reference = transmittal.number ?? "Draft";
+  const rows = transmittal.lines.flatMap(sheetRows);
+  // One line since 0099; a transmittal from before may carry several sets.
+  const line = transmittal.lines.length === 1 ? transmittal.lines[0]! : null;
+  const fromFolders = transmittal.lines.some((row) => row.folderSheets.length > 0);
+  const links = transmittal.lines.filter((row) => row.drawingsUrl);
+
+  const columns: Column<SheetRow>[] = [
+    { header: "#", width: 0.4, render: (_row, index) => String(index + 1) },
+    ...(line ? [] : [{ header: "Drawing set", width: 2.2, render: (row: SheetRow) => row.set }]),
+    { header: "Sheet", width: 6, render: (row) => row.name },
+    {
+      header: fromFolders ? "Last changed" : "Code",
+      width: 1.3,
+      align: "right",
+      render: (row) => row.detail,
+    },
+  ];
 
   const meta: DocumentMeta = {
     documentType: "TRANSMITTAL",
@@ -114,29 +136,59 @@ export function TransmittalDocument({ transmittal }: { transmittal: TransmittalD
           <Meta label="Villa" value={transmittal.villaName} />
           <Meta label="Plot" value={transmittal.plotName} />
           <Meta label="Project" value={transmittal.projectName} />
+          {line && <Meta label="Drawing set" value={line.setName} wide />}
+          {line && <Meta label="Revision" value={`R${line.revisionNo}`} />}
           <Meta label="Design stage" value={transmittal.stageName} />
           <Meta
             label="Issued"
             value={transmittal.issuedAt ? formatDate(transmittal.issuedAt) : "Not issued"}
           />
           <Meta label="Issued by" value={transmittal.issuedByName ?? "—"} />
-          <Meta label="Drawings" value={String(transmittal.lines.length)} />
+          <Meta label="Sheets" value={rows.length > 0 ? String(rows.length) : "—"} />
         </View>
+
+        {line?.revisionNote && (
+          <View style={styles.noteBlock}>
+            <Text style={styles.noteLabel}>
+              {line.revisionNo === 0 ? "About this issue" : "What changed"}
+            </Text>
+            <Text style={styles.noteText}>{line.revisionNote}</Text>
+          </View>
+        )}
 
         {transmittal.note && (
           <View style={styles.noteBlock}>
-            <Text style={styles.noteLabel}>Note</Text>
+            <Text style={styles.noteLabel}>Note for site</Text>
             <Text style={styles.noteText}>{transmittal.note}</Text>
           </View>
         )}
 
-        <Text style={styles.sectionLabel}>Drawings on this transmittal</Text>
-        <DocumentTable columns={columns} rows={transmittal.lines} />
+        {links.map((row) => (
+          <View key={row.lineId} style={styles.noteBlock} wrap={false}>
+            <Text style={styles.noteLabel}>
+              {line ? "Drawings — WorkDrive" : `${row.setName} — WorkDrive`}
+            </Text>
+            <Link src={row.drawingsUrl!} style={styles.link}>
+              {row.drawingsUrl}
+            </Link>
+          </View>
+        ))}
+
+        <Text style={styles.sectionLabel}>Sheets on this transmittal</Text>
+        {rows.length > 0 ? (
+          <DocumentTable columns={columns} rows={rows} />
+        ) : (
+          <Text style={styles.empty}>
+            {links.length > 0
+              ? "The sheets are in the WorkDrive folder above; no list of them was kept."
+              : "No sheets were recorded."}
+          </Text>
+        )}
 
         {/* Only an issued transmittal is something anyone signs for — a
             draft must never look like a receipt. */}
         {!isDraft && (
-          <View style={styles.signatureRow}>
+          <View style={styles.signatureRow} wrap={false}>
             <View style={styles.signatureBox}>
               <View style={styles.signatureRule}>
                 <Text style={styles.signatureLabel}>Issued by, for Goodearth</Text>
@@ -154,9 +206,9 @@ export function TransmittalDocument({ transmittal }: { transmittal: TransmittalD
   );
 }
 
-function Meta({ label, value }: { label: string; value: string }) {
+function Meta({ label, value, wide = false }: { label: string; value: string; wide?: boolean }) {
   return (
-    <View style={styles.metaItem}>
+    <View style={wide ? styles.metaItemWide : styles.metaItem}>
       <Text style={styles.metaLabel}>{label}</Text>
       <Text style={styles.metaValue}>{value}</Text>
     </View>

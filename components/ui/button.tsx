@@ -63,6 +63,11 @@ interface LinkButtonProps {
    * builds the whole thing just because a cursor passed over the button.
    */
   plain?: boolean;
+  /**
+   * Another site, opened in a new tab with no referrer — a WorkDrive
+   * folder, say. Implies `plain`.
+   */
+  newTab?: boolean;
 }
 
 export function LinkButton({
@@ -72,8 +77,17 @@ export function LinkButton({
   size = "md",
   children,
   plain = false,
+  newTab = false,
 }: LinkButtonProps) {
   const classes = cn(base, variantClasses[variant], sizeClasses[size], className);
+
+  if (newTab) {
+    return (
+      <a href={href} target="_blank" rel="noreferrer" className={classes}>
+        {children}
+      </a>
+    );
+  }
 
   if (plain) {
     return (
