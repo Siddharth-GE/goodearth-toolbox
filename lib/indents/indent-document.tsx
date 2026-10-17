@@ -15,17 +15,9 @@ import { formatDate, formatQuantity } from "@/lib/format";
 import type { IndentDetail, IndentLineRow } from "./queries";
 import { stillToBuy, waitsForEstimator } from "./workflow";
 
-/**
- * The indent on paper — what site asked for, what has been ordered
- * against it, and what is still to buy. No money: an indent never carries
- * a rate, so this document cannot print one.
- */
-
 export type IndentPdfData = {
   indent: IndentDetail;
-  /** "Footing — (Base + 4 Sides) Area — FD.15", or null. */
   work_label: string | null;
-  /** The project's company, printed on the letterhead; null → placeholder. */
   company: LetterheadCompany | null;
 };
 
@@ -64,8 +56,6 @@ const columns: Column<IndentLineRow>[] = [
   { header: "Note", width: 1.8, render: noteFor },
 ];
 
-/** The line's note, and — for a line outside the estimate (0113) — why it
- * is needed and what the estimator said. */
 function noteFor(row: IndentLineRow): string {
   if (!waitsForEstimator(row.source)) return row.note ?? "";
   const answer = row.estimator

@@ -22,14 +22,7 @@ import { useMemo, useState, useTransition } from "react";
 type Row = PullLineRow & Partial<Pick<BudgetPullLineRow, "vendor_name">>;
 export type PullGroup = { label: string; lines: Row[] };
 
-/**
- * The interiors pull: an approved budget laid out group by group,
- * quantities prefilled with what was planned, a local basket and one
- * commit. Nothing is written until Add — ticking costs nothing, exactly
- * like the catalogue picker's basket. (The construction plan used this
- * screen too until 2026-08-20; those requests pull from the villa's
- * official estimate now.)
- */
+// Nothing is written until Add; ticking costs nothing, like the catalogue picker's basket.
 export function PullBasket({
   indentId,
   reference,
@@ -41,7 +34,6 @@ export function PullBasket({
   indentId: string;
   reference: string;
   groups: PullGroup[];
-  /** What a group heading means here — "space" for a budget. */
   groupNoun: string;
   budgetId: string;
   showVendor?: boolean;
@@ -81,8 +73,7 @@ export function PullBasket({
       const result = await addBudgetPullLines(indentId, budgetId, lines);
       if (result?.error) {
         setError(result.error);
-        // A partial add still changed the indent: drop what went in so a
-        // second press can't ask for it twice.
+        // A partial add still changed the indent: refresh so a second press can't ask twice.
         router.refresh();
         setPicked({});
         return;
@@ -201,7 +192,6 @@ export function PullBasket({
         );
       })}
 
-      {/* Nothing has been written yet — this bar is the commit point. */}
       <div className="border-border bg-surface fixed inset-x-0 bottom-0 z-10 mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 border-t px-5 py-3 md:rounded-t-2xl md:border">
         <div className="min-w-0">
           {pickedEntries.length === 0 ? (

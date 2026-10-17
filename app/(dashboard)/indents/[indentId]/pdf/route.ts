@@ -5,12 +5,7 @@ import { getProjectCompany } from "@/lib/masters/companies";
 import { listWorkItems } from "@/lib/masters/works";
 import { createElement, type ReactElement } from "react";
 
-/**
- * The indent, as a PDF to print. getIndent enforces the /indents grant.
- * Opened in the browser (inline) rather than downloaded, because the ask
- * is to print it; generated on demand, so it never drifts from the
- * indent, and a draft carries its watermark.
- */
+// getIndent enforces the /indents grant. Inline for printing; on demand, so it never drifts.
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ indentId: string }> },

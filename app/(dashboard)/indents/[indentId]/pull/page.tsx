@@ -5,13 +5,7 @@ import { getIndentHeader } from "@/lib/indents/queries";
 import { Calculator } from "lucide-react";
 import { notFound } from "next/navigation";
 
-/**
- * Retired 2026-08-20 — the founder's backbone decision: the Estimator
- * IS the construction line, so construction requests pull from the
- * villa's official estimate instead of the stage-wise plan. The route
- * stays as a pointer because site phones have it bookmarked; historic
- * construction-anchored lines render on their indents unchanged.
- */
+// Retired: construction requests pull from the official estimate. The route stays because site phones have it bookmarked.
 export default async function ConstructionPullPage({
   params,
 }: {

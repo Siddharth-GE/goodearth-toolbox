@@ -9,24 +9,12 @@ import { approvalBlocker } from "./workflow";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-// Type-only import, and deliberately NOT re-exported — see the note in
-// lib/budgets/actions.ts: a bare `export type { X };` in a "use server"
-// file crashes every action in its compiled chunk at load time.
+// Type-only and not re-exported: `export type { X }` in a "use server" file crashes the chunk at load.
 import type { ActionState } from "@/lib/action-state";
 
-/**
- * Writes for Indents. The real status machine lives in the database
- * (indents_guard + indent_lines_draft_only, migration 0019) — these
- * actions validate first so refusals arrive as friendly messages, but a
- * write that slips past the UI is still stopped DB-side.
- *
- * M3 covers creating an indent and direct lines; the two pull paths
- * (construction stage, approved interiors budget) land in M4 and
- * approve/reject in M5.
- */
+// The status machine lives in the database (indents_guard, indent_lines_draft_only, 0019); actions pre-check so refusals read as sentences.
 
-/** The guard raises human-readable messages (written for exactly this).
- * Surface the known ones instead of a generic "try again". */
+/** The guard raises human-readable messages; surface the known ones. */
 const INDENT_GUARD_PHRASES = [
   "draft",
   "permanent",
@@ -39,7 +27,6 @@ const INDENT_GUARD_PHRASES = [
   "estimator",
 ] as const;
 
-/** How long a reason for a line outside the estimate may run. */
 const REASON_LIMIT = 500;
 
 export type CreateIndentInput = {
@@ -58,8 +45,7 @@ export async function createIndent(input: CreateIndentInput): Promise<ActionStat
 
   const supabase = await createClient();
 
-  // Pre-checked here so the common case reads well in the form; the RPC
-  // raises the same refusal for any caller that skips this action.
+  // Pre-checked for a readable message; the RPC raises the same refusal.
   const { data: project, error: projectError } = await supabase
     .from("projects")
     .select("code")
@@ -75,17 +61,12 @@ export async function createIndent(input: CreateIndentInput): Promise<ActionStat
     };
   }
 
-  // The casts paper over a typegen limitation (the create_item_request
-  // precedent): it types every function argument non-null, but these are
-  // genuinely optional — "no plot", "no stage" are real inputs, and
-  // PostgREST passes the JSON null straight through.
+  // The casts paper over typegen typing every RPC argument non-null; PostgREST passes null through.
   const { data: indentId, error } = await supabase.rpc("create_indent", {
     p_project_id: input.projectId,
     p_plot_id: (input.plotId || null) as unknown as string,
     p_unit_id: (input.unitId || null) as unknown as string,
-    // The one vocabulary: the work, not the retired stage picker. The
-    // create RPC's p_stage stays for the legacy column; new indents
-    // leave it null and carry the work instead.
+    // p_stage stays for the legacy column; new indents carry the work instead.
     p_stage: null as unknown as string,
     p_required_by: (input.requiredBy || null) as unknown as string,
     p_note: (input.note?.trim() || null) as unknown as string,
@@ -96,10 +77,7 @@ export async function createIndent(input: CreateIndentInput): Promise<ActionStat
   }
   if (!indentId) return { error: "Could not create the indent. Try again." };
 
-  // The work rides in a second write: create_indent()'s signature
-  // predates the works vocabulary and additive-only keeps it as is. A
-  // failure here leaves a draft without its work — visible on the
-  // header, fixable in place, never silent.
+  // create_indent()'s signature predates works (additive-only), so the work rides a second write; a failure leaves a visible, fixable draft.
   if (input.workItemId) {
     const { error: workError } = await supabase
       .from("indents")
@@ -117,19 +95,8 @@ export type DirectLineInput = {
   quantity: number;
 };
 
-/**
- * Commits a picker basket. An item already requested the same way on
- * this indent has its quantity raised rather than gaining a second row —
- * the same behaviour every picker in the app promises.
- *
- * A pick the villa's official estimate lists is filed as an ESTIMATE line
- * (0113), so "already requested" counts it and it does not wait for the
- * estimator; anything else is a direct line — outside the estimate, so it
- * needs a reason and the estimator's yes. The estimate is read here, never
- * trusted from the client, and indent_lines_estimate_anchor holds it.
- *
- * uom comes from the item master server-side, never from the client.
- */
+// A pick on the villa's official estimate is an ESTIMATE line (0113); anything else is a direct line needing a reason and the estimator's yes.
+// The estimate is read here, never trusted from the client; uom comes from the item master.
 export async function addDirectLines(
   indentId: string,
   lines: DirectLineInput[],
@@ -155,8 +122,7 @@ export async function addDirectLines(
   }
   if (!indent) return { error: "That indent no longer exists." };
 
-  // The villa's official estimate, through the money-free window. A failed
-  // read refuses rather than filing every pick as outside the estimate.
+  // Official estimate via the money-free window; a failed read refuses rather than filing every pick as outside it.
   let unitId = indent.unit_id;
   if (!unitId && indent.plot_id) {
     const { data: unit, error: unitError } = await supabase
@@ -197,8 +163,7 @@ export async function addDirectLines(
     }
   }
 
-  // Merging considers lines of the same kind only — a line pulled from a
-  // budget or a construction stage keeps its provenance untouched.
+  // Merge only lines of the same kind; pulled lines keep their provenance.
   const [{ data: items, error: itemsError }, { data: existing, error: existingError }] =
     await Promise.all([
       supabase.from("items").select("id, default_uom").in("id", itemIds),
@@ -261,20 +226,12 @@ export async function addDirectLines(
 }
 
 export type PullLineInput = {
-  /** construction_budget_lines.id, or the budget's line_key. */
   sourceId: string;
   quantity: number;
 };
 
-/**
- * Pulls lines from an approved interiors budget.
- *
- * The anchor is the composite (budget_id, line_key) — the CLAUDE.md
- * rule — and the item/uom are re-read from the selection line, never
- * trusted from the client. Reads go through the approved_* views only:
- * this action never touches budgets or budget_lines directly, so it
- * cannot see (or accidentally copy) a cost, a margin or a client rate.
- */
+// Anchor is the composite (budget_id, line_key); item and uom are re-read from the selection line, never the client.
+// Only the approved_* views are read, so no cost, margin or rate is reachable.
 export async function addBudgetPullLines(
   indentId: string,
   budgetId: string,
@@ -300,18 +257,13 @@ export async function addBudgetPullLines(
     return { error: "That budget is no longer available to pull from." };
   }
 
-  // Only the current design revision may be requested against — a stale
-  // tab or pasted URL lands here after the screens have filtered, and
-  // the 0028 trigger backstops the insert itself.
+  // Only the current revision may be requested against (the 0028 trigger backstops).
   const [{ data: revision, error: revisionError }, { data: indent, error: indentReadError }] =
     await Promise.all([
       supabase.from("selections").select("status").eq("id", budget.selection_id).maybeSingle(),
       supabase.from("indents").select("unit_id").eq("id", indentId).maybeSingle(),
     ]);
-  // Checked separately from the test below, because a failed read and a
-  // superseded revision both leave `revision` null — and saying "that
-  // budget belongs to a superseded design revision" when the read simply
-  // failed sends the team off to re-issue a revision that was fine.
+  // Checked apart: a failed read and a superseded revision both leave `revision` null.
   if (revisionError || indentReadError) {
     console.error("addBudgetPullLines revision check failed:", revisionError ?? indentReadError);
     return { error: "Could not check that budget just now. Try again." };
@@ -326,16 +278,12 @@ export async function addBudgetPullLines(
     return { error: "That budget belongs to a different unit than this indent." };
   }
 
-  // A line pulled from ANY of this unit's budgets is the same line —
-  // line_key is stable across revisions, so the dedupe must span them
-  // all, not just the budget on screen (the double-buy bug).
+  // Dedupe across ALL the unit's budgets: line_key is stable across revisions (the double-buy bug).
   const { data: siblingBudgets, error: siblingBudgetsError } = await supabase
     .from("approved_budgets")
     .select("id")
     .eq("unit_id", budget.unit_id);
-  // The dedupe below is only as wide as this list. A failed read narrows
-  // it to nothing, every line looks unrequested, and the same quantity
-  // gets ordered twice — so refuse the pull rather than write it.
+  // A failed read would narrow the dedupe and double-order, so refuse the pull.
   if (siblingBudgetsError) {
     console.error("addBudgetPullLines sibling budgets read failed:", siblingBudgetsError);
     return { error: "Could not check what has already been requested. Try again." };
@@ -346,8 +294,7 @@ export async function addBudgetPullLines(
 
   const [{ data: valid, error: validError }, { data: design, error: designError }, existingResult] =
     await Promise.all([
-      // Confirms each key really belongs to this APPROVED budget — the
-      // view is the filter, so a key from anywhere else simply isn't here.
+      // The approved view is the filter: a key from elsewhere isn't here.
       supabase
         .from("approved_budget_lines")
         .select("line_key")
@@ -413,8 +360,7 @@ export async function addBudgetPullLines(
   revalidatePath(`/indents/${indentId}`);
   revalidatePath(`/indents/${indentId}/pull-interiors`);
   if (skipped > 0) {
-    // Same as the construction pull: the screen disables what's already
-    // here, so this only fires on a genuine race — and says so.
+    // The screen disables what is already here, so this only fires on a race.
     return {
       error: `Added ${inserts.length}. ${skipped} ${skipped === 1 ? "line was" : "lines were"} already on this indent and ${skipped === 1 ? "was" : "were"} not added again.`,
     };
@@ -422,22 +368,15 @@ export async function addBudgetPullLines(
   return undefined;
 }
 
-/** Save-on-blur target for a row. No revalidate — the values are
- * already on screen (the saveLine pattern).
- *
- * THE UNIT. A material moves in its Masters unit from indent to stock —
- * a cement line switched to cft once rode onto the PO, the receipt and
- * the stock sum beside bags. So only an interiors line (a tile may be
- * specified per sqft by design) keeps a chosen unit; every other line is
- * saved in the item's `default_uom`, re-read here, whatever was sent. */
+// No revalidate: the values are already on screen.
+// A material moves in its Masters unit through PO, receipt and stock; only an interiors line keeps a chosen unit, the rest are saved in the item's default_uom.
 export async function updateLine(
   lineId: string,
   input: {
     quantity: number;
     uom: string;
     note: string | null;
-    /** Why a line outside the estimate is needed (0113) — kept only on
-     * such a line; the database asks for it at submit. */
+    /** Why a line outside the estimate is needed (0113); the database asks for it at submit. */
     reason: string | null;
   },
 ): Promise<ActionState> {
@@ -475,8 +414,7 @@ export async function updateLine(
     uom = masterUom;
   }
 
-  // A change of quantity, unit or reason empties an earlier estimator's
-  // answer (indent_lines_draft_only) — it answered a different question.
+  // A change empties an earlier estimator's answer (indent_lines_draft_only).
   const outside =
     existing.budget_id == null &&
     existing.construction_line_id == null &&
@@ -512,8 +450,6 @@ export async function removeLine(indentId: string, lineId: string): Promise<Acti
   return undefined;
 }
 
-/** Save-on-blur target for the header fields editable in draft. No
- * revalidate for the same reason as updateLine. */
 export async function updateIndentHeader(
   indentId: string,
   input: {
@@ -525,9 +461,7 @@ export async function updateIndentHeader(
   const user = await requireTool("/indents");
 
   const supabase = await createClient();
-  // `stage` is deliberately absent: the picker is gone (founder,
-  // 2026-08-20 — one vocabulary, the works masters) and a legacy stage
-  // on an old indent stays exactly as history left it.
+  // `stage` is absent on purpose: an old indent keeps its legacy stage.
   const { error } = await supabase
     .from("indents")
     .update({
@@ -548,9 +482,7 @@ export async function submitIndent(indentId: string): Promise<ActionState> {
   const user = await requireTool("/indents");
   const supabase = await createClient();
 
-  // Checked twice on purpose: here for the friendly message, and in
-  // indents_guard() under the row lock — the backstop that holds even
-  // for a write this function never sees. Exact count, never a fetch.
+  // Also checked in indents_guard() under the row lock; this is for the friendly message.
   const { count, error: countError } = await supabase
     .from("indent_lines")
     .select("id", { count: "exact", head: true })
@@ -563,9 +495,7 @@ export async function submitIndent(indentId: string): Promise<ActionState> {
     return { error: "Add at least one line before submitting." };
   }
 
-  // 0113: every line outside the estimate says why it is needed. The
-  // reason saves on blur without a refresh, so this reads the database
-  // rather than trusting the page's count.
+  // 0113: lines outside the estimate need a reason. Read the database, not the page's count (the reason saves on blur).
   const { count: noReason, error: reasonError } = await supabase
     .from("indent_lines")
     .select("id", { count: "exact", head: true })
@@ -592,9 +522,7 @@ export async function submitIndent(indentId: string): Promise<ActionState> {
       submitted_at: new Date().toISOString(),
       rejection_note: null,
     })
-    // No status filter here: filtering to drafts would make a submit on a
-    // locked indent match zero rows and "succeed" silently. Let the guard
-    // refuse it with a message worth showing.
+    // No status filter: filtering to drafts would make a submit on a locked indent match zero rows and "succeed".
     .eq("id", indentId);
   if (error) {
     console.error("submitIndent failed:", error);
@@ -606,20 +534,12 @@ export async function submitIndent(indentId: string): Promise<ActionState> {
   return undefined;
 }
 
-/**
- * Approves a submitted indent — the end of the road for this tool; a
- * Purchase Order (Phase 6) is what happens next.
- *
- * Who may approve is checked in `indents_guard()` against
- * `indent_approvers` (or admin), under the row lock. The check here is
- * only so a refusal reads as a sentence rather than a database error.
- */
+// indents_guard() checks approvers under the row lock; this check only makes the refusal a sentence.
 export async function approveIndent(indentId: string): Promise<ActionState> {
   const user = await requireTool("/indents");
   const supabase = await createClient();
 
-  // 0113: a line outside the estimate waits for the estimator's yes —
-  // indents_guard refuses it under the row lock; this says it plainly.
+  // 0113: a line outside the estimate waits for the estimator's yes; the guard refuses it too.
   const { data: held, error: heldError } = await supabase
     .from("indent_lines")
     .select("estimator_decision")
@@ -660,13 +580,7 @@ export async function approveIndent(indentId: string): Promise<ActionState> {
   return undefined;
 }
 
-/**
- * Sends a submitted indent back to draft with a reason.
- *
- * The note is mandatory — the guard refuses a rejection without one,
- * because "rejected" with no explanation is the fastest way to make
- * people stop using a tool. Submitting again clears it.
- */
+// The note is mandatory (the guard refuses without one); submitting again clears it.
 export async function rejectIndent(indentId: string, note: string): Promise<ActionState> {
   await requireTool("/indents");
 
@@ -695,8 +609,7 @@ export async function rejectIndent(indentId: string, note: string): Promise<Acti
   return undefined;
 }
 
-/** Only a draft can go — the RPC re-checks under a row lock, and its
- * number stays burnt (gaps in the sequence are accepted and expected). */
+// Only a draft can go; the RPC re-checks under a row lock and the number stays burnt.
 export async function deleteIndent(indentId: string): Promise<ActionState> {
   await requireTool("/indents");
   const supabase = await createClient();
@@ -704,7 +617,7 @@ export async function deleteIndent(indentId: string): Promise<ActionState> {
   const { error } = await supabase.rpc("delete_draft_indent", { p_indent_id: indentId });
   if (error) {
     console.error("deleteIndent failed:", error);
-    // Written for a person to read by the RAISE EXCEPTION in the function.
+    // The function's RAISE EXCEPTION text is written for people.
     return { error: dbErrorMessage(error, "Could not delete this indent.") };
   }
 
@@ -713,21 +626,12 @@ export async function deleteIndent(indentId: string): Promise<ActionState> {
 }
 
 export type EstimatePullInput = {
-  /** The catalogue item — the row of the pull. */
   itemId: string;
-  /** Typed (or prefilled) by the operator, in the ITEM's unit. */
   quantity: number;
 };
 
-/**
- * Pulls materials from the villa's official estimate — pull path 3.
- *
- * Only which items and how much comes from the client; that each item is
- * on the official estimate, and its unit, are re-read server-side from
- * estimate_takeoff_facts and the catalogue. Items already on this indent
- * are skipped rather than merged, the same rule as the other two pull
- * paths (the unique (indent, estimate, item) anchor backstops it).
- */
+// The client sends item and quantity only; that the item is on the official estimate, and its unit, are re-read server-side.
+// Items already on the indent are skipped (the unique (indent, estimate, item) anchor backstops).
 export async function addEstimatePullLines(
   indentId: string,
   estimateId: string,
@@ -760,8 +664,7 @@ export async function addEstimatePullLines(
     console.error("addEstimatePullLines lookup failed:", factsError ?? existingError);
     return { error: "Could not add those materials. Try again." };
   }
-  // The view reads official estimates only, so an item missing here means
-  // the estimate was superseded while the screen was open.
+  // The view reads official estimates only: a missing item means the estimate was superseded.
   const onEstimate = new Set((facts ?? []).map((fact) => fact.item_id));
   if (itemIds.some((id) => !onEstimate.has(id))) {
     return { error: "That estimate is no longer the official one — reload and look again." };

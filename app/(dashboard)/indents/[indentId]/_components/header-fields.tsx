@@ -9,13 +9,7 @@ import { updateIndentHeader } from "@/lib/indents/actions";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
 import { useState } from "react";
 
-/**
- * The indent's own fields — stage, required-by, note — editable on blur
- * while it's a draft, read-only text once submitted. The database guard
- * refuses header edits past draft, so read-only here is honesty, not
- * enforcement. Stage is picked from the construction stages master
- * (0053), never typed.
- */
+// The database guard refuses header edits past draft, so read-only here is honesty, not enforcement.
 export type WorkOption = { id: string; code: string; name: string; category: string };
 
 export function HeaderFields({
@@ -28,9 +22,8 @@ export function HeaderFields({
   editable,
 }: {
   indentId: string;
-  /** A legacy stage (0053) — display-only history; the picker is gone. */
+  /** A legacy stage (0053): display-only history. */
   stage: string | null;
-  /** The work this request serves, from the works masters (0078). */
   workItemId: string | null;
   works: WorkOption[];
   requiredBy: string | null;
@@ -86,8 +79,7 @@ export function HeaderFields({
             onBlur={save}
           >
             <option value="">No work</option>
-            {/* A saved work stays choosable even if it has since been
-                deactivated — same rule as the stage above. */}
+            {/* A saved work stays choosable even if deactivated. */}
             {workValue && !works.some((work) => work.id === workValue) && (
               <option value={workValue}>{workLabel(workValue)}</option>
             )}

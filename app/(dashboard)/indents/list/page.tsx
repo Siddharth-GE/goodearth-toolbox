@@ -63,9 +63,7 @@ export default async function IndentsPage({
   ]);
   const { indents, total, page: currentPage, pageCount, pageSize } = result;
 
-  // Every choice rides along, so a tab or a page link never drops a filter
-  // (strings, not a function — a function can't cross into a Client
-  // Component).
+  // Every choice rides along so a tab or page link never drops a filter (strings: a function can't cross into a Client Component).
   const hrefWith = (params: URLSearchParams) => {
     if (project) params.set("project", project);
     if (work) params.set("work", work);

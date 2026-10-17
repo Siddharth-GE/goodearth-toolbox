@@ -16,13 +16,7 @@ import { approveIndent, deleteIndent, rejectIndent, submitIndent } from "@/lib/i
 import { canDecide, canEditIndent, canSubmit, type IndentStatus } from "@/lib/indents/workflow";
 import { useState, useTransition } from "react";
 
-/**
- * Everything that changes an indent's status, in one place.
- *
- * Which buttons appear comes from lib/indents/workflow.ts; every rule is
- * enforced again by indents_guard() in the database, so a hidden button
- * is a courtesy and the trigger is the actual boundary.
- */
+// Buttons come from lib/indents/workflow.ts; indents_guard() enforces every rule, so a hidden button is a courtesy.
 export function ActionButtons({
   indentId,
   status,
@@ -34,8 +28,7 @@ export function ActionButtons({
   status: IndentStatus;
   lineCount: number;
   decider: { isAdmin: boolean; isApprover: boolean };
-  /** Why Approve is locked (0113 — lines outside the estimate wait for
-   * the estimator), or null. Sending back stays open either way. */
+  /** Why Approve is locked (0113: lines outside the estimate wait for the estimator); Send back stays open. */
   approvalBlocker: string | null;
 }) {
   const [pending, startTransition] = useTransition();
@@ -51,7 +44,6 @@ export function ActionButtons({
       else setRejecting(false);
     });
 
-  // ---- Submitted: the approver's decision ---------------------------
   if (canDecide(status, decider)) {
     return (
       <div className="space-y-1 text-right">
@@ -117,7 +109,6 @@ export function ActionButtons({
     );
   }
 
-  // ---- Draft: the site team's own actions ---------------------------
   if (!canEditIndent(status)) return null;
 
   return (

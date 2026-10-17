@@ -19,14 +19,7 @@ import type { EstimatePullRow } from "@/lib/indents/queries";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
-/**
- * The estimate pull: the official estimate's material takeoff, one row
- * per catalogue item, a local basket and one commit — the PullBasket
- * idea. A ready row prefills the estimate's figure; a needs-quantity row
- * (an estimate from before materials were items) shows the estimate's
- * figure and asks a person for the procurement quantity; an unlinked row
- * cannot be picked and says why.
- */
+// A needs-quantity row (an estimate from before materials were items) asks a person for the procurement quantity; an unlinked row cannot be picked.
 export function EstimatePullBasket({
   indentId,
   estimateId,
@@ -35,7 +28,6 @@ export function EstimatePullBasket({
 }: {
   indentId: string;
   estimateId: string;
-  /** The indent's reference, for the commit bar. */
   reference: string;
   rows: EstimatePullRow[];
 }) {
@@ -156,9 +148,7 @@ export function EstimatePullBasket({
                 </TableCell>
                 <TableCell className="text-sm whitespace-nowrap">
                   {row.already_requested_for_work !== null ? (
-                    // A pull for one work: what this work's indents asked
-                    // for, with the villa-wide figure (the double-buy rule
-                    // is per item across the villa) beneath it.
+                    // A pull for one work shows that work's figure with the villa-wide one beneath (double-buy is per item across the villa).
                     <>
                       {row.already_requested_for_work > 0
                         ? `${formatQuantity(row.already_requested_for_work)} ${row.item_default_uom}`
@@ -222,8 +212,7 @@ export function EstimatePullBasket({
   );
 }
 
-/** True when the estimate's figure is already the item's own unit and
- * quantity — nothing to convert, so no "≈" hint beside it. */
+/** True when the figure is already in the item's own unit: no "≈" hint. */
 function isAsBought(row: EstimatePullRow): boolean {
   const [only, ...rest] = row.estimate_parts;
   return (

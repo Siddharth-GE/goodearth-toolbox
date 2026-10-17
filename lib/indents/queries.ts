@@ -27,18 +27,8 @@ import {
 } from "./pull-rules";
 import { stillToBuy, type IndentStatus } from "./workflow";
 
-// Indents reads the construction/selections/masters tables DIRECTLY,
-// under its own /indents grant. It deliberately does not call another
-// tool's queries module: those all open with requireTool for *their*
-// tool, so a site user holding only /indents would be redirected away
-// from their own screen. Cross-stage reads belong to the downstream
-// tool — the same rule that lets any tool read lib/masters/* without
-// holding /masters.
-//
-// Nothing here can leak money: indents carry no cost, margin or rate by
-// design, and the only interiors window this tool will ever read
-// through (M4) is the approved_budgets/approved_budget_lines views,
-// whose column lists exclude the secret side of the 0011 boundary.
+// Reads the tables directly under the /indents grant: another tool's queries open with their own requireTool and would redirect a site user.
+// No money here: indents carry none, and interiors are read only through the approved_budgets views (0011 boundary).
 
 const INDENTS_LIST_LIMIT = 50;
 
@@ -52,8 +42,7 @@ export type IndentListRow = {
   project_name: string;
   unit_name: string | null;
   line_count: number;
-  /** Lines still to buy — requested less what live POs ordered. Null
-   * unless the indent is approved: only approved indents get bought. */
+  /** Lines still to buy: requested less live PO orders. Null unless approved. */
   lines_to_buy: number | null;
 };
 
@@ -65,8 +54,6 @@ export type IndentListPage = {
   pageSize: number;
 };
 
-/** Headline counts for the tool's welcome screen. Indents carry no
- * money by design, so these are plain status counts. */
 export async function getWelcomeCounts() {
   await requireTool("/indents");
   const supabase = await createClient();
@@ -76,7 +63,6 @@ export async function getWelcomeCounts() {
   startOfMonth.setHours(0, 0, 0, 0);
   const since = startOfMonth.toISOString();
 
-  // Exact database counts, head-only — never rows.length.
   const [submitted, drafts, approved] = await Promise.all([
     supabase.from("indents").select("id", { count: "exact", head: true }).eq("status", "submitted"),
     supabase.from("indents").select("id", { count: "exact", head: true }).eq("status", "draft"),
@@ -98,11 +84,8 @@ export type IndentListFilters = {
   page?: number;
   status?: IndentStatus;
   projectId?: string;
-  /** The work an indent serves (work_items.id). */
   workItemId?: string;
-  /** Indent reference — already made safe by searchParam. */
   q?: string;
-  /** Raised-on date range, YYYY-MM-DD, already checked by dateParam. */
   from?: string;
   to?: string;
 };
@@ -122,8 +105,7 @@ export async function listIndents({
   const pageSize = INDENTS_LIST_LIMIT;
   const currentPage = Math.max(1, page);
 
-  // Every filter in one place. created_at is a timestamp, so the "to" day
-  // runs up to — not including — the day after it.
+  // created_at is a timestamp, so the "to" day runs up to the day after it.
   const filtered = <T extends Filterable<T>>(query: T): T => {
     let next = query;
     if (status) next = next.eq("status", status);
@@ -135,8 +117,6 @@ export async function listIndents({
     return next;
   };
 
-  // A stated limit with an exact database count — the total is never
-  // derived from the rows that happened to arrive.
   const { data, count, error } = await filtered(
     supabase
       .from("indents")
@@ -148,8 +128,7 @@ export async function listIndents({
     .order("created_at", { ascending: false })
     .order("id")
     .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
-  // A failed read is an error screen, never an empty list — "no indents"
-  // and "could not read the indents" mean opposite things.
+  // A failed read is an error screen, never an empty list.
   if (error) {
     console.error("listIndents failed:", error);
     throw new Error("Could not read the indents.", { cause: error });
@@ -181,14 +160,7 @@ export async function listIndents({
   };
 }
 
-/**
- * For each of these (approved) indents, how many lines still have
- * something to buy: requested less what non-cancelled POs ordered, from
- * the money-free po_line_facts view (migration 0022) — quantities only,
- * so a site user without /purchase-orders sees the same figure. Both
- * reads are SUMMED, so they go through fetchAll: a silent 1,000-row cap
- * would call a line fully ordered, or not ordered at all.
- */
+/** Lines still to buy per indent, from the money-free po_line_facts (0022). Summed, so fetchAll. */
 async function countLinesToBuy(
   supabase: Awaited<ReturnType<typeof createClient>>,
   indentIds: string[],
@@ -233,9 +205,6 @@ async function countLinesToBuy(
   return counts;
 }
 
-/** The list page's filter dropdowns — every project, and the active
- * works (the one vocabulary, Masters). The reads are open; this wrapper
- * is the gate. */
 export async function getIndentFilterOptions(): Promise<{
   projects: { id: string; name: string }[];
   works: { id: string; label: string }[];
@@ -250,8 +219,6 @@ export async function getIndentFilterOptions(): Promise<{
   };
 }
 
-/** Where a line came from — provenance, shown on the grid and used by
- * the pull screens (M4) to skip lines already requested. */
 export type IndentLineSource = "direct" | "construction" | "interiors" | "estimate";
 
 export type IndentLineRow = {
@@ -263,27 +230,18 @@ export type IndentLineRow = {
   item_thumb_url: string | null;
   quantity: number;
   uom: string;
-  /** The item's unit in Masters. Every line except an interiors one moves
-   * in it (a tile may be specified per sqft); a line saved in another unit
-   * before that rule shows a warning. */
+  /** Lines move in the item's Masters unit (interiors excepted); another unit shows a warning. */
   item_default_uom: string | null;
   note: string | null;
   source: IndentLineSource;
-  /** Who last touched the line — the attribution rule. */
   updated_by_name: string | null;
-  /** Ordered across all live POs (Phase 6) — the "ordered X of Y" figure. */
   ordered_quantity: number;
-  /** The PO references carrying this line, e.g. "PO/SAA/P12/001". */
   ordered_po_refs: string | null;
-  /** Set when a design revision issued AFTER this line was pulled has
-   * changed or removed it — the "check this order" flag. Null for
-   * direct/construction lines and for lines still on the current
-   * revision. */
+  /** Set when a design revision issued after the pull changed or removed this line. */
   design_drift: "changed" | "removed" | null;
   /** Why a line outside the estimate is needed (0113); null on the rest. */
   off_estimate_reason: string | null;
-  /** The estimator's answer on a line outside the estimate (0113) — null
-   * until it answers, and on every other line. */
+  /** The estimator's answer on a line outside the estimate (0113). */
   estimator: {
     decision: "approved" | "refused";
     by_name: string | null;
@@ -297,7 +255,6 @@ export type IndentDetail = {
   reference: string;
   status: IndentStatus;
   stage: string | null;
-  /** The work this request serves, from the works masters (0078). */
   work_item_id: string | null;
   required_by: string | null;
   note: string | null;
@@ -323,15 +280,9 @@ export type IndentHeader = {
   project_id: string;
   project_name: string;
   unit_id: string | null;
-  /** The work the indent serves (0078), when it names one. */
   work_item_id: string | null;
 };
 
-/**
- * Just the header — for screens (the two pull pages) that need the
- * reference and status to render but have no use for the full detail's
- * lines, fulfilment facts and actor names.
- */
 export const getIndentHeader = cache(async (indentId: string): Promise<IndentHeader | null> => {
   await requireTool("/indents");
   const supabase = await createClient();
@@ -342,9 +293,7 @@ export const getIndentHeader = cache(async (indentId: string): Promise<IndentHea
       .eq("id", indentId)
       .maybeSingle(),
   );
-  // Both pull screens call notFound() on a null header, so a swallowed
-  // error here told the user the indent doesn't exist. Throw instead —
-  // it is the same rule as the drift reads below.
+  // Throw: both pull screens turn a null header into notFound(), so a swallowed error reads as "no such indent".
   if (error) {
     console.error("getIndentHeader failed:", error);
     throw new Error("Could not open that indent.", { cause: error });
@@ -388,8 +337,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
 
   if (!indent) return null;
 
-  // Names for every actor on the document — the attribution rule. One
-  // profiles read rather than embedded joins (several FKs to profiles).
+  // One profiles read, not embeds (several FKs to profiles).
   const actorIds = [
     ...new Set(
       [
@@ -406,11 +354,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
   const names = new Map((profiles ?? []).map((profile) => [profile.id, profile.full_name]));
   const nameOf = (id: string | null | undefined) => (id ? (names.get(id) ?? null) : null);
 
-  // "Ordered X of Y" per line, through the money-free po_line_facts view
-  // (migration 0022) — quantities and references only, never a rate, so
-  // a site user without /purchase-orders still sees fulfilment.
-  // Read to completion: these rows are SUMMED into ordered quantities,
-  // so a silent 1,000-row cap would under-report "ordered X of Y".
+  // Money-free po_line_facts (0022), summed, so read to completion.
   const lineIds = lines.map((line) => line.id);
   const orderedFacts = lineIds.length
     ? await fetchAll((from, to) =>
@@ -432,11 +376,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
     orderedByLine.set(fact.indent_line_id, entry);
   }
 
-  // Lines anchored to an interiors budget may have drifted: a revision
-  // issued AFTER the pull can change or remove the design line they came
-  // from. Compare each anchored line (its own revision's selection line)
-  // against the unit's latest issued revision, and flag the differences.
-  // All money-free reads: approved_budgets, selections, selection_lines.
+  // Anchored lines may have drifted: compare each to the unit's latest issued revision.
   const driftByAnchor = new Map<string, DriftStatus>();
   const anchoredBudgetIds = [
     ...new Set(lines.map((line) => line.budget_id).filter((id): id is string => id != null)),
@@ -448,11 +388,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
         .select("id, selection_id, unit_id")
         .in("id", anchoredBudgetIds),
     );
-    // Throw rather than fall through to an empty list: no rows here reads
-    // as "nothing drifted", so a failed read would clear every drift flag
-    // on the screen and tell the site team an indent is safe to order
-    // when the design under it has changed. Same rule as fetchAll — a
-    // read that failed has no partial answer worth showing.
+    // Throw: an empty result would read as "nothing drifted" and clear every flag.
     if (anchorBudgetsError) {
       console.error("indent drift read failed:", anchorBudgetsError);
       throw new Error("Could not check this indent for design changes.", {
@@ -474,10 +410,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
             ),
         )
       : { data: [], error: null };
-    // Same rule as the read above. An empty answer here means "no anchor
-    // revision is still issued", which marks every budget superseded — so
-    // a failed read doesn't clear the flags, it invents them. Either way
-    // the screen is telling the site team something untrue.
+    // Throw: an empty result would mark every budget superseded.
     if (anchorSelectionsError) {
       console.error("indent drift read failed:", anchorSelectionsError);
       throw new Error("Could not check this indent for design changes.", {
@@ -503,10 +436,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
           .in("unit_id", [...new Set(superseded.map((row) => row.unit_id))])
           .eq("status", "issued"),
       );
-      // This is the revision the drift is measured AGAINST. No rows reads
-      // as "there is nothing newer to compare with", so a failed read
-      // leaves every changed and removed line unflagged — the exact
-      // silence the throw above exists to prevent.
+      // Throw: an empty result would leave every changed line unflagged.
       if (issuedSelectionsError) {
         console.error("indent drift read failed:", issuedSelectionsError);
         throw new Error("Could not check this indent for design changes.", {
@@ -631,19 +561,9 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
   };
 });
 
-/* ------------------------------------------------------------------ *
- * The pull line shape shared by the pull screens
- * ------------------------------------------------------------------ *
- * Pull path 1 was the unit's construction plan. Retired 2026-08-20 —
- * the founder's backbone decision: the Estimator IS the construction
- * line, so construction requests pull from the villa's official
- * estimate (pull path 3) instead. The "construction" source label and
- * indent_lines.construction_line_id stay forever for historic lines;
- * only the pull UI and its reads are gone.
- */
+// Pull path 1 (the construction plan) is retired; the "construction" source and indent_lines.construction_line_id stay for historic lines.
 
 export type PullLineRow = {
-  /** The source row's id — construction_budget_lines.id. */
   source_id: string;
   item_id: string;
   item_name: string;
@@ -651,29 +571,15 @@ export type PullLineRow = {
   item_brand: string | null;
   item_thumb_url: string | null;
   uom: string;
-  /** What the plan (or the budget) says this line should be. */
   planned_quantity: number;
-  /** How much has been asked for across EVERY indent, this one included —
-   * the figure that says whether a stage is already covered. */
   already_requested: number;
-  /** Already a line on this indent: the unique (indent_id, source) pair
-   * means it can't be added twice, so the screen says so instead. */
+  /** Already a line on this indent: the unique (indent_id, source) pair forbids adding it twice. */
   on_this_indent: boolean;
   note: string | null;
 };
 
-/* ------------------------------------------------------------------ *
- * Pull path 2 — an approved interiors budget
- *
- * Everything below goes through the approved_budgets /
- * approved_budget_lines security-barrier views (migration 0019). Those
- * views are the ONE sanctioned window through the 0011 margin RLS, and
- * their column lists are the security boundary: no unit_cost, no
- * margin_pct, no client_rate, and item_margins is not reachable at all.
- * Never widen a select here to the underlying budgets/budget_lines
- * tables — under /indents alone they return zero rows, and under
- * /budgets they would leak markup into a screen that must never show it.
- * ------------------------------------------------------------------ */
+// Pull path 2 reads only the approved_budgets / approved_budget_lines views (0019), the one window through the 0011 margin RLS.
+// Never select from budgets or budget_lines here: zero rows under /indents, a margin leak under /budgets.
 
 export type ApprovedBudgetOption = {
   budget_id: string;
@@ -684,8 +590,6 @@ export type ApprovedBudgetOption = {
   approved_at: string | null;
 };
 
-/** A unit whose current revision is issued but not yet priced and
- * approved — shown paused rather than silently offering the old budget. */
 export type PendingBudgetUnit = {
   unit_name: string;
   revision_no: number;
@@ -696,14 +600,7 @@ export type BudgetChooser = {
   pending: PendingBudgetUnit[];
 };
 
-/**
- * The approved interiors budgets the pull screen may offer: only each
- * unit's CURRENT (issued) revision. A superseded revision's budget stays
- * approved forever as history, but requesting material against it is how
- * the same line gets bought twice — those units appear as pending until
- * the new revision's budget is approved. An indent tagged to a unit sees
- * that unit alone.
- */
+/** Approved budgets to offer: only each unit's current issued revision, since a superseded one is how a line gets bought twice. */
 export async function listApprovedBudgetsForProject(
   projectId: string,
   unitId?: string | null,
@@ -725,9 +622,7 @@ export async function listApprovedBudgetsForProject(
         .order("id")
         .range(from, to),
     ),
-    // At most one issued selection per unit (issue_selection supersedes
-    // the previous one) — the R-number and the "is this current" test in
-    // one read.
+    // At most one issued selection per unit (issue_selection supersedes the last).
     supabase
       .from("selections")
       .select("id, unit_id, revision_no")
@@ -778,7 +673,6 @@ export async function listApprovedBudgetsForProject(
 }
 
 export type BudgetPullLineRow = PullLineRow & {
-  /** budget_lines.line_key — half of the composite anchor. */
   line_key: string;
   space_label: string;
   vendor_name: string | null;
@@ -794,14 +688,7 @@ export type BudgetPull = {
   spaces: BudgetPullSpaceGroup[];
 };
 
-/**
- * One approved budget's lines, grouped by space, ready to pull.
- *
- * The quantity shown is the BUDGET's quantity (the team's measured
- * figure), not the designer's — that's what was actually costed and
- * approved. Item, uom and space come from selection_lines, joined on
- * (selection_id, line_key), because the view carries no item at all.
- */
+/** Lines show the budget's quantity (what was costed); item, uom and space come from selection_lines on (selection_id, line_key). */
 export async function getBudgetPull(
   budgetId: string,
   indentId: string,
@@ -816,21 +703,15 @@ export async function getBudgetPull(
       .eq("id", budgetId)
       .maybeSingle(),
   );
-  // A failed read must not become a 404 that says this budget isn't
-  // there.
   if (budgetError) {
     console.error("indent budget pull read failed:", budgetError);
     throw new Error("Could not open that budget.", { cause: budgetError });
   }
   if (!budget || !budget.selection_id || !budget.unit_id) return null;
-  // Captured as locals: TypeScript drops property narrowing inside the
-  // retry callbacks below, and these are non-null from here on.
   const budgetUnitId: string = budget.unit_id;
   const budgetSelectionId: string = budget.selection_id;
 
-  // An indent tagged to a unit pulls from that unit alone — the chooser
-  // never offers another unit's budget, so arriving here with one is a
-  // pasted URL.
+  // A unit-tagged indent pulls from that unit alone; a pasted URL could name another.
   const indent = await getIndentHeader(indentId);
   if (!indent) return null;
   if (indent.unit_id && indent.unit_id !== budget.unit_id) return null;
@@ -868,29 +749,20 @@ export async function getBudgetPull(
       .maybeSingle(),
   ]);
 
-  // A failed spaces read would silently label every line "Unassigned";
-  // a failed selection read would look exactly like a superseded
-  // revision and 404. Neither is worth showing.
+  // A failed read must not look like a missing budget or a superseded revision.
   if (spacesError || selectionError) {
     console.error("indent budget pull read failed:", spacesError ?? selectionError);
     throw new Error("Could not open that budget.", { cause: spacesError ?? selectionError });
   }
 
-  // Only the current design revision may be requested against. The
-  // chooser already filters; this holds against a stale tab or a pasted
-  // URL, and the 0028 trigger backstops the insert itself.
+  // Only the current revision may be requested against (the 0028 trigger backstops).
   if (selection?.status !== "issued") return null;
 
-  // Every line already raised against ANY of this unit's budgets, on any
-  // indent. line_key is stable across revisions, so a line pulled from
-  // R1's budget must show as already asked when R2's budget is on
-  // screen — scoping this to one budget_id was the double-buy bug.
+  // Lines raised against ANY of the unit's budgets: line_key is stable across revisions, so scoping to one budget double-buys.
   const { data: siblingBudgets, error: siblingBudgetsError } = await withRetry(() =>
     supabase.from("approved_budgets").select("id").eq("unit_id", budgetUnitId),
   );
-  // No sibling budgets reads as "nothing has ever been raised for this
-  // unit", so every line shows as still to order — which is the
-  // double-buy bug arriving by the other door. Throw instead.
+  // Throw: no sibling rows would show every line as still to order.
   if (siblingBudgetsError) {
     console.error("indent pull sibling budgets read failed:", siblingBudgetsError);
     throw new Error("Could not check what has already been requested for this unit.", {
@@ -938,8 +810,7 @@ export async function getBudgetPull(
   for (const line of budgetLines ?? []) {
     if (!line.line_key) continue;
     const design = designLines.get(line.line_key);
-    // A budget line whose selection line has gone is not something to
-    // request — skip it rather than render a row with no item.
+    // Skip a budget line whose selection line has gone.
     if (!design) continue;
     const item = design.items as {
       name: string;
@@ -982,15 +853,7 @@ export async function getBudgetPull(
   };
 }
 
-/**
- * May the signed-in user decide on a submitted indent?
- *
- * Admins always may; everyone else is either named on
- * `indent_approvers` or holds a role that approves indents (0034).
- * This asks the database's own `can_approve_indents()` — the same
- * function `indents_guard()` calls — so which buttons appear and what
- * the database will actually allow cannot drift apart.
- */
+/** May the user decide on a submitted indent? Asks the database's can_approve_indents() (0034), as indents_guard() does. */
 export async function isCurrentUserApprover(): Promise<{
   isAdmin: boolean;
   isApprover: boolean;
@@ -1018,12 +881,9 @@ export type IndentFormOptions = {
   projects: ProjectOption[];
   plots: ScopedOption[];
   units: (ScopedOption & { plot_id: string | null })[];
-  /** The works masters — the one vocabulary (founder, 2026-08-20). */
   works: { id: string; code: string; name: string; category: string }[];
 };
 
-/** Everything the new-indent form needs, in one gated call. The masters
- * reads themselves are ungated by design — this wrapper is the gate. */
 export async function getIndentFormOptions(): Promise<IndentFormOptions> {
   await requireTool("/indents");
   const [projects, plots, units, workItems, workCategories] = await Promise.all([
@@ -1033,9 +893,6 @@ export async function getIndentFormOptions(): Promise<IndentFormOptions> {
     listWorkItems(),
     listWorkCategories(),
   ]);
-  // One vocabulary (founder, 2026-08-20): the works masters, the same
-  // list the estimate speaks. The old construction-stages picker is
-  // gone from these forms; a saved stage still displays as history.
   const categoryNameById = new Map(workCategories.map((c) => [c.id, c.name]));
   return {
     projects: projects.map(({ id, name, code }) => ({ id, name, code })),
@@ -1058,44 +915,25 @@ export async function getIndentFormOptions(): Promise<IndentFormOptions> {
   };
 }
 
-/* ------------------------------------------------------------------ *
- * Pull path 3 — the villa's official estimate (0078)
- *
- * Reads estimate_takeoff_facts, the money-free window over the 0077
- * submit snapshot: frozen quantities and the item each one is bought
- * as, no rates anywhere. The takeoff is per (work, item); the pull
- * AGGREGATES it per item, because construction materials are bought in
- * bulk for the villa, not per work — and because the anchor dedupes on
- * (indent, estimate, item), one row per item is the shape that cannot
- * double-buy.
- * ------------------------------------------------------------------ */
+// Pull path 3 reads estimate_takeoff_facts (money-free, 0077 snapshot).
+// Aggregated per item: the anchor dedupes on (indent, estimate, item), so one row per item cannot double-buy.
 
 export type EstimatePullState = EstimateVerdict["state"];
 
 export type EstimatePullRow = {
   /** The item's id, or "unlinked:<name>" for an older row naming none. */
   key: string;
-  /** The frozen name(s) the estimate was submitted with. */
   estimate_name: string;
-  /** What the estimate says, one part per unit it used. */
   estimate_parts: { quantity: number; uom: string }[];
-  /** How many works of the estimate consume it. */
   work_count: number;
   item_id: string | null;
   item_name: string | null;
   item_code: string | null;
   item_thumb_url: string | null;
   item_default_uom: string | null;
-  /** What the screen may do: prefill, ask for a quantity, or refuse. */
   state: EstimatePullState;
-  /** The estimate figure in the item's unit; null when the conversion is
-   * unknown (state !== "ready"). */
   prefill_qty: number | null;
-  /** Requested against ANY of this villa's estimates, in the item's
-   * unit — the figure that says it is already covered. */
   already_requested: number;
-  /** Of that, what indents raised for this pull's work asked for; null
-   * when the pull is not for one work. */
   already_requested_for_work: number | null;
   on_this_indent: boolean;
 };
@@ -1104,31 +942,18 @@ export type EstimatePull = {
   estimate_id: string;
   reference: string;
   submitted_at: string | null;
-  /** When the villa's working estimate changed after this official copy
-   * was made (0109) — its changes are not here yet. Null when it has not. */
+  /** The villa's working estimate changed after this copy was made (0109). */
   working_changed_at: string | null;
   unit_name: string;
   rows: EstimatePullRow[];
   /** Rows of an older estimate that name no catalogue item. */
   unlinked_count: number;
-  /** The work the rows are for — the indent's, unless every work was
-   * asked for. Null when the pull covers every work. */
   work: { id: string; label: string } | null;
-  /** The indent's own work, so the screen can offer to go back to it. */
   indent_work: { id: string; label: string } | null;
-  /** Materials the official estimate has under OTHER works — what
-   * "Show every work" would add. */
   other_work_material_count: number;
 };
 
-/**
- * The official estimate's takeoff for a unit, one row per item, annotated
- * with what has already been requested against this villa's estimates.
- * An indent raised for a work sees that work's materials (`factsForWork`)
- * unless `allWorks` is asked for. Returns null when the unit's official
- * estimate carries no materials at all — or it has none — and the screen
- * says which to check.
- */
+/** One row per item, with what is already requested against the villa's estimates. Null when the estimate has no materials. */
 export async function getEstimatePull(
   unitId: string,
   indentId: string,
@@ -1138,11 +963,7 @@ export async function getEstimatePull(
   await requireTool("/indents");
   const supabase = await createClient();
 
-  // Read to completion — a truncated takeoff silently under-plans. Every
-  // column of a view is nullable in the generated types. The guard below
-  // narrows on what a row cannot do without, and NOT on material_id:
-  // that column is null on every row written since 0086, and narrowing
-  // on it is exactly how this screen went blind (BUGCATCHER #16).
+  // Read to completion. View columns are all nullable: guard on what a row cannot do without, NOT on material_id (BUGCATCHER #16).
   const facts = await fetchAll<{
     estimate_id: string | null;
     reference: string | null;
@@ -1195,9 +1016,7 @@ export async function getEstimatePull(
     ...new Set(offered.map((fact) => fact.item_id).filter((id): id is string => !!id)),
   ];
 
-  // The villa's indents, so the double-buy figure can span every estimate
-  // the villa has had — an indent names its unit, and a superseded
-  // estimate's pulls are still material on its way to the same villa.
+  // The villa's indents, so the double-buy figure spans every estimate it has had.
   const { data: villaIndents, error: indentsError } = await supabase
     .from("indents")
     .select("id, work_item_id")
@@ -1248,7 +1067,6 @@ export async function getEstimatePull(
     workItemId,
   );
 
-  // Work labels — the works vocabulary is Masters, open to every reader.
   const labelWorkIds = [workItemId, indentWorkItemId].filter((id): id is string => !!id);
   const { data: works, error: worksError } = labelWorkIds.length
     ? await supabase.from("work_items").select("id, code, name").in("id", labelWorkIds)
