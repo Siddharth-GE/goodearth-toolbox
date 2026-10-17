@@ -23,8 +23,9 @@ Switch day is the founder's to run. Before it, three things must be done:
   - Move the header choice into a pure function in `lib/dexter/`, with a test.
   - _Check:_ a deck still plays, and its "visit our website" button opens.
   - Done: `lib/dexter/headers.ts` (tested). Locally against staging, the "Experience_Sample" deck played under the sandbox, with its preview tags, picture and answers intact. Staging's four decks are single HTML files, so none changes. The website button is the founder's check.
-- [ ] `[Opus]` **Make the sign-in cookies unreadable by script.** Set `httpOnly` through `cookieOptions` in `lib/supabase/server.ts` and `proxy.ts`. The `@supabase/ssr` default is readable by script, and no browser client needs it.
+- [x] `[Opus]` **Make the sign-in cookies unreadable by script.** Set `httpOnly` through `cookieOptions` in `lib/supabase/server.ts` and `proxy.ts`. The `@supabase/ssr` default is readable by script, and no browser client needs it.
   - _Check, as the probe:_ password and code, Google, sign-out, and the theme switch.
+  - Done: one `AUTH_COOKIE_OPTIONS` in `lib/supabase/cookie-options.ts`. A real probe session on staging (an admin sign-in link, its password untouched) wrote its session cookie `httpOnly`, and sign-out cleared it; Google's three verifier cookies came out `httpOnly` too. The theme cookie is the app's own and stays readable. Signing in through the screens is the founder's check.
 - [ ] `[Fable]` **H2: `user_apps`.** Its grant, revoke and admin-read policies (`0003:20–39`, confirmed live) check `profiles.role` directly. That skips `session_is_verified()` and `is_active`.
   - New migration: `is_admin()` in each, and one SELECT policy, `user_id = auth.uid() or is_admin()`.
   - Trial: an admin session with no verified-session row is refused.
