@@ -10,13 +10,7 @@ import { Select } from "@/components/ui/select";
 import { requestItem } from "@/lib/selections/actions";
 import { useState, useTransition } from "react";
 
-/**
- * "It's not in the catalogue."
- *
- * Deliberately not a gate: the item is created and usable immediately,
- * and Masters tidies it up later. A designer working at 9pm must never be
- * blocked waiting for someone to approve a product name.
- */
+/** Not a gate: the item is created and usable at once, and Masters tidies up later. */
 export function RequestItemDialog({
   categories,
   brands,
@@ -26,7 +20,6 @@ export function RequestItemDialog({
 }: {
   categories: { id: string; name: string }[];
   brands: { id: string; name: string }[];
-  /** Active unit names from the one master (0082). */
   uoms: string[];
   prefillName?: string;
   onCreated: (itemId: string, name: string) => void;
@@ -68,8 +61,6 @@ export function RequestItemDialog({
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        // The search term is the most likely name, so it's re-offered
-        // each time rather than only on first open.
         if (next && prefillName) setName(prefillName);
         if (!next) setError(undefined);
       }}

@@ -13,9 +13,7 @@ export function StartRevisionButton({ unitId }: { unitId: string }) {
     <div className="space-y-1">
       <Button
         variant="secondary"
-        // Disabled while in flight: the database enforces one draft per
-        // unit, so a double-click would otherwise surface as a duplicate
-        // key error rather than doing nothing.
+        // Disabled in flight: one draft per unit is a DB rule, so a double-click would surface as a duplicate-key error.
         disabled={pending}
         onClick={() =>
           startTransition(async () => {

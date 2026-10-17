@@ -1,13 +1,7 @@
 import { csvResponse, csvRow, safeFilename } from "@/lib/csv";
 import { getBudgetHandoff } from "@/lib/selections/queries";
 
-/**
- * A revision as a spreadsheet.
- *
- * Same shape as the PDF and the same rule: quantities only, no rates.
- * This exists so a designer can work with the list in Excel — sorting,
- * sharing, marking up — not so pricing can leak out of Budgets.
- */
+/** A revision as a spreadsheet: quantities only, no rates. */
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ selectionId: string }> },

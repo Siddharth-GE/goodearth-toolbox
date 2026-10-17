@@ -17,18 +17,7 @@ import type { SpaceViewRow } from "@/lib/design-views/queries";
 import { ChevronLeft, ChevronRight, ImagePlus, Trash2 } from "lucide-react";
 import { useRef, useState, useTransition } from "react";
 
-/**
- * Normalises an image to the document spec *before* it leaves the browser.
- *
- * Not an optimisation — a necessity. Server Actions cap the request body
- * at 1MB, and hosting caps it not much higher, so an 8MB render never
- * reaches the server at all. Resizing here sends ~300KB instead, which
- * also makes uploads bearable on a site connection.
- *
- * The server re-normalises what arrives regardless: an action is a public
- * endpoint, so nothing a browser sends can be trusted to already be the
- * right shape.
- */
+/** Normalise to the document spec before upload: Server Actions cap the body at ~1MB, so a big render never arrives. The server re-normalises anyway (an action is a public endpoint). */
 async function normaliseForUpload(file: File): Promise<Blob> {
   const bitmap = await createImageBitmap(file);
   try {
@@ -39,7 +28,7 @@ async function normaliseForUpload(file: File): Promise<Blob> {
     const context = canvas.getContext("2d");
     if (!context) throw new Error("no 2d context");
 
-    // Letterbox on white rather than crop — same rule as the server.
+    // Letterbox on white, not crop, same as the server.
     context.fillStyle = "#ffffff";
     context.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -64,13 +53,7 @@ async function normaliseForUpload(file: File): Promise<Blob> {
   }
 }
 
-/**
- * The renders and elevations for one space.
- *
- * Every image is normalised to 16:9 on upload (lib/pdf/theme.ts), so the
- * strip below is a true preview of how the space will read on the client
- * document rather than an approximation of it.
- */
+/** Every image is normalised to 16:9 on upload (lib/pdf/theme.ts), so the strip previews the client document. */
 export function SpaceViews({
   spaceId,
   selectionId,
@@ -90,15 +73,13 @@ export function SpaceViews({
     if (!files || files.length === 0) return;
     setError(undefined);
     startUpload(async () => {
-      // Sequential, not Promise.all: Server Actions dispatch one at a
-      // time per client anyway, and this keeps the order predictable.
+      // Sequential: Server Actions dispatch one at a time per client anyway; keeps the order predictable.
       for (const file of Array.from(files)) {
         let normalised: Blob;
         try {
           normalised = await normaliseForUpload(file);
         } catch {
-          // Usually a format the browser can't decode — HEIC straight off
-          // an iPhone is the common one.
+          // Usually a format the browser can't decode, e.g. HEIC from an iPhone.
           setError(`Couldn't read “${file.name}”. Export it as JPG or PNG and try again.`);
           break;
         }
@@ -191,9 +172,7 @@ function ViewCard({
 }) {
   const [caption, setCaption] = useState(view.caption ?? "");
   const [busy, startTransition] = useTransition();
-  // The shared hook, not a hand-rolled marker: it only advances its
-  // "already saved" state after the server confirms, so a failed save
-  // surfaces and the next blur retries it instead of short-circuiting.
+  // Shared hook: it advances "already saved" only after the server confirms, so a failed save retries on the next blur.
   const captionSave = useSaveOnBlur<string>({
     initial: view.caption ?? "",
     save: (value) => captionSpaceView(view.id, selectionId, value),
@@ -202,9 +181,7 @@ function ViewCard({
   return (
     <figure className={busy ? "opacity-50" : undefined}>
       <div className="border-border bg-surface overflow-hidden rounded-xl border">
-        {/* Plain <img>: the route handler is same-origin and already
-            returns a normalised 16:9 JPEG, so there is nothing for
-            next/image to optimise. */}
+        {/* Plain <img>: the route returns a normalised 16:9 JPEG, so next/image has nothing to optimise. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={`/selections/views/${view.id}`}

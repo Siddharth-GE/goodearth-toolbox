@@ -24,15 +24,12 @@ export type SelectionRow = {
   created_at: string;
 };
 
-/** A unit plus the revision a designer would land on. */
 export type UnitSelectionRow = {
   unit_id: string;
   unit_name: string;
   unit_type: string;
   project_name: string;
-  /** The open draft, if there is one — only ever zero or one per unit. */
   draft: SelectionRow | null;
-  /** The most recent issued revision, for units whose design is settled. */
   latestIssued: SelectionRow | null;
 };
 
@@ -44,7 +41,6 @@ export type UnitSpaceRow = {
   label: string;
   description: string | null;
   sort_order: number;
-  /** Lines currently against this space, so the rail can show counts. */
   line_count: number;
 };
 
@@ -58,9 +54,7 @@ export type SelectionLineRow = {
   item_brand: string | null;
   item_description: string | null;
   item_thumb_url: string | null;
-  /** The larger picture, opened from the thumbnail. */
   item_image_url: string | null;
-  /** The vendor's product page. */
   item_source_url: string | null;
   item_is_provisional: boolean;
   quantity: number;
@@ -80,12 +74,10 @@ export type UnitSelectionPage = {
   pageSize: number;
 };
 
-/** Headline counts for the tool's welcome screen. Counts only, no money. */
 export async function getWelcomeCounts() {
   await requireTool("/selections");
   const supabase = await createClient();
 
-  // Exact database counts, head-only — never rows.length.
   const [units, drafts, issued] = await Promise.all([
     supabase.from("units").select("id", { count: "exact", head: true }),
     supabase.from("selections").select("id", { count: "exact", head: true }).eq("status", "draft"),
@@ -99,15 +91,7 @@ export async function getWelcomeCounts() {
   };
 }
 
-/**
- * Units a designer can work on, with whichever revision matters.
- *
- * Deliberately lists every unit rather than only those with a design:
- * starting the first revision for a unit is the most common action here,
- * so a unit with no design yet must be visible to be startable. Paged
- * with a real database count — every unit is still reachable, 50 at a
- * time, and the total is never derived from the rows that arrived.
- */
+/** Lists every unit, not only designed ones: starting the first revision is the commonest action. Paged with a real database count. */
 export async function listUnitsForSelections({
   page = 1,
 }: { page?: number } = {}): Promise<UnitSelectionPage> {
@@ -139,8 +123,7 @@ export async function listUnitsForSelections({
         unit_id: unit.id,
         unit_name: unit.name,
         unit_type: unit.unit_type,
-        // The embed is typed as an object or array depending on the FK
-        // direction; units → projects is many-to-one, so it's one row.
+        // The embed is an object or array depending on FK direction; units → projects is many-to-one, so one row.
         project_name: (unit.projects as { name: string } | null)?.name ?? "—",
         draft: revisions.find((r) => r.status === "draft") ?? null,
         latestIssued: revisions.find((r) => r.status === "issued") ?? null,
@@ -156,14 +139,10 @@ export async function listUnitsForSelections({
 export type SelectionDetail = SelectionRow & {
   unit_name: string;
   project_name: string;
-  /** Set once a later revision supersedes this one. */
   superseded_by: string | null;
 };
 
-// The three functions below are request-cached. The editor screen asks for
-// the same revision's lines and spaces from more than one place — the page
-// itself, and again inside diffRevisions — and without this each one is a
-// separate round trip for identical data.
+// The three functions below are request-cached: the page and diffRevisions ask for the same lines and spaces.
 export const getSelection = cache(async (selectionId: string): Promise<SelectionDetail | null> => {
   await requireTool("/selections");
 
@@ -206,8 +185,7 @@ export const listUnitSpaces = cache(async function listUnitSpaces(
       .eq("unit_id", unitId)
       .order("sort_order")
       .order("label"),
-    // Read to completion — a truncated read here under-counts the space
-    // rail's per-room line counts past 1,000 lines.
+    // Read to completion: a truncated read under-counts the rail past 1,000 lines.
     selectionId
       ? fetchAll((from, to) =>
           supabase
@@ -243,11 +221,8 @@ export const listSelectionLines = cache(async function listSelectionLines(
   await requireTool("/selections");
 
   const supabase = await createClient();
-  // Read to completion: this one read feeds the editor grid, the design
-  // PDF, the Excel export and diffRevisions — past 1,000 lines a
-  // truncated read wouldn't error, it would silently drop lines (and the
-  // diff would report them as removed). The trailing .order("id") is the
-  // unique tiebreaker paging needs.
+  // Read to completion: this feeds the grid, PDF, export and diff; a truncated read would silently drop lines, and the diff would report them removed.
+  // .order("id") is the unique tiebreaker paging needs.
   const data = await fetchAll((from, to) =>
     supabase
       .from("selection_lines")
@@ -295,7 +270,6 @@ export const listSelectionLines = cache(async function listSelectionLines(
   });
 });
 
-/** The revision this one replaced, if any. */
 export async function getPreviousIssued(
   unitId: string,
   revisionNo: number,
@@ -316,13 +290,10 @@ export async function getPreviousIssued(
   return (data as SelectionRow) ?? null;
 }
 
-// The diff rules live in ./diff (pure, tested); these aliases pin the
-// generic types to the concrete line shape this module returns, so
-// consumers keep importing them from here.
+// Aliases pin the generic ./diff types to this module's line shape.
 export type LineChange = GenericLineChange<SelectionLineRow>;
 export type RevisionDiff = GenericRevisionDiff<SelectionLineRow>;
 
-/** What changed between two revisions — fetch here, decide in ./diff. */
 export async function diffRevisions(
   previousSelectionId: string,
   currentSelectionId: string,
@@ -330,9 +301,7 @@ export async function diffRevisions(
 ): Promise<RevisionDiff> {
   const [previousLines, currentLines, spaces] = await Promise.all([
     listSelectionLines(previousSelectionId),
-    // Same arguments the page itself used, so the request cache returns
-    // these rather than re-querying. Passing a different shape here would
-    // quietly double the work.
+    // Same arguments the page used, so the request cache returns them; a different shape would double the work.
     listSelectionLines(currentSelectionId),
     listUnitSpaces(unitId, currentSelectionId),
   ]);
@@ -345,26 +314,13 @@ export async function diffRevisions(
 }
 
 /**
- * A revision assembled whole: header, spaces, lines, and what changed.
- *
- * Despite the name, Budgets does NOT call this — it can't: everything in
- * this module gates on /selections, and Budgets reads the selection
- * tables directly under its own grant (see lib/budgets/queries.ts). The
- * name survives because this shape IS the documented handoff contract —
- * what an issued revision hands downstream — and its real callers are
- * Selections' own PDF and CSV exports, which render exactly that.
- *
- * Note what is NOT here: no cost, no margin, no client rate. Selections
- * records what was specified; `indicative_rate_snapshot` is the figure
- * the item carried the day it was picked, present so an issued revision
- * doesn't silently re-price when a master price changes, not as an
- * opinion about what anything should cost.
+ * Budgets does NOT call this: everything here gates on /selections, and Budgets reads the tables under its own grant. This shape is the handoff contract; real callers are the PDF and CSV exports.
+ * No cost, margin or client rate; `indicative_rate_snapshot` is the item's figure when picked, so an issued revision doesn't re-price.
  */
 export type BudgetHandoff = {
   selection: SelectionDetail;
   spaces: { space: UnitSpaceRow; lines: SelectionLineRow[] }[];
   totalLines: number;
-  /** Null for R0 — there is nothing to compare a first revision against. */
   diff: RevisionDiff | null;
   previousRevisionNo: number | null;
 };
@@ -383,8 +339,7 @@ export async function getBudgetHandoff(selectionId: string): Promise<BudgetHando
 
   return {
     selection,
-    // Spaces with nothing in them are dropped: the budget team is being
-    // handed work, and an empty room is not work.
+    // Empty spaces are dropped: an empty room is not work for the budget team.
     spaces: spaces
       .map((space) => ({ space, lines: lines.filter((line) => line.unit_space_id === space.id) }))
       .filter((group) => group.lines.length > 0),
@@ -394,7 +349,7 @@ export async function getBudgetHandoff(selectionId: string): Promise<BudgetHando
   };
 }
 
-/** Space types a designer may pick from — proposals aren't offered until approved. */
+/** Proposals aren't offered until approved. */
 export async function listActiveSpaceTypes() {
   await requireTool("/selections");
 
@@ -408,24 +363,14 @@ export async function listActiveSpaceTypes() {
   return data ?? [];
 }
 
-/** Where a design line has already gone downstream — the indents (and
- * through them the POs) carrying it. */
 export type LineImpact = {
   indent_refs: string[];
   po_refs: string[];
 };
 
 /**
- * Which of these lines are already on indents or purchase orders — the
- * diff page's "this change affects live orders" warning.
- *
- * Direct table reads under the /selections grant: indent_lines and
- * indents are open reads by design (0019), and po_line_facts (0022) is
- * the money-free PO window every tool may use — references and
- * quantities, never a rate. Selections imports no Indents code; the
- * database is the shared surface. Matching on bare line_key is safe
- * HERE because it's a read and line_key is a uuid — anchors elsewhere
- * stay composite per the CLAUDE.md rule.
+ * Powers the diff page's "this change affects live orders" warning. indent_lines and indents are open reads (0019); po_line_facts (0022) is the money-free PO window.
+ * Matching on bare line_key is safe HERE: it's a read and line_key is a uuid.
  */
 export async function getDownstreamImpact(lineKeys: string[]): Promise<Map<string, LineImpact>> {
   await requireTool("/selections");
@@ -434,7 +379,7 @@ export async function getDownstreamImpact(lineKeys: string[]): Promise<Map<strin
 
   const supabase = await createClient();
 
-  // Read to completion — a silent cap here would hide an affected order.
+  // Read to completion: a silent cap would hide an affected order.
   const indentLines = await fetchAll((from, to) =>
     supabase
       .from("indent_lines")

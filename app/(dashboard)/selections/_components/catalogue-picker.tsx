@@ -10,13 +10,7 @@ import { useState } from "react";
 
 type Space = { id: string; label: string };
 
-/**
- * Selections' "Add items" — a thin wrapper around the shared
- * CataloguePickerDialog that keeps this tool's two extras: the space
- * chips (which rooms receive the basket) and the request-item escape
- * hatch (a provisional item, created on the spot, dropped straight into
- * the basket).
- */
+/** Wraps the shared CataloguePickerDialog with space chips (which rooms get the basket) and the request-item escape hatch. */
 export function CataloguePicker({
   selectionId,
   unitId,
@@ -32,16 +26,11 @@ export function CataloguePicker({
   currentSpaceId: string;
   categories: { id: string; name: string }[];
   brands: { id: string; name: string }[];
-  /** Active unit names from the one master (0082), for item requests. */
   uoms: string[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  // Re-synced every time the dialog opens, never trusted from mount.
-  // Switching space in the rail is a client-side navigation, so this
-  // component is reused and a useState initial value would keep pointing
-  // at whichever space was open when the page first loaded — silently
-  // writing items into the wrong room.
+  // Re-synced every time the dialog opens: switching space is a client navigation, so a useState initial value would point at the wrong space and write items into the wrong room.
   const [targetSpaces, setTargetSpaces] = useState<string[]>([currentSpaceId]);
 
   const commit = async (lines: PickedLine[]) => {
@@ -53,9 +42,7 @@ export function CataloguePicker({
       lines.map((line) => ({ itemId: line.item.id, quantity: line.quantity })),
     );
     if (outcome?.error) return outcome;
-    // Adding into spaces you aren't looking at is a normal thing to do
-    // here, but it leaves the screen unchanged and looks like nothing
-    // happened. Go to the first space that received the items.
+    // Adding into spaces you aren't viewing leaves the screen unchanged; go to the first space that received items.
     if (!targets.includes(currentSpaceId)) {
       router.push(`/selections/${selectionId}?space=${targets[0]}`);
     }
@@ -81,8 +68,6 @@ export function CataloguePicker({
         open={open}
         onOpenChange={(next) => {
           setOpen(next);
-          // Opening resets the target to the space you're actually
-          // looking at.
           if (next) setTargetSpaces([currentSpaceId]);
         }}
         title="Add items"
@@ -92,9 +77,6 @@ export function CataloguePicker({
         valueMultiplier={targetSpaces.length}
         commitDisabled={targetSpaces.length === 0}
         headerSlot={
-          /* Which spaces receive the basket. Defaults to the space you
-             came from; tick more to specify four identical bathrooms at
-             once. */
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
               Add to

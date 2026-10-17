@@ -14,9 +14,7 @@ export function NextRevisionButton({ fromSelectionId }: { fromSelectionId: strin
     <div className="space-y-1">
       <Button
         variant="secondary"
-        // The database refuses a second open draft, so blocking the button
-        // while in flight keeps a double-click from surfacing that as an
-        // error the designer has to interpret.
+        // The database refuses a second open draft; block the button in flight so a double-click doesn't surface that as an error.
         disabled={pending}
         onClick={() =>
           startTransition(async () => {

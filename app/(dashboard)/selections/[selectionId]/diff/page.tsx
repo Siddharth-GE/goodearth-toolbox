@@ -88,9 +88,7 @@ async function DiffBody({
     );
   }
 
-  // Changed or removed lines that are already on an indent (or a PO
-  // through one) — the people who ordered them need to hear about this
-  // revision. Additions can't be on an order yet, so they're not asked.
+  // Changed or removed lines already on an indent (or a PO): their people need to hear. Additions can't be on an order yet.
   const impact = await getDownstreamImpact(
     [...changed, ...removed].map((entry) => entry.line.line_key),
   );
@@ -115,8 +113,6 @@ async function DiffBody({
         <Summary tone="success" count={diff.added} label="added" />
         <Summary tone="danger" count={diff.removed} label="removed" />
         <Summary tone="warning" count={diff.changed} label="changed" />
-        {/* The number that matters to the budget team: work they don't
-            have to redo. */}
         <Summary tone="default" count={diff.unchanged} label="unchanged — pricing carries over" />
       </div>
 
@@ -167,7 +163,6 @@ function Section({
   title: string;
   entries: LineChange[];
   previousRevisionNo: number;
-  /** line_key → the indents/POs already carrying it (changed/removed only). */
   impact?: Map<string, LineImpact>;
 }) {
   if (entries.length === 0) return null;

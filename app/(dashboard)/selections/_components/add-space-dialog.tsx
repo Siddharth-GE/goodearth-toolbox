@@ -18,13 +18,7 @@ import { useMemo, useState, useTransition } from "react";
 type SpaceType = { id: string; code: string; name: string };
 type ExistingSpace = { label: string; space_type_id: string };
 
-/**
- * Sets up several spaces at once.
- *
- * A villa is eight or nine spaces, and adding them one dialog at a time
- * was the slowest part of starting a design. Same stepper idea as the
- * catalogue picker: build the list locally, review it, write it in one go.
- */
+/** Build the list locally, review it, write it in one go (a villa is eight or nine spaces). */
 export function AddSpaceDialog({
   unitId,
   spaceTypes,
@@ -38,17 +32,12 @@ export function AddSpaceDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [counts, setCounts] = useState<Record<string, number>>({});
-  // Labels the designer has overridden, keyed by their position in the
-  // generated list. Anything untouched keeps following the suggestion.
+  // Labels the designer overrode, keyed by position; untouched ones keep following the suggestion.
   const [overrides, setOverrides] = useState<Record<string, string>>({});
   const [error, setError] = useState<string>();
   const [saving, startSaving] = useTransition();
 
-  /**
-   * Suggested names. One of a type is just "Kitchen"; several become
-   * "Bedroom 1", "Bedroom 2". Numbering continues past whatever the unit
-   * already has, and skips any name that's taken.
-   */
+  /** One of a type is "Kitchen"; several are "Bedroom 1", "Bedroom 2". Numbering continues past what the unit has and skips taken names. */
   const planned = useMemo(() => {
     const taken = new Set(existing.map((space) => space.label.toLowerCase()));
     const rows: { key: string; spaceTypeId: string; suggestion: string }[] = [];
@@ -69,7 +58,6 @@ export function AddSpaceDialog({
             suggestion = `${type.name} ${n}`;
           } while (taken.has(suggestion.toLowerCase()));
         }
-        // Guard the un-numbered case too, in case another type used it.
         while (taken.has(suggestion.toLowerCase())) suggestion = `${suggestion} +`;
         taken.add(suggestion.toLowerCase());
         rows.push({ key: `${type.id}:${i}`, spaceTypeId: type.id, suggestion });
@@ -120,8 +108,7 @@ export function AddSpaceDialog({
         if (!next) reset();
       }}
     >
-      {/* asChild so the caller's own button keeps its focus and keyboard
-          behaviour rather than being wrapped in a non-focusable element. */}
+      {/* asChild keeps the caller's own button focusable. */}
       <DialogTrigger asChild>
         {trigger ?? <Button variant="secondary">Add spaces</Button>}
       </DialogTrigger>

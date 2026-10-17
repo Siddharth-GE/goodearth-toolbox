@@ -3,20 +3,11 @@ import { getCurrentUser } from "@/lib/auth/dal";
 import { DESIGN_VIEWS_BUCKET } from "@/lib/design-views/queries";
 import { createClient } from "@/lib/supabase/server";
 
-/**
- * Serves a design view.
- *
- * The `design-views` bucket is private, so this is the only way to see
- * one: the caller is checked, then the object is streamed. An object path
- * on its own gets you nothing, which is the difference between these and
- * the public catalogue thumbnails — these are a specific client's design
- * work, not vendor product photos.
- */
+/** The design-views bucket is private: this route checks the caller, then streams the object. These are a client's design work, not public product photos. */
 export async function GET(_request: Request, { params }: { params: Promise<{ viewId: string }> }) {
   const user = await getCurrentUser();
   if (!user) return new Response("Unauthorized", { status: 401 });
 
-  // Designers manage these; Budgets renders them into the client quote.
   const allowed = (await hasApp(user, "/selections")) || (await hasApp(user, "/budgets"));
   if (!allowed) return new Response("Forbidden", { status: 403 });
 
@@ -38,9 +29,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ vie
   return new Response(await file.arrayBuffer(), {
     headers: {
       "Content-Type": "image/jpeg",
-      // Private, so no shared cache may keep a copy — but the bytes at a
-      // given id never change (a replacement is a new row), so the
-      // browser can hold it.
+      // Private cache only, but a view's bytes never change (a replacement is a new row), so the browser can hold them.
       "Cache-Control": "private, max-age=3600",
     },
   });

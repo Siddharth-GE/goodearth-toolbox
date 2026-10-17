@@ -1,16 +1,6 @@
 /**
- * What changed between two revisions — the pure decision, no database.
- *
- * Matched on `line_key`, never on row id: a line copied into the next
- * revision is a different row but the same line, which is exactly what
- * lets Budgets carry pricing forward instead of re-pricing everything
- * each time a revision is issued. This module exists apart from
- * queries.ts (which fetches the lines and calls it) so the rules can be
- * tested directly — it may import nothing.
- *
- * Generic over the line shape: the algorithm only needs the three fields
- * in DiffableLine, and staying generic keeps this file free of the
- * server-only import chain the full SelectionLineRow lives in.
+ * Pure diff, matched on `line_key`, never row id: a copied line is a different row but the same line, which lets Budgets carry pricing forward.
+ * Generic over the line shape and import-free, so it stays testable and out of the server-only chain.
  */
 
 export type DiffableLine = {
@@ -35,7 +25,6 @@ export type RevisionDiff<L extends DiffableLine = DiffableLine> = {
   added: number;
   removed: number;
   changed: number;
-  /** Lines whose pricing carries over untouched — the budget team's number. */
   unchanged: number;
   entries: LineChange<L>[];
 };
@@ -43,7 +32,6 @@ export type RevisionDiff<L extends DiffableLine = DiffableLine> = {
 export function diffLines<L extends DiffableLine>(
   previousLines: L[],
   currentLines: L[],
-  /** space id → label, for saying WHERE a change happened. */
   spaceLabel: Map<string, string>,
 ): RevisionDiff<L> {
   const previousByKey = new Map(previousLines.map((line) => [line.line_key, line]));

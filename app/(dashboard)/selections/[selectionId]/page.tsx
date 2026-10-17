@@ -50,16 +50,9 @@ export default async function SelectionEditorPage({
     getPreviousIssued(selection.unit_id, selection.revision_no),
   ]);
 
-  // Views belong to the space, not the revision (a render of Bedroom 1
-  // is still a render of Bedroom 1 in R3). The revision diff is NOT
-  // awaited here: every space click is a full server navigation, and
-  // the diff re-read the whole previous revision each time just to feed
-  // the Issue dialog's summary and one paragraph — both stream in
-  // behind their own <Suspense> below so the grid paints first.
+  // Views belong to the space, not the revision. The diff is NOT awaited here: it streams behind its own <Suspense>, so a space click doesn't re-read the previous revision.
   const viewsBySpace = await listSpaceViews(spaces.map((space) => space.id));
 
-  // Land on the requested space, else the first one. A stale ?space from a
-  // bookmark (or a space just deleted) falls back rather than 404s.
   const activeSpace = spaces.find((s) => s.id === space) ?? spaces[0] ?? null;
   const activeLines = activeSpace
     ? lines.filter((line) => line.unit_space_id === activeSpace.id)
@@ -88,17 +81,13 @@ export default async function SelectionEditorPage({
               <Badge variant="success">Issued</Badge>
             )}
             {previous && (
-              // Available on a draft too, so a designer can review exactly
-              // what they're about to hand over before pressing Issue.
               <LinkButton href={`/selections/${selectionId}/diff`} variant="secondary">
                 <GitCompare className="size-4" />
                 Changes
               </LinkButton>
             )}
             {lines.length > 0 && (
-              // plain: a next/link would prefetch on hover and generate the
-              // entire PDF server-side just because the cursor passed over
-              // the button. A plain anchor also gives native "save as".
+              // Plain anchor: next/link would prefetch on hover and generate the whole PDF; it also gives native save-as.
               <LinkButton href={`/selections/${selectionId}/pdf`} variant="secondary" plain>
                 <FileDown className="size-4" />
                 PDF
@@ -115,8 +104,6 @@ export default async function SelectionEditorPage({
                 <AddSpaceDialog
                   unitId={selection.unit_id}
                   spaceTypes={spaceTypes}
-                  // Passed so suggested names continue past what's already
-                  // there — a second Bath becomes "Bath 2", not a clash.
                   existing={spaces.map((s) => ({ label: s.label, space_type_id: s.space_type_id }))}
                 />
                 {lines.length > 0 && (
@@ -149,8 +136,6 @@ export default async function SelectionEditorPage({
             )}
           </p>
           {selection.notes && <p className="text-muted mt-1 text-sm">“{selection.notes}”</p>}
-          {/* Says plainly what the budget team was handed, so a designer
-              can answer "what did they get?" without leaving the screen. */}
           <Suspense
             fallback={
               <p className="text-muted mt-2 text-xs">
@@ -186,8 +171,6 @@ export default async function SelectionEditorPage({
         />
       ) : (
         <div className="grid gap-4 md:grid-cols-[220px_1fr]">
-          {/* Space rail. Plain links rather than client state so the chosen
-              space survives a refresh and can be linked to directly. */}
           <nav className="space-y-1">
             {spaces.map((s) => {
               const active = s.id === activeSpace?.id;
@@ -225,8 +208,6 @@ export default async function SelectionEditorPage({
                     <CataloguePicker
                       selectionId={selectionId}
                       unitId={selection.unit_id}
-                      // Every space, so one trip through the catalogue can
-                      // fill four identical bathrooms at once.
                       spaces={spaces.map((s) => ({ id: s.id, label: s.label }))}
                       currentSpaceId={activeSpace.id}
                       categories={categories.map((c) => ({ id: c.id, name: c.name }))}
@@ -264,10 +245,7 @@ export default async function SelectionEditorPage({
   );
 }
 
-// The two diff consumers, each streamed behind its own <Suspense> so a
-// space click never waits on re-reading the previous revision. They are
-// mutually exclusive (dialog on drafts, summary once issued), so the
-// diff is still computed at most once per navigation.
+// The two diff consumers stream behind their own <Suspense>. They are mutually exclusive (dialog on drafts, summary once issued), so the diff is computed once per navigation.
 
 async function IssueDialogWithDiff({
   selectionId,
