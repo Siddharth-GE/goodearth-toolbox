@@ -17,6 +17,7 @@ import {
   greetingFor,
   loadOf,
   nextAction,
+  ownerOfSide,
   plotHealth,
   plotInList,
   plotNumber,
@@ -276,4 +277,11 @@ test("the Plots grid by side and person: each side has its own owner", () => {
   assert.equal(plotInList(plot, open, "kaadal", "mgmt"), true);
   assert.equal(plotInList(plot, open, "sales", "mgmt"), false);
   assert.equal(plotInList(plot, open, null, "all"), true);
+});
+
+test("a step on a plot belongs to its side's owner, or to nobody yet", () => {
+  const plot = { constructionOwnerId: "anu", interiorOwnerId: "sayooj" };
+  assert.equal(ownerOfSide(plot, "sales"), "anu");
+  assert.equal(ownerOfSide(plot, "kaadal"), "sayooj");
+  assert.equal(ownerOfSide({ ...plot, interiorOwnerId: null }, "kaadal"), null);
 });

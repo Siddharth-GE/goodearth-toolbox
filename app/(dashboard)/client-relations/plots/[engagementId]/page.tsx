@@ -54,6 +54,7 @@ function plotFields(engagement: EngagementDetail): PlotFields {
     progressStageId,
     kaadalStage,
     kaadalOwnerId,
+    kaadalOwnerName,
     kaadalNote,
     details,
     designSupport,
@@ -83,6 +84,7 @@ function plotFields(engagement: EngagementDetail): PlotFields {
     progressStageId,
     kaadalStage,
     kaadalOwnerId,
+    kaadalOwnerName,
     kaadalNote,
     details,
     designSupport,
@@ -240,7 +242,6 @@ export default async function PlotDetailPage({
                 fixedPlot={engagement.id}
                 defaultOwner={defaultOwner}
                 defaultTrack={side ?? mySide}
-                ownerFor={{ sales: engagement.ownerId, kaadal: engagement.kaadalOwnerId }}
               />
             </div>
           </div>

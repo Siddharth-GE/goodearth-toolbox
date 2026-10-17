@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
-import { closeRight, dueLabel, type DueTone } from "@/lib/client-relations/next-steps";
+import { closeRight, dueLabel, ownerOfSide, type DueTone } from "@/lib/client-relations/next-steps";
 import { updateNextStep, type StepPatch } from "@/lib/client-relations/next-steps-actions";
 import type { NextStep } from "@/lib/client-relations/next-steps-queries";
 import { ACTION_STATUSES, ACTION_TRACKS, optionFor } from "@/lib/client-relations/stages";
@@ -20,7 +20,7 @@ import { useState, useTransition } from "react";
 
 import { useBoard, useToast } from "./board-context";
 import { Pill, PillButton, PersonName, PlotChip, type PillTone } from "./pill";
-import { SideIcon, SideMark } from "./side-mark";
+import { SideIcon, SideMark, sideLabel } from "./side-mark";
 import { DueMenu, MenuCheck, MenuLabel, OwnerMenu, PlotList } from "./step-menus";
 
 const DUE_TONE: Record<DueTone, PillTone> = {
@@ -200,21 +200,39 @@ export function StepCard({
           </PillButton>
         </DueMenu>
 
-        <OwnerMenu
-          value={step.ownerId}
-          onPick={(ownerId) => {
-            if (ownerId === step.ownerId) return;
-            const name = team.find((person) => person.id === ownerId)?.name.split(" ")[0];
-            save({ ownerId }, name ? `Given to ${name}` : "Owner changed", {
-              ownerId: step.ownerId,
-            });
-          }}
-        >
-          <PillButton aria-label={`Owner: ${step.ownerName}. Hand it to someone else`}>
-            <PersonName name={step.ownerName} />
-            {step.ownerId === meId ? <span className="text-muted">· you</span> : null}
-          </PillButton>
-        </OwnerMenu>
+        {step.engagementId ? (
+          // On a plot, a step is its side's owner's (0125): shown, not picked —
+          // the side is handed over on the plot, open steps and all. A closed
+          // step keeps who did it.
+          <span
+            title={
+              done
+                ? undefined
+                : `Every ${sideLabel(step.track).toLowerCase()} step on this plot is its owner's. Change the owner on the plot to hand them over.`
+            }
+          >
+            <Pill>
+              <PersonName name={step.ownerName} />
+              {step.ownerId === meId ? <span className="text-muted">· you</span> : null}
+            </Pill>
+          </span>
+        ) : (
+          <OwnerMenu
+            value={step.ownerId}
+            onPick={(ownerId) => {
+              if (ownerId === step.ownerId) return;
+              const name = team.find((person) => person.id === ownerId)?.name.split(" ")[0];
+              save({ ownerId }, name ? `Given to ${name}` : "Owner changed", {
+                ownerId: step.ownerId,
+              });
+            }}
+          >
+            <PillButton aria-label={`Owner: ${step.ownerName}. Hand it to someone else`}>
+              <PersonName name={step.ownerName} />
+              {step.ownerId === meId ? <span className="text-muted">· you</span> : null}
+            </PillButton>
+          </OwnerMenu>
+        )}
 
         {/* Construction is the plot's usual side; only Interior is marked. */}
         {step.track === "kaadal" ? (
@@ -301,12 +319,19 @@ export function StepCard({
                 {ACTION_TRACKS.map((option) => (
                   <DropdownMenuItem
                     key={option.value}
-                    onSelect={() =>
-                      option.value !== step.track &&
-                      save({ track: option.value }, `Moved to ${option.label}`, {
-                        track: step.track,
-                      })
-                    }
+                    onSelect={() => {
+                      if (option.value === step.track) return;
+                      // On a plot it goes to that side's owner (0125) — say who.
+                      const to = step.plot ? ownerOfSide(step.plot, option.value) : null;
+                      const name = team.find((person) => person.id === to)?.name.split(" ")[0];
+                      save(
+                        { track: option.value },
+                        name
+                          ? `Moved to ${option.label} · ${name}'s now`
+                          : `Moved to ${option.label}`,
+                        { track: step.track },
+                      );
+                    }}
                   >
                     <SideIcon track={option.value} className="text-muted" />
                     <span>{option.label}</span>

@@ -51,6 +51,10 @@ function friendly(error: { message: string; code?: string }, fallback: string): 
     "You need the Client Relations app",
     "Only whoever set this action",
     "Who set an action cannot be changed",
+    // One owner per side (0125): a step's owner, a side with none, a side left with nobody.
+    "step on this plot is",
+    "owner yet",
+    "instead of nobody",
   ]);
   if (state?.error === fallback) console.error("Client Relations write failed:", error);
   return state;
