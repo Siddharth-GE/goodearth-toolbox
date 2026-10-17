@@ -41,7 +41,7 @@ Every conversation starts the same way: the founder says **"read CLAUDE.md"**, a
 - **All database access is server-side** — no browser Supabase client exists; do not add one. Tools use the RLS-scoped client, never the admin client.
 - **RLS on for every table, always.** Every new view ships with its write revokes and every new function with its execute revokes, in the same migration — named roles, not `public`.
 - **Never add a money column to a fact view. Never add a second SELECT policy to a gated table** — widen the existing qual.
-- **A tool whose work is assigned is `scoped`** (`lib/tools.ts`): its own migration narrows each policy in place to the grant and "mine", admins and its team leads see all through `is_lead()`, and no view over its tables admits its grant.
+- **A tool the founder makes `scoped`** (`lib/tools.ts`; assigned work alone does not make one): its own migration narrows each policy in place to the grant and "mine", admins and its team leads see all through `is_lead()`, and no view over its tables admits its grant.
 - **Redefining `has_app()` or `is_admin()` must carry `session_is_verified()` forward.**
 - Every unauthenticated route goes in `PUBLIC_PATHS` as an **exact string** (`/deck/`, Dexter's public viewer, is the one prefix — `SECURITY.md`).
 - Actions return `ActionState`, never throw. **Never re-export a type from a `"use server"` file** — `export type { X }`, `export { type X }`, `export type * from` — a plain `export type X = …` declaration is fine, and `check:actions` enforces exactly that line.

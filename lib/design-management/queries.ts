@@ -31,53 +31,6 @@ const fail = (context: string, error: { message: string }): never =>
   readFailed("design-management", context, error);
 
 // ---------------------------------------------------------------------
-// Welcome
-// ---------------------------------------------------------------------
-
-export async function getWelcomeCounts(): Promise<{
-  villasWithReleasedDrawings: number;
-  draftTransmittals: number;
-  transmittalsIssued: number;
-}> {
-  await requireTool(GRANT);
-  const supabase = await createClient();
-
-  // No count of drawing sets: there is no master list to count any more
-  // (founder, 2026-08-22 evening). Everything here is plot-level.
-  const [releasedRevisionUnits, draftTransmittals, issuedTransmittals] = await Promise.all([
-    // "Villas with at least one released drawing" is a
-    // COUNT(DISTINCT unit_id) — `head: true` counts rows, not distinct
-    // values, so it can't express this. Reading the (single, small)
-    // unit_id column to completion via fetchAll and deduping in JS is
-    // the honest alternative to guessing at a cap; there is no
-    // aggregate view here to lean on (this tool has none — no money,
-    // no fact view).
-    fetchAll<{ unit_id: string }>((from, to) =>
-      supabase
-        .from("drawing_revisions")
-        .select("unit_id")
-        .eq("status", "released")
-        .order("unit_id")
-        .range(from, to),
-    ),
-    supabase
-      .from("transmittals")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "draft"),
-    supabase
-      .from("transmittals")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "issued"),
-  ]);
-
-  return {
-    villasWithReleasedDrawings: new Set(releasedRevisionUnits.map((row) => row.unit_id)).size,
-    draftTransmittals: draftTransmittals.count ?? 0,
-    transmittalsIssued: issuedTransmittals.count ?? 0,
-  };
-}
-
-// ---------------------------------------------------------------------
 // Design stages
 // ---------------------------------------------------------------------
 
@@ -88,6 +41,8 @@ export type DesignStageRow = {
   code: string | null;
   sortOrder: number;
   isActive: boolean;
+  /** A column on the design board (0126). */
+  onBoard: boolean;
 };
 
 export async function listDesignStages(): Promise<DesignStageRow[]> {
@@ -100,10 +55,11 @@ export async function listDesignStages(): Promise<DesignStageRow[]> {
     code: string | null;
     sort_order: number;
     is_active: boolean;
+    on_board: boolean;
   }>((from, to) =>
     supabase
       .from("design_stages")
-      .select("id, name, code, sort_order, is_active")
+      .select("id, name, code, sort_order, is_active, on_board")
       .order("sort_order")
       .order("name")
       .order("id")
@@ -116,95 +72,13 @@ export async function listDesignStages(): Promise<DesignStageRow[]> {
     code: stage.code,
     sortOrder: stage.sort_order,
     isActive: stage.is_active,
+    onBoard: stage.on_board,
   }));
 }
 
 // ---------------------------------------------------------------------
 // Villas
 // ---------------------------------------------------------------------
-
-export type DesignVillaRow = {
-  unitId: string;
-  villaName: string;
-  plotName: string;
-  projectName: string;
-  /** Transmittals issued on this villa — a draft is not one yet. */
-  transmittalsIssued: number;
-  /** Drafts still being put together here. */
-  draftTransmittals: number;
-  lastIssuedAt: string | null;
-};
-
-/**
- * Every villa as a card: where its drawings stand, said in transmittals.
- *
- * Founder, 2026-08-22 evening: "person sees all villas (as cards) goes
- * into the villa there all transmittals of that plot". So the summary is
- * plot-level — how much has gone out and when — rather than a count of
- * revisions, which is detail belonging one level in.
- *
- * Anchored on `unit_id` rather than `plot_id` because this tool's own
- * tables key off units. The per-villa tallies read the whole (small)
- * transmittals table once via `fetchAll` and count in JS rather than
- * running one query per villa.
- */
-export async function listVillas(): Promise<DesignVillaRow[]> {
-  await requireTool(GRANT);
-  const supabase = await createClient();
-
-  const [units, plots, projects, transmittals] = await Promise.all([
-    fetchAll<{ id: string; project_id: string; plot_id: string; name: string }>((from, to) =>
-      supabase
-        .from("units")
-        .select("id, project_id, plot_id, name")
-        .order("name")
-        .order("id")
-        .range(from, to),
-    ),
-    fetchAll<{ id: string; name: string }>((from, to) =>
-      supabase.from("plots").select("id, name").order("id").range(from, to),
-    ),
-    fetchAll<{ id: string; name: string }>((from, to) =>
-      supabase.from("projects").select("id, name").order("id").range(from, to),
-    ),
-    fetchAll<{ unit_id: string; status: string; issued_at: string | null }>((from, to) =>
-      supabase
-        .from("transmittals")
-        .select("unit_id, status, issued_at")
-        .order("unit_id")
-        .order("id")
-        .range(from, to),
-    ),
-  ]);
-
-  const plotNames = new Map(plots.map((plot) => [plot.id, plot.name]));
-  const projectNames = new Map(projects.map((project) => [project.id, project.name]));
-
-  const issued = new Map<string, number>();
-  const drafts = new Map<string, number>();
-  const lastIssued = new Map<string, string>();
-  for (const transmittal of transmittals) {
-    if (transmittal.status === "issued") {
-      issued.set(transmittal.unit_id, (issued.get(transmittal.unit_id) ?? 0) + 1);
-      const held = lastIssued.get(transmittal.unit_id);
-      if (transmittal.issued_at && (!held || transmittal.issued_at > held)) {
-        lastIssued.set(transmittal.unit_id, transmittal.issued_at);
-      }
-    } else {
-      drafts.set(transmittal.unit_id, (drafts.get(transmittal.unit_id) ?? 0) + 1);
-    }
-  }
-
-  return units.map((unit) => ({
-    unitId: unit.id,
-    villaName: unit.name,
-    plotName: plotNames.get(unit.plot_id) ?? "—",
-    projectName: projectNames.get(unit.project_id) ?? "—",
-    transmittalsIssued: issued.get(unit.id) ?? 0,
-    draftTransmittals: drafts.get(unit.id) ?? 0,
-    lastIssuedAt: lastIssued.get(unit.id) ?? null,
-  }));
-}
 
 export type DrawingRevisionFileRow = {
   id: string;

@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { FormMessage } from "@/components/ui/form-message";
 import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,7 @@ import {
   renameDesignStage,
   setDesignStageActive,
   setDesignStageCode,
+  setDesignStageOnBoard,
 } from "@/lib/design-management/actions";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
@@ -153,6 +155,43 @@ export function DesignStageToggle({ id, isActive }: { id: string; isActive: bool
       >
         {pending ? "Saving…" : isActive ? "Retire" : "Reactivate"}
       </Button>
+    </div>
+  );
+}
+
+/** Whether the stage is a column on the design board (0126). */
+export function DesignStageBoardSwitch({
+  id,
+  name,
+  onBoard,
+  disabled,
+}: {
+  id: string;
+  name: string;
+  onBoard: boolean;
+  disabled?: boolean;
+}) {
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string>();
+
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-foreground inline-flex items-center gap-2 text-sm whitespace-nowrap">
+        <Checkbox
+          checked={onBoard}
+          disabled={pending || disabled}
+          aria-label={`${name} on the design board`}
+          onChange={(event) => {
+            const next = event.currentTarget.checked;
+            startTransition(async () => {
+              const result = await setDesignStageOnBoard(id, next);
+              setError(result?.error);
+            });
+          }}
+        />
+        {pending ? "Saving…" : onBoard ? "On the board" : "Off"}
+      </label>
+      <FormMessage error={error} size="xs" />
     </div>
   );
 }
