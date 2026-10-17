@@ -478,7 +478,7 @@ What was checked before the upload was dropped (2026-10-17): nothing in the tool
 - [x] `[Opus]` (in `[Sonnet]`'s place, one session) The cover sheet — link and one row per sheet — rendered from staging's Villa 41 TR-0002 (nine uploaded sheets) and a forty-sheet WorkDrive list, and looked at: the list runs to a second page with its header repeated. The PDF's file name carries the villa; the issued transmittal page and Supervisors' **Open drawings** show the link and the sheets by name.
 - [x] `[Opus]` prettier, lint, typecheck, 1,143 tests, `next build`, `check:actions` — green; every changed `select` answers 200 at staging's PostgREST. **No screen has been opened signed in** — a model session cannot sign in; the founder's vet is the first look.
 - [x] `[Opus]` Docs: Design Management's `PLAN.md` (decisions 3, 6, 8–10; the WorkDrive folder; the guard table), `SECURITY.md`, `STATUS.md`, `TODO.md`; the new table on both wipe scripts' lists.
-- [ ] ~~`[Fable]` Approval pass~~ — skipped on the founder's word, as above; pull request to `staging`, CI green, merge.
+- [x] ~~`[Fable]` Approval pass~~ — **skipped on the founder's explicit word for this merge**, as above. Pull request #101 into `staging`; CI green; signed out, the new routes answer 307 → `/login` on the preview; merged.
 - [ ] Founder — the checklist below, on staging.
 
 ## Verification — the founder, on staging (eleventh piece)
