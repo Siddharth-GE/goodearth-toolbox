@@ -1,50 +1,26 @@
 /**
- * Brings Birdwing's history in, once — from the laptop "BirdWing Manager"
- * app's own parsed data (its data/seed.json: the income sheet's 220 rows,
- * the combined expenses workbook's 599 lines, 767 attendance days, the
- * company block, bank, UPI and policy) — into Birdwing Stays and Books
- * (0115, 0116). plan.md, _Birdwing_.
+ * Brings Birdwing's history in, once, from the "BirdWing Manager" app's parsed data
+ * (data/seed.json) into Birdwing Stays and Books (0115, 0116).
  *
  *   npx tsx scripts/import-birdwing.ts --project <ref> --seed data/birdwing-seed.json            # dry run
- *   npx tsx scripts/import-birdwing.ts --project <ref> --seed data/birdwing-seed.json --commit   # write
+ *   npx tsx scripts/import-birdwing.ts --project <ref> --seed data/birdwing-seed.json --commit
  *
- * ONE TRANSACTION. Everything is sent as one SQL batch: the data rides in
- * as JSON, set-based inserts place it, and an assertion block proves every
- * source row landed before the commit — all of it lands or none of it. A
- * dry run sends the same batch and aborts it at the end, so it proves the
- * inserts against the live schema and keeps nothing.
+ * One transaction with an assertion block proving every source row landed, so all or
+ * nothing; a dry run aborts at the end. Re-runnable: every row is keyed to its source
+ * and an existing key is skipped. Settings only FILL BLANKS.
  *
- * RE-RUNNABLE. Every row is keyed to where it came from — a stay to its
- * sheet row ("Income Sheet!A54:AP54"), an expense to "Sheet!Cell", an
- * attendance day to the app's id — and a key already present is skipped.
- * A second run writes nothing. Settings only FILL BLANKS: nothing an admin
- * typed in Birdwing → Settings is overwritten.
- *
- * WHAT IT DECIDES, AND WHAT IT LEAVES (review flags on the stay, shown on
- * Stays → Review until a person marks them reviewed):
- *   * use and channel from "Mode of Booking"; Goodearth's own stays come
- *     in with no cost centre — the founder assigns them in bulk.
- *   * one charge line per head, GST-inclusive as the sheet held it (5% on
- *     room and food, 18% on experiences, as its headers said).
- *   * money received: the sheet's TOTAL RECEIVED, as one undated receipt
- *     (counted on the accounting month's last day) — its advance and
- *     paid-after columns disagree with that total on many rows, and the
- *     consolidated page used the total.
- *   * the commission / cash back / discount column: an OTA's (Airbnb,
- *     Booking.com, MakeMyTrip) becomes OTA commission, anyone else's a
- *     discount — flagged either way.
- *   * invoice numbers kept as history (#1…, MEF/GH/05…), repeats and all;
- *     the counter is not moved — the next issue is MEF/GH/133.
- *   * rooms were never named: the room COUNT is kept, occupancy for these
- *     months is an estimate; a blank count with room rent is taken as 1.
- *   * expenses: status recorded; lines pre-entered for a month not yet
- *     come are flagged and never confirmed. Staff names are made one
- *     spelling (Sajina → Sajna, Bijith → Bijeeth).
- *   * attendance: status only; the old overtime notation ("6.3") is kept
- *     in the note, never read as hours. Sajna's pay rule is the app's; the
- *     others have none until an admin enters them.
- *
- * Service-level access through the management API (scripts only).
+ * Decisions (review flags show on Stays -> Review):
+ *   * Goodearth's own stays come in with no cost centre.
+ *   * one GST-inclusive charge line per head (5% room and food, 18% experiences).
+ *   * money received is the sheet's TOTAL RECEIVED as one undated receipt; its advance and
+ *     paid-after columns disagree with it on many rows.
+ *   * commission / cash back / discount: an OTA's (Airbnb, Booking.com, MakeMyTrip) is OTA
+ *     commission, anyone else's a discount; flagged either way.
+ *   * old invoice numbers kept as history; the counter is not moved (next is MEF/GH/133).
+ *   * rooms were never named: the COUNT is kept; a blank count with room rent is 1.
+ *   * expenses pre-entered for a future month are flagged, never confirmed; staff names
+ *     get one spelling (Sajina -> Sajna, Bijith -> Bijeeth).
+ *   * attendance: status only; old overtime ("6.3") goes in the note, never read as hours.
  */
 import { readFileSync } from "node:fs";
 
@@ -125,10 +101,6 @@ type Seed = {
   }[];
 };
 
-// ---------------------------------------------------------------------
-// Arguments
-// ---------------------------------------------------------------------
-
 const argv = process.argv.slice(2);
 const ref = requireProjectRef(process.argv);
 const commit = isCommit(process.argv);
@@ -138,10 +110,6 @@ if (seedAt < 0 || !argv[seedAt + 1]) {
 }
 const seed = JSON.parse(readFileSync(argv[seedAt + 1], "utf8")) as Seed;
 const today = new Date().toISOString().slice(0, 10);
-
-// ---------------------------------------------------------------------
-// The mappings
-// ---------------------------------------------------------------------
 
 const MODES: Record<string, { use: string; channel: string }> = {
   "Direct Booking": { use: "guest", channel: "direct" },
@@ -172,7 +140,6 @@ const HEAD_KINDS: Record<string, { kind: string; gst: number }> = {
   "night walk": { kind: "experience", gst: 18 },
 };
 
-/** One spelling per person, the consolidated page's. */
 const STAFF_NAMES: Record<string, string> = {
   sajina: "Sajna",
   sajna: "Sajna",
@@ -217,10 +184,6 @@ const monthEnd = (month: string) => {
 };
 const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 const num = (value: unknown) => (typeof value === "number" ? value : Number(value ?? 0) || 0);
-
-// ---------------------------------------------------------------------
-// Stays, their charges, invoices and receipts
-// ---------------------------------------------------------------------
 
 const refCounts = new Map<string, number>();
 for (const booking of seed.bookings) {
@@ -412,10 +375,6 @@ for (const [index, booking] of seed.bookings.entries()) {
   }
 }
 
-// ---------------------------------------------------------------------
-// Expenses
-// ---------------------------------------------------------------------
-
 const expenses: Record<string, unknown>[] = [];
 const expenseKeys = new Set<string>();
 const unknownHeads = new Set<string>();
@@ -467,10 +426,6 @@ for (const expense of seed.expenses) {
   });
 }
 
-// ---------------------------------------------------------------------
-// Staff and attendance
-// ---------------------------------------------------------------------
-
 const staffSet = new Map<string, boolean>();
 for (const day of seed.attendance) staffSet.set(staffName(day.staff), true);
 for (const expense of seed.expenses) {
@@ -482,8 +437,7 @@ for (const day of seed.attendance) {
   const name = staffName(day.staff);
   if ((lastSeen.get(name) ?? "") < day.date) lastSeen.set(name, day.date);
 }
-// Still working: attendance reaching into the data's last two months
-// (Sujitha's stops in April, so she comes in switched off).
+// Still working: attendance reaching into the data's last two months.
 const newest = [...lastSeen.values()].sort().at(-1) ?? today;
 const [newestYear, newestMonth] = newest.split("-").map(Number);
 const cutoff = new Date(Date.UTC(newestYear, newestMonth - 2, 1)).toISOString().slice(0, 10);
@@ -524,10 +478,6 @@ for (const day of seed.attendance) {
 
 const sajna = seed.staff.find((person) => staffName(person.name) === "Sajna");
 
-// ---------------------------------------------------------------------
-// The report
-// ---------------------------------------------------------------------
-
 const PAGE = { billed: 2138120.11, collected: 1403745.48, expenses: 2391966.5, future: 70000 };
 const line = (label: string, ours: number, page: number) =>
   `  ${label.padEnd(22)} ${ours.toFixed(2).padStart(12)}   page ${page.toFixed(2).padStart(12)}   ${Math.abs(ours - page) < 1 ? "OK" : "DIFFERS"}`;
@@ -565,10 +515,6 @@ console.log(
   `  pay rule: ${sajna ? `Sajna's from the app (₹${sajna.salary}, ${sajna.shift_start}–${sajna.shift_end}, ₹${sajna.ot_rate}/hr, ₹${sajna.room_rate}/room-day)` : "none found"}; Amal, Appu and Bijeeth have none yet.`,
 );
 
-// ---------------------------------------------------------------------
-// The batch
-// ---------------------------------------------------------------------
-
 const json = (value: unknown) => {
   const text = JSON.stringify(value);
   if (text.includes("$bw$")) throw new Error("The data contains the quoting tag $bw$.");
@@ -580,7 +526,7 @@ const company = seed.settings;
 const statements = [
   "begin;",
 
-  // 1. The invoicing company (Masters) and Birdwing's settings — blanks only.
+  // Blanks only.
   `insert into companies (name, legal_name, address, gstin, state)
    select 'Maloor Eco Farms', ${literal(company.company)}, ${literal(company.address)}, ${literal(company.gstin)}, 'Kerala'
    where not exists (
@@ -601,7 +547,6 @@ const statements = [
      updated_at = now()
    where id;`,
 
-  // 2. Staff, and the one pay rule the app knew.
   `insert into birdwing_staff (name, sort_order, is_active)
    select x.name, x.sort_order, x.is_active
    from jsonb_to_recordset(${json(staff)}) as x(name text, sort_order int, is_active boolean)
@@ -616,7 +561,6 @@ const statements = [
          and not exists (select 1 from birdwing_pay_rules r where r.staff_id = s.id);`
     : "",
 
-  // 3. Guests: one per name, a returning guest found again.
   `create temp table _bw_stays on commit drop as
    select * from jsonb_to_recordset(${json(stays)}) as x(
      row int, source_key text, guest_name text, use text, channel text, arrival date, departure date,
@@ -628,7 +572,7 @@ const statements = [
    where not exists (select 1 from birdwing_guests g where lower(trim(g.name)) = lower(trim(s.guest_name)))
    order by lower(trim(s.guest_name));`,
 
-  // 4. Stays, in sheet order (so BW-0001 is the sheet's first row).
+  // Sheet order, so BW-0001 is the sheet's first row.
   `insert into birdwing_stays (ref, guest_id, use, channel, status, arrival, departure, adults, children,
                               accounting_month, ota_commission, discount, referred_by, notes,
                               legacy_room_count, review_flags, source_key)
@@ -641,7 +585,7 @@ const statements = [
    where not exists (select 1 from birdwing_stays t where t.source_key = s.source_key)
    order by s.row;`,
 
-  // 5. Charges — only onto a stay that has none (a re-run adds nothing).
+  // Only onto a stay that has none, so a re-run adds nothing.
   `insert into birdwing_stay_charges (stay_id, rate_card_id, head, kind, qty, rate, gst_pct,
                                      rate_includes_gst, sac, sort_order)
    select st.id, rc.id, c.head, c.kind, c.qty, c.rate, c.gst_pct, true, rc.sac, c.sort_order
@@ -651,7 +595,7 @@ const statements = [
    left join birdwing_rate_card rc on lower(trim(rc.head)) = lower(c.head)
    where not exists (select 1 from birdwing_stay_charges x where x.stay_id = st.id);`,
 
-  // 6. The old invoices, as history — after the charges they freeze.
+  // After the charges, because invoices freeze them.
   `insert into birdwing_invoices (stay_id, number, historic, issued_on, bill_to_name, taxable, cgst, sgst,
                                  total, discount, payable, snapshot, source_key)
    select st.id, i.number, true, i.issued_on, i.bill_to_name, i.taxable, i.cgst, i.sgst, i.total,
@@ -670,7 +614,6 @@ const statements = [
    join birdwing_stays st on st.source_key = i.stay_key
    where not exists (select 1 from birdwing_invoices x where x.source_key = i.source_key);`,
 
-  // 7. What was received.
   `insert into birdwing_receipts (stay_id, invoice_id, amount, received_on, mode, note, source_key)
    select st.id,
           (select v.id from birdwing_invoices v where v.stay_id = st.id and v.status = 'issued'),
@@ -680,7 +623,6 @@ const statements = [
    join birdwing_stays st on st.source_key = r.stay_key
    where not exists (select 1 from birdwing_receipts x where x.source_key = r.source_key);`,
 
-  // 8. Expenses.
   `insert into birdwing_expenses (accounting_month, head_id, description, spent_on, amount, payee,
                                  payment_details, status, review_note, source_key)
    select e.accounting_month, h.id, e.description, e.spent_on, e.amount, e.payee, e.payment_details,
@@ -691,7 +633,7 @@ const statements = [
    join birdwing_expense_heads h on lower(trim(h.name)) = lower(e.head)
    where not exists (select 1 from birdwing_expenses x where x.source_key = e.source_key);`,
 
-  // 9. Attendance — a day already marked for that person is left alone.
+  // A day already marked for that person is left alone.
   `insert into birdwing_attendance (staff_id, on_date, status, note, source_key)
    select s.id, a.on_date, a.status, a.note, a.source_key
    from jsonb_to_recordset(${json(attendance)}) as a(source_key text, staff text, on_date date,
@@ -702,7 +644,6 @@ const statements = [
      where x.source_key = a.source_key or (x.staff_id = s.id and x.on_date = a.on_date)
    );`,
 
-  // 10. Prove every source row is in.
   `do $check$
    declare v int;
    begin

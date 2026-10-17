@@ -1,33 +1,17 @@
 /**
- * Deletes every drawing in Design Management — sets, revisions, sheets,
- * work links, transmittals and their numbering — and the sheet files in
- * the `drawings` bucket. Design stages (the master list) stay.
- *
- * Founder, 2026-09-27: "delete all drawings on the app, and wherever it
- * is associated which is only supervisors basically". Supervisors keeps
- * no copy of its own: it reads released drawings through lib/drawings/,
- * so emptying these tables empties its Drawings section too.
- *
- * For a person to run, not a model session: a model's auto mode refuses
- * a bulk delete from cloud storage, rightly, and the founder chose to run
- * this themselves.
- *
- * WHY IT BYPASSES THE GUARDS. An issued transmittal and a released
- * revision refuse deletion through their guard triggers (0091, 0093) —
- * rightly, for everyday use. A wipe is the one case that must get past
- * them, so the deletes run in ONE transaction with
- * `session_replication_role = replica`, which switches every trigger off
- * for that transaction only (the guards, the FK checks and the audit
- * rows). The whole transaction lands or none of it does.
- *
- * Rows first, then files — the order the app uses on the way out, so a
- * failure part-way leaves an unreachable file, never a row pointing at a
- * file that is gone. Files go through the Storage API: the platform
- * refuses direct deletes from storage.objects.
+ * Deletes every drawing in Design Management (sets, revisions, sheets, work links,
+ * transmittals, numbering) and the files in the `drawings` bucket. Design stages stay.
  *
  *   npx tsx scripts/wipe-drawings.ts --project <ref>            # counts only
  *   npx tsx scripts/wipe-drawings.ts --project <ref> --commit   # deletes
  *
+ * For a person to run, not a model session: auto mode rightly refuses a bulk cloud delete.
+ * It bypasses the guards: issued transmittals and released revisions refuse deletion via
+ * triggers (0091, 0093), so the deletes run in ONE transaction with
+ * `session_replication_role = replica` (triggers, FK checks and audit rows off for that
+ * transaction only). All or nothing.
+ * Rows first, then files, so a failure leaves an unreachable file, never a dangling row.
+ * Files go through the Storage API: the platform refuses direct deletes from storage.objects.
  * --project is required and never defaults (supabase-management.ts).
  */
 import { createClient } from "@supabase/supabase-js";
@@ -62,7 +46,6 @@ async function counts(ref: string): Promise<{ t: string; n: number }[]> {
   return rows;
 }
 
-/** Every object path in the bucket; a folder has no id in the listing. */
 async function listAll(storage: Storage, prefix = ""): Promise<string[]> {
   const { data, error } = await storage.from(BUCKET).list(prefix, { limit: 1000 });
   if (error) throw new Error(`Could not list ${BUCKET}/${prefix}: ${error.message}`);

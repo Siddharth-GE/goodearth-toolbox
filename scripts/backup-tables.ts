@@ -1,11 +1,11 @@
 /**
- * Writes whole tables to JSON before a script deletes or replaces rows in
- * them, so the change can be undone by hand. Files land in
- * data/backups/<time>-<ref>-<label>/<table>.json — data/ is gitignored,
+ * Writes whole tables to JSON before a script deletes or replaces rows, so
+ * the change can be undone by hand. Files land in
+ * data/backups/<time>-<ref>-<label>/<table>.json; data/ is gitignored
  * because the rows include bank details and client money.
  *
- * Read in pages of 1,000 so a large table (the audit log) never meets the
- * management API's response limit in one go.
+ * Read in pages of 1,000 so a large table never hits the management API's
+ * response limit.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";

@@ -3,33 +3,15 @@
  *
  *   npx tsx scripts/check-view-columns.ts --project <ref>
  *
- * READ-ONLY. Exit 0 means every view is exactly the shape the manifest
- * says. Exit 1 means one of them is not, and prints which and how.
+ * Read-only. Exit 1 prints which view differs and how.
  *
- * WHY. These views are owned by `postgres`, so they bypass row-level
- * security: each one's WHERE clause, column list and grants ARE its whole
- * permission boundary. There is no policy behind them to refuse a
- * careless change, and until this existed the only guard was a comment.
- * Five things go wrong silently, and this catches all five:
+ * These views bypass RLS, so their WHERE clause, columns and grants ARE the permission
+ * boundary. It catches a column added to a money-free fact view, a `has_app` check lost
+ * from a WHERE (re-running an older migration can do it), `security_invoker` lost from
+ * budget_report_lines, write privileges handed back by `drop view`, and a new view
+ * missing from the manifest.
  *
- *   1. A COLUMN ADDED to a money-free fact view — the money boundary
- *      crossed with no error anywhere.
- *   2. A `has_app` CHECK LOST from a WHERE clause. Re-running an older
- *      migration as-is is enough to do it, and it strips a whole tool's
- *      access without failing.
- *   3. `security_invoker` LOST from budget_report_lines, which would turn
- *      the one view carrying margins from RLS-respecting into RLS-
- *      bypassing.
- *   4. WRITE PRIVILEGES handed back. `drop view` restores Supabase's
- *      defaults, which include INSERT/UPDATE/DELETE for `authenticated` —
- *      that was a real hole on production, and views bypass RLS, so a
- *      writable view is an RLS bypass with a DELETE on the end.
- *   5. A NEW VIEW that nobody added to the manifest, which would sit
- *      outside this check entirely. An unknown view is a failure.
- *
- * It is deliberately absolute rather than comparative. `db:compare` proves
- * two databases match each other, which is worth having and is not this:
- * two databases can agree and both be wrong.
+ * It is absolute, not comparative: `db:compare` shows two databases agree, but both can be wrong.
  */
 import { requireProjectRef, sql } from "./supabase-management";
 import { VIEW_MANIFEST } from "./view-manifest";
@@ -43,7 +25,6 @@ type ViewRow = {
   writers: string | null;
 };
 
-/** Every app slug named in a has_app(…) call in the definition, sorted. */
 function guardsOf(definition: string): string[] {
   const found = [...definition.matchAll(/has_app\('([^']+)'/g)].map((match) => match[1]);
   return [...new Set(found)].sort();

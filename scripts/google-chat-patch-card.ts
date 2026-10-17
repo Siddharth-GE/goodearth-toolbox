@@ -1,35 +1,16 @@
 /**
  * Rewrites one Google Chat card by hand, as the app.
  *
- *   npx tsx scripts/google-chat-patch-card.ts --message spaces/AAA.../messages/BBB...
- *       # dry run — says what it would send
+ *   npx tsx scripts/google-chat-patch-card.ts --message spaces/AAA.../messages/BBB...            # dry run
+ *   npx tsx scripts/google-chat-patch-card.ts --message spaces/AAA.../messages/BBB... --commit   # mints an app token, PATCHes
  *
- *   npx tsx scripts/google-chat-patch-card.ts --message spaces/AAA.../messages/BBB... --commit
- *       # mints an app token and PATCHes the card
- *
- * WHAT THIS PROVES. plan.md's step 2 turns on one belief nobody can
- * check from the code: **may the Chat app rewrite a card it posted
- * privately to one person?** Everything round two builds — the court
- * card catching up with the press that just moved a baton — rests on
- * Google saying yes. So the belief is settled first, by hand, with a
- * one-widget card and no app code in the way: a 200 means yes, and a
- * 403 or 404 means the door falls back to Option A (answering with the
- * card and losing the public confirmation) and none of the rest gets
- * written. Whatever Google answers goes into BUGCATCHER #17 as trap (m),
- * verbatim.
- *
- * It is also the repair tool afterwards. The door logs one
- * `google-chat refresh` line per press carrying the message's resource
- * name; when a refresh fails, that name pasted into `--message` here is
- * how the card gets put right without waiting for the next press.
- *
- * It needs the founder's service-account key in `.env.local` under
- * `GOOGLE_CHAT_SERVICE_ACCOUNT_KEY` (the downloaded JSON, one line), and
- * it is the reason lib/google-chat/app-token.ts does not import
- * `server-only` — that package throws the moment `tsx` loads it.
- *
- * It prints the HTTP status and Google's own reason, and nothing else:
- * not the key, not the token, not the message.
+ * It settles whether the Chat app may rewrite a card it posted privately to one person:
+ * 200 means yes; 403 or 404 means the door falls back to Option A. Record Google's answer
+ * verbatim in BUGCATCHER #17 trap (m). It also repairs a card: paste the message name
+ * from a failed `google-chat refresh` log line into `--message`.
+ * Needs `GOOGLE_CHAT_SERVICE_ACCOUNT_KEY` in `.env.local`. lib/google-chat/app-token.ts
+ * avoids `server-only` because that package throws under `tsx`.
+ * It prints only the HTTP status and Google's reason, never the key, token or message.
  */
 import { config } from "dotenv";
 import { resolve } from "node:path";
@@ -39,10 +20,8 @@ import { parseServiceAccountKey } from "../lib/google-chat/outbound-rules";
 
 config({ path: resolve(import.meta.dirname, "..", ".env.local") });
 
-/** The same shape `messageName()` accepts in events.ts — a typo here is a 404 nobody can explain. */
 const MESSAGE_PATTERN = /^spaces\/[^/]+\/messages\/[^/]+$/;
 
-/** One widget, dated, so it is obvious at a glance whether the card actually changed. */
 function proofCard() {
   return [
     {
@@ -100,8 +79,7 @@ async function main() {
   const { status, reason } = await patchCard(token.token, message, proofCard());
   console.log(`\nHTTP ${status}${reason ? ` — ${reason}` : ""}`);
   if (status < 200 || status >= 300) {
-    // A refusal here is the answer to plan.md step 2, not a bug to fix:
-    // record it verbatim as trap (m) and take Option A.
+    // A refusal is the answer to plan.md step 2, not a bug: record it as trap (m).
     process.exitCode = 1;
     return;
   }

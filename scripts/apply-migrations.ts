@@ -1,63 +1,22 @@
 /**
- * Applies supabase/migrations/*.sql to one named database, and records
- * what it applied.
+ * Applies supabase/migrations/*.sql to one named database and records them in the ledger.
  *
- *   npx tsx scripts/apply-migrations.ts --project <ref>
- *       # dry run — says what it WOULD apply, writes nothing
+ *   npx tsx scripts/apply-migrations.ts --project <ref>                          # dry run, writes nothing
+ *   npx tsx scripts/apply-migrations.ts --project <ref> --commit                 # applies what the ledger lacks, in filename order
+ *   npx tsx scripts/apply-migrations.ts --project <ref> --commit --record-only   # records every file as applied WITHOUT running it
+ *   npx tsx scripts/apply-migrations.ts --project <ref> --commit --only 0068_x.sql   # exactly one file
  *
- *   npx tsx scripts/apply-migrations.ts --project <ref> --commit
- *       # applies everything not already in the ledger, in filename order
- *
- *   npx tsx scripts/apply-migrations.ts --project <ref> --commit --record-only
- *       # records every file as applied WITHOUT running it — for the
- *       # database that already had all of them applied by hand
- *
- *   npx tsx scripts/apply-migrations.ts --project <ref> --commit --only 0068_x.sql
- *       # applies exactly one file. This is the normal move when a new
- *       # migration goes to staging ahead of the code that needs it, and
- *       # it is how the ledger table itself gets created on a database
- *       # that already has everything else.
- *
- * WHY THIS EXISTS. Sixty-six migrations were applied to one database by
- * hand, and nothing recorded that they were. That was survivable with one
- * database and one person. With two databases it is not: they drift, and
- * the drift is silent until a screen breaks on one and not the other.
- * See 0067_migration_ledger.sql.
- *
- * --project IS REQUIRED AND NEVER DEFAULTED. Not to production, not to
- * .env.local. See scripts/supabase-management.ts for why.
- *
- * HOW A FILE IS APPLIED. Wrapped in begin/commit, so a file that fails
- * half way leaves nothing behind — the next run starts it cleanly rather
- * than tripping over half of itself. Its ledger row is written inside the
- * same transaction, so "applied" and "recorded as applied" cannot come
- * apart. (No migration here uses CREATE INDEX CONCURRENTLY, which is the
- * one thing that cannot run inside a transaction. Two files mention the
- * word in comments only.)
- *
- * THE BOOTSTRAP. On an empty database the ledger table does not exist
- * until 0067 creates it, so the per-file ledger insert is guarded by
- * to_regclass and simply does nothing for 0001–0066. A reconcile pass at
- * the end records those, once there is a table to record them in.
- *
- * CHECKSUMS. A filename only answers "did something with this name run?".
- * The checksum answers "did THIS file run?" — so an applied migration
- * that was edited afterwards, which the rulebook forbids, shows up as a
- * mismatch instead of passing unnoticed. A mismatch never re-applies the
- * file; it reports and exits non-zero, because the honest answer is that
- * nobody knows what that database actually has.
- *
- * SAFE TO RUN TWICE. Anything already in the ledger is skipped, so a
- * second run against the same database does nothing at all.
+ * --project is required and never defaulted, so no run can fall back to production.
+ * Each file runs in begin/commit with its ledger row in the same transaction, so a
+ * failure leaves nothing behind (hence no CREATE INDEX CONCURRENTLY).
+ * Bootstrap: the ledger table does not exist until 0067, so the insert is guarded by
+ * to_regclass and a reconcile pass records 0001-0066.
+ * Checksums catch an applied migration edited afterwards; a mismatch never re-applies.
  */
 import { compareToLedger, readLedger, readMigrations, type Migration } from "./migration-ledger";
 import { isCommit, requireProjectRef, sql } from "./supabase-management";
 
-/**
- * Records a file as applied, but only once there is a table to record it
- * in. Written as a DO block rather than a plain insert so the same
- * statement is valid before and after 0067 has run.
- */
+// A DO block, not a plain insert, so it is valid before and after 0067 creates the ledger.
 function ledgerInsert(migration: Migration): string {
   const filename = migration.filename.replace(/'/g, "''");
   return `
@@ -153,9 +112,7 @@ async function main() {
     }
   }
 
-  // The bootstrap reconcile: anything applied before 0067 created the
-  // ledger table has no row yet, because its guarded insert found nothing
-  // to insert into.
+  // Bootstrap reconcile: files applied before the ledger table existed have no row yet.
   const after = await readLedger(ref);
   const unrecorded = pending.filter((migration) => !after.has(migration.filename));
   if (unrecorded.length > 0) {

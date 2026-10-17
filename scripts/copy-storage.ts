@@ -1,46 +1,21 @@
 /**
- * Copies Storage objects from one Supabase project to another, and fixes
- * the URLs that point at them.
+ * Copies Storage objects from one Supabase project to another and rewrites the URLs
+ * that point at them.
  *
- *   npx tsx scripts/copy-storage.ts --from <ref> --to <ref>
- *       # dry run — lists what it WOULD copy, writes nothing
- *
+ *   npx tsx scripts/copy-storage.ts --from <ref> --to <ref>            # dry run, writes nothing
  *   npx tsx scripts/copy-storage.ts --from <ref> --to <ref> --commit
  *
- * WHY THIS EXISTS. clone-data.ts moves rows; rows are not files. The
- * `catalogue` bucket holds 897 item thumbnails, and `items.thumb_url`
- * holds absolute URLs naming the project they live in. Copy the rows
- * alone and every thumbnail on the new database points back at the old
- * one — which would *look* fine in a browser, because that bucket is
- * public, right up until you notice next.config.ts only allows the host
- * in NEXT_PUBLIC_SUPABASE_URL. next/image blocks every other host, so the
- * entire catalogue grid comes up empty with no failed request to explain
- * it. Hence: copy the files, then rewrite the column.
- *
- * WHY NOT fetch-catalogue-images.ts. That script rebuilds thumbnails by
- * re-downloading ~900 originals from other companies' Shopify CDNs, and
- * is written to survive their timeouts and 404s. It is the right tool for
- * building the catalogue and the wrong one for moving it: a vendor who
- * has deleted a product since would silently cost us that thumbnail. Both
- * buckets here are ours. It stays the fallback if a file is missing.
- *
- * UPLOADS HAND STORAGE A Blob, NEVER A Buffer. BUGCATCHER.md's newest
- * entry: Next's patched fetch text-decodes a raw Buffer and stores
- * mangled bytes while reporting success. The upload "works" and the image
- * is rubbish.
- *
- * KEYS. Service-role keys for both projects are fetched from the
- * management API using SUPABASE_ACCESS_TOKEN, rather than kept in
- * .env.local. One fewer secret on disk, and no chance of the script
- * reading a stale key for the wrong project.
- *
- * SAFE TO RUN TWICE. Uploads use upsert, and the URL rewrite only matches
- * URLs still naming the source project.
+ * clone-data.ts moves rows, not files. `items.thumb_url` names the source project, and
+ * next.config.ts only allows the current host, so without the rewrite the catalogue
+ * grid comes up empty with no failed request. fetch-catalogue-images.ts is not used: it
+ * re-downloads from vendor CDNs and would lose deleted thumbnails.
+ * Uploads take a Blob, never a Buffer (BUGCATCHER: a raw Buffer is mangled silently).
+ * Service-role keys are fetched through the management API, so none sit in .env.local.
+ * Safe to run twice: uploads upsert and the rewrite only matches source-project URLs.
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { isCommit, literal, managementToken, requireProjectRef, sql } from "./supabase-management";
 
-/** Buckets to move, and nothing else. */
 const BUCKETS = ["catalogue", "staff-photos", "design-views"];
 
 async function serviceClient(ref: string): Promise<SupabaseClient> {
@@ -119,9 +94,7 @@ async function main() {
       continue;
     }
 
-    // download.data is already a Blob. It is handed over untouched — the
-    // moment this becomes a Buffer, the bytes get text-decoded on the way
-    // out and the upload succeeds with rubbish in it.
+    // download.data is already a Blob. Keep it one: a Buffer is text-decoded and corrupted.
     const upload = await target.storage.from(object.bucket_id).upload(object.name, download.data, {
       contentType: object.mimetype ?? undefined,
       upsert: true,
@@ -138,12 +111,8 @@ async function main() {
   console.log(`  ${copied} of ${objects.length} copied`);
   for (const problem of failed) console.error(`  FAILED ${problem}`);
 
-  // ---- point the URLs at their new home --------------------------------
-  //
-  // Under replica mode, so the audit trigger stays quiet. Without it this
-  // one statement files 897 "items UPDATE" rows, and a brand-new
-  // database's audit log opens with 897 entries about its own setup
-  // rather than about anything anyone did.
+  // Replica mode keeps the audit trigger quiet, so the new database's log
+  // does not open with 897 "items UPDATE" rows.
   console.log("\nRewriting items.thumb_url...");
   await sql(
     to,

@@ -1,48 +1,20 @@
 /**
  * What every view in `public` is allowed to be.
  *
- * WHY THIS FILE EXISTS. Fourteen views are owned by `postgres`, and a view
- * owned by its tables' owner BYPASSES row-level security. That is not an
- * accident — it is how /indents reads budget quantities without reading
- * budget costs, and how Financial Management reads client money without
- * reading the CRM's prose. But it means each of these views has no policy
- * behind it: its own WHERE clause, its own column list, and its grants ARE
- * the permission boundary, and until now the only thing guarding them was
- * a comment saying "NEVER add a money column".
+ * These views are owned by `postgres` and BYPASS row-level security, so each one's WHERE
+ * clause, columns and grants ARE the permission boundary. `npm run db:check-views --
+ * --project <ref>` compares every view on a database to the rows below; CI runs it on
+ * every pull request. To change a view: write the migration, apply it to staging, run the
+ * checker, and update the row here in the same commit with a sentence on why.
  *
- * A comment cannot fail a build. This can. `npm run db:check-views --
- * --project <ref>` compares every view on that database against the rows
- * below and exits non-zero on any difference, and CI runs it on every pull
- * request. So a column added to a fact view, a WHERE clause that quietly
- * loses one of its `has_app` checks, a `security_invoker` flag that goes
- * missing, or a write privilege handed back by `drop view` is a red check
- * rather than a silent widening of who can read the company's money.
- *
- * HOW TO CHANGE A VIEW. Write the migration, apply it to staging, then run
- * the checker: it prints exactly what differs. Update the row here in the
- * same commit, with a sentence saying why the new shape is correct. That
- * edit is the reviewable moment — the point is not that views never
- * change, it is that changing one is never invisible.
- *
- * WHAT EACH FIELD MEANS
- *
- *   columns  Exact and in order. `information_schema` order, which is the
- *            order the view's SELECT declares.
- *   guards   Every distinct app slug appearing in a `has_app('…')` call in
- *            the view's definition, sorted. For the owner views this IS
- *            the gate. SECURITY.md warns that redefining
- *            crm_milestone_facts or crm_receipt_facts must carry their
- *            two-way WHERE forward (0123), and business_plan_target_facts
- *            its three-way one — re-running an older migration as-is
- *            silently strips Financial Management's access, or hands every
- *            Client Relations member every plot's money. This field is that
- *            warning made enforceable.
- *   barrier  `security_barrier=true`: stops the planner leaking rows past
- *            the WHERE through a cheap, side-effecting function.
- *   invoker  `security_invoker=true`: the view runs as the CALLER, so RLS
- *            applies. Exactly one view has it, and must.
- *   money    Does this view carry rupees? Documentation for the reader,
- *            and the question to ask before adding any column.
+ * Fields:
+ *   columns  Exact and in order (the view's SELECT order).
+ *   guards   Every distinct app slug in a `has_app('...')` call, sorted: for the owner views
+ *            this IS the gate. Redefining crm_milestone_facts or crm_receipt_facts must carry
+ *            their two-way WHERE forward (0123), business_plan_target_facts its three-way one.
+ *   barrier  `security_barrier=true`: no leaks past the WHERE through side-effecting functions.
+ *   invoker  `security_invoker=true`: runs as the CALLER so RLS applies. Exactly one view.
+ *   money    Does this view carry rupees? Ask before adding any column.
  */
 
 export type ViewExpectation = {
@@ -51,17 +23,12 @@ export type ViewExpectation = {
   barrier: boolean;
   invoker: boolean;
   money: boolean;
-  /** Why this shape is the correct one. */
   why: string;
 };
 
 export const VIEW_MANIFEST: Record<string, ViewExpectation> = {
-  // -------------------------------------------------------------------
-  // Money-free by construction. Indents and Inventory carry no money at
-  // all, so these exist to let them read a purchase order or a budget
-  // without reading a rupee. Adding a money column here would cross the
-  // boundary in silence, because there is no policy to refuse it.
-  // -------------------------------------------------------------------
+  // Money-free by construction: they let Indents and Inventory read a PO or budget
+  // without a rupee. A money column here would cross the boundary in silence.
   approved_budgets: {
     columns: ["id", "selection_id", "unit_id", "version", "approved_at"],
     guards: ["/budgets", "/indents"],
@@ -225,12 +192,8 @@ export const VIEW_MANIFEST: Record<string, ViewExpectation> = {
     why: "Relay's one read surface, redefined six times and consumed by Client Relations and Reporter as well. Carries no money; the clock-anchor columns are the fragile part, and dropping one breaks a screen in another tool.",
   },
 
-  // -------------------------------------------------------------------
-  // The money views. Every one of these is a founder decision written
-  // into a migration, and every one is gated by its own WHERE. The guards
-  // list below is the whole permission boundary — if it shrinks, someone
-  // has lost access; if it grows, someone has gained it.
-  // -------------------------------------------------------------------
+  // The money views. Each is gated by its own WHERE; if guards shrinks someone
+  // lost access, if it grows someone gained it.
   po_billing_totals: {
     columns: ["po_id", "ordered_total", "billed_total", "bill_count"],
     guards: ["/bills", "/purchase-orders"],
@@ -372,9 +335,6 @@ export const VIEW_MANIFEST: Record<string, ViewExpectation> = {
     why: "THE ONE security_invoker VIEW, and it must stay one. It carries unit_cost, margin_pct and client_rate, so it has to INHERIT row-level security rather than bypass it — its guards list is empty precisely because the policies on the tables underneath are doing the work. If invoker ever goes false here, every rupee of margin in the company is readable by anyone signed in.",
   },
 
-  // -------------------------------------------------------------------
-  // The ERP corrections (0104–0108, 2026-10-08).
-  // -------------------------------------------------------------------
   work_unit_facts: {
     columns: ["work_item_id", "uom"],
     guards: [],
@@ -428,10 +388,8 @@ export const VIEW_MANIFEST: Record<string, ViewExpectation> = {
     money: false,
     why: "Birdwing Books pays room-day and guest-day incentives (0116), and a /birdwing-books holder cannot read Stays' tables. Three counts per day and nothing else — never a guest's name, a stay or a rupee.",
   },
-  // Birdwing's money (0117), for the two grants that read the company's
-  // money by founder decision. Owner views, gated in their own WHERE —
-  // NOT /birdwing or /birdwing-books, and never a guest's phone, email or
-  // ID: a wider table qual would have handed those over too.
+  // Birdwing's money (0117), for the two grants that read it by founder decision.
+  // Owner views gated in their own WHERE, never a guest's phone, email or ID.
   birdwing_stay_facts: {
     columns: [
       "stay_id",

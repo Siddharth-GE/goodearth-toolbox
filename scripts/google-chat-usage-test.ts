@@ -5,42 +5,13 @@
  *   npm run chat:usage -- --as siddharth@goodearthkannur.org --dm --bounce
  *   npm run chat:usage -- --as siddharth@goodearthkannur.org --press push --commit
  *
- * WHAT IT IS FOR. Every gate this repo has is blind to the bot: a green
- * build never talks to Google, the tests pin our own card shapes, and
- * the only way to exercise the door has been for a person to type a
- * command in a real Chat space on staging. This script closes most of
- * that gap. It builds the envelopes Google sends — a slash command, a
- * dialog request, a button press with the bot's own card behind it — and
- * hands them straight to `handleChatRequest` (lib/google-chat/dispatch.ts)
- * in this process, against the STAGING database, as a named person. So
- * identity, the reads, the card renderers, an act-as write and the card
- * refresh all run for real, and the answers come back to be classified.
- *
- * WHAT IT CANNOT PROVE. Google is still the only judge of the JSON we
- * send it (BUGCATCHER #17): a card that classifies perfectly here can
- * still be "Relay not responding" in a space. What this proves is our
- * side — that nothing throws, that the envelope is the right KIND for
- * the event, that the rows are the person's real rows, and what the
- * door's own log lines say. The founder's vet in a real space stays
- * exactly as required as it was.
- *
- * THE LOCK IS NOT DRIVEN. verify.ts is never called: this script starts
- * where the route hands over, after Google has been proven. That is the
- * whole reason the dispatch was moved out of route.ts — a Next.js route
- * file may export nothing but its handlers.
- *
- * SAFETY. It refuses to run against anything but the staging database,
- * because with `--commit` it moves a real baton as a real person. Reads
- * are always allowed; the one write (`--press`) needs `--commit` and
- * says which row it would press otherwise. It prints no email but the
- * one given on the command line, and never a token or a key.
- *
- * WHY THE LOADER. `server-only` is not an installed package and
- * `next/cache` throws outside a Next request, so plain Node cannot
- * import the door. `scripts/google-chat-usage-loader.mjs` stubs those
- * two specifiers in the module loader rather than weakening anything
- * under lib/ — which is why this script is run through the npm alias
- * and not with a bare `npx tsx`.
+ * Builds the envelopes Google sends (slash command, dialog request, button press) and hands
+ * them to `handleChatRequest` (lib/google-chat/dispatch.ts) against STAGING as a named
+ * person, so identity, reads, renderers, an act-as write and card refresh run for real.
+ * It cannot prove Google accepts our JSON (BUGCATCHER #17); verify.ts (the lock) is never called.
+ * Safety: it refuses any database but staging, because `--commit` moves a real baton.
+ * The one write (`--press`) needs `--commit`. It prints no email but the one given.
+ * Run it through the npm alias: google-chat-usage-loader.mjs stubs `server-only` and `next/cache`.
  */
 import { config } from "dotenv";
 import { resolve } from "node:path";
@@ -50,21 +21,14 @@ import type { ChatEvent } from "../lib/google-chat/events";
 
 config({ path: resolve(import.meta.dirname, "..", ".env.local") });
 
-/** The only database this script will speak to. */
 const STAGING_REF = DATABASES.practice;
 
-/**
- * The registered endpoint of the staging Chat app. `chatAudience()` and
- * `chatOrigin()` are read all over the door — a button's callback URL,
- * every "Open in the toolbox" link — and they throw when it is unset.
- * The lock never runs here, so this value is a label, not a credential.
- */
+// The staging Chat app's registered endpoint. chatAudience() and chatOrigin()
+// throw when unset. The lock never runs here, so it is a label, not a credential.
 const DEFAULT_AUDIENCE = "https://staging.goodearthkannur.org/api/google-chat";
 
-/** A space nothing is linked to, so a run cannot disturb a real space's scope. */
 const DEFAULT_SPACE = "spaces/USAGE-TEST";
 
-/** The pressed card's resource name. Deliberately fake: no such message exists. */
 const PRESSED_MESSAGE_ID = "USAGE-TEST";
 
 const PRESS_ACTIONS = ["push", "finish", "hold", "return"] as const;
@@ -83,8 +47,6 @@ type Options = {
   bounce: boolean;
   commit: boolean;
 };
-
-// --- the command line ----------------------------------------------------
 
 function flagValue(argv: string[], flag: string): string | undefined {
   const at = argv.indexOf(flag);
@@ -120,8 +82,6 @@ function readOptions(argv: string[]): Options {
   };
 }
 
-// --- the envelopes Google sends -----------------------------------------
-
 function chatUser(options: Options) {
   return {
     name: "users/usage-test",
@@ -139,11 +99,7 @@ function chatSpace(options: Options) {
   };
 }
 
-/**
- * A typed slash command. Google sends the int64 command id as a string,
- * so it is a string here too — `commandId()` normalises it, and sending
- * a number would test a shape Google never sends.
- */
+// A typed slash command. Google sends the int64 command id as a string, so this does too.
 function commandEvent(
   options: Options,
   id: number,
@@ -164,16 +120,9 @@ function commandEvent(
   };
 }
 
-/**
- * A press on one of the bot's own card buttons. The message behind the
- * press is the CARD, whose sender is the bot, and the person is in
- * `chat.user` — trap (k) in BUGCATCHER #17, the shape that once made
- * every button answer "Google didn't tell me who you are".
- *
- * The card's resource name is a real-looking handle for a message that
- * does not exist, which is the point: the refresh path runs all the way
- * to Google and its log line says whether the key works.
- */
+// A press on one of the bot's own card buttons. The sender is the bot and the
+// person is in `chat.user` (BUGCATCHER #17 trap (k)). The card name is fake,
+// so the refresh path runs to Google and its log line says whether the key works.
 function pressEvent(
   options: Options,
   parameters: Record<string, string>,
@@ -198,9 +147,6 @@ function pressEvent(
   };
 }
 
-// --- reading the answer --------------------------------------------------
-
-/** One row of a card: what the person sees, and what its buttons would send back. */
 type CardRow = {
   topLabel: string;
   text: string;
@@ -223,7 +169,6 @@ type Answer =
   | { kind: "empty" }
   | { kind: "unexpected"; body: unknown };
 
-/** The bot writes `<b>`, `<br>` and escaped entities into card text; this reads it back as a person would. */
 function strip(value: unknown): string {
   if (typeof value !== "string") return "";
   return value
@@ -251,7 +196,6 @@ function dig(value: unknown, ...path: string[]): unknown {
   return current;
 }
 
-/** A button's `[{key,value}]` parameters, read back as the record a press carries. */
 function buttonParameters(button: unknown): Record<string, string> {
   const raw = dig(button, "onClick", "action", "parameters");
   const parameters: Record<string, string> = {};
@@ -265,12 +209,8 @@ function buttonParameters(button: unknown): Record<string, string> {
   return parameters;
 }
 
-/**
- * A card's widgets, read as rows. A `decoratedText` starts a row and the
- * `buttonList` that follows it belongs to it — which is exactly how
- * `rowWidgets` in cards.ts builds them, and how a person reads them.
- * Anything else (the "and N more" lines, "Court cleared") is a note.
- */
+// A card's widgets as rows: a `decoratedText` starts a row and the following
+// `buttonList` belongs to it, as in `rowWidgets` in cards.ts. Anything else is a note.
 function readCard(entry: unknown): CardView {
   const card = dig(entry, "card");
   const title = String(dig(card, "header", "title") ?? "");
@@ -313,7 +253,6 @@ function readCard(entry: unknown): CardView {
   return { title, subtitle, rows, notes };
 }
 
-/** Which of the five envelopes the door answered with. */
 function classify(body: unknown): Answer {
   const message = dig(
     body,
@@ -344,8 +283,7 @@ function classify(body: unknown): Answer {
         kind: "dialog",
         how,
         title: view.title || null,
-        // A dialog is mostly inputs, which `readCard` doesn't turn into
-        // rows, so the honest count is every widget in it.
+        // A dialog is mostly inputs that `readCard` skips, so count every widget.
         widgets: countWidgets(card),
         firstLine: view.notes[0] ?? view.rows[0]?.text ?? null,
       };
@@ -363,7 +301,6 @@ function classify(body: unknown): Answer {
   return { kind: "unexpected", body };
 }
 
-/** Every widget in a dialog card, including the inputs `readCard` doesn't turn into rows. */
 function countWidgets(card: unknown): number {
   const sections = dig(card, "sections");
   if (!Array.isArray(sections)) return 0;
@@ -374,8 +311,6 @@ function countWidgets(card: unknown): number {
   }
   return total;
 }
-
-// --- the transcript ------------------------------------------------------
 
 let failures = 0;
 let door: ((request: Request) => Promise<Response>) | null = null;
@@ -429,12 +364,8 @@ function printAnswer(label: string, answer: Answer) {
   console.log(JSON.stringify(answer.body, null, 2));
 }
 
-/**
- * One event through the door, exactly as Google would post it: a POST to
- * the registered audience with a JSON body. A throw, a status that isn't
- * 200 or a body that isn't JSON is a failure — the door's whole contract
- * is that it always answers Google with 200 and a well-formed envelope.
- */
+// One event through the door as Google would post it. A throw, a non-200 or a
+// non-JSON body fails: the door must always answer 200 with a well-formed envelope.
 async function deliver(label: string, event: ChatEvent): Promise<Answer | null> {
   if (!door) throw new Error("The door was not loaded.");
 
@@ -472,9 +403,7 @@ async function deliver(label: string, event: ChatEvent): Promise<Answer | null> 
   if (answer.kind === "unexpected") failures += 1;
   printAnswer(label, answer);
 
-  // The door's own apology is a well-formed 200 and the right kind of
-  // envelope, so nothing above catches it — but it means a read failed,
-  // which is exactly the sort of thing this script exists to notice.
+  // The door's apology is a well-formed 200, so nothing above catches it, but it means a read failed.
   if (apologised(answer)) {
     failures += 1;
     line("", "^ the door apologised, so a read failed — this step counts as a failure");
@@ -482,7 +411,6 @@ async function deliver(label: string, event: ChatEvent): Promise<Answer | null> 
   return answer;
 }
 
-/** Did the door fall back on "Something went wrong on our side"? */
 function apologised(answer: Answer): boolean {
   const said =
     answer.kind === "message"
@@ -495,9 +423,6 @@ function apologised(answer: Answer): boolean {
   return said.startsWith("Something went wrong on our side");
 }
 
-// --- the run -------------------------------------------------------------
-
-/** The first row of a court card offering this action, and what its button would send. */
 function findRow(
   answer: Answer | null,
   action: PressAction | "bounce",
@@ -529,8 +454,7 @@ async function main() {
     );
   }
 
-  // Never verified here — the lock stays in route.ts — but every card the
-  // door builds needs it for its buttons and its links.
+  // Never verified here (the lock stays in route.ts); cards need it for buttons and links.
   process.env.GOOGLE_CHAT_AUDIENCE ??= DEFAULT_AUDIENCE;
 
   console.log("Google Chat usage test");
@@ -578,7 +502,7 @@ async function main() {
     } else {
       line(`Press ${options.press} on`, describe(found.row));
       await deliver(`Press ${options.press}`, pressEvent(options, found.parameters));
-      // The same command again, so the transcript itself shows the move.
+      // The same command again, so the transcript shows the move.
       await deliver("/court (after)", commandEvent(options, COURT_COMMAND_ID, "/court", ""));
     }
   }

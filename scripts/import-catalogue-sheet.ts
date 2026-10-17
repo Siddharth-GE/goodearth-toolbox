@@ -1,31 +1,16 @@
 /**
- * Brings the interiors catalogue spreadsheet (the design team's
- * "Main - Catalogue's" workbook, sheet MAIN CATALOGUE) into the items
- * master: the picture pasted on each row and its product link go onto the
- * item the toolbox already has, and a row the toolbox does not have yet
+ * Imports the interiors catalogue spreadsheet (sheet MAIN CATALOGUE) into the items
+ * master: pictures and product links go onto matching items; a row the toolbox lacks
  * becomes a new item.
  *
  *   npx tsx scripts/import-catalogue-sheet.ts --project <ref> --xlsx <path>            # dry run
- *   npx tsx scripts/import-catalogue-sheet.ts --project <ref> --xlsx <path> --commit   # write
+ *   npx tsx scripts/import-catalogue-sheet.ts --project <ref> --xlsx <path> --commit
  *
- * Then `scripts/fetch-catalogue-images.ts` finds a picture for the items
- * that have a product link and nothing pasted in the sheet.
- *
- * The founder's instruction (2026-09-26): a picture for every item that
- * has one, the links visible, no duplicates — and "if there are small
- * variations in some data they are probably not a duplicate". How a row
- * is recognised, and why never by its code, is in
- * lib/masters/catalogue-sheet.ts, which is tested.
- *
- * What it never does: replace a picture or a link an item already has,
- * or change any existing item's name, description, price, code or
- * category. The sheet is the design team's working copy; the toolbox's
- * prices are Masters' to edit.
- *
- * Safe to run twice. A second run finds the new items already there
- * (they now match), finds the pictures already set, and writes nothing.
- * The workbook is not committed — it carries real prices — so pass the
- * path of the copy on this machine.
+ * Then run scripts/fetch-catalogue-images.ts for items with a link and no picture.
+ * How a row is recognised, and why never by code, is in lib/masters/catalogue-sheet.ts.
+ * It never replaces an item's picture or link, or changes an existing item's name,
+ * description, price, code or category (prices are Masters' to edit).
+ * Safe to run twice. The workbook is not committed (real prices): pass the local path.
  */
 import { createClient } from "@supabase/supabase-js";
 import { strFromU8, unzipSync } from "fflate";
@@ -46,15 +31,12 @@ import { isCommit, literal, requireProjectRef, serviceRoleKey, sql } from "./sup
 
 const SHEET_NAME = "MAIN CATALOGUE";
 const BUCKET = "catalogue";
-/** The same thumbnail fetch-catalogue-images.ts makes, so every tile looks alike. */
 const THUMB_PX = 300;
 const THUMB_QUALITY = 78;
-/** The picture opened from a line — no vendor page holds these, so they are ours. */
 const FULL_PX = 1200;
 const FULL_QUALITY = 82;
 const CONCURRENCY = 4;
 
-/** Header text (upper case, spaces collapsed) → the field it fills. */
 const HEADERS = {
   "ITEM CODE": "code",
   "ITEM CATEGORY": "placement",
@@ -70,9 +52,7 @@ const HEADERS = {
 } as const;
 type Field = (typeof HEADERS)[keyof typeof HEADERS];
 
-// --- The workbook ----------------------------------------------------------
-// An .xlsx is a zip of XML parts. fflate (already a dependency, for Dexter)
-// opens it; the parts are regular enough that a few patterns read them.
+// An .xlsx is a zip of XML parts; fflate opens it and a few patterns read the parts.
 
 type Parts = Record<string, Uint8Array>;
 
@@ -93,7 +73,6 @@ function unescapeXml(value: string): string {
     .replace(/&amp;/g, "&");
 }
 
-/** A part's relationships: id → absolute part path (or URL, for hyperlinks). */
 function relationships(parts: Parts, partPath: string): Map<string, string> {
   const relsPath = posix.join(posix.dirname(partPath), "_rels", `${posix.basename(partPath)}.rels`);
   const out = new Map<string, string>();
@@ -171,8 +150,7 @@ function readSheet(parts: Parts, name: string): Sheet {
     if (ref && url) links.set(ref, url);
   }
 
-  // Pictures float over the sheet, anchored to the cell their top-left
-  // corner sits in — that cell's row is the item they belong to.
+  // Pictures float over the sheet; the cell holding their top-left corner is their row.
   const pictures = new Map<number, { column: number; media: string }[]>();
   for (const drawingMatch of body.matchAll(/<drawing\b[^>]*\br:id="([^"]+)"/g)) {
     const drawingPath = sheetRels.get(drawingMatch[1]);
@@ -230,7 +208,7 @@ function sheetRows(sheet: Sheet): SheetRow[] {
     const linkText = get("link");
     const price = Number(get("price"));
     const pictures = (sheet.pictures.get(number) ?? [])
-      // The picture in the LINK / IMAGE column first; strays after.
+      // The LINK / IMAGE column's picture first; strays after.
       .sort(
         (a, b) =>
           Number(b.column === columnIndex(linkColumn)) -
@@ -258,8 +236,6 @@ function sheetRows(sheet: Sheet): SheetRow[] {
   return rows.sort((a, b) => a.row - b.row);
 }
 
-// --- The database ------------------------------------------------------------
-
 type ItemRow = CatalogueRow & {
   name: string;
   image_url: string | null;
@@ -280,8 +256,6 @@ async function loadItems(ref: string): Promise<ItemRow[]> {
 
 const lower = (value: string | null | undefined) =>
   (value ?? "").replace(/\s+/g, " ").trim().toLowerCase();
-
-// --- Pictures ----------------------------------------------------------------
 
 async function uploadPicture(
   storage: ReturnType<typeof createClient>["storage"],
@@ -317,8 +291,6 @@ async function uploadPicture(
   return { thumb_url: urls[0], image_url: urls[1] };
 }
 
-// --- Main --------------------------------------------------------------------
-
 async function main() {
   const argv = process.argv.slice(2);
   const ref = requireProjectRef(argv);
@@ -353,7 +325,6 @@ async function main() {
 
   const { matched, copies, fresh } = matchSheet(rows, items);
 
-  // --- What would change on existing items --------------------------------
   const pictureTargets = matched.filter(
     (m) => m.row.pictures.length > 0 && !m.item.thumb_url && !m.item.image_url,
   );
@@ -361,7 +332,6 @@ async function main() {
     .filter((m) => m.row.link && !m.item.source_url)
     .map((m) => ({ id: m.item.id, source_url: cleanLink(m.row.link)! }));
 
-  // --- New items -------------------------------------------------------------
   const errors: string[] = [];
   const taken = new Set(codes.map((c) => c.code));
   const categoryByKey = new Map(categories.map((c) => [lower(c.name), c.name]));
@@ -394,14 +364,13 @@ async function main() {
       brand,
       placement: sheetPlacement(row.placement),
       default_uom: unit ?? "each",
-      // Whole rupees, as every price the first import stored.
+      // Whole rupees.
       indicative_price: row.price === null ? null : Math.round(row.price),
       source_url: cleanLink(row.link),
     };
   });
 
-  // Close to something the toolbox has, by the founder's rule still new.
-  // Listed so a person can look — Masters can switch one off.
+  // Close to an existing item, so still new; listed so a person can look.
   const byLink = new Map<string, ItemRow>();
   for (const item of items) if (item.source_url) byLink.set(linkKey(item.source_url), item);
   const matchedIds = new Set(matched.map((m) => m.item.id));
@@ -420,7 +389,6 @@ async function main() {
       : [];
   });
 
-  // --- Report ----------------------------------------------------------------
   const byRule = new Map<string, number>();
   for (const m of matched) byRule.set(m.rule, (byRule.get(m.rule) ?? 0) + 1);
   console.log(`Rows that are items the toolbox already has: ${matched.length}`);
@@ -479,7 +447,6 @@ async function main() {
     return;
   }
 
-  // --- Write: items and links, in one transaction -------------------------------
   if (inserts.length > 0 || linkTargets.length > 0) {
     const statements: string[] = [];
     for (const category of newCategories.values()) {
@@ -510,8 +477,7 @@ async function main() {
           source_url: i.source_url,
         })),
       );
-      // Categories and brands resolve by name inside the statement; the
-      // `not exists` makes a re-run of a half-finished write harmless.
+      // Categories and brands resolve by name; `not exists` makes a re-run harmless.
       statements.push(
         `insert into items (code, name, description, kind, category_id, brand_id, placement,
                             default_uom, indicative_price, source_url, is_active, is_provisional)
@@ -536,9 +502,7 @@ async function main() {
     console.log(`\nWrote ${inserts.length} new item(s) and ${linkTargets.length} link(s).`);
   }
 
-  // --- Write: pictures -----------------------------------------------------------
-  // Matched again against the database as it now is, so the new items have
-  // their ids — and so a run interrupted here resumes where it stopped.
+  // Matched again against the database as it now is, so new items have ids and an interrupted run resumes.
   const again = matchSheet(rows, await loadItems(ref));
   if (again.fresh.length > 0) {
     console.error(

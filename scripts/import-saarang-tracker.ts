@@ -1,47 +1,23 @@
 /**
- * Brings the self-hosted Saarang Tracker's data into Client Relations,
- * once — its plots' paperwork, build stage, Kaadal and design checks, and
- * every action (root plan.md, seventh piece; 0119, 0120).
+ * Brings the Saarang Tracker's data into Client Relations, once: plot paperwork, build
+ * stage, Kaadal and design checks, and every action (0119, 0120).
  *
  *   npx tsx scripts/import-saarang-tracker.ts --project <ref> --json data/saarang-tracker-<date>.json            # dry run
- *   npx tsx scripts/import-saarang-tracker.ts --project <ref> --json data/saarang-tracker-<date>.json --commit   # write
- *   … --print <file.sql>   writes the batch (ending in a dry-run abort) for scripts/dry-run-migrations.ts --trial
+ *   npx tsx scripts/import-saarang-tracker.ts --project <ref> --json data/saarang-tracker-<date>.json --commit
+ *   ... --print <file.sql>   writes the batch (ending in a dry-run abort) for scripts/dry-run-migrations.ts --trial
  *
- * The export is the tracker's own `/api/export` (a manager's download) or
- * its `data.json`. It names clients and their circumstances, so it lives
- * in /data, which git ignores — never commit it.
+ * The export names clients, so it lives in /data, which git ignores. Never commit it.
+ * One transaction, the import-birdwing shape; a dry run aborts at the end.
  *
- * ONE TRANSACTION, the import-birdwing shape: the data rides in as JSON,
- * set-based statements place it, an assertion block proves every action
- * landed, and a dry run sends the same batch and aborts it at the end.
- *
- * WHAT IT DECIDES
- *
- *   * A plot matches by number: "Plot 22-23" is Saarang's P22-23 and
- *     "P3 05" is Saarang West's W5 (lib/client-relations/saarang-tracker.ts).
- *     Run scripts/update-saarang-register.ts first, so Masters has them.
- *   * IT FILLS BLANKS AND NEVER OVERWRITES. A field Client Relations
- *     already holds keeps its value; a deed or CA status counts as blank
- *     while it is the default 'not_signed'.
- *   * MASTERS IS NEVER WRITTEN. Where the tracker and Masters disagree on
- *     who holds a plot, the plot's fields are left alone and the plot is
- *     listed for the founder. Its actions still land on it — they are
- *     about the plot, whoever holds it.
- *   * An action on a plot Masters does not have lands with no plot, the
- *     tracker's plot named in its notes, so no promise is dropped.
- *   * The build stage matches Masters' build progress by name; "Not
- *     started" is none. A "Yes" design check is stamped with the plot's
- *     last-updated day in the tracker — the only date it has. The
- *     tracker's plot-payment word goes into the plot's details beside its
- *     notes, because Client Relations works payment out from receipts.
- *   * The tracker's "Fix first" list is not imported: every item on it is
- *     resolved. Nor is its audit log.
- *
- * RE-RUNNABLE. Each action's id is derived from its tracker id
- * (md5('saarang-tracker:<id>')), so a second run inserts nothing; the
- * plots' fill-blank updates change nothing the second time.
- *
- * Service-level access through the management API (scripts only).
+ *   * A plot matches by number: "Plot 22-23" is P22-23, "P3 05" is Saarang West's W5
+ *     (lib/client-relations/saarang-tracker.ts). Run update-saarang-register.ts first.
+ *   * It fills blanks, never overwrites; a deed or CA status counts as blank while 'not_signed'.
+ *   * Masters is never written. Where the tracker and Masters disagree on who holds a plot,
+ *     the plot is listed for the founder; its actions still land on it.
+ *   * An action on a plot Masters lacks lands with no plot, named in its notes.
+ *   * A "Yes" design check is stamped with the plot's last-updated day (the only date there is).
+ *   * The tracker's "Fix first" list and audit log are not imported.
+ * Re-runnable: each action's id is md5('saarang-tracker:<id>'), so a second run inserts nothing.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 

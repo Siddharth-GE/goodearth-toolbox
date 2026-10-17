@@ -1,20 +1,12 @@
 /**
- * Runs migration files (and an optional trial) inside ONE transaction that
- * always aborts — a parse-and-assert check that keeps nothing.
+ * Runs migration files (and an optional trial) inside ONE transaction that always aborts,
+ * so a typo or failing assert shows up before review and nothing is kept.
  *
- * WHY. A migration reaches `db:apply` only after its review (MODELS.md),
- * but a typo or a failing assert is cheaper to find before the review
- * than during it. This sends `begin; <files>; <trial>; raise; rollback;`
- * through the management API: every statement runs, every migration's
- * own asserts run, a trial can exercise the new triggers — and the final
- * raise guarantees nothing is committed. "DRY RUN COMPLETE" (or the
- * trial's own "ALL TRIALS PASSED") is success; any other error is the
- * first thing that failed.
+ * It sends `begin; <files>; <trial>; raise; rollback;` through the management API.
+ * "DRY RUN COMPLETE" (or the trial's "ALL TRIALS PASSED") is success; any other error is
+ * the first thing that failed. Practice database only, however safe the rollback.
  *
- * Practice database only, however safe the rollback.
- *
- *   npx tsx scripts/dry-run-migrations.ts --project <ref> \
- *     supabase/migrations/0101_x.sql … [--trial scripts/trials/erp-chain.sql]
+ *   npx tsx scripts/dry-run-migrations.ts --project <ref> supabase/migrations/0101_x.sql [--trial scripts/trials/erp-chain.sql]
  */
 import { readFileSync } from "node:fs";
 

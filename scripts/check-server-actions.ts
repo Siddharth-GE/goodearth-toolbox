@@ -1,17 +1,11 @@
 /**
- * Guards against the failure that took production down on 2026-08-03.
+ * Guards against type re-exports in "use server" files (BUGCATCHER). A bare
+ * `export type { X };` builds fine, then kills EVERY action in its chunk at
+ * module load with "X is not defined".
  *
- * A bare `export type { X };` in a "use server" file compiles fine and
- * builds fine — then kills EVERY action in its chunk at module load with
- * "X is not defined". Pages still render, so nothing looks wrong until
- * somebody presses a save button. It went unnoticed for two days.
- *
- * `tsc`, ESLint, the tests and `next build` were all green throughout,
- * which is why this exists as its own check. Two passes:
- *
- *   1. SOURCE — refuse the pattern in any "use server" file.
- *   2. COMPILED — scan the built chunks for its fingerprint, so a form
- *      the source pass hasn't thought of is still caught.
+ *   1. SOURCE: refuse the pattern in any "use server" file.
+ *   2. COMPILED: scan the built chunks for its fingerprint, to catch forms
+ *      the source pass misses.
  *
  * Run after `npm run build` so both passes have something to look at.
  */
@@ -35,7 +29,6 @@ function walk(dir: string, match: (name: string) => boolean, out: string[] = [])
   return out;
 }
 
-/** A file-level "use server" directive — the only kind that matters here. */
 function isServerActionFile(source: string): boolean {
   for (const raw of source.split("\n").slice(0, 30)) {
     const line = raw.trim();
@@ -45,14 +38,8 @@ function isServerActionFile(source: string): boolean {
   return false;
 }
 
-/**
- * All three re-export forms: `export type { X }`, `export { type X }`,
- * and the wildcard `export type * from "./mod"`.
- *
- * Only lines that actually START a statement are considered — the
- * codebase deliberately mentions this pattern in comments explaining why
- * it's banned, and those must not trip the check.
- */
+// All three re-export forms: `export type { X }`, `export { type X }`, `export type * from`.
+// Only lines that START a statement count, so comments naming the pattern pass.
 function findTypeReExports(source: string): { line: number; detail: string }[] {
   const lines = source.split("\n");
   const found: { line: number; detail: string }[] = [];
@@ -67,7 +54,7 @@ function findTypeReExports(source: string): { line: number; detail: string }[] {
     }
 
     if (/^export\s*\{/.test(line)) {
-      // An export block can span lines: `export {\n  type Foo,\n};`
+      // An export block can span lines.
       let block = line;
       let j = i;
       while (!block.includes("}") && j + 1 < lines.length && j - i < 20) {
@@ -99,17 +86,8 @@ function checkSource(): Problem[] {
   return problems;
 }
 
-/**
- * The compiled fingerprint.
- *
- * Turbopack emits every server action module's exports as
- * `ensureServerEntryExports([i,j,k,…])`, where the real actions are
- * minified to short local identifiers. A type that doesn't exist at
- * runtime can't be minified, so it survives in that list as its original
- * PascalCase name — and evaluating the array throws on module load.
- *
- * Verified against a deliberately broken build before being trusted.
- */
+// Turbopack lists every action module's exports as `ensureServerEntryExports([i,j,k,…])`.
+// Real actions are minified; a type survives as its PascalCase name, and evaluating the array throws.
 const EXPORT_LIST = /ensureServerEntryExports[^[]{0,40}\[([^\]]{0,4000})\]/g;
 const LOOKS_LIKE_A_TYPE = /^[A-Z][A-Za-z0-9_$]+$/;
 
@@ -138,8 +116,6 @@ function checkBuild(): { problems: Problem[]; listsSeen: number } {
   return { problems, listsSeen };
 }
 
-// ---------------------------------------------------------------------
-
 const sourceProblems = checkSource();
 let failed = false;
 
@@ -165,9 +141,7 @@ if (!existsSync(join(ROOT, BUILD_DIR))) {
   const { problems, listsSeen } = checkBuild();
 
   if (listsSeen === 0) {
-    // A guard that silently stops guarding is worse than no guard: if the
-    // bundler's output shape changes, fail loudly and re-derive it (see
-    // the header — the shape was found by building the bug on purpose).
+    // If the bundler's output shape changes, fail loudly and re-derive the fingerprint.
     failed = true;
     console.error(
       "\n✗ build: found no ensureServerEntryExports(...) lists to inspect." +
