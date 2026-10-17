@@ -19,15 +19,7 @@ import { ChevronDown, ChevronUp, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-/**
- * Setting a project's schedule. Two kinds of input and no more: the date
- * it starts, and how many weeks each stage takes.
- *
- * There is deliberately nowhere to type a stage's start or end date.
- * Those are shown, calculated, next to each row — and they move on their
- * own when anything above them changes, which is the whole reason they
- * are not stored.
- */
+/** Two inputs only: the start date and each stage's weeks. Stage dates are calculated, never typed. */
 export function ScheduleEditor({
   projectId,
   startDate,
@@ -44,11 +36,7 @@ export function ScheduleEditor({
   const [newName, setNewName] = useState("");
   const [newWeeks, setNewWeeks] = useState(4);
 
-  // A plain boolean, not useTransition. router.refresh() inside an async
-  // transition leaves isPending true for as long as the refresh is in
-  // flight — and on this page, which stays mounted, that greyed the
-  // whole editor out and never came back. Nothing here needs a
-  // transition's interruptibility; it needs "is a save running".
+  // Plain boolean, not useTransition: router.refresh() inside a transition leaves isPending true and greys this mounted editor out.
   const run = async (action: () => Promise<{ error?: string } | undefined>) => {
     setPending(true);
     setError(null);
@@ -211,8 +199,6 @@ function StageRow({
         onChange={(e) => setWeeks(Number(e.target.value))}
       />
 
-      {/* Calculated, never typed — and it moves by itself when anything
-          above this row changes. */}
       <span className="text-muted shrink-0 font-mono text-[11px]">
         {formatDate(stage.startDay)} → {formatDate(stage.endDay)}
       </span>

@@ -6,35 +6,18 @@ import { guardError } from "@/lib/db-error";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
-// Applying a standard set needs two reads before it can write — the set's
-// activities, and each one's legs from its last run. Both live in
-// queries.ts; this is a plain server-to-server import, and it stays a
-// one-way street (queries.ts never imports from here).
+// Applying a set reads queries.ts first; the import stays one-way (queries.ts never imports from here).
 import { getActivityDefaults, getDepartmentsByTrailSet, listTrailSets } from "./queries";
 
-// Type-only import, and deliberately NOT re-exported — a bare
-// `export type { X };` in a "use server" file crashes every action in its
-// compiled chunk at load time (npm run check:actions enforces this).
+// Type-only and not re-exported: a re-export in a "use server" file crashes the chunk (check:actions).
 import type { ActionState } from "@/lib/action-state";
 
 /**
- * Writes for Pusher.
- *
- * The relay's rules live in the database (migration 0036 §8–§9), not
- * here. These actions exist to turn a refusal into something a person can
- * read and to revalidate the right pages — a write that skips them is
- * still stopped by the guard.
- *
- * Pushing, bouncing and finishing are ONE INSERT each: the guard stamps
- * the actor, the timestamp, the sequence number and the snapshots. That
- * is deliberate, and worth preserving — there is nothing for a caller to
- * get wrong except which trail and which leg.
+ * The relay's rules live in the database (0036 §8-§9); these actions turn a refusal into
+ * words a person can read and revalidate pages. Push, bounce and finish are one INSERT each.
  */
 
-/**
- * The guard's messages are written to be read by a person; pass the known
- * ones straight through instead of burying them under "try again".
- */
+// The guard's messages are written for people; pass known ones through.
 const RELAY_GUARD_PHRASES = [
   "baton",
   "trail",
@@ -44,38 +27,23 @@ const RELAY_GUARD_PHRASES = [
   "signed-in",
 ] as const;
 
-/**
- * The layout form, always: the Relay welcome screen renders four live
- * counters (in flight, gone cold, in your court, with a client) and an
- * exact-path call left every one of them stale — the exact-path trap in
- * CLAUDE.md. One call covers every screen under /relay.
- */
+// Layout form: the welcome screen's counters go stale on an exact-path call (CLAUDE.md).
 function revalidateRelay() {
   revalidatePath("/relay", "layout");
 }
 
-/** A leg IS an activity (0043) — there is no label to type any more. */
 export type LegInput = { activityId: string; assigneeId: string; expectedDays: number };
 
 export type OpenTrailInput = {
   projectId: string;
   unitId: string | null;
-  /**
-   * The trail's single activity — only for a one-step trail, and null
-   * for anything longer. Since 0043 the activities live on the LEGS; a
-   * twelve-step trail has no one answer to "which activity is it", which
-   * is why the column is nullable and the view falls back to the type's
-   * name.
-   */
+  /** Only for a one-step trail, else null: the activities live on the legs (0043). */
   activityId: string | null;
-  /** Which trail type this is, if it came from one. */
   trailSetId: string | null;
   title: string | null;
   note: string | null;
   legs: LegInput[];
-  /** A trail can be in several at once — a selections handoff is Design and Purchase. */
   departmentIds: string[];
-  /** False lays it out without starting it — the queue the founder kept. */
   start?: boolean;
 };
 
@@ -95,18 +63,14 @@ export async function openTrail(
     }
   }
 
-  // The same activity twice in one trail would put the baton through
-  // identical steps, which is never what anyone meant and is impossible
-  // to read on the route afterwards.
+  // The same activity twice sends the baton through identical steps.
   const seen = new Set(input.legs.map((l) => l.activityId));
   if (seen.size !== input.legs.length) {
     return { error: "The same activity appears twice — each step should be a different one." };
   }
 
   const supabase = await createClient();
-  // The generated RPC arg types are non-null (Postgres has no way to say
-  // "this parameter may be null"), but unit_id, title and note all
-  // legitimately are — a project-level trail has no unit.
+  // Generated RPC arg types are non-null, but unit_id, title and note may be null.
   const { data, error } = await supabase.rpc("open_chain", {
     p_project_id: input.projectId,
     p_unit_id: input.unitId as string,
@@ -119,8 +83,6 @@ export async function openTrail(
       expected_days: l.expectedDays,
     })),
     p_trail_set_id: input.trailSetId as string,
-    // Kept by the founder: a trail can be laid out now and begun when
-    // the site is actually ready.
     p_start: input.start !== false,
   });
 
@@ -128,10 +90,7 @@ export async function openTrail(
 
   const chainId = data as string;
 
-  // A second call rather than a parameter on open_chain: the trail
-  // existing without its tags is a cosmetic gap someone can fix on the
-  // trail page, whereas failing the whole open because a department is
-  // missing would lose the legs they just typed.
+  // A second call: missing tags are cosmetic, failing the open would lose the legs just typed.
   if (input.departmentIds.length > 0) {
     const { error: deptError } = await supabase.rpc("set_chain_departments", {
       p_chain_id: chainId,
@@ -144,12 +103,7 @@ export async function openTrail(
   return { chainId };
 }
 
-/**
- * `fromLeg` is the caller's optimistic-concurrency token: "I am acting on
- * the leg I was looking at". If someone else moved the baton in the
- * meantime the guard says so by name rather than quietly acting on the
- * wrong leg.
- */
+/** fromLeg is the optimistic-concurrency token: if the baton moved meanwhile, the guard says so. */
 export async function pushBaton(
   chainId: string,
   fromLeg: number,
@@ -171,14 +125,7 @@ export async function pushBaton(
   return undefined;
 }
 
-/**
- * Say the work has gone to the client, or come back.
- *
- * Same leg, same holder, same clock — the only thing that changes is
- * what the screen says is being waited on. The person holding the baton
- * is still the person chasing it, which is why the trail stays in their
- * court with an amber chip rather than disappearing from it.
- */
+/** Mark work as gone to the client or back. Same leg, holder and clock; the trail stays in the holder's court. */
 export async function holdForClient(
   chainId: string,
   fromLeg: number,
@@ -256,8 +203,7 @@ export async function bounceBaton(
 ): Promise<ActionState> {
   await requireTool("/relay");
 
-  // The database refuses these too (0036 §6) — checked here so the form
-  // can say so without a round trip that reads like a crash.
+  // The database refuses these too (0036 §6); checked here for a readable message.
   if (!reason) return { error: "Pick a reason — a bounce is never silent." };
   if (!note.trim()) return { error: "Say what needs to change before it comes back." };
   if (toLeg >= fromLeg) return { error: "A bounce goes backwards, to a leg the trail has passed." };
@@ -277,7 +223,7 @@ export async function bounceBaton(
   return undefined;
 }
 
-/** Admin only, and enforced in the RPC and both guards, not just here. */
+/** Admin only, enforced in the RPC and both guards. */
 export async function handBaton(
   chainId: string,
   toUserId: string,
@@ -305,16 +251,8 @@ export async function handBaton(
 }
 
 /**
- * Rewrites the legs still ahead of the baton. Everything behind it is
- * history.
- *
- * NOT WIRED TO A SCREEN YET, AND NOT DEAD CODE — leave it alone. The
- * waiting list has no inline editor for a queued trail's activities; this
- * is the write path that editor will call, written and tested first
- * because getting the "everything ahead of the baton" boundary wrong
- * would rewrite history. `editableFromLeg` in ./events.ts is its other
- * half, unwired for the same reason. A cleanup that removes unused
- * exports will find both and should be told no.
+ * Rewrites the legs still ahead of the baton. NOT WIRED TO A SCREEN YET, NOT DEAD CODE:
+ * the queued-trail editor will call it, and so will editableFromLeg in ./events.ts. Do not remove either.
  */
 export async function replaceFutureLegs(chainId: string, legs: LegInput[]): Promise<ActionState> {
   await requireTool("/relay");
@@ -342,11 +280,7 @@ export async function replaceFutureLegs(chainId: string, legs: LegInput[]): Prom
   return undefined;
 }
 
-/**
- * The project schedule. Only two things are ever typed: a start date and
- * a stage's length in weeks. Every date on screen is worked out from
- * them, so there is nothing here that sets one.
- */
+/** The project schedule: only a start date and each stage's weeks are typed; every date is derived. */
 export async function setProjectStart(projectId: string, startDate: string): Promise<ActionState> {
   await requireTool("/relay");
 
@@ -385,8 +319,7 @@ export async function addProjectStage(
   const supabase = await createClient();
   const user = await getCurrentUser();
 
-  // Appended to the end. Reordering is its own action, so adding a stage
-  // never silently reshuffles the plan.
+  // Appended last; reordering is its own action.
   const { data: last, error: lastError } = await supabase
     .from("project_stages")
     .select("sort_order")
@@ -452,15 +385,14 @@ export async function deleteProjectStage(stageId: string): Promise<ActionState> 
   const supabase = await createClient();
   const { error } = await supabase.from("project_stages").delete().eq("id", stageId);
 
-  // The guard refuses a stage that still has trails in it, and says how
-  // many — pass that through rather than a generic failure.
+  // The guard refuses a stage that still has trails and says how many; pass that through.
   if (error) return guardError(error, "Could not remove this stage.", RELAY_GUARD_PHRASES);
 
   revalidateRelay();
   return undefined;
 }
 
-/** Swap a stage with its neighbour. The accepted moveSpaceView race — it self-heals. */
+/** Swap a stage with its neighbour. The accepted moveSpaceView race; it self-heals. */
 export async function moveProjectStage(
   stageId: string,
   projectId: string,
@@ -482,11 +414,7 @@ export async function moveProjectStage(
   const swapWith = direction === "up" ? index - 1 : index + 1;
   if (index < 0 || swapWith < 0 || swapWith >= stages.length) return undefined;
 
-  // Two updates rather than an upsert: nothing is being inserted, and an
-  // upsert would demand every NOT NULL column just to change one. There
-  // is no unique index on sort_order, so the moment between the two
-  // writes where both rows share a value is harmless — reads break ties
-  // on id.
+  // Two updates, not an upsert (it would demand every NOT NULL column). sort_order has no unique index, so the gap is harmless.
   const a = stages[index];
   const b = stages[swapWith];
   const [first, second] = await Promise.all([
@@ -499,7 +427,6 @@ export async function moveProjectStage(
   return undefined;
 }
 
-/** Filing a trail under a stage — or taking it out of one. */
 export async function setTrailStage(
   chainId: string,
   projectStageId: string | null,
@@ -519,7 +446,6 @@ export async function setTrailStage(
   return undefined;
 }
 
-/** Replaces the whole set — the UI edits departments as chips, not one at a time. */
 export async function setTrailDepartments(
   chainId: string,
   departmentIds: string[],
@@ -562,7 +488,6 @@ export async function createDepartment(
   return undefined;
 }
 
-/** Departments are switched off, never deleted — past trails must stay readable. */
 export async function setDepartmentActive(id: string, isActive: boolean): Promise<ActionState> {
   await requireTool("/relay");
 
@@ -602,7 +527,6 @@ export async function createActivity(
   return undefined;
 }
 
-/** Activities are switched off, never deleted — trails behind them must stay readable. */
 export async function setActivityActive(id: string, isActive: boolean): Promise<ActionState> {
   await requireTool("/relay");
 
@@ -618,36 +542,9 @@ export async function setActivityActive(id: string, isActive: boolean): Promise<
   return undefined;
 }
 
-// ---------------------------------------------------------------------
-// Standard trails at the house level
-// ---------------------------------------------------------------------
-
 /**
- * Lay a standard set down on a house.
- *
- * Every trail arrives QUEUED — created, staffed, and with no clock
- * running. That is the whole point: twelve live trails would be twelve
- * clocks started at once, and the Handover trail at three expected days
- * would be cold within the week, on work nobody meant to begin.
- *
- * One RPC, so a set either lands whole or not at all. The legs come from
- * each activity's last run, exactly as the Open-a-trail form fills them
- * in — a set says WHAT work happens, the last run says who tends to do
- * it. An activity nobody has ever run has no prefill, so it is reported
- * by name rather than silently skipped or landed with an empty leg.
- */
-/**
- * Lay a trail type down on a house — ONE trail, whose legs are the
- * type's activities in order (0043).
- *
- * This used to create twelve separate trails. The founder's correction:
- * "the leg is the activity". So a standard villa is one trail with
- * twelve activity-legs and one baton walking them, which also means one
- * clock rather than twelve — the thing the queue was invented to stop.
- *
- * Each activity's person and days come from the type's own defaults,
- * falling back to whoever last carried that activity anywhere. Everything
- * is editable afterwards, and nothing behind the baton ever is.
+ * Lay a trail type down on a house as ONE trail whose legs are the type's activities (0043).
+ * Person and days come from the type's defaults, else whoever last carried the activity.
  */
 export async function applyTrailSet(
   projectId: string,
@@ -671,9 +568,7 @@ export async function applyTrailSet(
     return { error: `"${set.name}" has no activities in it yet — add some first.` };
   }
 
-  // An activity nobody has ever carried has no one to put on it. Naming
-  // them is the whole value of this message: the fix is to pick someone,
-  // and nobody can do that without being told which.
+  // An activity nobody has carried has no one to put on it; name it so the user can pick someone.
   const unstaffed = set.activities
     .filter((item) => !defaults.get(item.activityId)?.assigneeId)
     .map((item) => item.activityName);
@@ -705,10 +600,7 @@ export async function applyTrailSet(
   const chainId = typeof data === "string" ? data : undefined;
   const departmentIds = departments.get(setId) ?? [];
   if (chainId && departmentIds.length > 0) {
-    // Best effort, and deliberately not fatal: the trail exists and is
-    // correct without its department tags, and failing the whole action
-    // here would leave the founder staring at an error beside a trail
-    // that plainly did get created.
+    // Best effort: the trail is correct without its department tags.
     await supabase.rpc("set_chain_departments", {
       p_chain_id: chainId,
       p_department_ids: departmentIds,
@@ -731,13 +623,7 @@ export async function startTrail(chainId: string) {
   return undefined;
 }
 
-/**
- * Throw away a queued trail — the one honest exception to "never delete
- * a chain" (0036 §7), and only because it has no history to destroy.
- *
- * The database refuses the moment it has started, so the button is a
- * courtesy and the guard is the boundary, as everywhere else here.
- */
+/** Throw away a queued trail: the one exception to "never delete a chain" (0036 §7), since it has no history. The database refuses once started. */
 export async function discardTrail(chainId: string) {
   await requireTool("/relay");
   if (!chainId) return { error: "Pick a trail first." };
@@ -774,7 +660,6 @@ export async function createTrailSet(
   return undefined;
 }
 
-/** Types are switched off, never deleted — the trails they built stay readable. */
 export async function setTrailSetActive(id: string, isActive: boolean): Promise<ActionState> {
   await requireTool("/relay");
 
@@ -790,14 +675,7 @@ export async function setTrailSetActive(id: string, isActive: boolean): Promise<
   return undefined;
 }
 
-/**
- * Replace a set's activities wholesale — which is also how it is
- * reordered, because sort_order is rewritten from the array's position.
- *
- * Delete-then-insert rather than a diff: the list is a dozen rows at
- * most, and a diff would have to reason about a row that moved AND
- * changed, which is exactly where an ordering bug hides.
- */
+/** Replace a set's activities wholesale (also how it is reordered). Delete-then-insert, not a diff: a dozen rows at most. */
 export async function setTrailSetActivities(
   setId: string,
   items: { activityId: string; expectedDays: number }[],
@@ -805,8 +683,7 @@ export async function setTrailSetActivities(
   await requireTool("/relay");
   if (!setId) return { error: "Pick a trail type first." };
 
-  // The same activity twice would send the baton through identical
-  // steps — the database refuses it, and this says so first.
+  // The database refuses a duplicate activity; this says so first.
   if (new Set(items.map((i) => i.activityId)).size !== items.length) {
     return { error: "That activity is already in this type." };
   }

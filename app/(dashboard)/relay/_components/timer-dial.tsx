@@ -1,13 +1,6 @@
 import { cn } from "@/lib/utils";
 
-/**
- * How long the baton has been sitting here, against how long it was
- * supposed to. A ring rather than a number alone, because the thing a
- * reader needs at a glance is the proportion, not the arithmetic.
- *
- * Past the allowance the ring fills red and breathes — calm, and
- * impossible to miss. That is the whole product in one component.
- */
+/** How long the baton has sat here against its allowance, as a ring (the proportion matters at a glance). Past the allowance it fills red and breathes. */
 export function TimerDial({
   days,
   expectedDays,
@@ -30,8 +23,7 @@ export function TimerDial({
       style={{
         background: `conic-gradient(var(--${stuck ? "danger" : "accent"}) ${pct}%, var(--border) 0)`,
       }}
-      // The ring is decorative; the text inside already says it, and a
-      // screen reader should hear it once, not twice.
+      // Decorative: the text inside already says it.
       role="img"
       aria-label={`${days} of ${expectedDays} days${stuck ? ", overdue" : ""}`}
     >

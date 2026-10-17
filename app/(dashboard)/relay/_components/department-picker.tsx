@@ -2,16 +2,7 @@
 
 import { cn } from "@/lib/utils";
 
-/**
- * Departments as toggle chips, because a trail is routinely in more than
- * one — a selections handoff is Design and Purchase, a site handover is
- * Site and Client Relations. A single dropdown would have forced a lie
- * on exactly the trails worth watching.
- *
- * Chips rather than a multi-select box: with six or so options the whole
- * set is visible at once and picking two is two taps, which matters on a
- * phone.
- */
+/** Departments as toggle chips: a trail is often in several (Design and Purchase), and chips keep it two taps on a phone. */
 export function DepartmentPicker({
   departments,
   selected,

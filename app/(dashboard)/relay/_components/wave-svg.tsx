@@ -3,37 +3,9 @@ import { wavePath } from "@/lib/relay/wave";
 import { cn } from "@/lib/utils";
 
 /**
- * A house's open work, drawn as one wave along the project's stages.
- *
- * Inline SVG for the same reason as the trail route: the shape IS the
- * information. Counts in a row would say how much work is open; only the
- * curve says where it is piled up and where nothing has started.
- *
- * Scaled UNIFORMLY — a stretched viewBox turns every marker dot into a
- * smear. On a phone the wave gets short; the status words beside it carry
- * the reading at that size, which is the same trade the trail route made.
- *
- * It draws NO stage names. It used to draw its own set at `lg`, centred
- * on each stage and clipped at the edges — which is the exact bug
- * `WaveStageHeader` below was written to fix, shipped twice because the
- * fix was applied to one copy and not the other. There is one way to
- * label a wave now, and it is that component.
- *
- * The model does all the arithmetic (lib/relay/wave.ts). This file only
- * chooses colours and layers. The choices lean quiet on purpose: the
- * body is a gradient that fades to nothing rather than a flat tint, the
- * stage rules are dotted hairlines, and the only saturated ink on the
- * whole drawing is a marker that means trouble.
- *
- * THE INK GOES WHERE THE WORK IS. A villa with one trail used to be
- * drawn as a heavy line across the whole row — ninety percent of the
- * stroke saying "nothing here" at the same weight as the one hump that
- * mattered. The curve is now stroked only across the stages that hold
- * work (rising off the baseline and settling back beside them); the rest
- * of the row is just the ruled hairline. Two deliberate exceptions:
- * "complete" keeps its full-width green line, because the whole trail
- * having landed IS a statement about the whole row, and "nothing yet"
- * draws no curve at all — an absence should look absent.
+ * A house's open work as one wave along the project's stages (inline SVG, scaled UNIFORMLY so dots don't smear).
+ * It draws NO stage names: WaveStageHeader is the one way to label a wave. Arithmetic lives in lib/relay/wave.ts.
+ * THE INK GOES WHERE THE WORK IS: stroke only stages holding work; "complete" is full-width green, "nothing yet" no curve.
  */
 export function WaveSvg({ model, size = "sm" }: { model: WaveModel; size?: "sm" | "lg" }) {
   const W = 720;
@@ -41,22 +13,13 @@ export function WaveSvg({ model, size = "sm" }: { model: WaveModel; size?: "sm" 
   const PAD = size === "lg" ? 14 : 8;
   const baseline = H - PAD;
 
-  // Complete is the only state that earns green: the work has landed.
-  // Everything with open work is drawn in the reading colour, and the
-  // dots — not the line — carry what is wrong. A line that changed colour
-  // for every state would make five waves on a page into a rainbow, and
-  // the eye would stop trusting any of them.
+  // Only "complete" earns green; open work uses the reading colour and the dots carry what is wrong.
   const quiet = model.status === "quiet" || model.status === "waiting";
   const stroke =
     model.status === "complete" ? "var(--success)" : quiet ? "var(--muted)" : "var(--foreground)";
   const hasBody = model.points.some((p) => p.y > 0);
 
-  // The living region: from the first stage holding work to the last.
-  // The curve is built from only the points inside it, entering and
-  // leaving on the baseline at its edges, so the stroke exists exactly
-  // where the work does. The edges reach a little beyond the stages
-  // themselves — a four-week stage is 4% of a three-year timeline, and
-  // rising and falling inside that alone drew a needle, not a wave.
+  // The living region: first to last stage holding work, padded so a short stage draws a wave, not a needle.
   const RAMP = 0.055;
   const active = model.bands.filter((b) => b.amp > 0);
   const lead = active.length > 0 ? Math.max(0, active[0].x0 - RAMP) : 0;
@@ -70,15 +33,11 @@ export function WaveSvg({ model, size = "sm" }: { model: WaveModel; size?: "sm" 
           { x: tail, y: 0 },
         ];
 
-  // The curve starts and ends on the baseline, so Z closes it flat.
   const d = wavePath(strokePoints, W, H, PAD);
   const area = `${d} Z`;
   const drawCurve = model.status !== "quiet";
 
-  // The body fades out instead of sitting as a flat tint — the curve is
-  // the subject and the fill only gives it weight. Gradient ids repeat
-  // across instances on one page; that is fine because every instance of
-  // a variant defines the identical gradient.
+  // The body fades out; gradient ids repeat across instances but each variant defines the same gradient.
   const fillId = quiet ? "relay-wave-body-quiet" : "relay-wave-body";
   const fillColour = quiet ? "var(--muted)" : "var(--accent)";
 
@@ -94,9 +53,6 @@ export function WaveSvg({ model, size = "sm" }: { model: WaveModel; size?: "sm" 
         </linearGradient>
       </defs>
 
-      {/* Where one stage ends and the next begins — dotted hairlines,
-          because the wave is the subject and these are only its ruled
-          paper. */}
       {model.bands.slice(1).map((band) => (
         <line
           key={band.stageId}
@@ -126,10 +82,7 @@ export function WaveSvg({ model, size = "sm" }: { model: WaveModel; size?: "sm" 
         />
       )}
 
-      {/* Where the plan says today is — one thin amber line, the same
-          signal the schedule picture uses, so the two pictures agree.
-          The head dot only on the big wave: on a card row it read as a
-          stray orange lollipop, louder than the work itself. */}
+      {/* Today's line matches the schedule picture; the head dot is only on the big wave (on a card row it looked like a lollipop). */}
       {model.planX !== null && (
         <g>
           <line
@@ -147,10 +100,7 @@ export function WaveSvg({ model, size = "sm" }: { model: WaveModel; size?: "sm" 
         </g>
       )}
 
-      {/* Trouble sits ON the curve, at the stage it belongs to. No
-          animation: a page of pulsing dots is an alarm everyone learns to
-          ignore, so breathing stays on the timer dial where there is
-          something to press. */}
+      {/* No animation on markers: a page of pulsing dots is an alarm to ignore. */}
       {model.markers.map((m) => (
         <g key={`${m.kind}-${m.x}`}>
           <circle
@@ -180,23 +130,8 @@ export function WaveSvg({ model, size = "sm" }: { model: WaveModel; size?: "sm" 
 }
 
 /**
- * The stage names for a wave, or a stack of waves sharing one x-axis.
- *
- * The names sit on TWO staggered rows, and that is not decoration.
- * Stage lengths vary wildly — Saarang runs a four-week Design straight
- * into a sixteen-week Technical Drawings — so one row either overlaps
- * the names or clips them to "De…" and "Co…". Staggering puts each
- * label's neighbours two stages away, which gives even a four-week stage
- * room for its full name over the exact point it labels.
- *
- * Always rendered INSIDE the surface that holds the wave, never floating
- * on the page: a strip of names hanging in page-space above a card reads
- * as debris, not as an axis.
- *
- * Carries no horizontal padding of its own: the labels are positioned as
- * percentages of THIS element's width, so it has to be the exact width
- * of the wave it names. Padding it to match one caller's card would put
- * every label a few pixels off the stage it points at in the other.
+ * Stage names for a wave or a stack sharing one x-axis, on TWO staggered rows so a four-week stage beside a sixteen-week one keeps its full name.
+ * Render INSIDE the surface holding the wave, with no horizontal padding: labels are percentages of this element's width.
  */
 export function WaveStageHeader({ wave, className }: { wave: WaveModel; className?: string }) {
   return (
@@ -208,8 +143,7 @@ export function WaveStageHeader({ wave, className }: { wave: WaveModel; classNam
     >
       {wave.bands.map((band, i) => {
         const mid = ((band.x0 + band.x1) / 2) * 100;
-        // The first and last names would hang off the ends, so they line
-        // up with the edge instead of their midpoint.
+        // End names align to the edge, not their midpoint.
         const align = mid < 8 ? "0" : mid > 92 ? "-100%" : "-50%";
         return (
           <span

@@ -9,14 +9,7 @@ import type { ActionState } from "@/lib/action-state";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState } from "react";
 
-/**
- * A name and an on/off switch — the shape both of Relay's little
- * masters have. Deliberately the plainest screen in the tool.
- *
- * Nothing here is ever deleted. A finished trail behind an activity or a
- * department has to stay readable forever, and the prefill history is
- * what makes opening a repeat quick.
- */
+/** A name and an on/off switch. Nothing is ever deleted: finished trails stay readable and prefill history makes repeats quick. */
 export function SimpleMaster({
   title,
   hint,
@@ -35,16 +28,14 @@ export function SimpleMaster({
   setActiveAction: (id: string, isActive: boolean) => Promise<ActionState>;
 }) {
   const [state, formAction, pending] = useActionState(createAction, undefined);
-  // See schedule-editor.tsx: a refresh inside a transition keeps a
-  // still-mounted control disabled while it runs.
+  // See schedule-editor.tsx: a refresh in a transition keeps the control disabled.
   const [busy, setBusy] = useState(false);
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const wasPending = useRef(false);
   const inputId = `new-${title.toLowerCase().replace(/\s+/g, "-")}`;
 
-  // Clear the box only after a save that actually worked, so a rejected
-  // name is still there to fix (the RecordFormDialog convention).
+  // Clear the box only after a save that worked (the RecordFormDialog convention).
   useEffect(() => {
     if (wasPending.current && !pending && !state?.error) {
       formRef.current?.reset();

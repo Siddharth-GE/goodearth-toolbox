@@ -10,26 +10,12 @@ import { useState, type ReactNode } from "react";
 
 import { SchedulePath } from "../../../_components/schedule-path";
 
-/**
- * The project at a glance — and the only place its schedule is edited.
- *
- * The editor used to sit permanently open below this card, so the page
- * opened with a form nobody needed most visits, pushing the houses and
- * the trails below the fold. It is now one button on the picture it
- * edits, which is where you are already looking when you decide the plan
- * is wrong.
- *
- * A plain `useState`, not `useTransition`: the editor stays mounted
- * across the router.refresh() every save does, and isPending would grey
- * the whole thing out for as long as the refresh took (Relay's PLAN.md
- * records that one).
- */
+/** The project at a glance and the only place its schedule is edited. Plain useState, not useTransition: the editor stays mounted across router.refresh() and isPending would grey it out (Relay PLAN.md). */
 export function ScheduleCard({
   schedule,
   editor,
 }: {
   schedule: ScheduleSummary;
-  /** Rendered on the server and passed in, so this stays a thin shell. */
   editor: ReactNode;
 }) {
   const [editing, setEditing] = useState(false);

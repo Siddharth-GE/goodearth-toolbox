@@ -5,15 +5,7 @@ import { setTrailStage } from "@/lib/relay/actions";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-/**
- * Filing a trail under a stage. Lives on the trail's own page, and on
- * the project page's stragglers panel — since 0065 a trail files itself
- * on creation, so this is the correction, not the routine.
- *
- * Disabled on a finished trail: it has already counted towards the
- * picture, and moving it after the fact rewrites what the schedule said
- * last week.
- */
+/** Files a trail under a stage: the correction, not the routine (a trail files itself on creation, 0065). Disabled once finished, or the schedule's past would change. */
 export function StagePicker({
   chainId,
   stages,
@@ -25,9 +17,7 @@ export function StagePicker({
   current: string | null;
   disabled?: boolean;
 }) {
-  // Plain boolean rather than useTransition — see the note in
-  // schedule-editor.tsx: a refresh inside a transition leaves a
-  // long-lived control disabled for as long as the refresh runs.
+  // Plain boolean, not useTransition (see schedule-editor.tsx): a refresh inside a transition leaves the control disabled.
   const [pending, setPending] = useState(false);
   const router = useRouter();
 

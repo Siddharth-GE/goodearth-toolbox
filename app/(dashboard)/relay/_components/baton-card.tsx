@@ -7,14 +7,8 @@ import type { ReactNode } from "react";
 import { TimerDial } from "./timer-dial";
 
 /**
- * One baton in your hand. Deliberately a card and not a table row: this
- * screen is the one a site engineer opens on a phone between site
- * visits, and it should read as "here is what is yours today", not as a
- * report.
- *
- * A cold card carries the breathing danger ring — the same signal as the
- * dial inside it, because the whole point is that it cannot be scrolled
- * past.
+ * One baton as a card, not a table row: read on a phone between site visits.
+ * A cold card carries the breathing danger ring so it cannot be scrolled past.
  */
 export function BatonCard({
   row,
@@ -60,8 +54,7 @@ export function BatonCard({
             </span>
           </>
         )}
-        {/* Still in your court while a client has it — you are the one
-            who chases them. */}
+        {/* Still in your court while a client has it: you chase them. */}
         {row.isWithClient && (
           <>
             {" · "}

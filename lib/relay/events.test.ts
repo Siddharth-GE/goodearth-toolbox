@@ -1,10 +1,4 @@
-/**
- * The mirror of the database guard, and the with-client flag.
- *
- * These tests matter most where the mirror could drift from the trigger:
- * a hold is derived from the last event that MOVED the work, which is
- * not always the last event, and a hand-off must not disturb it.
- */
+/** Mirror of the database guard; a hold derives from the last event that MOVED the work. */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -142,8 +136,7 @@ test("an unopened trail has nothing to hand over", () => {
 });
 
 test("the old predicates still answer correctly when a hold is the last event", () => {
-  // A held trail is still on its leg with its holder, so the ordinary
-  // moves stay available — that is the point of the snapshot columns.
+  // A held trail keeps its leg and holder, so ordinary moves stay available.
   const held = ev("client_held", { from_leg: 2, to_leg: 2 });
   assert.equal(currentLeg(held), 2);
   assert.equal(holderOf(held), PRIYA);

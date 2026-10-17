@@ -2,15 +2,7 @@ import { NavTabs } from "@/components/ui/tabs";
 import { Settings2 } from "lucide-react";
 import Link from "next/link";
 
-/**
- * The three places you actually work, plus a gear for the two you set up
- * once and rarely touch again.
- *
- * Activities and trail types are vocabulary, not work. Sitting them
- * beside Projects and Your court gave five tabs of equal weight and made
- * the daily ones harder to find — so they nest behind the gear, which is
- * the whole point of the hierarchy the founder asked for.
- */
+/** The three places you work, plus a gear for the two setup screens (activities, trail types), which are vocabulary, not work. */
 export function RelayNav({ active }: { active: string }) {
   const inSetup = active === "activities" || active === "sets";
 
@@ -41,7 +33,6 @@ export function RelayNav({ active }: { active: string }) {
   );
 }
 
-/** The two setup screens, shown only once you are inside one of them. */
 export function RelaySetupNav({ active }: { active: string }) {
   return (
     <NavTabs

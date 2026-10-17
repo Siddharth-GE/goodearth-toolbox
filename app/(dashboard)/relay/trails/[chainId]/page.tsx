@@ -72,9 +72,7 @@ export default async function TrailPage({ params }: { params: Promise<{ chainId:
             state.status === "finished" ? (
               <Badge variant="success">Done</Badge>
             ) : (
-              // Cold and with-client are not alternatives. A trail can be
-              // both, and when it is, both are worth saying: the delay is
-              // real, and the client is where it is sitting.
+              // Cold and with-client can both be true; say both.
               <div className="flex flex-wrap items-center gap-2">
                 {state.isStuck && <Badge variant="danger">Cold · {state.overBy}d over</Badge>}
                 {state.isWithClient && (
@@ -86,9 +84,6 @@ export default async function TrailPage({ params }: { params: Promise<{ chainId:
           }
         />
 
-        {/* Tags and filing, one quiet row. The stage picker moved here
-            from the project page's trails-by-stage listing when that
-            section went — a trail is re-filed where the trail is. */}
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <TrailDepartments
             chainId={chainId}
@@ -163,9 +158,7 @@ export default async function TrailPage({ params }: { params: Promise<{ chainId:
             <TrailRoute legs={state.legActuals} />
           </div>
 
-          {/* One column, always. A trail is a sequence, and two columns
-              made it read 1, 2 across then 3 below — the wrong order for
-              the one thing this list is for. */}
+          {/* One column: two columns read 1, 2 across then 3 below, the wrong order for a sequence. */}
           <div className="space-y-1.5 px-4 pb-4">
             {trail.legs.map((leg) => {
               const actual = state.legActuals.find((a) => a.legNo === leg.leg_no);
@@ -274,9 +267,7 @@ export default async function TrailPage({ params }: { params: Promise<{ chainId:
   );
 }
 
-// `label` is the activity's name snapshotted when the leg was written
-// (0043) — nullable, because the activity is the truth and the name is
-// the courtesy. Falls back to the leg number rather than showing a gap.
+// label is the activity name snapshotted when the leg was written (0043); null falls back to the leg number.
 function legName(
   trail: { legs: { leg_no: number; label: string | null }[] },
   legNo: number | null,

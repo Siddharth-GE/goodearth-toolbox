@@ -8,7 +8,6 @@ import type { ActionState } from "@/lib/action-state";
 import { Plus } from "lucide-react";
 import { useActionState, useEffect, useRef } from "react";
 
-/** Name a new standard set. Its activities are added on its own card below. */
 export function NewSetForm({
   action,
 }: {
@@ -17,8 +16,7 @@ export function NewSetForm({
   const [state, formAction, pending] = useActionState(action, undefined);
   const formRef = useRef<HTMLFormElement>(null);
 
-  // Clear the field once the set exists, so adding three in a row does
-  // not mean selecting and deleting the last name each time.
+  // Clear the field once the set exists, so adding several in a row is quick.
   useEffect(() => {
     if (!pending && !state?.error) formRef.current?.reset();
   }, [pending, state]);

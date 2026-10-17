@@ -4,12 +4,7 @@ import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useRouter, useSearchParams } from "next/navigation";
 
-/**
- * Narrowing the board. The choice lives in the URL so the list page
- * stays a Server Component — the bill-filters pattern, with one addition:
- * "Gone cold" is a toggle rather than a select, because it is the filter
- * anyone actually reaches for and it should be one tap.
- */
+/** Filters live in the URL so the list page stays a Server Component. "Gone cold" is a toggle: it is the one everyone reaches for. */
 export function TrailFilters({
   people,
   activities,

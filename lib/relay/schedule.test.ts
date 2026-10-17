@@ -1,9 +1,3 @@
-/**
- * The project schedule. Everything here is calculated from one start
- * date and a list of week counts, so these tests are mostly about the
- * two judgement calls: stages weigh by their length, and a stage in
- * progress earns partial credit.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -17,7 +11,6 @@ const stages = [
 ];
 
 const START = "2026-01-01";
-/** Noon IST on a given day, as the instant "now". */
 const at = (day: string) => `${day}T06:30:00.000Z`;
 
 const trail = (stageId: string | null, finished = false, stuck = false): StageTrail => ({
@@ -27,7 +20,6 @@ const trail = (stageId: string | null, finished = false, stuck = false): StageTr
   isQueued: false,
 });
 
-/** Created but never started — planned work with no clock running. */
 const queued = (stageId: string | null): StageTrail => ({
   projectStageId: stageId,
   isFinished: false,
@@ -181,10 +173,7 @@ test("stuck trails are reported per stage", () => {
 });
 
 test("queued trails are planned work that is not done", () => {
-  // Laying a standard set down on a house MUST move the project picture.
-  // The alternative -- queued work counting for nothing -- would let a
-  // house record a dozen jobs and still read 100% done, which is the
-  // flattering lie this tool exists to stop telling.
+  // Laying a set down MUST move the project picture; counting queued work as nothing would let 12 jobs read 100% done.
   const before = buildSchedule(stages, [trail("s1", true)], START, at("2026-01-01"));
   const after = buildSchedule(
     stages,

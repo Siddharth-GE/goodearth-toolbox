@@ -10,19 +10,8 @@ import { buildSchedule, orderStages, type ProjectStage } from "./schedule";
 import type { ChainEvent, EventKind, Leg } from "./events";
 
 /**
- * Reads for Relay.
- *
- * Two rules shape everything here:
- *
- * 1. Lists read `pusher_chain_state` (0036 §11), never raw events. That
- *    view derives holder, current leg and days-in-leg in SQL, so "which
- *    trails have gone cold" is a filter the database answers rather than
- *    something we work out after dragging every event into Node. Only the
- *    trail detail page reads a full log, and that is one trail's worth.
- *
- * 2. Everyone signed in can SEE every trail — full visibility is the
- *    product, it is how a manager spots a cold trail in someone else's
- *    court. requireTool is what decides who gets in at all.
+ * Lists read pusher_chain_state (0036): holder, leg and days-in-leg come from SQL.
+ * Every signed-in user sees every trail; requireTool decides who gets in.
  */
 
 const RELAY_LIST_LIMIT = 50;
@@ -103,7 +92,6 @@ function toRow(row: StateRow, names: Map<string, string>): ChainRow {
   };
 }
 
-/** Everyone who could hold a baton. Small (~70 rows) and needed by every screen. */
 export const listPeople = cache(async (): Promise<{ id: string; name: string }[]> => {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -130,16 +118,7 @@ export type TrailFilters = {
   holderId?: string;
   activityId?: string;
   departmentId?: string;
-  /**
-   * "running" (default), "finished", "queued", or "all".
-   *
-   * Queued trails are excluded from "running" deliberately: a house with
-   * a standard set laid down has a dozen of them, and letting them into
-   * the running list would bury the trails someone is actually holding
-   * under work nobody has started. They are findable — that is what
-   * "queued" and "all" are for — but they are never the default answer
-   * to "what is in flight".
-   */
+  /** "running" (default), "finished", "queued" or "all". Queued stays out of "running" so it cannot bury held trails. */
   status?: "running" | "finished" | "queued" | "all";
 };
 
@@ -152,8 +131,6 @@ export async function listTrails(filters: TrailFilters = {}) {
   let query = supabase
     .from("pusher_chain_state")
     .select(STATE_COLUMNS, { count: "exact" })
-    // Cold first, then the longest-waiting: the whole point of the tool
-    // is that a stuck trail is the first thing anyone sees.
     .order("is_stuck", { ascending: false })
     .order("days_in_leg", { ascending: false })
     .order("chain_id");
@@ -168,9 +145,7 @@ export async function listTrails(filters: TrailFilters = {}) {
   if (filters.projectId) query = query.eq("project_id", filters.projectId);
   if (filters.holderId) query = query.eq("holder_id", filters.holderId);
   if (filters.activityId) query = query.eq("activity_id", filters.activityId);
-  // Departments are an array on the view precisely so this stays one
-  // server-side containment filter rather than a second query and a
-  // merge in Node — a trail can be in several at once.
+  // Departments is an array on the view, so this is one containment filter.
   if (filters.departmentId) query = query.contains("department_ids", [filters.departmentId]);
 
   const { data, error, count } = await query.range(from, from + RELAY_LIST_LIMIT - 1);
@@ -187,12 +162,7 @@ export async function listTrails(filters: TrailFilters = {}) {
   return { rows, total, page, pageCount: Math.max(1, Math.ceil(total / RELAY_LIST_LIMIT)) };
 }
 
-/**
- * The batons one person is holding, worst first. Read to completion —
- * nobody holds 50, but a court that silently stopped listing would look
- * exactly like an empty one, so it throws to the error screen rather
- * than answer with nothing (BUGCATCHER entry 9).
- */
+/** Batons one person holds, worst first. A silent short list looks like an empty court, so it throws (BUGCATCHER #9). */
 export async function listMyCourt(userId: string): Promise<ChainRow[]> {
   await requireTool("/relay");
   const supabase = await createClient();
@@ -214,11 +184,7 @@ export async function listMyCourt(userId: string): Promise<ChainRow[]> {
   return (data as StateRow[]).map((r) => toRow(r, names));
 }
 
-/**
- * Batons held by someone whose account has since been switched off. They
- * cannot sign in, so nothing moves until an admin hands it over — which
- * is why this has its own panel rather than being left to be noticed.
- */
+/** Batons held by deactivated accounts: nothing moves until an admin hands them over. */
 export async function listStrandedTrails(): Promise<ChainRow[]> {
   await requireTool("/relay");
   const supabase = await createClient();
@@ -244,11 +210,7 @@ export async function listStrandedTrails(): Promise<ChainRow[]> {
     .map((r) => toRow(r, names));
 }
 
-/**
- * Legs for a handful of trails at once — what the court cards need to
- * name the current leg and say who the baton passes to next. One query
- * for the whole screen rather than one per card.
- */
+/** Legs for several trails in one query, for the court cards. */
 export async function getLegsFor(chainIds: string[]): Promise<Map<string, Leg[]>> {
   const byChain = new Map<string, Leg[]>();
   if (chainIds.length === 0) return byChain;
@@ -296,7 +258,6 @@ export type TrailDetail = {
   departments: { id: string; name: string }[];
   title: string | null;
   note: string | null;
-  /** The stage this trail is filed under, and the project's stages to move it. */
   projectStageId: string | null;
   stages: ProjectStage[];
   legs: (Leg & { assigneeName: string })[];
@@ -308,12 +269,7 @@ export const getTrail = cache(async (chainId: string): Promise<TrailDetail | nul
   await requireTool("/relay");
   const supabase = await createClient();
 
-  // The FK is named explicitly because pusher_chains reaches units
-  // TWICE — once by unit_id, once by the (project_id, unit_id) composite
-  // that proves the unit is in the chain's own project. A bare
-  // `units(name)` is ambiguous and PostgREST refuses it outright
-  // (PGRST201). Exactly the shape that silently signed everyone out in
-  // 2026-08-05's `roles` embed.
+  // Name the FK: pusher_chains reaches units twice (unit_id and the composite), so a bare embed is ambiguous (PGRST201).
   const { data: chain, error } = await supabase
     .from("pusher_chains")
     .select(
@@ -328,10 +284,7 @@ export const getTrail = cache(async (chainId: string): Promise<TrailDetail | nul
   }
   if (!chain) return null;
 
-  // A trail's own legs and events are bounded (legs are a handful, events
-  // grow only as the baton moves), so these need no paging — but they do
-  // need to be COMPLETE, because a missing event silently changes who the
-  // holder is. fetchAll throws rather than answering with half a log.
+  // Must be complete (fetchAll): a missing event changes who the holder is.
   const [legRows, stageRows, eventRows, names] = await Promise.all([
     fetchAll<{
       leg_no: number;
@@ -347,8 +300,6 @@ export const getTrail = cache(async (chainId: string): Promise<TrailDetail | nul
         .order("leg_no")
         .range(from, to),
     ),
-    // The project's stages, so the trail can be re-filed from its own
-    // page — the one place someone is already looking at it.
     fetchAll<ProjectStage>((from, to) =>
       supabase
         .from("project_stages")
@@ -378,9 +329,7 @@ export const getTrail = cache(async (chainId: string): Promise<TrailDetail | nul
     expected_days: l.expected_days,
   }));
 
-  // `kind` is a CHECK-constrained text column, so it arrives as a plain
-  // string — narrow it once, here at the read boundary, rather than
-  // casting at every use.
+  // kind is a CHECK-constrained text column; narrow it once here.
   const events: ChainEvent[] = eventRows.map((e) => ({ ...e, kind: e.kind as EventKind }));
 
   return {
@@ -445,17 +394,7 @@ export async function listActivities(includeInactive = false) {
   return data ?? [];
 }
 
-/**
- * What one activity normally looks like: who last carried it and how
- * many days it was given.
- *
- * The unit of prefill is the ACTIVITY, not the trail (0043). A trail is
- * now a list of activities, so "who normally does the Fire NOC, and how
- * long does it normally take" is the question worth answering — and the
- * answer comes from the most recent LEG of that activity anywhere, which
- * is far better evidence than the last whole trail that happened to
- * mention it.
- */
+/** Who last carried an activity and how many days it got. Prefill is per activity (0043): its latest leg anywhere is the best evidence. */
 export type ActivityDefault = { assigneeId: string; expectedDays: number };
 
 export async function getActivityDefaults(): Promise<Map<string, ActivityDefault>> {
@@ -463,8 +402,7 @@ export async function getActivityDefaults(): Promise<Map<string, ActivityDefault
   const supabase = await createClient();
 
   const [legs, people] = await Promise.all([
-    // Completeness matters: a missing leg means an activity silently
-    // prefills with the wrong person, which is worse than not at all.
+    // Complete, or an activity prefills with the wrong person.
     fetchAll<{
       activity_id: string;
       assignee_id: string;
@@ -487,10 +425,7 @@ export async function getActivityDefaults(): Promise<Map<string, ActivityDefault
   for (const leg of legs) {
     if (byActivity.has(leg.activity_id)) continue;
     byActivity.set(leg.activity_id, {
-      // Someone switched off comes back blank rather than pre-chosen:
-      // the guard refuses to land a baton on a deactivated account, so
-      // prefilling one only produces a refusal at the last step, on the
-      // screen furthest from the cause.
+      // A deactivated person comes back blank: the guard refuses to land a baton on them.
       assigneeId: active.has(leg.assignee_id) ? leg.assignee_id : "",
       expectedDays: leg.expected_days,
     });
@@ -499,7 +434,6 @@ export async function getActivityDefaults(): Promise<Map<string, ActivityDefault
   return byActivity;
 }
 
-/** Departments used by the last trail of a given type — prefilled like the legs. */
 export async function getDepartmentsByTrailSet(): Promise<Map<string, string[]>> {
   await requireTool("/relay");
   const supabase = await createClient();
@@ -540,15 +474,13 @@ export async function getDepartmentsByTrailSet(): Promise<Map<string, string[]>>
   return new Map([...latest].map(([setId, chainId]) => [setId, byChain.get(chainId) ?? []]));
 }
 
-/** Projects and their units, for the "where does this trail live" picker. */
 export async function getTrailFormOptions() {
   await requireTool("/relay");
   const supabase = await createClient();
 
   const [projects, units, activities, departments, people, prefills] = await Promise.all([
     supabase.from("projects").select("id, name").order("name"),
-    // Completeness matters: a unit missing from this list is a unit
-    // nobody can open a trail on, with no error to explain why.
+    // Complete: a missing unit is one nobody can open a trail on.
     fetchAll<{ id: string; name: string; project_id: string }>((from, to) =>
       supabase.from("units").select("id, name, project_id").order("id").range(from, to),
     ),
@@ -564,16 +496,11 @@ export async function getTrailFormOptions() {
     activities,
     departments,
     people,
-    // A plain object, not the Map: this crosses into a Client Component,
-    // and React only serialises plain data as props.
+    // Plain object, not Map: React serialises only plain data as props.
     activityDefaults: Object.fromEntries(prefills) as Record<string, ActivityDefault>,
   };
 }
 
-/**
- * Every project with a one-line verdict — the list behind the Projects
- * tab. Three reads for the whole page, however many projects there are.
- */
 export async function listProjectSchedules() {
   await requireTool("/relay");
   const supabase = await createClient();
@@ -588,10 +515,7 @@ export async function listProjectSchedules() {
         .range(from, to),
     ),
     supabase.from("pusher_project_plans").select("project_id, start_date"),
-    // Every trail in the company, but only the four fields the schedule
-    // needs. This crosses 1,000 on the first real project, so it pages.
-    // project_id is nullable here only because every view column comes
-    // back nullable from the type generator — normalised just below.
+    // Only the four fields the schedule needs; this passes 1,000 rows, so it pages.
     fetchAll<{
       project_id: string | null;
       project_stage_id: string | null;
@@ -628,12 +552,10 @@ export async function listProjectSchedules() {
       name: project.name,
       code: project.code,
       status: project.status,
-      // "Live" is a baton with someone. Queued work is counted separately
-      // rather than folded in — it is real, but it is not in flight.
+      // "Live" is a baton with someone; queued is counted apart.
       liveTrails: projectTrails.filter((t) => !t.isFinished && !t.isQueued).length,
       queuedTrails: projectTrails.filter((t) => t.isQueued).length,
       stuckTrails: projectTrails.filter((t) => !t.isFinished && t.isStuck).length,
-      /** The rows the project's wave is drawn from. */
       trails: projectTrails,
       schedule: buildSchedule(
         stages.filter((s) => s.project_id === project.id),
@@ -645,7 +567,6 @@ export async function listProjectSchedules() {
   });
 }
 
-/** One project: its schedule, its stages, and the trails filed under each. */
 export async function getProjectSchedule(projectId: string) {
   await requireTool("/relay");
   const supabase = await createClient();
@@ -702,15 +623,11 @@ export async function getProjectSchedule(projectId: string) {
   };
 }
 
-/** Headline counts for the top of the tool. */
 export async function getRelayPulse(userId: string) {
   await requireTool("/relay");
   const supabase = await createClient();
 
-  // "Live" means a baton is actually with someone. A queued trail is
-  // real planned work but nobody is holding it and no clock is running,
-  // so counting it here would inflate the one number that is supposed to
-  // mean "in flight right now".
+  // "Live" means a baton is with someone; a queued trail has no holder and no clock.
   const running = supabase
     .from("pusher_chain_state")
     .select("chain_id", { count: "exact", head: true })
@@ -725,16 +642,13 @@ export async function getRelayPulse(userId: string) {
       .eq("is_queued", false)
       .eq("is_finished", false)
       .eq("is_stuck", true),
-    // holder_id is null on a queued trail, so this one is already safe —
-    // stated anyway so the three counts read as one rule, not two.
     supabase
       .from("pusher_chain_state")
       .select("chain_id", { count: "exact", head: true })
       .eq("is_queued", false)
       .eq("is_finished", false)
       .eq("holder_id", userId),
-    // Waiting on someone outside the company. Counted apart from cold
-    // because the fix is different: chasing a client, not a colleague.
+    // Waiting on someone outside: counted apart from cold, the fix is chasing a client.
     supabase
       .from("pusher_chain_state")
       .select("chain_id", { count: "exact", head: true })
@@ -751,10 +665,6 @@ export async function getRelayPulse(userId: string) {
   };
 }
 
-// ---------------------------------------------------------------------
-// Standard trails at the house level
-// ---------------------------------------------------------------------
-
 export type TrailSet = {
   id: string;
   name: string;
@@ -764,21 +674,12 @@ export type TrailSet = {
     itemId: string;
     activityId: string;
     activityName: string;
-    /** How long this step is given when the type is laid down. Editable after. */
     expectedDays: number;
     sortOrder: number;
   }[];
 };
 
-/**
- * The named standard sets, each with its ordered activities.
- *
- * Two reads, however many sets — the same shape as the schedule reads.
- * A set is a list of ACTIVITIES, never a frozen copy of people and days:
- * the legs are prefilled from each activity's last run at the moment the
- * set is applied, so a leaver's name cannot ride along on every new
- * house forever.
- */
+/** Named standard sets with their activities. A set holds activities, never frozen people and days: legs prefill at apply time. */
 export async function listTrailSets(includeInactive = false): Promise<TrailSet[]> {
   await requireTool("/relay");
   const supabase = await createClient();
@@ -792,9 +693,7 @@ export async function listTrailSets(includeInactive = false): Promise<TrailSet[]
 
   const [sets, items] = await Promise.all([
     setQuery,
-    // Completeness matters: an activity missing from a set is work that
-    // silently never lands on a house, with nothing on screen to explain
-    // the gap.
+    // Complete: a missing activity is work that never lands on a house.
     fetchAll<{
       id: string;
       set_id: string;
@@ -845,14 +744,7 @@ export type HouseRow = {
   finished: number;
 };
 
-/**
- * Every house in a project with its four counts — the list on the
- * project page, and the way into each house.
- *
- * Units come from Masters and are listed even when they have no trails
- * at all: a villa nobody has started work on is exactly the one worth
- * seeing, and leaving it out would make "nothing here yet" invisible.
- */
+/** Every house in a project with four counts. Units with no trails are listed too: an unstarted villa is the one worth seeing. */
 export async function listProjectHouses(projectId: string): Promise<HouseRow[]> {
   await requireTool("/relay");
   const supabase = await createClient();
@@ -897,11 +789,6 @@ export async function listProjectHouses(projectId: string): Promise<HouseRow[]> 
     .sort((a, b) => a.unitName.localeCompare(b.unitName, undefined, { numeric: true }));
 }
 
-/**
- * One house: its trails split into what is running and what is waiting,
- * plus the project's stages and start date so the house can draw its own
- * wave along the same axis its project page uses.
- */
 export async function getHouse(projectId: string, unitId: string) {
   await requireTool("/relay");
   const supabase = await createClient();
@@ -944,7 +831,6 @@ export async function getHouse(projectId: string, unitId: string) {
     stages: orderStages(stages),
     startDate: (plan.data?.start_date as string | undefined) ?? null,
     trails: rows,
-    // Cold first among the running ones — the tool's standing order.
     running: rows
       .filter((r) => !r.isQueued && !r.isFinished)
       .sort((a, b) => Number(b.isStuck) - Number(a.isStuck) || b.daysInLeg - a.daysInLeg),

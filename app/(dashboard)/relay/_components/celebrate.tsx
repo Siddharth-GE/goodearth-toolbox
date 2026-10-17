@@ -4,25 +4,14 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import type { ReactNode } from "react";
 
 /**
- * Relay's reward moments: a points float on every move, a full-screen
- * banner and confetti when a trail is finished.
- *
- * DESIGN.md allows one payoff per flow and warns against motion added
- * "to make it feel nice". Pusher is the stated exception: moving a baton
- * IS the product, and the reward for moving it is how the tool gets
- * adopted at all. It stays confined to this tool.
- *
- * Everything here checks prefers-reduced-motion. The toast still appears
- * for someone who has asked for stillness — they should learn the push
- * worked, they just should not be shown fireworks about it.
+ * Relay's reward moments: a points float on every move, a banner and confetti on finish.
+ * DESIGN.md's one-payoff rule is waived here (moving a baton IS the product); it stays in this tool.
+ * All of it honours prefers-reduced-motion; the toast still shows.
  */
 
 type Celebration = {
-  /** A short line, always shown. */
   toast: (message: string) => void;
-  /** "+10 FLOW · ON TIME" — floats up from the bottom. */
   flow: (message: string) => void;
-  /** The big one, for finishing a trail. */
   banner: (message: string) => void;
 };
 
@@ -30,8 +19,7 @@ const CelebrateContext = createContext<Celebration | null>(null);
 
 export function useCelebrate(): Celebration {
   const ctx = useContext(CelebrateContext);
-  // A no-op rather than a throw: a component that celebrates should not
-  // be able to crash a page by being rendered outside the provider.
+  // A no-op, not a throw: rendering outside the provider must not crash a page.
   return (
     ctx ?? {
       toast: () => {},
@@ -73,8 +61,7 @@ export function CelebrateProvider({ children }: { children: ReactNode }) {
   const [flowText, setFlowText] = useState<string | null>(null);
   const [bannerText, setBannerText] = useState<string | null>(null);
 
-  // Keyed remounts so a second celebration restarts the animation
-  // instead of being swallowed by the first one still running.
+  // Keyed remounts so a new celebration restarts the animation.
   const [tick, setTick] = useState(0);
 
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -147,9 +134,7 @@ export function CelebrateProvider({ children }: { children: ReactNode }) {
           aria-hidden="true"
           className="pointer-events-none fixed inset-0 z-[70] flex items-center justify-center"
         >
-          {/* Smooth ease-out, not a back/overshoot curve: the overshoot
-              is already in the keyframes (0.88 -> 1.03 -> 1.0), and a
-              springy easing on top of it double-bounces. */}
+          {/* Plain ease-out: the overshoot is already in the keyframes, and springy easing double-bounces. */}
           <div className="bg-surface-raised text-foreground [animation:relay-banner_1.9s_cubic-bezier(.22,1,.36,1)_forwards] rounded-3xl px-10 py-6 text-3xl font-extrabold tracking-tight shadow-2xl md:text-4xl">
             {bannerText}
           </div>

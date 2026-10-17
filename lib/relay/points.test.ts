@@ -1,9 +1,4 @@
-/**
- * The points economy. The two that matter most are the ones that stop it
- * being farmed: on-time is measured from the snapshot on the previous
- * event, and repeat bounces on the same trail on the same day are worth
- * nothing after the first.
- */
+/** The anti-farming rules: on-time uses the previous event's snapshot; repeat same-day bounces score nothing. */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

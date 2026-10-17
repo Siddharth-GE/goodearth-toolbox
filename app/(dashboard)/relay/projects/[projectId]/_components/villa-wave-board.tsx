@@ -5,25 +5,11 @@ import Link from "next/link";
 
 import { WaveStageHeader, WaveSvg } from "../../../_components/wave-svg";
 
-/**
- * Every villa, one board.
- *
- * The first cut drew each villa as its own card with the stage names
- * floating on the page above the stack — which read as debris, and the
- * founder said so. The names belong to the waves, so they live INSIDE
- * the same surface now: one card, the axis written once across its top,
- * and every villa as a row beneath it, all sharing the same ruled x.
- * This is also, it turns out, exactly what the original mock drew.
- *
- * Each row is one glance: name, wave, verdict. The verdict is the only
- * coloured text on the row, so scanning the right edge reads the whole
- * project — which is the point of the page.
- */
+/** Every villa on one board: the axis is written once across the top, each villa a row sharing the x. The verdict is the only coloured text, so the right edge reads the project. */
 export function VillaWaveBoard({
   headerWave,
   rows,
 }: {
-  /** Any wave from the same project — the header only reads its bands. */
   headerWave: WaveModel;
   rows: { key: string; name: string; href: string; wave: WaveModel }[];
 }) {
@@ -60,8 +46,7 @@ function VillaWaveRow({ name, href, wave }: { name: string; href: string; wave: 
       <div className="mt-1.5">
         <WaveSvg model={wave} />
       </div>
-      {/* Work not filed under a stage cannot sit on the curve, so it is
-          said out loud — quietly, below the drawing it is absent from. */}
+      {/* Unfiled work can't sit on the curve, so it is said out loud below the drawing. */}
       {wave.unfiledOpen > 0 && (
         <p className="text-muted mt-1 text-[11px]">
           {wave.unfiledOpen} more not filed under a stage, so not drawn

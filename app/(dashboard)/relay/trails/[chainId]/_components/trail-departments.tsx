@@ -9,15 +9,7 @@ import { useState, useTransition } from "react";
 
 import { DepartmentPicker } from "../../../_components/department-picker";
 
-/**
- * Departments on an open trail: read-only chips until someone chooses to
- * change them, because most visits to this page are to move a baton, not
- * to re-tag it.
- *
- * Editable only while the trail is running. Once it is finished the
- * database refuses (0038 §3) — changing them then would silently rewrite
- * what every past report said.
- */
+/** Departments on an open trail: read-only chips until changed. Editable only while running; once finished the database refuses (0038 §3) so past reports don't change. */
 export function TrailDepartments({
   chainId,
   departments,

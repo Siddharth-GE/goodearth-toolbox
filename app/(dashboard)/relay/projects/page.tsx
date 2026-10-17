@@ -15,8 +15,7 @@ import { WaveStageHeader, WaveSvg } from "../_components/wave-svg";
 export default async function ProjectsPage() {
   const projects = await listProjectSchedules();
 
-  // One ceiling across the page, so a busier project really does draw a
-  // taller wave than the one above it.
+  // One ceiling across the page so a busier project draws a taller wave.
   const ampUnit = waveAmpUnit(projects.map((p) => p.trails));
 
   return (
@@ -81,11 +80,7 @@ export default async function ProjectsPage() {
 
                   {project.schedule.hasSchedule ? (
                     <>
-                      {/* The same wave the villas inside are drawn as, for
-                        the project as a whole: where its open work is
-                        sitting across its own stages. The figures below
-                        carry the plan-against-actual reading in words,
-                        which is the part a curve cannot say. */}
+                      {/* The project's wave across its stages; the figures below carry plan-against-actual in words. */}
                       {wave && (
                         <div className="mt-3">
                           <WaveStageHeader wave={wave} />

@@ -15,18 +15,8 @@ import { useState } from "react";
 type Trail = ChainRow & { projectStageId: string | null };
 
 /**
- * The waiting half of a house: trails that exist, are staffed, and have
- * no clock running.
- *
- * Deliberately plain about that last part. A queued trail gets no
- * TimerDial and no day count — it has not elapsed anything, and a dial
- * reading "0 of 4 days" would look like a clock that had started. Its
- * line says "not started" instead.
- *
- * `useState` rather than `useTransition` for the pending flag: this form
- * stays mounted across the router.refresh() that follows every write, and
- * isPending stays true while a refresh is in flight, which greys the
- * whole panel out permanently (Relay's PLAN.md records that one).
+ * The waiting half of a house: staffed trails with no clock running. No TimerDial or day count ("0 of 4 days" looks started).
+ * useState, not useTransition: the form stays mounted across router.refresh() and isPending would grey the panel (Relay PLAN.md).
  */
 export function HouseQueue({
   projectId,
@@ -53,8 +43,7 @@ export function HouseQueue({
       setError(result.error);
       return;
     }
-    // revalidatePath alone leaves this page showing the old queue — the
-    // router cache holds its payload. Same fix as every other write here.
+    // revalidatePath alone leaves the old queue: the router cache holds its payload.
     router.refresh();
   };
 
@@ -104,9 +93,7 @@ export function HouseQueue({
           as one trail, staffed and ready — not counting a day until you start it.
         </p>
       ) : (
-        // Tiles rather than rows: each waiting trail carries two buttons,
-        // and a row of them wraps into a pile of orphaned controls on the
-        // phone this screen is used from.
+        // Tiles, not rows: each trail has two buttons, and rows wrap into orphaned controls on a phone.
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
           {queued.map((trail) => (
             <div

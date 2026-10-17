@@ -4,11 +4,6 @@ import { getRelayPulse } from "@/lib/relay/queries";
 
 import { ToolWelcome } from "../_components/tool-welcome";
 
-/**
- * The welcome screen (founder, 2026-08-13: every Operations and
- * Management tool opens on one). Supersedes the 2026-08-10 decision to
- * open straight on Projects — Projects is now the primary door below.
- */
 export default async function RelayPage() {
   const user = await requireUser();
   const pulse = await getRelayPulse(user.id);

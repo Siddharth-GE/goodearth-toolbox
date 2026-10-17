@@ -18,17 +18,7 @@ type Leg = { activityId: string; assigneeId: string; expectedDays: number };
 
 const BLANK_LEG: Leg = { activityId: "", assigneeId: "", expectedDays: 2 };
 
-/**
- * Opening a trail.
- *
- * A trail is an ordered list of ACTIVITIES (0043), each with a person and
- * a number of days — the leg IS the activity, so there is nothing to
- * type. Pick a trail type and the whole list arrives, staffed from
- * whoever last carried each activity; or build one activity at a time.
- *
- * Everything is editable before it opens. Nothing behind the baton is
- * editable afterwards.
- */
+/** Opening a trail: an ordered list of ACTIVITIES (0043), each with a person and days. Picking a type brings the whole list; nothing behind the baton is editable afterwards. */
 export function OpenTrailForm({
   projects,
   units,
@@ -45,7 +35,6 @@ export function OpenTrailForm({
   activities: { id: string; name: string }[];
   departments: { id: string; name: string }[];
   people: { id: string; name: string }[];
-  /** The named trail types, each with its fixed activities in order. */
   trailSets: {
     id: string;
     name: string;
@@ -53,7 +42,6 @@ export function OpenTrailForm({
   }[];
   /** Per activity: who normally carries it and for how long. Sent up front so picking is instant. */
   activityDefaults: Record<string, { assigneeId: string; expectedDays: number }>;
-  /** Set when the form is opened from a house, so the two pickers arrive answered. */
   initialProjectId?: string;
   initialUnitId?: string;
 }) {
@@ -70,7 +58,6 @@ export function OpenTrailForm({
 
   const projectUnits = units.filter((u) => u.project_id === projectId);
 
-  /** Picking a type replaces the whole list; picking none leaves it alone. */
   const pickTrailSet = (id: string) => {
     setTrailSetId(id);
     if (!id) return;
@@ -79,8 +66,6 @@ export function OpenTrailForm({
     setLegs(
       set.activities.map((a) => ({
         activityId: a.activityId,
-        // Whoever last carried this activity anywhere — better evidence
-        // than the last whole trail that happened to mention it.
         assigneeId: activityDefaults[a.activityId]?.assigneeId ?? "",
         expectedDays: a.expectedDays,
       })),
@@ -88,7 +73,6 @@ export function OpenTrailForm({
     if (!title) setTitle(set.name);
   };
 
-  /** Choosing an activity fills in who normally does it, and for how long. */
   const pickActivityForLeg = (index: number, activityId: string) => {
     const preset = activityDefaults[activityId];
     setLegs((current) =>
@@ -113,9 +97,7 @@ export function OpenTrailForm({
       const result = await openTrail({
         projectId,
         unitId: unitId || null,
-        // A one-step trail still has a single activity worth recording;
-        // anything longer has no one answer, and the column is nullable
-        // for exactly that reason.
+        // A one-step trail records its single activity; longer ones have no one answer, so the column is null.
         activityId: legs.length === 1 ? legs[0].activityId : null,
         trailSetId: trailSetId || null,
         title: title.trim() || null,
@@ -248,9 +230,7 @@ export function OpenTrailForm({
                     <option
                       key={a.id}
                       value={a.id}
-                      // The same activity twice would send the baton
-                      // through identical steps; the action refuses it
-                      // and this stops it being offered in the first place.
+                      // The action refuses a repeated activity; don't offer it.
                       disabled={a.id !== leg.activityId && legs.some((l) => l.activityId === a.id)}
                     >
                       {a.name}
@@ -303,8 +283,6 @@ export function OpenTrailForm({
         <FormMessage error={error} />
 
         <div className="flex flex-wrap items-center justify-end gap-3">
-          {/* The queue, kept by the founder: lay a house's trail out
-                now and begin it when the site is actually ready. */}
           <label className="text-muted flex cursor-pointer items-center gap-2 text-sm">
             <input
               type="checkbox"

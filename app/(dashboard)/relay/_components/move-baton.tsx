@@ -29,14 +29,7 @@ import { useState, useTransition } from "react";
 
 import { useCelebrate } from "./celebrate";
 
-/**
- * The three things a baton-holder can do, plus the admin rescue.
- *
- * Every one of these is refused at the database if the rules are not met
- * (migration 0036 §8) — this component only decides what to offer and
- * how to phrase it. When the guard does refuse, its message is shown
- * verbatim: it was written to be read.
- */
+/** Baton actions plus the admin rescue. The database refuses rule breaks (0036 §8); this only decides what to offer and shows the guard's message verbatim. */
 
 export type MoveTarget = {
   chainId: string;
@@ -45,9 +38,7 @@ export type MoveTarget = {
   legCount: number;
   daysInLeg: number;
   expectedDays: number;
-  /** Legs behind the baton, bounce-able. */
   bounceTargets: { legNo: number; label: string; assigneeName: string }[];
-  /** Who leg N+1 belongs to, for "the baton passes to …". */
   nextLegLabel: string | null;
   nextLegAssignee: string | null;
   nextLegDays: number | null;
@@ -180,11 +171,7 @@ function MoveDialog({
         return;
       }
 
-      // revalidatePath in the action marks the data stale, but the page
-      // the mover is standing on is rendered dynamically and its RSC
-      // payload is already in the router cache — without this the baton
-      // moves in the database and the screen keeps showing the old leg,
-      // which is the one thing this tool cannot afford to get wrong.
+      // revalidatePath marks data stale, but the page being stood on has its RSC payload in the router cache; without this the screen keeps the old leg.
       router.refresh();
 
       if (mode === "finish") {
@@ -203,9 +190,7 @@ function MoveDialog({
         celebrate.flow(`+${POINTS.bounce} FLOW · HONEST BOUNCE`);
         celebrate.toast("Sent back, with your reason.");
       } else if (mode === "client") {
-        // No flow points either way: neither sending work to a client nor
-        // getting it back is an achievement, and scoring it would invite
-        // people to score it.
+        // No flow points either way: sending work to a client or getting it back is no achievement.
         celebrate.toast("Marked as with the client.");
       } else if (mode === "clientBack") {
         celebrate.toast("Back with us.");

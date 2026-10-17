@@ -20,14 +20,7 @@ import { AlertTriangle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-/**
- * Batons held by someone whose account has been switched off.
- *
- * They cannot sign in, so the trail cannot move — and nothing else in
- * the tool would ever say so. Without this panel these are invisible
- * forever, which is the difference between an escape hatch and a data
- * jail. Admins only, because handing a baton over is admin-only.
- */
+/** Batons held by deactivated accounts; nothing else would say they cannot move. Admins only, like the hand-over. */
 export function StrandedPanel({
   rows,
   people,

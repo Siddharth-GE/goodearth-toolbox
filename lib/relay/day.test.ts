@@ -1,10 +1,4 @@
-/**
- * The IST day boundary. These tests exist because the failure mode is
- * silent: every one of them passes trivially if the machine running them
- * happens to be in IST, and every one of them catches a real bug on a
- * UTC CI runner. The instants below are chosen to straddle 18:30 UTC —
- * IST midnight — in both directions.
- */
+/** The failure is silent: tests pass trivially on an IST machine. Instants straddle 18:30 UTC (IST midnight). */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -35,8 +29,7 @@ test("an unparseable instant throws rather than answering wrongly", () => {
 });
 
 test("evening to next morning is one day, not zero", () => {
-  // The rule the whole tool leans on: 18:00 Monday IST -> 09:00 Tuesday
-  // IST is a day, because that is how a site team counts.
+  // 18:00 Monday IST to 09:00 Tuesday IST is one day.
   const monEvening = "2026-08-03T12:30:00.000Z"; // 18:00 IST Mon
   const tueMorning = "2026-08-04T03:30:00.000Z"; // 09:00 IST Tue
   assert.equal(istDaysBetween(monEvening, tueMorning), 1);
