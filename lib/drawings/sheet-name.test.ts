@@ -20,7 +20,7 @@ const parts = (overrides: Partial<SheetNameParts> = {}): SheetNameParts => ({
   villaName: "Villa 12",
   stageCode: "WD",
   stageName: "Working Drawings",
-  transmittalNumber: "TR-0003",
+  transmittalNumber: "TB-0003",
   sheetCode: "GFP",
   originalFileName: "ground floor plan v3.pdf",
   contentType: "application/pdf",
@@ -28,7 +28,7 @@ const parts = (overrides: Partial<SheetNameParts> = {}): SheetNameParts => ({
 });
 
 test("names an issued sheet the founder's way", () => {
-  assert.equal(sheetFileName(parts()), "SAA-Saarang-Villa12-WD-TR0003-GFP.pdf");
+  assert.equal(sheetFileName(parts()), "SAA-Saarang-Villa12-WD-TB0003-GFP.pdf");
 });
 
 test("a draft says DRAFT where the number will go", () => {
@@ -41,7 +41,7 @@ test("a draft says DRAFT where the number will go", () => {
 test("a project with no code leaves the code out", () => {
   assert.equal(
     sheetFileName(parts({ projectCode: null, projectName: "Baveli", villaName: "1" })),
-    "Baveli-1-WD-TR0003-GFP.pdf",
+    "Baveli-1-WD-TB0003-GFP.pdf",
   );
 });
 
@@ -50,21 +50,21 @@ test("a stage with no code uses its initials", () => {
   assert.equal(stageInitials("MEP"), "M");
   assert.equal(
     sheetFileName(parts({ stageCode: null, stageName: "Typical Details" })),
-    "SAA-Saarang-Villa12-TD-TR0003-GFP.pdf",
+    "SAA-Saarang-Villa12-TD-TB0003-GFP.pdf",
   );
 });
 
 test("a sheet from before sheet codes falls back to its file name", () => {
   assert.equal(
     sheetFileName(parts({ sheetCode: null, originalFileName: "Ground floor (v3).pdf" })),
-    "SAA-Saarang-Villa12-WD-TR0003-Groundfloorv3.pdf",
+    "SAA-Saarang-Villa12-WD-TB0003-Groundfloorv3.pdf",
   );
 });
 
 test("a photo keeps the stored image type", () => {
   assert.equal(
     sheetFileName(parts({ contentType: "image/jpeg", originalFileName: "IMG_2231.HEIC.png" })),
-    "SAA-Saarang-Villa12-WD-TR0003-GFP.jpg",
+    "SAA-Saarang-Villa12-WD-TB0003-GFP.jpg",
   );
 });
 

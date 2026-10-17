@@ -3750,6 +3750,57 @@ export type Database = {
           },
         ]
       }
+      drawing_revision_folder_sheets: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          drawing_revision_id: string
+          id: string
+          modified_at: string | null
+          name: string
+          size_bytes: number | null
+          sort_order: number
+          workdrive_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          drawing_revision_id: string
+          id?: string
+          modified_at?: string | null
+          name: string
+          size_bytes?: number | null
+          sort_order?: number
+          workdrive_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          drawing_revision_id?: string
+          id?: string
+          modified_at?: string | null
+          name?: string
+          size_bytes?: number | null
+          sort_order?: number
+          workdrive_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drawing_revision_folder_sheets_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drawing_revision_folder_sheets_drawing_revision_id_fkey"
+            columns: ["drawing_revision_id"]
+            isOneToOne: false
+            referencedRelation: "drawing_revisions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       drawing_revision_works: {
         Row: {
           created_at: string
@@ -3801,6 +3852,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           drawing_set_id: string
+          drawings_url: string | null
           id: string
           note: string | null
           released_at: string | null
@@ -3815,6 +3867,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           drawing_set_id: string
+          drawings_url?: string | null
           id?: string
           note?: string | null
           released_at?: string | null
@@ -3829,6 +3882,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           drawing_set_id?: string
+          drawings_url?: string | null
           id?: string
           note?: string | null
           released_at?: string | null

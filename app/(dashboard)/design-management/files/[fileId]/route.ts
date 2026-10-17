@@ -20,7 +20,7 @@ import { createClient } from "@/lib/supabase/server";
  * uses for design views.
  *
  * The file goes out under its sheet name (lib/drawings/sheet-name.ts:
- * SAA-Saarang-Villa12-WD-TR0003-GFP.pdf), built now because the
+ * SAA-Saarang-Villa12-WD-TB0003-GFP.pdf), built now because the
  * transmittal number exists only once issued. If that lookup fails the
  * sheet is still served, under the name it was uploaded with — the
  * drawing matters more than its label.

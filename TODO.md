@@ -30,12 +30,13 @@ Everything below is on `staging.goodearthkannur.org`. Each ships only after the 
 - **Settings refreshes every page after a change** — **vetted by the founder 2026-09-26**.
 - **Design Management's simpler transmittal flow** (PR #81, on staging) — waiting for the founder's vet and the Fable review it skipped.
 - **Design Management: sets by stage, sheets by code** (`0099`) — on staging, waiting for the founder's vet. Staging's drawings were wiped for it. **The Fable review of `0099` was skipped for staging and is due before production**; production then needs `scripts/wipe-drawings.ts` (dry run first) and `0099`.
+- **Design Management: WorkDrive links, TB numbers, the designer's revision number** (`0124`) — the founder's checklist is `plan.md`, _Verification (eleventh piece)_. The folder is read the way WorkDrive's own share page does it, with no key: if Zoho changes that page, the list stops and the link alone still issues (Design Management's `PLAN.md`).
 
 **Getting it to `master`.** `staging` is ~185 commits ahead and carries `0094`–`0118`. Either the Chat door's ship checklist runs first and everything goes together, or a piece travels alone on a release branch cut from `master` (the skin: cherry-pick `a096e58`…`3fe4c95`, skip the sweep `f8a9e5c` and re-run it on `master`). Every route needs production restored first, then the migrations applied there and `db:compare` empty.
 
 ## Setup the tools are waiting on
 
-3. **Grant `/design-management` to the design team** — nobody holds it.
+3. **Grant `/design-management` to the whole design team** — some of them already issue on staging (six transmittals, 2026-10-16).
 4. **Grant `/supervisors` to the site supervisors** — nothing is visible to staff, and drawings reach site through it.
 5. **Rebuild the rate book's materials** (staging) — no work has any material today, so no estimate can carry a material to Indents or Supervisors until a person enters them (Estimator → Works). 135 of 270 works have a labour rate; the Rate book's "Used but not priced" list shows the rest as estimates use them.
 6. **The workbook's "Project IDs" sheet** — projects, plots and cost centres such as Rent House and Access Road (subprojects were set aside by the founder 2026-10-08). Its own step, not loaded: it renames Saarang to "Saarang Villas" and leaves out Plots 11–16, which have villas and clients.

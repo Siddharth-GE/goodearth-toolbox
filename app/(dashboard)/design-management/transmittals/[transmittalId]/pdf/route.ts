@@ -32,12 +32,15 @@ export async function GET(
   );
 
   // Filename built from real identifiers so a folder of these stays
-  // sortable and self-explanatory months later. A draft has no number
-  // to be filed under, so it is named by its villa and marked a draft.
+  // sortable and self-explanatory months later. The number counts per
+  // villa (0092), so the villa is part of the name — TB-0003 alone names
+  // a transmittal on every villa that has had three. A draft has no
+  // number to be filed under, so it is marked a draft.
   const safe = (value: string) => value.replace(/[^\w-]+/g, "-").replace(/^-|-$/g, "");
+  const villa = transmittal.villaName.replace(/[^A-Za-z0-9]+/g, "") || "Villa";
   const filename = transmittal.number
-    ? `Goodearth-Transmittal-${safe(transmittal.number)}.pdf`
-    : `Goodearth-Transmittal-Draft-${safe(transmittal.villaName)}.pdf`;
+    ? `Goodearth-Transmittal-${villa}-${safe(transmittal.number)}.pdf`
+    : `Goodearth-Transmittal-${villa}-Draft.pdf`;
 
   return new Response(new Uint8Array(buffer), {
     headers: {
