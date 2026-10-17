@@ -41,7 +41,8 @@ Switch day is the founder's to run. Before it, three things must be done:
 - [x] `[Opus]` **M1: lockouts fail closed.** `lib/auth/rate-limit.ts:52, 61, 78` and `lib/marathon/rate-limit.ts:57, 70, 88`.
   - _Check:_ 10 wrong passwords still lock the account for 10 minutes.
   - Done: each function returns a refusal ready to show; a count it cannot read or write refuses ("Could not check…"), and a failed clear is logged. Run against staging with a made-up address: the 10th wrong password and the 10th wrong PIN lock for 10 minutes, a correct one clears it, and with the database unreachable every check refuses.
-- [ ] `[Sonnet]` **M7: rotate the Marathon admin PIN.** `0002` seeds "2026" in this public repo. `scripts/rotate-marathon-pins.ts` must also rotate `marathon_config`'s admin PIN, and SHIPPING.md runs it on every new database.
+- [x] `[Sonnet]` **M7: rotate the Marathon admin PIN.** `0002` seeds "2026" in this public repo. `scripts/rotate-marathon-pins.ts` must also rotate `marathon_config`'s admin PIN, and SHIPPING.md runs it on every new database.
+  - Done by `[Opus]` in Sonnet's place, on the founder's "keep going". The script checks and rotates the admin PIN (to six random digits), with `2026` added to the published list; checked against `0002`'s own seed. Staging's admin PIN is already off it (dry run: nothing to do).
 - [ ] `[Opus]` **BUGCATCHER #21 and #22.**
   - [x] #21: a sandbox that lists the types it covers leaves every other type open.
   - #22: a policy written before the second factor existed never learned it.
