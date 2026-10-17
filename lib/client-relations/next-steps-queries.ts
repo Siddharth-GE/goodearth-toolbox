@@ -94,6 +94,9 @@ type PlotRecord = {
 export type PlotRef = {
   engagementId: string;
   unitId: string;
+  number: string;
+  /** The plot code, compared numerically. */
+  sortKey: string;
   clientId: string | null;
   clientName: string | null;
   projectId: string;

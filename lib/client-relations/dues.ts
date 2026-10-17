@@ -34,6 +34,13 @@ export type MilestoneDue = MilestoneInput & {
 };
 
 export type DuesSummary = {
+  scheduled: number;
+  invoiced: number;
+  received: number;
+  /** Scheduled minus received, floored at zero. */
+  outstanding: number;
+  /** Outstanding on milestones already past due. */
+  overdue: number;
   overdueCount: number;
   overpaid: number;
   nextDueOn: string | null;
