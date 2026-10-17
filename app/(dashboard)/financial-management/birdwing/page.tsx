@@ -44,13 +44,7 @@ const USE_WORDS: Record<string, string> = {
   vendor: "Vendor",
 };
 
-/**
- * Birdwing Farmstay, live — the consolidated page (birdwing-consolidated
- * .html) rebuilt from 0117's views: the eight tiles, month by month, who
- * the rooms were for, where the money went, occupancy, and what is still
- * pending. Read-only; the stays and expenses are kept in Birdwing's own
- * two tools.
- */
+/** Birdwing Farmstay, live: the consolidated page rebuilt from 0117's views. Read-only; stays and expenses are kept in Birdwing's own tools. */
 export default async function BirdwingFinancePage() {
   const today = todayInIndia();
   const picture = await getBirdwingPicture();

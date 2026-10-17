@@ -15,11 +15,7 @@ import { deleteMovement } from "@/lib/financial-management/actions";
 import { Trash2 } from "lucide-react";
 import { useState } from "react";
 
-/**
- * Remove one movement — a mistyped payment must be correctable. Asks
- * first: this is a rupee record, and the audit trail keeping the
- * before-image is for accidents, not a routine.
- */
+/** Remove one movement. Asks first: this is a rupee record, and the audit trail is for accidents, not a routine. */
 export function MovementRowMenu({
   movementId,
   facilityId,

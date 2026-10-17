@@ -1,10 +1,7 @@
 "use server";
 
-// Type-only import, and deliberately NOT re-exported: a bare
-// `export type { ActionState }` in a "use server" file survives into the
-// compiled module's runtime export list, where the type doesn't exist —
-// every action in the chunk then dies at module load (the 2026-08-03
-// production outage). Import it from "@/lib/action-state" instead.
+// Not re-exported: `export type { ActionState }` in a "use server" file survives into the runtime
+// exports and every action dies at load (BUGCATCHER). Import it from "@/lib/action-state".
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { parseNumber } from "@/lib/form-data";
@@ -26,7 +23,6 @@ type FacilityFields = {
   terms: string | null;
 };
 
-/** Shared by create and update — the same form posts both. */
 function readFacilityFields(formData: FormData): FacilityFields | { error: string } {
   const party = String(formData.get("party") ?? "").trim();
   if (!party) return { error: "Name the bank or investor." };
@@ -68,7 +64,6 @@ function readFacilityFields(formData: FormData): FacilityFields | { error: strin
   };
 }
 
-/** Set up a funding source, then open it. */
 export async function createFacility(
   _state: ActionState,
   formData: FormData,
@@ -91,8 +86,7 @@ export async function createFacility(
   }
 
   revalidatePath("/financial-management", "layout");
-  // redirect() throws its own control-flow signal, so it must be outside
-  // any try/catch and after every write has been checked.
+  // redirect() throws, so it sits outside any try/catch, after every write is checked.
   redirect(`/financial-management/funding/${data.id}`);
 }
 
@@ -122,7 +116,6 @@ export async function updateFacility(
   return undefined;
 }
 
-/** Close (or reopen) a facility. A closed loan keeps its history. */
 export async function setFacilityActive(
   facilityId: string,
   isActive: boolean,
@@ -144,11 +137,7 @@ export async function setFacilityActive(
   return undefined;
 }
 
-/**
- * Delete a facility — refused in plain English once it has history. The
- * RESTRICT FK enforces the same rule at the database, so the pre-check
- * here is for the message, not the safety.
- */
+/** Delete a facility, refused in plain English once it has history. The RESTRICT FK enforces it; the pre-check is for the message. */
 export async function deleteFacility(facilityId: string): Promise<ActionState> {
   await requireTool("/financial-management");
   const supabase = await createClient();
@@ -179,7 +168,6 @@ export async function deleteFacility(facilityId: string): Promise<ActionState> {
   redirect("/financial-management/funding");
 }
 
-/** Record a drawdown, repayment or interest payment against a facility. */
 export async function recordMovement(
   facilityId: string,
   _state: ActionState,
@@ -227,10 +215,7 @@ export async function recordMovement(
   return undefined;
 }
 
-/**
- * Remove a movement. Allowed — a mistyped payment must be correctable —
- * and the audit trigger keeps the before-image.
- */
+/** Remove a movement: a mistyped payment must be correctable; the audit trigger keeps the before-image. */
 export async function deleteMovement(movementId: string, facilityId: string): Promise<ActionState> {
   await requireTool("/financial-management");
   const supabase = await createClient();

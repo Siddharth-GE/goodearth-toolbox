@@ -1,7 +1,6 @@
 /**
- * Birdwing in Financial Management — the consolidated page's eight tiles
- * and its charts, worked out from 0117's month and expense facts. Pure:
- * birdwing-queries.ts reads, this shapes, the page draws.
+ * Birdwing in Financial Management: the consolidated page's eight tiles and charts, from 0117's
+ * month and expense facts. Pure: birdwing-queries.ts reads, this shapes, the page draws.
  *
  *   billed value      Σ charges − OTA commission − discount
  *   collected         Σ receipts
@@ -10,9 +9,8 @@
  *   occupancy (est.)  room-nights ÷ (rooms × days), over complete months
  *   average room rate room revenue ÷ room-nights
  *
- * A month still running counts in the money but not in occupancy or the
- * room rate (its nights are not all slept yet); a month not yet begun
- * counts in nothing.
+ * A month still running counts in the money but not in occupancy or the room rate (not all its
+ * nights are slept yet); a month not yet begun counts in nothing.
  */
 import { ACCENT_TOKEN, chartToken } from "@/lib/charts/palette";
 import type { CartesianModel } from "@/lib/charts/series";
@@ -67,7 +65,6 @@ const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 1
 const sum = (rows: BirdwingMonth[], pick: (row: BirdwingMonth) => number) =>
   round2(rows.reduce((total, row) => total + pick(row), 0));
 
-/** "2026-10-01" → "Oct 26". */
 export function shortMonth(month: string): string {
   return new Date(`${month.slice(0, 7)}-01T00:00:00Z`).toLocaleDateString("en-IN", {
     month: "short",
@@ -76,7 +73,6 @@ export function shortMonth(month: string): string {
   });
 }
 
-/** The months that have begun, oldest first. */
 export function monthsSoFar(rows: BirdwingMonth[], today: string): BirdwingMonth[] {
   const current = `${today.slice(0, 7)}-01`;
   return rows.filter((row) => row.month <= current).sort((a, b) => (a.month < b.month ? -1 : 1));
@@ -92,8 +88,7 @@ export function birdwingTiles(rows: BirdwingMonth[], today: string): BirdwingTil
   const expenses = sum(months, (row) => row.expenses);
   const roomNights = sum(complete, (row) => row.roomNights);
   const capacity = complete.reduce((total, row) => total + row.rooms * row.daysInMonth, 0);
-  // The room rate over the same complete months as occupancy — the
-  // consolidated page's window.
+  // Room rate over the same complete months as occupancy.
   const roomRevenue = sum(complete, (row) => row.roomRevenue);
 
   return {
@@ -118,7 +113,6 @@ export function birdwingTiles(rows: BirdwingMonth[], today: string): BirdwingTil
   };
 }
 
-/** Billed, collected and spent, month by month. */
 export function moneyByMonthModel(months: BirdwingMonth[]): CartesianModel {
   return {
     kind: "cartesian",
@@ -137,7 +131,6 @@ export function moneyByMonthModel(months: BirdwingMonth[]): CartesianModel {
   };
 }
 
-/** Who the rooms were for: paying guests against Goodearth's own use. */
 export function segmentSplitModel(months: BirdwingMonth[]): CartesianModel {
   return {
     kind: "cartesian",
@@ -155,7 +148,6 @@ export function segmentSplitModel(months: BirdwingMonth[]): CartesianModel {
   };
 }
 
-/** The month's result on billed value, one series in the accent. */
 export function resultModel(months: BirdwingMonth[]): CartesianModel {
   return {
     kind: "cartesian",
@@ -170,7 +162,6 @@ export function resultModel(months: BirdwingMonth[]): CartesianModel {
   };
 }
 
-/** Occupancy as a percentage of the rooms' nights, complete months only. */
 export function occupancyModel(months: BirdwingMonth[], today: string): CartesianModel {
   const current = `${today.slice(0, 7)}-01`;
   return {
@@ -194,10 +185,7 @@ export function occupancyModel(months: BirdwingMonth[], today: string): Cartesia
   };
 }
 
-/**
- * Where the money went, by head and month: the heads in order of their
- * total, eight at most — the rest fold into "Other" (DESIGN.md's ceiling).
- */
+/** Where the money went, by head and month: eight heads at most (DESIGN.md's ceiling), the rest fold into "Other". */
 export function expenseStackModel(
   lines: { month: string; head: string; amount: number }[],
   months: BirdwingMonth[],

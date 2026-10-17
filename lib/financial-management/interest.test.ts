@@ -1,8 +1,4 @@
-/**
- * The facility arithmetic. Outstanding principal and accrued interest —
- * numbers that will sit next to a bank's own statement, so the edges
- * matter more than usual.
- */
+/** Facility arithmetic: numbers that sit beside a bank statement, so the edges matter. */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -43,8 +39,7 @@ test("a facility with no rate gets a dash, never a zero", () => {
 });
 
 test("a lone drawdown accrues one month's interest per completed month", () => {
-  // Jan..Jul are the completed months before an August `today` — seven
-  // months at 1% of 1,00,000.
+  // Jan..Jul are the completed months before an August `today`: seven at 1% of 1,00,000.
   const p = facilityPosition([draw(100_000, "2026-01-15")], 12, TODAY);
   assert.equal(p.accrued, 7000);
 });

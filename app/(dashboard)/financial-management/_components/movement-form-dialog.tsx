@@ -9,7 +9,6 @@ import { recordMovement } from "@/lib/financial-management/actions";
 import { MOVEMENT_KIND_LABELS, MOVEMENT_KINDS } from "@/lib/financial-management/kinds";
 import { todayInIndia } from "@/lib/format";
 
-/** Record a drawdown, repayment or interest payment against one facility. */
 export function MovementFormDialog({ facilityId }: { facilityId: string }) {
   return (
     <RecordFormDialog
