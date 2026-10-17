@@ -34,20 +34,9 @@ import {
 import { GRANT } from "./shared";
 
 /**
- * Reads for the design board (root plan.md, thirteenth piece): the Board,
- * a villa's stages, actions and history, the Actions list, the welcome.
- *
- * Every export opens with requireTool("/design-management"). Everyone
- * holding the grant sees every villa (0126 — the founder took the open
- * recommendation); who opens on whose list is decided here, never by a
- * policy. Small on purpose: ~70 villas, a few hundred steps and actions,
- * so each screen reads its slice whole (fetchAll) and works in memory — a
- * count from a truncated page is a wrong number that looks right.
- *
- * Names merge through Maps, never an embed of `profiles`: design_steps,
- * design_step_events and design_actions each carry several FKs to it
- * (BUGCATCHER #2). `units` reaches `plots` through two FKs, so that embed
- * names its key.
+ * Every export opens with requireTool. Everyone holding the grant sees every villa (0126); who opens on whose list is decided here, not by a policy.
+ * Small on purpose (~70 villas): each screen reads its slice whole (fetchAll); a count from a truncated page looks right and is wrong.
+ * Names merge through Maps, never a `profiles` embed (several FKs, BUGCATCHER #2); `units` reaches `plots` through two FKs, so that embed names its key.
  */
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
@@ -85,10 +74,6 @@ async function namesFor(supabase: Supabase, ids: (string | null)[]): Promise<Map
   return new Map(rows.map((row) => [row.id, row.full_name ?? "—"]));
 }
 
-// ---------------------------------------------------------------------
-// Stages and villas
-// ---------------------------------------------------------------------
-
 type StageRecord = {
   id: string;
   name: string;
@@ -119,9 +104,7 @@ async function readStages(
 
 export type VillaRef = {
   unitId: string;
-  /** "41", "22-23" — set in monospace. */
   number: string;
-  /** For sorting: the plot code, compared numerically. */
   sortKey: string;
   villaName: string;
   clientName: string | null;
@@ -173,10 +156,6 @@ async function readVillas(supabase: Supabase): Promise<VillaRef[]> {
   return rows.map(toRef).sort(compareVillas);
 }
 
-// ---------------------------------------------------------------------
-// Steps, people, actions
-// ---------------------------------------------------------------------
-
 type StepRecord = {
   id: string;
   unit_id: string;
@@ -226,7 +205,6 @@ export type DesignAction = {
   doneOn: string | null;
   createdBy: string | null;
   setterName: string;
-  /** "Added 15 Oct by Navarang" / "Edited …". */
   stamp: { edited: boolean; on: string; by: string | null };
   sortKey: string;
 };
@@ -271,21 +249,13 @@ function sortActions(actions: DesignAction[]): DesignAction[] {
   return [...open, ...done];
 }
 
-// ---------------------------------------------------------------------
-// The Board
-// ---------------------------------------------------------------------
-
 export type VillaCard = VillaRef & {
   place: Place;
-  /** The stage it sits at; null when nothing has started. */
   placeName: string | null;
   currentStatus: StepStatus | null;
   rail: RailSegment[];
-  /** "Revising Design · 2nd time" for each earlier stage sent back. */
   revising: string[];
-  /** On the stage it sits at. */
   people: Person[];
-  /** Days since the stage it sits at started. */
   daysInStage: number | null;
   next: { action: string; dueOn: string | null; status: string } | null;
   health: VillaHealth | null;
@@ -298,7 +268,6 @@ export type BoardBasics = {
   team: Person[];
   stages: BoardStage[];
   villas: VillaRef[];
-  /** Open actions per person, for the owner menu. */
   openByOwner: Record<string, number>;
 };
 
@@ -311,7 +280,6 @@ type BoardData = BoardBasics & {
   stageNames: Map<string, string>;
 };
 
-/** Everything the board's screens share, read once. */
 async function readBoard(): Promise<BoardData> {
   const me = await readMe();
   const supabase = await createClient();
@@ -469,11 +437,8 @@ function basicsOf(data: BoardData): BoardBasics {
 export type BoardFilters = { q?: string; project?: string; who?: string; health?: string };
 
 export type DesignBoard = BoardBasics & {
-  /** Villas with something started, after every filter, in board order. */
   cards: VillaCard[];
-  /** Villas with nothing started, after the search and project filters. */
   notStarted: VillaCard[];
-  /** "mine" or "all" — what the board is showing. */
   who: "mine" | "all";
   projects: { id: string; name: string }[];
   counts: Record<VillaHealth | "all", number>;
@@ -532,14 +497,9 @@ export async function getDesignBoard(filters: BoardFilters): Promise<DesignBoard
   };
 }
 
-// ---------------------------------------------------------------------
-// A villa
-// ---------------------------------------------------------------------
-
 export type StepView = {
   stageId: string;
   stageName: string;
-  /** Null until the stage has a step on this villa. */
   stepId: string | null;
   status: StepStatus;
   note: string | null;
@@ -627,21 +587,15 @@ export async function getVillaBoard(unitId: string): Promise<VillaBoard | null> 
   };
 }
 
-// ---------------------------------------------------------------------
-// Actions
-// ---------------------------------------------------------------------
-
 export type ActionsFilters = { project?: string; who?: string; showDone?: boolean };
 
 export type DesignActionsBoard = BoardBasics & {
   actions: DesignAction[];
-  /** A person's id, "all", or "mgmt". */
   who: string;
   hour: number;
   loads: { person: Person; load: Load }[];
   management: number;
   myLoad: Load;
-  /** Finished by their owners, waiting for this person to confirm. */
   myToConfirm: number;
   doneCount: number;
   projects: { id: string; name: string }[];
@@ -708,10 +662,6 @@ export async function getDesignActions(filters: ActionsFilters): Promise<DesignA
     projects,
   };
 }
-
-// ---------------------------------------------------------------------
-// The welcome
-// ---------------------------------------------------------------------
 
 export async function getBoardWelcomeCounts(): Promise<{
   inDesign: number;

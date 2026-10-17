@@ -43,8 +43,7 @@ export function DesignStageForm() {
   );
 }
 
-/** The name, editable in place. A rename follows through to every
- * transmittal carrying it, so this doesn't ask for confirmation. */
+/** A rename follows through to every transmittal carrying it, so no confirmation. */
 export function DesignStageNameField({ id, name }: { id: string; name: string }) {
   const [value, setValue] = useState(name);
   const [pending, startTransition] = useTransition();
@@ -86,11 +85,7 @@ export function DesignStageNameField({ id, name }: { id: string; name: string })
   );
 }
 
-/**
- * The stage's short code, which every sheet of the stage carries in its
- * file name (WD in SAA-Saarang-Villa12-WD-TR0003-GFP.pdf). Saved on
- * leaving the field; a change renames those sheets on their next download.
- */
+/** The stage's short code in every sheet's file name; a change renames those sheets on their next download. */
 export function DesignStageCodeField({ id, code }: { id: string; code: string | null }) {
   const [value, setValue] = useState(code ?? "");
   const [pending, startTransition] = useTransition();
@@ -159,7 +154,6 @@ export function DesignStageToggle({ id, isActive }: { id: string; isActive: bool
   );
 }
 
-/** Whether the stage is a column on the design board (0126). */
 export function DesignStageBoardSwitch({
   id,
   name,

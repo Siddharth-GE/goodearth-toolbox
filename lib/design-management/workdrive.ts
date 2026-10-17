@@ -9,20 +9,9 @@ import {
 } from "./workdrive-link";
 
 /**
- * Reads a WorkDrive share link's folder the way its own public page does
- * (0124; plan.md, eleventh piece). Goodearth has no Zoho API access, and the
- * links are "anyone can view": the link's page names the folder it
- * shares and hands the visitor that link's viewing cookies, and with them
- * `api/v1/files/<folder>/files` on the same host answers the list —
- * names, sizes, last-changed times. No file is ever fetched.
- *
- * THIS IS ZOHO'S PAGE, NOT A PROMISE. If Zoho changes either step, the
- * read fails, says which step in one log line, and the caller carries on
- * with the link alone — a transmittal is never stopped by it.
- *
- * Only ever called with an id from `parseWorkDriveLink`, and only ever
- * fetches the share host rebuilt from it — never text a person typed.
- * Never throws; never logs a cookie or Zoho's body.
+ * Reads a WorkDrive share link's folder the way its public page does (0124): there is no Zoho API access, so the page's viewing cookies unlock `api/v1/files/<folder>/files` for names, sizes and times. No file is fetched.
+ * THIS IS ZOHO'S PAGE, NOT A PROMISE: if either step changes, the read fails with one log line and the transmittal carries on with the link alone.
+ * Only called with an id from parseWorkDriveLink, fetching only the share host rebuilt from it. Never throws; never logs a cookie or Zoho's body.
  */
 
 const SHARE_ORIGIN = "https://workdrive.zohoexternal.com";
@@ -37,9 +26,7 @@ export type FolderRead =
 export async function readWorkDriveFolder(linkId: string): Promise<FolderRead> {
   let step = "page";
   try {
-    // Every call refuses a redirect: the server talks to Zoho's share host
-    // and nowhere else, so a link Zoho sends elsewhere fails here, in a
-    // sentence, and goes as a link alone.
+    // Every call refuses a redirect, so a link Zoho sends elsewhere fails here and goes as a link alone.
     const page = await fetch(`${SHARE_ORIGIN}/external/${encodeURIComponent(linkId)}`, {
       cache: "no-store",
       redirect: "error",

@@ -18,16 +18,7 @@ import type { VillaDrawingSetState } from "@/lib/design-management/queries";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 
-/**
- * Start a transmittal: a stage, then one drawing set of THAT stage.
- *
- * Founder, 2026-09-27: "one transmittal contains only one stage and you
- * upload a drawing set and inside that sheets". So the two questions a
- * transmittal needs are asked together, and the sets offered are only
- * the ones this villa has at the chosen stage — a Structural set can no
- * longer go out on a Concept transmittal (0099 refuses it too). Every
- * press here is `startTransmittal`, which lands on the new workspace.
- */
+/** A stage, then one drawing set of THAT stage: only this villa's sets at the chosen stage are offered (0099 refuses a mismatch too). */
 export function NewTransmittalDialog({
   unitId,
   stages,
@@ -167,7 +158,6 @@ export function NewTransmittalDialog({
   );
 }
 
-/** The one right press for a set of this stage, given where it stands. */
 function SetOffer({
   set,
   onStart,
@@ -195,7 +185,6 @@ function SetOffer({
   );
 }
 
-/** What this villa has of the set, said plainly. */
 function stateLine(set: VillaDrawingSetState): string {
   if (set.released) {
     const sheets = `${set.released.fileCount} ${set.released.fileCount === 1 ? "sheet" : "sheets"}`;

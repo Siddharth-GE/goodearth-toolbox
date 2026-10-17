@@ -18,12 +18,7 @@ import type { ReactNode } from "react";
 
 import { ActionCard } from "./action-card";
 
-/**
- * The board's server-rendered parts — section heads, the action sections,
- * the team strip and greeting, the filter chips — in Client Relations'
- * shape (its own copy). Every filter is a link, so a screen is a plain URL
- * a person can bookmark or send, and works before any script has loaded.
- */
+/** Every filter is a link, so a screen is a bookmarkable URL and works before any script loads. */
 
 export function SectionHead({
   title,
@@ -79,7 +74,6 @@ const SECTIONS: Record<
   done: { title: "Done", tone: "muted", hint: "The latest, newest first" },
 };
 
-/** The sections, top to bottom; an empty one is left out. */
 export function ActionSections({
   actions,
   today,
@@ -204,7 +198,6 @@ function Legend({ load }: { load: Load }) {
   );
 }
 
-/** A manager's view: what waits on them, and a card per designer. */
 export function TeamStrip({
   loads,
   management,

@@ -2,11 +2,7 @@ import type { FolderSheet } from "@/lib/drawings/folder-sheets";
 import { formatShortDate } from "@/lib/format";
 import { FileText } from "lucide-react";
 
-/**
- * A WorkDrive folder's sheets as the toolbox read them (0124): numbered,
- * by name, with the day each last changed in WorkDrive. The files are
- * opened in WorkDrive through the folder's link, never from here.
- */
+/** Files are opened in WorkDrive through the folder's link, never from here. */
 export function FolderSheetList({ sheets }: { sheets: FolderSheet[] }) {
   if (sheets.length === 0) {
     return <p className="text-muted text-xs">No sheets were found in the folder.</p>;

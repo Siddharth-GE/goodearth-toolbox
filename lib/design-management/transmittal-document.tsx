@@ -5,18 +5,8 @@ import { formatDate } from "@/lib/format";
 import type { TransmittalDetail, TransmittalLineRow } from "./queries";
 
 /**
- * The transmittal cover sheet, on the company letterhead.
- *
- * It is a COVER SHEET and not the drawings: since 0124 the drawings are a
- * WorkDrive folder, printed here as its link, and before that they were
- * PDFs forwarded beside it. What this page has to answer is "which
- * drawings, at which revision, went out on which date, at which design
- * stage" — so after the set and its revision it lists every sheet by
- * name, one row each (the design team, 2026-10-17: "the transmittal sheet
- * displays only the drawing set name"). A forty-sheet set runs onto a
- * second page, the table's header repeating.
- *
- * No money anywhere, because this tool has none.
+ * A COVER SHEET, not the drawings: since 0124 the drawings are a WorkDrive folder, printed as its link. It answers which drawings, at which revision, went out when, at which stage,
+ * so after the set and revision it lists every sheet by name; a forty-sheet set runs onto a second page with the header repeating. No money.
  */
 
 const styles = StyleSheet.create({
@@ -73,7 +63,6 @@ const styles = StyleSheet.create({
   signatureLabel: { fontSize: pdf.size.tiny, color: pdf.color.muted },
 });
 
-/** One row per sheet, whichever way the revision carries its drawings. */
 type SheetRow = { set: string; name: string; detail: string };
 
 function sheetRows(line: TransmittalLineRow): SheetRow[] {
@@ -90,9 +79,7 @@ function sheetRows(line: TransmittalLineRow): SheetRow[] {
 
 export function TransmittalDocument({ transmittal }: { transmittal: TransmittalDetail }) {
   const isDraft = transmittal.status !== "issued";
-  // A draft has no number at all — 0091 refuses to let one hold a
-  // number before it is issued — so the reference says so in words and
-  // the watermark says it again across the page.
+  // A draft has no number (0091 refuses one before issue), so the reference and the watermark say so in words.
   const reference = transmittal.number ?? "Draft";
   const rows = transmittal.lines.flatMap(sheetRows);
   // One line since 0099; a transmittal from before may carry several sets.
@@ -185,8 +172,7 @@ export function TransmittalDocument({ transmittal }: { transmittal: TransmittalD
           </Text>
         )}
 
-        {/* Only an issued transmittal is something anyone signs for — a
-            draft must never look like a receipt. */}
+        {/* Only an issued transmittal is signed for; a draft must never look like a receipt. */}
         {!isDraft && (
           <View style={styles.signatureRow} wrap={false}>
             <View style={styles.signatureBox}>

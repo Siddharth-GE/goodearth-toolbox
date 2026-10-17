@@ -1,7 +1,6 @@
 "use server";
 
-// Type-only import, never re-exported from a "use server" file — the
-// 2026-08-03 outage rule, enforced by npm run check:actions.
+// Type-only and never re-exported from a "use server" file (check:actions).
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { dbErrorMessage } from "@/lib/db-error";
@@ -19,21 +18,7 @@ import { redirect } from "next/navigation";
 const NAME_LIMIT = 120;
 const NOTE_LIMIT = 1000;
 
-/**
- * Writes for the Design Management app: design stages (its one master),
- * a villa's drawing revisions and the sheets on them, the drawing sets
- * those revisions belong to — which are born inside a transmittal, never
- * in a master screen — and the transmittals that send it all to site.
- * Every action opens with
- * requireTool and ends by revalidating the layout — an exact-path call
- * would leave the welcome counts stale while the moved list refreshes
- * (the exact-path trap in CLAUDE.md). Nothing here writes another
- * tool's table.
- */
-
-// ---------------------------------------------------------------------
-// Design stages
-// ---------------------------------------------------------------------
+/** Every action opens with requireTool and ends by revalidating the layout: an exact path would leave the welcome counts stale. Nothing here writes another tool's table. */
 
 export async function addDesignStage(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireTool(GRANT);
@@ -53,8 +38,7 @@ export async function addDesignStage(_prev: ActionState, formData: FormData): Pr
     return { error: "Could not work out where to add it. Try again." };
   }
 
-  // Steps of 10, the construction_stages/work_items convention — room
-  // to slot one between two later without renumbering everything.
+  // Steps of 10, so one can slot between two without renumbering.
   const { error } = await supabase.from("design_stages").insert({
     name,
     sort_order: (last?.sort_order ?? 0) + 10,
@@ -95,11 +79,7 @@ export async function renameDesignStage(id: string, name: string): Promise<Actio
   return undefined;
 }
 
-/**
- * The short code a stage puts into every sheet's file name (WD, STR, …).
- * Changing it renames every sheet of that stage on its next download —
- * names are built then, never stored (lib/drawings/sheet-name.ts).
- */
+/** The short code in every sheet's file name (WD, STR). Names are built at download, never stored, so changing it renames them (lib/drawings/sheet-name.ts). */
 export async function setDesignStageCode(id: string, input: string): Promise<ActionState> {
   const user = await requireTool(GRANT);
   const code = normaliseStageCode(input);
@@ -137,11 +117,7 @@ export async function setDesignStageActive(id: string, isActive: boolean): Promi
   return undefined;
 }
 
-/**
- * Whether a stage is a column on the design board (0126). Switching one
- * off hides its column and leaves every step on it, and its history, as
- * it was — switched back on, the villas are where they were.
- */
+/** Whether a stage is a board column (0126). Off hides the column but leaves every step and its history. */
 export async function setDesignStageOnBoard(id: string, onBoard: boolean): Promise<ActionState> {
   const user = await requireTool(GRANT);
 
@@ -159,11 +135,7 @@ export async function setDesignStageOnBoard(id: string, onBoard: boolean): Promi
   return undefined;
 }
 
-/**
- * Swaps sort_order with the neighbour in the given direction — two
- * updates, not a rewrite of the whole ordered list, so a reorder costs
- * the same regardless of how many stages exist.
- */
+/** Swaps sort_order with the neighbour: two updates, not a rewrite of the list. */
 export async function moveDesignStage(id: string, direction: "up" | "down"): Promise<ActionState> {
   const user = await requireTool(GRANT);
   const supabase = await createClient();
@@ -206,33 +178,13 @@ export async function moveDesignStage(id: string, direction: "up" | "down"): Pro
   return undefined;
 }
 
-// ---------------------------------------------------------------------
-// Drawing revisions — a villa's own workspace on a set
-// ---------------------------------------------------------------------
-
-/** The RLS-scoped client, so the helpers below can be handed the one the
- *  action already made rather than each opening another. Declared, never
- *  exported — a "use server" file exports async functions only (the
- *  lib/budgets/actions.ts precedent). */
+/** Declared, never exported: a "use server" file exports async functions only. */
 type DesignClient = Awaited<ReturnType<typeof createClient>>;
 
 /**
- * Starts a draft revision for one (villa, set) and hands back its id.
- *
- * `revision_no` is max + 1 across every status for that pair, or 0 for
- * the first — a number is spent once and never re-used. The new draft
- * copies the set master's default work links, which is the
- * "customisable on release" rule: it starts where the set says and can
- * then differ for this villa alone.
- *
- * The partial unique index (one draft per unit+set) is the real guard;
- * its 23505 comes back as a sentence rather than a code. `seedFailed`
- * is handed back rather than swallowed so the caller can report the
- * partial honestly — the revision exists but its work links did not
- * copy, and silence there would ship an unlabelled empty list.
- *
- * Not an action: no `requireTool`, no `revalidatePath`. Its callers do
- * both, and it is never reachable except through one of them.
+ * Starts a draft revision for one (villa, set). `revision_no` is max + 1 across every status, or 0: a number is spent once. The draft copies the set's default work links.
+ * The partial unique index (one draft per unit+set) is the guard; its 23505 becomes a sentence. `seedFailed` is returned so the caller can report the partial honestly.
+ * Not an action: its callers do requireTool and revalidatePath.
  */
 async function startDraftRevision(
   supabase: DesignClient,
@@ -300,14 +252,8 @@ async function startDraftRevision(
 }
 
 /**
- * Deletes a draft revision's rows and then its files in storage.
- *
- * ROWS FIRST, THEN OBJECTS — a failure part-way leaves an orphaned file
- * nobody can see, never a row pointing at a file that isn't there. The
- * paths are read BEFORE the RPC, because the RPC deletes
- * `drawing_revision_files` itself. `delete_draft_revision` (0091 §10)
- * refuses while the revision still sits on a transmittal line, so the
- * caller takes the line off first.
+ * ROWS FIRST, THEN OBJECTS: a failure leaves an orphaned file nobody sees, never a row pointing at nothing. Paths are read BEFORE the RPC, which deletes drawing_revision_files itself.
+ * delete_draft_revision (0091) refuses while the revision sits on a transmittal line, so the caller takes the line off first.
  */
 async function discardDraftRevision(
   supabase: DesignClient,
@@ -337,7 +283,6 @@ async function discardDraftRevision(
   return {};
 }
 
-/** The note is the designer's own words on what changed — editable while draft. */
 export async function updateDraftRevisionNote(
   revisionId: string,
   note: string,
@@ -358,14 +303,7 @@ export async function updateDraftRevisionNote(
   return undefined;
 }
 
-/**
- * A revision's own work links, written as one whole-list diff — the same
- * shape as the set-level diff that used to exist, one level finer —
- * and now the only place work links are ticked at all. The draft-only
- * trigger
- * refuses this once the revision has gone to site; that refusal is
- * surfaced here rather than thrown.
- */
+/** Written as one whole-list diff. The draft-only trigger refuses it once the revision has gone to site; that refusal is surfaced, not thrown. */
 export async function setDrawingRevisionWorks(
   revisionId: string,
   workItemIds: string[],
@@ -418,11 +356,8 @@ export async function setDrawingRevisionWorks(
 }
 
 /**
- * The revision number, the designer's while the revision is a draft
- * (0124; founder, 2026-10-17): a set the team had at R2 in Excel starts
- * here at R3. The guard refuses a number at or below one the set already
- * used on this villa, and any change once it has gone to site — its
- * sentence ("Pick a number above R2 …") is passed through.
+ * The designer's revision number while a draft (0124): a set the team had at R2 in Excel starts at R3. The guard refuses a number at or below one already used
+ * on this villa, and any change once it has gone to site; its sentence is passed through.
  */
 export async function setDraftRevisionNumber(
   revisionId: string,
@@ -452,15 +387,8 @@ export async function setDraftRevisionNumber(
 }
 
 /**
- * The drawings, as a WorkDrive share link (0124; founder, 2026-10-17:
- * "lets not get into file handling … they paste a link of our drive").
- * Saving it reads the folder straight away, so the designer sees the
- * count and the names before anything else. An empty link takes the link
- * and its list off the draft.
- *
- * The link is stored as rebuilt from its id (`parseWorkDriveLink`), never
- * as typed. A folder that cannot be read still keeps its link — the
- * transmittal can go with the link alone — and says why.
+ * The drawings are a WorkDrive share link (0124). Saving reads the folder straight away. An empty link clears the link and list from the draft.
+ * The link is stored rebuilt from its id (`parseWorkDriveLink`), never as typed. An unreadable folder keeps its link and says why.
  */
 export async function setDraftDrawingsLink(
   revisionId: string,
@@ -511,7 +439,6 @@ export async function setDraftDrawingsLink(
     : undefined;
 }
 
-/** Reads the draft's folder again — after a sheet was added in WorkDrive. */
 export async function readDraftFolder(revisionId: string): Promise<ActionState> {
   const user = await requireTool(GRANT);
   const supabase = await createClient();
@@ -536,12 +463,7 @@ export async function readDraftFolder(revisionId: string): Promise<ActionState> 
   return read.error ? { error: read.error } : undefined;
 }
 
-/**
- * Reads the folder and replaces the draft's kept list with what it holds
- * (0124: delete, then insert — the table has no UPDATE policy). On a
- * failed read nothing is touched, so the last good list stays. Not an
- * action: its callers gate and revalidate.
- */
+/** Replaces the draft's kept list with the folder's contents (0124: delete, then insert, no UPDATE policy). A failed read touches nothing. Not an action: callers gate and revalidate. */
 async function keepFolderList(
   supabase: DesignClient,
   userId: string,
@@ -586,28 +508,10 @@ async function keepFolderList(
   return {};
 }
 
-// ---------------------------------------------------------------------
-// Transmittals — the formal record of what went to site
-// ---------------------------------------------------------------------
-
 /**
- * Starts a transmittal: one villa, one stage, one drawing set — that
- * set's next revision, whose full set of sheets goes to site together
- * (founder, 2026-09-27: "one transmittal contains only one stage … so
- * each time a full set gets to site"), since 0124 as a WorkDrive link.
- *
- * The person picks the stage, then either a set of THAT stage already on
- * this villa or a new name. 0099 refuses a set of another stage and a
- * second set on one transmittal, so the screen can only offer what the
- * database would take anyway.
- *
- * Order: the revision (and, for a new name, the set) first, then the
- * header, then the line. A failure after the revision was started here
- * takes it back out, and a failure after the header takes that out too:
- * pressing Start gives a transmittal to work on, or leaves no draft
- * behind. A new set whose revision is taken back out stays as an empty
- * row nobody sees — a set surfaces only where it has revisions. The
- * number is minted on Issue, never here.
+ * Starts a transmittal: one villa, one stage, one drawing set; its next revision goes to site as a WorkDrive link (0124).
+ * 0099 refuses a set of another stage and a second set on one transmittal, so the screen only offers what the database takes.
+ * Order: revision (and new set), header, line. A failure takes back what this call started, so Start leaves a transmittal or no draft. The number is minted on Issue.
  */
 export async function startTransmittal(
   unitId: string,
@@ -680,9 +584,7 @@ export async function startTransmittal(
     setId = choice.setId;
   }
 
-  // An open draft is continued, never duplicated (one per villa and set,
-  // by a partial unique index). One already on a transmittal is that
-  // transmittal's to finish.
+  // An open draft is continued, never duplicated (one per villa and set); one already on a transmittal is that transmittal's to finish.
   const { data: openDraft, error: draftError } = await supabase
     .from("drawing_revisions")
     .select("id")
@@ -759,8 +661,7 @@ export async function startTransmittal(
   redirect(`/design-management/transmittals/${transmittal.id}`);
 }
 
-/** The one line a transmittal carries: `unit_id` from the header (never
- *  from the browser). 0099 allows exactly one line per transmittal. */
+/** `unit_id` comes from the header, never the browser. 0099 allows exactly one line per transmittal. */
 async function appendTransmittalLine(
   supabase: DesignClient,
   userId: string,
@@ -785,12 +686,7 @@ async function appendTransmittalLine(
   return dbErrorMessage(error, "Could not add that drawing set. Try again.");
 }
 
-/**
- * The note for site, saved when the person leaves the field — editable
- * only while the transmittal is a draft. The guard trigger refuses it
- * once issued, and that refusal is shown rather than swallowed. The
- * stage is not editable here: it came with the set (0099).
- */
+/** Editable only while a draft; the guard trigger refuses it once issued and that is shown. The stage is not editable: it came with the set (0099). */
 export async function setDraftTransmittalNote(
   transmittalId: string,
   note: string,
@@ -816,29 +712,14 @@ export async function setDraftTransmittalNote(
 }
 
 /**
- * The one act that puts a drawing in front of site.
- *
- * `issue_transmittal` (0091 §10) does the whole thing in one
- * transaction: it refuses an empty transmittal, releases every draft
- * revision on it, supersedes whatever that set had released before, and
- * mints the number — which it returns. The number goes into the URL so
- * the refreshed page can say it in words; the header shows it too, but
- * "Issued as TR-0001" is the sentence the person pressing the button is
- * waiting for.
- *
- * Every refusal in that function is a RAISE written for a person to
- * read, so it is passed through rather than replaced — including "Add at
- * least one drawing before issuing this transmittal", which is why the
- * button stays pressable on an empty draft instead of quietly hiding.
+ * issue_transmittal (0091) does it all in one transaction: refuses an empty transmittal, releases every draft revision, supersedes the set's earlier release, mints the number.
+ * The number goes in the URL so the page can say "Issued as TR-0001". Its refusals are written for people and passed through, which is why the button stays pressable on an empty draft.
  */
 export async function issueTransmittal(transmittalId: string): Promise<ActionState> {
   const user = await requireTool(GRANT);
   const supabase = await createClient();
 
-  // 0124: the folder is read once more, so the list kept with the record
-  // is what the folder held when it went to site. A read that fails keeps
-  // the last good list (or none) and never stops the issue — the link
-  // itself is the drawings.
+  // The folder is read once more so the kept list is what it held when it went to site; a failed read never stops the issue.
   const { data: lines, error: linesError } = await supabase
     .from("transmittal_lines")
     .select("drawing_revision_id")
@@ -881,25 +762,14 @@ export async function issueTransmittal(transmittalId: string): Promise<ActionSta
 }
 
 /**
- * A draft raised by mistake, gone entirely — and its draft drawings with
- * it. The screen says so before the press.
- *
- * The header and lines go in one transaction (`delete_draft_transmittal`,
- * 0091 §10), because two requests can fail in between and strand a
- * header with its lines gone. THEN each draft revision that was on it,
- * rows before files (`discardDraftRevision`) — a draft left on no
- * transmittal is one nobody can open (2026-09-27 audit). Released
- * drawings that were being re-sent are untouched.
- *
- * An issued transmittal is refused by the function and by the guard: it
- * is the answer to "what did site have on the 22nd".
+ * A draft raised by mistake, gone with its draft drawings. Header and lines go in one transaction (delete_draft_transmittal, 0091), then each draft revision, rows before files.
+ * An issued transmittal is refused by the function and the guard: it answers "what did site have on the 22nd".
  */
 export async function deleteDraftTransmittal(transmittalId: string): Promise<ActionState> {
   await requireTool(GRANT);
   const supabase = await createClient();
 
-  // Read the villa and the drafts BEFORE the rows go: afterwards there is
-  // nothing left pointing at either.
+  // Read the villa and the drafts BEFORE the rows go.
   const { data: header, error: headerError } = await supabase
     .from("transmittals")
     .select("unit_id")
@@ -910,8 +780,7 @@ export async function deleteDraftTransmittal(transmittalId: string): Promise<Act
     return { error: "Could not delete this draft. Try again." };
   }
 
-  // Complete, not capped: a draft missed here is a draft left behind.
-  // fetchAll throws on a failed read; an action answers with a sentence.
+  // Complete, not capped: a draft missed here is left behind.
   let draftIds: string[];
   try {
     const lines = await fetchAll<{ drawing_revision_id: string }>((from, to) =>
@@ -949,9 +818,7 @@ export async function deleteDraftTransmittal(transmittalId: string): Promise<Act
     return { error: dbErrorMessage(error, "Could not delete this draft. Try again.") };
   }
 
-  // The transmittal is already gone, so there is no page to stay on and
-  // report from. A draft that would not delete stays on the villa, where
-  // the Add drawing dialog offers "Continue draft" for it.
+  // The transmittal is gone, so a draft that would not delete stays on the villa, where Add drawing offers "Continue draft".
   for (const draftId of draftIds) {
     const discarded = await discardDraftRevision(supabase, draftId);
     if (discarded.error) {

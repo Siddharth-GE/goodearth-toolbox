@@ -22,16 +22,6 @@ import { TransmittalList } from "./_components/transmittal-list";
 import { VillaHistory } from "./_components/villa-history";
 import { VillaStages } from "./_components/villa-stages";
 
-/**
- * A villa's page (root plan.md, thirteenth piece): where it sits, its
- * stages and who is on them, its next steps, its drawings, and every
- * move it has made. Client Relations' plot page in design's terms — the
- * plot number large, then the cards in the order the work runs. Back goes
- * to the Board; a transmittal still goes back to its villa.
- *
- * The transmittals and drawing sets are exactly as before (founder,
- * 2026-08-22: "goes into the villa there all transmittals of that plot").
- */
 export default async function VillaDesignPage({ params }: { params: Promise<{ unitId: string }> }) {
   const { unitId } = await params;
   const [board, villa, stages, sets] = await Promise.all([
@@ -48,8 +38,7 @@ export default async function VillaDesignPage({ params }: { params: Promise<{ un
     .map((stage) => ({ id: stage.id, name: stage.name }));
   const stageNames = new Map(stages.map((stage) => [stage.id, stage.name]));
   const stageOrder = new Map(stages.map((stage, index) => [stage.id, index]));
-  // Grouped by stage in the stage list's own order; a set from before
-  // sets had stages sorts last.
+  // Grouped by stage in the master's order; a set from before sets had stages sorts last.
   const orderedSets = [...sets].sort(
     (a, b) =>
       (a.stageId ? (stageOrder.get(a.stageId) ?? 999) : 1000) -

@@ -7,16 +7,7 @@ import { formatDate } from "@/lib/format";
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 
-/**
- * This villa's transmittals, newest first, filtered by design stage.
- *
- * Founder, 2026-08-22 evening: "there all transmittals of that plot,
- * filters by group". The chips are Radix `Tabs` — same-page panels, no
- * navigation and no URL change, which is what a filter is; `NavTabs`
- * would be the wrong one (DESIGN.md draws that line). Only stages that
- * actually appear here get a chip, so pressing one can never show an
- * empty list.
- */
+/** Chips are Radix Tabs, not NavTabs: a filter is same-page panels with no URL change (DESIGN.md). Only stages that appear get a chip. */
 export function TransmittalList({
   transmittals,
   stages,

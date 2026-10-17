@@ -15,22 +15,12 @@ import type { ActionState } from "@/lib/action-state";
 import type { TablesUpdate } from "@/lib/supabase/database.types";
 
 /**
- * Writes for the design board (root plan.md, thirteenth piece): a villa's
- * stages — status, note, people, pass on, send back, set where it is —
- * and the design team's actions.
- *
- * Every export opens with requireTool("/design-management"), returns an
- * ActionState and never throws. The database holds every rule (0126):
- * the guards refuse a send-back with no reason, a stage off the board,
- * someone off the team, a close by anyone but the setter; this file says
- * the same things in a sentence first where it can. A pass and "set where
- * it is" touch several rows, so each is one database function — one
- * transaction, never half done.
+ * Every export opens with requireTool and returns an ActionState. The database holds every rule (0126); this file says the same in a sentence first where it can.
+ * A pass and "set where it is" touch several rows, so each is one database function: one transaction, never half done.
  */
 
 function revalidateAll(): void {
-  // The welcome counts and the board move with every change (CLAUDE.md:
-  // an exact-path call would refresh only the welcome).
+  // Layout revalidate: an exact path would refresh only the welcome.
   revalidatePath("/design-management", "layout");
 }
 
@@ -64,15 +54,7 @@ function cleanPeople(peopleIds: string[]): string[] {
   return [...new Set(peopleIds.filter(Boolean))];
 }
 
-// ---------------------------------------------------------------------
-// A villa's stages
-// ---------------------------------------------------------------------
-
-/**
- * One tap on a status chip. A stage with no step yet starts with this
- * status; Revising needs a reason (the database insists too). Not started
- * on a stage that never began is nothing to do.
- */
+/** A stage with no step starts with this status. Revising needs a reason (the database insists too). */
 export async function setStepStatus(
   unitId: string,
   stageId: string,
@@ -112,7 +94,6 @@ export async function setStepStatus(
   return undefined;
 }
 
-/** The one-line note on a stage — saves when you leave the box. */
 export async function setStepNote(stepId: string, note: string): Promise<ActionState> {
   await requireTool(GRANT);
   const text = note.trim();
@@ -129,7 +110,6 @@ export async function setStepNote(stepId: string, note: string): Promise<ActionS
   return undefined;
 }
 
-/** Put someone on a stage that has started. */
 export async function addStepPerson(stepId: string, personId: string): Promise<ActionState> {
   await requireTool(GRANT);
   if (!personId) return { error: "Pick who to put on it." };
@@ -161,10 +141,7 @@ export async function removeStepPerson(stepId: string, personId: string): Promis
   return undefined;
 }
 
-/**
- * Start a stage — any stage, at any time: Structural alongside WD,
- * Interiors before Permit comes back. With the people who take it.
- */
+/** Start a stage at any time, with the people who take it. */
 export async function startStep(
   unitId: string,
   stageId: string,
@@ -212,7 +189,6 @@ export async function startStep(
   return undefined;
 }
 
-/** Pass on: this stage done, the next Working with whoever takes it — one transaction. */
 export async function passStep(input: {
   unitId: string;
   fromStageId: string;
@@ -241,11 +217,7 @@ export async function passStep(input: {
   return undefined;
 }
 
-/**
- * Bringing a villa in at the stage it has reached: every board stage
- * before it Done, this one Working with its people — one transaction,
- * and only on a villa with nothing started.
- */
+/** Brings a villa in at the stage it has reached: earlier board stages Done, this one Working. One transaction, only on a villa with nothing started. */
 export async function setWhereItIs(
   unitId: string,
   stageId: string,
@@ -267,10 +239,6 @@ export async function setWhereItIs(
   revalidateAll();
   return undefined;
 }
-
-// ---------------------------------------------------------------------
-// Actions — the design team's to-do list
-// ---------------------------------------------------------------------
 
 export type NewDesignAction = {
   unitId: string | null;
@@ -314,11 +282,7 @@ export type DesignActionPatch = {
   stageId?: string | null;
 };
 
-/**
- * One change to one action — a chip saves the moment it is tapped. Only
- * whoever set it, or a manager, closes it or opens it again; its owner
- * marks it finished for them (0126 holds the same line).
- */
+/** Only whoever set it, or a manager, closes or reopens it; its owner marks it finished (0126 holds the same line). */
 export async function updateDesignAction(
   actionId: string,
   patch: DesignActionPatch,

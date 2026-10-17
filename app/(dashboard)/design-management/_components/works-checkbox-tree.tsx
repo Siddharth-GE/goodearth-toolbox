@@ -4,20 +4,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import type { WorksTreeCategory } from "@/lib/masters/works";
 
 /**
- * The works-vocabulary checkbox tree — categories, their groups, and the
- * items inside. Shared by two editors that check different things
- * against the same tree: a drawing set's default work links
- * (sets/_components/works-link-editor.tsx) and one draft revision's own
- * links (villas/[unitId]/_components/draft-revision-editor.tsx). Purely
- * presentational: the caller owns the checked set, the dirty check, and
- * the save.
- *
- * The category header carries its own ticker (founder, 2026-08-22:
- * "make a ticker for a group like foundation that can tick all the
- * works below it") — tick it and every work under the category ticks;
- * part-ticked shows the native half state. `onSetMany` sets the whole
- * list one way, which is not the same as toggling each: toggling a
- * mixed selection would invert it instead of completing it.
+ * Checkbox tree of the works vocabulary, shared by the set-default editor and the draft revision editor; the caller owns the checked set, dirty check and save.
+ * `onSetMany` sets a whole category one way: toggling each would invert a mixed selection instead of completing it.
  */
 export function WorksCheckboxTree({
   tree,

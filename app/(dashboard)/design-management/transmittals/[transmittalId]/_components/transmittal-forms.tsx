@@ -14,14 +14,7 @@ import { useState, useTransition } from "react";
 
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
-/**
- * The note for site on a DRAFT transmittal, saved when the person leaves
- * the field. The stage and the set are not here: they were chosen when
- * the transmittal started and never move (0099). Once issued, nothing in
- * this file renders — the guard trigger in 0091 refuses these writes
- * anyway, and an issued transmittal that looks editable is worse than
- * one that plainly isn't.
- */
+/** The note for site on a DRAFT, saved when the field is left. Stage and set never move (0099). Once issued nothing here renders: an issued transmittal that looks editable is worse than one that plainly isn't. */
 export function TransmittalNote({
   transmittalId,
   note,
@@ -52,16 +45,7 @@ export function TransmittalNote({
   );
 }
 
-/**
- * The row under the title: whether this draft is ready to go, and Issue.
- *
- * The readiness line is worked out from the page's own data
- * (lib/design-management/readiness.ts) so the problem is named before
- * the press. Issue stays pressable either way: `issue_transmittal` is
- * the rule, and if it refuses, its own sentence replaces the readiness
- * line at full size, right where the eye already is — not in small
- * print beside the button.
- */
+/** Readiness is worked out from the page's own data (readiness.ts) so the problem is named before the press. Issue stays pressable: issue_transmittal is the rule, and its refusal replaces the readiness line at full size. */
 export function IssueBar({
   transmittalId,
   problem,
@@ -109,13 +93,11 @@ export function IssueBar({
   );
 }
 
-/** The whole draft, gone — said out loud first, with what goes with it. */
 export function DeleteDraftTransmittalButton({
   transmittalId,
   draft,
 }: {
   transmittalId: string;
-  /** The draft revision on it, which is deleted too; null when there is none. */
   draft: { label: string; revisionNo: number; sheetCount: number } | null;
 }) {
   const goesWithIt = !draft

@@ -9,30 +9,14 @@ import { readFailed } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
 
 /**
- * Reads for the Design Management app.
- *
- * Every function opens with `requireTool("/design-management")`. What
- * this tool reads from outside itself (STATUS.md contract row): the
- * shared units/plots/projects/profiles masters, and the works
- * vocabulary (work_categories/work_groups/work_items) via
- * lib/masters/works.ts — the same vocabulary Estimator prices and
- * Supervisors logs against. Nothing here reads or shows money.
- *
- * `units` has two FK paths to `plots` (0029), and `drawing_revisions` /
- * `transmittals` carry multiple FKs to `profiles` (created_by,
- * released_by/issued_by, updated_by) — so wherever this module needs a
- * villa or a person's name it merges through a `Map` rather than an
- * embed (BUGCATCHER #2), the lib/supervisors/queries.ts pattern.
+ * Every function opens with requireTool. Outside reads (STATUS.md contract row): the shared units/plots/projects/profiles masters and the works vocabulary via lib/masters/works.ts. No money here.
+ * `units` has two FK paths to `plots` (0029) and drawing_revisions/transmittals carry several FKs to `profiles`, so villa and person names merge through a Map, not an embed (BUGCATCHER #2).
  */
 
 const GRANT = "/design-management";
 
 const fail = (context: string, error: { message: string }): never =>
   readFailed("design-management", context, error);
-
-// ---------------------------------------------------------------------
-// Design stages
-// ---------------------------------------------------------------------
 
 export type DesignStageRow = {
   id: string;
@@ -41,7 +25,6 @@ export type DesignStageRow = {
   code: string | null;
   sortOrder: number;
   isActive: boolean;
-  /** A column on the design board (0126). */
   onBoard: boolean;
 };
 
@@ -76,13 +59,8 @@ export async function listDesignStages(): Promise<DesignStageRow[]> {
   }));
 }
 
-// ---------------------------------------------------------------------
-// Villas
-// ---------------------------------------------------------------------
-
 export type DrawingRevisionFileRow = {
   id: string;
-  /** The name it was uploaded under. */
   fileName: string;
   /** GFP — typed at upload; null only for sheets from before 0099. */
   sheetCode: string | null;
@@ -100,15 +78,9 @@ export type DrawingRevisionRow = {
   releasedAt: string | null;
   /** Sheets uploaded before 0124 — none on a revision started since. */
   files: DrawingRevisionFileRow[];
-  /** The WorkDrive share link of this revision's folder (0124). */
   drawingsUrl: string | null;
-  /** That folder's sheets as the toolbox last read them. */
   folderSheets: FolderSheet[];
-  /**
-   * Null for released/superseded revisions — those work links are frozen
-   * and the screen never offers to edit them, so there is nothing to
-   * fetch. Populated only for the (at most one) draft per set.
-   */
+  /** Null for released/superseded revisions (frozen, never edited); set only for the one draft per set. */
   workItemIds: string[] | null;
 };
 
@@ -120,7 +92,6 @@ export type VillaTransmittalRow = {
   stageId: string;
   stageName: string;
   lineCount: number;
-  /** The drawing set it carries and its revision — one per transmittal (0099). */
   setName: string | null;
   revisionNo: number | null;
   issuedAt: string | null;
@@ -133,34 +104,14 @@ export type VillaDesignDetail = {
   villaName: string;
   plotName: string;
   projectName: string;
-  /** Newest first, and complete — one villa's transmittals are few. */
   transmittals: VillaTransmittalRow[];
-  /**
-   * The design stages that actually appear on this villa's transmittals,
-   * in the stage master's own order — the filter chips. A stage nobody
-   * has issued against here is not offered: a chip that can only ever
-   * show an empty list is clutter, which is the thing being removed.
-   */
+  /** Stages that appear on this villa's transmittals, in master order: the filter chips offer no stage that would show an empty list. */
   stages: { id: string; name: string }[];
 };
 
 /**
- * The villa's home page: who it is, and every transmittal on it.
- *
- * Founder, 2026-08-22 evening: "goes into the villa there all
- * transmittals of that plot, filters by group". So this replaced both
- * the old stage board and the global transmittals list — everything is
- * plot-level now, and there is no company-wide list to consolidate with.
- *
- * Read complete rather than capped: a villa accumulates transmittals at
- * the speed a design team issues drawings, and the filter chips have to
- * be able to say honestly which stages appear. `null` when the unit id
- * doesn't exist — the caller's `notFound()`.
- *
- * Ordered by `created_at`: a draft has no issue date at all, and
- * PostgREST cannot order on a coalesce. A transmittal is issued within
- * minutes of being raised, so the two orders agree — and an unfinished
- * draft belongs at the top anyway.
+ * The villa's home page. Read complete, not capped, so the filter chips can say honestly which stages appear. `null` for an unknown unit id (the caller's notFound()).
+ * Ordered by created_at: a draft has no issue date and PostgREST cannot order on a coalesce; the two orders agree in practice.
  */
 export async function getVillaDesignDetail(unitId: string): Promise<VillaDesignDetail | null> {
   await requireTool(GRANT);
@@ -211,9 +162,7 @@ export async function getVillaDesignDetail(unitId: string): Promise<VillaDesignD
     ...new Set(transmittals.map((row) => row.issued_by).filter((id): id is string => id !== null)),
   ];
 
-  // Names merge through Maps, never an embed: `transmittals` carries two
-  // FKs to `profiles` (created_by and issued_by), which is a PGRST201 at
-  // runtime that every local gate passes (BUGCATCHER #2).
+  // Names merge through Maps: transmittals has two FKs to profiles (PGRST201 at runtime, BUGCATCHER #2).
   const [lines, issuers] = await Promise.all([
     transmittalIds.length > 0
       ? fetchAll<{ transmittal_id: string; drawing_revision_id: string }>((from, to) =>
@@ -237,7 +186,6 @@ export async function getVillaDesignDetail(unitId: string): Promise<VillaDesignD
       : Promise.resolve([]),
   ]);
 
-  // The set each transmittal carries: its line's revision, then the set.
   const lineRevisionIds = [...new Set(lines.map((line) => line.drawing_revision_id))];
   const lineRevisions =
     lineRevisionIds.length > 0
@@ -314,12 +262,7 @@ export type VillaRevisionSummary = {
   revisionNo: number;
   note: string | null;
   fileCount: number;
-  /**
-   * Where to open it. For a draft: the draft transmittal it sits on, or
-   * null for a draft on none (an orphan from before drafts were deleted
-   * with their line). For a released revision: the transmittal that
-   * issued it — the earliest issued one carrying it.
-   */
+  /** For a draft, the transmittal it sits on (null for an orphan); for a released revision, the earliest issued one carrying it. */
   transmittalId: string | null;
 };
 
@@ -327,48 +270,22 @@ export type VillaDrawingSetState = {
   setId: string;
   setCode: string | null;
   setName: string;
-  /** The stage the set belongs to (0099); null for a set from before. */
   stageId: string | null;
-  /** The one open draft on this villa, if there is one. */
   draft: VillaRevisionSummary | null;
-  /** The current released revision, if this set has ever gone out here. */
   released: VillaRevisionSummary | null;
-  /**
-   * What "Revise" would number the next draft — max + 1 across every
-   * status, or 0 for a set never drawn for this villa. Superseded rows
-   * count: a number is spent once and never re-used.
-   */
+  /** What Revise would number the next draft: max + 1 across every status (superseded count), or 0. */
   nextRevisionNo: number;
 };
 
 /**
- * THIS VILLA'S drawing sets, and where it stands on each: the open
- * draft, the current released revision, and the number the next
- * revision would take.
- *
- * A set is only this villa's if a revision of it lives on this unit.
- * That is the whole of the villa-scoping the founder asked for on
- * 2026-08-22 evening — "not a master set for the whole damn project" —
- * and it needs no column: `drawing_sets` stays one global table, and a
- * set born on another villa's transmittal simply never appears here.
- * Two villas that both make a "Working Drawings" are two rows, which is
- * intended.
- *
- * It feeds two screens: the villa page's "Drawing sets on this
- * plot" (each row opening its transmittal), and the transmittal's Add
- * drawing dialog. A set that has never been drawn here cannot be reached from
- * either — that is what the dialog's "New drawing set" field is
- * for.
- *
- * A retired set still appears if it carries history here, so a villa
- * mid-flight is never stranded.
+ * THIS VILLA'S drawing sets and where it stands on each. A set is this villa's only if a revision of it lives on this unit (no column; drawing_sets stays one global table),
+ * so two villas that both make "Working Drawings" are two rows, on purpose. A retired set still appears if it carries history here.
  */
 export async function listVillaDrawingSetStates(unitId: string): Promise<VillaDrawingSetState[]> {
   await requireTool(GRANT);
   const supabase = await createClient();
 
-  // The villa's revisions come first, and the sets follow from them —
-  // the order that makes the scoping true rather than filtered.
+  // The villa's revisions come first and the sets follow, so the scoping is true rather than filtered.
   const revisions = await fetchAll<{
     id: string;
     drawing_set_id: string;
@@ -404,13 +321,10 @@ export async function listVillaDrawingSetStates(unitId: string): Promise<VillaDr
       .range(from, to),
   );
 
-  // Only the drafts and the current released rows ever have their files
-  // counted — a superseded revision's sheets are history nobody is about
-  // to send again.
+  // Only drafts and current released rows have files counted; a superseded revision's sheets are history.
   const countableIds = revisions
     .filter((revision) => revision.status !== "superseded")
     .map((revision) => revision.id);
-  // Uploaded sheets (before 0124) and a folder's kept list both count.
   const [files, folderSheets] =
     countableIds.length > 0
       ? await Promise.all([
@@ -438,9 +352,7 @@ export async function listVillaDrawingSetStates(unitId: string): Promise<VillaDr
     fileCounts.set(file.drawing_revision_id, (fileCounts.get(file.drawing_revision_id) ?? 0) + 1);
   }
 
-  // Which transmittal to open for each current revision: the lines that
-  // carry it, then those transmittals' status and date. Two flat reads
-  // merged through Maps, never an embed (BUGCATCHER #2).
+  // Which transmittal to open for each current revision: two flat reads merged through Maps (BUGCATCHER #2).
   const lines =
     countableIds.length > 0
       ? await fetchAll<{ drawing_revision_id: string; transmittal_id: string }>((from, to) =>
@@ -466,9 +378,7 @@ export async function listVillaDrawingSetStates(unitId: string): Promise<VillaDr
       : [];
   const transmittalsById = new Map(lineTransmittals.map((row) => [row.id, row]));
 
-  // A draft opens on its draft transmittal; a released revision on the
-  // first issued transmittal that carried it (a later re-send is not
-  // where it went out).
+  // A draft opens on its draft transmittal; a released revision on the first issued one that carried it.
   const draftHome = new Map<string, string>();
   const releasedHome = new Map<string, { id: string; issuedAt: string }>();
   for (const line of lines) {
@@ -541,19 +451,12 @@ export type TransmittalLineRow = {
   revisionNo: number;
   revisionStatus: "draft" | "released" | "superseded";
   revisionNote: string | null;
-  /** Sheets uploaded before 0124. */
   files: DrawingRevisionFileRow[];
-  /** The WorkDrive share link (0124), if the revision carries one. */
   drawingsUrl: string | null;
   /** Its folder's sheets — as last read on a draft, as kept on Issue once issued. */
   folderSheets: FolderSheet[];
-  /**
-   * The draft's work links, for the editor that now sits inline on this
-   * page. Null for a released or superseded line — those are frozen, so
-   * there is nothing to edit and nothing to fetch.
-   */
+  /** Null for a released or superseded line: frozen, nothing to edit. */
   draftWorkItemIds: string[] | null;
-  /** Every revision of this set that has gone to site, newest first. */
   revisionLog: { revisionNo: number; note: string | null; releasedAt: string | null }[];
 };
 
@@ -571,17 +474,10 @@ export type TransmittalDetail = {
   issuedAt: string | null;
   issuedByName: string | null;
   createdAt: string;
-  /** In sheet order — what the screen lists and the PDF prints. */
   lines: TransmittalLineRow[];
 };
 
-/**
- * One transmittal, everything the detail screen and the PDF cover sheet
- * need. `null` when the id doesn't exist — the caller's `notFound()`,
- * and also what someone without this tool's grant gets for a draft,
- * since the widened SELECT qual (0091 §11) hides it rather than
- * refusing.
- */
+/** `null` for an unknown id, and for a draft when the caller lacks this tool's grant: the widened SELECT qual (0091) hides it. */
 export async function getTransmittalDetail(
   transmittalId: string,
 ): Promise<TransmittalDetail | null> {
@@ -674,8 +570,7 @@ export async function getTransmittalDetail(
       : Promise.resolve([]),
   ]);
 
-  // The draft lines carry the editor that now lives on this page, so
-  // their work links are read here. A released line has none to read.
+  // Draft lines carry the inline editor, so their work links are read; released lines have none.
   const draftRevisionIds = revisions
     .filter((revision) => revision.status === "draft")
     .map((revision) => revision.id);
@@ -704,9 +599,7 @@ export async function getTransmittalDetail(
         )
       : [];
 
-  // The revision log per set: every revision of this villa's sets that
-  // has gone to site, for the "Revision log" button beside a released
-  // line — long change text folded behind a click (founder, 2026-08-22).
+  // Every revision of this villa's sets that has gone to site, for the Revision log button.
   const logRows =
     setIds.length > 0
       ? await fetchAll<{

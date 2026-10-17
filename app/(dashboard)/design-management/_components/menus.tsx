@@ -17,12 +17,7 @@ import { useMemo, useState, type ReactNode } from "react";
 
 import { useDesignBoard } from "./board-context";
 
-/**
- * The board's chip menus, on the toolbox's DropdownMenu (Radix: focus,
- * Escape, arrow keys). Each takes its trigger — a pill — and says what was
- * picked; saving is the caller's. Inputs inside a menu stop their key
- * presses reaching it, or Radix's type-to-find would swallow the letters.
- */
+/** Inputs inside a menu stop their key presses reaching it, or Radix type-to-find swallows the letters. */
 
 export function MenuLabel({ children }: { children: ReactNode }) {
   return (
@@ -131,10 +126,7 @@ export function NobodyOnTheTeam() {
   );
 }
 
-/**
- * A searchable list of villas inside an open menu — the composer's villa
- * pill and an action's "Move to another villa". `general` offers "no villa".
- */
+/** `general` offers "no villa". */
 export function VillaList({
   onPick,
   general = true,

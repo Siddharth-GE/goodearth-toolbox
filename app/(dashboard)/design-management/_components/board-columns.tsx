@@ -4,12 +4,7 @@ import type { VillaCard } from "@/lib/design-management/board-queries";
 import { SectionHead } from "./board-parts";
 import { LotCard } from "./lot-card";
 
-/**
- * The board's columns: one per board stage, each villa in the column of
- * the furthest stage it has started. Side by side on a desktop, like a
- * CRM pipeline; on a phone they stack, a stage at a time, so nothing
- * scrolls sideways.
- */
+/** One column per board stage; on a phone they stack so nothing scrolls sideways. */
 export function BoardColumns({
   stages,
   cards,

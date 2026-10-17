@@ -27,16 +27,7 @@ import { WorksCheckboxTree } from "./works-checkbox-tree";
 
 const LABEL = "text-muted text-[11px] font-medium tracking-[0.14em] uppercase";
 
-/**
- * The draft's own workspace: its number, what changed, its drawings (a
- * WorkDrive link and the folder's sheets), and the works it serves — the
- * only revision status this tool ever offers an edit surface for. Once
- * released or superseded, the guard triggers refuse every one of these
- * writes anyway; this component simply never renders for that row.
- *
- * It sits INSIDE a transmittal line, which is why it has no delete button
- * of its own: discarding a draft is the transmittal's Delete this draft.
- */
+/** The draft's workspace: number, what changed, drawings, works. Rendered only for a draft (guard triggers refuse later writes anyway). It sits inside a transmittal line, so discarding is the transmittal's Delete this draft. */
 export function DraftRevisionEditor({
   revision,
   tree,
@@ -45,8 +36,7 @@ export function DraftRevisionEditor({
   tree: WorksTreeCategory[];
 }) {
   return (
-    // No warning tint: the Draft badge says what it is, and a status
-    // colour that only decorates stops meaning anything.
+    // No warning tint: the Draft badge says what it is.
     <div className="border-border space-y-4 rounded-xl border p-3">
       <RevisionNumberField revisionId={revision.id} revisionNo={revision.revisionNo} />
       <NoteField revisionId={revision.id} revisionNo={revision.revisionNo} note={revision.note} />
@@ -61,12 +51,7 @@ export function DraftRevisionEditor({
   );
 }
 
-/**
- * The revision number, the designer's while draft (0124; founder,
- * 2026-10-17): a set the team had at R2 in Excel starts here at R3. The
- * database refuses a number at or below one the set already used, and its
- * sentence shows under the field.
- */
+/** The designer's revision number while draft (0124); the database refuses one at or below a number the set already used, and its sentence shows under the field. */
 function RevisionNumberField({
   revisionId,
   revisionNo,
@@ -135,8 +120,7 @@ function NoteField({
         onChange={(event) => setValue(event.target.value)}
         onBlur={() => noteSave.flush(value)}
         placeholder={
-          // 0093: R0 is the first issue, so there is no change to explain
-          // yet; from R1 the note is what the database asks for at Issue.
+          // 0093: R0 is the first issue, so nothing to explain yet; from R1 the note is what Issue asks for.
           revisionNo === 0
             ? "Optional — anything site should know about this first issue"
             : "What changed in this revision — needed before it can go to site"
@@ -147,13 +131,7 @@ function NoteField({
   );
 }
 
-/**
- * The drawings: the share link of this revision's WorkDrive folder (0124;
- * founder, 2026-10-17: "lets not get into file handling"). Using a link
- * reads the folder there and then, so the count and the names show before
- * anything else; Read again picks up a sheet added in WorkDrive since.
- * Issue reads it once more and keeps that list with the record.
- */
+/** The share link of this revision's WorkDrive folder (0124). Using it reads the folder there and then; Read again picks up new sheets; Issue reads it once more and keeps that list. */
 function DrawingsField({
   revisionId,
   drawingsUrl,
@@ -252,10 +230,7 @@ function DrawingsField({
   );
 }
 
-/**
- * Sheets uploaded before 0124, on a draft started then. They go to site
- * with it unless taken off; nothing new is uploaded any more.
- */
+/** Sheets uploaded before 0124 go to site with the draft unless taken off. */
 function UploadedSheets({ files }: { files: DrawingRevisionRow["files"] }) {
   const [removingId, setRemovingId] = useState<string>();
   const [error, setError] = useState<string>();
@@ -290,8 +265,7 @@ function UploadedSheets({ files }: { files: DrawingRevisionRow["files"] }) {
               <FileText className="text-muted size-3.5 shrink-0" />
               <span className="min-w-0 break-all">{file.fileName}</span>
             </a>
-            {/* No confirmation: one sheet, on a draft. Everything that loses
-                more than that asks first. */}
+            {/* No confirmation: one sheet, on a draft. */}
             <IconButton
               aria-label={`Take off ${file.fileName}`}
               tone="danger"
@@ -340,8 +314,7 @@ function WorksEditor({
     });
   };
 
-  // The category ticker: set the whole list one way, never toggle each —
-  // toggling a mixed selection would invert it instead of completing it.
+  // Set the whole list one way, never toggle each: toggling a mixed selection would invert it.
   const setMany = (ids: string[], check: boolean) => {
     setJustSaved(false);
     setChecked((prev) => {
@@ -363,9 +336,7 @@ function WorksEditor({
     });
   };
 
-  // Folded until asked for (2026-09-27 audit: the whole works vocabulary,
-  // open under every draft line, buried the note and the sheets). Unsaved
-  // ticks keep it open, so a change is never hidden behind the fold.
+  // Folded until asked for; unsaved ticks keep it open so a change is never hidden.
   const shown = open || dirty;
 
   return (

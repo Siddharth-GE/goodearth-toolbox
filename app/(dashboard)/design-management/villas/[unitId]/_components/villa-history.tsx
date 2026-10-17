@@ -2,12 +2,7 @@ import { Avatar } from "@/components/ui/avatar";
 import type { HistoryLine } from "@/lib/design-management/board";
 import { formatShortDate, formatTime } from "@/lib/format";
 
-/**
- * Every move on this villa, newest first — written by the database
- * itself (0126), so it is the record, not a screen's guess. One move is
- * one line: a pass reads "marked WD done, started Structural, put Jiljith
- * on Structural".
- */
+/** Written by the database itself (0126), so it is the record, not a screen's guess. One move is one line. */
 export function VillaHistory({ lines }: { lines: HistoryLine[] }) {
   if (lines.length === 0) {
     return <p className="text-muted text-sm">Nothing has moved on this villa yet.</p>;

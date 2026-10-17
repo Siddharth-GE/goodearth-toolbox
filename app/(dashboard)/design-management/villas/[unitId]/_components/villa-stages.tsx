@@ -51,13 +51,6 @@ import { useId, useState, useTransition } from "react";
 import { useDesignBoard } from "../../../_components/board-context";
 import { MenuLabel, NobodyOnTheTeam } from "../../../_components/menus";
 
-/**
- * A villa's stages, one card per board stage (root plan.md, thirteenth
- * piece): its status as one-tap chips, who is on it, a one-line note, and
- * the moves — Pass on, Send back for revision, Start. Every change saves
- * at once; the database writes the history.
- */
-
 /** The chips a person taps. Revising goes through Send back, which asks why. */
 const TAPPABLE: StepStatus[] = ["working", "with_client", "waiting", "done"];
 
@@ -233,7 +226,6 @@ function StageCard({
   );
 }
 
-/** Who is on a stage: faces with a cross, and + to put someone on. */
 function StagePeople({ step }: { step: StepView }) {
   const { team } = useDesignBoard();
   const undoBar = useUndoBar();
@@ -319,7 +311,6 @@ function StagePeople({ step }: { step: StepView }) {
   );
 }
 
-/** The one-line note — saves when you leave the box. */
 function StageNote({ step }: { step: StepView }) {
   const undoBar = useUndoBar();
   const [, startTransition] = useTransition();
@@ -352,7 +343,6 @@ function StageNote({ step }: { step: StepView }) {
   );
 }
 
-/** Pick people from the team with one tap each. */
 function PeopleChips({
   value,
   onChange,
@@ -389,7 +379,6 @@ function PeopleChips({
   );
 }
 
-/** Pass on: this stage done, the next Working with whoever takes it. */
 function PassDialog({
   unitId,
   step,
@@ -500,7 +489,6 @@ function PassDialog({
   );
 }
 
-/** Start a stage — any stage, any time — with the people who take it. */
 function StartDialog({ unitId, step }: { unitId: string; step: StepView }) {
   const undoBar = useUndoBar();
   const [open, setOpen] = useState(false);
@@ -564,10 +552,6 @@ function StartDialog({ unitId, step }: { unitId: string; step: StepView }) {
   );
 }
 
-/**
- * Bringing a villa in at the stage it has reached: every stage before it
- * Done, this one Working with its people.
- */
 function SetWhereItIs({ unitId }: { unitId: string }) {
   const { stages } = useDesignBoard();
   const undoBar = useUndoBar();

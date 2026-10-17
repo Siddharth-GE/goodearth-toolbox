@@ -21,17 +21,7 @@ import {
   TransmittalNote,
 } from "./_components/transmittal-forms";
 
-/**
- * One transmittal: one stage, one drawing set, and that set's drawings.
- *
- * Founder, 2026-09-27: "one transmittal contains only one stage … so each
- * time a full set gets to site to avoid confusion". The stage and the set
- * are chosen when the transmittal starts and never change here (0099), so
- * a draft is only: the note for site, the revision, what changed, the
- * drawings — since 0124 a WorkDrive link whose folder the toolbox reads —
- * and Issue. An issued one is the record: what went out, when and by
- * whom, the link and the sheets the folder held, and the cover sheet.
- */
+/** One stage, one drawing set (chosen at start, never changed here, 0099). A draft is the note, revision, drawings (a WorkDrive link since 0124) and Issue; an issued one is the record. */
 export default async function TransmittalDetailPage({
   params,
   searchParams,
@@ -46,8 +36,7 @@ export default async function TransmittalDetailPage({
   const isDraft = transmittal.status === "draft";
   const tree: WorksTreeCategory[] = isDraft ? await getWorksTree() : [];
 
-  // 0099: at most one line. A draft with none is one started before that
-  // rule; it can only be deleted and started again.
+  // 0099: at most one line. A draft with none predates that rule; it can only be deleted.
   const line = transmittal.lines[0] ?? null;
   const setLabel = line
     ? line.setCode
@@ -76,8 +65,7 @@ export default async function TransmittalDetailPage({
         actions={
           <>
             <Badge variant={isDraft ? "warning" : "success"}>{isDraft ? "Draft" : "Issued"}</Badge>
-            {/* The cover sheet is what goes out beside the drawings, so it
-                is offered once there is something that went out. */}
+            {/* The cover sheet goes out beside the drawings, so offer it only once something went out. */}
             {!isDraft && (
               <LinkButton
                 href={`/design-management/transmittals/${transmittal.id}/pdf`}
@@ -103,7 +91,6 @@ export default async function TransmittalDetailPage({
         <FormMessage success={`Issued as ${issued}. Its drawings are now released to site.`} />
       )}
 
-      {/* What is going out, said as one line a person would say aloud. */}
       <Card className="space-y-3 p-4">
         <div className="space-y-0.5">
           <p className="text-foreground text-sm">
@@ -187,8 +174,7 @@ export default async function TransmittalDetailPage({
         </Section>
       )}
 
-      {/* One way back and one way out. The link to the villa is the back
-          link at the top — repeating it here was part of the clutter. */}
+      {/* One way back and one way out; the back link to the villa is at the top. */}
       {isDraft && (
         <div className="flex justify-end">
           <DeleteDraftTransmittalButton
@@ -209,7 +195,6 @@ export default async function TransmittalDetailPage({
   );
 }
 
-/** The editor takes a revision; the draft line carries every part of one. */
 function draftRevision(
   line: NonNullable<Awaited<ReturnType<typeof getTransmittalDetail>>>["lines"][number],
 ): DrawingRevisionRow {
