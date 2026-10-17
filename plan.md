@@ -74,12 +74,13 @@ Applied migrations are never edited, so their comments stay.
   - Delete 7 superseded scripts (git keeps them): `import-material-master`, `import-vendors`, `import-contractors`, `import-works`, `import-catalogue`, `import-saarang`, `import-staff`.
   - Drop `csv-parse` once nothing needs it. **Kept:** `lib/csv.ts` reads Birdwing's expense uploads with it.
   - `[Opus]` decides the three rules only tests call (`canEditDetails`, `isContractBillable`, `canApproveEffective`): wire each where it belongs, or delete the rule and its test. **`canEditDetails` wired** into the stay page (it hand-wrote the same check); **`isContractBillable` deleted** (`0106` refuses a bill on an unapproved or inactive work order); **`canApproveEffective` deleted** (a bare OR nothing called; the database decides approvers).
-- [ ] `[Sonnet]` **Thin the comments, one tool per commit** (`lib/<tool>` with `app/(dashboard)/<tool>`), shared code last.
+- [x] `[Sonnet]` **Thin the comments, one tool per commit** (`lib/<tool>` with `app/(dashboard)/<tool>`), shared code last.
   - Keep a comment only where it says a non-obvious why or rule, in two lines at most.
   - Cut history, dates, incident stories (point at BUGCATCHER #n instead), restated code, banners and commented-out code.
   - Security reasoning keeps its why, shortened: the deck sandbox, act-as, the proxy, rate limits, the environment.
   - **Proof each commit is comment-only:** every changed file transpiles to the same output before and after (`ts.transpileModule` with `removeComments: true`). Write it as a short `scripts/check-comment-only.ts` and run it on every commit.
   - Target: under 6,000 comment lines.
+  - Done: 19,631 comment lines to 5,089. Twelve Sonnet helpers each thinned a group of tools; `[Opus]` thinned the security code itself, then checked and committed each tool's result. `check:comments` compares each changed file's compiled code and also its types: compiled code alone missed seven type lines cut in Client Relations, which the typecheck caught and which are restored.
 - [ ] Founder: **the cuts only you can make.** TODO.md, _Open questions_, has three: is Marathon finished, are the construction budget screens retired, does the Training stub stay. Each yes becomes its own step here.
 - [ ] Founder: **delete the 15 feature branches** on GitHub that are already merged into `staging`.
 
