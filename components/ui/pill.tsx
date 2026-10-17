@@ -7,7 +7,7 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
  * The tracker's pills — a plot, a date, a person, a status — small,
  * rounded, and the trigger of every chip menu. Born in Client Relations
  * (root plan.md, seventh piece, "The look"); shared from its second tool,
- * Design Management's board (twelfth piece).
+ * Design Management's board (thirteenth piece).
  *
  * Status tones carry fixed meaning (DESIGN.md): danger is overdue or
  * waiting on management, info is due soon, warning is waiting on someone

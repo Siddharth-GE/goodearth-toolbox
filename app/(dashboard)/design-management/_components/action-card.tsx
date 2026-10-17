@@ -66,7 +66,7 @@ export function ActionCard({
   const due = dueLabel({ ...action, status }, today);
   const urgent = !done && !finished && (due.tone === "danger" || status === "waiting_management");
   // Only whoever set it, or a manager, closes it; its owner marks it
-  // finished for them (0125 holds the same line).
+  // finished for them (0126 holds the same line).
   const right = closeRight(action, { id: meId, isManager });
   const setter = action.createdBy === meId ? "you" : action.setterName.split(" ")[0];
 

@@ -138,7 +138,7 @@ export async function setDesignStageActive(id: string, isActive: boolean): Promi
 }
 
 /**
- * Whether a stage is a column on the design board (0125). Switching one
+ * Whether a stage is a column on the design board (0126). Switching one
  * off hides its column and leaves every step on it, and its history, as
  * it was — switched back on, the villas are where they were.
  */

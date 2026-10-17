@@ -435,7 +435,9 @@ export type EngagementRow = {
   permitOn: string | null;
   workingDrawingOn: string | null;
   kaadalStage: KaadalStage | null;
+  /** The Interior owner — the plot's second owner, beside the Construction owner (`ownerId`). */
   kaadalOwnerId: string | null;
+  kaadalOwnerName: string | null;
   kaadalNote: string | null;
   /** When the plot's own record last changed. */
   updatedAt: string;
@@ -484,6 +486,7 @@ function toRow(
     workingDrawingOn: record.working_drawing_on,
     kaadalStage: record.kaadal_stage as KaadalStage | null,
     kaadalOwnerId: record.kaadal_owner_id,
+    kaadalOwnerName: record.kaadal_owner_id ? (owners.get(record.kaadal_owner_id) ?? null) : null,
     kaadalNote: record.kaadal_note,
     updatedAt: record.updated_at,
     invoiceStage,
@@ -703,7 +706,7 @@ async function buildDetail(records: EngagementRecord[]): Promise<EngagementDetai
     loadMoney(supabase, ids),
     nameMap(
       supabase,
-      records.map((r) => r.crm_owner_id ?? ""),
+      records.flatMap((r) => [r.crm_owner_id ?? "", r.kaadal_owner_id ?? ""]),
     ),
     getRelayForUnits(unitIds),
     supabase

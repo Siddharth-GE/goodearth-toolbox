@@ -8,13 +8,13 @@ import { DesignBoardProvider } from "../_components/board-context";
 import { Composer } from "../_components/composer";
 
 /**
- * The design team's to-do list (root plan.md, twelfth piece) — Client
+ * The design team's to-do list (root plan.md, thirteenth piece) — Client
  * Relations' Actions for design: every step with an owner and a date,
  * sorted by how late it is.
  *
  * An admin opens on everyone, with the team strip; everyone else on their
  * own list, under a greeting, with a switch to everyone's — the whole
- * team sees every villa (0125). Every filter lives in the URL.
+ * team sees every villa (0126). Every filter lives in the URL.
  */
 export default async function DesignActionsPage({
   searchParams,

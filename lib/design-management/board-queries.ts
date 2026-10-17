@@ -34,11 +34,11 @@ import {
 import { GRANT } from "./shared";
 
 /**
- * Reads for the design board (root plan.md, twelfth piece): the Board,
+ * Reads for the design board (root plan.md, thirteenth piece): the Board,
  * a villa's stages, actions and history, the Actions list, the welcome.
  *
  * Every export opens with requireTool("/design-management"). Everyone
- * holding the grant sees every villa (0125 — the founder took the open
+ * holding the grant sees every villa (0126 — the founder took the open
  * recommendation); who opens on whose list is decided here, never by a
  * policy. Small on purpose: ~70 villas, a few hundred steps and actions,
  * so each screen reads its slice whole (fetchAll) and works in memory — a
@@ -69,7 +69,7 @@ async function readMe(): Promise<Me> {
   };
 }
 
-/** Who can be put on a stage or own an action — design_team() (0125). */
+/** Who can be put on a stage or own an action — design_team() (0126). */
 async function readTeam(supabase: Supabase): Promise<Person[]> {
   const { data, error } = await supabase.rpc("design_team");
   fail("the design team", error);

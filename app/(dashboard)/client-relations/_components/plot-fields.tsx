@@ -22,15 +22,16 @@ import {
 import { formatDate } from "@/lib/format";
 import type { ProgressStageRow } from "@/lib/masters/progress-stages";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, Leaf } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useState, useTransition, type ReactNode } from "react";
 
 import { Avatar } from "@/components/ui/avatar";
 import { useBoard, useToast } from "./board-context";
+import { SideIcon } from "./side-mark";
 
 /**
- * A plot's record as the tracker's drawer laid it out — Sales, Sale deed,
- * Construction agreement, Build progress, Kaadal, Context — every choice a
+ * A plot's record as the tracker's drawer laid it out — Construction, Sale
+ * deed, Construction agreement, Build progress, Interior, Context — every choice a
  * row of chips that saves when tapped, every box saving when you leave it
  * (root plan.md, seventh piece). The chip shows the new value at once and
  * goes back if the save is refused, with the reason at the foot of the
@@ -265,14 +266,15 @@ export function ClientNameField({ clientId, name }: { clientId: string; name: st
 // The cards
 // ---------------------------------------------------------------------
 
-export function SalesCard({ engagement }: { engagement: PlotFields }) {
+/** The plot's Construction side: its owner, bottleneck and registration (the tracker's Sales). */
+export function ConstructionCard({ engagement }: { engagement: PlotFields }) {
   const { team } = useBoard();
   return (
-    <Section title="Sales">
+    <Section title="Construction">
       <div className="space-y-5">
         <SavedChoice
           engagementId={engagement.id}
-          label="Sales owner"
+          label="Construction owner"
           options={peopleOptions(team, engagement.ownerId, engagement.ownerName)}
           initial={engagement.ownerId}
           patch={(value) => ({ ownerId: value })}
@@ -554,13 +556,14 @@ export function BuildCard({
   );
 }
 
-export function KaadalCard({ engagement }: { engagement: PlotFields }) {
+/** The plot's Interior side: its stage, its owner and its note (stored as kaadal_*, stages.ts). */
+export function InteriorCard({ engagement }: { engagement: PlotFields }) {
   const { team } = useBoard();
   return (
-    <Section title="Kaadal interiors">
+    <Section title="Interior">
       <div className="space-y-5">
         <p className="text-muted -mt-1 flex items-center gap-1.5 text-xs">
-          <Leaf className="size-3.5" /> Where things stand with the interiors pitch and work
+          <SideIcon track="kaadal" /> Where things stand with the interiors pitch and work
         </p>
         <SavedChoice
           engagementId={engagement.id}
@@ -571,14 +574,14 @@ export function KaadalCard({ engagement }: { engagement: PlotFields }) {
         />
         <SavedChoice
           engagementId={engagement.id}
-          label="Kaadal owner"
+          label="Interior owner"
           options={peopleOptions(team, engagement.kaadalOwnerId, null)}
           initial={engagement.kaadalOwnerId}
           patch={(value) => ({ kaadalOwnerId: value })}
         />
         <SavedText
           engagementId={engagement.id}
-          label="Kaadal note"
+          label="Interior note"
           initial={engagement.kaadalNote}
           patch={(value) => ({ kaadalNote: value })}
           placeholder="Where things stand with interiors"

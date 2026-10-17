@@ -1,5 +1,5 @@
 /**
- * The design board's rules, pure (root plan.md, twelfth piece) — where a
+ * The design board's rules, pure (root plan.md, thirteenth piece) — where a
  * villa sits, its rail, how it is doing, what Pass on offers, and the
  * history read as sentences.
  *

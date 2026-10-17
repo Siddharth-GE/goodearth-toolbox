@@ -202,7 +202,7 @@ export const TOOLS: Tool[] = [
   // Relay replaced both the planned Design Management AND
   // project-management layers when it shipped — but 2026-08-22 revived
   // Design Management to hold the artefacts Relay deliberately refuses
-  // to store, and since 0125 (founder, 2026-10-17: "build it full forget
+  // to store, and since 0126 (founder, 2026-10-17: "build it full forget
   // relay") it also passes each villa from stage to stage, with people
   // and actions. Relay keeps whatever trails are filed in it; nothing
   // links the two. Both slugs stay legal in the database CHECKs (0036 §1

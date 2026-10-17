@@ -1,16 +1,16 @@
 # Design Management — the rules
 
-Each villa's design from stage to stage — who is on it, what is next, what went back for revision — and the drawings themselves: sets, revisions and the transmittals that send them to site. Grant `/design-management`. Migrations `0091`–`0093`, `0099`, `0124` and `0125`.
+Each villa's design from stage to stage — who is on it, what is next, what went back for revision — and the drawings themselves: sets, revisions and the transmittals that send them to site. Grant `/design-management`. Migrations `0091`–`0093`, `0099`, `0124` and `0126`.
 
 ## The boundary with Relay
 
 > **The design team's hand-offs and to-dos live here** (founder, 2026-10-17: "build it full forget relay"). Relay keeps whatever trails are filed in it; **nothing links the two**.
 
-Until `0125` this tool kept only the artefacts and Relay the baton. The board (below) reversed that for design, the call the founder made for Client Relations' build progress (its decision 4) — on staging Relay held no trails at all. Nothing in Relay stores a file, and a `'transmittal'` link kind in Relay stays left out.
+Until `0126` this tool kept only the artefacts and Relay the baton. The board (below) reversed that for design, the call the founder made for Client Relations' build progress (its decision 4) — on staging Relay held no trails at all. Nothing in Relay stores a file, and a `'transmittal'` link kind in Relay stays left out.
 
 ## The founder's decisions
 
-1. **Its own design-stage list** (Design, Permit, Working Drawings, Structural, MEP, Interiors, Typical Details, Landscape), renameable and retirable — what a transmittal is filed under, and, for the stages **on the board**, the columns a villa moves through. Concept and Approvals became Design and Permit in `0125`, the founder's words.
+1. **Its own design-stage list** (Design, Permit, Working Drawings, Structural, MEP, Interiors, Typical Details, Landscape), renameable and retirable — what a transmittal is filed under, and, for the stages **on the board**, the columns a villa moves through. Concept and Approvals became Design and Permit in `0126`, the founder's words.
 2. **Revisions live per drawing set per villa** — R0, R1, … each with a note. The Selections model one level finer.
 3. **A revision's drawings are a Zoho WorkDrive share link** (2026-10-17: "lets not get into file handling, new transmittal is created and they paste a link of our drive into it"), "anyone can view", so site needs no Zoho login. Before `0124` a revision held uploaded sheet files; those stay, and nothing new is uploaded.
 4. **Sharing is in-app plus a letterhead PDF cover sheet**, forwarded by hand. No outbound email.
@@ -41,7 +41,7 @@ The Board keeps the Villas screen's address, so every link into a villa and its 
 
 The rules are `lib/design-management/board.ts`, pure and tested; the reads `board-queries.ts`; the writes `board-actions.ts`.
 
-- **The columns are the stages switched On the board** (`design_stages.on_board`, `0125`), in the list's order. Switching one off hides its column and keeps every step and line of history on it.
+- **The columns are the stages switched On the board** (`design_stages.on_board`, `0126`), in the list's order. Switching one off hides its column and keeps every step and line of history on it.
 - **A step per villa per board stage** (`design_steps`): Working · With the client · Waiting on others · Revising · Done, a one-line note, started and done dates the guard keeps in line with the status. No row is "not started"; a step started by mistake goes back to not started (••• → Take back the start), never deleted.
 - **Where a villa sits is worked out, never stored**: the furthest board stage whose step has started. Every board stage Done reads Design complete.
 - **Pass on** is offered only on the stage a villa sits at — done or not, since a finished stage waiting to be handed on is the point — to any later stage, the next first; it marks this stage Done and starts that one with the people picked (`design_pass_step`, one transaction). An earlier stage under revision finishes with its Done chip.
@@ -88,9 +88,9 @@ The rules are `lib/design-management/board.ts`, pure and tested; the reads `boar
 | `transmittal_lines_stage_match`             | a set on a transmittal of another stage, or a set with no stage (`0099`)                                                                                             |
 | `transmittals_stage_locked`                 | moving a draft's stage once it carries a set (`0099`)                                                                                                                |
 | `drawing_sets_stage_locked`                 | moving a set's stage once given (`0099`)                                                                                                                             |
-| `design_steps_guard`                        | a step on a stage off the board; a step moving villa or stage; a send-back with no reason; who started it changing (`0125`)                                          |
-| `design_step_people_guard`                  | putting someone who does not hold the grant on a stage (`0125`)                                                                                                      |
-| `design_actions_guard`                      | the setter changing; closing or reopening by anyone but the setter or an admin; an owner off the team (`0125`)                                                       |
+| `design_steps_guard`                        | a step on a stage off the board; a step moving villa or stage; a send-back with no reason; who started it changing (`0126`)                                          |
+| `design_step_people_guard`                  | putting someone who does not hold the grant on a stage (`0126`)                                                                                                      |
+| `design_actions_guard`                      | the setter changing; closing or reopening by anyone but the setter or an admin; an owner off the team (`0126`)                                                       |
 
 Screens hide the buttons that would fail; the database decides. The RAISE messages are written for a designer and pass through verbatim. All the functions are `security invoker` on direct paths, so RLS still applies — except `design_team()`, a definer whose `has_app` check is its boundary, and the two history logs, definers no client role may call.
 

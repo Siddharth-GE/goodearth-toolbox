@@ -1,5 +1,5 @@
--- 0125_design_board.sql — Design Management: each villa passed from stage
--- to stage (root plan.md, twelfth piece).
+-- 0126_design_board.sql — Design Management: each villa passed from stage
+-- to stage (root plan.md, thirteenth piece).
 --
 -- The founder, 2026-10-17: "each plot can be passed from one stage to
 -- another and so to different people, like design, permit, wd, structure,
@@ -656,18 +656,18 @@ begin
     select 1 from information_schema.columns
     where table_schema = 'public' and table_name = 'design_stages' and column_name = 'on_board'
   ) then
-    raise exception '0125: design_stages.on_board is missing';
+    raise exception '0126: design_stages.on_board is missing';
   end if;
 
   foreach t in array array['design_steps', 'design_step_people', 'design_step_events', 'design_actions']
   loop
     if not (select relrowsecurity from pg_class where oid = t::regclass) then
-      raise exception '0125: RLS is off on %', t;
+      raise exception '0126: RLS is off on %', t;
     end if;
     -- Exactly one SELECT policy on each (SECURITY.md: never a second).
     if (select count(*) from pg_policies
         where schemaname = 'public' and tablename = t and cmd = 'SELECT') <> 1 then
-      raise exception '0125: % should have exactly one SELECT policy', t;
+      raise exception '0126: % should have exactly one SELECT policy', t;
     end if;
     if exists (
       select 1 from pg_policies
@@ -675,13 +675,13 @@ begin
         and (coalesce(qual, '') || coalesce(with_check, ''))
             not like '%has_app(''/design-management''::text)%'
     ) then
-      raise exception '0125: a % policy is not gated on /design-management', t;
+      raise exception '0126: a % policy is not gated on /design-management', t;
     end if;
     if exists (
       select 1 from pg_policies
       where schemaname = 'public' and tablename = t and ('anon' = any (roles) or cmd = 'ALL')
     ) then
-      raise exception '0125: a % policy admits anon or every command', t;
+      raise exception '0126: a % policy admits anon or every command', t;
     end if;
   end loop;
 
@@ -690,7 +690,7 @@ begin
     if (select count(*) from pg_policies where schemaname = 'public' and tablename = t) <> 3
        or exists (select 1 from pg_policies
                   where schemaname = 'public' and tablename = t and cmd = 'DELETE') then
-      raise exception '0125: % should have SELECT, INSERT and UPDATE policies and no DELETE', t;
+      raise exception '0126: % should have SELECT, INSERT and UPDATE policies and no DELETE', t;
     end if;
   end loop;
 
@@ -699,26 +699,26 @@ begin
       where schemaname = 'public' and tablename = 'design_step_people') <> 3
      or exists (select 1 from pg_policies
                 where schemaname = 'public' and tablename = 'design_step_people' and cmd = 'UPDATE') then
-    raise exception '0125: design_step_people should have SELECT, INSERT and DELETE and no UPDATE';
+    raise exception '0126: design_step_people should have SELECT, INSERT and DELETE and no UPDATE';
   end if;
 
   -- History: read only. Only the log triggers write it.
   if (select count(*) from pg_policies
       where schemaname = 'public' and tablename = 'design_step_events') <> 1 then
-    raise exception '0125: design_step_events must have its SELECT policy and nothing else';
+    raise exception '0126: design_step_events must have its SELECT policy and nothing else';
   end if;
 
   -- The team: a definer whose grant check is its boundary.
   if not (select prosecdef from pg_proc where oid = 'design_team()'::regprocedure) then
-    raise exception '0125: design_team must be security definer';
+    raise exception '0126: design_team must be security definer';
   end if;
   if position('has_app(''/design-management'')' in
        pg_get_functiondef('design_team()'::regprocedure)) = 0 then
-    raise exception '0125: design_team has lost its grant check';
+    raise exception '0126: design_team has lost its grant check';
   end if;
   if has_function_privilege('anon', 'design_team()', 'execute')
      or not has_function_privilege('authenticated', 'design_team()', 'execute') then
-    raise exception '0125: design_team must be executable by authenticated and not anon';
+    raise exception '0126: design_team must be executable by authenticated and not anon';
   end if;
 
   -- The two moves run as the caller.
@@ -726,23 +726,23 @@ begin
     'design_pass_step(uuid, uuid, uuid, uuid[], text)', 'design_set_where(uuid, uuid, uuid[])'
   ] loop
     if (select prosecdef from pg_proc where oid = f::regprocedure) then
-      raise exception '0125: % must run as the caller', f;
+      raise exception '0126: % must run as the caller', f;
     end if;
     if has_function_privilege('anon', f, 'execute')
        or not has_function_privilege('authenticated', f, 'execute') then
-      raise exception '0125: % must be executable by authenticated and not anon', f;
+      raise exception '0126: % must be executable by authenticated and not anon', f;
     end if;
   end loop;
 
   -- The two logs are definers no client role may call; the guards run as the caller.
   foreach f in array array['design_steps_log()', 'design_step_people_log()'] loop
     if not (select prosecdef from pg_proc where oid = f::regprocedure) then
-      raise exception '0125: % must be security definer', f;
+      raise exception '0126: % must be security definer', f;
     end if;
   end loop;
   foreach f in array array['design_steps_guard()', 'design_step_people_guard()', 'design_actions_guard()'] loop
     if (select prosecdef from pg_proc where oid = f::regprocedure) then
-      raise exception '0125: % must run as the caller', f;
+      raise exception '0126: % must run as the caller', f;
     end if;
   end loop;
   foreach f in array array[
@@ -751,7 +751,7 @@ begin
   ] loop
     if has_function_privilege('authenticated', f, 'execute')
        or has_function_privilege('anon', f, 'execute') then
-      raise exception '0125: a client role can execute %', f;
+      raise exception '0126: a client role can execute %', f;
     end if;
   end loop;
 end $$;

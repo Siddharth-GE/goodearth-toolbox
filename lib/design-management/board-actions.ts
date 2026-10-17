@@ -15,12 +15,12 @@ import type { ActionState } from "@/lib/action-state";
 import type { TablesUpdate } from "@/lib/supabase/database.types";
 
 /**
- * Writes for the design board (root plan.md, twelfth piece): a villa's
+ * Writes for the design board (root plan.md, thirteenth piece): a villa's
  * stages — status, note, people, pass on, send back, set where it is —
  * and the design team's actions.
  *
  * Every export opens with requireTool("/design-management"), returns an
- * ActionState and never throws. The database holds every rule (0125):
+ * ActionState and never throws. The database holds every rule (0126):
  * the guards refuse a send-back with no reason, a stage off the board,
  * someone off the team, a close by anyone but the setter; this file says
  * the same things in a sentence first where it can. A pass and "set where
@@ -317,7 +317,7 @@ export type DesignActionPatch = {
 /**
  * One change to one action — a chip saves the moment it is tapped. Only
  * whoever set it, or a manager, closes it or opens it again; its owner
- * marks it finished for them (0125 holds the same line).
+ * marks it finished for them (0126 holds the same line).
  */
 export async function updateDesignAction(
   actionId: string,

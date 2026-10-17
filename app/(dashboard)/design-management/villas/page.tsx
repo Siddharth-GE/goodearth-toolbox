@@ -12,7 +12,7 @@ import { FilterChips } from "../_components/board-parts";
 
 /**
  * The Board — every villa in design, one column per board stage (root
- * plan.md, twelfth piece: "a setup with a similar ui like crm, where each
+ * plan.md, thirteenth piece: "a setup with a similar ui like crm, where each
  * plot can be passed from one stage to another"). A villa sits in the
  * column of the furthest stage it has started; a stage sent back for
  * revision shows on its card and never moves it back.

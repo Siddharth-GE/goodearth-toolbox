@@ -159,7 +159,7 @@ export function DesignStageToggle({ id, isActive }: { id: string; isActive: bool
   );
 }
 
-/** Whether the stage is a column on the design board (0125). */
+/** Whether the stage is a column on the design board (0126). */
 export function DesignStageBoardSwitch({
   id,
   name,

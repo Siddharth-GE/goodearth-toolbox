@@ -4,7 +4,7 @@ import { formatShortDate, formatTime } from "@/lib/format";
 
 /**
  * Every move on this villa, newest first — written by the database
- * itself (0125), so it is the record, not a screen's guess. One move is
+ * itself (0126), so it is the record, not a screen's guess. One move is
  * one line: a pass reads "marked WD done, started Structural, put Jiljith
  * on Structural".
  */

@@ -3,7 +3,7 @@
  * action sits in, what its date says, who may close it, how loaded a
  * person is. Born in Client Relations (the Saarang tracker, root plan.md
  * seventh and eighth pieces) and moved here when Design Management's
- * board took the same list (twelfth piece): two tools wanting the same
+ * board took the same list (thirteenth piece): two tools wanting the same
  * rules get a shared module, never an import of each other's code.
  *
  *   * NO DATE IS OVERDUE. An action without a due date sits with the

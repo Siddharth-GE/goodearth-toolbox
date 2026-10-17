@@ -41,7 +41,7 @@ export type DesignStageRow = {
   code: string | null;
   sortOrder: number;
   isActive: boolean;
-  /** A column on the design board (0125). */
+  /** A column on the design board (0126). */
   onBoard: boolean;
 };
 

@@ -6,7 +6,7 @@ import { ToolWelcome } from "../_components/tool-welcome";
 // tool opens on one). Counts only, never rupees — this tool has no money
 // anywhere in it.
 //
-// The Board is the main door since the twelfth piece (root plan.md): each
+// The Board is the main door since the thirteenth piece (root plan.md): each
 // villa passed from stage to stage, "like crm". Drawings are reached
 // through a villa, as before.
 export default async function DesignManagementPage() {

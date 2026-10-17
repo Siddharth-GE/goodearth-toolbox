@@ -27,7 +27,7 @@ import { StepCard } from "../_components/step-card";
 /**
  * One person: who they are, their plots as lot cards, and every next step
  * on those plots (root plan.md, seventh piece). A plot's whole record —
- * deed, agreement, build, Kaadal, collections — is its own page, one tap
+ * deed, agreement, build, interiors, collections — is its own page, one tap
  * on its card away.
  */
 export default async function ClientDetailPage({

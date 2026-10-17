@@ -52,7 +52,7 @@ import { useDesignBoard } from "../../../_components/board-context";
 import { MenuLabel, NobodyOnTheTeam } from "../../../_components/menus";
 
 /**
- * A villa's stages, one card per board stage (root plan.md, twelfth
+ * A villa's stages, one card per board stage (root plan.md, thirteenth
  * piece): its status as one-tap chips, who is on it, a one-line note, and
  * the moves — Pass on, Send back for revision, Start. Every change saves
  * at once; the database writes the history.

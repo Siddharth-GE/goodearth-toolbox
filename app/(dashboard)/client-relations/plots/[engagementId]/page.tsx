@@ -3,6 +3,7 @@ import { Section } from "@/components/ui/section";
 import { PLOT_STATUS_LABELS } from "@/lib/client-relations/next-steps";
 import { getBoardBasics } from "@/lib/client-relations/next-steps-queries";
 import { getEngagement, type EngagementDetail } from "@/lib/client-relations/queries";
+import { sideForTrack, trackForSide, type ActionTrack } from "@/lib/client-relations/stages";
 import { formatLongDate } from "@/lib/format";
 import { listProgressStages } from "@/lib/masters/progress-stages";
 import { ChevronLeft } from "lucide-react";
@@ -10,22 +11,23 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { BoardProvider } from "../../_components/board-context";
-import { SectionHead } from "../../_components/board-parts";
+import { FilterChips, SectionHead } from "../../_components/board-parts";
 import { CollectionsPanel } from "../../_components/collections-panel";
 import { Composer } from "../../_components/composer";
 import { HealthPill, PlotRail } from "../../_components/lot-card";
 import { NotYours } from "../../_components/not-yours";
-import { Pill } from "../../_components/pill";
+import { PersonName, Pill } from "../../_components/pill";
 import {
   BuildCard,
   ClientNameField,
   ContextCard,
   DocumentCard,
-  KaadalCard,
-  SalesCard,
+  ConstructionCard,
+  InteriorCard,
   type PlotFields,
 } from "../../_components/plot-fields";
 import { RelayPanel } from "../../_components/relay-panel";
+import { SideIcon, SideMark, sideLabel } from "../../_components/side-mark";
 import { StepCard } from "../../_components/step-card";
 
 /** Only what the cards edit, so the browser is not sent the whole record six times. */
@@ -98,13 +100,21 @@ function plotFields(engagement: EngagementDetail): PlotFields {
  *
  * Reached from the Plots grid, a client's page, or any action's plot chip —
  * including the plots with no buyer, which have no client page to live on.
+ *
+ * A plot has two sides, Construction and Interior, each with its own owner
+ * and its own actions (founder, 2026-10-17: "some people may get the
+ * interiors or construction of the same plot"). Next steps shows both, or
+ * one (`?side=`), and a new step goes to that side's owner.
  */
 export default async function PlotDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ engagementId: string }>;
+  searchParams: Promise<{ side?: string }>;
 }) {
   const { engagementId } = await params;
+  const side = trackForSide((await searchParams).side);
 
   const [engagement, basics, stages] = await Promise.all([
     getEngagement(engagementId),
@@ -121,12 +131,23 @@ export default async function PlotDetailPage({
   const { card, steps } = engagement;
   const fields = plotFields(engagement);
   const onTeam = (id: string | null) => Boolean(id && basics.team.some((p) => p.id === id));
-  const defaultOwner = onTeam(engagement.ownerId)
-    ? engagement.ownerId
-    : onTeam(basics.meId)
-      ? basics.meId
-      : null;
-  const open = steps.filter((step) => step.status !== "done").length;
+  const defaultOwner = onTeam(basics.meId) ? basics.meId : null;
+  // Someone who holds only the Interior side starts their steps there.
+  const mySide: ActionTrack =
+    engagement.kaadalOwnerId === basics.meId && engagement.ownerId !== basics.meId
+      ? "kaadal"
+      : "sales";
+  const shown = side ? steps.filter((step) => step.track === side) : steps;
+  const openOn = (track: ActionTrack | null) =>
+    steps.filter((step) => step.status !== "done" && (!track || step.track === track)).length;
+  const sideHref = (track: ActionTrack | null) =>
+    track
+      ? `/client-relations/plots/${engagement.id}?side=${sideForTrack(track)}`
+      : `/client-relations/plots/${engagement.id}`;
+  const owners: { track: ActionTrack; name: string | null }[] = [
+    { track: "sales", name: engagement.ownerName },
+    { track: "kaadal", name: engagement.kaadalOwnerName },
+  ];
 
   return (
     <BoardProvider {...basics}>
@@ -168,29 +189,70 @@ export default async function PlotDetailPage({
               ) : null}
             </div>
             {engagement.clientId ? <PlotRail rail={card.rail} className="mt-3 max-w-md" /> : null}
+            {/* Assigned twice: one owner per side. */}
+            <div className="text-muted mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
+              {owners.map(({ track, name }) => (
+                <span key={track} className="flex min-w-0 items-center gap-1.5">
+                  <SideIcon track={track} />
+                  <span>{sideLabel(track)}</span>
+                  {name ? <PersonName name={name} size={18} /> : <span>· nobody yet</span>}
+                </span>
+              ))}
+            </div>
           </div>
         </Card>
 
-        <Section title="Next steps" aside={<Pill>{open} open</Pill>}>
+        <Section title="Next steps" aside={<Pill>{openOn(side)} open</Pill>}>
           <div className="space-y-2">
-            {steps.length === 0 ? (
-              <p className="text-muted text-sm">No actions yet. Add the next step below.</p>
+            <FilterChips
+              label="Which side"
+              items={[
+                {
+                  key: "both",
+                  label: <>Both sides · {openOn(null)}</>,
+                  href: sideHref(null),
+                  on: !side,
+                },
+                ...(["sales", "kaadal"] as const).map((track) => ({
+                  key: track,
+                  label: (
+                    <>
+                      <SideMark track={track} /> · {openOn(track)}
+                    </>
+                  ),
+                  href: sideHref(track),
+                  on: side === track,
+                })),
+              ]}
+            />
+            {shown.length === 0 ? (
+              <p className="text-muted text-sm">
+                {side
+                  ? `No ${sideLabel(side).toLowerCase()} actions yet. Add the next step below.`
+                  : "No actions yet. Add the next step below."}
+              </p>
             ) : (
-              steps.map((step) => <StepCard key={step.id} step={step} showPlot={false} />)
+              shown.map((step) => <StepCard key={step.id} step={step} showPlot={false} />)
             )}
             <div className="pt-1">
-              <Composer fixedPlot={engagement.id} defaultOwner={defaultOwner} />
+              <Composer
+                key={side ?? "both"}
+                fixedPlot={engagement.id}
+                defaultOwner={defaultOwner}
+                defaultTrack={side ?? mySide}
+                ownerFor={{ sales: engagement.ownerId, kaadal: engagement.kaadalOwnerId }}
+              />
             </div>
           </div>
         </Section>
 
-        <SalesCard engagement={fields} />
+        <ConstructionCard engagement={fields} />
         <div className="grid items-start gap-4 lg:grid-cols-2">
           <DocumentCard engagement={fields} kind="deed" />
           <DocumentCard engagement={fields} kind="ca" />
         </div>
         <BuildCard engagement={fields} stages={stages} />
-        <KaadalCard engagement={fields} />
+        <InteriorCard engagement={fields} />
 
         <div className="space-y-3">
           <SectionHead title="Collections" />

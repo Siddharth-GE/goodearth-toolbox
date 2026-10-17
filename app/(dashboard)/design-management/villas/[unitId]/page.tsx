@@ -23,7 +23,7 @@ import { VillaHistory } from "./_components/villa-history";
 import { VillaStages } from "./_components/villa-stages";
 
 /**
- * A villa's page (root plan.md, twelfth piece): where it sits, its
+ * A villa's page (root plan.md, thirteenth piece): where it sits, its
  * stages and who is on them, its next steps, its drawings, and every
  * move it has made. Client Relations' plot page in design's terms — the
  * plot number large, then the cards in the order the work runs. Back goes

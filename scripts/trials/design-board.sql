@@ -1,4 +1,4 @@
--- Behaviour trial for 0125 — the design board. Runs inside the dry-run
+-- Behaviour trial for 0126 — the design board. Runs inside the dry-run
 -- transaction; always rolled back.
 --
 -- Everything after the setup runs UNDER ROW-LEVEL SECURITY (set local
@@ -8,7 +8,7 @@
 -- owner bypasses every policy (BUGCATCHER #19).
 --
 --   npx tsx scripts/dry-run-migrations.ts --project ipstebqawrvhkyntctrv \
---     supabase/migrations/0125_design_board.sql \
+--     supabase/migrations/0126_design_board.sql \
 --     --trial scripts/trials/design-board.sql
 do $trial$
 declare
