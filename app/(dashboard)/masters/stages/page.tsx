@@ -24,12 +24,7 @@ import {
 
 import { StageForm, StageMove, StageNameField, StageToggle } from "./_components/stage-forms";
 
-/**
- * Two lists side by side because they are easy to confuse: construction
- * stages are what money is for (indents and budget lines are tagged with
- * them, 0053); build progress is how far a villa has got (Client
- * Relations, 0119). Each card says which.
- */
+/** Two lists, easy to confuse: construction stages are what money is tagged with (0053); build progress is how far a villa has got (0119). */
 export default async function StagesPage() {
   const [stages, progress] = await Promise.all([listConstructionStages(), listProgressStages()]);
   const activeProgress = progress.filter((stage) => stage.is_active);

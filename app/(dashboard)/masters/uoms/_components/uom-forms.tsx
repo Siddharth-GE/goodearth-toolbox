@@ -33,9 +33,7 @@ export function UomForm() {
   );
 }
 
-/** The name, editable in place. A rename follows through to every row
- * carrying the unit — the FKs cascade (0082) — so the word changes
- * everywhere at once. */
+/** A rename cascades to every row carrying the unit (0082). */
 export function UomNameField({ id, name }: { id: string; name: string }) {
   const [value, setValue] = useState(name);
   const [pending, startTransition] = useTransition();

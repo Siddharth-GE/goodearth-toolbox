@@ -16,14 +16,7 @@ import type { CatalogueSearchResult } from "@/lib/masters/catalogue";
 import { Search } from "lucide-react";
 import { useState, useTransition } from "react";
 
-/**
- * Resolving a request.
- *
- * The catalogue search runs immediately, seeded with the requested name,
- * because with 2,600 items already loaded most "new" items are existing
- * items under a different name. Making the duplicate check the first
- * thing on screen is the difference between a catalogue and a junk drawer.
- */
+/** Catalogue search runs at once, seeded with the requested name: most "new" items are existing ones under another name. */
 export function ResolveRequest({
   requestId,
   provisionalItemId,
@@ -39,10 +32,7 @@ export function ResolveRequest({
   const [error, setError] = useState<string>();
   const [saving, startSaving] = useTransition();
 
-  // The shared hook, not this file's own copy — the hand-rolled version
-  // here had already drifted (it flashed "Nothing similar found" for
-  // 200ms before the first search returned, the exact symptom the hook's
-  // docstring warns about).
+  // Shared hook, not a local copy: it avoids a "Nothing similar found" flash before the first search returns.
   const { result, loading } = useDebouncedSearch<CatalogueSearchResult>({
     url: "/api/catalogue",
     params: { q: search },
@@ -60,8 +50,7 @@ export function ResolveRequest({
       setOpen(false);
     });
 
-  // The provisional item is in the catalogue too, so it would otherwise
-  // appear as a candidate to merge itself into.
+  // Leave out the provisional item itself, or it appears as a candidate to merge into.
   const candidates = result.items.filter((item) => item.id !== provisionalItemId);
 
   return (

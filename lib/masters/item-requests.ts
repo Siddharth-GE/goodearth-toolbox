@@ -14,17 +14,10 @@ export type ItemRequestRow = {
   spec_note: string | null;
   status: ItemRequestStatus;
   created_at: string;
-  /** How many selection lines already point at the provisional item. */
   usage_count: number;
 };
 
-/**
- * Requests raised by designers for items the catalogue doesn't have.
- *
- * No requireApp gate, per the masters convention — reads are open to any
- * tool that already gated its own entry point. Only the resolve actions
- * are restricted.
- */
+/** No requireApp gate (masters read convention); only the resolve actions are restricted. */
 export async function listItemRequests(
   status: ItemRequestStatus = "pending",
 ): Promise<ItemRequestRow[]> {
@@ -41,11 +34,7 @@ export async function listItemRequests(
   );
   if (requests.length === 0) return [];
 
-  // How widely each provisional item is already used — the thing that
-  // makes a merge consequential rather than housekeeping. Read to
-  // completion: a count derived from a capped read would report a
-  // heavily-used item as barely used, and it could be merged on that
-  // basis.
+  // Read to completion: a capped count would show a heavily used item as barely used.
   const lines = await fetchAll((from, to) =>
     supabase
       .from("selection_lines")

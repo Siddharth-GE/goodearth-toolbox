@@ -1,11 +1,3 @@
-/**
- * The single "For" picker replaced separate plot and unit dropdowns
- * (migration 0029: plot ↔ unit is 1:1), so what it offers and what a
- * choice writes back are pinned: a pair submits the UNIT id (keeping
- * resolveScopeCode's unit-first order and every historical scope_code
- * valid), a unit-less plot submits the plot id, and nothing outside the
- * chosen project ever appears.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -33,7 +25,6 @@ test("a plot with no unit yet still appears, submitting the plot id", () => {
   const options = buildSiteOptions(units, plots, "proj");
   const bare = options.find((option) => option.value === "plot:p2");
   assert.equal(bare?.label, "Plot 7 — no unit yet");
-  // Its code is the plot's own — null here, which the forms warn on.
   assert.equal(bare?.code, null);
 });
 

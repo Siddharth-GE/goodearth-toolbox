@@ -72,9 +72,8 @@ export async function updateVendor(
 }
 
 /**
- * Bank details live in vendor_payment_details (0089), the gated 1:1
- * table — never on the open vendors row. One save replaces the whole
- * set of four fields; clearing all four removes the row.
+ * Bank details live in the gated vendor_payment_details (0089), never on vendors.
+ * One save replaces all four fields; clearing all four removes the row.
  */
 export async function saveVendorPaymentDetails(
   vendorId: string,

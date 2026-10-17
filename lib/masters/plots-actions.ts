@@ -12,8 +12,7 @@ function readPlotForm(formData: FormData) {
   return {
     project_id: String(formData.get("project_id") ?? ""),
     name: String(formData.get("name") ?? "").trim(),
-    // Normalised the way poReference() expects: uppercase, no spaces.
-    // The DB CHECK (^[A-Z0-9-]{2,10}$, migration 0021) is the backstop.
+    // Uppercase, no spaces, as poReference() expects. The DB CHECK (migration 0021) is the backstop.
     code:
       String(formData.get("code") ?? "")
         .trim()

@@ -10,22 +10,18 @@ export type ProjectStatus = "planning" | "active" | "completed";
 export type ProjectRow = {
   id: string;
   name: string;
-  // Short code indent numbers are built from (ASHRAM → IND/ASHRAM/001).
-  // Nullable: a project without one can't have indents raised against it.
+  // Nullable: a project without a code can't have indents raised.
   code: string | null;
   location: string | null;
   project_type: ProjectType;
   status: ProjectStatus;
-  // The company its documents print under (0101); null prints the
-  // placeholder letterhead.
+  // Null prints the placeholder letterhead (0101).
   company_id: string | null;
   created_at: string;
   updated_at: string | null;
   updated_by: string | null;
 };
 
-// fetchAll for consistency with the other masters reads: every list
-// here promises completeness, so none of them get to silently cap.
 export async function listProjects(): Promise<ProjectRow[]> {
   const supabase = await createClient();
   const data = await fetchAll((from, to) =>

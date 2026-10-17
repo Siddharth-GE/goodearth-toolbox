@@ -38,13 +38,9 @@ export default async function PlotsPage({
   ]);
   const { rows: plots, total, page: currentPage, pageSize, pageCount } = result;
   const projectName = (id: string) => projects.find((p) => p.id === id)?.name ?? "—";
-  // Plot ↔ unit is 1:1 (0029): each plot shows its unit, or that it's
-  // still waiting for one — the soft side of the rule the DB can't
-  // enforce additively.
+  // Plot to unit is 1:1 (0029), but the DB can't enforce it additively, so a plot may still wait for its unit.
   const unitByPlot = new Map(units.map((unit) => [unit.plot_id, unit.name]));
 
-  // Carries the active filters onto the pager links, so paging never
-  // silently drops the search you're in the middle of.
   const hrefForPage = (target: number) => {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
@@ -57,8 +53,6 @@ export default async function PlotsPage({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-2">
-        {/* GET form: submitting drops `page`, so changing any filter
-            naturally returns to page 1 rather than stranding you on page 40. */}
         <form action="/masters/plots" className="flex flex-wrap items-end gap-2">
           <div className="space-y-1.5">
             <Label htmlFor="q">Search</Label>
@@ -141,8 +135,7 @@ export default async function PlotsPage({
           <Pagination
             page={currentPage}
             pageCount={pageCount}
-            // Precomputed strings, not the function itself — a function
-            // can't cross into a Client Component.
+            // Strings, not the function: a function can't cross into a Client Component.
             prevHref={currentPage > 1 ? hrefForPage(currentPage - 1) : null}
             nextHref={currentPage < pageCount ? hrefForPage(currentPage + 1) : null}
             total={total}

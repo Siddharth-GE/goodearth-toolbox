@@ -90,8 +90,7 @@ export function WorkGroupFormDialog({
     >
       <div className="space-y-1.5">
         <Label htmlFor="category_id">Category</Label>
-        {/* A group cannot move category once created — its items' codes
-            and the composite FK both belong to this category. */}
+        {/* A group can't change category: its items' codes and the composite FK belong to it. */}
         <Select
           id="category_id"
           name="category_id"
@@ -161,10 +160,7 @@ export function WorkItemFormDialog({
   trigger?: React.ReactNode;
 }) {
   const isEdit = !!item;
-  // The one dependent field, same shape as Units: the group list is
-  // filtered by the chosen category. Editing keeps the category fixed
-  // (moving an item across categories means giving it a new code — do
-  // that as delete + add).
+  // Editing keeps the category fixed; moving an item means a new code (delete + add).
   const [categoryId, setCategoryId] = useState(item?.category_id ?? defaultCategoryId ?? "");
   const filteredGroups = groups.filter((group) => group.category_id === categoryId);
 

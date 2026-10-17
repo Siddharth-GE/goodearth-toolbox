@@ -17,8 +17,7 @@ export async function addConstructionStage(
 
   const supabase = await createClient();
 
-  // New stages land at the end of the sequence; steps of 10 leave room
-  // to slot one between two later by editing sort_order in the database.
+  // Steps of 10 leave room to slot a stage between two by editing sort_order.
   const { data: last, error: lastError } = await supabase
     .from("construction_stages")
     .select("sort_order")
@@ -46,11 +45,7 @@ export async function addConstructionStage(
   return undefined;
 }
 
-/**
- * A rename follows through to every indent and construction budget line
- * carrying the stage — the FKs cascade on update (0053), so the word
- * changes everywhere at once and history keeps making sense.
- */
+/** A rename cascades to every indent and budget line carrying the stage (0053). */
 export async function renameConstructionStage(id: string, name: string): Promise<ActionState> {
   const user = await requireTool("/masters");
 

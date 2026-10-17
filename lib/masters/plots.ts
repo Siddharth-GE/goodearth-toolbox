@@ -10,16 +10,13 @@ export type PlotRow = {
   id: string;
   project_id: string;
   name: string;
-  /** Short code for PO numbers (PO/SAA/<code>/001) — null until set. */
   code: string | null;
   area: number | null;
   status: PlotStatus;
   created_at: string;
 };
 
-// fetchAll like listUnits/listVendors: this promises the complete plot
-// list, and it feeds the PO, Bill and Indent forms — the first master
-// likely to cross PostgREST's silent 1,000-row cap as real data lands.
+// fetchAll: this feeds the PO, Bill and Indent forms and must be complete (1,000-row cap).
 export async function listPlots(projectId?: string): Promise<PlotRow[]> {
   const supabase = await createClient();
   const data = await fetchAll((from, to) => {
@@ -38,7 +35,6 @@ export type PlotFilters = {
   page?: number;
 };
 
-/** One page for the masters table screen; listPlots stays the complete read. */
 export async function listPlotsPage(filters: PlotFilters = {}): Promise<PagedResult<PlotRow>> {
   const supabase = await createClient();
   const search = cleanSearch(filters.search);

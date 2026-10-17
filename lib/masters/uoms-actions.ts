@@ -41,11 +41,7 @@ export async function addUom(_state: ActionState, formData: FormData): Promise<A
   return undefined;
 }
 
-/**
- * A rename follows through to every row carrying the unit — items,
- * request lines, movements, estimator setups — because all the FKs
- * cascade on update (0082). The word changes everywhere at once.
- */
+/** A rename cascades to every row carrying the unit (0082). */
 export async function renameUom(id: string, name: string): Promise<ActionState> {
   const user = await requireTool("/masters");
 

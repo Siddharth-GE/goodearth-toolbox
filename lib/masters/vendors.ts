@@ -11,22 +11,19 @@ export type VendorRow = {
   mobile: string | null;
   gst_no: string | null;
   address: string | null;
-  /** 0089: the vendor extract's ordinary details. */
   email: string | null;
   contact_designation: string | null;
   gst_state: string | null;
   payment_term_days: number | null;
   is_active: boolean;
-  /** 0073: contractors are vendors (0025's one-counterparty-list rule); the flag only filters. */
+  /** 0073: contractors are vendors; the flag only filters. */
   is_contractor: boolean;
   created_at: string;
   updated_at: string | null;
   updated_by: string | null;
 };
 
-// fetchAll for the same reason as listUnits: this promises the complete
-// vendor list, and vendors will matter even more once POs and Bills key
-// off them — a capped read would silently hide real vendors.
+// fetchAll: a capped read would silently hide real vendors.
 export async function listVendors(activeOnly = false): Promise<VendorRow[]> {
   const supabase = await createClient();
   const data = await fetchAll((from, to) => {
@@ -41,14 +38,11 @@ const VENDORS_PAGE_SIZE = 50;
 
 export type VendorFilters = {
   search?: string;
-  /** "active" | "inactive" | undefined (all) */
   status?: string;
-  /** "contractor" | "supplier" | undefined (all) */
   type?: string;
   page?: number;
 };
 
-/** One page for the masters table screen; listVendors stays the complete read. */
 export async function listVendorsPage(
   filters: VendorFilters = {},
 ): Promise<PagedResult<VendorRow>> {

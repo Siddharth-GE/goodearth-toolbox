@@ -4,11 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { ClientRow } from "./clients";
 import type { UnitStatus, UnitType } from "./units";
 
-// Reads only open surfaces: units/projects/selections are readable by
-// every authenticated user. approved_budgets is grant-gated to
-// /budgets|/indents — the caller says whether the viewer holds one, and
-// without it the budget column is omitted entirely rather than shown
-// as a misleading blank.
+// approved_budgets is gated to /budgets|/indents; without one the budget column is omitted, not shown blank.
 
 export type ClientUnit = {
   id: string;
@@ -18,16 +14,13 @@ export type ClientUnit = {
   status: UnitStatus;
   project_id: string;
   projectName: string;
-  /** Latest issued selection revision, null when nothing issued yet. */
   issuedRevision: number | null;
   issuedAt: string | null;
-  /** Only meaningful when includeBudgets was true; null otherwise. */
   budgetApproved: boolean | null;
 };
 
 export type ClientDetail = {
   client: ClientRow;
-  /** Who last edited the client, when updated_by is stamped. */
   updatedByName: string | null;
   units: ClientUnit[];
 };

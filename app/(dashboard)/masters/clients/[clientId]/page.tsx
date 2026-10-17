@@ -31,8 +31,7 @@ export default async function ClientDetailPage({
   params: Promise<{ clientId: string }>;
 }) {
   const [user, { clientId }] = await Promise.all([requireUser(), params]);
-  // approved_budgets is RLS-gated to /budgets|/indents — without one of
-  // those grants the budget column is omitted, not shown misleadingly empty.
+  // approved_budgets is gated to /budgets|/indents; without a grant the budget column is left out, not shown empty.
   const includeBudgets = (await hasApp(user, "/budgets")) || (await hasApp(user, "/indents"));
   const detail = await getClientDetail(clientId, { includeBudgets });
   if (!detail) notFound();

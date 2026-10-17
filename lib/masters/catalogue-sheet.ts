@@ -1,29 +1,10 @@
-// Matching the interiors catalogue spreadsheet to the items master — the
-// pure half of scripts/import-catalogue-sheet.ts, kept here so it can be
-// tested (the script reads the workbook and writes; this decides).
-//
-// WHY NOT MATCH ON THE CODE. The sheet's ITEM CODE column is a formula —
-// UPPER(LEFT(item,3) & LEFT(type,1)) & a COUNTIFS running number — so
-// inserting one row renumbers every row below it of the same kind. On
-// 2026-09-26 about 1,000 of the sheet's 2,759 codes named a different
-// product than the same code in the toolbox. A code is a label here, not
-// an identity; a product is its description, brand, link and price.
-//
-// THE FOUNDER'S RULE (2026-09-26): "if there are small variations in some
-// data they are probably not a duplicate". So a row joins an existing
-// item only on an exact match of what describes the product, and anything
-// that differs — a "3" added to a sofa's description, the same lamp at
-// another price — becomes its own item. Masters can switch one off later;
-// a wrong merge would silently put one product's picture on another.
+// Match sheet rows to items on what describes the product, never the code: the sheet's code is a formula, so inserting a row renumbers the rest.
+// Small differences mean a separate item; a wrong merge would put one product's picture on another.
 
 export type SheetRow = {
-  /** The spreadsheet row number, for the report. */
   row: number;
-  /** The sheet's own code — shown, never trusted (see above). */
   code: string | null;
-  /** ITEM CATEGORY: Loose / Fixed / SOFT FURNISHING. */
   placement: string | null;
-  /** ITEM TYPE — the toolbox's item category. */
   type: string | null;
   name: string | null;
   description: string | null;
@@ -33,7 +14,6 @@ export type SheetRow = {
   articleNo: string | null;
   unit: string | null;
   price: number | null;
-  /** Pictures pasted on the row, as paths inside the workbook. */
   pictures: string[];
 };
 
@@ -49,9 +29,7 @@ export type CatalogueRow = {
 
 export type SheetMatch<T extends CatalogueRow> = {
   matched: { row: SheetRow; item: T; rule: string }[];
-  /** Rows that repeat an earlier row's product — listed twice in the sheet. */
   copies: { row: SheetRow; of: number }[];
-  /** Rows with no existing item: each becomes a new one. */
   fresh: SheetRow[];
 };
 
@@ -63,15 +41,10 @@ const text = (value: string | null | undefined) =>
     .replace(/\s+/g, " ")
     .trim();
 
-/** Whole rupees, or "" when there is no price — the pairing key. */
 const rupees = (value: number | null | undefined) =>
   value == null || !Number.isFinite(value) ? "" : String(Math.round(value));
 
-/**
- * A product link reduced to what identifies the product: host without
- * www, the path, no query. Whispering Homes moved from /product/ to
- * /products/ and redirects the old form, so both spell the same page.
- */
+/** Host without www, path, no query: /product/ and /products/ are the same page. */
 export function linkKey(url: string | null | undefined): string {
   const raw = (url ?? "").trim();
   if (!raw) return "";
@@ -84,10 +57,8 @@ export function linkKey(url: string | null | undefined): string {
   }
 }
 
-/** Parameters that only say where a click came from. */
 const TRACKING = /^(_gl|_pos|_sid|_ss|_fid|_psq|gclid|gbraid|wbraid|fbclid|utm_.*)$/i;
 
-/** The link as it is stored: tracking parameters removed, the rest kept. */
 export function cleanLink(url: string | null | undefined): string | null {
   const raw = (url ?? "").trim();
   if (!raw) return null;
@@ -102,7 +73,6 @@ export function cleanLink(url: string | null | undefined): string | null {
   }
 }
 
-/** Every field that describes the product — two rows alike in all of them are one product. */
 function fingerprint(row: SheetRow): string {
   return [
     text(row.name),
@@ -140,9 +110,7 @@ function rules<T extends CatalogueRow>(): Rule<T>[] {
       item: (i) => text(i.description) && `${text(i.description)}#${text(i.brand)}`,
     },
     {
-      // The one exact-match rule without the description: the same product
-      // page, brand and price with the description rewritten (Lunar Crystal
-      // Wall Light, 2026-09-26). All three together are the product.
+      // Same product page, brand and price with a rewritten description is the same product.
       name: "same link, brand and price",
       sheet: (r) =>
         withAll(linkKey(r.link), rupees(r.price)) &&
@@ -152,8 +120,7 @@ function rules<T extends CatalogueRow>(): Rule<T>[] {
         `${linkKey(i.source_url)}#${text(i.brand)}#${rupees(i.indicative_price)}`,
     },
     {
-      // Only for rows with no description at all, where nothing above can
-      // apply — without it such a row would be added again on every run.
+      // Rows with no description: without this rule they would be added again on every run.
       name: "no description: same name, brand and price",
       sheet: (r) =>
         !text(r.description) && text(r.name)
@@ -168,13 +135,8 @@ function rules<T extends CatalogueRow>(): Rule<T>[] {
 }
 
 /**
- * Pairs sheet rows with existing items, one to one, never reusing either
- * side. Rules run strongest first. Inside one rule, when several rows and
- * items share a key (twenty "Ashwood bench … By HOMEWORK." that differ
- * only in size), rows pair with the item at the same price first, then in
- * order — `items` should arrive sorted by code, which is the order the
- * original import gave them. A row left over once its twins are paired
- * falls through to the next rule, and past the last one it is new.
+ * Strongest rule first, one to one. Twins with the same key pair by price, then by order (items arrive sorted by code).
+ * A row left over falls to the next rule, and past the last it is new.
  */
 export function matchSheet<T extends CatalogueRow>(rows: SheetRow[], items: T[]): SheetMatch<T> {
   const matchedRow = new Map<number, { item: T; rule: string }>();
@@ -223,10 +185,7 @@ export function matchSheet<T extends CatalogueRow>(rows: SheetRow[], items: T[])
     }
   }
 
-  // A row left over is a repeat when it is identical to an earlier row, or
-  // names the same product page, brand and price as one — the identity the
-  // third rule already trusts. The sheet has both: a block of 26 consoles
-  // pasted twice, 19 of them identical and six with a corrected description.
+  // A repeat is identical to an earlier row, or has the same page, brand and price.
   const matched: SheetMatch<T>["matched"] = [];
   const copies: SheetMatch<T>["copies"] = [];
   const fresh: SheetRow[] = [];
@@ -260,17 +219,11 @@ export function matchSheet<T extends CatalogueRow>(rows: SheetRow[], items: T[])
   return { matched, copies, fresh };
 }
 
-/**
- * The code a new item gets: the sheet's own formula for the prefix —
- * first three characters of the item, first of the type, upper case — and
- * the next number the toolbox has not used for that prefix. The sheet's
- * number cannot be used, for the reason at the top of this file.
- */
+/** The sheet's prefix formula, then the next number the toolbox has not used for it. */
 export function nextCode(name: string, type: string, taken: Set<string>): string {
   const squash = (value: string) => value.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
   const prefix = squash(name).slice(0, 3) + squash(type).slice(0, 1);
-  // Three digits only: the sheet's broken rows carry codes like CHAIS2732
-  // (a different formula), which must not drag the numbering to 2,733.
+  // Three digits only: broken sheet rows (CHAIS2732) must not drag numbering to 2,733.
   const pattern = new RegExp(`^${prefix}(\\d{3})$`);
   let highest = 0;
   for (const code of taken) {
@@ -284,7 +237,7 @@ export function nextCode(name: string, type: string, taken: Set<string>): string
   return code;
 }
 
-/** Sheet UNIT → uoms.name. Blank is one of something, as every existing catalogue item is. */
+/** Blank unit means one of something, like every existing catalogue item. */
 export function sheetUnit(unit: string | null): string | undefined {
   const key = text(unit).replace(/[.\s]/g, "");
   if (key === "" || key === "no" || key === "nos" || key === "each") return "each";
@@ -293,7 +246,6 @@ export function sheetUnit(unit: string | null): string | undefined {
   return undefined;
 }
 
-/** Sheet ITEM CATEGORY → items.placement. */
 export function sheetPlacement(value: string | null): string | null {
   const key = text(value);
   if (key === "loose") return "loose";

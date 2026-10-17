@@ -12,8 +12,7 @@ const PROJECT_STATUSES = ["planning", "active", "completed"];
 function readProjectForm(formData: FormData) {
   return {
     name: String(formData.get("name") ?? "").trim(),
-    // Normalised the way indentReference() expects: uppercase, no spaces.
-    // The DB CHECK (^[A-Z0-9-]{2,10}$, migration 0019) is the backstop.
+    // Uppercase, no spaces, as indentReference() expects. The DB CHECK (migration 0019) is the backstop.
     code:
       String(formData.get("code") ?? "")
         .trim()

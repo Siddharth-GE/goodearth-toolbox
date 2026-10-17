@@ -29,9 +29,7 @@ export async function createItemCategory(
   return undefined;
 }
 
-// Kind stays fixed on purpose: items already filed under this category
-// were picked with its kind in mind, and flipping it would relabel them
-// all at once. Rename or deactivate instead.
+// Kind stays fixed: items under this category were picked with its kind in mind. Rename or deactivate instead.
 export async function updateItemCategory(
   id: string,
   _state: ActionState,

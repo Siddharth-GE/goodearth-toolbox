@@ -5,12 +5,9 @@ import type { PlotRow } from "./plots";
 import type { ProjectRow } from "./projects";
 import type { UnitStatus } from "./units";
 
-// Money confinement, same rule as vendor-detail: document activity
-// comes from the money-free fact views and open tables only — counts
-// and references, never an amount.
+// Money-free: fact views and open tables only; counts and references, never an amount.
 
 export type ProjectPlot = PlotRow & {
-  /** The plot's unit (1:1 since 0029), or null while it waits for one. */
   unitName: string | null;
 };
 
@@ -21,13 +18,11 @@ export type ProjectUnit = {
   status: UnitStatus;
   clientName: string | null;
   issuedRevision: number | null;
-  /** Only meaningful when includeBudgets was true; null otherwise. */
   budgetApproved: boolean | null;
 };
 
 export type ProjectDetail = {
   project: ProjectRow;
-  /** Who last edited the project, when updated_by is stamped. */
   updatedByName: string | null;
   plots: ProjectPlot[];
   plotTotal: number;
@@ -74,8 +69,6 @@ export async function getProjectDetail(
   const plotIds = plots.map((p) => p.id);
 
   const [plotUnitRes, selectionRes, budgetRes] = await Promise.all([
-    // Keyed on the plots actually shown, so the mapping is complete for
-    // them even if the project somehow outgrows the units page above.
     plotIds.length
       ? supabase.from("units").select("plot_id, name").in("plot_id", plotIds)
       : Promise.resolve({ data: [] as { plot_id: string; name: string }[] }),

@@ -7,11 +7,7 @@ import { Label } from "@/components/ui/label";
 import type { VendorPaymentDetails } from "@/lib/masters/vendor-detail";
 import { saveVendorPaymentDetails } from "@/lib/masters/vendors-actions";
 
-/**
- * Edits the vendor's bank details — the gated vendor_payment_details
- * row, never columns on the open vendors table. Clearing every field
- * and saving removes the details entirely.
- */
+/** Bank details live in the gated vendor_payment_details row, not on vendors. Clearing every field removes them. */
 export function VendorPaymentDialog({
   vendorId,
   details,

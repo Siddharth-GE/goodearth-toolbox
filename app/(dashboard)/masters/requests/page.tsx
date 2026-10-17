@@ -20,8 +20,7 @@ export default async function ItemRequestsPage({
 }: {
   searchParams: Promise<{ status?: string }>;
 }) {
-  // listItemRequests has no gate, following the masters read convention,
-  // so this page states its own.
+  // listItemRequests has no gate (masters read convention), so this page states its own.
   const user = await requireUser();
   await requireApp(user, "/masters");
 
@@ -71,8 +70,7 @@ export default async function ItemRequestsPage({
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-foreground font-medium">{request.requested_name}</p>
                     {request.status === "pending" && <Badge variant="warning">Provisional</Badge>}
-                    {/* Usage is what makes a merge consequential: this item
-                        is already sitting on issued revisions. */}
+                    {/* Usage makes a merge consequential: the item may already be on issued revisions. */}
                     {request.usage_count > 0 && (
                       <span className="text-muted text-xs">
                         used on {request.usage_count} {request.usage_count === 1 ? "line" : "lines"}

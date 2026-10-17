@@ -7,10 +7,8 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
 /**
- * Build progress, written (0119). Order carries meaning here — the last
- * active stage is the handover — so unlike construction stages this list
- * can be re-ordered from the screen. A stage a plot sits on cannot be
- * deleted (0120's foreign key), so there is no delete: switch it off.
+ * Order carries meaning: the last active stage is the handover.
+ * A stage a plot sits on can't be deleted (0120's FK), so switch it off.
  */
 
 function validName(name: string): string | ActionState {
@@ -22,7 +20,6 @@ function validName(name: string): string | ActionState {
 
 function refresh() {
   revalidatePath("/masters/stages");
-  // Client Relations names each plot's stage and draws its rail from the order.
   revalidatePath("/client-relations", "layout");
 }
 
@@ -99,12 +96,7 @@ export async function setProgressStageActive(id: string, isActive: boolean): Pro
   return undefined;
 }
 
-/**
- * Swap a stage with its neighbour above or below. Two updates, not one
- * transaction: if the second fails the two share a position for a moment
- * and the list sorts them by name — visible, harmless, and fixed by the
- * next press.
- */
+/** Two updates, not one transaction: if the second fails the two share a position and sort by name until the next press. */
 export async function moveProgressStage(
   id: string,
   direction: "up" | "down",
@@ -134,8 +126,7 @@ export async function moveProgressStage(
 
   const mine = stages[at];
   const theirs = stages[other];
-  // Equal positions (two stages added by hand at one number) still swap:
-  // nudge so the order actually changes.
+  // Equal positions still swap: nudge so the order changes.
   const myNew =
     theirs.sort_order === mine.sort_order
       ? theirs.sort_order + (direction === "up" ? -1 : 1)

@@ -3,11 +3,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type { VendorRow } from "./vendors";
 
-// Money confinement: this module reads ONLY the money-free fact views
-// (po_facts, bill_facts) — never purchase_orders/bills base tables,
-// never po_billing_totals, never an amount column. A /masters-only
-// viewer sees this whole page; what a PO or bill is worth stays behind
-// the /purchase-orders and /bills grants.
+// Money confinement: reads only the money-free po_facts and bill_facts, never base tables or an amount column.
 
 export type VendorPoFact = {
   id: string;
@@ -40,20 +36,13 @@ export type VendorPaymentDetails = {
 
 export type VendorDetail = {
   vendor: VendorRow;
-  /** Who last edited the vendor, when updated_by is stamped. */
   updatedByName: string | null;
-  /**
-   * Bank details from the gated vendor_payment_details table (0089).
-   * RLS answers rows only to /masters, /purchase-orders and /bills —
-   * for anyone else this is null exactly like "no details entered", so
-   * the page must decide visibility from the grant, not from this.
-   */
+  /** RLS returns rows only to /masters, /purchase-orders and /bills; null otherwise looks like "no details entered", so decide visibility from the grant. */
   paymentDetails: VendorPaymentDetails | null;
   pos: VendorPoFact[];
   poTotal: number;
   bills: VendorBillFact[];
   billTotal: number;
-  /** project id → name, covering every row above. */
   projectNames: Map<string, string>;
 };
 

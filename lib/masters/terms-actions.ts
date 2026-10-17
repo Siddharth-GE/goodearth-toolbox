@@ -24,12 +24,7 @@ function validate(form: ReturnType<typeof readTermsForm>): string | undefined {
   return undefined;
 }
 
-/**
- * At most one default per kind — a partial unique index (0101). The row is
- * saved first with the flag down, so a name clash fails before the old
- * default is touched; only then is the old default lowered and this one
- * raised.
- */
+/** One default per kind (partial unique index, 0101): save with the flag down first so a name clash fails before the old default is touched. */
 async function makeDefault(id: string, kind: string, userId: string): Promise<ActionState> {
   const supabase = await createClient();
   const { error: lowerError } = await supabase

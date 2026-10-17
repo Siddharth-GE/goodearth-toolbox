@@ -9,12 +9,6 @@ import type { ActionState } from "@/lib/action-state";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 
-/**
- * The two stage lists on this screen — construction stages (0053) and
- * build progress (0119) — share these controls; each page passes in its
- * own server actions.
- */
-
 export function StageForm({
   action,
   inputId,
@@ -49,7 +43,6 @@ export function StageForm({
   );
 }
 
-/** The name, editable in place. */
 export function StageNameField({
   id,
   name,
@@ -132,7 +125,6 @@ export function StageToggle({
   );
 }
 
-/** Up and down, for a list whose order means something. */
 export function StageMove({
   id,
   name,

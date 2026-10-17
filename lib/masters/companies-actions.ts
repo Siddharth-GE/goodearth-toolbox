@@ -5,9 +5,7 @@ import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
-// Two state digits, then thirteen letters and digits: 32ABCDE1234F1Z5.
-// Loose on purpose — the shape catches a pasted PAN or a missing
-// character; the checksum is the tax portal's job, not ours.
+// GSTIN shape, loose on purpose: catches a pasted PAN or a missing character; the checksum is the tax portal's job.
 const GSTIN_SHAPE = /^[0-9]{2}[A-Z0-9]{13}$/;
 
 function readCompanyForm(formData: FormData) {
@@ -40,7 +38,6 @@ function validate(form: ReturnType<typeof readCompanyForm>): string | undefined 
 
 function refresh() {
   revalidatePath("/masters/companies");
-  // The projects list and each project's page show the company's name.
   revalidatePath("/masters/projects", "layout");
 }
 

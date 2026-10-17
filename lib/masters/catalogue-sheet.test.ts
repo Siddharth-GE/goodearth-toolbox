@@ -1,9 +1,3 @@
-/**
- * The catalogue sheet matcher decides, for 2,793 rows, "this is an item we
- * already have" or "this is new" — and a wrong answer either duplicates a
- * product or puts one product's picture on another. Every case here is a
- * real one from the sheet of 2026-09-26.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -50,7 +44,6 @@ function item(fields: Partial<CatalogueRow> & { id: string }): CatalogueRow {
 }
 
 test("a renumbered code does not decide the match — the content does", () => {
-  // The sheet's SOFS018 is the toolbox's SOFS017: a row was inserted above.
   const items = [
     item({
       id: "a",
@@ -227,7 +220,6 @@ test("the same product page, brand and price is the same item even when rewritte
 });
 
 test("a row with no description is still found again on a second run", () => {
-  // Wardrobe sensor light, Kaadal, ₹1,500 — a name and nothing else.
   const lone = row({ name: "Wardrobe sensor light", brand: "Kaadal", price: 1500 });
   const once = matchSheet([lone], []);
   assert.equal(once.fresh.length, 1);

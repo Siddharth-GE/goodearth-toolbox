@@ -73,11 +73,8 @@ export async function updateItem(
 }
 
 /**
- * One item's price, and nothing else — for screens outside Masters that
- * show a price beside where it is used (the Estimator's rate panel), so
- * pricing a material doesn't mean opening the whole item form. The same
- * gate as every Masters write: `/masters`. Blank clears it — "not priced"
- * is a real answer and never ₹0. The caller refreshes its own screen.
+ * Price only, for screens outside Masters. Same gate as every Masters write.
+ * Blank clears it: "not priced" is never ₹0.
  */
 export async function setItemPrice(itemId: string, price: number | null): Promise<ActionState> {
   const user = await requireTool("/masters");

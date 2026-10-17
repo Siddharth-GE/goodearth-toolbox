@@ -1,9 +1,3 @@
-/**
- * The masters workbook decides which vendors, works and materials the
- * whole toolbox works from — a wrong merge joins two parties' bank
- * details, a wrong group files a work under the wrong stage. Every case
- * here is a real one from Masters.xlsx of 2026-10-06.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -23,9 +17,8 @@ const sheet = (header: string[] | null, body: (string | undefined)[][]): SheetRo
   ...body.map((cells, i) => ({ row: i + (header ? 2 : 1), cells })),
 ];
 
-// Vendor columns: 0 Sl, 1 Name, 2 Address, 3 Contact, 4 Mobile, 5 Designation,
-// 6 Email, 7 MATERIAL, 8 SUBCONTRACTOR, 9 GSTIN, 10 GST State, 11 PAN,
-// 12 Bank, 13 Account, 14 Holder, 15 IFSC.
+// Vendor columns by index: 0 Sl, 1 Name, 2 Address, 3 Contact, 4 Mobile, 5 Designation, 6 Email, 7 MATERIAL,
+// 8 SUBCONTRACTOR, 9 GSTIN, 10 GST State, 11 PAN, 12 Bank, 13 Account, 14 Holder, 15 IFSC.
 const vendor = (name: string, fields: Record<number, string> = {}) => {
   const cells: (string | undefined)[] = Array(16).fill(undefined);
   cells[1] = name;
@@ -143,11 +136,8 @@ test("loose keys agree across punctuation and case, not across word order", () =
   assert.notEqual(looseKey("Santhosh K"), looseKey("K Santhosh"));
 });
 
-// ---------------------------------------------------------------------------
-
 const WORK_HEADER = ["Code", "Work Description", "Scope", "Unit", "Price"];
 
-/** The sheet's own tricky rows, in its order, with enough around them to read. */
 const WORKS = sheet(WORK_HEADER, [
   ["FD", "Foundation"],
   ["FD.1", "FD - Total Station Marking"],
@@ -304,8 +294,6 @@ test("a fix whose row has gone from the sheet stops the run", () => {
   );
   assert.throws(() => worksFromSheet(without), /no longer has PF.2/);
 });
-
-// ---------------------------------------------------------------------------
 
 const CATEGORIES = materialCategoriesFromSheet(
   sheet(null, [
