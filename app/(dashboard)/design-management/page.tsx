@@ -1,39 +1,33 @@
-import { getWelcomeCounts } from "@/lib/design-management/queries";
+import { getBoardWelcomeCounts } from "@/lib/design-management/board-queries";
 
 import { ToolWelcome } from "../_components/tool-welcome";
 
 // The welcome screen (founder, 2026-08-13: every Management/Operations
-// tool opens on one). Counts only, never rupees — this tool has no
-// money anywhere in it, not even a fact view to gate.
+// tool opens on one). Counts only, never rupees — this tool has no money
+// anywhere in it.
 //
-// Two doors, not four (founder, 2026-08-22 evening: "the flow is super
-// cluttered right now"). Everything about drawings is reached through a
-// villa; design stages are the one list that is genuinely company-wide.
+// The Board is the main door since the twelfth piece (root plan.md): each
+// villa passed from stage to stage, "like crm". Drawings are reached
+// through a villa, as before.
 export default async function DesignManagementPage() {
-  const counts = await getWelcomeCounts();
+  const counts = await getBoardWelcomeCounts();
 
   return (
     <ToolWelcome
       icon="DraftingCompass"
       intro={[
-        "This is where a villa's drawings live: what has gone to site, what revision each set is on, and what is still being prepared.",
-        "Open a villa and press New transmittal: pick the stage and the drawing set, paste the WorkDrive link to its sheets and issue it. Relay tracks who holds each task; this tool holds the drawings.",
+        "Every villa's design, stage by stage: Design, Permit, Working Drawings, Structural, Interiors. Pass a villa on to the next stage and the people who take it; send a stage back for revision when it needs one — the villa stays where it has got to.",
+        "Actions are the team's to-do list: a step, an owner and a date, overdue first. A villa's drawings and transmittals are on its page.",
       ]}
       stats={[
-        {
-          label: "Villas with issued drawings",
-          value: counts.villasWithReleasedDrawings,
-          hint: "at least one drawing released",
-        },
-        { label: "Transmittals issued", value: counts.transmittalsIssued, hint: "all time" },
-        {
-          label: "Drafts open",
-          value: counts.draftTransmittals,
-          hint: "started, not yet issued",
-        },
+        { label: "Villas in design", value: counts.inDesign, hint: "started, not complete" },
+        { label: "Revising now", value: counts.revising, hint: "a stage sent back" },
+        { label: "With the client", value: counts.withClient, hint: "waiting on their word" },
+        { label: "Actions overdue", value: counts.overdueActions, hint: "or with no date" },
       ]}
       links={[
-        { label: "Villas", href: "/design-management/villas", primary: true },
+        { label: "Board", href: "/design-management/villas", primary: true },
+        { label: "Actions", href: "/design-management/actions" },
         { label: "Design stages", href: "/design-management/stages" },
       ]}
     />

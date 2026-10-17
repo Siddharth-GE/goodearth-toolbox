@@ -3440,6 +3440,90 @@ export type Database = {
           },
         ]
       }
+      design_actions: {
+        Row: {
+          action: string
+          created_at: string
+          created_by: string | null
+          design_stage_id: string | null
+          done_on: string | null
+          due_on: string | null
+          id: string
+          notes: string | null
+          owner_id: string
+          status: string
+          unit_id: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          created_by?: string | null
+          design_stage_id?: string | null
+          done_on?: string | null
+          due_on?: string | null
+          id?: string
+          notes?: string | null
+          owner_id: string
+          status?: string
+          unit_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          created_by?: string | null
+          design_stage_id?: string | null
+          done_on?: string | null
+          due_on?: string | null
+          id?: string
+          notes?: string | null
+          owner_id?: string
+          status?: string
+          unit_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "design_actions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "design_actions_design_stage_id_fkey"
+            columns: ["design_stage_id"]
+            isOneToOne: false
+            referencedRelation: "design_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "design_actions_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "design_actions_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "design_actions_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       design_stages: {
         Row: {
           code: string | null
@@ -3448,6 +3532,7 @@ export type Database = {
           id: string
           is_active: boolean
           name: string
+          on_board: boolean
           sort_order: number
           updated_at: string
           updated_by: string | null
@@ -3459,6 +3544,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name: string
+          on_board?: boolean
           sort_order?: number
           updated_at?: string
           updated_by?: string | null
@@ -3470,6 +3556,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name?: string
+          on_board?: boolean
           sort_order?: number
           updated_at?: string
           updated_by?: string | null
@@ -3484,6 +3571,207 @@ export type Database = {
           },
           {
             foreignKeyName: "design_stages_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      design_step_events: {
+        Row: {
+          actor_id: string | null
+          at: string
+          design_stage_id: string
+          from_status: string | null
+          id: string
+          kind: string
+          person_id: string | null
+          reason: string | null
+          seq: number
+          step_id: string
+          to_status: string | null
+          unit_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          at?: string
+          design_stage_id: string
+          from_status?: string | null
+          id?: string
+          kind: string
+          person_id?: string | null
+          reason?: string | null
+          seq?: never
+          step_id: string
+          to_status?: string | null
+          unit_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          at?: string
+          design_stage_id?: string
+          from_status?: string | null
+          id?: string
+          kind?: string
+          person_id?: string | null
+          reason?: string | null
+          seq?: never
+          step_id?: string
+          to_status?: string | null
+          unit_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "design_step_events_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "design_step_events_design_stage_id_fkey"
+            columns: ["design_stage_id"]
+            isOneToOne: false
+            referencedRelation: "design_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "design_step_events_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "design_step_events_step_id_fkey"
+            columns: ["step_id"]
+            isOneToOne: false
+            referencedRelation: "design_steps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "design_step_events_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      design_step_people: {
+        Row: {
+          added_at: string
+          added_by: string | null
+          id: string
+          profile_id: string
+          step_id: string
+        }
+        Insert: {
+          added_at?: string
+          added_by?: string | null
+          id?: string
+          profile_id: string
+          step_id: string
+        }
+        Update: {
+          added_at?: string
+          added_by?: string | null
+          id?: string
+          profile_id?: string
+          step_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "design_step_people_added_by_fkey"
+            columns: ["added_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "design_step_people_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "design_step_people_step_id_fkey"
+            columns: ["step_id"]
+            isOneToOne: false
+            referencedRelation: "design_steps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      design_steps: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          design_stage_id: string
+          done_on: string | null
+          id: string
+          note: string | null
+          reason: string | null
+          started_on: string | null
+          status: string
+          unit_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          design_stage_id: string
+          done_on?: string | null
+          id?: string
+          note?: string | null
+          reason?: string | null
+          started_on?: string | null
+          status?: string
+          unit_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          design_stage_id?: string
+          done_on?: string | null
+          id?: string
+          note?: string | null
+          reason?: string | null
+          started_on?: string | null
+          status?: string
+          unit_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "design_steps_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "design_steps_design_stage_id_fkey"
+            columns: ["design_stage_id"]
+            isOneToOne: false
+            referencedRelation: "design_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "design_steps_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "design_steps_updated_by_fkey"
             columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -11272,6 +11560,27 @@ export type Database = {
         Returns: undefined
       }
       delete_recorded_bill: { Args: { p_bill_id: string }; Returns: undefined }
+      design_pass_step: {
+        Args: {
+          p_from: string
+          p_note: string
+          p_people: string[]
+          p_to: string
+          p_unit: string
+        }
+        Returns: undefined
+      }
+      design_set_where: {
+        Args: { p_people: string[]; p_stage: string; p_unit: string }
+        Returns: undefined
+      }
+      design_team: {
+        Args: never
+        Returns: {
+          full_name: string
+          id: string
+        }[]
+      }
       directory_emails: {
         Args: never
         Returns: {

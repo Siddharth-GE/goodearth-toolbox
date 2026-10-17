@@ -138,6 +138,28 @@ export async function setDesignStageActive(id: string, isActive: boolean): Promi
 }
 
 /**
+ * Whether a stage is a column on the design board (0125). Switching one
+ * off hides its column and leaves every step on it, and its history, as
+ * it was — switched back on, the villas are where they were.
+ */
+export async function setDesignStageOnBoard(id: string, onBoard: boolean): Promise<ActionState> {
+  const user = await requireTool(GRANT);
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("design_stages")
+    .update({ on_board: onBoard, updated_by: user.id })
+    .eq("id", id);
+  if (error) {
+    console.error("setDesignStageOnBoard failed:", error);
+    return { error: "Could not update the stage. Try again." };
+  }
+
+  revalidatePath("/design-management", "layout");
+  return undefined;
+}
+
+/**
  * Swaps sort_order with the neighbour in the given direction — two
  * updates, not a rewrite of the whole ordered list, so a reorder costs
  * the same regardless of how many stages exist.
