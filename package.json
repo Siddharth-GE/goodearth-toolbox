@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test \"lib/**/*.test.ts\"",
     "check:actions": "tsx scripts/check-server-actions.ts",
+    "check:comments": "tsx scripts/check-comment-only.ts",
     "db:types": "supabase gen types typescript --project-id pajfrgnkapicdgangjey --schema public > lib/supabase/database.types.ts",
     "db:types:staging": "supabase gen types typescript --project-id ipstebqawrvhkyntctrv --schema public > lib/supabase/database.types.ts",
     "db:apply": "tsx scripts/apply-migrations.ts",

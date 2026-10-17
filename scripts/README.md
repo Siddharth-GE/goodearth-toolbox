@@ -37,6 +37,7 @@ The `data/` files importers read are gitignored: real business data, some of it 
 ## App checks
 
 - `check-server-actions.ts` — refuses a type re-export in a `"use server"` file (BUGCATCHER #5). `npm run check:actions`, after a build.
+- `check-comment-only.ts` — proves a change touched comments and layout only: each changed file compiles to the same code before and after. `npm run check:comments [base] [head]`.
 - `rotate-marathon-pins.ts` — moves any kiosk agent off a published PIN. `npm run rotate-marathon-pins -- --project <ref>`
 - `google-chat-usage-test.ts` (+ `google-chat-usage-loader.mjs`) — drives the Chat door in-process against staging with Google-shaped events. `npm run chat:usage -- --as <email>`
 - `google-chat-patch-card.ts` — rewrites one Chat card as the app; the repair when a refresh fails. `--message spaces/<id>/messages/<id>`
