@@ -14,12 +14,6 @@ import { useState, useTransition } from "react";
 
 type ChosenItem = { id: string; name: string; code: string | null; thumb_url: string | null };
 
-/**
- * The only way a balance changes without a movement behind it, so the
- * reason is mandatory here and at the database. Opening stock is simply
- * a positive adjustment — that is the intended way to start a store off
- * with what is already sitting in it.
- */
 export function AdjustmentForm({
   stores,
   categories,
@@ -92,7 +86,6 @@ export function AdjustmentForm({
       <h2 className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
         Correct a count
       </h2>
-      {/* The founder's team asked what this section is for (2026-10-08). */}
       <p className="text-muted text-sm">
         For a store&apos;s count only, with the reason written down: opening stock, a box found
         (add), breakage or a recount (remove). A wrong delivery or issue is not fixed here — record

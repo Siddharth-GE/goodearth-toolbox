@@ -1,9 +1,5 @@
-/**
- * Both references are written on paper — a GRN number goes on the file
- * the challan is stapled into — so their exact shape is pinned here,
- * including the lpad-truncation case where the TS mirror and the SQL
- * mint (migration 0023) could silently drift apart.
- */
+// Both references are written on paper, so their exact shape is pinned, including the lpad
+// truncation case where the TS mirror and the SQL mint could drift.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

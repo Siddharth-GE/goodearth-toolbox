@@ -11,12 +11,7 @@ import { PackageMinus } from "lucide-react";
 import Link from "next/link";
 import { IssueForm } from "../../_components/issue-form";
 
-/**
- * Two steps, on purpose: pick the store first, then the page can show
- * exactly what that store holds — there is no way to type in an item it
- * doesn't have, which is the mistake the negative-stock guard would
- * otherwise catch after the fact.
- */
+/** Two steps: pick the store first, then the form lists only what it holds, so no item it lacks can be typed. */
 export default async function NewIssuePage({
   searchParams,
 }: {
@@ -29,7 +24,6 @@ export default async function NewIssuePage({
     store ? listStoreBatches(store) : Promise.resolve<Record<string, Batch[]>>({}),
     listWorkItems(),
     listWorkCategories(),
-    // Step H: arriving from the requests queue prefills the form.
     requestId ? getSiteRequest(requestId) : Promise.resolve(null),
   ]);
   const chosen = options.stores.find((s) => s.id === store) ?? null;
@@ -83,8 +77,6 @@ export default async function NewIssuePage({
               </li>
             ))}
           </ul>
-          {/* A select is redundant beside the list above, but keeps the
-              screen usable when a site has many stores. */}
           <noscript>
             <Select aria-label="Store" defaultValue="">
               <option value="">Pick a store…</option>

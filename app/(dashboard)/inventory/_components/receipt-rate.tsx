@@ -18,11 +18,7 @@ import { differsFromPo } from "@/lib/inventory/batches";
 import type { ReceiptLineRate } from "@/lib/inventory/queries";
 import { useState, useTransition } from "react";
 
-/**
- * A delivery line's rate (0108): the PO's, copied when the goods were
- * received, or what the delivery bill said instead. A changed rate shows
- * the PO's beside it in amber, so accounts see every difference.
- */
+/** A changed rate shows the PO's beside it in amber, so accounts see every difference (0108). */
 export function ReceiptRate({
   receiptLineId,
   itemName,

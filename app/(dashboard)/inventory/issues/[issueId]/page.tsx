@@ -28,10 +28,7 @@ export default async function IssuePage({ params }: { params: Promise<{ issueId:
   ]);
   if (!issue) notFound();
 
-  // Phase 2 Step I — flag, never refuse: the issue is saved either way;
-  // this banner appears the moment the redirect lands after recording,
-  // and again for anyone opening the note later. Derived fresh, so a
-  // resubmitted estimate that now covers the material clears it.
+  // Flag, never refuse: derived fresh, so a resubmitted estimate that covers the material clears the banner.
   const overRows =
     issue.plot_id && issue.work_item_id
       ? await getOverIssueRows(issue.plot_id, issue.work_item_id)

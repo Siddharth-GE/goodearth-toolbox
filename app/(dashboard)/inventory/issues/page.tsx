@@ -19,8 +19,6 @@ import { PackageMinus } from "lucide-react";
 import Link from "next/link";
 import { InventoryNav } from "../_components/inventory-nav";
 
-/** Material leaving a store — to a plot, where it gets used, or to
- * another store, which is a transfer. */
 export default async function IssuesPage({
   searchParams,
 }: {

@@ -22,13 +22,7 @@ import { isFullyReceivedOrder } from "@/lib/inventory/stock";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
-/**
- * Recording one delivery: the PoolBasket pattern from the PO tool's
- * pull screen. Every ordered line stays on screen — the ones already
- * fully delivered show disabled and labelled rather than vanishing, so
- * a store-keeper can see the whole order in front of them while they
- * count. Nothing is written until the commit bar at the bottom.
- */
+/** Every ordered line stays visible (fully delivered ones disabled); nothing is written until the commit bar. */
 type WorkOption = { id: string; code: string; name: string; category: string };
 
 export function ReceiveBasket({ pool, works }: { pool: ReceivePool; works: WorkOption[] }) {
@@ -74,8 +68,6 @@ export function ReceiveBasket({ pool, works }: { pool: ReceivePool; works: WorkO
     ([id, quantity]) => quantity > (remainingById.get(id) ?? 0),
   );
 
-  /** Would this delivery finish the order? Mirrors the condition the
-   * database checks before flipping the PO to Completed. */
   const finishesOrder = isFullyReceivedOrder(
     pool.lines.map((line) => ({
       ordered: line.ordered,
@@ -87,9 +79,7 @@ export function ReceiveBasket({ pool, works }: { pool: ReceivePool; works: WorkO
   const allPicked =
     available.length > 0 && available.every((line) => picked[line.po_line_id] != null);
 
-  /** A general-scope PO has no plot or unit, so there is no site to
-   * unload at and nowhere in Stock for the goods to show — those must
-   * go into a store. The database refuses it too (migration 0024). */
+  /** A general-scope PO has no site to unload at, so it must go to a store (the database refuses otherwise, 0024). */
   const hasSite = pool.site_label !== null;
   const destinationChosen = (toSite && hasSite && workItemId !== "") || (!toSite && storeId !== "");
   const workCategories = useMemo(() => [...new Set(works.map((work) => work.category))], [works]);
@@ -108,12 +98,10 @@ export function ReceiveBasket({ pool, works }: { pool: ReceivePool; works: WorkO
       });
       if (result?.error) {
         setError(result.error);
-        // A partial record still changed the order: drop what went in so
-        // a second press can't book the same delivery twice.
+        // A partial record still changed the order: drop what went in so a second press can't book it twice.
         router.refresh();
         setPicked({});
       }
-      // On success the action redirects to the delivery note.
     });
 
   return (
@@ -339,7 +327,6 @@ export function ReceiveBasket({ pool, works }: { pool: ReceivePool; works: WorkO
         </Table>
       </section>
 
-      {/* Nothing has been written yet — this bar is the commit point. */}
       <div className="border-border bg-surface fixed inset-x-0 bottom-0 z-10 mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 border-t px-5 py-3 md:rounded-t-2xl md:border">
         <div className="min-w-0">
           {pickedEntries.length === 0 ? (

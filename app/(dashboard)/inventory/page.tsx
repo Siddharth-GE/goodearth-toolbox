@@ -4,9 +4,6 @@ import { countOpenSiteRequests } from "@/lib/inventory/requests-queries";
 
 import { ToolWelcome } from "../_components/tool-welcome";
 
-// The welcome screen (founder, 2026-08-13: every Operations and
-// Management tool opens on one). The Receive screen lives one click in
-// at /inventory/receive.
 export default async function InventoryPage() {
   const [counts, openRequests] = await Promise.all([getWelcomeCounts(), countOpenSiteRequests()]);
 

@@ -9,14 +9,8 @@ import { createClient } from "@/lib/supabase/server";
 
 import { matchingItemIds } from "./queries";
 
-/**
- * The store-keeper's side of the Supervisors' requests (Phase 2 Step
- * H). `issue_requests` is the Supervisors tool's table; Inventory reads
- * it (its SELECT policy admits `/inventory` since 0084) and resolves it
- * — the fifth documented cross-tool write exception (STATUS.md). The
- * guard trigger in 0084 is the boundary: this side can only move
- * `requested → fulfilled/declined`, never rewrite what was asked.
- */
+// The store-keeper's side of supervisors' issue_requests (0084 policy). Resolving is a cross-tool write
+// exception (STATUS.md); the 0084 trigger only lets it move requested to fulfilled/declined.
 
 const fail = (context: string, error: { message: string }): never =>
   readFailed("inventory requests", context, error);
@@ -61,9 +55,7 @@ const REQUEST_COLUMNS =
 
 export type SiteRequestFilters = {
   plotId?: string;
-  /** Waiting (requested), issued (fulfilled) or declined. */
   status?: SiteRequestRow["status"];
-  /** Item name — already made safe by searchParam. */
   q?: string;
 };
 
@@ -71,21 +63,17 @@ export async function listSiteRequests({ plotId, status, q }: SiteRequestFilters
   open: SiteRequestRow[];
   answered: SiteRequestRow[];
   answeredTotal: number;
-  /** More items matched the search than it can carry — the screen says so. */
   searchCapped: boolean;
 }> {
   await requireTool("/inventory");
   const supabase = await createClient();
 
-  // The search is over items (an open Masters read): find the matching
-  // item ids first, then keep only the requests for those items.
   const found = q ? await matchingItemIds(supabase, q, ["name"]) : null;
   if (found && found.ids.length === 0) {
     return { open: [], answered: [], answeredTotal: 0, searchCapped: false };
   }
 
-  // Every filter in one place; the status filter picks WHICH list(s) to
-  // read below, since waiting and answered are two separate lists.
+  // The status filter picks which list(s) to read: waiting and answered are separate.
   const filtered = <T extends Filterable<T>>(query: T): T => {
     let next = query;
     if (plotId) next = next.eq("plot_id", plotId);
@@ -105,8 +93,7 @@ export async function listSiteRequests({ plotId, status, q }: SiteRequestFilters
       .range(0, ANSWERED_SHOWN - 1);
   };
 
-  // The queue reads complete (a capped queue silently starves the
-  // oldest request); answered is a display list and says its limit.
+  // The queue reads complete (a cap would starve the oldest request); answered says its limit.
   const [open, answeredPage] = await Promise.all([
     wantOpen
       ? fetchAll<RequestRecord>((from, to) =>
@@ -143,7 +130,6 @@ export async function countOpenSiteRequests(): Promise<number> {
   return count ?? 0;
 }
 
-/** One request, for prefilling the issue form (?request=<id>). */
 export async function getSiteRequest(id: string): Promise<SiteRequestRow | null> {
   await requireTool("/inventory");
   const supabase = await createClient();
