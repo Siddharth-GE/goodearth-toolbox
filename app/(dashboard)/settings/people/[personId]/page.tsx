@@ -13,6 +13,7 @@ import {
   listBillApprovers,
   listGrantsForUser,
   listIndentApprovers,
+  listLeadsForUser,
 } from "@/lib/settings/queries";
 import { effectiveApprovalLimit, effectiveGrant } from "@/lib/settings/access-model";
 import { arrangeTools } from "@/lib/nav/arrange";
@@ -24,6 +25,7 @@ import { AccountSwitches } from "../../_components/account-switches";
 import { ApprovalLimitField } from "../../_components/approval-limit-field";
 import { ApproverCheckbox } from "../../_components/approver-checkbox";
 import { GrantCheckbox } from "../../_components/grant-checkbox";
+import { LeadCheckbox } from "../../_components/lead-checkbox";
 import { NameField } from "../../_components/name-field";
 import { RolePicker } from "../../_components/role-picker";
 
@@ -44,6 +46,7 @@ export default async function PersonPage({ params }: { params: Promise<{ personI
   // they used to wait on six unrelated reads for no reason.
   const [
     grants,
+    leads,
     indentApprovers,
     billApprovers,
     billLimits,
@@ -54,6 +57,7 @@ export default async function PersonPage({ params }: { params: Promise<{ personI
     arrangement,
   ] = await Promise.all([
     listGrantsForUser(personId),
+    listLeadsForUser(personId),
     listIndentApprovers(),
     listBillApprovers(),
     listBillApprovalLimits(),
@@ -168,41 +172,62 @@ export default async function PersonPage({ params }: { params: Promise<{ personI
                   {tools.map((tool) => {
                     const effective = effectiveGrant(tool.href, grants, roleApps);
                     return (
-                      <label
-                        key={tool.href}
-                        className="border-border flex items-start gap-2 rounded-lg border px-3 py-2"
-                      >
-                        <GrantCheckbox
-                          userId={person.id}
-                          app={tool.href}
-                          granted={grants.has(tool.href)}
-                        />
-                        <span className="min-w-0">
-                          <span className="text-foreground block text-sm font-medium">
-                            {tool.name}
-                            {!tool.built && (
-                              <span className="text-muted ml-1.5 text-xs font-normal">
-                                coming soon
+                      <div key={tool.href} className="border-border rounded-lg border px-3 py-2">
+                        <label className="flex items-start gap-2">
+                          <GrantCheckbox
+                            userId={person.id}
+                            app={tool.href}
+                            granted={grants.has(tool.href)}
+                          />
+                          <span className="min-w-0">
+                            <span className="text-foreground block text-sm font-medium">
+                              {tool.name}
+                              {!tool.built && (
+                                <span className="text-muted ml-1.5 text-xs font-normal">
+                                  coming soon
+                                </span>
+                              )}
+                            </span>
+                            {effective.source === "role" || effective.source === "both" ? (
+                              <span className="text-muted block text-xs">
+                                via role
+                                {effective.source === "both" ? " (and given directly)" : ""} — they
+                                keep it{" "}
+                                {effective.source === "both"
+                                  ? "even if unticked"
+                                  : "without a tick"}
+                              </span>
+                            ) : (
+                              <span className="text-muted block text-xs">{tool.description}</span>
+                            )}
+                            {tool.grantWarning && (
+                              <span className="text-warning block text-xs font-medium">
+                                {tool.grantWarning}
                               </span>
                             )}
                           </span>
-                          {effective.source === "role" || effective.source === "both" ? (
-                            <span className="text-muted block text-xs">
-                              via role
-                              {effective.source === "both" ? " (and given directly)" : ""} — they
-                              keep it{" "}
-                              {effective.source === "both" ? "even if unticked" : "without a tick"}
+                        </label>
+                        {/* Only beside a grant they hold: without it the tick does nothing (0122). */}
+                        {tool.scoped && effective.granted && (
+                          <label className="border-border mt-2 flex items-start gap-2 border-t pt-2">
+                            <LeadCheckbox
+                              userId={person.id}
+                              app={tool.href}
+                              isLead={leads.has(tool.href)}
+                              toolName={tool.name}
+                            />
+                            <span className="min-w-0">
+                              <span className="text-foreground block text-sm font-medium">
+                                Team lead
+                              </span>
+                              <span className="text-muted block text-xs">
+                                Sees everyone&apos;s work in {tool.name}. Without this they see only
+                                what is assigned to them.
+                              </span>
                             </span>
-                          ) : (
-                            <span className="text-muted block text-xs">{tool.description}</span>
-                          )}
-                          {tool.grantWarning && (
-                            <span className="text-warning block text-xs font-medium">
-                              {tool.grantWarning}
-                            </span>
-                          )}
-                        </span>
-                      </label>
+                          </label>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
@@ -306,7 +331,8 @@ export default async function PersonPage({ params }: { params: Promise<{ personI
             Access history
           </p>
           <p className="text-muted mt-1 text-sm">
-            App grants and account changes, newest first. Approver changes aren&apos;t recorded yet.
+            App grants, team lead ticks and account changes, newest first. Approver changes
+            aren&apos;t recorded yet.
           </p>
         </div>
         {history.length === 0 ? (

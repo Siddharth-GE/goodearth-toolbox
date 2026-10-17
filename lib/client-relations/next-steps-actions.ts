@@ -42,7 +42,11 @@ function revalidateAll(): void {
   revalidatePath("/client-relations", "layout");
 }
 
-function friendly(error: { message: string }, fallback: string): ActionState {
+function friendly(error: { message: string; code?: string }, fallback: string): ActionState {
+  // A row policy refusing the new row (0123): the plot is someone else's.
+  if (error.code === "42501") {
+    return { error: "That plot is not one of yours, so this cannot go on it." };
+  }
   const state = guardError(error, fallback, [
     "You need the Client Relations app",
     "Only whoever set this action",

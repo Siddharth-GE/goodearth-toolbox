@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/auth/access";
 import { requireUser } from "@/lib/auth/dal";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { GRANTABLE_TOOLS } from "@/lib/tools";
+import { GRANTABLE_TOOLS, SCOPED_TOOLS } from "@/lib/tools";
 import { revalidatePath } from "next/cache";
 import { blockedReason, validateInvite } from "./invite";
 
@@ -226,6 +226,59 @@ export async function revokeApp(userId: string, app: string): Promise<ActionStat
   if (error) {
     console.error("revokeApp failed:", error);
     return { error: "Could not revoke access. Try again." };
+  }
+
+  // The lead tick goes with the tick it sits under, so it never comes back
+  // unseen with a later grant. (Without the grant it does nothing — 0122.)
+  const { error: leadError } = await supabase
+    .from("tool_leads")
+    .delete()
+    .eq("user_id", userId)
+    .eq("app", app);
+  if (leadError) {
+    console.error("revokeApp lead cleanup failed:", leadError);
+    return { error: "Access removed, but their team lead tick stayed. Untick it by hand." };
+  }
+
+  revalidatePath("/settings", "layout");
+  return undefined;
+}
+
+/**
+ * Team lead: sees everyone's work in a tool whose work is assigned
+ * (lib/tools.ts `scoped`, 0122) — everyone else sees only their own.
+ * The tick does nothing without the grant, so the person page offers it
+ * only beside a grant they hold.
+ */
+export async function setToolLead(
+  userId: string,
+  app: string,
+  isLead: boolean,
+): Promise<ActionState> {
+  const user = await requireUser();
+  await requireAdmin(user);
+  if (!SCOPED_TOOLS.includes(app)) {
+    return { error: "Everyone already sees all of that app's work — there is no lead to pick." };
+  }
+
+  const supabase = await createClient();
+  if (isLead) {
+    const { error } = await supabase.from("tool_leads").insert({ user_id: userId, app });
+    // Ticking someone already a lead hits the primary key — a no-op.
+    if (error && error.code !== "23505") {
+      console.error("setToolLead failed:", error);
+      return { error: "Could not make them team lead. Try again." };
+    }
+  } else {
+    const { error } = await supabase
+      .from("tool_leads")
+      .delete()
+      .eq("user_id", userId)
+      .eq("app", app);
+    if (error) {
+      console.error("setToolLead failed:", error);
+      return { error: "Could not remove them as team lead. Try again." };
+    }
   }
 
   revalidatePath("/settings", "layout");

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { requireTool } from "@/lib/auth/access";
+import { isToolLead, requireTool } from "@/lib/auth/access";
 import { hourInIndia, todayInIndia } from "@/lib/format";
 import { listProgressStages, type ProgressStageRow } from "@/lib/masters/progress-stages";
 import { fetchAll } from "@/lib/supabase/fetch-all";
@@ -29,10 +29,12 @@ import type { ActionStatus, ActionTrack, KaadalStage } from "./stages";
  * Reads for the Saarang tracker's screens inside Client Relations — the
  * Actions board and the plot cards (root plan.md, seventh piece).
  *
- * Every export opens with requireTool("/client-relations"); client_actions
- * is gated on it for SELECT too (0120). Everyone holding the grant sees
- * every action (founder, 2026-10-16: "anyone with access can see is ok") —
- * who opens on whose list is decided here, never by a policy.
+ * Every export opens with requireTool("/client-relations"). Which plots and
+ * actions come back is the database's answer, not this file's (0123): a
+ * member sees the plots they own or hold an open action on, and the
+ * actions they own, set, or that sit on their plots; an admin or a team
+ * lead sees everything. So every count here is a count of what the viewer
+ * may see. Who opens on whose list is decided here.
  *
  * Small on purpose: Saarang is ~70 plots and a few hundred actions a year,
  * so each screen reads its slice whole (fetchAll) and works in memory —
@@ -274,7 +276,11 @@ export type BoardFilters = {
 export type ActionsBoard = {
   today: string;
   hour: number;
-  me: { id: string; name: string; isManager: boolean };
+  /**
+   * isManager: an admin — closes anyone's action (0121). seesAll: an admin
+   * or a team lead (0122) — everyone's work, and the team view.
+   */
+  me: { id: string; name: string; isManager: boolean; seesAll: boolean };
   team: Person[];
   /** Resolved: "all", "mgmt", or a person's id. */
   who: string;
@@ -301,7 +307,8 @@ export async function getActionsBoard(filters: BoardFilters = {}): Promise<Actio
   const today = todayInIndia();
   const isManager = user.profile?.role === "admin";
 
-  const [team, plotRecords, open, doneCountRes] = await Promise.all([
+  const [seesAll, team, plotRecords, open, doneCountRes] = await Promise.all([
+    isToolLead(user, GRANT),
     readTeam(supabase),
     loadPlots(supabase),
     loadSteps(supabase, { open: true }),
@@ -337,7 +344,7 @@ export async function getActionsBoard(filters: BoardFilters = {}): Promise<Actio
   const scoped = all.filter(inScope);
   const scopedOpen = scoped.filter((step) => step.status !== "done");
 
-  const who = filters.who || (isManager ? "all" : user.id);
+  const who = filters.who || (seesAll ? "all" : user.id);
   const shown = scoped.filter((step) => {
     if (who === "mgmt") return step.status === "waiting_management";
     if (who === "all") return true;
@@ -378,7 +385,12 @@ export async function getActionsBoard(filters: BoardFilters = {}): Promise<Actio
   return {
     today,
     hour: hourInIndia(),
-    me: { id: user.id, name: names.get(user.id) ?? user.profile?.full_name ?? "", isManager },
+    me: {
+      id: user.id,
+      name: names.get(user.id) ?? user.profile?.full_name ?? "",
+      isManager,
+      seesAll,
+    },
     team,
     who,
     steps: [...openShown, ...doneShown],
@@ -567,18 +579,21 @@ export type PlotBoard = {
   counts: Record<Health | "all", number>;
   projects: { id: string; name: string }[];
   team: Person[];
+  /** An admin or a team lead (0122): these are everyone's plots, not the viewer's own. */
+  seesAll: boolean;
 };
 
 export async function getPlotBoard(filters: PlotFilters = {}): Promise<PlotBoard> {
-  await requireTool(GRANT);
+  const user = await requireTool(GRANT);
   const supabase = await createClient();
   const today = todayInIndia();
 
-  const [records, steps, stages, team] = await Promise.all([
+  const [records, steps, stages, team, seesAll] = await Promise.all([
     loadPlots(supabase),
     loadSteps(supabase, {}),
     listProgressStages(),
     readTeam(supabase),
+    isToolLead(user, GRANT),
   ]);
   const index = stageIndex(stages);
   const names = await namesFor(
@@ -642,6 +657,7 @@ export async function getPlotBoard(filters: PlotFilters = {}): Promise<PlotBoard
       .map(([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name)),
     team,
+    seesAll,
   };
 }
 
@@ -654,13 +670,15 @@ export async function getBoardBasics(): Promise<{
   today: string;
   meId: string;
   isManager: boolean;
+  seesAll: boolean;
   team: Person[];
   plots: PlotRef[];
   openByOwner: Record<string, number>;
 }> {
   const user = await requireTool(GRANT);
   const supabase = await createClient();
-  const [team, records, open] = await Promise.all([
+  const [seesAll, team, records, open] = await Promise.all([
+    isToolLead(user, GRANT),
     readTeam(supabase),
     loadPlots(supabase),
     loadSteps(supabase, { open: true }),
@@ -671,6 +689,7 @@ export async function getBoardBasics(): Promise<{
     today: todayInIndia(),
     meId: user.id,
     isManager: user.profile?.role === "admin",
+    seesAll,
     team,
     plots: records.map(toRef).sort(comparePlots),
     openByOwner,

@@ -25,11 +25,17 @@ export type Board = {
   today: string;
   team: Person[];
   plots: PlotRef[];
-  /** Open actions per person, for the owner menu. */
+  /** Open actions per person, for the owner menu — shown only when `seesAll`. */
   openByOwner: Record<string, number>;
   meId: string;
   /** An admin: closes any action (0121). */
   isManager: boolean;
+  /**
+   * An admin or a team lead (0122): sees everyone's work. Anyone else sees
+   * only their own, so a colleague's count would be a count of what this
+   * viewer can see — a wrong number that looks right — and is not shown.
+   */
+  seesAll: boolean;
 };
 
 const BoardContext = createContext<Board | null>(null);

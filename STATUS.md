@@ -14,8 +14,8 @@ Production is `toolbox.goodearthkannur.org` (from `master`); staging is `staging
 ## Platform
 
 - **Stack:** Next.js 16.2 (Turbopack) · React 19.2 · Tailwind 4 · Supabase Postgres. Vercel `bom1` + Supabase `ap-south-1`, both Mumbai.
-- **Migrations:** `0001`–`0093` on both databases; `0094`–`0121` on staging only. `applied_migrations` (`0067`) is the ledger, and CI checks it on every pull request.
-- **Access:** per-user grants (`user_apps`) + role bundles (`role_apps`), enforced in the database by `has_app()`.
+- **Migrations:** `0001`–`0093` on both databases; `0094`–`0123` on staging only. `applied_migrations` (`0067`) is the ledger, and CI checks it on every pull request.
+- **Access:** per-user grants (`user_apps`) + role bundles (`role_apps`), enforced in the database by `has_app()`. On staging, a tool whose work is assigned (`scoped` — Client Relations) shows each person only their own rows, and admins and its team leads everything (`0122`, `is_lead()`).
 - **Navigation** (staging): tools sit under closed teams in the sidebar, arranged by the founder in Settings → Teams (`0114`, `lib/nav/`); a tool with no team sits under Other. Teams arrange, grants decide.
 - **Sign-in:** password → emailed 6-digit code (30-day trusted device), self-service reset, Google for existing team emails only; both steps rate-limited in the database. Mail rides Resend as `toolbox@goodearthkannur.org`. The rules are `SECURITY.md`.
 - **Performance:** warm TTFB ~0.2s, cold ~1.0s — cold starts are the one measured problem.
@@ -27,7 +27,7 @@ Production unless marked. Each tool's rules are its `PLAN.md` (Google Chat door:
 
 - **Marathon** — race-day kiosk: PIN login, entries, bibs, admin. Own auth and service-role client — the one kiosk, not a pattern.
 - **Masters** — the shared reference data every tool reads: projects, plots, units, clients, vendors, stores, items (catalogue and materials), categories, brands, GST rates, construction stages, units of measure, works, item requests (on staging: companies, terms templates, a material rate that rises with POs, and build progress beside construction stages). Reads ungated, writes need `/masters`.
-- **Settings** — people, grants, roles, approver lists (on staging: the sidebar's teams). Admin only.
+- **Settings** — people, grants, roles, approver lists (on staging: the sidebar's teams, and a team lead tick beside a scoped grant). Admin only.
 - **Selections** — what design specifies per room; revisions immutable once issued. Tiles and lines show the item's picture, description and product link (catalogue pictures on staging).
 - **Budgets** — prices an issued revision (interiors) and a construction stage tree; money gated.
 - **Indents** — site requests from a villa's official estimate, an approved interiors budget, or direct. No money (on staging: the indent's work's own materials, always in the Masters unit, what is still to buy, and a print; a line no estimate or budget covers says why and waits for the estimator's yes before the indent can be approved).
@@ -38,7 +38,7 @@ Production unless marked. Each tool's rules are its `PLAN.md` (Google Chat door:
 - **Design Management** — drawing sets, revisions and transmittals per villa; released drawings reach Supervisors.
 - **Estimator** — what a villa costs: a rate book, each villa measured on its own, a frozen official copy, a site check across villas (the rework on staging; there, Site check opens with the indent lines waiting for the estimator, then a card per villa to open, and a SketchUp model's takeoff measures a villa's estimate — **From the model**).
 - **Supervisors** — the site's day on a phone: labour, material requests, drawn-vs-estimated per work (on staging: labour as daily wages or piece-work, and a request off the estimate asks why).
-- **Client Relations** — the plot register and the only money coming in: payment schedules and receipts (on staging: the Saarang tracker brought in — **Actions**, every promise to a client with an owner and a date, overdue first; a Plots grid of lot cards; each plot's deed, agreement, build progress, design checks and Kaadal interiors as one-tap chips).
+- **Client Relations** — the plot register and the only money coming in: payment schedules and receipts (on staging: the Saarang tracker brought in — **Actions**, every promise to a client with an owner and a date, overdue first; a Plots grid of lot cards; each plot's deed, agreement, build progress, design checks and Kaadal interiors as one-tap chips; each team member sees only the plots and actions assigned to them, admins and team leads everything).
 - **Business Planning** — the founder's JV business plan as a recalculating tool.
 - **Financial Management** — cash, forward view and funding facilities, read from views.
 - **Reporter** — a report builder over a dataset registry; carries money by founder decision (on staging: a search box, a totals row and quick filters).

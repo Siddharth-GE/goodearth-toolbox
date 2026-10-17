@@ -81,6 +81,15 @@ export type Tool = {
    * way /inventory once did, when the route kept a hand list.
    */
   catalogue?: true;
+  /**
+   * Each person sees only the work assigned to them; admins and the tool's
+   * team leads see everyone's (0122). Settings offers the "Team lead" tick
+   * beside exactly these grants. Setting the flag switches nothing on by
+   * itself — the tool's own migration says what "assigned" means for its
+   * rows and narrows its policies with is_lead() (0123 for Client
+   * Relations). SECURITY.md, "Assigned work".
+   */
+  scoped?: true;
 };
 
 // A tool is visible to admins (always, every tool), and to staff who've
@@ -237,6 +246,8 @@ export const TOOLS: Tool[] = [
     href: "/client-relations",
     icon: "Handshake",
     built: true,
+    // Each person sees the plots and actions assigned to them (0123).
+    scoped: true,
   },
   {
     name: "Financial Management",
@@ -283,6 +294,9 @@ export const GRANTABLE_TOOLS = TOOLS.filter((tool) => tool.href !== "/settings")
 
 // The grants that may search the catalogue — see Tool.catalogue.
 export const CATALOGUE_TOOLS = TOOLS.filter((tool) => tool.catalogue).map((tool) => tool.href);
+
+// The grants that can carry a team lead — see Tool.scoped.
+export const SCOPED_TOOLS = TOOLS.filter((tool) => tool.scoped).map((tool) => tool.href);
 
 export function visibleTools(profile: { role: string } | null, grantedApps: string[]) {
   if (!profile) return [];

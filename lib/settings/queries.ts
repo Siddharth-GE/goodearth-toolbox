@@ -95,6 +95,20 @@ export async function listGrantsForUser(userId: string): Promise<Set<string>> {
   return new Set(data.map((row) => row.app));
 }
 
+/** The tools one person leads (0122) — the person page's lead ticks. */
+export async function listLeadsForUser(userId: string): Promise<Set<string>> {
+  await requireAdminCaller();
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("tool_leads").select("app").eq("user_id", userId);
+  // A failed read would show a real lead as unticked, and an admin would
+  // "fix" it wrongly — the same reason the grants read to completion.
+  if (error) {
+    console.error("listLeadsForUser failed:", error);
+    throw new Error("Could not load who leads which app.", { cause: error });
+  }
+  return new Set((data ?? []).map((row) => row.app));
+}
+
 const HISTORY_LIMIT = 50;
 
 /**
@@ -113,11 +127,19 @@ export async function listAccessHistory(userId: string): Promise<AccessAuditRow[
   await requireAdminCaller();
   const supabase = await createClient();
 
-  const [appsRes, profileRes] = await Promise.all([
+  const [appsRes, leadsRes, profileRes] = await Promise.all([
     supabase
       .from("audit_log")
       .select("table_name, action, at, actor, old_data, new_data")
       .eq("table_name", "user_apps")
+      .or(`new_data->>user_id.eq.${userId},old_data->>user_id.eq.${userId}`)
+      .order("at", { ascending: false })
+      .limit(HISTORY_LIMIT),
+    // Team lead ticks (0122), the same shape as a grant.
+    supabase
+      .from("audit_log")
+      .select("table_name, action, at, actor, old_data, new_data")
+      .eq("table_name", "tool_leads")
       .or(`new_data->>user_id.eq.${userId},old_data->>user_id.eq.${userId}`)
       .order("at", { ascending: false })
       .limit(HISTORY_LIMIT),
@@ -130,8 +152,9 @@ export async function listAccessHistory(userId: string): Promise<AccessAuditRow[
       .limit(HISTORY_LIMIT),
   ]);
 
-  const rows = [...(appsRes.data ?? []), ...(profileRes.data ?? [])].sort((a, b) =>
-    a.at < b.at ? 1 : a.at > b.at ? -1 : 0,
+  if (leadsRes.error) console.error("listAccessHistory team leads failed:", leadsRes.error);
+  const rows = [...(appsRes.data ?? []), ...(leadsRes.data ?? []), ...(profileRes.data ?? [])].sort(
+    (a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0),
   );
 
   // One lookup for every actor mentioned, rather than a join the audit

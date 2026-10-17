@@ -71,17 +71,28 @@ export default async function ClientsPage({
             },
           ]}
         />
-        <ClientFormDialog owners={options.owners} />
+        <ClientFormDialog
+          owners={options.owners}
+          defaultOwnerId={options.me.seesAll ? null : options.me.id}
+        />
       </div>
 
       {clients.length === 0 ? (
         <EmptyState
           icon={Handshake}
-          title={isFiltered ? "Nobody matches those filters" : "No clients yet"}
+          title={
+            isFiltered
+              ? "Nobody matches those filters"
+              : options.me.seesAll
+                ? "No clients yet"
+                : "No clients of yours yet"
+          }
           description={
             isFiltered
               ? "Try a different name, stage or person."
-              : "Add a prospect to start tracking them."
+              : options.me.seesAll
+                ? "Add a prospect to start tracking them."
+                : "Your clients show here: the ones you look after and the buyers of your plots. Add a prospect to start tracking them."
           }
         />
       ) : (
