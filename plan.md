@@ -36,7 +36,8 @@ Switch day is the founder's to run. Before it, three things must be done:
   - `lib/environment.test.ts` reads `.github/workflows/ci.yml` and `package.json` (`db:types`) and fails if their refs disagree.
   - Switch day then changes one constant.
   - Done: `DATABASES` and `PRODUCTION_SITE`, also read by `check-migrations.ts`; no other file in code names a ref. `dry-run-migrations` now runs on the practice database only, instead of refusing only production. The test was proven to bite with a wrong ref in `ci.yml`.
-- [ ] `[Opus]` **H4: Budgets.** `lib/budgets/queries.ts:241` (margins) and `:220` (spaces) must check `error`. A failed read is the error screen, never blank margins saved at cost.
+- [x] `[Opus]` **H4: Budgets.** `lib/budgets/queries.ts:241` (margins) and `:220` (spaces) must check `error`. A failed read is the error screen, never blank margins saved at cost.
+  - Done through the shared `assertRead`. Budgets' other unchecked reads are Phase 2's.
 - [ ] `[Opus]` **M1: lockouts fail closed.** `lib/auth/rate-limit.ts:52, 61, 78` and `lib/marathon/rate-limit.ts:57, 70, 88`.
   - _Check:_ 10 wrong passwords still lock the account for 10 minutes.
 - [ ] `[Sonnet]` **M7: rotate the Marathon admin PIN.** `0002` seeds "2026" in this public repo. `scripts/rotate-marathon-pins.ts` must also rotate `marathon_config`'s admin PIN, and SHIPPING.md runs it on every new database.
