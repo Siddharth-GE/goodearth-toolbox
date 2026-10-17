@@ -18,10 +18,11 @@ Switch day is the founder's to run. Before it, three things must be done:
 2. TODO.md's vet list, tried or accepted as is.
 3. One `[Fable]` pass over what staging has that Fable never saw. That is most of `0096`–`0126` and PR #81; each piece's section below marks its skip. Any fix to an applied migration is a new migration.
 
-- [ ] `[Opus]` **H1: Dexter.** The deck route (`app/deck/[token]/[[...path]]/route.ts:263`) sandboxes only HTML and SVG, so an uploaded `.xml` runs script on our origin.
+- [x] `[Opus]` **H1: Dexter.** The deck route (`app/deck/[token]/[[...path]]/route.ts:263`) sandboxes only HTML and SVG, so an uploaded `.xml` runs script on our origin.
   - Sandbox every response.
   - Move the header choice into a pure function in `lib/dexter/`, with a test.
   - _Check:_ a deck still plays, and its "visit our website" button opens.
+  - Done: `lib/dexter/headers.ts` (tested). Locally against staging, the "Experience_Sample" deck played under the sandbox, with its preview tags, picture and answers intact. Staging's four decks are single HTML files, so none changes. The website button is the founder's check.
 - [ ] `[Opus]` **Make the sign-in cookies unreadable by script.** Set `httpOnly` through `cookieOptions` in `lib/supabase/server.ts` and `proxy.ts`. The `@supabase/ssr` default is readable by script, and no browser client needs it.
   - _Check, as the probe:_ password and code, Google, sign-out, and the theme switch.
 - [ ] `[Fable]` **H2: `user_apps`.** Its grant, revoke and admin-read policies (`0003:20–39`, confirmed live) check `profiles.role` directly. That skips `session_is_verified()` and `is_active`.
@@ -38,7 +39,7 @@ Switch day is the founder's to run. Before it, three things must be done:
   - _Check:_ 10 wrong passwords still lock the account for 10 minutes.
 - [ ] `[Sonnet]` **M7: rotate the Marathon admin PIN.** `0002` seeds "2026" in this public repo. `scripts/rotate-marathon-pins.ts` must also rotate `marathon_config`'s admin PIN, and SHIPPING.md runs it on every new database.
 - [ ] `[Opus]` **BUGCATCHER #21 and #22.**
-  - #21: a sandbox that lists the types it covers leaves every other type open.
+  - [x] #21: a sandbox that lists the types it covers leaves every other type open.
   - #22: a policy written before the second factor existed never learned it.
 
 ## Phase 1: cut the fat

@@ -24,6 +24,7 @@ Client presentations as shareable links, and the answers a client types into one
 ## Known limits, stated
 
 - A deck that needs `localStorage`, cookies or `document.domain` throws under the sandbox. Plain HTML, reveal.js and the usual export-to-HTML decks do not need them; anything a deck wants remembered goes through the answers script instead. If a real deck breaks on this, the answer is a separate domain for the viewer — not `allow-same-origin`.
+- Every file a link serves is sandboxed, not only pages, so a PDF inside a deck may refuse to show in some browsers. Staging's decks are single HTML files; a deck that needs a PDF should link to it elsewhere.
 - Every save is a token lookup, a read and an upsert — one typist costs a request per pause in typing. Two people on the same link overwrite each other's answers, by decision (one link, one client).
 - Every asset request is a row lookup plus a Storage download through a serverless function. Fine at seventy staff and a handful of clients; a deck with hundreds of assets would notice.
 - The browser may cache an asset for five minutes; a replaced file can look stale for that long on a machine that had it open.

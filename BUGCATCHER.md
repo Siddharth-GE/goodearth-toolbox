@@ -153,6 +153,13 @@ The founder's first look at the sidebar's teams showed every tool under Other. P
 **Rule.** "JWT issued at future" is retried (`isTransient`); every other token refusal is not. Anything read in the dashboard layout must survive one failed attempt, because its answer outlives the request.
 **Check.** A caught-and-logged failure never reaches `app_errors` — read the deployment's own log: `npx vercel logs -d <deployment-url> --since 2h --level error -x` (the CLI's login works where `.env.local` has no `VERCEL_TOKEN`).
 
+### 21. A sandbox that lists the types it covers leaves every other type open
+
+Dexter's viewer sandboxed HTML and SVG and nothing else, so an `.xml` (or `.xhtml`) inside an uploaded deck would have rendered as a live document on our own origin, with script, as whoever opened the link. Every test passed: each checked a listed type, and none asked about a type nobody listed. Found by the 2026-10-17 audit, never used.
+
+**Rule.** Untrusted files get the sandbox on every response; browsers ignore it on non-documents, so there is nothing to choose.
+**Check.** `lib/dexter/headers.test.ts` walks every type, including an unknown one and a file with no extension.
+
 ## Adding to this file
 
 When something breaks that a green build said was fine, it belongs here, numbered next. Four things, short: **what happened, why every gate missed it, the rule, and the one check** — the check is the part that matters. Keep the whole page readable in five minutes.
