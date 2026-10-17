@@ -20,11 +20,7 @@ import { FileText, MoreHorizontal } from "lucide-react";
 import { useState, useTransition } from "react";
 import { ExpenseDialog } from "./expense-dialog";
 
-/**
- * A line's bill and its controls. A salary line belongs to its confirmed
- * run and shows only that; a confirmed line must be marked recorded again
- * before it can be changed or removed (0116's guard says the same).
- */
+/** A line's bill and controls. A salary line belongs to its confirmed run; a confirmed line must be marked recorded again before it can be changed or removed (0116's guard). */
 export function ExpenseRowActions({
   row,
   heads,

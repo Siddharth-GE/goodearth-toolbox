@@ -4,12 +4,7 @@ import { BILLS_BUCKET } from "@/lib/birdwing-books/storage";
 import { idParam } from "@/lib/list-params";
 import { createClient } from "@/lib/supabase/server";
 
-/**
- * Serves one expense bill from the private `birdwing-books` bucket: the row
- * is looked up by id through the RLS-scoped client first, so a path never
- * leaves the server for anyone without /birdwing-books. nosniff: the type
- * is what the row says.
- */
+/** Serves one expense bill from the private bucket. The row is looked up by id through the RLS-scoped client first, so a path never leaves the server for anyone without /birdwing-books. nosniff: the type is what the row says. */
 export async function GET(_request: Request, { params }: { params: Promise<{ fileId: string }> }) {
   const user = await getCurrentUser();
   if (!user) return new Response("Unauthorized", { status: 401 });

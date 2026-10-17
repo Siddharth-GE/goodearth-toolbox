@@ -23,15 +23,7 @@ function ActiveBox({ defaultChecked }: { defaultChecked: boolean }) {
   );
 }
 
-// ---------------------------------------------------------------------
-// Staff and their pay rules
-// ---------------------------------------------------------------------
-
-/**
- * Each person and the rules they are paid by, newest first. A raise is a
- * new rule from its first day — the old one stays, so last year's salaries
- * read last year's rule. No shift means a fixed salary with no overtime.
- */
+/** Each person and their rules, newest first. A raise is a new rule from its first day, so last year's salaries read last year's rule. No shift means a fixed salary. */
 export function StaffSection({
   staff,
   rules,
@@ -276,10 +268,6 @@ function PayRuleFields({ staffId, rule }: { staffId: string; rule?: PayRuleRow }
     </>
   );
 }
-
-// ---------------------------------------------------------------------
-// Expense heads
-// ---------------------------------------------------------------------
 
 export function HeadsSection({ heads }: { heads: HeadRow[] }) {
   return (

@@ -1,15 +1,10 @@
 /**
- * Reading the expenses sheet — the combined workbook's ten columns, pasted
- * or uploaded as CSV — into lines Books can record, each with what is
- * wrong with it in plain words. Pure (lib/csv.ts reads the text).
- *
- *   Month · Category · Description / Staff · Date · Amount (INR) · Remarks ·
- *   Invoice Link · Source Sheet · Source Cell · Review Note
- *
- * The repeat-upload key is `Source Sheet!Source Cell` when the sheet has
- * them (the workbook does, on every line), else the line's own content —
- * so uploading the same sheet twice adds nothing the second time, and a
- * line already in is reported, never overwritten.
+ * Reads the expenses sheet (the combined workbook's ten columns, pasted or CSV) into lines Books
+ * can record, each with what is wrong with it in plain words. Pure (lib/csv.ts reads the text).
+ * Columns: Month · Category · Description / Staff · Date · Amount (INR) · Remarks · Invoice
+ * Link · Source Sheet · Source Cell · Review Note.
+ * The repeat-upload key is `Source Sheet!Source Cell`, else the line's own content, so a second
+ * upload adds nothing and a line already in is reported, never overwritten.
  */
 import { parseCsv } from "@/lib/csv";
 

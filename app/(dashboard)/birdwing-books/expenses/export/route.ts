@@ -2,13 +2,7 @@ import { listExpenses } from "@/lib/birdwing-books/queries";
 import { csvResponse, csvRow } from "@/lib/csv";
 import { todayInIndia } from "@/lib/format";
 
-/**
- * A month's expense lines as a CSV for reading in a spreadsheet, in the
- * workbook's own ten columns. An imported line keeps its old sheet and
- * cell; a line made here has none — so this file is for reading, not for
- * uploading back (a line made here would come in twice).
- * listExpenses enforces the /birdwing-books grant.
- */
+/** A month's expense lines as CSV for reading, in the workbook's ten columns. Lines made here have no old sheet and cell, so uploading this back would add them twice. listExpenses enforces the grant. */
 export async function GET(request: Request) {
   const raw = new URL(request.url).searchParams.get("month") ?? "";
   const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(raw) ? raw : todayInIndia().slice(0, 7);

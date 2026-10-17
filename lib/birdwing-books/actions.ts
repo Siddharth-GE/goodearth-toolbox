@@ -1,7 +1,6 @@
 "use server";
 
-// Type-only imports, never re-exported from a "use server" file — the
-// 2026-08-03 outage rule, enforced by npm run check:actions.
+// Type-only imports, never re-exported from a "use server" file (npm run check:actions).
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { dbErrorMessage } from "@/lib/db-error";
@@ -14,13 +13,9 @@ import { ATTENDANCE_STATUSES, GRANT, oneOf } from "./shared";
 import { readAmount, readExpenseUpload, type UploadLine } from "./upload";
 
 /**
- * Writes for Birdwing Books — expense lines and their upload, attendance,
- * and confirming a month's salary. Settings (staff, pay rules, heads) are
- * settings-actions.ts, admin only; bills are files-actions.ts.
- *
- * Every action opens with requireTool and revalidates the layout. The
- * guards in 0116 refuse in plain English (a confirmed line, a salary
- * line, a closed month); those sentences pass through.
+ * Writes for Birdwing Books: expense lines and their upload, attendance, confirming a salary.
+ * Settings are settings-actions.ts (admin only), bills files-actions.ts. The 0116 guards refuse
+ * in plain English (confirmed line, salary line, closed month); those sentences pass through.
  */
 
 const GUARD_PHRASES = [
@@ -42,10 +37,6 @@ function fromDb(error: { message: string; code?: string }, fallback: string): Ac
 }
 
 const FIRST_OF_MONTH = /^\d{4}-\d{2}$/;
-
-// ---------------------------------------------------------------------
-// Expense lines
-// ---------------------------------------------------------------------
 
 function readExpenseForm(formData: FormData) {
   const month = text(formData, "accounting_month");
@@ -139,10 +130,6 @@ export async function deleteExpense(expenseId: string): Promise<ActionState> {
   return undefined;
 }
 
-// ---------------------------------------------------------------------
-// The upload — preview, then add what is new
-// ---------------------------------------------------------------------
-
 export type PreviewLine = UploadLine & { state: "new" | "already" | "problem" };
 export type UploadPreview = { error?: string; lines?: PreviewLine[] };
 
@@ -163,17 +150,12 @@ async function readUpload(csv: string): Promise<UploadPreview> {
   };
 }
 
-/** What an upload would do — nothing is written. */
 export async function previewExpenseUpload(csv: string): Promise<UploadPreview> {
   await requireTool(GRANT);
   return readUpload(csv);
 }
 
-/**
- * Adds the new lines only: a line already in (same sheet and cell) is
- * skipped and never overwritten, a line with a problem is left out. The
- * file is read again here — the browser's preview is never trusted.
- */
+/** Adds the new lines only: a line already in (same sheet and cell) is skipped, never overwritten. The file is read again here; the browser's preview is never trusted. */
 export async function commitExpenseUpload(
   csv: string,
 ): Promise<{ error?: string; added?: number; skipped?: number; refused?: number }> {
@@ -218,10 +200,6 @@ export async function commitExpenseUpload(
     refused: preview.lines.filter((line) => line.state === "problem").length,
   };
 }
-
-// ---------------------------------------------------------------------
-// Attendance
-// ---------------------------------------------------------------------
 
 const TIME = /^\d{2}:\d{2}$/;
 
@@ -309,16 +287,10 @@ export async function markAllPresent(onDate: string): Promise<ActionState> {
   return undefined;
 }
 
-// ---------------------------------------------------------------------
-// Confirming a salary
-// ---------------------------------------------------------------------
-
 /**
- * The figures are worked out HERE, again, from attendance, the pay rule
- * and occupancy — the screen sends only who, which month, and the
- * reviewer's incentives, deductions and note. The database sums the
- * total and writes the run and its one expense line together; a second
- * press returns the first.
+ * Figures are worked out HERE again from attendance, pay rule and occupancy; the screen sends
+ * only who, which month and the reviewer's incentives, deductions and note. The database writes
+ * the run and its one expense line together; a second press returns the first.
  */
 export async function confirmSalary(
   staffId: string,

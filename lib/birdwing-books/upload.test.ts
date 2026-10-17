@@ -1,7 +1,4 @@
-/**
- * Reading the expenses sheet: the workbook's own columns and date forms,
- * and the repeat-upload key that makes a second upload add nothing.
- */
+/** The expenses sheet's columns and date forms, and the repeat-upload key that makes a second upload add nothing. */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

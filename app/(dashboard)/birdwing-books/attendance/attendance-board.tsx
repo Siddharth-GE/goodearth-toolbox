@@ -41,12 +41,7 @@ const TONE: Record<AttendanceStatus, string> = {
   absent: "bg-danger/10 text-danger",
 };
 
-/**
- * Today first — the morning's one job on a phone, each person a row of
- * big buttons — then the month, staff down the side and days across, for
- * putting a day right. Any day opens its status, times and note. A month
- * whose salary is confirmed is closed for that person (0116 holds it).
- */
+/** Today first (the morning's one job on a phone), then the month grid for putting a day right. A month whose salary is confirmed is closed for that person (0116 holds it). */
 export function AttendanceBoard({
   staff,
   days,

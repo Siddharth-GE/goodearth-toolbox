@@ -1,8 +1,4 @@
-/**
- * Birdwing Books' vocabulary — the database's CHECK lists and the words a
- * person reads for each. Import-free: "use server" files and client
- * components import it.
- */
+/** Birdwing Books' vocabulary: the database's CHECK lists and the words a person reads for each. Import-free, so "use server" files and client components can import it. */
 
 export const GRANT = "/birdwing-books";
 
@@ -41,7 +37,6 @@ export function oneOf<T extends string>(list: readonly T[], value: unknown): T |
     : null;
 }
 
-/** "YYYY-MM" → "October 2026". */
 export function monthLabel(month: string): string {
   return new Date(`${month.slice(0, 7)}-01T00:00:00Z`).toLocaleDateString("en-IN", {
     month: "long",
@@ -50,14 +45,12 @@ export function monthLabel(month: string): string {
   });
 }
 
-/** "YYYY-MM" stepped by whole months. */
 export function shiftMonth(month: string, by: number): string {
   const [year, mon] = month.slice(0, 7).split("-").map(Number);
   const at = new Date(Date.UTC(year, mon - 1 + by, 1));
   return at.toISOString().slice(0, 7);
 }
 
-/** Every day of a "YYYY-MM" month, as YYYY-MM-DD. */
 export function daysOfMonth(month: string): string[] {
   const [year, mon] = month.slice(0, 7).split("-").map(Number);
   const count = new Date(Date.UTC(year, mon, 0)).getUTCDate();
