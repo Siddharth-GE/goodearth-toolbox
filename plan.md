@@ -379,7 +379,7 @@ The founder: the app is "Toolbox by Kaadal" under the Kaadal K; Goodearth stays 
 
 # Tenth piece — transmittals the design team can use (2026-10-17)
 
-The design team's first day on staging (2026-10-16: six transmittals issued on Villas 1, 26, 40 and 41, two drafts) came back as four points: the transmittal number cannot be changed; the revision number cannot be changed; "only Sheet 9 is being uploaded"; the transmittal sheet shows only the drawing set's name. The data shows the workaround: set names carrying the Excel number, revision and date ("Transmittal - 018 - Plot 26 - Plumbing Layout R0- 15102026"), and the team's own Excel cover sheet uploaded as one of the sheets (Villa 26 sheet 1, Villa 40 sheet 5). Planned by `[Opus]` at the founder's request — `MODELS.md` gives planning to Fable, so the migration still waits for a Fable review. Branch `feature/design-management`, migration `0122`.
+The design team's first day on staging (2026-10-16: six transmittals issued on Villas 1, 26, 40 and 41, two drafts) came back as four points: the transmittal number cannot be changed; the revision number cannot be changed; "only Sheet 9 is being uploaded" — the founder: "in a drawing set only 9 sheets are getting uploaded when there are almost 30-40"; the transmittal sheet shows only the drawing set's name. The data shows the workaround: set names carrying the Excel number, revision and date ("Transmittal - 018 - Plot 26 - Plumbing Layout R0- 15102026"), and the team's own Excel cover sheet uploaded as one of the sheets (Villa 26 sheet 1, Villa 40 sheet 5). Planned by `[Opus]` at the founder's request — `MODELS.md` gives planning to Fable, so the migration still waits for a Fable review. Branch `feature/design-management`, migration `0122`.
 
 ## The founder's decision (2026-10-17)
 
@@ -404,18 +404,28 @@ The design team's first day on staging (2026-10-16: six transmittals issued on V
 **3. Every sheet by its name — on screen and on the cover sheet** (no migration)
 
 - A sheet's **title** is the name its file was uploaded under, less the extension ("Plot 41,42 - Plinth beam Layout") — already stored as `file_name`, so no column. Renaming a title is not in this build.
-- **The cover sheet**: the set, its revision, the stage and _What changed_ in the header block; then **one row per sheet** — # · Sheet (code) · Title · Rev. Today it has one row per set with a count, which is what "only the drawing set name" describes — and very likely "only Sheet 9": Villa 41's TR-0002 shows its set with **9** in the Sheets column. Issued transmittals get the new layout too (the PDF is built on demand).
+- **The cover sheet**: the set, its revision, the stage and _What changed_ in the header block; then **one row per sheet** — # · Sheet (code) · Title · Rev. Today it has one row per set with a count, which is what "only the drawing set name" describes. A forty-sheet set runs onto a second page, and is rendered and looked at that way (BUGCATCHER #8's forty-rows case). Issued transmittals get the new layout too (the PDF is built on demand).
 - **On screen** — the draft workspace, an issued transmittal, and Supervisors' drawings (through `lib/drawings/`, which already returns `fileName`): each sheet shows its title, with the name it downloads under beneath it, small. Today only the download name shows, so a sheet uploaded as "Plinth beam Layout" with code 9 reads as `…-DRAFT-9.pdf`.
 
-**4. Pick every sheet at once** (no migration)
+**4. A set of 30–40 sheets goes up in one go**
 
-- **Choose sheets** takes one file or many. They line up in a short list: each with its title, a code box filled with the next free number (1, 2, 3 … after the highest number there — what the team typed by hand on every set), and a ×. A code can be changed (GFP) before **Upload 9 sheets**.
-- Each file still goes up on its own request — the 4 MB cap per file stays (Design Management's `PLAN.md` never raises it) — one after another, saying "Uploading 3 of 9". A refused file says why, by name, and the rest carry on. On day one the nine Villa 41 sheets went up one at a time, each code typed.
-- The next-free-number rule is a pure helper with tests.
+What was checked (2026-10-17): **nothing in the toolbox stops a set at 9.** The database took sheets 10–40 on Villa 1's draft from a single-grant `/design-management` person under RLS (a rolled-back trial); every file in the `drawings` bucket has its row, so no upload died half-way; the error log has nothing since 13 October. Both sets that stop at 9 (Villa 1's ARCHITECTURE-GFC draft, Villa 41's Foundation detail) stopped without a crash — so the 10th sheet was refused with a message on screen, or never tried. The screen refuses a sheet for three reasons: over 4 MB, not a PDF/JPG/PNG, or a code already used.
+
+_4a — many at once_ (no migration)
+
+- **Choose sheets** takes one file or forty. They line up in a short list: each with its title, a code box filled with the next free number (1, 2, 3 … after the highest number there — what the team typed by hand on every set), and a ×. A code can be changed (GFP) before **Upload 40 sheets**.
+- Each file still goes up on its own request, one after another, saying "Uploading 12 of 40". A refused file stays in the list with its reason, by name, and the rest carry on — so a set can never quietly stop part-way.
+- The next-free-number rule is a pure helper with tests. Day one's nine Villa 41 sheets took seven minutes, one at a time, each code typed.
+
+_4b — sheets over 4 MB_ (`0122`) — **only if the designer saw "over 4 MB"** (the question below)
+
+- Design Management's `PLAN.md` names the escape hatch: a PDF over 4 MB goes **straight to Storage**. The action checks the grant, the draft and the code, then asks Storage (through the RLS client, so the bucket's insert policy still decides) for a one-time upload address for one path; the browser sends the file there with a plain `fetch` — no Supabase client in the browser, the red line holds; a second action reads what landed (size, type), writes the row, and removes the object if anything is wrong.
+- `0122` raises the `drawings` bucket's `file_size_limit` from 4 MB to 50 MB (Supabase's ceiling on the free plan). Photos keep going through the server, which resizes them.
+- A `SECURITY.md` line for the one-time upload address, and Fable's review of it with `0122`.
 
 ## Open — for the founder to ask the designer
 
-- If "only Sheet 9 is being uploaded" means **a revision should send only the changed sheet** (sheet 9 at R1, the others staying at R0), that reverses decision 5 ("each time a full set gets to site to avoid confusion", 2026-09-27) and moves the revision from the set to each sheet. That is a build of its own, not this one.
+- **What did the screen say when the 10th sheet would not go up?** "Over 4 MB" → 4b is in this build. Nothing, or they stopped — 4a alone answers it. A code already used → 4a's numbering answers it.
 
 ## Steps
 
@@ -425,7 +435,7 @@ The design team's first day on staging (2026-10-16: six transmittals issued on V
 - [ ] `[Opus]` Apply to staging; `db:check`, `db:check-views`; types unchanged (no new column).
 - [ ] `[Opus]` The revision field and `setDraftRevisionNumber`.
 - [ ] `[Sonnet]` The cover sheet one row per sheet, the PDF's file name, titles on the three screens. Rendered from staging's Villa 41 TR-0002 (nine sheets) and looked at (BUGCATCHER #8).
-- [ ] `[Opus]` Choose sheets, many at once.
+- [ ] `[Opus]` Choose sheets, many at once (4a). Then 4b if the designer's answer calls for it — its bucket change rides in `0122`, so the answer comes before `0122` is reviewed.
 - [ ] `[Opus]` prettier, lint, typecheck, tests, `next build`, `check:actions`; every changed `select` run at staging's PostgREST.
 - [ ] `[Opus]` Docs: Design Management's `PLAN.md` (decisions 8–10, the number rule, the guard table), `STATUS.md` (migrations), `TODO.md`.
 - [ ] `[Fable]` Approval pass, or the founder's word; pull request to `staging`; CI green; merge.
@@ -437,8 +447,8 @@ Staging is becoming the real database, so this checklist issues nothing — an i
 
 1. **Villa 41 → TR-0002 → Cover sheet (PDF)**: all nine sheets listed, each with its code and title; the file is named `Goodearth-Transmittal-Villa41-TR-0002.pdf`.
 2. **Villa 40 → New transmittal → Structural → Foundation Layout → Revise to R1.** On the draft, set Revision to **0** — refused, in a sentence. Set **3** — saved; the label reads R3.
-3. **Choose sheets** → pick three PDFs at once → they line up as 1, 2, 3 with their titles. Change one code to GFP. **Upload 3 sheets** → "Uploading 2 of 3", then each is listed by title with its download name beneath.
-4. Pick a file over 4 MB with two others — it is refused by name; the other two go up.
+3. **Choose sheets** → pick a whole real set at once (30 or more PDFs) → they line up as 1, 2, 3 … with their titles. Change one code to GFP. **Upload** → "Uploading 12 of 30 …", then each is listed by title with its download name beneath — all of them.
+4. Pick a file over 4 MB with two others — with 4b it goes up like the rest; without it, it stays in the list with its reason and the other two go up.
 5. **Delete the draft** (bottom of the page): nothing issued, nothing burned.
 6. **Supervisors → Villa 41 → Drawings**: each sheet shows its title.
 7. After the team's next real issue: it reads **TB-000n**, and its cover sheet lists every sheet.
