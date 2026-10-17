@@ -1,4 +1,4 @@
--- 0122 — Transmittals the design team can use
+-- 0124 — Transmittals the design team can use
 --
 -- FOUNDER, 2026-10-17, after the design team's first day on staging:
 --
@@ -146,7 +146,7 @@ begin
     raise exception 'A revision''s villa and drawing set never change.';
   end if;
 
-  -- The number (0122): the designer's while draft, and only above every
+  -- The number (0124): the designer's while draft, and only above every
   -- other revision of this set on this villa, so none is ever re-used or
   -- undercut. Fixed for good once the revision has gone to site.
   if new.revision_no is distinct from old.revision_no then
@@ -181,7 +181,7 @@ begin
     return new;
   end if;
   if old.status = 'draft' and new.status = 'released' then
-    -- The release gate (0093, widened by 0122): the drawings are a
+    -- The release gate (0093, widened by 0124): the drawings are a
     -- WorkDrive link or an uploaded sheet; a change needs its reason.
     if new.drawings_url is null
        and not exists (
@@ -309,7 +309,7 @@ begin
   end loop;
 
   -- Minted here and nowhere else — per villa (0092), as the toolbox's
-  -- own series (0122: TB, so it is never mistaken for the Excel one).
+  -- own series (0124: TB, so it is never mistaken for the Excel one).
   -- greatest() because lpad TRUNCATES a string longer than its target —
   -- lpad('12345', 4) is '1234' (0019).
   insert into transmittal_counters (scope, last_no)
@@ -383,7 +383,7 @@ begin
   if not exists (
     select 1 from pg_constraint where conname = 'drawing_revisions_drawings_url_shape'
   ) then
-    raise exception '0122: the drawings_url shape check is missing';
+    raise exception '0124: the drawings_url shape check is missing';
   end if;
 
   -- The new table: RLS on, three policies, exactly one SELECT, site kept
@@ -393,25 +393,25 @@ begin
     where n.nspname = 'public' and c.relname = 'drawing_revision_folder_sheets'
       and c.relrowsecurity
   ) then
-    raise exception '0122: drawing_revision_folder_sheets is missing or has RLS off';
+    raise exception '0124: drawing_revision_folder_sheets is missing or has RLS off';
   end if;
   select count(*) into v from pg_policies
     where schemaname = 'public' and tablename = 'drawing_revision_folder_sheets';
   if v <> 3 then
-    raise exception '0122: drawing_revision_folder_sheets has % policies, expected 3', v;
+    raise exception '0124: drawing_revision_folder_sheets has % policies, expected 3', v;
   end if;
   select count(*) into v from pg_policies
     where schemaname = 'public' and tablename = 'drawing_revision_folder_sheets'
       and cmd = 'SELECT' and qual like '%/supervisors%' and qual like '%draft%';
   if v <> 1 then
-    raise exception '0122: drawing_revision_folder_sheets needs exactly one SELECT policy that keeps site off drafts';
+    raise exception '0124: drawing_revision_folder_sheets needs exactly one SELECT policy that keeps site off drafts';
   end if;
   if exists (
     select 1 from pg_policies
     where schemaname = 'public' and tablename = 'drawing_revision_folder_sheets'
       and cmd in ('UPDATE', 'ALL')
   ) then
-    raise exception '0122: drawing_revision_folder_sheets must have no UPDATE policy';
+    raise exception '0124: drawing_revision_folder_sheets must have no UPDATE policy';
   end if;
   foreach t in array array[
     'drawing_revision_folder_sheets_draft_only', 'audit_drawing_revision_folder_sheets'
@@ -422,43 +422,43 @@ begin
       where tgname = t and tgrelid = 'drawing_revision_folder_sheets'::regclass
         and not tgisinternal and tgenabled <> 'D'
     ) then
-      raise exception '0122: the % trigger is missing or disabled', t;
+      raise exception '0124: the % trigger is missing or disabled', t;
     end if;
   end loop;
 
   if position('new.drawings_url is null' in v_guard) = 0
      or position('old.drawings_url' in v_guard) = 0 then
-    raise exception '0122: the guard is missing the link gate or the link freeze';
+    raise exception '0124: the guard is missing the link gate or the link freeze';
   end if;
   if position('v_top' in v_guard) = 0 then
-    raise exception '0122: the guard is missing the movable-number rule';
+    raise exception '0124: the guard is missing the movable-number rule';
   end if;
   if position('new.released_at' in v_guard) = 0 then
-    raise exception '0122: the guard lost the released_at freeze (0091 Fable review)';
+    raise exception '0124: the guard lost the released_at freeze (0091 Fable review)';
   end if;
   if not exists (
     select 1 from pg_trigger
     where tgname = 'drawing_revisions_guard' and not tgisinternal and tgenabled <> 'D'
   ) then
-    raise exception '0122: the drawing_revisions_guard trigger is missing or disabled';
+    raise exception '0124: the drawing_revisions_guard trigger is missing or disabled';
   end if;
 
   if position('''TB-''' in v_issue) = 0 or position('''TR-''' in v_issue) > 0 then
-    raise exception '0122: issue_transmittal does not mint TB';
+    raise exception '0124: issue_transmittal does not mint TB';
   end if;
   if position('r.drawings_url is null' in v_issue) = 0 then
-    raise exception '0122: issue_transmittal is missing the link gate';
+    raise exception '0124: issue_transmittal is missing the link gate';
   end if;
   if position('v_unit_id::text' in v_issue) = 0 then
-    raise exception '0122: issue_transmittal lost the per-villa mint (0092)';
+    raise exception '0124: issue_transmittal lost the per-villa mint (0092)';
   end if;
   if position('drawing_revision_folder_sheets'
        in pg_get_functiondef('delete_draft_revision(uuid)'::regprocedure)) = 0 then
-    raise exception '0122: delete_draft_revision does not clear the kept list';
+    raise exception '0124: delete_draft_revision does not clear the kept list';
   end if;
 
   if has_function_privilege('anon', 'public.issue_transmittal(uuid)', 'execute')
      or has_function_privilege('anon', 'public.delete_draft_revision(uuid)', 'execute') then
-    raise exception '0122: anon can execute a Design Management function';
+    raise exception '0124: anon can execute a Design Management function';
   end if;
 end $$;

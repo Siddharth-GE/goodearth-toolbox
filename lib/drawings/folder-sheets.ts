@@ -4,7 +4,7 @@ import { fetchAll } from "@/lib/supabase/fetch-all";
 import type { createClient } from "@/lib/supabase/server";
 
 /**
- * A revision's WorkDrive folder, as the toolbox last read it (0122): the
+ * A revision's WorkDrive folder, as the toolbox last read it (0124): the
  * list kept in `drawing_revision_folder_sheets` — read on the draft,
  * read once more on Issue, fixed from then on. It is what the cover sheet
  * prints and what site sees, whatever later happens in the folder.

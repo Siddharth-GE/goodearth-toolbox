@@ -224,9 +224,9 @@ export type DrawingRevisionRow = {
   status: "draft" | "released" | "superseded";
   note: string | null;
   releasedAt: string | null;
-  /** Sheets uploaded before 0122 — none on a revision started since. */
+  /** Sheets uploaded before 0124 — none on a revision started since. */
   files: DrawingRevisionFileRow[];
-  /** The WorkDrive share link of this revision's folder (0122). */
+  /** The WorkDrive share link of this revision's folder (0124). */
   drawingsUrl: string | null;
   /** That folder's sheets as the toolbox last read them. */
   folderSheets: FolderSheet[];
@@ -536,7 +536,7 @@ export async function listVillaDrawingSetStates(unitId: string): Promise<VillaDr
   const countableIds = revisions
     .filter((revision) => revision.status !== "superseded")
     .map((revision) => revision.id);
-  // Uploaded sheets (before 0122) and a folder's kept list both count.
+  // Uploaded sheets (before 0124) and a folder's kept list both count.
   const [files, folderSheets] =
     countableIds.length > 0
       ? await Promise.all([
@@ -667,9 +667,9 @@ export type TransmittalLineRow = {
   revisionNo: number;
   revisionStatus: "draft" | "released" | "superseded";
   revisionNote: string | null;
-  /** Sheets uploaded before 0122. */
+  /** Sheets uploaded before 0124. */
   files: DrawingRevisionFileRow[];
-  /** The WorkDrive share link (0122), if the revision carries one. */
+  /** The WorkDrive share link (0124), if the revision carries one. */
   drawingsUrl: string | null;
   /** Its folder's sheets — as last read on a draft, as kept on Issue once issued. */
   folderSheets: FolderSheet[];

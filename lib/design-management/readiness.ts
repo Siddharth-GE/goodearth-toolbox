@@ -3,7 +3,7 @@
  * BEFORE the press (2026-09-27 audit: Issue was trial and error, its
  * refusal a line of small print in the header).
  *
- * A mirror, not the rule. `issue_transmittal` (0093, widened by 0122)
+ * A mirror, not the rule. `issue_transmittal` (0093, widened by 0124)
  * decides, and its refusal still reaches the screen verbatim; this only
  * reads the same three conditions off data the page already has, in the
  * same order, so the line under the title and the database never name
@@ -21,9 +21,9 @@ export type ReadinessLine = {
   setName: string;
   revisionNo: number;
   revisionStatus: "draft" | "released" | "superseded";
-  /** Sheets uploaded before 0122. */
+  /** Sheets uploaded before 0124. */
   fileCount: number;
-  /** A WorkDrive share link (0122) — the drawings, whatever the folder holds. */
+  /** A WorkDrive share link (0124) — the drawings, whatever the folder holds. */
   hasLink: boolean;
   note: string | null;
 };

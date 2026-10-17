@@ -66,9 +66,9 @@ export type ReleasedDrawingSet = {
     note: string | null;
     releasedAt: string;
   };
-  /** Sheets uploaded before 0122; a revision since carries a link instead. */
+  /** Sheets uploaded before 0124; a revision since carries a link instead. */
   files: ReleasedDrawingFile[];
-  /** The WorkDrive share link the revision went out with (0122), if any. */
+  /** The WorkDrive share link the revision went out with (0124), if any. */
   drawingsUrl: string | null;
   /** That folder's sheets as the toolbox kept them on Issue. */
   folderSheets: FolderSheet[];

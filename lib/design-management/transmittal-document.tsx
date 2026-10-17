@@ -7,7 +7,7 @@ import type { TransmittalDetail, TransmittalLineRow } from "./queries";
 /**
  * The transmittal cover sheet, on the company letterhead.
  *
- * It is a COVER SHEET and not the drawings: since 0122 the drawings are a
+ * It is a COVER SHEET and not the drawings: since 0124 the drawings are a
  * WorkDrive folder, printed here as its link, and before that they were
  * PDFs forwarded beside it. What this page has to answer is "which
  * drawings, at which revision, went out on which date, at which design

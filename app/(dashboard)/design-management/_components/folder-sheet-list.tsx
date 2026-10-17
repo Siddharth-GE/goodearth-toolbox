@@ -3,7 +3,7 @@ import { formatShortDate } from "@/lib/format";
 import { FileText } from "lucide-react";
 
 /**
- * A WorkDrive folder's sheets as the toolbox read them (0122): numbered,
+ * A WorkDrive folder's sheets as the toolbox read them (0124): numbered,
  * by name, with the day each last changed in WorkDrive. The files are
  * opened in WorkDrive through the folder's link, never from here.
  */

@@ -28,7 +28,7 @@ import {
  * time a full set gets to site to avoid confusion". The stage and the set
  * are chosen when the transmittal starts and never change here (0099), so
  * a draft is only: the note for site, the revision, what changed, the
- * drawings — since 0122 a WorkDrive link whose folder the toolbox reads —
+ * drawings — since 0124 a WorkDrive link whose folder the toolbox reads —
  * and Issue. An issued one is the record: what went out, when and by
  * whom, the link and the sheets the folder held, and the cover sheet.
  */

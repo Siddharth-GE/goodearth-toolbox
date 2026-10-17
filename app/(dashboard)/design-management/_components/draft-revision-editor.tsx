@@ -62,7 +62,7 @@ export function DraftRevisionEditor({
 }
 
 /**
- * The revision number, the designer's while draft (0122; founder,
+ * The revision number, the designer's while draft (0124; founder,
  * 2026-10-17): a set the team had at R2 in Excel starts here at R3. The
  * database refuses a number at or below one the set already used, and its
  * sentence shows under the field.
@@ -148,7 +148,7 @@ function NoteField({
 }
 
 /**
- * The drawings: the share link of this revision's WorkDrive folder (0122;
+ * The drawings: the share link of this revision's WorkDrive folder (0124;
  * founder, 2026-10-17: "lets not get into file handling"). Using a link
  * reads the folder there and then, so the count and the names show before
  * anything else; Read again picks up a sheet added in WorkDrive since.
@@ -253,7 +253,7 @@ function DrawingsField({
 }
 
 /**
- * Sheets uploaded before 0122, on a draft started then. They go to site
+ * Sheets uploaded before 0124, on a draft started then. They go to site
  * with it unless taken off; nothing new is uploaded any more.
  */
 function UploadedSheets({ files }: { files: DrawingRevisionRow["files"] }) {

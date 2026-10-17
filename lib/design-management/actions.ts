@@ -397,7 +397,7 @@ export async function setDrawingRevisionWorks(
 
 /**
  * The revision number, the designer's while the revision is a draft
- * (0122; founder, 2026-10-17): a set the team had at R2 in Excel starts
+ * (0124; founder, 2026-10-17): a set the team had at R2 in Excel starts
  * here at R3. The guard refuses a number at or below one the set already
  * used on this villa, and any change once it has gone to site — its
  * sentence ("Pick a number above R2 …") is passed through.
@@ -430,7 +430,7 @@ export async function setDraftRevisionNumber(
 }
 
 /**
- * The drawings, as a WorkDrive share link (0122; founder, 2026-10-17:
+ * The drawings, as a WorkDrive share link (0124; founder, 2026-10-17:
  * "lets not get into file handling … they paste a link of our drive").
  * Saving it reads the folder straight away, so the designer sees the
  * count and the names before anything else. An empty link takes the link
@@ -516,7 +516,7 @@ export async function readDraftFolder(revisionId: string): Promise<ActionState> 
 
 /**
  * Reads the folder and replaces the draft's kept list with what it holds
- * (0122: delete, then insert — the table has no UPDATE policy). On a
+ * (0124: delete, then insert — the table has no UPDATE policy). On a
  * failed read nothing is touched, so the last good list stays. Not an
  * action: its callers gate and revalidate.
  */
@@ -572,7 +572,7 @@ async function keepFolderList(
  * Starts a transmittal: one villa, one stage, one drawing set — that
  * set's next revision, whose full set of sheets goes to site together
  * (founder, 2026-09-27: "one transmittal contains only one stage … so
- * each time a full set gets to site"), since 0122 as a WorkDrive link.
+ * each time a full set gets to site"), since 0124 as a WorkDrive link.
  *
  * The person picks the stage, then either a set of THAT stage already on
  * this villa or a new name. 0099 refuses a set of another stage and a
@@ -813,7 +813,7 @@ export async function issueTransmittal(transmittalId: string): Promise<ActionSta
   const user = await requireTool(GRANT);
   const supabase = await createClient();
 
-  // 0122: the folder is read once more, so the list kept with the record
+  // 0124: the folder is read once more, so the list kept with the record
   // is what the folder held when it went to site. A read that fails keeps
   // the last good list (or none) and never stops the issue — the link
   // itself is the drawings.

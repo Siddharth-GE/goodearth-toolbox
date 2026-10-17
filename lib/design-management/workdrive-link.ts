@@ -1,5 +1,5 @@
 /**
- * A revision's drawings, as a Zoho WorkDrive share link (0122).
+ * A revision's drawings, as a Zoho WorkDrive share link (0124).
  *
  * Founder, 2026-10-17: "lets not get into file handling, new transmittal
  * is created and they paste a link of our drive into it" — the drive is
@@ -28,7 +28,7 @@ export type ParsedLink = { ok: true; linkId: string; url: string } | { ok: false
  * The link as pasted → its id and the address the server may fetch,
  * REBUILT from the id. The pasted text itself is never fetched, so a
  * typed address can never make the server call anywhere but Zoho's share
- * host. The database checks the same shape (0122).
+ * host. The database checks the same shape (0124).
  */
 export function parseWorkDriveLink(input: string): ParsedLink {
   const text = input.trim();

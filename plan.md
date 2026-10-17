@@ -379,7 +379,7 @@ The founder: the app is "Toolbox by Kaadal" under the Kaadal K; Goodearth stays 
 
 # Tenth piece — transmittals the design team can use (2026-10-17)
 
-The design team's first day on staging (2026-10-16: six transmittals issued on Villas 1, 26, 40 and 41, two drafts) came back as four points: the transmittal number cannot be changed; the revision number cannot be changed; "only Sheet 9 is being uploaded" — the founder: "in a drawing set only 9 sheets are getting uploaded when there are almost 30-40"; the transmittal sheet shows only the drawing set's name. The data shows the workaround: set names carrying the Excel number, revision and date ("Transmittal - 018 - Plot 26 - Plumbing Layout R0- 15102026"), and the team's own Excel cover sheet uploaded as one of the sheets (Villa 26 sheet 1, Villa 40 sheet 5). Planned by `[Opus]` at the founder's request — `MODELS.md` gives planning to Fable, so the migration still waits for a Fable review. Branch `feature/design-management`, migration `0122`.
+The design team's first day on staging (2026-10-16: six transmittals issued on Villas 1, 26, 40 and 41, two drafts) came back as four points: the transmittal number cannot be changed; the revision number cannot be changed; "only Sheet 9 is being uploaded" — the founder: "in a drawing set only 9 sheets are getting uploaded when there are almost 30-40"; the transmittal sheet shows only the drawing set's name. The data shows the workaround: set names carrying the Excel number, revision and date ("Transmittal - 018 - Plot 26 - Plumbing Layout R0- 15102026"), and the team's own Excel cover sheet uploaded as one of the sheets (Villa 26 sheet 1, Villa 40 sheet 5). Planned by `[Opus]` at the founder's request — `MODELS.md` gives planning to Fable, so the migration still waits for a Fable review. Branch `feature/design-management`, migration `0124`.
 
 ## The founder's decisions (2026-10-17)
 
@@ -391,21 +391,21 @@ The team rule that comes with decision 2, which the toolbox cannot enforce: **on
 
 ## What it does
 
-**1. TB numbers** (`0122`)
+**1. TB numbers** (`0124`)
 
 - `issue_transmittal()` restated whole from `0093`, one change: `'TB-'` for `'TR-'`. Its grants restated (`revoke … from public, anon`; `grant … to authenticated`).
 - The six already issued keep `TR-0001`/`TR-0002` — an issued transmittal never changes (`0092`'s precedent). Villa 41's next is `TB-0003`.
 - The cover sheet's file name gains the villa: `Goodearth-Transmittal-Villa41-TB-0003.pdf` — a per-villa number is unique only with it.
 - `sheet-name.ts` (the names of sheets uploaded before) takes the number as given; its tests and comments move to TB.
 
-**2. The revision number is the designer's to set, while draft** (`0122`)
+**2. The revision number is the designer's to set, while draft** (`0124`)
 
 - On a draft transmittal, beside _What changed_: **Revision R[ n ]**, saved on leaving the field like the note. Any number above every revision the set already has on this villa — a set the team had at R2 in Excel starts here at R3. A number that went to site is never re-used or undercut.
 - `drawing_revisions_guard` restated whole from `0093`, one change: `revision_no` may move while the revision is a draft, and only above the set's other revisions on that villa; the refusal names the highest one ("Pick a number above R2 — R2 has already been used for this set."). Released or superseded, it stays frozen. The unique `(unit_id, drawing_set_id, revision_no)` still settles a race.
 - `setDraftRevisionNumber(revisionId, n)` in `actions.ts`: `requireTool`, a whole number 0–99, the database's sentence on refusal, `revalidatePath("/design-management", "layout")`.
 - R1 and above still need _What changed_ before Issue (`0093`): a set brought in at R3 says what changed since the Excel R2.
 
-**3. The WorkDrive link replaces the upload** (`0122`)
+**3. The WorkDrive link replaces the upload** (`0124`)
 
 - `drawing_revisions.drawings_url text` — a Zoho WorkDrive address only: a CHECK in the database on the shape (`^https://workdrive\.zohoexternal\.com/external/[0-9a-f]{64}$`), and a pure `parseWorkDriveLink` with tests on the screen's side, which trims it, finds the link's id, and says plainly what is wrong. A folder's own WorkDrive address (`workdrive.zoho.com/…`) is refused with "Paste the folder's share link — the one anyone can view": site could not open it without a Zoho login. The team's links are **`https://workdrive.zohoexternal.com/external/<64 hex>`** — an "anyone can view" link to a folder, on Zoho's `.com` servers (the founder's real one, 2026-10-17). Frozen with the note once the revision leaves draft (the guard's freeze list gains it).
 - The release gate (`0093`'s "no drawing without a file", founder 2026-08-22) becomes **a WorkDrive link or an uploaded sheet**, in both places it lives: the guard's draft → released check and `issue_transmittal`'s pre-check, which names the set ("… has no WorkDrive link — paste the folder's link before issuing"). `readiness.ts` mirrors it; its tests follow.
@@ -413,7 +413,7 @@ The team rule that comes with decision 2, which the toolbox cannot enforce: **on
 - **What was uploaded stays.** The six issued transmittals keep their sheets, opened and downloaded as today (the files route, `lib/drawings/sheet-name.ts`). The two drafts (Villas 1 and 41, ARCHITECTURE-GFC) keep theirs, each still removable; either can issue with its sheets, a link, or both.
 - Every link out opens in a new tab with `rel="noreferrer"`.
 
-**4. The toolbox reads the folder: the count and every sheet's name, automatically** (`0122`)
+**4. The toolbox reads the folder: the count and every sheet's name, automatically** (`0124`)
 
 The founder: "is there a way that an uploaded link autocounts and extracts the name etc to make the transmittal list?" — and, Goodearth having no Zoho API access: "i can view the folder without zoho access … can u help me out?" Yes: **the toolbox reads the link exactly as a browser does, with no key and no Zoho account.** Everything in section 3 works without it.
 
@@ -437,8 +437,8 @@ What was checked before the upload was dropped (2026-10-17): nothing in the tool
 - [x] Founder — one real link (2026-10-17).
 - [ ] Founder — approve this plan.
 - [x] `[Opus]` The spike: the founder's link read with plain Node, no key — the folder's name and both files (above).
-- [ ] `[Opus]` `0122` — the TB mint, the movable draft number, `drawings_url`, the gate "a link or a sheet", `drawing_revision_folder_sheets` — and `scripts/trials/design-links-as-designer.sql`, dry-run on staging as a single-grant `/design-management` person and a single-grant `/supervisors` person under RLS: Issue mints TB; a draft with a link and no upload issues, one with neither is refused; a non-WorkDrive address is refused; the link and the kept list never change once issued; a supervisor sees a released revision's list and never a draft's; the draft's number moves up only. Proved to bite: with the TR mint, without the "above" check, and without the draft-only trigger on the new table, it fails.
-- [ ] `[Fable]` Review `0122` — a new table and its policies, a guard trigger, and a function's grants restated. Or the founder's word to skip it for staging, with `[Opus]` reviewing in its place.
+- [ ] `[Opus]` `0124` — the TB mint, the movable draft number, `drawings_url`, the gate "a link or a sheet", `drawing_revision_folder_sheets` — and `scripts/trials/design-links-as-designer.sql`, dry-run on staging as a single-grant `/design-management` person and a single-grant `/supervisors` person under RLS: Issue mints TB; a draft with a link and no upload issues, one with neither is refused; a non-WorkDrive address is refused; the link and the kept list never change once issued; a supervisor sees a released revision's list and never a draft's; the draft's number moves up only. Proved to bite: with the TR mint, without the "above" check, and without the draft-only trigger on the new table, it fails.
+- [ ] `[Fable]` Review `0124` — a new table and its policies, a guard trigger, and a function's grants restated. Or the founder's word to skip it for staging, with `[Opus]` reviewing in its place.
 - [ ] `[Opus]` Apply to staging; `db:check`, `db:check-views`; types regenerated (`db:types:staging`).
 - [ ] `[Opus]` The draft workspace: the revision field, the WorkDrive link with `parseWorkDriveLink`, `readiness.ts`; the upload goes.
 - [ ] `[Opus]` `workdrive.ts` and the folder read: the list on the draft, the kept list at Issue, link-only whenever the read fails. Pure parts (the id from a link, the page's fields, Zoho's answer to rows, name ordering) tested against a saved copy of the real answers. A `SECURITY.md` line: the server fetches only an address it rebuilt from the link's id.

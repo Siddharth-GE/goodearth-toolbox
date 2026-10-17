@@ -107,7 +107,7 @@ export default async function VillaPage({ params }: { params: Promise<{ plotId: 
                       Released {formatDate(set.revision.releasedAt)}
                     </p>
                   </div>
-                  {/* Since 0122 the drawings are a WorkDrive folder: one
+                  {/* Since 0124 the drawings are a WorkDrive folder: one
                       button opens it, and the sheets it held when issued
                       are listed by name so site can count them. */}
                   {set.drawingsUrl && (

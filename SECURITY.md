@@ -27,6 +27,14 @@ The app's one unauthenticated POST (`app/api/google-chat/route.ts`). Everything 
 - **The app's own credential may do one thing.** `GOOGLE_CHAT_SERVICE_ACCOUNT_KEY` lets `outbound.ts` rewrite a card the app itself posted, after a press. It never touches the database, mints a session or moves a baton. Unset, the door behaves as before.
 - **Nothing logs message text, an email, a token or a session id.** No replay table yet — Google's token `exp` and the single-use magic link cover it; a deferral, not a decision.
 
+## Design Management reads a WorkDrive folder
+
+A revision's drawings are a Zoho WorkDrive "anyone can view" share link (`0124`), and the server reads the shared folder's list the way its public page does (`lib/design-management/workdrive.ts`) — no Zoho key exists, and none is needed.
+
+- **The server fetches only Zoho's share host, at an address it rebuilt.** `parseWorkDriveLink` takes the id out of what was pasted and builds `https://workdrive.zohoexternal.com/external/<id>`; the pasted text is never fetched, so a typed address cannot make the server call anywhere else. The database checks the stored link's shape too.
+- **Names, sizes and times only — never a file.** The viewing cookies Zoho hands any visitor live for one read and are never stored or logged; nor is Zoho's answer.
+- **The kept list has the uploaded sheets' reach**: one SELECT policy, the design team or `/supervisors` once released; writes `/design-management`, while draft only (the draft-only trigger).
+
 ## Dexter's public door
 
 A client opens `/deck/<token>/index.html` and sees an uploaded presentation.

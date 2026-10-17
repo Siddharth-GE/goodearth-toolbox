@@ -1,4 +1,4 @@
--- Behaviour trial for 0122 — TB numbers, the designer's revision number,
+-- Behaviour trial for 0124 — TB numbers, the designer's revision number,
 -- the WorkDrive link and the kept folder list. Runs inside the dry-run
 -- transaction; always rolled back.
 --
@@ -8,7 +8,7 @@
 -- run as the database owner proves no policy and no guard (BUGCATCHER #19).
 --
 --   npx tsx scripts/dry-run-migrations.ts --project ipstebqawrvhkyntctrv \
---     supabase/migrations/0122_*.sql --trial scripts/trials/design-links-as-designer.sql
+--     supabase/migrations/0124_*.sql --trial scripts/trials/design-links-as-designer.sql
 do $trial$
 declare
   v_designer uuid := (select id from auth.users where email = 'siddharth.cyriac.99@gmail.com');

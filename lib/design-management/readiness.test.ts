@@ -1,6 +1,6 @@
 /**
  * The ready-to-issue line mirrors issue_transmittal's three refusals
- * (0093, widened by 0122), in the same order. If the migration's order
+ * (0093, widened by 0124), in the same order. If the migration's order
  * ever changes, these tests are the place that should break first.
  */
 import assert from "node:assert/strict";
@@ -29,7 +29,7 @@ test("an R0 with a WorkDrive link and no note is ready", () => {
   assert.deepEqual(transmittalReadiness([line()]), { ready: true, problem: null });
 });
 
-test("an R0 with uploaded sheets and no link is ready, as before 0122", () => {
+test("an R0 with uploaded sheets and no link is ready, as before 0124", () => {
   assert.equal(transmittalReadiness([line({ hasLink: false, fileCount: 9 })]).ready, true);
 });
 

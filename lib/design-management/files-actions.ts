@@ -11,7 +11,7 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
 // ---------------------------------------------------------------------
-// Drawing revision files — sheets uploaded before 0122
+// Drawing revision files — sheets uploaded before 0124
 // ---------------------------------------------------------------------
 //
 // Nothing uploads a sheet any more (founder, 2026-10-17: "lets not get
