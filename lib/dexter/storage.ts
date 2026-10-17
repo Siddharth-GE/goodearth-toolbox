@@ -1,8 +1,5 @@
-/**
- * The `dexter` bucket name, standing alone — the lib/design-management/
- * storage.ts shape: a neutral module both a "use server" file and a route
- * handler can import without dragging either's machinery along.
- */
+// Standalone so a "use server" file and a route handler can import it without the other's
+// machinery.
 export const DEXTER_BUCKET = "dexter";
 
 /** Every deck's objects live under this folder: decks/<deckId>/<relative path>. */

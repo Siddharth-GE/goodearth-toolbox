@@ -27,11 +27,6 @@ import { formatDate, formatTime } from "@/lib/format";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-/**
- * A deck's saved answers: a badge in the row that opens the answers,
- * field by field, with a Clear button. Plain useState booleans, not
- * useTransition — see the note at the top of deck-actions.tsx.
- */
 export function DeckAnswers({
   deck,
 }: {

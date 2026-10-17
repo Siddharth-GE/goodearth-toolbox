@@ -17,16 +17,8 @@ import { Pencil } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-/**
- * Rename and delete for the project header. `renameProject` takes plain
- * arguments rather than a FormData action, so this reads the form by
- * hand on submit rather than using useActionState — the same shape as
- * lib/design-management's inline edits.
- *
- * Plain useState booleans rather than useTransition: router.refresh()
- * inside an async transition leaves isPending true for as long as the
- * refresh is in flight (the Relay schedule-editor bug).
- */
+// renameProject takes plain arguments, so the form is read by hand on submit. Plain useState, not
+// useTransition (router.refresh() leaves isPending true).
 export function ProjectHeaderActions({
   project,
   deckCount,
@@ -80,8 +72,7 @@ export function ProjectHeaderActions({
           <DialogHeader>
             <DialogTitle>Rename this project</DialogTitle>
           </DialogHeader>
-          {/* Inside DialogContent, which Radix unmounts on close, so every
-              open starts from the saved values with no stale error. */}
+          {/* Radix unmounts DialogContent on close, so every open starts from the saved values. */}
           <RenameProjectForm
             projectId={project.id}
             name={project.name}

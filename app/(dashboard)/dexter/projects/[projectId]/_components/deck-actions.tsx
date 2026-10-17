@@ -52,15 +52,8 @@ export type DexterDeckActionRow = {
   answers: unknown | null;
 };
 
-/**
- * Every per-deck action, in one dropdown: open, copy, rename, replace
- * the file, toggle the link, issue a new one, delete.
- *
- * Plain useState booleans rather than useTransition throughout — a
- * router.refresh() inside an async transition leaves isPending true for
- * as long as the refresh is in flight, which greys the row out and never
- * comes back (the Relay schedule-editor bug).
- */
+// Plain useState, not useTransition: router.refresh() inside an async transition leaves isPending
+// true and greys the row out for good.
 export function DeckActions({ deck }: { deck: DexterDeckActionRow }) {
   const router = useRouter();
   const path = `/deck/${deck.shareToken}/${deck.entryPath}`;
@@ -184,8 +177,7 @@ export function DeckActions({ deck }: { deck: DexterDeckActionRow }) {
           <DialogHeader>
             <DialogTitle>Rename this deck</DialogTitle>
           </DialogHeader>
-          {/* Inside DialogContent, which Radix unmounts on close, so every
-              open starts from the saved title with no stale error. */}
+          {/* Radix unmounts DialogContent on close, so every open starts from the saved title. */}
           <RenameDeckForm
             deckId={deck.id}
             title={deck.title}

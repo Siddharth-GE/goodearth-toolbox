@@ -1,22 +1,8 @@
-/**
- * Pure logic for a deck's saved answers: the reserved file names the
- * viewer serves beside a deck, the shape and limits of what the browser
- * may send, and how a saved answer reads on the staff screen.
- *
- * Deliberately import-free — this is read by `lib/dexter/actions.ts`
- * ("use server", where the whole module must stay lean) AND by
- * `app/deck/[token]/[[...path]]/route.ts` (a public route with no
- * session), so it cannot depend on either's machinery. Every exported
- * name here is part of that shared contract — do not rename one without
- * updating the route.
- */
+// Import-free on purpose: read by actions.ts ("use server") and by the public deck route, which has
+// no session. Renaming an export breaks the route. The browser is untrusted, so what it may send is
+// capped and validated here.
 
-// ---------------------------------------------------------------------
-// Reserved names and limits
-// ---------------------------------------------------------------------
-
-// Both begin with a dot, so `planZip` can never put a file of either name
-// inside a deck — the viewer is free to answer them itself.
+// Both start with a dot, so planZip can never put a file of either name inside a deck.
 export const DEXTER_SCRIPT_PATH = ".dexter.js";
 export const DEXTER_STATE_PATH = ".state";
 
@@ -32,15 +18,10 @@ export const ANSWER_LIMITS = {
   listItemLength: 500,
 } as const;
 
-// ---------------------------------------------------------------------
-// Validation
-// ---------------------------------------------------------------------
-
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** One answer's value is a short string, a boolean, or a short list of short strings. */
 function isAnswerValue(value: unknown): value is AnswerValue {
   if (typeof value === "string") return value.length <= ANSWER_LIMITS.textLength;
   if (typeof value === "boolean") return true;
@@ -57,7 +38,6 @@ function isAnswerName(name: string): boolean {
   return name.trim() !== "" && name.length <= ANSWER_LIMITS.nameLength;
 }
 
-/** JSON text from the browser → a clean payload, or one plain-English error. */
 export function parseAnswers(
   text: string,
 ): { fields: AnswerFields; submitted: boolean } | { error: string } {
@@ -98,7 +78,7 @@ export function parseAnswers(
   return { fields, submitted: body.submitted === true };
 }
 
-/** jsonb from the database → the same shape, dropping anything that isn't (a row written before a rule changed). */
+// Drops anything off-shape (a row written before a rule changed).
 export function readAnswerFields(value: unknown): AnswerFields {
   if (!isPlainObject(value)) return {};
   const fields: AnswerFields = {};
@@ -108,11 +88,6 @@ export function readAnswerFields(value: unknown): AnswerFields {
   return fields;
 }
 
-// ---------------------------------------------------------------------
-// Display
-// ---------------------------------------------------------------------
-
-/** For the staff dialog: true → "Yes", false → "No", a list → "a, b", a string as is. */
 export function formatAnswer(value: AnswerValue): string {
   if (value === true) return "Yes";
   if (value === false) return "No";

@@ -12,10 +12,6 @@ import {
   previewTags,
 } from "./preview";
 
-// ---------------------------------------------------------------------
-// parseCssColor
-// ---------------------------------------------------------------------
-
 test("parseCssColor reads every hex length and drops alpha", () => {
   assert.equal(parseCssColor("#abc"), "#aabbcc");
   assert.equal(parseCssColor("#ABCD"), "#aabbcc");
@@ -60,10 +56,6 @@ test("parseCssColor takes the first colour in a gradient", () => {
   assert.equal(parseCssColor("linear-gradient(#521323, #180b0f)"), "#521323");
   assert.equal(parseCssColor("linear-gradient(to right, white, #180b0f)"), "#ffffff");
 });
-
-// ---------------------------------------------------------------------
-// deckBackgroundColor
-// ---------------------------------------------------------------------
 
 test("deckBackgroundColor reads theme-color in either attribute order and quote style", () => {
   assert.equal(deckBackgroundColor(`<meta name="theme-color" content="#521323">`), "#521323");
@@ -164,10 +156,6 @@ test("deckBackgroundColor returns null when nothing names a colour", () => {
   assert.equal(deckBackgroundColor(`<style>body { background: url(x.jpg) }</style>`), null);
 });
 
-// ---------------------------------------------------------------------
-// previewMarkColor
-// ---------------------------------------------------------------------
-
 test("previewMarkColor returns every brand-approved pairing", () => {
   const pairs: Record<string, string> = {
     "#be904c": "#ffffff",
@@ -197,10 +185,6 @@ test("previewMarkColor falls back to white or ink when neither brand colour reac
   assert.equal(previewMarkColor("#727272"), "#ffffff");
 });
 
-// ---------------------------------------------------------------------
-// latin1ToUtf8
-// ---------------------------------------------------------------------
-
 test("latin1ToUtf8 turns a byte-per-char string back into real text", () => {
   const title = "Café — വീട്";
   const asLatin1 = Array.from(new TextEncoder().encode(title), (b) => String.fromCharCode(b)).join(
@@ -210,10 +194,6 @@ test("latin1ToUtf8 turns a byte-per-char string back into real text", () => {
   assert.equal(latin1ToUtf8(asLatin1), title);
   assert.equal(latin1ToUtf8("plain"), "plain");
 });
-
-// ---------------------------------------------------------------------
-// pageTitle
-// ---------------------------------------------------------------------
 
 test("pageTitle reads the first title and decodes entities", () => {
   assert.equal(
@@ -239,10 +219,6 @@ test("pageTitle is null for a missing or empty title", () => {
   assert.equal(pageTitle("<title>   </title>"), null);
   assert.equal(pageTitle("<title></title>"), null);
 });
-
-// ---------------------------------------------------------------------
-// previewTags
-// ---------------------------------------------------------------------
 
 test("previewTags produces the exact block", () => {
   assert.equal(
@@ -271,10 +247,6 @@ test("previewTags output is pure printable ASCII", () => {
   assert.match(tags, /^[\x20-\x7e\n]*$/);
 });
 
-// ---------------------------------------------------------------------
-// canInjectPreviewTags
-// ---------------------------------------------------------------------
-
 test("canInjectPreviewTags refuses UTF-16 and allows everything else", () => {
   assert.equal(canInjectPreviewTags(new Uint8Array([0xff, 0xfe, 0x3c])), false);
   assert.equal(canInjectPreviewTags(new Uint8Array([0xfe, 0xff, 0x00])), false);
@@ -282,10 +254,6 @@ test("canInjectPreviewTags refuses UTF-16 and allows everything else", () => {
   assert.equal(canInjectPreviewTags(new Uint8Array([])), true);
   assert.equal(canInjectPreviewTags(new Uint8Array([0xff])), true);
 });
-
-// ---------------------------------------------------------------------
-// injectPreviewTags
-// ---------------------------------------------------------------------
 
 const TAGS = `<meta name="x" content="y">`;
 const BLOCK = `\n${TAGS}\n`;

@@ -7,10 +7,6 @@ function body(fields: unknown, submitted?: unknown): string {
   return JSON.stringify(submitted === undefined ? { fields } : { fields, submitted });
 }
 
-// ---------------------------------------------------------------------
-// parseAnswers
-// ---------------------------------------------------------------------
-
 test("parseAnswers accepts a string, a boolean and a list of strings", () => {
   const result = parseAnswers(body({ a: "hello", b: true, c: false, d: ["x", "y"], e: [] }));
   assert.deepEqual(result, {
@@ -88,10 +84,6 @@ test("parseAnswers refuses a list that is too long or has a long item", () => {
   assert.ok("error" in parseAnswers(body({ a: ["x".repeat(ANSWER_LIMITS.listItemLength + 1)] })));
 });
 
-// ---------------------------------------------------------------------
-// readAnswerFields
-// ---------------------------------------------------------------------
-
 test("readAnswerFields keeps good entries and drops the rest", () => {
   const read = readAnswerFields({
     a: "text",
@@ -114,10 +106,6 @@ test("readAnswerFields returns an empty object for anything that is not an objec
   assert.deepEqual(readAnswerFields(["a"]), {});
   assert.deepEqual(readAnswerFields(5), {});
 });
-
-// ---------------------------------------------------------------------
-// formatAnswer
-// ---------------------------------------------------------------------
 
 test("formatAnswer reads each kind in plain English", () => {
   assert.equal(formatAnswer(true), "Yes");

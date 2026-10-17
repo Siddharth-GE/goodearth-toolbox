@@ -19,13 +19,8 @@ import { useState } from "react";
 
 import { sendUpload } from "./send-upload";
 
-/**
- * `uploadDeck` takes `(projectId, formData)` rather than the
- * `(prevState, formData)` shape useActionState expects, so this reads
- * the form by hand on submit — the same pattern
- * app/(dashboard)/design-management/_components/draft-revision-editor.tsx
- * uses for uploadDrawingRevisionFile.
- */
+// uploadDeck takes (projectId, formData), not useActionState's (prevState, formData), so the form
+// is read by hand on submit.
 export function UploadDeckDialog({ projectId }: { projectId: string }) {
   const [open, setOpen] = useState(false);
 
@@ -38,8 +33,7 @@ export function UploadDeckDialog({ projectId }: { projectId: string }) {
         <DialogHeader>
           <DialogTitle>Upload a deck</DialogTitle>
         </DialogHeader>
-        {/* Inside DialogContent, which Radix unmounts on close, so every
-            open starts with a clean form and no stale error. */}
+        {/* Radix unmounts DialogContent on close, so every open starts clean. */}
         <UploadDeckForm projectId={projectId} onDone={() => setOpen(false)} />
       </DialogContent>
     </Dialog>
