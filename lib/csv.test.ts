@@ -1,8 +1,3 @@
-/**
- * Written BEFORE the Selections CSV route was refactored onto this
- * module, so that change is provably a no-op: every rule below is the
- * behaviour that route already had.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -15,14 +10,12 @@ test("every cell is quoted, and quotes inside it are doubled", () => {
 });
 
 test("a formula-looking cell is defused with a leading quote", () => {
-  // Excel would otherwise evaluate these. "-- spare --" is a real item
-  // name; =HYPERLINK is the injection an attacker would try.
+  // Excel would evaluate these; =HYPERLINK is the injection to stop.
   assert.equal(csvCell("-- spare --"), `"'-- spare --"`);
   assert.equal(csvCell('=HYPERLINK("http://x")'), `"'=HYPERLINK(""http://x"")"`);
   assert.equal(csvCell("+91 98470"), `"'+91 98470"`);
   assert.equal(csvCell("@once"), `"'@once"`);
-  // A negative number is a number, and still gets the guard — Excel
-  // reads a quoted "-4" as text either way, so nothing is lost.
+  // A negative number is a number, and still gets the guard.
   assert.equal(csvCell(-4), `"'-4"`);
 });
 
@@ -36,7 +29,6 @@ test("null and undefined are empty, not the word null", () => {
 test("commas and newlines inside a value survive because every cell is quoted", () => {
   const row = csvRow(["Kochi, Kerala", "line one\nline two", 4]);
   assert.equal(row, '"Kochi, Kerala","line one\nline two","4"');
-  // Splitting on commas outside quotes still finds three cells.
   assert.equal(row.split(/,(?=")/).length, 3);
 });
 
@@ -51,9 +43,7 @@ test("safeFilename strips path separators and anything else exotic", () => {
 
 test("the response carries a BOM, CRLF rows and download headers", async () => {
   const response = csvResponse(['"A","B"', '"1","2"'], "Report.csv");
-  // Checked as BYTES: response.text() decodes UTF-8 and strips a leading
-  // BOM, so it cannot tell a file Excel reads correctly from one it
-  // mangles. This is the assertion that would catch a lost BOM.
+  // Checked as bytes: response.text() strips a leading BOM, so it cannot catch a lost one.
   const bytes = new Uint8Array(await response.arrayBuffer());
   assert.deepEqual([...bytes.slice(0, 3)], [0xef, 0xbb, 0xbf], "no BOM — Excel mangles non-ASCII");
   assert.equal(Buffer.from(bytes).toString("utf8").slice(1), '"A","B"\r\n"1","2"');

@@ -1,12 +1,4 @@
-/**
- * Database error → sentence rules.
- *
- * Worth pinning because the two modes replaced seven private copies: the
- * guard-phrase mode (a trigger's refusal passes through, anything else is
- * hidden behind the fallback) and the pass-everything mode. An empty
- * message must never come back as an empty error, which a form reads as
- * success.
- */
+// An empty message must never come back as an empty error: a form reads that as success.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

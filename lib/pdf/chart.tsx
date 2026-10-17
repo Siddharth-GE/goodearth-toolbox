@@ -1,23 +1,6 @@
 /**
- * A chart, for paper — drawn with react-pdf's own primitives from the
- * SAME tested ChartModel the screen renders (lib/charts/series.ts).
- *
- * **This replaces the planned Recharts → renderToStaticMarkup → sharp
- * pipeline, on evidence:** recharts@3 renders an empty wrapper <div>
- * under renderToStaticMarkup — its SVG mounts only in a live browser —
- * so the SVG string the plan wanted to rasterise does not exist. (The
- * plan's verification checked that the APIs exist; frame zero of a
- * chart that draws after mount is still empty.) Drawing from the model
- * directly is smaller than it sounds because every hard part — series,
- * palette slots, null handling, magnitude splits, "Other" folding — is
- * already done by the pure, tested shaping. What lives here is print
- * geometry only. It also removes the two risks the plan itself flagged:
- * no sharp rasterisation (vector output, crisp at any zoom) and no
- * librsvg font roulette on Vercel — text is the document's Helvetica.
- *
- * Paper has no tooltips, so values are DIRECT-LABELLED on the marks —
- * which is also what the palette's relief rule asks for. Bars carry
- * their value at the data end; lines label first, peak and last.
+ * A chart for paper, drawn with react-pdf primitives from the same ChartModel the screen renders (lib/charts/series.ts).
+ * Not Recharts: under renderToStaticMarkup it renders an empty wrapper. Paper has no tooltips, so marks carry direct value labels.
  */
 
 import { Path, Polyline, StyleSheet, Svg, Text, View } from "@react-pdf/renderer";
@@ -42,7 +25,6 @@ function printValue(value: number | null, money: boolean): string {
   return money ? formatAmount(value) : formatQuantity(value);
 }
 
-/** The largest absolute value on the chart — the scale's whole story. */
 function chartMax(points: ChartPoint[], seriesIds: string[], stacked: boolean): number {
   let max = 0;
   for (const point of points) {
@@ -71,10 +53,6 @@ function Legend({ model }: { model: CartesianModel }) {
     </View>
   );
 }
-
-// ---------------------------------------------------------------------
-// Horizontal bars — rows read like a ranked table, ideal on paper
-// ---------------------------------------------------------------------
 
 const HBAR_TRACK = 300;
 
@@ -158,10 +136,6 @@ function HorizontalBars({ model }: { model: CartesianModel }) {
   );
 }
 
-// ---------------------------------------------------------------------
-// Line / area — an Svg polyline; react-pdf draws these natively
-// ---------------------------------------------------------------------
-
 const LINE_W = 500;
 const LINE_H = 130;
 
@@ -179,8 +153,7 @@ function LineArea({ model }: { model: CartesianModel }) {
       <Legend model={model} />
       <Svg width={LINE_W} height={LINE_H + 14}>
         {model.series.map((series) => {
-          // Null is a GAP: split into runs, one polyline per run, so a
-          // missing month never draws as a fabricated slope to zero.
+          // Null is a gap: one polyline per run, never a slope to zero.
           const runs: { x: number; value: number }[][] = [];
           let run: { x: number; value: number }[] = [];
           model.points.forEach((point, index) => {
@@ -234,10 +207,6 @@ function LineArea({ model }: { model: CartesianModel }) {
   );
 }
 
-// ---------------------------------------------------------------------
-// Meter — the same CSS-style bar the screen draws, in print colours
-// ---------------------------------------------------------------------
-
 function Meter({ model }: { model: MeterModel }) {
   return (
     <View>
@@ -262,11 +231,7 @@ function Meter({ model }: { model: MeterModel }) {
   );
 }
 
-/**
- * The chart block of a report document. Vertical bar forms render as
- * horizontal on paper — every category keeps a readable label, which a
- * portrait A4's width cannot promise vertical bars.
- */
+/** The chart block of a report: vertical bars print horizontal so every label stays readable on portrait A4. */
 export function PdfChart({ model }: { model: ChartModel }) {
   if (model.kind === "empty") return null;
   if (model.kind === "meter") {

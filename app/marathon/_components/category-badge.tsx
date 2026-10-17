@@ -1,9 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-// Static lookup, not a template literal — Tailwind can only see class names
-// that appear literally in source, so `bg-${color}-100` would silently be
-// dropped from the production build.
+// Static lookup: Tailwind only sees class names written literally in source.
 const COLOR_CLASSES: Record<string, string> = {
   green: "bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-300",
   blue: "bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300",

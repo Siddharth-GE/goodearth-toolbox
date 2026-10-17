@@ -2,23 +2,12 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 
+// Service-role client: the kiosk has no Supabase user (its own PIN login), so RLS cannot scope it; each function does.
 export async function getMarathonHome() {
   const supabase = createAdminClient();
 
-  // Every run's entry count comes from marathon_run_counts() (0072) —
-  // Postgres does the GROUP BY, in one query, and the run's name comes
-  // back with it, so there is no separate marathon_runs read any more.
-  //
-  // This used to be one exact count per run inside a .map, and that was
-  // already the careful version: the one before it fetched every entry row
-  // and called .length, which on race day would have frozen the per-run
-  // breakdown at PostgREST's 1,000-row ceiling while the total beside it
-  // kept climbing — two numbers on the same screen contradicting each
-  // other, on the only day this screen matters. PostgREST cannot express a
-  // GROUP BY, so doing it properly needed a database function.
-  //
-  // A run with no entries still comes back, at zero: the kiosk lists the
-  // runs, and a missing row would read as a missing run, not an empty one.
+  // Counts come from marathon_run_counts() (0072): one GROUP BY, not row fetches that stop at PostgREST's 1,000-row
+  // ceiling. A run with no entries still comes back, at zero.
   const [
     { data: config },
     { data: counts, error: countsError },
@@ -28,16 +17,13 @@ export async function getMarathonHome() {
   ] = await Promise.all([
     supabase.from("marathon_config").select("event_name").single(),
     supabase.rpc("marathon_run_counts"),
-    // A head-count, not the rows. Fetching every group just to read
-    // .length would silently stop at PostgREST's 1000-row ceiling.
+    // A head-count, not the rows: fetching them would stop at the 1,000-row ceiling.
     supabase.from("marathon_groups").select("id", { count: "exact", head: true }),
     supabase.from("marathon_agents").select("id, name").order("name"),
     supabase.from("marathon_entries").select("id", { count: "exact", head: true }),
   ]);
 
-  // Checked, not shrugged at. A failed read here would otherwise render
-  // every run at zero entries, which on race day is a lie that looks
-  // exactly like a quiet morning.
+  // Checked: a failed read would otherwise show every run at zero.
   if (countsError) {
     throw new Error(`Could not count the entries per run: ${countsError.message}`);
   }
@@ -56,15 +42,7 @@ export async function getMarathonHome() {
   };
 }
 
-/**
- * How many entry rows a list screen will show at most.
- *
- * Deliberately explicit and below PostgREST's implicit 1000-row ceiling,
- * so the limit is a decision this code made rather than one the transport
- * imposed silently. Screens report the true total alongside, and say so
- * when they're showing a subset — a number that quietly stops counting is
- * worse than a smaller number labelled honestly.
- */
+/** Most entry rows a list shows: explicit, below PostgREST's 1,000-row ceiling. Screens report the true total beside it. */
 export const MARATHON_LIST_LIMIT = 500;
 
 export type SavedEntry = {
@@ -78,13 +56,8 @@ export type SavedEntry = {
 export async function getSavedEntry(bib: string, agentId: string): Promise<SavedEntry | null> {
   const supabase = createAdminClient();
 
-  // Scoped to the calling agent: bib arrives from a URL param on the
-  // service-role client, so without this filter any signed-in agent
-  // could read any runner's entry by walking bib numbers.
-  //
-  // The DB returns single objects here (each entry has exactly one
-  // category and one run), but supabase-js can't infer that without
-  // generated types and defaults to typing embeds as arrays.
+  // Scoped to the calling agent: bib comes from a URL on the service-role client, so without this any agent could
+  // read any runner by walking bib numbers. Embeds are single objects, but untyped supabase-js infers arrays.
   const { data, error } = await supabase
     .from("marathon_entries")
     .select("bib, name, tee_size, marathon_categories(name, color), marathon_runs(name)")
@@ -158,8 +131,7 @@ export type AdminEntryFilters = {
 export async function getAdminEntries(filters: AdminEntryFilters = {}) {
   const supabase = createAdminClient();
 
-  // Applied to both the row query and the count query, so "showing 500 of
-  // 1,240 matching" is always true rather than "500 of everything".
+  // On both the row and count queries, so "500 of 1,240 matching" is true.
   const applyFilters = <T extends { eq: (column: string, value: string) => T }>(query: T) => {
     let filtered = query;
     if (filters.runId) filtered = filtered.eq("run_id", filters.runId);
@@ -185,9 +157,7 @@ export async function getAdminEntries(filters: AdminEntryFilters = {}) {
   const rows = (entries ?? []) as unknown as AdminEntry[];
   return {
     entries: rows,
-    // The real number of entries matching the filter, which is what the
-    // screen's headline should report — rows.length is only how many
-    // fitted on the page.
+    // The true matching count; rows.length is only what fitted on the page.
     matchingCount: matchingCount ?? 0,
     grandTotal: grandTotal ?? 0,
     truncated: rows.length === MARATHON_LIST_LIMIT,
@@ -233,10 +203,7 @@ export async function getEntryFormData() {
   return {
     groups: groups ?? [],
     runs: runs ?? [],
-    // gender is a free-text column with a DB check constraint, not a
-    // real Postgres enum, so generated types widen it to `string | null`
-    // — narrowed back here to match the DB's actual constraint, once,
-    // rather than in every component that consumes this data.
+    // gender is free text behind a DB check, so generated types widen it; narrowed once here.
     categories: (categories ?? []) as unknown as EntryFormCategory[],
   };
 }

@@ -1,10 +1,3 @@
-/**
- * Form reading rules.
- *
- * Worth pinning because these helpers replace three identical private
- * copies and two near-identical parsers — the point of one home is that
- * every screen reads a blank, a space and a rupee sign the same way.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

@@ -1,9 +1,4 @@
-/**
- * The one rule worth pinning: an unreadable cookie means "follow the
- * device", never a guessed colour. Someone whose cookie got mangled has
- * to land back on the default, because a person stuck in a theme they
- * cannot see their way out of has no route to the switch either.
- */
+// An unreadable cookie means "follow the device", never a guessed colour.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -43,8 +38,7 @@ test("with no choice made, the device decides", () => {
 });
 
 test("the switch always flips away from what is on screen", () => {
-  // The case that would strand someone: device dark, no choice yet. One
-  // press has to give light, not a no-op back to dark.
+  // Device dark, no choice yet: one press must give light.
   assert.equal(nextTheme(effectiveTheme(undefined, true)), "light");
   assert.equal(nextTheme(effectiveTheme(undefined, false)), "dark");
 });

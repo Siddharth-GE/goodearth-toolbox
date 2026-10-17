@@ -26,8 +26,7 @@ export default async function MarathonAdminEntriesPage({
     getAdminAgents(),
   ]);
 
-  // Drop a category filter that no longer belongs to the selected race
-  // (e.g. left over from before the race filter changed).
+  // Drop a category filter that no longer belongs to the selected race.
   const categories = runFilter
     ? allCategories.filter((c) => c.run_id === runFilter)
     : allCategories;
@@ -48,9 +47,7 @@ export default async function MarathonAdminEntriesPage({
 
       <div className="px-5 pt-5 pb-16">
         <p className="text-muted mb-1 text-sm">{hasFilter ? "Matching" : "Total"} entries</p>
-        {/* The real count, not how many rows fitted on this page — the
-            list is capped, and a headline that quietly stops climbing on
-            race day would be worse than no headline at all. */}
+        {/* The real count, not the rows on this page: the list is capped, and a headline that stops climbing would mislead. */}
         <p className="text-foreground mb-1 text-3xl font-extrabold tracking-tight">
           {matchingCount}
           {hasFilter && <span className="text-muted text-base font-medium"> of {grandTotal}</span>}

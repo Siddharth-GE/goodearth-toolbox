@@ -29,9 +29,7 @@ export async function OperationsPipeline() {
         )}
       </div>
       <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-5">
-        {/* Stage 01 is real. No rupee figure: an indent carries items and
-            quantities, never money — that's a deliberate design decision,
-            so the sub-line says lines instead of inventing a value. */}
+        {/* No rupee figure: an indent carries items and quantities, never money, by design. */}
         <div>
           <p className="text-muted text-[11px] tabular-nums">01</p>
           <p className="text-foreground mt-1.5 text-xs font-medium">Indents raised</p>
@@ -46,10 +44,8 @@ export async function OperationsPipeline() {
           </div>
         </div>
 
-        {/* Stage 02 is real. No rupee figure on purpose: PO money is
-            gated to the /purchase-orders grant, and this card renders
-            for every signed-in user — so it reports drafts in progress
-            instead, through the money-free po_facts view. */}
+        {/* No rupee figure: PO money is gated to /purchase-orders but this card shows for everyone,
+            so it reports drafts via the money-free po_facts view. */}
         <div>
           <p className="text-muted text-[11px] tabular-nums">02</p>
           <p className="text-foreground mt-1.5 text-xs font-medium">POs issued</p>
@@ -69,9 +65,7 @@ export async function OperationsPipeline() {
           </div>
         </div>
 
-        {/* Stage 03 is real. No rupee figure either: Inventory carries
-            no money at all by design, so the sub-line reports how many
-            orders are still waiting on their goods. */}
+        {/* No rupee figure: Inventory carries no money; the sub-line reports orders still awaiting goods. */}
         <div>
           <p className="text-muted text-[11px] tabular-nums">03</p>
           <p className="text-foreground mt-1.5 text-xs font-medium">Goods received</p>
@@ -91,10 +85,7 @@ export async function OperationsPipeline() {
           </div>
         </div>
 
-        {/* Stage 04 is real. No rupee figure on purpose: bill money is
-            gated to the /bills grant, and this card renders for every
-            signed-in user — so it counts through the money-free
-            bill_facts view and reports what's awaiting approval. */}
+        {/* No rupee figure: bill money is gated to /bills, so this counts via the money-free bill_facts view. */}
         <div>
           <p className="text-muted text-[11px] tabular-nums">04</p>
           <p className="text-foreground mt-1.5 text-xs font-medium">Bills booked</p>
@@ -114,8 +105,7 @@ export async function OperationsPipeline() {
           </div>
         </div>
 
-        {/* Stage 05 is real — the tail. Unpaid is the number accounts
-            chases, so it takes the danger colour the illustration used. */}
+        {/* The tail. Unpaid is what accounts chases, so it takes the danger colour. */}
         <div>
           <p className="text-muted text-[11px] tabular-nums">05</p>
           <p className="text-foreground mt-1.5 text-xs font-medium">Paid</p>

@@ -2,16 +2,8 @@ import { type ClassValue, clsx } from "clsx";
 import { extendTailwindMerge } from "tailwind-merge";
 
 /**
- * tailwind-merge knows Tailwind's own scales and nothing else, so the
- * custom names registered in app/globals.css are invisible to it.
- * Measured: `twMerge("shadow-float shadow-none")` returns BOTH classes,
- * which means a caller passing `shadow-none` to a component that already
- * sets `shadow-float` could never turn the shadow off — the last class
- * in the stylesheet would win instead of the last class passed in.
- *
- * So every custom shadow, easing and animation name added to the
- * `@theme inline` block has to be listed here as well, or cn() quietly
- * stops being a merge for that name.
+ * tailwind-merge knows only Tailwind's own scales, so every custom shadow, easing and animation name in
+ * globals.css' `@theme inline` must be listed here, or cn() keeps both classes and a caller can't override.
  */
 const twMerge = extendTailwindMerge({
   extend: {

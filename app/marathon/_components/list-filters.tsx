@@ -29,10 +29,7 @@ export function ListFilters({
   const [runId, setRunId] = useState(initialRun ?? "");
   const [categoryId, setCategoryId] = useState(initialCategory ?? "");
 
-  // Only offer categories that belong to the currently picked race — the
-  // Fun Run only ever has "Open", so the rest would just be noise (and
-  // couldn't match anything). Live, so it updates as soon as Race is
-  // picked, before Filter is even tapped.
+  // Only offer categories of the picked race, live, before Filter is tapped.
   const visibleCategories = runId ? categories.filter((c) => c.run_id === runId) : categories;
 
   function handleRunChange(value: string) {
@@ -69,12 +66,7 @@ export function ListFilters({
         ))}
       </Select>
 
-      {/*
-        Same guard as the registration form: the visible dropdowns above
-        are display-only, and these hidden fields (driven by the same
-        state) are what actually get submitted, so a stray tap on a
-        <select> can't change what's filtered.
-      */}
+      {/* The visible dropdowns are display-only; hidden fields from the same state are what submit. */}
       <input type="hidden" name="group" value={groupId} />
       <input type="hidden" name="run" value={runId} />
       <input type="hidden" name="category" value={categoryId} />

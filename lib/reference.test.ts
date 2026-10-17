@@ -1,10 +1,3 @@
-/**
- * The core every document number in the toolbox mirrors — indents,
- * estimates, GRNs, stock issues, bills and purchase orders each build
- * their reference from these three functions, so their exact behaviour
- * is pinned here once, including the lpad-truncation case where the TS
- * mirror and the SQL mint could silently drift apart.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

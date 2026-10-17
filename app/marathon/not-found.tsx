@@ -2,12 +2,7 @@ import { LinkButton } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FileQuestion } from "lucide-react";
 
-/**
- * The kiosk's own 404. The dashboard's not-found boundary lives inside
- * the (dashboard) route group and cannot serve /marathon, so without
- * this the PIN page's notFound() (a stale or mistyped agent link)
- * dropped to Next's default unstyled screen, outside the kiosk shell.
- */
+/** The kiosk's own 404: the dashboard's boundary lives in its route group and can't serve /marathon. */
 export default function MarathonNotFound() {
   return (
     <EmptyState

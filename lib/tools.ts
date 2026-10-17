@@ -24,11 +24,7 @@ import {
   Warehouse,
 } from "lucide-react";
 
-// Icon references can't cross the Server->Client Component boundary
-// directly (React can only serialize plain data as props, not function/
-// component references) — Sidebar is a Client Component, so Tool.icon
-// stores a lookup key instead, resolved against this map wherever it's
-// actually rendered.
+// Icons are stored as a lookup key: component references can't cross the Server to Client boundary.
 export const TOOL_ICONS = {
   Bed,
   BookOpen,
@@ -54,51 +50,26 @@ export const TOOL_ICONS = {
   Warehouse,
 } satisfies Record<string, LucideIcon>;
 
-// Which heading a tool sits under is not here: the founder arranges
-// teams in Settings → Teams (0114, lib/nav/). A new tool appears under
-// "Other" until it is given one.
+// Teams in Settings (lib/nav/), not this file, decide the sidebar heading; a new tool sits under "Other".
 export type Tool = {
   name: string;
   description: string;
   href: string;
   icon: keyof typeof TOOL_ICONS;
-  // false = the sidebar still links to it, but the route renders the
-  // shared ComingSoon stub (app/(dashboard)/_components/coming-soon.tsx)
-  // instead of a real tool.
+  // false: the sidebar links to it but the route renders the shared ComingSoon stub.
   built: boolean;
-  /**
-   * Shown in AMBER beside this tool's checkbox everywhere it can be
-   * granted (a person's page, the role editor). For the one grant whose
-   * consequence is easy to under-imagine — the founder's requirement
-   * that Settings says it out loud, next to the tick, not in a doc.
-   */
+  /** Shown in amber beside this tool's checkbox wherever it can be granted. */
   grantWarning?: string;
-  /**
-   * Renders the shared catalogue picker or margins browser, so this grant
-   * must reach /api/catalogue. The route derives its allow-list from this
-   * flag: a tool that adopts the picker without setting it fails as an
-   * unparseable fetch inside the dialog, not as a friendly refusal — the
-   * way /inventory once did, when the route kept a hand list.
-   */
+  /** Renders the catalogue picker: /api/catalogue's allow-list is derived from this flag. */
   catalogue?: true;
   /**
-   * Each person sees only the work assigned to them; admins and the tool's
-   * team leads see everyone's (0122). Settings offers the "Team lead" tick
-   * beside exactly these grants. Setting the flag switches nothing on by
-   * itself — the tool's own migration says what "assigned" means for its
-   * rows and narrows its policies with is_lead() (0123 for Client
-   * Relations). SECURITY.md, "Assigned work".
+   * Each person sees only assigned work; admins and team leads see all (0122). The tool's own migration
+   * narrows its policies with is_lead(). SECURITY.md, "Assigned work".
    */
   scoped?: true;
 };
 
-// A tool is visible to admins (always, every tool), and to staff who've
-// been granted it explicitly — see supabase/migrations/0003_user_apps.sql
-// and lib/auth/access.ts. Add an entry here as each tool ships.
-// "Overview" (/) isn't in this list — every signed-in user sees it
-// regardless of grants, so the Sidebar renders it as a pinned item
-// directly. "Settings" is also never grantable — see requireAdmin in
-// lib/auth/access.ts.
+// Admins see every tool; staff see what they are granted (lib/auth/access.ts). Overview and Settings are never grantable.
 export const TOOLS: Tool[] = [
   {
     name: "Estimator",
@@ -145,8 +116,7 @@ export const TOOLS: Tool[] = [
     href: "/purchase-orders",
     icon: "ShoppingCart",
     built: true,
-    // No catalogue flag since 0113: a PO line comes from an indent, never
-    // from the picker, so this grant has no reason to reach /api/catalogue.
+    // No catalogue flag: a PO line comes from an indent, never the picker (0113).
   },
   {
     name: "Inventory",
@@ -199,14 +169,8 @@ export const TOOLS: Tool[] = [
     icon: "Settings",
     built: true,
   },
-  // Relay replaced both the planned Design Management AND
-  // project-management layers when it shipped — but 2026-08-22 revived
-  // Design Management to hold the artefacts Relay deliberately refuses
-  // to store, and since 0126 (founder, 2026-10-17: "build it full forget
-  // relay") it also passes each villa from stage to stage, with people
-  // and actions. Relay keeps whatever trails are filed in it; nothing
-  // links the two. Both slugs stay legal in the database CHECKs (0036 §1
-  // says why).
+  // Relay and Design Management both stay legal slugs in the database CHECKs (0036 §1).
+  // Design Management also passes each villa from stage to stage (0126).
   {
     name: "Relay",
     description: "Who is holding each task, and for how long.",
@@ -235,9 +199,7 @@ export const TOOLS: Tool[] = [
     href: "/reporter",
     icon: "FileChartColumn",
     built: true,
-    // The founder's decision (Reporter PLAN.md, decisions 3 and 4;
-    // policies widened by 0055; Birdwing's views by 0117) and the copy
-    // that decision requires.
+    // Reporter PLAN.md decisions 3 and 4 (policies 0055, Birdwing's views 0117) require this copy.
     grantWarning:
       "Shows all money: every vendor rate, every bill amount, the margin on every quoted line, and Birdwing's stays, guests' bills and expenses.",
   },
@@ -256,9 +218,7 @@ export const TOOLS: Tool[] = [
     href: "/financial-management",
     icon: "Landmark",
     built: true,
-    // The founder's decision (Financial Management PLAN.md; views
-    // restated by 0058; Birdwing's added by 0117) and the copy that
-    // decision requires.
+    // Financial Management PLAN.md (views 0058, Birdwing's 0117) requires this copy.
     grantWarning:
       "Shows the company's full money picture: every client's dues and receipts, every bill's amount, every loan and investor with its terms, and Birdwing's takings and spending.",
   },
@@ -269,9 +229,7 @@ export const TOOLS: Tool[] = [
     icon: "Target",
     built: true,
   },
-  // The Hospitality pair (0115, 0116): Birdwing Farmstay's guest house.
-  // Two tools because the people differ — the caretaker books and bills,
-  // accounts keeps the books. 0115 puts both under a Hospitality team.
+  // The Hospitality pair (0115, 0116): the caretaker books and bills, accounts keeps the books.
   {
     name: "Birdwing Stays",
     description: "Bookings, rooms, invoices and collections at Birdwing Farmstay.",
@@ -289,8 +247,6 @@ export const TOOLS: Tool[] = [
   },
 ];
 
-// Tools a user can actually be granted (Settings manages access, so it
-// isn't itself grantable — only reachable via the admin bypass).
 export const GRANTABLE_TOOLS = TOOLS.filter((tool) => tool.href !== "/settings");
 
 // The grants that may search the catalogue — see Tool.catalogue.

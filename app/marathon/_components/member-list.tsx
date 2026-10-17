@@ -17,9 +17,7 @@ export function MemberList({ agents }: { agents: Agent[] }) {
 
   return (
     <div>
-      {/* No autoFocus — this is a shared kiosk home screen, not a
-          single-purpose field, so the on-screen keyboard shouldn't pop
-          up uninvited when the page loads. */}
+      {/* No autoFocus: the on-screen keyboard should not pop up on a shared kiosk home screen. */}
       {agents.length > 0 && (
         <Input
           value={query}

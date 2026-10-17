@@ -1,9 +1,6 @@
 import { cn } from "@/lib/utils";
 
-// Bolder than category-badge's tint — this card is the runner's hand-off,
-// meant to be glanced at (and eventually printed), not just a small label.
-// Static lookup for the same reason as category-badge: Tailwind can't see
-// dynamically-built class names.
+// Bolder than category-badge: the runner's hand-off. Static class lookup, as Tailwind can't see built class names.
 const CARD_COLOR_CLASSES: Record<string, string> = {
   green: "bg-green-600",
   blue: "bg-blue-600",

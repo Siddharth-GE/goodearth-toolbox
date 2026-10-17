@@ -1,12 +1,4 @@
-/**
- * The rule worth pinning: the last class a caller passes wins, even when
- * the class is one of ours. tailwind-merge ships knowing Tailwind's own
- * scales only, so `shadow-float`, `ease-out-quint` and the `animate-*`
- * names from app/globals.css have to be declared in lib/utils.ts. Without
- * that declaration cn() keeps both classes and a component's shadow or
- * animation can never be overridden from outside — measured, and the
- * reason these four lines exist.
- */
+// The last class a caller passes must win, even a custom one (shadow-float, animate-*) declared in lib/utils.ts.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

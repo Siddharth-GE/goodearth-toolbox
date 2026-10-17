@@ -15,11 +15,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const sections = arrangeTools(visibleTools(user.profile, grantedApps), arrangement);
 
   return (
-    // Column on phones (top bar above content), row from md up (rail
-    // beside content). The rail pins itself with sticky; the page body
-    // is the one scroll container, so anchors and the browser's own
-    // chrome behave normally. min-w-0 keeps a wide table inside main
-    // from stretching the whole row instead of scrolling in place.
+    // Column on phones, row from md up. The page body is the one scroll container;
+    // min-w-0 keeps a wide table scrolling in place.
     <div className="flex min-h-screen flex-col md:flex-row">
       <Sidebar sections={sections} userName={user.profile?.full_name || user.email} />
       <main className="min-w-0 flex-1">

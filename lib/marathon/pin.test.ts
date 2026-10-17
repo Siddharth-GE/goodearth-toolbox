@@ -1,6 +1,3 @@
-/**
- * The kiosk's only auth primitive, on a public URL — worth pinning.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -14,8 +11,7 @@ test("a PIN verifies against its own hash and no other", () => {
 });
 
 test("the same PIN hashes differently each time (per-agent salt)", () => {
-  // Two agents choosing the same PIN must not produce equal rows — a
-  // leaked table should not give away that they match.
+  // Two agents with the same PIN must not produce equal rows.
   const first = hashPin("1234");
   const second = hashPin("1234");
   assert.notEqual(first.hash, second.hash);
@@ -28,8 +24,7 @@ test("a corrupted stored hash fails closed", () => {
 });
 
 test("lockout message rounds up and never says zero minutes", () => {
-  // Math.max(1, …) is the guard being pinned: "try again in 0 minutes"
-  // would invite an immediate (still locked-out) retry.
+  // Math.max(1, …): "try again in 0 minutes" would invite an immediate retry.
   const soon = new Date(Date.now() + 5_000);
   assert.equal(
     lockoutMessage({ lockedUntil: soon }),

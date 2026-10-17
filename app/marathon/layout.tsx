@@ -5,9 +5,6 @@ export const metadata: Metadata = {
 };
 
 export default function MarathonLayout({ children }: { children: React.ReactNode }) {
-  // 480px is deliberate, not arbitrary — Marathon is a single-device
-  // kiosk, so the whole app stays phone-width even on a desktop
-  // browser. See DESIGN.md's Spacing & radius section before reusing
-  // this for a tool that isn't genuinely kiosk-style.
+  // 480px on purpose: Marathon is a single-device kiosk, phone-width on any browser (DESIGN.md, Spacing & radius).
   return <div className="bg-background mx-auto min-h-screen max-w-[480px]">{children}</div>;
 }

@@ -5,13 +5,7 @@ import { Input } from "@/components/ui/input";
 import { resetAgentPin, type PinChangeState } from "@/lib/marathon/actions";
 import { useActionState, useState } from "react";
 
-/**
- * Resets one agent's PIN, inline on the members list.
- *
- * Collapsed until asked for: the common reason to open this screen is to
- * add somebody, not to reset a PIN, and a row of open PIN boxes next to
- * every name invites the wrong one being filled in.
- */
+/** Collapsed until asked for: open PIN boxes beside every name invite filling in the wrong one. */
 export function ResetAgentPin({ agentId, name }: { agentId: string; name: string }) {
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState<PinChangeState, FormData>(

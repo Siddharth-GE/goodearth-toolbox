@@ -46,10 +46,8 @@ export function EntryForm({
 }) {
   const [state, formAction, pending] = useActionState<EntryState, FormData>(createEntry, undefined);
 
-  // Every field is controlled: React resets a form's uncontrolled fields
-  // after any action submission (including a "duplicate, confirm?" reply
-  // that isn't really an error), so an uncontrolled field would visibly
-  // clear right when the agent needs to tap Save a second time.
+  // Fields are controlled: React resets uncontrolled ones after any action, clearing the form
+  // just when the agent must tap Save again.
   const [groupId, setGroupId] = useState("");
   const [name, setName] = useState("");
   const [mobile, setMobile] = useState("");
@@ -59,9 +57,7 @@ export function EntryForm({
   const [teeSize, setTeeSize] = useState("");
 
   const [confirmed, setConfirmed] = useState(false);
-  // Sync `confirmed` from the action's result without an Effect: react to
-  // the state object changing during render, not after commit, so a fresh
-  // duplicate warning always shows the confirm step exactly once.
+  // Sync `confirmed` from the action result during render, so a fresh duplicate warning shows the confirm step once.
   const [handledState, setHandledState] = useState(state);
   if (state !== handledState) {
     setHandledState(state);
@@ -198,10 +194,7 @@ export function EntryForm({
 
       <AnimatedReveal show={Boolean(state?.error)}>
         {state?.error && (
-          // Not FormMessage: this one message is amber for the "already
-          // registered, save anyway?" step and red otherwise, a dual tone
-          // the shared component deliberately doesn't offer. The role is
-          // what matters for a screen reader.
+          // Not FormMessage: amber for the "save anyway?" step, red otherwise. The role matters for screen readers.
           <p
             role="alert"
             className={`text-sm font-medium ${state.duplicate ? "text-warning" : "text-danger"}`}
@@ -211,26 +204,15 @@ export function EntryForm({
         )}
       </AnimatedReveal>
 
-      {/*
-        The four dropdowns above are display-only (no `name`) — what
-        actually gets submitted comes only from React state via these
-        hidden fields. That's deliberate: a stray tap or scroll on a
-        <select> right before saving must never change the bib category
-        that gets recorded. State already drives the live preview above,
-        so the agent sees exactly what these fields will submit.
-      */}
+      {/* The dropdowns are display-only (no name); hidden fields from React state are what submit,
+          so a stray tap on a <select> cannot change the recorded bib category. */}
       <input type="hidden" name="group" value={groupId} />
       <input type="hidden" name="gender" value={gender} />
       <input type="hidden" name="teeSize" value={teeSize} />
       <input type="hidden" name="run" value={runId} />
       {confirmed && <input type="hidden" name="confirmed" value="1" />}
 
-      {/*
-        Sticky, not fixed: stays pinned to the bottom of the viewport as
-        the form scrolls (registering a runner is the single most-repeated
-        action in the app), but still sits inside normal document flow so
-        it doesn't need extra bottom padding tricks elsewhere on the page.
-      */}
+      {/* Sticky, not fixed: pinned to the viewport bottom yet in normal flow, so no extra padding tricks. */}
       <div className="border-border bg-background/95 sticky bottom-0 -mx-5 border-t px-5 py-3 backdrop-blur">
         <Button type="submit" disabled={pending} className="w-full">
           {pending ? "Saving…" : confirmed ? "Yes, Save Anyway" : "Save & Get Bib"}

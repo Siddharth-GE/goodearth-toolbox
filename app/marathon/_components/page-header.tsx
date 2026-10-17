@@ -1,10 +1,6 @@
 import type { ReactNode } from "react";
 
-// The sticky title-bar treatment proven across Marathon's screens:
-// stays reachable while the rest of the page scrolls underneath, quiet
-// enough not to read as a heavy app-bar. `children` overrides the
-// title/subtitle block for screens that need something other than a
-// plain heading there (e.g. a NavTabs row).
+// Sticky title bar; `children` replaces the title and subtitle block.
 export function PageHeader({
   title,
   subtitle,

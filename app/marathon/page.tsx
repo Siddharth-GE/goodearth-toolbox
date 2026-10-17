@@ -5,10 +5,7 @@ import { HeroCounter } from "./_components/hero-counter";
 import { MemberList } from "./_components/member-list";
 import { copy } from "./_lib/copy";
 
-// This page reads no cookies/searchParams, so Next.js would otherwise
-// treat it as static and prerender it once at build/deploy time —
-// meaning a new agent or updated counts wouldn't show up on the kiosk
-// until the next deploy. Force it to hit the database on every visit.
+// Reads no cookies, so Next would prerender it at build; force a database read on every visit.
 export const dynamic = "force-dynamic";
 
 export default async function MarathonHome() {

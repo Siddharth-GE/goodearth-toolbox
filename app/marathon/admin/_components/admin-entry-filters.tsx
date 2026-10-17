@@ -35,8 +35,7 @@ export function AdminEntryFilters({
   const [categoryId, setCategoryId] = useState(initialCategory ?? "");
   const [agentId, setAgentId] = useState(initialAgent ?? "");
 
-  // Same live-narrowing as the agent's My Entries filter: Category only
-  // offers options that belong to the currently picked Race.
+  // Category only offers options for the picked Race.
   const visibleCategories = runId ? categories.filter((c) => c.run_id === runId) : categories;
 
   function handleRunChange(value: string) {
@@ -81,11 +80,7 @@ export function AdminEntryFilters({
         ))}
       </Select>
 
-      {/*
-        Same guard as the entry form and My Entries: the visible
-        dropdowns are display-only, hidden fields (driven by the same
-        state) are what actually submit.
-      */}
+      {/* The visible dropdowns are display-only; hidden fields from the same state are what submit. */}
       <input type="hidden" name="agent" value={agentId} />
       <input type="hidden" name="group" value={groupId} />
       <input type="hidden" name="run" value={runId} />

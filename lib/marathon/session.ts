@@ -6,8 +6,6 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 
-// The hashing primitives live in ./pin (pure, tested); re-exported here
-// so existing importers keep one place to look for "PIN things".
 import { verifyPinHash } from "./pin";
 export { hashPin, verifyPinHash } from "./pin";
 
@@ -25,6 +23,7 @@ function secret() {
   return value;
 }
 
+// The cookie is HMAC-signed so it cannot be forged to claim another agent or the admin.
 function sign(payload: MarathonSession) {
   const payloadB64 = Buffer.from(JSON.stringify(payload)).toString("base64url");
   const sig = createHmac("sha256", secret()).update(payloadB64).digest("base64url");
@@ -79,8 +78,7 @@ export async function clearMarathonSession() {
   cookieStore.set(COOKIE_NAME, "", { path: COOKIE_PATH, maxAge: 0 });
 }
 
-// Cached per request so multiple reads (layout + page + action) don't
-// re-verify the cookie repeatedly.
+// Cached per request so layout, page and action verify the cookie once.
 export const getMarathonSession = cache(async (): Promise<MarathonSession | null> => {
   const cookieStore = await cookies();
   const token = cookieStore.get(COOKIE_NAME)?.value;
@@ -111,8 +109,6 @@ export async function requireAdminSession() {
   if (!session) redirect("/marathon/admin");
   return session;
 }
-
-// PIN hashing ---------------------------------------------------------------
 
 export async function verifyAdminPin(pin: string) {
   const supabase = createAdminClient();

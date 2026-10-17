@@ -29,9 +29,7 @@ export async function verifyAgentPin(
   const pin = String(formData.get("pin") ?? "").trim();
   if (!pin) return { error: "Enter your PIN." };
 
-  // Checked before the PIN is even looked at, so somebody working through
-  // all 10,000 combinations against this public URL learns nothing from
-  // an attempt made while locked out.
+  // Before the PIN is looked at, so someone trying all 10,000 PINs learns nothing while locked out.
   const locked = await checkLockout(agentId);
   if (locked) return locked;
 
@@ -67,8 +65,7 @@ export async function verifyAdminPinAction(
   const pin = String(formData.get("pin") ?? "").trim();
   if (!pin) return { error: "Enter the admin PIN." };
 
-  // The admin PIN is shared and opens every screen, so it matters more
-  // than any single agent's.
+  // The shared admin PIN opens every screen, so it matters more than any agent's.
   const locked = await checkLockout(ADMIN_TARGET);
   if (locked) return locked;
 
@@ -137,11 +134,7 @@ export async function createGroup(
   redirect("/marathon/admin/groups");
 }
 
-// PINs ----------------------------------------------------------------
-// Both PINs shipped as seeded defaults in migration 0002 — admin 2026 and
-// a test agent on 1234 — and that migration is in version control, on a
-// kiosk URL anyone can reach. They have to be changeable from the app;
-// asking someone to run SQL to rotate a password is how it never happens.
+// The PINs seeded by 0002 are public, so the app must be able to change them.
 
 export type PinChangeState = { error?: string; done?: string } | undefined;
 
@@ -157,8 +150,7 @@ export async function changeAdminPin(
   const next = String(formData.get("newPin") ?? "").trim();
   const confirm = String(formData.get("confirmPin") ?? "").trim();
 
-  // Asked for even though the session already proves admin: a kiosk left
-  // unlocked on a table is the realistic threat, not a stolen cookie.
+  // Asked for even though the session proves admin: an unlocked kiosk left on a table is the real threat.
   if (!(await verifyAdminPin(current))) return { error: "That isn't the current admin PIN." };
   if (!PIN_RULE.test(next)) return { error: "New PIN must be 4 to 6 digits." };
   if (next !== confirm) return { error: "The two new PINs don't match." };
@@ -173,7 +165,6 @@ export async function changeAdminPin(
   if (configError) console.error("admin PIN change config read failed:", configError);
   if (!config) return { error: "Could not read the event settings. Try again." };
 
-  // updated_at is the set_updated_at trigger's job (migration 0016).
   const { error } = await supabase
     .from("marathon_config")
     .update({ admin_pin_hash: hash, admin_pin_salt: salt })
@@ -209,10 +200,7 @@ export async function resetAgentPin(
     return { error: "Could not reset the PIN. Try again." };
   }
 
-  // An agent locked out after ten wrong tries has almost certainly
-  // forgotten their PIN — resetting it should let them straight back in
-  // rather than leaving them waiting out a lockout for a PIN that no
-  // longer exists.
+  // A locked-out agent has likely forgotten their PIN: a reset lets them straight back in.
   await clearFailures(agentId);
   return { done: "PIN reset." };
 }
@@ -255,8 +243,7 @@ export async function createEntry(_state: EntryState, formData: FormData): Promi
     }
   }
 
-  // marathon_create_entry returns a single composite row (not setof), so
-  // PostgREST hands it back as one object here, not an array.
+  // marathon_create_entry returns one composite row, not an array.
   const { data, error } = await supabase.rpc("marathon_create_entry", {
     p_run_id: runId,
     p_group_id: groupId,

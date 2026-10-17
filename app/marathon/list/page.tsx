@@ -27,9 +27,7 @@ export default async function MarathonListPage({
     getEntryFormData(),
   ]);
 
-  // Only offer categories that belong to the selected race — every
-  // category under the Fun Run is "Open", so once a race is picked the
-  // rest would just be noise (and couldn't match anything anyway).
+  // Only offer categories of the selected race: the Fun Run's are all "Open".
   const categories = runFilter
     ? allCategories.filter((c) => c.run_id === runFilter)
     : allCategories;

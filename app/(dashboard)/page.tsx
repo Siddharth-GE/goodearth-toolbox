@@ -37,8 +37,7 @@ export default async function DashboardHome() {
 
       <div className="space-y-8">
         <ToolGrid sections={sections} />
-        {/* Fetches its own counts now that Indents is real, so it gets
-            its own boundary rather than holding up the whole page. */}
+        {/* Fetches its own counts, so it gets its own boundary rather than holding up the page. */}
         <Suspense
           fallback={
             <div className="bg-surface flex h-[168px] items-center justify-center rounded-2xl">

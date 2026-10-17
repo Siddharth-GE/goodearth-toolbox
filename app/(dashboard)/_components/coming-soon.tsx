@@ -1,9 +1,7 @@
 import { EmptyState } from "@/components/ui/empty-state";
 import type { LucideIcon } from "lucide-react";
 
-// Shared by every unbuilt tool's route stub — see lib/tools.ts's
-// `built: false` flag and CLAUDE.md for the convention. Wraps the
-// existing EmptyState rather than inventing a new visual pattern.
+// Stub for every `built: false` tool (lib/tools.ts).
 export function ComingSoon({
   icon,
   title,

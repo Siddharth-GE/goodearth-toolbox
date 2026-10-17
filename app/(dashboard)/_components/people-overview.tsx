@@ -3,18 +3,8 @@ import { countPeople } from "@/lib/overview/queries";
 import Link from "next/link";
 
 /**
- * Live now that the Directory is real. This card used to hardcode "78
- * full-time, 214 contractors, 82% training completion, 4 courses
- * assigned" and link straight to a Coming Soon placard — four invented
- * numbers sitting beside real ones.
- *
- * The training figures are gone rather than replaced with zeros: Training
- * has not been built, and a dash is honest where "0%" reads as a company
- * that never trains anyone. They come back when the tool does.
- *
- * The counts come from lib/overview/queries.ts, NOT from the Directory's
- * own queries — those gate on requireTool and would redirect the home
- * page to itself. That comment lives on countPeople().
+ * Counts come from lib/overview/queries.ts, not the Directory's queries, which gate on requireTool and would
+ * redirect the home page to itself. Training shows dashes: it isn't built, and "0%" would read as never training.
  */
 export async function PeopleOverview() {
   const { people, departments } = await countPeople();

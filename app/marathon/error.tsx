@@ -3,14 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { useEffect } from "react";
 
-/**
- * The kiosk's own error screen.
- *
- * Separate from the dashboard's because the audience is: a field agent on
- * a phone at a registration desk, mid-queue, who may have basic literacy
- * and no way to reach anyone. So: very few words, one big button, and no
- * technical reference number they'd have no use for.
- */
+/** The kiosk's own error screen: few words and one big button, for a field agent on a phone mid-queue. */
 export default function MarathonError({
   error,
   reset,

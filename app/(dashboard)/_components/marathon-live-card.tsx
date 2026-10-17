@@ -3,13 +3,10 @@ import { getMarathonPulse } from "@/lib/overview/queries";
 import { Footprints } from "lucide-react";
 import Link from "next/link";
 
-// Real data — the same query Marathon's own home page calls, narrowed
-// through lib/overview so the dashboard never touches marathon
-// internals directly.
+// Reads through lib/overview so the dashboard never touches marathon internals.
 export async function MarathonLiveCard() {
   const pulse = await getMarathonPulse();
-  // Marathon unreachable: show nothing rather than a live card with
-  // nothing live in it. The rest of the home page is unaffected.
+  // Marathon unreachable: show nothing; the rest of the home page is unaffected.
   if (!pulse) return null;
   const { eventName, totalEntries, groupCount, runCounts } = pulse;
 

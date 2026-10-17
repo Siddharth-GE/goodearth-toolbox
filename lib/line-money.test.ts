@@ -1,9 +1,3 @@
-/**
- * The line formula Purchase Orders and Bills share. What it protects:
- * "2 cum at ₹4,000 shows ₹8,000" (the team's own example), a discount
- * taken before tax, freight added after it, and the CGST/SGST vs IGST
- * split following the vendor's state.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

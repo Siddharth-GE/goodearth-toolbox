@@ -3,11 +3,8 @@ import { LoginForm } from "@/components/login-form";
 import Link from "next/link";
 import { Suspense } from "react";
 
-// Deliberately no `searchParams` prop: awaiting it makes this page
-// dynamic, and /login is one of the three prerendered-static routes
-// (BUGCATCHER #6 — the theme cookie cost them once already). The
-// ?reset=done message is read client-side inside LoginForm instead,
-// which is why the form sits in Suspense (useSearchParams needs it).
+// No `searchParams` prop: awaiting it makes /login dynamic (BUGCATCHER #6). ?reset=done is read
+// client-side in LoginForm, hence the Suspense.
 export default function LoginPage() {
   return (
     <div className="w-full max-w-sm">

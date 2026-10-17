@@ -4,15 +4,8 @@ import { Figure, FigureBand, FigureBandCell } from "@/components/ui/figure";
 import { formatCount } from "@/lib/format";
 import { TOOL_ICONS } from "@/lib/tools";
 
-// The screen a tool opens on: what it's for in plain English, a few live
-// counts, and the doors into the real screens. Shared by every Operations
-// and Management tool (the founder's ask — no tool drops you straight onto
-// a table any more). Lives beside coming-soon.tsx because it's the same
-// kind of thing: a cross-tool screen composition, not a ui primitive.
-//
-// Counts only, never rupees — a welcome screen must not leak what the
-// money views gate. Each tool fetches its own stats through its own
-// requireTool-gated query and passes plain numbers here.
+// A tool's opening screen: plain English, live counts, doors into the real screens.
+// Counts only, never rupees: a welcome screen must not leak what the money views gate.
 export function ToolWelcome({
   icon,
   intro,
@@ -20,14 +13,12 @@ export function ToolWelcome({
   links,
 }: {
   icon: keyof typeof TOOL_ICONS;
-  /** 1–2 short plain-English paragraphs. */
   intro: string[];
   stats: { label: string; value: number; hint?: string }[];
   links: { label: string; href: string; primary?: boolean }[];
 }) {
   const Icon = TOOL_ICONS[icon];
-  // A band whose last row is short shows the border colour through the
-  // empty cells, so the column count follows the stat count exactly.
+  // A short last row shows the border colour through empty cells, so columns follow the stat count.
   const bandColumns =
     stats.length === 2
       ? "sm:grid-cols-2 lg:grid-cols-2"
