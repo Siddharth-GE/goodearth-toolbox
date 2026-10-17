@@ -1,11 +1,7 @@
 "use client";
 
-/**
- * The chart half of a report page. The model arrives fully shaped from
- * the server (lib/charts/series.ts — pure, tested); this component only
- * picks the wrapper. A "split" model renders side-by-side charts — two
- * measures on wildly different scales never share one axis.
- */
+// The model arrives fully shaped from the server; this only picks the wrapper. A "split" model
+// renders side-by-side charts.
 
 import { Card } from "@/components/ui/card";
 import { ChartBars } from "@/components/ui/chart/bar-chart";

@@ -1,12 +1,4 @@
-/**
- * Label rules shared by the report builder, the table, the chart legend
- * and the CSV download. Worth testing because these words are the
- * contract between screen and file: a column called one thing on the
- * page and another in the download is the kind of small lie that costs
- * an afternoon, and a wrong grammatical shortcut (a plural that reads
- * wrong, a filter sentence that doesn't parse) reaches every dataset at
- * once since these functions carry no dataset-specific case.
- */
+// These words are the contract between screen and file, and they carry no dataset-specific case.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -42,8 +34,6 @@ test("aggLabel names every aggregate the report can compute", () => {
 });
 
 test("a measure heading lowercases the field into the sentence", () => {
-  // "Total quantity", not "Total Quantity" — the field label is capitalised
-  // for its own column heading but reads mid-sentence here.
   assert.equal(measureLabel("Quantity", "sum"), "Total quantity");
   assert.equal(measureLabel("Rate", "avg"), "Average rate");
   assert.equal(measureLabel("Quantity", "max"), "Highest quantity");

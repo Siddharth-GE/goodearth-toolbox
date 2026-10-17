@@ -19,14 +19,8 @@ import { formatDate } from "@/lib/format";
 import { listReports } from "@/lib/reporter/queries";
 import { STARTERS } from "@/lib/reporter/starters";
 
-/**
- * The way in: the starting points, then everything the team has saved.
- *
- * Starters are code constants, not rows — they cannot be edited or
- * deleted, only copied. A saved report is a question, not a snapshot:
- * opening one re-runs it against live data through the opener's own
- * access.
- */
+// Starters are code constants (copy only); a saved report re-runs against live data under the
+// opener's own access.
 export default async function ReporterPage() {
   const reports = await listReports();
 
@@ -104,9 +98,8 @@ export default async function ReporterPage() {
                     {report.datasetExists ? (
                       report.datasetLabel
                     ) : (
-                      // The report still opens — the parser drops what it
-                      // cannot resolve and says so — but the list should
-                      // not pretend the data set is still there.
+                      // The report still opens (the parser drops what it can't resolve), but the
+                      // list shouldn't pretend the data set exists.
                       <Badge variant="warning">No longer available</Badge>
                     )}
                   </TableCell>

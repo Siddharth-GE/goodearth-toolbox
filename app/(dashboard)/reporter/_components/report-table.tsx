@@ -1,20 +1,8 @@
 "use client";
 
-/**
- * The table half of a report — pure props in, plus a search box.
- *
- * SEARCH (plan.md, A5) narrows the rows already on the screen by any
- * cell's text. It is not a filter: founder decision #4 (filters offer
- * choices, never typing) still holds for what the database is asked —
- * the search only looks through what came back, and says so when the
- * detail view was cut to its limit.
- *
- * Detail view: the chosen columns, sorted, cut to the spec's limit,
- * with an honest "showing N of M" from the database's exact count.
- * Grouped view: one row per group, subtotals per outer group when the
- * grouping is two-level, and a grand total row over every matched line
- * — computed over the COMPLETE set, never the visible rows.
- */
+// Search narrows the rows already on screen; it is not a filter (filters offer choices, never
+// typing). Detail totals and "showing N of M" come from the database's exact count; grouped totals
+// are over the COMPLETE set, never the visible rows.
 import { useMemo, useState, type ReactNode } from "react";
 
 import { Input } from "@/components/ui/input";
@@ -52,7 +40,6 @@ function formatValue(type: FieldType, value: ReportValue): string {
   }
 }
 
-/** A measure's cell: count aggregates are plain counts whatever the field. */
 function formatMeasure(type: FieldType, agg: string, value: number | null): string {
   if (value === null) return "—";
   if (agg === "count" || agg === "count_distinct") return formatCount(value);
@@ -62,8 +49,7 @@ function formatMeasure(type: FieldType, agg: string, value: number | null): stri
 
 const numericTypes: FieldType[] = ["number", "money"];
 
-// Sticky inside the scrolling wrapper; the inset shadow stands in for
-// the header border, which border-collapse would scroll away.
+// The inset shadow stands in for the header border, which border-collapse would scroll away.
 const stickyHeader = "sticky top-0 z-10 bg-surface shadow-[inset_0_-1px_0_0_var(--border)]";
 
 function matches(text: string, query: string): boolean {
@@ -88,7 +74,6 @@ export function ReportTable({ spec, result }: { spec: ReportSpec; result: Report
   const [search, setSearch] = useState("");
   const query = search.trim().toLowerCase();
 
-  // Rows whose any shown cell, as printed, contains the search text.
   const shown = useMemo(
     () =>
       query === ""
@@ -101,8 +86,7 @@ export function ReportTable({ spec, result }: { spec: ReportSpec; result: Report
     [query, result.detail, result.columns, dataset],
   );
 
-  // With a search, the totals are of the rows found (on screen); without,
-  // of every matched row (computed on the server, never the page).
+  // With a search, totals are of the rows found; without, of every matched row (server-computed).
   const foundTotals = useMemo(() => {
     const totals: Record<string, number | null> = {};
     for (const column of Object.keys(result.columnTotals)) {
@@ -218,8 +202,8 @@ function GroupedTable({ spec, result }: { spec: ReportSpec; result: ReportResult
   const [search, setSearch] = useState("");
   const query = search.trim().toLowerCase();
 
-  // A group stays when its own label contains the search, or any of its
-  // sub-groups' labels do — then only those sub-groups are kept under it.
+  // A group stays when its label or any sub-group's label matches; then only matching sub-groups
+  // stay under it.
   const label = (level: number, value: ReportValue) =>
     formatValue(dataset.fields[spec.groupBy[level]].type, value);
   const groups = (result.groups ?? []).flatMap((group): GroupRow[] => {

@@ -1,8 +1,5 @@
-/**
- * The KPI band — a report's headline figures, computed from the same
- * totals as the table's grand-total row so the two can never disagree.
- * The first measure is the answer and renders hero; the rest qualify it.
- */
+// Computed from the same totals as the table's grand-total row, so the two can't disagree. The
+// first measure is the answer; the rest qualify it.
 
 import { Figure, FigureBand, FigureBandCell } from "@/components/ui/figure";
 import { formatCount, formatCrore, formatQuantity } from "@/lib/format";

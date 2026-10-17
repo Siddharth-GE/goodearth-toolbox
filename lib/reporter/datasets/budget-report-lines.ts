@@ -1,11 +1,5 @@
-// ---------------------------------------------------------------------
-// budget_report_lines — priced budget lines, including margin
-// ---------------------------------------------------------------------
-// Reads the 0055 view of the same name: flat columns, no embeds, no
-// chance of the ambiguous-embed trap. The view is security_invoker, so
-// this dataset sees exactly what the signed-in user's widened policies
-// allow — margin included, per the founder's explicit reversal of
-// 0011's margin boundary.
+// Reads the 0055 view: flat columns, no embeds. security_invoker, so it sees what the user's
+// widened policies allow, margin included (the 0011 margin boundary is reversed).
 
 import type { DatasetDef } from "./types";
 

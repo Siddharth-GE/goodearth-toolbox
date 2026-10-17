@@ -1,10 +1,5 @@
-/**
- * parseReportSpec is the whole validation boundary between the browser
- * and the database — a hand-edited URL, a hostile payload and a report
- * saved before a rename all land here. These tests are the proof that
- * nothing a user typed survives into a select, a filter column or an
- * order clause.
- */
+// parseReportSpec is the whole validation boundary: nothing a user typed may survive into a select,
+// filter column or order clause.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

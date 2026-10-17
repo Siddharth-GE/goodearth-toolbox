@@ -23,23 +23,15 @@ import {
   type ReportSpec,
 } from "./spec";
 
-// The ONLY Reporter file that touches Supabase. Reads run under the
-// signed-in user's own RLS through the normal server client — Reporter
-// shows whatever the /reporter grant's policies let through, nothing
-// more. Every string reaching a filter or select below has already been
-// through parseReportSpec, so it is a registry constant, never input.
+// The ONLY Reporter file that touches Supabase, under the signed-in user's own RLS. Every string
+// reaching a filter or select has been through parseReportSpec, so it is a registry constant, never
+// input.
 
 export type RunOutcome = { ok: true; result: ReportResult } | { ok: false; message: string };
 
-/**
- * PostgREST's filter methods take the value as-is; the one injection
- * surface that actually exists is `,()` inside an .or()/.ilike() string,
- * so free-text goes through cleanSearch first (lib/masters/paged.ts).
- *
- * Generic in-and-out so the builder keeps its own type through the call
- * (`.order()`/`.range()` still chain after it); the structural view of
- * the filter methods lives in the one cast inside.
- */
+// The one injection surface is `,()` inside an .or()/.ilike() string, so free text goes through
+// cleanSearch first (lib/masters/paged.ts). Generic in and out so the builder keeps its type; the
+// structural cast lives inside.
 type FilterMethods = {
   eq(column: string, value: unknown): FilterMethods;
   neq(column: string, value: unknown): FilterMethods;
@@ -88,12 +80,8 @@ function applyFilters<Query>(
   return builder as unknown as Query;
 }
 
-/**
- * Run a parsed spec: exact-count probe first, refuse plainly above
- * MAX_REPORT_ROWS, otherwise fetch the COMPLETE filtered set and hand
- * it to the pure engine. Throws on a failed read, like every query —
- * a partial report is a wrong report.
- */
+// Exact-count probe first, refuse above MAX_REPORT_ROWS, else fetch the COMPLETE set (a partial
+// report is a wrong report). Throws on a failed read.
 export async function runSpec(spec: ReportSpec): Promise<RunOutcome> {
   await requireTool("/reporter");
   const supabase = await createClient();
@@ -104,17 +92,12 @@ export async function runSpec(spec: ReportSpec): Promise<RunOutcome> {
     if (field.filterColumn) filterColumns[key] = field.filterColumn;
   }
 
-  // The registry's source is a hand-authored table/view name, but the
-  // typed client's .from() overloads want a schema literal it cannot
-  // get from a string field — and tables and views are SEPARATE
-  // overloads, so even the honest KnownSource union does not fit. One
-  // documented bridge through a single literal; what actually guards
-  // the read is RLS plus the registry whitelist (datasets.test.ts pins
-  // every source to KNOWN_SOURCES), not this type.
+  // .from() wants a schema literal it can't get from a string field. This single cast is the
+  // bridge; the real guard is RLS plus the registry whitelist (datasets.test.ts pins every source
+  // to KNOWN_SOURCES).
   const source = dataset.source as "indent_lines";
 
-  // The probe: how many rows would this report load? `head: true` moves
-  // no data. The count is exact, so the screen can honestly say "N of M".
+  // Head-only exact count, so the screen can honestly say "N of M".
   const probe = applyFilters(
     supabase.from(source).select(dataset.select, { count: "exact", head: true }),
     spec.filters,
@@ -137,10 +120,8 @@ export async function runSpec(spec: ReportSpec): Promise<RunOutcome> {
     };
   }
 
-  // fetchAll pages to completion and throws if a page fails. Ordered by
-  // the dataset's pageOrder (id unless the source is a view without
-  // one) for a stable page order; the report's own sort happens in the
-  // pure engine, over the complete set.
+  // Ordered by the dataset's pageOrder for a stable page order; the report's own sort happens in
+  // the pure engine.
   const raw = await fetchAll((from, to) => {
     let query = supabase.from(source).select(dataset.select);
     for (const column of dataset.pageOrder ?? ["id"]) query = query.order(column);
@@ -153,13 +134,8 @@ export async function runSpec(spec: ReportSpec): Promise<RunOutcome> {
   return { ok: true, result: runReport(dataset, spec, rows, matched) };
 }
 
-/**
- * The stock view carries bare ids (a view declares no FKs, so PostgREST
- * cannot embed through it). Item and location names come from bounded
- * masters lookups instead — bounded because they fetch only the ids
- * actually present in the report's rows, chunked under PostgREST's URL
- * limits. A name that cannot be found renders as null, never a crash.
- */
+// A view declares no FKs, so PostgREST can't embed names through it: look up only the ids present,
+// chunked under URL limits. A missing name renders null.
 async function enrichStockNames(rows: ReportRow[]): Promise<ReportRow[]> {
   const supabase = await createClient();
 
@@ -203,9 +179,7 @@ async function enrichStockNames(rows: ReportRow[]): Promise<ReportRow[]> {
   return rows.map((row) => {
     const item = items.get(String(row[identityKey("item")]));
     const locationId = String(row[identityKey("location")]);
-    // The view's location_id is a store OR a plot id depending on kind;
-    // a unit-kind location also resolves through plots' sibling — but
-    // 0029 folded unit stock into plots, so stores and plots cover it.
+    // location_id is a store or a plot id depending on kind (0029 folded unit stock into plots).
     const location = stores.get(locationId) ?? plots.get(locationId);
     return {
       ...row,
@@ -216,31 +190,17 @@ async function enrichStockNames(rows: ReportRow[]): Promise<ReportRow[]> {
   });
 }
 
-/**
- * The same report for download. The spec's `limit` is a SCREEN setting
- * — "rows shown" — so a CSV lifts it to the load ceiling and carries
- * every matched line. Above that ceiling runSpec still refuses in
- * plain English rather than handing back a quietly partial file.
- */
+// The spec's `limit` is a screen setting, so a CSV lifts it to the load ceiling; above that runSpec
+// still refuses rather than hand back a partial file.
 export async function runSpecForCsv(spec: ReportSpec): Promise<RunOutcome> {
   return runSpec({ ...spec, limit: MAX_REPORT_ROWS });
 }
-
-// ---------------------------------------------------------------------
-// Saved reports
-// ---------------------------------------------------------------------
-// A saved report is a NAME and a SPEC — a question, not an answer. It
-// holds no figures: running it re-reads the live tables through the
-// reader's own RLS, so the same report shows each person exactly what
-// that person is allowed to see.
 
 export type ReportSummary = {
   id: string;
   name: string;
   description: string | null;
-  /** The dataset's label, or its key if the dataset has since gone. */
   datasetLabel: string;
-  /** False when the spec names a dataset that no longer exists. */
   datasetExists: boolean;
   updated_at: string;
   updated_by_name: string | null;
@@ -251,31 +211,22 @@ export type LoadedReport = {
   name: string;
   description: string | null;
   spec: ReportSpec;
-  /** True for a `starter-*` id — read-only, "Save a copy" only. */
   starter: boolean;
-  /** Whether THIS user may delete it: their own, or an admin. */
   canDelete: boolean;
   updated_at: string | null;
   updated_by_name: string | null;
 };
 
-/** Headline count for the tool's welcome screen — saved reports only;
- * starters and datasets are code constants counted where they live. */
 export async function getWelcomeCounts() {
   await requireTool("/reporter");
   const supabase = await createClient();
 
-  // Exact database count, head-only — never rows.length.
   const saved = await supabase.from("reports").select("id", { count: "exact", head: true });
 
   return { saved: saved.count ?? 0 };
 }
 
-/**
- * Every saved report, newest touch first. fetchAll rather than a plain
- * select: this is the only way to reach a saved report, so a silent
- * 1,000-row cap would one day hide one.
- */
+// fetchAll, not a plain select: a silent 1,000-row cap would one day hide a report.
 export async function listReports(): Promise<ReportSummary[]> {
   await requireTool("/reporter");
   const supabase = await createClient();
@@ -308,14 +259,8 @@ export async function listReports(): Promise<ReportSummary[]> {
   });
 }
 
-/**
- * One report by id — a `reports.id` uuid OR a `starter-*` id. One
- * screen, one code path, resolved here.
- *
- * Returns null for "no such report" AND for "not visible to you": RLS
- * makes those indistinguishable, and both end at notFound(), which is
- * the right answer to either.
- */
+// A reports.id uuid or a `starter-*` id. Null for "no such report" and "not visible to you": RLS
+// makes them indistinguishable.
 export const getReport = cache(async (reportId: string): Promise<LoadedReport | null> => {
   const user = await requireTool("/reporter");
 
@@ -353,20 +298,17 @@ export const getReport = cache(async (reportId: string): Promise<LoadedReport | 
     id: data.id,
     name: data.name,
     description: data.description,
-    // The stored spec is untrusted in exactly the way a URL is: it was
-    // written by an older version of this code. Unknown keys are
-    // dropped rather than thrown, so an old report still opens.
+    // The stored spec is untrusted like a URL; unknown keys are dropped so an old report still
+    // opens.
     spec: parseReportSpec(data.spec),
     starter: false,
-    // Mirrors the DELETE policy in 0054. The screen hides what the
-    // database would refuse, rather than offering a button that fails.
+    // Mirrors the DELETE policy in 0054, so the screen doesn't offer a button that fails.
     canDelete: user.profile?.role === "admin" || data.created_by === user.id,
     updated_at: data.updated_at,
     updated_by_name: data.updated_by ? (names.get(data.updated_by) ?? null) : null,
   };
 });
 
-/** What `describeSpecLoss` would say about a stored report, for the screen. */
 export async function getReportSpecLoss(reportId: string): Promise<string[]> {
   await requireTool("/reporter");
   if (isStarterId(reportId)) return [];
@@ -383,7 +325,6 @@ export async function getReportSpecLoss(reportId: string): Promise<string[]> {
 
 export type ProjectOption = { id: string; name: string };
 
-/** Options for the project filter's picker. */
 export async function listProjectOptions(): Promise<ProjectOption[]> {
   await requireTool("/reporter");
   const projects = await listProjects();
@@ -392,7 +333,6 @@ export async function listProjectOptions(): Promise<ProjectOption[]> {
 
 export type UnitOption = { id: string; name: string; projectId: string };
 
-/** Options for the unit filter's picker, grouped by project on screen. */
 export async function listUnitOptions(): Promise<UnitOption[]> {
   await requireTool("/reporter");
   const units = await listUnits();
@@ -401,27 +341,17 @@ export async function listUnitOptions(): Promise<UnitOption[]> {
 
 export type VendorOption = { id: string; name: string };
 
-/**
- * Options for the vendor filter's picker (the money datasets). All
- * vendors, not active-only: reports are history, and last year's lines
- * belong to vendors nobody buys from any more.
- */
+// All vendors, not active-only: old lines belong to vendors nobody buys from now.
 export async function listVendorOptions(): Promise<VendorOption[]> {
   await requireTool("/reporter");
   const vendors = await listVendors();
   return vendors.map((vendor) => ({ id: vendor.id, name: vendor.name }));
 }
 
-// Enough pages that every value a filter could need is present at
-// today's scale, without re-reading the whole dataset just to fill
-// dropdowns. If a dataset ever outgrows this, its rare values drop off
-// the list — revisit with a real DISTINCT source then, not a bigger cap.
+// Enough pages for every filter value at today's scale; past that, use a real DISTINCT source, not
+// a bigger cap.
 const OPTIONS_MAX_PAGES = 5;
 
-/**
- * The distinct values behind every `filterOptions: "distinct"` field of
- * a dataset, keyed by field key — what the builder's dropdowns show.
- */
 export async function listFilterOptions(datasetKey: string): Promise<Record<string, string[]>> {
   await requireTool("/reporter");
   const dataset = DATASETS[datasetKey];

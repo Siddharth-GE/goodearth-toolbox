@@ -1,10 +1,6 @@
 "use server";
 
-// Type-only import, and deliberately NOT re-exported: a bare
-// `export type { ActionState }` in a "use server" file survives into the
-// compiled module's runtime export list, where the type doesn't exist —
-// every action in the chunk then dies at module load (the 2026-08-03
-// production outage). Import it from "@/lib/action-state" instead.
+// Type-only import; never re-export it from a "use server" file (BUGCATCHER #5).
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
@@ -16,18 +12,8 @@ import { decodeSpecParam, parseReportSpec, REPORT_SCHEMA_VERSION } from "./spec"
 const NAME_LIMIT = 120;
 const DESCRIPTION_LIMIT = 300;
 
-/**
- * Saving a report saves a QUESTION, not an answer — the spec, never the
- * figures. Running it later re-reads the live tables through the
- * reader's own RLS, so a report saved by an admin shows a colleague
- * only what that colleague may see.
- *
- * Every action re-parses the spec on the way in. The browser sends it
- * as the same base64url `?spec=` the page uses, and 0054's jsonb column
- * is something the database cannot check — so parseReportSpec is the
- * only place a malformed spec can be stopped, exactly as
- * parsePlanInputs guards business_plans.
- */
+// A saved report is the spec, never the figures: it re-reads live data under the reader's own RLS.
+// Every action re-parses the spec; the jsonb column can't check it.
 
 type Named = { name: string; description: string | null };
 
@@ -42,11 +28,6 @@ function readName(formData: FormData): Named | { error: string } {
   return { name, description: description || null };
 }
 
-/**
- * Save the spec on screen as a new report, then open it. This is both
- * "Save" on an unsaved report and "Save a copy" of a starter or of
- * someone else's — one insert either way, so there is one code path.
- */
 export async function saveReport(_state: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireTool("/reporter");
 
@@ -65,8 +46,7 @@ export async function saveReport(_state: ActionState, formData: FormData): Promi
     .insert({
       name: named.name,
       description: named.description,
-      // Denormalised out of the spec so the list page can say what each
-      // report is over without parsing every document.
+      // Denormalised so the list page needn't parse every document.
       dataset: spec.dataset,
       schema_version: REPORT_SCHEMA_VERSION,
       spec,
@@ -82,16 +62,10 @@ export async function saveReport(_state: ActionState, formData: FormData): Promi
   }
 
   revalidatePath("/reporter", "layout");
-  // redirect() throws its own control-flow signal, so it must be outside
-  // any try/catch and after every write has been checked.
+  // redirect() throws, so it stays outside any try/catch.
   redirect(`/reporter/${data.id}`);
 }
 
-/**
- * Write a changed spec back to a saved report. Separate from renaming,
- * because reshaping a report and retitling it are different decisions
- * and a person should be able to do either without the other.
- */
 export async function updateReportSpec(reportId: string, specParam: string): Promise<ActionState> {
   const user = await requireTool("/reporter");
 
@@ -120,7 +94,6 @@ export async function updateReportSpec(reportId: string, specParam: string): Pro
   return undefined;
 }
 
-/** Rename a report, or reword what it says it answers. */
 export async function renameReport(
   reportId: string,
   _state: ActionState,
@@ -147,13 +120,7 @@ export async function renameReport(
   return undefined;
 }
 
-/**
- * Throw a report away. 0054 narrows DELETE to the person who created it
- * or an admin — editing someone's report is a change they can see and
- * undo, deleting it is not. RLS refuses silently (zero rows affected
- * rather than an error), so the refusal is checked here and said in
- * plain English.
- */
+// RLS refuses a DELETE silently (zero rows, no error), so the refusal is checked here (0054).
 export async function deleteReport(reportId: string): Promise<ActionState> {
   await requireTool("/reporter");
   const supabase = await createClient();

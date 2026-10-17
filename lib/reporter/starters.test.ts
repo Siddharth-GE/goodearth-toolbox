@@ -1,9 +1,5 @@
-/**
- * The one automated gate that catches a registry change silently
- * gutting a starting point: every starter must survive parseReportSpec
- * with ZERO loss. A dropped column or a dropped chart would otherwise
- * show up as a quietly worse report on the landing page.
- */
+// Every starter must survive parseReportSpec with ZERO loss, or a registry change would quietly gut
+// a starting point.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -68,10 +64,7 @@ test("every starter's chart is valid for its own grouping", () => {
 });
 
 test("a starter id survives a URL untouched", () => {
-  // It is a path segment (`/reporter/<id>`). A colon here read fine to
-  // Next's own routing and still 404'd on the deployed preview — the
-  // platform in front of the app does not treat it as an ordinary
-  // character — so an id that needs any encoding at all is a bug.
+  // A path segment: a colon 404s on the deployed platform, so an id needing any encoding is a bug.
   for (const starter of STARTERS) {
     assert.equal(
       encodeURIComponent(starter.id),
@@ -89,8 +82,7 @@ test("ids are unique, prefixed, and never mistakable for a saved report", () => 
     assert.ok(!seen.has(starter.id), `${starter.id}: duplicate id`);
     seen.add(starter.id);
     assert.equal(getStarter(starter.id)?.name, starter.name);
-    // A uuid must never resolve to a starter, or a saved report could be
-    // shadowed by one.
+    // A uuid must never resolve to a starter.
     assert.doesNotMatch(starter.id, /^[0-9a-f-]{36}$/);
   }
   assert.equal(getStarter("starter-nothing-like-this"), null);

@@ -1,11 +1,6 @@
-// ---------------------------------------------------------------------
-// plan_targets — a plan's published numbers beside the project's actuals
-// ---------------------------------------------------------------------
-// Reads 0057's view: one row per plan a founder has LINKED to a project
-// (an unlinked plan publishes nothing). The actuals are the view's own
-// per-project aggregates — billed spend and client collections — so no
-// report ever joins plan rows to bill or receipt rows. Money, gated by
-// the view's WHERE: /business-planning or /reporter.
+// Reads 0057's view: one row per plan LINKED to a project. The actuals are the view's own
+// per-project aggregates, so no report joins plan rows to bill or receipt rows. Money, gated by the
+// view's WHERE.
 
 import type { DatasetDef } from "./types";
 

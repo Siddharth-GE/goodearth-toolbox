@@ -1,9 +1,4 @@
-// ---------------------------------------------------------------------
-// birdwing_expenses — what the guest house spent, line by line (0117)
-// ---------------------------------------------------------------------
-// One row per expense line in Birdwing Books, from 0117's flat owner
-// view. A confirmed salary is ONE line per person per month (its pay rule
-// and attendance stay in Books).
+// From 0117's flat owner view. A confirmed salary is ONE line per person per month.
 
 import type { DatasetDef } from "./types";
 

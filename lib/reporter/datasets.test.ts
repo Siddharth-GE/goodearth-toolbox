@@ -1,10 +1,5 @@
-/**
- * The registry invariants. This is the only automated gate that would
- * have caught the four dead Client Relations screens: a bad PostgREST
- * select is invisible to lint, types, tests-with-no-database and build,
- * so the rules a select must obey are asserted as text here — and every
- * dataset still gets opened by hand once before its stage merges.
- */
+// Registry invariants, asserted as text: a bad PostgREST select is invisible to lint, types, tests
+// and build (BUGCATCHER #2).
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -27,7 +22,6 @@ test("every embed names its constraint — no bare relation before (", () => {
   for (const [key, dataset] of entries) {
     for (const select of [dataset.select, dataset.optionsSelect]) {
       if (!select) continue;
-      // Every `word(` or `word!inner(` must carry a named `!..._fkey`.
       const embeds = select.matchAll(/([a-z_]+)((?:![a-z_]+)*)\(/g);
       for (const [, relation, modifiers] of embeds) {
         assert.ok(
@@ -81,8 +75,6 @@ test("every filterColumn and sortColumn is present in the select", () => {
     for (const [fieldKey, field] of Object.entries(dataset.fields)) {
       for (const column of [field.filterColumn, field.sortColumn]) {
         if (!column) continue;
-        // For a dotted column ("indents.project_id") the embed and the
-        // final column must both be in the select string.
         const parts = column.split(".");
         const last = parts[parts.length - 1];
         assert.ok(
@@ -177,8 +169,7 @@ test("every pageOrder column is in the select — a view without id must page on
 });
 
 test("enriched fields are display-only — no filter or sort column to lie about", () => {
-  // An enriched name exists only after the fetch, so a filterColumn or
-  // sortColumn on it would push a nonexistent column to PostgREST.
+  // An enriched name exists only after the fetch, so it can't be a filterColumn or sortColumn.
   for (const [key, dataset] of entries) {
     if (!dataset.enrich) continue;
     for (const [fieldKey, field] of Object.entries(dataset.fields)) {
@@ -190,8 +181,7 @@ test("enriched fields are display-only — no filter or sort column to lie about
 });
 
 test("every dataset's source is a known table or view", () => {
-  // queries.ts casts source through KnownSource for the typed client;
-  // a source missing from that union would compile into a runtime 404.
+  // A source missing from KnownSource would compile into a runtime 404.
   for (const [key, dataset] of entries) {
     assert.ok(
       (KNOWN_SOURCES as readonly string[]).includes(dataset.source),
@@ -205,7 +195,6 @@ test("derived fields name a real function, read only columns, and never push dow
     for (const [fieldKey, field] of Object.entries(dataset.fields)) {
       if (!field.derive) continue;
       assert.ok(DERIVED[field.derive], `${key}.${fieldKey}: derive "${field.derive}" not in DERIVED`); // prettier-ignore
-      // No column to push a filter or sort to, and no identity to count.
       assert.ok(!field.filterColumn, `${key}.${fieldKey}: a derived field cannot filter`);
       assert.ok(!field.sortColumn, `${key}.${fieldKey}: a derived field cannot sort`);
       assert.ok(!field.identityPath, `${key}.${fieldKey}: a derived field cannot carry identity`);
@@ -215,9 +204,8 @@ test("derived fields name a real function, read only columns, and never push dow
 });
 
 test("a derived field never reads another derived field", () => {
-  // extractRows computes columns first, derived second, in one pass —
-  // so a derived-on-derived chain would read null. Prove no derive
-  // function changes its answer when handed only the column fields.
+  // extractRows computes columns, then derived fields: prove no derive function changes its answer
+  // given only column fields.
   for (const [key, dataset] of entries) {
     const columnRow: Record<string, unknown> = {};
     for (const [fieldKey, field] of Object.entries(dataset.fields)) {

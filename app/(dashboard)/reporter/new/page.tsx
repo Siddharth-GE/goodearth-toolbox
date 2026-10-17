@@ -6,9 +6,6 @@ import { requireTool } from "@/lib/auth/access";
 import { DATASETS } from "@/lib/reporter/datasets";
 import { defaultSpec, encodeSpec } from "@/lib/reporter/spec";
 
-// Dataset picker → blank builder. One card per registry entry; the
-// card's link carries that dataset's default spec, so the builder opens
-// showing real rows rather than an empty grid.
 export default async function NewReportPage() {
   await requireTool("/reporter");
 

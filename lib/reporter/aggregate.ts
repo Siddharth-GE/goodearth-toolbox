@@ -1,22 +1,6 @@
-/**
- * Grouping, aggregation, subtotals and totals — in pure TypeScript, not
- * SQL. PostgREST cannot do arbitrary GROUP BY; the SQL alternatives are
- * a `security definer` runner (reads past every policy) or a pile of
- * RLS-bypassing views — the same hazard as a definer function with no
- * permission check in its body, multiplied by every dataset.
- * TypeScript also puts the arithmetic behind a leadership report where
- * `npm test` can cover it — the same reasoning that put runScenario in
- * lib/business-planning/model.ts rather than in SQL.
- *
- * The rule the tests lock down: NULLS ARE SKIPPED, NOT ZEROED. An
- * unpriced line and a free line are different things, and a sum over
- * nothing is null, never 0.
- *
- * The second rule: A DISTINCT COUNT COUNTS THINGS, NOT LABELS. Where a
- * field declares an `identityPath`, extractRows carries that id along
- * beside the display value and `count_distinct` counts the ids — so
- * five different armchairs all named "Armchair" count as five.
- */
+// Grouping and aggregation in TypeScript, not SQL: PostgREST can't GROUP BY, and the SQL options
+// bypass RLS. Rules the tests lock: nulls are skipped, never zeroed; count_distinct counts identity
+// ids, not labels.
 
 import type { Aggregate, DatasetDef } from "./datasets";
 import { DERIVED } from "./derive";
@@ -25,9 +9,7 @@ import { measureId, type ReportSpec } from "./spec";
 export type ReportValue = string | number | boolean | null;
 export type ReportRow = Record<string, ReportValue>;
 
-/** One group of the grouped table; children when grouping is two-level. */
 export type GroupRow = {
-  /** The group's key values, outer first. */
   keys: ReportValue[];
   /** Aggregated values keyed by measure id ("field:agg"). */
   measures: Record<string, number | null>;
@@ -37,38 +19,27 @@ export type GroupRow = {
 
 export type ReportResult = {
   columns: string[];
-  /** Detail rows: sorted, cut to spec.limit. */
   detail: ReportRow[];
   /** Rows the filters matched — what totals are computed over. */
   matched: number;
-  /** True when detail shows fewer rows than matched. */
   truncated: boolean;
   /** Present when the spec groups; replaces the detail view. */
   groups: GroupRow[] | null;
-  /** Grand totals keyed by measure id, over every matched row. */
   totals: Record<string, number | null>;
   /**
-   * The detail view's totals row: each money or number column summed over
-   * EVERY matched row (not the rows shown), nulls skipped; null when the
-   * column has no value at all. A quantity column is not added up across
-   * different units — 40 bags and 5 loads are not 45 of anything — so it
-   * is null here and named in `mixedUnitColumns`.
+   * Sum of each number column over EVERY matched row, nulls skipped. Quantity columns stay null
+   * (see mixedUnitColumns): bags and loads don't add.
    */
   columnTotals: Record<string, number | null>;
   mixedUnitColumns: string[];
 };
-
-// ---------------------------------------------------------------------
-// Row extraction
-// ---------------------------------------------------------------------
 
 function valueAtPath(row: unknown, path: string): ReportValue {
   let current: unknown = row;
   for (const part of path.split(".")) {
     if (current === null || current === undefined || typeof current !== "object") return null;
     current = (current as Record<string, unknown>)[part];
-    // A to-one embed can come back as a one-element array depending on
-    // how PostgREST sees the relationship; take the row rather than fail.
+    // A to-one embed can arrive as a one-element array.
     if (Array.isArray(current)) current = current[0];
   }
   if (current === undefined || current === null) return null;
@@ -82,26 +53,17 @@ function valueAtPath(row: unknown, path: string): ReportValue {
   return null;
 }
 
-/**
- * Where a field's identity value sits in an extracted row. Field keys
- * are plain lowercase identifiers (datasets.test.ts enforces it), so
- * the "#" prefix can never collide with one.
- */
+// The "#" prefix can't collide with a field key (lowercase identifiers, enforced by
+// datasets.test.ts).
 export function identityKey(fieldKey: string): string {
   return `#id:${fieldKey}`;
 }
 
-/**
- * Raw PostgREST rows (nested embeds and all) flattened to one value per
- * registry field, keyed by field key. Missing anything becomes null.
- * Fields declaring an `identityPath` also carry their id under
- * `identityKey(field)`, for count_distinct — never displayed.
- */
+// Fields with an identityPath also carry their id under identityKey(field), for count_distinct;
+// never displayed.
 export function extractRows(dataset: DatasetDef, raw: unknown[]): ReportRow[] {
   const fields = Object.entries(dataset.fields);
-  // Columns first, derived second, so a derived field reads the row's
-  // other fields after every one of them exists. datasets.test.ts
-  // asserts a derived field never reads another derived field.
+  // Derived fields run after every column field; a derived field never reads another derived one.
   const columnFields = fields.filter(([, field]) => !field.derive);
   const derivedFields = fields.filter(([, field]) => field.derive);
   return raw.map((row) => {
@@ -117,10 +79,6 @@ export function extractRows(dataset: DatasetDef, raw: unknown[]): ReportRow[] {
     return flat;
   });
 }
-
-// ---------------------------------------------------------------------
-// Aggregation
-// ---------------------------------------------------------------------
 
 function aggregateValues(values: ReportValue[], agg: Aggregate): number | null {
   if (agg === "count") {
@@ -143,13 +101,8 @@ function aggregateValues(values: ReportValue[], agg: Aggregate): number | null {
   }
 }
 
-/**
- * Which key a measure reads. Only a distinct count switches to the
- * identity — a `count` counts values present, and every other aggregate
- * is arithmetic on the value itself. The `in` check lets rows that did
- * not come through extractRows (tests, and only tests) fall back to the
- * display value rather than counting nothing.
- */
+// Only a distinct count reads the identity; the "in" check lets test rows without it use the
+// display value.
 function sourceKey(dataset: DatasetDef, row: ReportRow, field: string, agg: Aggregate): string {
   if (agg !== "count_distinct" || !dataset.fields[field]?.identityPath) return field;
   const id = identityKey(field);
@@ -170,10 +123,6 @@ function measuresOver(
   }
   return out;
 }
-
-// ---------------------------------------------------------------------
-// Sorting
-// ---------------------------------------------------------------------
 
 function compareValues(a: ReportValue, b: ReportValue): number {
   // Nulls last, whichever direction — a missing value is never "first".
@@ -197,8 +146,7 @@ function sortDetail(rows: ReportRow[], spec: ReportSpec): ReportRow[] {
 }
 
 function sortGroups(groups: GroupRow[], spec: ReportSpec, keyIndex: number): GroupRow[] {
-  // A sort entry naming a measure orders groups by that measure; one
-  // naming the group's own field orders by key. Otherwise keys ascend.
+  // A sort entry naming a measure orders groups by it; naming the group's field orders by key.
   const entry = spec.sort.find(
     (s) => s.field === spec.groupBy[keyIndex] || spec.measures.some((m) => m.field === s.field),
   );
@@ -220,10 +168,6 @@ function sortGroups(groups: GroupRow[], spec: ReportSpec, keyIndex: number): Gro
   });
   return sorted;
 }
-
-// ---------------------------------------------------------------------
-// The report
-// ---------------------------------------------------------------------
 
 function groupRows(dataset: DatasetDef, rows: ReportRow[], spec: ReportSpec): GroupRow[] {
   const [outerField, innerField] = spec.groupBy;
@@ -258,8 +202,7 @@ function groupRows(dataset: DatasetDef, rows: ReportRow[], spec: ReportSpec): Gr
       }
       children = sortGroups(children, spec, 1);
     }
-    // The outer group's measures come from ITS OWN rows, not from
-    // combining child aggregates — an avg of avgs is wrong.
+    // The outer group's measures come from its own rows; an avg of avgs is wrong.
     outers.push({
       keys: [key],
       measures: measuresOver(dataset, bucket, spec),
@@ -271,11 +214,7 @@ function groupRows(dataset: DatasetDef, rows: ReportRow[], spec: ReportSpec): Gr
   return sortGroups(outers, spec, 0);
 }
 
-/**
- * The whole report from the complete filtered row set. Pure: rows in,
- * result out. `matched` is the database's exact count, carried through
- * so screens never derive a total from rows.length.
- */
+// Pure: rows in, result out. matched is the database's exact count, never rows.length.
 export function runReport(
   dataset: DatasetDef,
   spec: ReportSpec,
@@ -297,13 +236,11 @@ export function runReport(
   };
 }
 
-/** The detail totals row (see ReportResult.columnTotals). */
 export function totalsByColumn(
   dataset: DatasetDef,
   columns: string[],
   rows: ReportRow[],
 ): { columnTotals: Record<string, number | null>; mixedUnitColumns: string[] } {
-  // A dataset with a unit field says what a quantity is counted in.
   const unitField = Object.prototype.hasOwnProperty.call(dataset.fields, "uom") ? "uom" : null;
   const units = unitField
     ? new Set(rows.map((row) => row[unitField]).filter((unit) => unit !== null && unit !== ""))

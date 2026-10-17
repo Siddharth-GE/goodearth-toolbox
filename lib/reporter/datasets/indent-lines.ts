@@ -1,13 +1,7 @@
-// ---------------------------------------------------------------------
-// indent_lines — every material line ever requested
-// ---------------------------------------------------------------------
-// The Stage 2 dataset, chosen because indents and indent_lines are
-// readable by every authenticated user (0019) — zero RLS risk while the
-// whole pipeline is proven. Carries no money by design.
+// No money.
 
-// item_id, project_id and unit_id are selected for their fields'
-// identityPath, not for display — a distinct count of items counts ids
-// while the column keeps showing names.
+// item_id, project_id and unit_id are selected for their identityPath, not display: a distinct
+// count counts ids while the column shows names.
 import type { DatasetDef } from "./types";
 
 const INDENT_LINES_SELECT =
@@ -46,20 +40,18 @@ export const indentLines: DatasetDef = {
     unit: {
       label: "Unit",
       type: "text",
-      // Unit names repeat across projects — every project has a "Villa
-      // 6" — so the count follows the id.
+      // Unit names repeat across projects ("Villa 6"), so the count follows the id.
       path: "indents.units.name",
       identityPath: "indents.unit_id",
-      // Filters by id on the inner-joined indents row — a name filter
-      // would need units!inner, which drops unit-less lines everywhere.
+      // By id on the inner-joined indents row: a name filter would need units!inner, which drops
+      // unit-less lines.
       filterColumn: "indents.unit_id",
       sortColumn: "indents.units.name",
       groupable: true,
       aggregates: ["count_distinct"],
       lookup: "units",
     },
-    // No identityPath: a reference IS the identity — generated, unique,
-    // never blank — so counting references counts indents.
+    // No identityPath: a reference is generated, unique and never blank.
     indent: {
       label: "Indent",
       type: "text",
@@ -88,9 +80,7 @@ export const indentLines: DatasetDef = {
       aggregates: [],
       filterOptions: "distinct",
     },
-    // Item name and item code are two labels for the same thing, so
-    // both count by item_id: five armchairs all named "Armchair" are
-    // five items, and an item with no code is still an item.
+    // Name and code are two labels for one thing, so both count by item_id.
     item: {
       label: "Item",
       type: "text",
@@ -132,9 +122,7 @@ export const indentLines: DatasetDef = {
       aggregates: [],
       filterOptions: "distinct",
     },
-    // A note is prose — a dropdown of whole notes would be nonsense and
-    // typing is out by the founder's rule, so it displays but never
-    // filters (no filterColumn).
+    // Prose: displays but never filters.
     note: {
       label: "Note",
       type: "text",

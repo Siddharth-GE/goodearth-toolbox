@@ -1,21 +1,7 @@
-/**
- * A ReportSpec is what the browser sends: which dataset, which columns,
- * filters, grouping, measures, sort and chart. It travels as
- * `?spec=<base64url JSON>` — shareable, bookmarkable, and therefore
- * UNTRUSTED. A hand-edited URL is just another input hitting the parser.
- *
- * `parseReportSpec` is the ONLY way untrusted JSON becomes a ReportSpec
- * — the same shape as lib/business-planning/inputs.ts, whose
- * parsePlanInputs guards a jsonb column the database cannot check. It
- * NEVER throws: aliases resolve first, unknowns are dropped (not
- * errored, so a report saved before a rename still opens), numbers are
- * clamped, and everything is capped so a spec is bounded. After it runs,
- * every string in the spec is provably a key of DATASETS — nothing a
- * user typed ever reaches a select, a filter column or an order clause.
- *
- * `describeSpecLoss` says in plain English what the parser dropped, so
- * the screen can tell the person instead of silently showing less.
- */
+// A ReportSpec travels as `?spec=<base64url JSON>`, so it is UNTRUSTED. parseReportSpec is the only
+// way JSON becomes one: it never throws, drops unknowns (so a report saved before a rename still
+// opens), clamps numbers and caps sizes. Afterwards every string is provably a DATASETS key, so
+// nothing typed reaches a select, filter column or order clause.
 
 import {
   AGGREGATES,
@@ -28,11 +14,7 @@ import {
 
 export const REPORT_SCHEMA_VERSION = 1;
 
-/**
- * Above this, the report refuses with a plain sentence rather than
- * silently truncating. Completeness is the point of a report; a partial
- * total is a wrong total.
- */
+// Above this the report refuses in plain words: a partial total is a wrong total.
 export const MAX_REPORT_ROWS = 50_000;
 
 export const MAX_COLUMNS = 12;
@@ -41,12 +23,10 @@ export const MAX_GROUP_BY = 2;
 export const MAX_MEASURES = 8;
 export const MAX_SORTS = 3;
 
-/** Detail rows shown on screen. Totals are computed over every row. */
 export const MIN_LIMIT = 10;
 export const MAX_LIMIT = 1_000;
 export const DEFAULT_LIMIT = 100;
 
-/** The longest string a filter value may carry. */
 const MAX_FILTER_VALUE_LENGTH = 200;
 
 export const OPS = ["eq", "neq", "gt", "gte", "lt", "lte", "contains"] as const;
@@ -61,15 +41,10 @@ export type ReportSort = { field: string; dir: "asc" | "desc" };
 
 export type ReportChart = {
   type: ChartType;
-  /** Which groupBy field runs along the axis. Must be one of groupBy. */
   category: string;
-  /**
-   * Measure ids ("field:agg"), 1..8, order = palette slots, one shared
-   * scale. Two measures of wildly different magnitude get two charts,
-   * never two axes — dual-axis is impossible by construction.
-   */
+  // Measure ids ("field:agg"), 1..8, one shared scale; very different magnitudes get two charts,
+  // never two axes.
   measures: string[];
-  /** Highlight one measure id; the rest go gray. */
   emphasis?: string;
 };
 
@@ -85,20 +60,16 @@ export type ReportSpec = {
   chart: ReportChart | null;
 };
 
-/** The one spelling of a measure's identity, used by chart + result maps. */
 export function measureId(measure: { field: string; agg: string }): string {
   return `${measure.field}:${measure.agg}`;
 }
 
-/** Which operators a filter on this field may use. */
 export function opsForField(field: FieldDef): Op[] {
-  // Dropdown-backed fields (the founder's rule: choices, never typing)
-  // take exactly is / is-not.
+  // Dropdown-backed fields take exactly is / is-not.
   if (field.lookup || field.filterOptions) return ["eq", "neq"];
   switch (field.type) {
     case "text":
-      // No current field reaches here with a filterColumn — `contains`
-      // is reserved for a future genuinely free-text search field.
+      // `contains` is reserved for a future free-text field.
       return ["eq", "neq", "contains"];
     case "number":
     case "money":
@@ -110,7 +81,6 @@ export function opsForField(field: FieldDef): Op[] {
   }
 }
 
-/** A blank report on a dataset: its default columns and sort, nothing else. */
 export function defaultSpec(datasetKey: string): ReportSpec {
   const key = Object.prototype.hasOwnProperty.call(DATASETS, datasetKey)
     ? datasetKey
@@ -129,10 +99,6 @@ export function defaultSpec(datasetKey: string): ReportSpec {
   };
 }
 
-// ---------------------------------------------------------------------
-// The parser — the only door in
-// ---------------------------------------------------------------------
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -146,7 +112,6 @@ function clampInt(value: unknown, fallback: number, min: number, max: number): n
   return Math.round(Math.min(max, Math.max(min, n)));
 }
 
-/** ISO date, the value of an <input type="date">. Anything else is dropped. */
 function isIsoDate(value: unknown): value is string {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
@@ -182,7 +147,6 @@ function parseWithLoss(raw: unknown): ParseOutcome {
     return { spec: defaultSpec(DEFAULT_DATASET), loss };
   }
 
-  // Dataset first — every other key resolves against it.
   let datasetKey: string;
   if (
     typeof raw.dataset === "string" &&
@@ -199,8 +163,7 @@ function parseWithLoss(raw: unknown): ParseOutcome {
   }
   const dataset = DATASETS[datasetKey];
 
-  // Columns — unknowns dropped, duplicates collapsed, empty falls back
-  // to the dataset's defaults so the table is never blank.
+  // Empty falls back to the dataset's defaults so the table is never blank.
   const columns: string[] = [];
   for (const rawKey of array(raw.columns).slice(0, MAX_COLUMNS * 2)) {
     const key = resolveFieldKey(dataset, rawKey);
@@ -213,8 +176,6 @@ function parseWithLoss(raw: unknown): ParseOutcome {
   }
   if (columns.length === 0) columns.push(...dataset.defaultColumns);
 
-  // Filters — field must resolve, op must be legal for the field, value
-  // must be the right shape. Anything else is dropped and said.
   const filters: ReportFilter[] = [];
   for (const entry of array(raw.filters).slice(0, MAX_FILTERS * 2)) {
     if (!isRecord(entry)) continue;
@@ -237,7 +198,6 @@ function parseWithLoss(raw: unknown): ParseOutcome {
     if (filters.length < MAX_FILTERS) filters.push({ field: key, op, value });
   }
 
-  // Group by — groupable fields only, at most two levels.
   const groupBy: string[] = [];
   for (const rawKey of array(raw.groupBy).slice(0, MAX_GROUP_BY * 2)) {
     const key = resolveFieldKey(dataset, rawKey);
@@ -248,7 +208,6 @@ function parseWithLoss(raw: unknown): ParseOutcome {
     if (!groupBy.includes(key) && groupBy.length < MAX_GROUP_BY) groupBy.push(key);
   }
 
-  // Measures — the field must allow the aggregate.
   const measures: ReportMeasure[] = [];
   for (const entry of array(raw.measures).slice(0, MAX_MEASURES * 2)) {
     if (!isRecord(entry)) continue;
@@ -268,8 +227,7 @@ function parseWithLoss(raw: unknown): ParseOutcome {
     }
   }
 
-  // Sort — only fields that declare a sortColumn, or measures/groups
-  // (which sort the grouped table in TypeScript).
+  // Only fields with a sortColumn, or measures/groups (sorted in TypeScript).
   const sort: ReportSort[] = [];
   for (const entry of array(raw.sort).slice(0, MAX_SORTS * 2)) {
     if (!isRecord(entry)) continue;
@@ -284,9 +242,7 @@ function parseWithLoss(raw: unknown): ParseOutcome {
       sort.push({ field: key, dir });
   }
 
-  // Chart — parsed and validated here even before charts render (Stage
-  // 3), so a saved spec never carries an impossible chart. A chart whose
-  // category is not in groupBy is dropped, not rendered wrong.
+  // A chart whose category is not in groupBy is dropped, not rendered wrong.
   let chart: ReportChart | null = null;
   if (isRecord(raw.chart)) {
     const type =
@@ -300,8 +256,7 @@ function parseWithLoss(raw: unknown): ParseOutcome {
       .filter((m): m is string => typeof m === "string" && measureIds.includes(m))
       .filter((m, i, all) => all.indexOf(m) === i)
       .slice(0, MAX_MEASURES);
-    // A meter is one ratio against a limit — the value, then the limit,
-    // and nothing else.
+    // A meter is the value, then the limit, and nothing else.
     if (type === "meter") chartMeasures = chartMeasures.slice(0, 2);
     if (type && category && groupBy.includes(category) && chartMeasures.length > 0) {
       const emphasis =
@@ -314,8 +269,7 @@ function parseWithLoss(raw: unknown): ParseOutcome {
     }
   }
 
-  // Loss messages mention labels where they can; keep them deduplicated
-  // so ten broken filters do not read as a wall.
+  // Deduplicated so ten broken filters don't read as a wall.
   const dedupedLoss = loss.filter((message, i) => loss.indexOf(message) === i);
 
   return {
@@ -334,22 +288,15 @@ function parseWithLoss(raw: unknown): ParseOutcome {
   };
 }
 
-/** The only way untrusted JSON becomes a ReportSpec. Never throws. */
 export function parseReportSpec(raw: unknown): ReportSpec {
   return parseWithLoss(raw).spec;
 }
 
-/** Plain-English list of what parsing dropped, for the screen to show. */
 export function describeSpecLoss(raw: unknown): string[] {
   return parseWithLoss(raw).loss;
 }
 
-// ---------------------------------------------------------------------
-// The URL round trip
-// ---------------------------------------------------------------------
-// base64url so the spec survives copy-paste, chat apps and bookmarks.
-// TextEncoder/TextDecoder around btoa/atob for UTF-8 safety — a filter
-// value can legitimately carry a Malayalam item name.
+// base64url so the spec survives copy-paste; TextEncoder around btoa for UTF-8 (Malayalam names).
 
 export function encodeSpec(spec: ReportSpec): string {
   const bytes = new TextEncoder().encode(JSON.stringify(spec));
@@ -358,11 +305,7 @@ export function encodeSpec(spec: ReportSpec): string {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-/**
- * The raw `?spec=` value back to unknown JSON, for the parser. Returns
- * null for anything unreadable — never throws, a mangled URL is just an
- * empty report.
- */
+// Null for anything unreadable: a mangled URL is just an empty report.
 export function decodeSpecParam(raw: string | string[] | undefined): unknown {
   const value = Array.isArray(raw) ? raw[0] : raw;
   if (!value || typeof value !== "string" || value.length > 20_000) return null;
@@ -377,30 +320,22 @@ export function decodeSpecParam(raw: string | string[] | undefined): unknown {
   }
 }
 
-/** Non-null when the spec came from the URL and read cleanly. */
 export function specFromParam(raw: string | string[] | undefined): ReportSpec | null {
   const decoded = decodeSpecParam(raw);
   return decoded === null ? null : parseReportSpec(decoded);
 }
 
-// ---------------------------------------------------------------------
-// What the builder screen needs to know
-// ---------------------------------------------------------------------
-// A serialisable view of one dataset for the Client Component: keys,
-// labels and what each field may legally do — never paths, selects or
-// filter columns, which stay server-side.
+// Serialisable view for the Client Component: never paths, selects or filter columns.
 
 export type BuilderField = {
   key: string;
   label: string;
   type: FieldDef["type"];
-  /** Empty = this field can never be filtered. */
   ops: Op[];
   groupable: boolean;
   aggregates: Aggregate[];
   sortable: boolean;
   lookup?: "projects" | "units" | "vendors";
-  /** Value control is a dropdown of the data's own distinct values. */
   distinct?: true;
 };
 
@@ -434,13 +369,8 @@ export function builderDataset(datasetKey: string): BuilderDataset {
   };
 }
 
-// ---------------------------------------------------------------------
-// Quick filters — the bar above the builder (plan.md, A5)
-// ---------------------------------------------------------------------
-// Date range, project, villa and vendor, always in view. Each writes an
-// ORDINARY picker filter into the spec — the same filter the builder
-// would make — so a saved report, the CSV and the PDF see exactly what
-// the screen does, and the parser stays the only door.
+// Each writes an ordinary picker filter into the spec, so saved reports, CSV and PDF see what the
+// screen does and the parser stays the only door.
 
 export type QuickFilterKind = "date" | "project" | "unit" | "vendor";
 export type QuickFilterFields = Partial<Record<QuickFilterKind, string>>;
@@ -452,7 +382,6 @@ export type QuickFilterValues = {
   vendor?: string;
 };
 
-/** Which field of a dataset each quick filter writes to; absent = not offered. */
 export function quickFilterFields(datasetKey: string): QuickFilterFields {
   const dataset = DATASETS[datasetKey];
   if (!dataset) return {};
@@ -467,7 +396,6 @@ export function quickFilterFields(datasetKey: string): QuickFilterFields {
   return fields;
 }
 
-/** The quick filters' current values, read back from a spec. */
 export function readQuickFilters(spec: ReportSpec, fields: QuickFilterFields): QuickFilterValues {
   const find = (field: string | undefined, op: Op) =>
     field
@@ -483,12 +411,8 @@ export function readQuickFilters(spec: ReportSpec, fields: QuickFilterFields): Q
   };
 }
 
-/**
- * The spec with the quick filters set to `values`: each quick filter's own
- * filter (date gte/lte, lookup eq) is replaced, every other filter kept,
- * and the result goes back through the parser so it stays valid and
- * bounded. An empty value removes that filter.
- */
+// Replaces each quick filter's own filter, keeps the rest, and re-parses so it stays bounded. An
+// empty value removes it.
 export function applyQuickFilters(
   spec: ReportSpec,
   fields: QuickFilterFields,

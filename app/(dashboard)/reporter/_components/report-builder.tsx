@@ -1,17 +1,9 @@
 "use client";
 
-/**
- * The builder half of a report. Owns a DRAFT of the spec; "Run report"
- * writes it to `?spec=` and the Server Component re-runs the query —
- * the trail-filters pattern, with the whole spec in one param so a
- * report link is shareable and bookmarkable. The parent keys this
- * component on the raw param, so navigation remounts it in sync.
- *
- * Nothing typed here reaches the database as anything but a VALUE:
- * every field, op and aggregate is a registry key, re-validated
- * server-side by parseReportSpec. This screen just refuses to offer
- * illegal combinations in the first place.
- */
+// Owns a DRAFT of the spec; "Run report" writes it to `?spec=` and the Server Component re-runs.
+// The parent keys this on the raw param so navigation remounts it in sync. Nothing typed here
+// reaches the database but as a VALUE: every field, op and aggregate is a registry key,
+// re-validated by parseReportSpec.
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -76,16 +68,13 @@ export function ReportBuilder({
   dataset: BuilderDataset;
   spec: ReportSpec;
   /**
-   * Where "Run report" pushes the new spec — `/reporter/run` for an
-   * unsaved report, `/reporter/<id>` for a saved one, so reshaping a
-   * saved report stays on that report's page instead of dropping the
-   * person into an unsaved copy of it.
+   * `/reporter/run` for an unsaved report, `/reporter/<id>` for a saved one, so reshaping stays on
+   * that page.
    */
   basePath: string;
   projects: ProjectOption[];
   units: UnitOption[];
   vendors: VendorOption[];
-  /** Distinct data values per field key, for the dropdown filters. */
   options: Record<string, string[]>;
 }) {
   const router = useRouter();
@@ -111,8 +100,7 @@ export function ReportBuilder({
   const sortable = dataset.fields.filter((field) => field.sortable);
 
   const run = () => {
-    // An unfinished filter row (blank value) is dropped quietly here —
-    // sending it would only earn a "left out" note from the parser.
+    // A blank-value filter row is dropped quietly; the parser would only note it.
     const measureIds = measures.map((measure) => measureId(measure));
     const chartMeasures = chart.measures.filter((id) => measureIds.includes(id));
     const draft = parseReportSpec({
@@ -173,8 +161,7 @@ export function ReportBuilder({
     setFilters((current) =>
       current.map((filter, i) => {
         if (i !== index) return filter;
-        // A new field brings its own legal ops; keep the op if it still
-        // applies, otherwise fall to the field's first.
+        // A new field has its own legal ops: keep the op if it still applies, else use the first.
         if (next.field && next.field !== filter.field) {
           const field = byKey.get(next.field);
           const ops = field?.ops ?? [];
@@ -210,7 +197,6 @@ export function ReportBuilder({
 
   return (
     <Card className="space-y-5 p-4 sm:p-5">
-      {/* Columns */}
       <div className="space-y-2">
         <p className={sectionLabel}>Columns</p>
         <div className="flex flex-wrap gap-1.5">
@@ -236,7 +222,6 @@ export function ReportBuilder({
         </div>
       </div>
 
-      {/* Filters */}
       <div className="space-y-2">
         <p className={sectionLabel}>Filters</p>
         {filters.length === 0 && (
@@ -309,7 +294,6 @@ export function ReportBuilder({
         )}
       </div>
 
-      {/* Group & measure */}
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <p className={sectionLabel}>Group by</p>
@@ -417,7 +401,6 @@ export function ReportBuilder({
         </div>
       </div>
 
-      {/* Chart */}
       <div className="space-y-2">
         <p className={sectionLabel}>Chart</p>
         {groupBy.length === 0 || measures.length === 0 ? (
@@ -527,7 +510,6 @@ export function ReportBuilder({
         )}
       </div>
 
-      {/* Sort & size */}
       <div className="flex flex-wrap items-end gap-4">
         <div className="space-y-2">
           <p className={sectionLabel}>Sort</p>
@@ -653,8 +635,7 @@ function FilterValue({
     );
   }
   if (field.lookup === "units") {
-    // The same unit name recurs across projects, so the list groups by
-    // project rather than trusting the name to identify anything.
+    // The same unit name recurs across projects, so the list groups by project.
     return (
       <Select
         aria-label="Unit"

@@ -2,12 +2,8 @@ import { getReport } from "@/lib/reporter/queries";
 import { reportPdfResponse } from "@/lib/reporter/pdf";
 import { decodeSpecParam, parseReportSpec } from "@/lib/reporter/spec";
 
-/**
- * A saved report — or a starting point — as a PDF. A `?spec=` overrides
- * the stored spec, because the page allows the same reshaping; both
- * paths end at the same parser. getReport() enforces the grant and
- * returns null for "no such report" and "not yours to see" alike.
- */
+// A `?spec=` overrides the stored spec; getReport() enforces the grant and returns null for "no
+// such report" and "not yours" alike.
 export async function GET(request: Request, { params }: { params: Promise<{ reportId: string }> }) {
   const { reportId } = await params;
   const report = await getReport(reportId);

@@ -1,9 +1,4 @@
-// ---------------------------------------------------------------------
-// goods_receipt_lines — every delivery line ever received
-// ---------------------------------------------------------------------
-// Money-free by design (0022's reasoning: a quantity and a status are
-// operational fact, not commercial secret), and readable by every
-// authenticated user, so zero RLS risk.
+// Money-free by design (0022): a quantity and a status are operational fact.
 
 import type { DatasetDef } from "./types";
 
@@ -59,9 +54,8 @@ export const goodsReceiptLines: DatasetDef = {
       groupable: true,
       aggregates: ["count_distinct"],
     },
-    // Stores are few but have no lookup type and their name sits on a
-    // nested left embed (the filter-the-embed trap), so the store
-    // displays and groups but does not filter in v1.
+    // The name sits on a nested left embed (the filter-the-embed trap), so the store displays and
+    // groups but doesn't filter.
     store: {
       label: "Store",
       type: "text",

@@ -1,18 +1,6 @@
-/**
- * A report on paper: the same composed page the screen shows — headline
- * figures, chart, then the table with subtotals — through the shared
- * document shell (lib/pdf/document.tsx), so it prints on the same
- * letterhead as every other Goodearth document.
- *
- * Money renders through formatAmount (digits, no ₹ — Helvetica cannot
- * draw one), dates through formatDate: the same lib/format.ts the
- * screen uses, so paper and screen never disagree about a number.
- *
- * The DETAIL view mirrors the screen's row limit and says "first N of
- * M" honestly; the CSV is the export that carries every line. Grouped
- * reports print all their groups — that is the summary someone takes
- * to a meeting.
- */
+// Same composed page as the screen, through the shared PDF shell. Money uses formatAmount (digits,
+// no rupee sign: Helvetica can't draw one), so paper and screen agree. Detail mirrors the screen's
+// row limit ("first N of M"); the CSV carries every line.
 
 import { Document, StyleSheet, Text, View } from "@react-pdf/renderer";
 
@@ -97,7 +85,6 @@ export function ReportDocument({
   spec: ReportSpec;
   result: ReportResult;
   chartModel: ChartModel | null;
-  /** Passed in, not read from the clock — documents stay testable. */
   generatedOn: string;
 }) {
   const meta = {
@@ -157,9 +144,7 @@ export function ReportDocument({
   );
 }
 
-// No `spec` here on purpose: an ungrouped report prints the columns the
-// result carries, so the detail table needs the dataset's labels and the
-// rows, nothing about how the report was specified.
+// No `spec` on purpose: the table needs only the labels and the rows.
 function DetailTable({ dataset, result }: { dataset: DatasetDef; result: ReportResult }) {
   const columns: Column<Record<string, ReportValue>>[] = result.columns.map((key) => {
     const field = dataset.fields[key];

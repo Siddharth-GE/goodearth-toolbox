@@ -1,10 +1,5 @@
-// ---------------------------------------------------------------------
-// bills — every bill recorded, header level
-// ---------------------------------------------------------------------
-// A bill has no lines by design (the paper invoice's figures are the
-// record), so this dataset IS the billed money. No purchase_orders
-// embed on purpose: bills.po_id resolves to three relations and nothing
-// here needs it.
+// A bill has no lines by design, so this dataset IS the billed money. No purchase_orders embed:
+// bills.po_id resolves to three relations.
 
 import type { DatasetDef } from "./types";
 

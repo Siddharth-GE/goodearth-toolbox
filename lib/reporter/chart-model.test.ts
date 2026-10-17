@@ -1,9 +1,5 @@
-/**
- * The data shaping Recharts is handed. Nulls stay null (a gap, never a
- * fabricated zero), wildly different magnitudes split into two charts
- * rather than sharing one flattening scale, and a meter clamps its bar
- * while telling the truth in its caption.
- */
+// Nulls stay null, very different magnitudes split into two charts, and a meter clamps its bar but
+// tells the truth in its caption.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -139,7 +135,6 @@ test("a meter is value over limit, bar clamped, caption honest", () => {
   });
   const meter = m as MeterModel;
   assert.equal(meter.kind, "meter");
-  // sum = 35, count = 3 → wildly over 100%.
   assert.equal(meter.value, 35);
   assert.equal(meter.limit, 3);
   assert.ok((meter.pct ?? 0) > 100);
@@ -160,7 +155,6 @@ test("stacked by two grouping levels: segments are the other level, additive onl
   const malhar = cartesian.points.find((p) => p.category === "Malhar");
   assert.equal(malhar?.values["Cement"], 10);
 
-  // A non-additive measure refuses with a sentence, never a wrong stack.
   const { model: refused } = model({
     groupBy: ["project", "item"],
     measures: [{ field: "quantity", agg: "avg" }],
@@ -178,7 +172,6 @@ test("an inner-level category merges only additive measures", () => {
   const cartesian = additive as CartesianModel;
   assert.equal(cartesian.kind, "cartesian");
   const cement = cartesian.points.find((p) => p.category === "Cement");
-  // 10 from Malhar + 20 from Chila.
   assert.equal(cement?.values["quantity:sum"], 30);
 
   const { model: refused } = model({

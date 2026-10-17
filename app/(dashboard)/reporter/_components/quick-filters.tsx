@@ -17,13 +17,8 @@ import {
   type ReportSpec,
 } from "@/lib/reporter/spec";
 
-/**
- * The always-visible filters above the builder (plan.md, A5): a date
- * range, project, villa and vendor — whichever the data set has. Each
- * writes an ordinary picker filter into the spec (applyQuickFilters,
- * tested), so the builder below shows it too and a saved report keeps it.
- * Choices, never typing — founder decision #4 holds.
- */
+// Each writes an ordinary picker filter into the spec (applyQuickFilters), so the builder shows it
+// and a saved report keeps it. Choices, never typing.
 export function QuickFilters({
   spec,
   basePath,
@@ -52,7 +47,6 @@ export function QuickFilters({
       router.push(`${basePath}?spec=${encodeSpec(applyQuickFilters(spec, fields, next))}`);
     });
 
-  // A villa list narrowed to the chosen project, so it stays short.
   const villaChoices = values.project
     ? units.filter((unit) => unit.projectId === values.project)
     : units;
