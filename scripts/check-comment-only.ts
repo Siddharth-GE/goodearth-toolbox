@@ -30,6 +30,14 @@ function compile(source: string, fileName: string) {
   }).outputText;
 }
 
+/** The TypeScript itself, comments and whitespace removed: compiling erases
+ * types, so a deleted type member shows only here. */
+function typeShape(source: string, fileName: string) {
+  const kind = fileName.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
+  const file = ts.createSourceFile(fileName, source, ts.ScriptTarget.ESNext, false, kind);
+  return ts.createPrinter({ removeComments: true }).printFile(file).replace(/\s+/g, "");
+}
+
 /** The compiled code as tokens, whitespace and comments ignored. */
 function tokens(code: string): string[] {
   const scanner = ts.createScanner(ts.ScriptTarget.ESNext, true, ts.LanguageVariant.Standard, code);
@@ -88,6 +96,8 @@ function main() {
       failures.push(
         `${file}: code changed near "${x[i]?.split(":").slice(1).join(":")}" → "${y[i]?.split(":").slice(1).join(":")}"`,
       );
+    } else if (typeShape(before, file) !== typeShape(after, file)) {
+      failures.push(`${file}: a type changed (compiled code is the same)`);
     }
   }
 
