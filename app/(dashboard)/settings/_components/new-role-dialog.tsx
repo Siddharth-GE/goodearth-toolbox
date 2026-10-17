@@ -6,12 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createRole } from "@/lib/settings/roles-actions";
 
-/**
- * A new role starts empty — name and approval rights here, then its
- * apps are ticked on the card. Two steps on purpose: sixteen tool
- * checkboxes inside a dialog is a wall, and a role with no apps yet is
- * harmless (it grants nothing until you add some).
- */
+/** Two steps on purpose: a role with no apps grants nothing, and sixteen checkboxes in a dialog is a wall. */
 export function NewRoleDialog() {
   return (
     <RecordFormDialog label="Role" isEdit={false} action={createRole}>

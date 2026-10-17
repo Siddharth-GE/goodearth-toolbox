@@ -4,11 +4,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { setToolLead } from "@/lib/settings/actions";
 import { useState, useTransition } from "react";
 
-/**
- * The "Team lead" tick under a grant whose tool shows each person only
- * their own work (lib/tools.ts `scoped`, 0122) — a sibling of
- * GrantCheckbox, controlled and rolled back if the write fails.
- */
+/** The "Team lead" tick under a grant of a scoped tool (0122); controlled and rolled back like GrantCheckbox. */
 export function LeadCheckbox({
   userId,
   app,

@@ -11,11 +11,7 @@ import { deleteTeam, moveTeam, renameTeam } from "@/lib/settings/teams-actions";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { useState, useTransition } from "react";
 
-/**
- * One team: its place in the order (arrows), a rename, and a delete that
- * says where its tools go first. Deleting never touches anyone's access —
- * the tools only move to Other.
- */
+/** Deleting a team never touches anyone's access: its tools only move to Other. */
 export function TeamRow({
   team,
   toolCount,
@@ -62,8 +58,7 @@ export function TeamRow({
           </IconButton>
         </div>
 
-        {/* min-w-32: on a phone, Rename and Delete wrap to their own
-            line before the name is cut short. */}
+        {/* min-w-32: Rename and Delete wrap before the name is cut short on a phone. */}
         <div className="min-w-32 flex-1">
           <p className="text-foreground truncate text-sm font-medium">{team.name}</p>
           <p className="text-muted text-xs">

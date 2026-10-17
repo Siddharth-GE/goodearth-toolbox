@@ -6,9 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { GRANTABLE_TOOLS } from "@/lib/tools";
 import { revalidatePath } from "next/cache";
 
-// Type-only import, deliberately NOT re-exported — a type re-export from
-// a "use server" file can survive into the runtime export list and crash
-// it (the outage guarded by npm run check:actions).
+// Type-only import, not re-exported from a "use server" file (npm run check:actions).
 import type { ActionState } from "@/lib/action-state";
 
 function isGrantable(app: string) {
@@ -87,16 +85,11 @@ export async function updateRole(
     return { error: "Could not save the role. Try again." };
   }
 
-  // Everyone holding it is affected, so the whole tool is revalidated.
   revalidatePath("/settings", "layout");
   return undefined;
 }
 
-/**
- * A role is deleted only when nobody holds it — the FK is `on delete
- * restrict` (0034) precisely so this can't quietly strip someone's
- * access. 23503 is that refusal arriving.
- */
+/** Deleted only when nobody holds it: the FK is `on delete restrict` (0034) so it can't quietly strip access. 23503 is that refusal. */
 export async function deleteRole(roleId: string): Promise<ActionState> {
   const user = await requireUser();
   await requireAdmin(user);
@@ -122,7 +115,6 @@ export async function addRoleApp(roleId: string, app: string): Promise<ActionSta
 
   const supabase = await createClient();
   const { error } = await supabase.from("role_apps").insert({ role_id: roleId, app });
-  // Already in the bundle: a harmless no-op from the admin's view.
   if (error && error.code !== "23505") {
     console.error("addRoleApp failed:", error);
     return { error: "Could not add that app to the role. Try again." };
@@ -147,7 +139,6 @@ export async function removeRoleApp(roleId: string, app: string): Promise<Action
   return undefined;
 }
 
-/** Assigns a role to a person, or clears it when roleId is empty. */
 export async function setPersonRole(userId: string, roleId: string): Promise<ActionState> {
   const user = await requireUser();
   await requireAdmin(user);

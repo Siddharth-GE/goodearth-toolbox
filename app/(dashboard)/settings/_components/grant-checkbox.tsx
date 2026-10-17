@@ -14,10 +14,7 @@ export function GrantCheckbox({
   granted: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
-  // Controlled, not defaultChecked. An uncontrolled box keeps whatever
-  // the click set it to even when the write failed, so the screen would
-  // claim someone had access they didn't. This is the state the server
-  // actually confirmed.
+  // Controlled, not defaultChecked: an uncontrolled box stays ticked after a failed write, claiming access nobody has.
   const [checked, setChecked] = useState(granted);
   const [error, setError] = useState<string>();
 
@@ -29,8 +26,7 @@ export function GrantCheckbox({
         aria-label={`${checked ? "Revoke" : "Grant"} ${app}`}
         onChange={(event) => {
           const next = event.target.checked;
-          // Optimistic: the box moves immediately, and moves back if the
-          // server disagrees. Granting access should feel instant.
+          // Optimistic: the box moves at once and moves back if the server disagrees.
           setChecked(next);
           setError(undefined);
           startTransition(async () => {

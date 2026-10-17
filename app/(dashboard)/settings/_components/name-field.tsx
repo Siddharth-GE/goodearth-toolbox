@@ -6,12 +6,6 @@ import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
 import { setFullName } from "@/lib/settings/actions";
 import { useState } from "react";
 
-/**
- * The person's display name, saved on blur — the name every avatar and
- * "approved by" line across the tools resolves to. Empty until an admin
- * fills it in, because account creation (the Supabase dashboard) never
- * asks for a name.
- */
 export function NameField({ userId, name }: { userId: string; name: string | null }) {
   const [value, setValue] = useState(name ?? "");
 

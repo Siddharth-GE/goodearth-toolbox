@@ -5,7 +5,6 @@ import { Select } from "@/components/ui/select";
 import { setPersonRole } from "@/lib/settings/roles-actions";
 import { useState, useTransition } from "react";
 
-/** Assigning someone's role — saves on change, rolls back if refused. */
 export function RolePicker({
   userId,
   roleId,

@@ -3,12 +3,7 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { useState, useTransition } from "react";
 
-/**
- * A named-approver switch — a sibling of GrantCheckbox with the same
- * controlled/rollback behaviour, calling one action with a boolean
- * instead of two. Generic over which list it manages: the indents and
- * bills columns render this same component with their own action.
- */
+/** Sibling of GrantCheckbox calling one action with a boolean; the indents and bills columns share it. */
 export function ApproverCheckbox({
   userId,
   isApprover,
@@ -17,14 +12,11 @@ export function ApproverCheckbox({
 }: {
   userId: string;
   isApprover: boolean;
-  /** A server action: (userId, canApprove) — setIndentApprover, setBillApprover. */
   action: (userId: string, canApprove: boolean) => Promise<{ error?: string } | undefined>;
-  /** For the aria-label: "indent approver", "bill approver". */
   label: string;
 }) {
   const [isPending, startTransition] = useTransition();
-  // Controlled, not defaultChecked — the state the server actually
-  // confirmed, rolled back if the write fails (see GrantCheckbox).
+  // Controlled: the state the server confirmed, rolled back if the write fails.
   const [checked, setChecked] = useState(isApprover);
   const [error, setError] = useState<string>();
 

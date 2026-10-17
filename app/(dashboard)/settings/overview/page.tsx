@@ -24,11 +24,7 @@ import { GRANTABLE_TOOLS } from "@/lib/tools";
 import Link from "next/link";
 import { SettingsNav } from "../_components/settings-nav";
 
-/**
- * Who has what, at a glance — read-only on purpose. The matrix used to
- * BE the editor, which made every column a place to mis-click; changes
- * now happen on a person's own page, and this stays the picture.
- */
+/** Read-only on purpose: changes happen on a person's own page. */
 export default async function SettingsOverviewPage() {
   const user = await requireUser();
   await requireAdmin(user);
@@ -53,8 +49,7 @@ export default async function SettingsOverviewPage() {
         hold everything without either.
       </p>
 
-      {/* Sixteen tool columns don't fit a phone — the table scrolls
-          inside its own box rather than the page scrolling sideways. */}
+      {/* The table scrolls inside its own box, not the page, on a phone. */}
       <div className="overflow-x-auto">
         <Table>
           <TableHead>

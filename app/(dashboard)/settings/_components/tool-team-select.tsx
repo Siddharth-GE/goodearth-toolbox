@@ -7,11 +7,6 @@ import { useState, useTransition } from "react";
 
 const OTHER = "";
 
-/**
- * The team one tool sits under, saved on change. Controlled, like
- * GrantCheckbox: it shows what the server confirmed, and moves back if
- * the save fails.
- */
 export function ToolTeamSelect({
   app,
   toolName,

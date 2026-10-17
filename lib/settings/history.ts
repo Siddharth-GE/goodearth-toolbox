@@ -1,11 +1,5 @@
-/**
- * Turning audit_log rows about one person's access into sentences.
- *
- * Pure on purpose (the house rule: tests cover logic, never the
- * database) — the query hands over rows, this decides what they say.
- * Only the shapes Settings actually writes are described; anything else
- * falls back to a plain "changed" line rather than inventing a story.
- */
+// Turns audit_log rows about one person's access into sentences. Pure. Only shapes Settings writes are described;
+// anything else falls back to a plain "changed" line.
 
 import { TOOLS } from "@/lib/tools";
 
@@ -13,14 +7,12 @@ export type AccessAuditRow = {
   table_name: string;
   action: string;
   at: string;
-  /** profiles.full_name of whoever made the change, when known. */
   actorName: string | null;
   old_data: Record<string, unknown> | null;
   new_data: Record<string, unknown> | null;
 };
 
 export type AccessEvent = {
-  /** The sentence, without the actor or date. */
   what: string;
   actorName: string | null;
   at: string;
@@ -31,11 +23,7 @@ function field(data: Record<string, unknown> | null, key: string): string | null
   return typeof value === "string" ? value : null;
 }
 
-/**
- * The name the sidebar shows for a grant ("Purchase Orders"), so the access
- * log and the menu agree; a slug that has left the registry still reads as
- * words ("/management-dashboard" → "Management dashboard").
- */
+/** The sidebar's name for a grant, so log and menu agree; a slug gone from the registry still reads as words. */
 export function appLabel(app: string): string {
   const tool = TOOLS.find((tool) => tool.href === app);
   if (tool) return tool.name;
@@ -65,8 +53,7 @@ export function describeAccessEvent(row: AccessAuditRow): AccessEvent | null {
   }
 
   if (row.table_name === "profiles") {
-    // An UPDATE can touch several columns at once; report each real
-    // change rather than the first one found, so nothing goes unseen.
+    // An UPDATE can touch several columns: report each real change.
     const changes: string[] = [];
 
     const oldName = field(row.old_data, "full_name");
@@ -95,7 +82,6 @@ export function describeAccessEvent(row: AccessAuditRow): AccessEvent | null {
   return null;
 }
 
-/** The whole log for one person, newest first, unexplainable rows dropped. */
 export function describeAccessHistory(rows: AccessAuditRow[]): AccessEvent[] {
   return rows.map(describeAccessEvent).filter((event): event is AccessEvent => event !== null);
 }

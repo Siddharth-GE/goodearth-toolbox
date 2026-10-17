@@ -29,9 +29,7 @@ import { LeadCheckbox } from "../../_components/lead-checkbox";
 import { NameField } from "../../_components/name-field";
 import { RolePicker } from "../../_components/role-picker";
 
-// Grants read under teams here rather than as one long column: sixteen
-// tools in a flat list is a wall, and the teams (Settings → Teams) are
-// how the sidebar already organises them.
+// Grants read under the sidebar's teams (Settings → Teams), not one long column.
 
 export default async function PersonPage({ params }: { params: Promise<{ personId: string }> }) {
   const user = await requireUser();
@@ -41,9 +39,7 @@ export default async function PersonPage({ params }: { params: Promise<{ personI
   const person = await getPersonForAdmin(personId);
   if (!person) notFound();
 
-  // One batch, not two. The role's own bundle and rights (the last pair)
-  // depend only on person.role_id, which is in hand a line above — so
-  // they used to wait on six unrelated reads for no reason.
+  // One batch: the role's bundle depends only on person.role_id, which is already in hand.
   const [
     grants,
     leads,
@@ -109,9 +105,6 @@ export default async function PersonPage({ params }: { params: Promise<{ personI
 
       <Card className="space-y-3 p-4">
         <p className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">Name</p>
-        {/* The name feeds every avatar and "approved by" line in the
-            toolbox — editable here because account creation never asks
-            for one. */}
         <NameField userId={person.id} name={person.full_name} />
       </Card>
 

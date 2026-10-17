@@ -9,11 +9,7 @@ import { SettingsNav } from "../_components/settings-nav";
 import { TeamRow } from "../_components/team-row";
 import { ToolTeamSelect } from "../_components/tool-team-select";
 
-/**
- * Teams — the headings in everyone's sidebar, and which tool sits under
- * each. Reads with the throwing form: an empty list from a failed read
- * would look like "no teams yet" and invite duplicates.
- */
+// Reads with the throwing form: an empty list from a failed read would look like "no teams yet" and invite duplicates.
 export default async function SettingsTeamsPage() {
   const user = await requireUser();
   await requireAdmin(user);
@@ -90,14 +86,11 @@ export default async function SettingsTeamsPage() {
                   <span className="text-foreground truncate text-sm font-medium">{tool.name}</span>
                 </span>
                 <ToolTeamSelect
-                  // Keyed by the saved team, so a change made elsewhere
-                  // (a team deleted, its tools sent to Other) resets the
-                  // picker instead of leaving it showing the old team.
+                  // Keyed by the saved team so a change made elsewhere resets the picker.
                   key={teamId ?? "other"}
                   app={tool.href}
                   toolName={tool.name}
-                  // A row pointing at a team that is gone reads as Other,
-                  // exactly as the sidebar draws it.
+                  // A row pointing at a gone team reads as Other, as the sidebar draws it.
                   teamId={teamId && known.has(teamId) ? teamId : null}
                   teams={teams}
                 />

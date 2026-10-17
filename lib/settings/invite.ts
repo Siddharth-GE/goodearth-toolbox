@@ -1,11 +1,4 @@
-/**
- * The rules for inviting and deactivating people — pure, so they can be
- * tested without a database (the house rule) and so the button and the
- * action agree on what "allowed" means.
- *
- * These are courtesies, not the boundary: profiles_guard() (0032)
- * refuses the last-admin cases at the database, whatever the app thinks.
- */
+// Pure, so the button and the action agree. These are courtesies: profiles_guard() (0032) refuses the last-admin cases at the database.
 
 export type InviteInput = {
   fullName: string;
@@ -16,8 +9,7 @@ export type InviteInput = {
 /** Supabase's own minimum; stated here so the message arrives before the round trip. */
 export const MIN_PASSWORD_LENGTH = 8;
 
-// Deliberately loose: the point is to catch a typo like a missing "@",
-// not to adjudicate RFC 5322. Supabase rejects what it won't accept.
+// Deliberately loose: catches a typo like a missing "@"; Supabase rejects the rest.
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function validateInvite(input: InviteInput): string | undefined {
@@ -35,20 +27,14 @@ export function validateInvite(input: InviteInput): string | undefined {
 }
 
 export type AdminChange = {
-  /** The person being changed. */
   targetIsAdmin: boolean;
   targetIsActive: boolean;
   /** How many active admins exist right now, including the target. */
   activeAdminCount: number;
-  /** True when an admin is acting on their own row. */
   isSelf: boolean;
 };
 
-/**
- * Why a deactivation or demotion can't go ahead, or undefined when it
- * can. Removing the last active admin locks everyone out of Settings
- * permanently — recoverable only from the database console.
- */
+/** Why a deactivation or demotion can't go ahead. Removing the last active admin locks everyone out of Settings for good. */
 export function blockedReason(change: AdminChange): string | undefined {
   if (change.isSelf) {
     return "You can't change your own admin status or switch off your own account.";

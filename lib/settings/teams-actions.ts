@@ -7,19 +7,11 @@ import { createClient } from "@/lib/supabase/server";
 import { TOOLS } from "@/lib/tools";
 import { revalidatePath } from "next/cache";
 
-// Type-only import, deliberately NOT re-exported — a type re-export from
-// a "use server" file can survive into the runtime export list and crash
-// it (the outage guarded by npm run check:actions).
+// Type-only import, not re-exported from a "use server" file (npm run check:actions).
 import type { ActionState } from "@/lib/action-state";
 
-/**
- * Teams — the headings in everyone's sidebar (0114, lib/nav/). Admin
- * only: the policies say is_admin(), and every action checks first.
- * Teams arrange; grants decide — nothing here changes who can open what.
- *
- * Every page carries the sidebar, so a change refreshes the whole
- * dashboard, not just Settings.
- */
+/** Teams are the sidebar headings (0114). Admin only: the policies say is_admin() and every action checks first.
+ * Teams arrange, grants decide. Every page carries the sidebar, so a change refreshes the whole dashboard. */
 function refreshEverywhere() {
   revalidatePath("/", "layout");
 }
@@ -44,7 +36,6 @@ export async function createTeam(_state: ActionState, formData: FormData): Promi
   if ("error" in parsed) return { error: parsed.error };
 
   const supabase = await createClient();
-  // A new team goes to the bottom; the arrows move it from there.
   const { data: last, error: readError } = await supabase
     .from("tool_teams")
     .select("sort_order")
@@ -97,11 +88,7 @@ export async function renameTeam(
   return undefined;
 }
 
-/**
- * One step up or down the sidebar. The whole order is renumbered 1…n as
- * it is written, so ties or gaps left by deletes never make an arrow
- * look like it did nothing.
- */
+/** The whole order is renumbered 1…n as written, so ties or gaps never make an arrow look dead. */
 export async function moveTeam(teamId: string, direction: "up" | "down"): Promise<ActionState> {
   const user = await requireUser();
   await requireAdmin(user);
@@ -145,7 +132,6 @@ export async function moveTeam(teamId: string, direction: "up" | "down"): Promis
   return undefined;
 }
 
-/** Its tools fall back to Other (the FK cascades their rows) — no grant is touched. */
 export async function deleteTeam(teamId: string): Promise<ActionState> {
   const user = await requireUser();
   await requireAdmin(user);
@@ -161,13 +147,11 @@ export async function deleteTeam(teamId: string): Promise<ActionState> {
   return undefined;
 }
 
-/** Puts a tool under a team, or under Other when `teamId` is null. */
 export async function setToolTeam(app: string, teamId: string | null): Promise<ActionState> {
   const user = await requireUser();
   await requireAdmin(user);
 
-  // The table has no CHECK on the slug (0114 says why), so the registry
-  // is the check.
+  // The table has no CHECK on the slug (0114), so the registry is the check.
   if (!TOOLS.some((tool) => tool.href === app)) return { error: "That tool doesn't exist." };
 
   const supabase = await createClient();

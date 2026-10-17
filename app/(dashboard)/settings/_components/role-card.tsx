@@ -13,15 +13,7 @@ import type { ToolSection } from "@/lib/nav/arrange";
 import type { RoleWithApps } from "@/lib/settings/roles";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 
-/**
- * One role: its name and approval rights as a small save-on-submit
- * form, and its app bundle as toggles that save immediately (the
- * GrantCheckbox pattern — controlled, rolled back if the server
- * disagrees).
- *
- * Editing a bundle changes what everyone holding the role can open, on
- * their very next page load — nothing is copied, so nothing can drift.
- */
+/** Editing a bundle changes what everyone holding the role can open on their next page load: nothing is copied, so nothing drifts. */
 export function RoleCard({ role, sections }: { role: RoleWithApps; sections: ToolSection[] }) {
   const [state, formAction, pending] = useActionState(updateRole.bind(null, role.id), undefined);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -195,8 +187,6 @@ function RoleAppToggle({
   inBundle: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
-  // Controlled, like GrantCheckbox: the state the server confirmed,
-  // rolled back when it disagrees.
   const [checked, setChecked] = useState(inBundle);
   const [error, setError] = useState<string>();
 

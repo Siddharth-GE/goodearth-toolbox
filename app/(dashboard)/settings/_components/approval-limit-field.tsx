@@ -6,12 +6,7 @@ import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
 import { setBillApprovalLimit } from "@/lib/settings/actions";
 import { useState } from "react";
 
-/**
- * The ceiling on a bill approver's authority, saved on blur like the
- * name field. Blank is unlimited — the state every approver was in
- * before limits existed, so clearing it restores the old behaviour
- * rather than reducing someone to nothing.
- */
+/** Saved on blur. Blank is unlimited, so clearing restores the old behaviour rather than reducing someone to nothing. */
 export function ApprovalLimitField({ userId, limit }: { userId: string; limit: number | null }) {
   const initial = limit === null ? "" : String(limit);
   const [value, setValue] = useState(initial);

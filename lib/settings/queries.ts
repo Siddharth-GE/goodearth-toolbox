@@ -6,8 +6,7 @@ import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import type { AccessAuditRow } from "./history";
 
-// Settings is admin-only, so every read here guards itself — the page
-// checks too, but a query must not rely on its caller remembering to.
+// Settings is admin-only: every read guards itself rather than relying on the page's check.
 async function requireAdminCaller() {
   const user = await requireUser();
   await requireAdmin(user);
@@ -17,11 +16,9 @@ export type AdminUserRow = {
   id: string;
   email: string;
   full_name: string | null;
-  /** The admin/staff flag — a separate question from role_id (0034). */
   role: string;
   team: string | null;
   is_active: boolean;
-  /** The assigned role template, or null. */
   role_id: string | null;
 };
 
@@ -33,14 +30,8 @@ export async function listUsersForAdmin(): Promise<AdminUserRow[]> {
   return data ?? [];
 }
 
-// Every granted (user_id, app) pair, for every user — the Settings grid
-// renders this as a lookup rather than one query per row. Read to
-// completion: this table is sized by users × tools (200 × 10 clears
-// PostgREST's silent 1,000-row cap), and a truncated read renders real
-// grants as unticked boxes — which an admin would then "fix" wrongly.
-// The named list of people who may approve indents (admins always may,
-// without a row here). Read to completion for the same reason as the
-// grants below: a truncated read renders a real approver as unticked.
+// Read to completion: users × tools can pass PostgREST's silent 1,000-row cap, and a truncated read shows real grants as unticked.
+// Indent approvers (admins always may); read to completion, since a truncated read shows a real approver as unticked.
 export async function listIndentApprovers(): Promise<Set<string>> {
   await requireAdminCaller();
   const supabase = await createClient();
@@ -50,7 +41,6 @@ export async function listIndentApprovers(): Promise<Set<string>> {
   return new Set(data.map((row) => row.user_id));
 }
 
-// The bill twin of the list above (bill_approvers, migration 0025).
 export async function listBillApprovers(): Promise<Set<string>> {
   await requireAdminCaller();
   const supabase = await createClient();
@@ -60,11 +50,7 @@ export async function listBillApprovers(): Promise<Set<string>> {
   return new Set(data.map((row) => row.user_id));
 }
 
-/**
- * Each bill approver's ceiling (0033). Absent from the map means not an
- * approver at all; present with null means an approver with no limit —
- * a distinction the screens rely on, so it isn't flattened here.
- */
+/** Absent means not an approver; present with null means an approver with no limit. The screens rely on that distinction. */
 export async function listBillApprovalLimits(): Promise<Map<string, number | null>> {
   await requireAdminCaller();
   const supabase = await createClient();
@@ -78,14 +64,12 @@ export async function listBillApprovalLimits(): Promise<Map<string, number | nul
   return new Map(data.map((row) => [row.user_id, row.approval_limit]));
 }
 
-/** One person for their own Settings page, or null if the id is unknown. */
 export async function getPersonForAdmin(userId: string): Promise<AdminUserRow | null> {
   await requireAdminCaller();
   const users = await listUsersForAdmin();
   return users.find((row) => row.id === userId) ?? null;
 }
 
-/** The apps one person holds — the person page's own lookup. */
 export async function listGrantsForUser(userId: string): Promise<Set<string>> {
   await requireAdminCaller();
   const supabase = await createClient();
@@ -95,13 +79,11 @@ export async function listGrantsForUser(userId: string): Promise<Set<string>> {
   return new Set(data.map((row) => row.app));
 }
 
-/** The tools one person leads (0122) — the person page's lead ticks. */
 export async function listLeadsForUser(userId: string): Promise<Set<string>> {
   await requireAdminCaller();
   const supabase = await createClient();
   const { data, error } = await supabase.from("tool_leads").select("app").eq("user_id", userId);
-  // A failed read would show a real lead as unticked, and an admin would
-  // "fix" it wrongly — the same reason the grants read to completion.
+  // A failed read would show a real lead as unticked, and an admin would "fix" it wrongly.
   if (error) {
     console.error("listLeadsForUser failed:", error);
     throw new Error("Could not load who leads which app.", { cause: error });
@@ -111,18 +93,8 @@ export async function listLeadsForUser(userId: string): Promise<Set<string>> {
 
 const HISTORY_LIMIT = 50;
 
-/**
- * What has been done to this person's access, newest first.
- *
- * audit_log rows are matched on the row's own payload rather than a
- * column: user_apps rows carry the user in `user_id`, profiles rows in
- * `id`. Only the two tables Settings writes are read — describeAccess-
- * History (pure, tested) turns them into sentences.
- *
- * Coverage starts where the triggers do: user_apps and profiles from
- * 0018 (Aug 2026). The approver lists aren't audited yet — the screen
- * says so rather than implying nothing ever happened.
- */
+/** Newest first, matched on the row's own payload (user_apps rows carry `user_id`, profiles rows `id`). Coverage starts
+ * where the triggers do (0018); the approver lists aren't audited yet, and the screen says so. */
 export async function listAccessHistory(userId: string): Promise<AccessAuditRow[]> {
   await requireAdminCaller();
   const supabase = await createClient();
@@ -135,7 +107,6 @@ export async function listAccessHistory(userId: string): Promise<AccessAuditRow[
       .or(`new_data->>user_id.eq.${userId},old_data->>user_id.eq.${userId}`)
       .order("at", { ascending: false })
       .limit(HISTORY_LIMIT),
-    // Team lead ticks (0122), the same shape as a grant.
     supabase
       .from("audit_log")
       .select("table_name, action, at, actor, old_data, new_data")
@@ -157,8 +128,7 @@ export async function listAccessHistory(userId: string): Promise<AccessAuditRow[
     (a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0),
   );
 
-  // One lookup for every actor mentioned, rather than a join the audit
-  // table has no FK for.
+  // One lookup for every actor, since the audit table has no FK for a join.
   const actorIds = [...new Set(rows.map((row) => row.actor).filter((id): id is string => !!id))];
   const actorNames = new Map<string, string>();
   if (actorIds.length) {

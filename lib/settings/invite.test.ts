@@ -1,9 +1,4 @@
-/**
- * Inviting creates a real login, and deactivating can lock the company
- * out of Settings for good — so both rules are pinned here: what a valid
- * invite looks like, and the two changes that must always be refused
- * (acting on yourself, and removing the last active admin).
- */
+// Pins what a valid invite looks like and the changes always refused: acting on yourself, removing the last active admin.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
