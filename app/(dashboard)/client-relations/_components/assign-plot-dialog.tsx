@@ -17,16 +17,7 @@ import { assignPlot } from "@/lib/client-relations/actions";
 import type { AssignableUnit } from "@/lib/client-relations/queries";
 import { useState, useTransition } from "react";
 
-/**
- * The founder's "once they are a client they can be added to the master".
- *
- * This is the one place Client Relations writes Masters' data, and it goes
- * through crm_assign_unit (0050 §3) rather than touching `units` — a
- * security-definer function that gates itself and touches two columns.
- *
- * Assigning also flips the person from prospect to client, because a
- * prospect holding a plot is a state nobody would ever mean.
- */
+/** The one place CRM writes Masters' data, via crm_assign_unit (0050), a security-definer function that gates itself. Also flips the person to client. */
 export function AssignPlotDialog({
   clientId,
   units,

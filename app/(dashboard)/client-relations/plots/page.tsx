@@ -10,12 +10,6 @@ import { MapPin } from "lucide-react";
 import { FilterChips, SectionHead } from "../_components/board-parts";
 import { LotCard } from "../_components/lot-card";
 
-/**
- * Every plot as a lot card, grouped by project — the tracker's Plots view
- * (root plan.md, seventh piece). The headline band is the sheet's
- * hand-typed header, computed; the health chips say which plots need a
- * look, and only the ones with something in them show.
- */
 export default async function PlotsPage({
   searchParams,
 }: {
@@ -72,9 +66,7 @@ export default async function PlotsPage({
 
   return (
     <div className="space-y-4">
-      {/* The sheet's header row, computed. Every one of these was typed by
-          hand — "Sale Count: 38", "Sale deed: 29", "Const Agmt: 23" — and
-          went stale the moment a plot moved. */}
+      {/* The sheet's hand-typed header row, computed: typed totals went stale the moment a plot moved. */}
       <FigureBand>
         <FigureBandCell>
           <Figure label="Plots" value={formatCount(headlines.plots)} size="sm" />

@@ -30,7 +30,6 @@ import { RelayPanel } from "../../_components/relay-panel";
 import { SideIcon, SideMark, sideLabel } from "../../_components/side-mark";
 import { StepCard } from "../../_components/step-card";
 
-/** Only what the cards edit, so the browser is not sent the whole record six times. */
 function plotFields(engagement: EngagementDetail): PlotFields {
   const {
     id,
@@ -95,18 +94,8 @@ function plotFields(engagement: EngagementDetail): PlotFields {
 }
 
 /**
- * One plot, the tracker's drawer as a page: the number large, the buyer's
- * name editable in place, then Next steps on top and every other card in
- * the tracker's order (root plan.md, seventh piece). A page rather than a
- * drawer — it works on a phone, and Back returns to the grid.
- *
- * Reached from the Plots grid, a client's page, or any action's plot chip —
- * including the plots with no buyer, which have no client page to live on.
- *
- * A plot has two sides, Construction and Interior, each with its own owner
- * and its own actions (founder, 2026-10-17: "some people may get the
- * interiors or construction of the same plot"). Next steps shows both, or
- * one (`?side=`), and a new step goes to that side's owner.
+ * One plot as a page (phone-friendly; Back returns to the grid), including plots with no buyer.
+ * Next steps shows both sides or one (`?side=`); a new step goes to that side's owner.
  */
 export default async function PlotDetailPage({
   params,
@@ -123,8 +112,7 @@ export default async function PlotDetailPage({
     getBoardBasics(),
     listProgressStages(),
   ]);
-  // A member asking for a plot that is not theirs — or one they just
-  // handed on — gets a sentence, not "not found" (0123).
+  // A plot that is not theirs, or just handed on, gets a sentence, not "not found" (0123).
   if (!engagement) {
     if (!basics.seesAll) return <NotYours kind="plot" />;
     notFound();

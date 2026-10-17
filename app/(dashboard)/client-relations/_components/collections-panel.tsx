@@ -16,10 +16,6 @@ import { DeleteReceiptButton } from "./delete-receipt-button";
 import { MilestoneRowEditor } from "./milestone-row";
 import { ReceiptDialog } from "./receipt-dialog";
 
-/**
- * The Collections & dues tab for one plot: the nine-rung schedule, what
- * has come in against it, and the arithmetic between the two.
- */
 export function CollectionsPanel({ engagement }: { engagement: EngagementDetail }) {
   const { dues } = engagement;
 

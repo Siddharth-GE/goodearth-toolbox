@@ -30,19 +30,12 @@ const DUE_TONE: Record<DueTone, PillTone> = {
   success: "success",
 };
 
-/**
- * One action, the Saarang tracker's card: a round tick, the words edited
- * in place, and chips that open a menu — date, owner, and ••• for status,
- * track, notes, the plot. Every change saves at once; a tick says
- * "Marked done" with Undo for five seconds.
- */
 export function StepCard({
   step,
   showPlot = true,
   hideWhenDone = false,
 }: {
   step: NextStep;
-  /** Off on a plot's own page, where the plot goes without saying. */
   showPlot?: boolean;
   /** On the Actions list a ticked card leaves; on a plot's page it stays, struck through. */
   hideWhenDone?: boolean;
@@ -50,8 +43,7 @@ export function StepCard({
   const { today, meId, isManager, team } = useBoard();
   const toast = useToast();
   const [, startTransition] = useTransition();
-  // The tick shows at once, and the guess is dropped the moment the saved
-  // status moves — saved, or undone — so the card ends on the server's word.
+  // The tick shows at once; the guess is dropped when the saved status moves, so the card ends on the server's word.
   const [optimistic, setOptimistic] = useState<string | null>(null);
   const [seenStatus, setSeenStatus] = useState(step.status);
   if (seenStatus !== step.status) {
@@ -66,8 +58,7 @@ export function StepCard({
   const finished = status === "awaiting_confirmation";
   const due = dueLabel({ ...step, status }, today);
   const urgent = !done && !finished && (due.tone === "danger" || status === "waiting_management");
-  // Only whoever set it, or a manager, closes it; its owner marks it
-  // finished for them (founder, 2026-10-16; 0121 holds the same line).
+  // Only the setter or a manager closes it; its owner marks it finished (0121).
   const right = closeRight(step, { id: meId, isManager });
   const setter = step.createdBy === meId ? "you" : step.setterName.split(" ")[0];
 
@@ -201,9 +192,7 @@ export function StepCard({
         </DueMenu>
 
         {step.engagementId ? (
-          // On a plot, a step is its side's owner's (0125): shown, not picked —
-          // the side is handed over on the plot, open steps and all. A closed
-          // step keeps who did it.
+          // On a plot a step is its side's owner's (0125): shown, not picked; a closed step keeps who did it.
           <span
             title={
               done
@@ -234,7 +223,6 @@ export function StepCard({
           </OwnerMenu>
         )}
 
-        {/* Construction is the plot's usual side; only Interior is marked. */}
         {step.track === "kaadal" ? (
           <Pill tone="info">
             <SideMark track="kaadal" />
@@ -287,8 +275,7 @@ export function StepCard({
                 {ACTION_STATUSES.map((option) => (
                   <DropdownMenuItem
                     key={option.value}
-                    // Closing, or opening a closed one, is the setter's or a
-                    // manager's; marking it finished is its owner's (0121).
+                    // Closing is the setter's or a manager's; marking finished is its owner's (0121).
                     disabled={
                       ((option.value === "done" || step.status === "done") && right !== "close") ||
                       (option.value === "awaiting_confirmation" && right !== "finish")
@@ -372,7 +359,6 @@ export function StepCard({
   );
 }
 
-/** The words, edited in place: Enter or leaving the box saves. */
 function StepText({
   step,
   done,

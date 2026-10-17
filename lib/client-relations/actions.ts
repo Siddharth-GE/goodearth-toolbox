@@ -7,33 +7,19 @@ import { guardError } from "@/lib/db-error";
 import { optionalText, text } from "@/lib/form-data";
 import { createClient } from "@/lib/supabase/server";
 
-// Type-only import, and deliberately NOT re-exported. A bare
-// `export type { X }` in a "use server" file crashes every action in its
-// compiled chunk at load time — it caused a production outage once, and
-// `npm run check:actions` is the gate that keeps it from happening twice.
+// Type-only and NOT re-exported: a bare `export type { X }` in a "use server" file crashes every action in the chunk (check:actions).
 import type { ActionState } from "@/lib/action-state";
 
-/**
- * Writes for Client Relations.
- *
- * Every export opens with requireTool("/client-relations"), then RLS
- * refuses anything that slips past. Actions return ActionState and never
- * throw, so a form can render the message inline.
- */
+/** Every export opens with requireTool; RLS refuses anything that slips past. Actions return ActionState, never throw. */
 
 const GRANT = "/client-relations";
 
-/** Every CRM screen shows some slice of the same records. The layout
- * form covers the whole tree — the moved clients list included. */
+/** The layout form covers the whole tree, the moved clients list included. */
 function revalidateAll(): void {
   revalidatePath("/client-relations", "layout");
 }
 
-/**
- * The database's own messages are written for a person to read (0050
- * raises "You need the Client Relations app to assign a plot", not a
- * constraint name). Surface those; fall back for anything else.
- */
+/** Database messages are written for people (0050); surface those, fall back for the rest. */
 const CRM_GUARD_PHRASES = [
   "no longer exists",
   "You need the Client Relations app",
@@ -48,10 +34,6 @@ function friendly(error: { message: string; code?: string }, fallback: string): 
   if (state?.error === fallback) console.error("Client Relations write failed:", error);
   return state;
 }
-
-// ---------------------------------------------------------------------
-// Clients and prospects
-// ---------------------------------------------------------------------
 
 export type ClientInput = {
   name: string;
@@ -70,19 +52,14 @@ function validateClient(input: ClientInput): string | null {
   if (!["prospect", "client", "lost"].includes(input.stage)) {
     return "Pick whether this is a prospect, a client, or lost.";
   }
-  // Mirrors clients_lost_reason_check in 0050 §1. A status nobody can
-  // explain is a status nobody trusts six months later.
+  // Mirrors clients_lost_reason_check (0050).
   if (input.stage === "lost" && !(input.lostReason ?? "").trim()) {
     return "Say why this one was lost — a blank reason helps nobody later.";
   }
   return null;
 }
 
-/**
- * Named createClientRecord, not createClient, because
- * lib/supabase/server.ts already owns that name — the same collision
- * Masters resolved the same way.
- */
+/** Named createClientRecord because createClient is taken by lib/supabase/server.ts. */
 export async function createClientRecord(input: ClientInput): Promise<ActionState> {
   await requireTool(GRANT);
   const problem = validateClient(input);
@@ -125,8 +102,7 @@ export async function updateClientRecord(
       crm_owner_id: input.ownerId,
       source: input.source?.trim() || null,
       first_contact_on: input.firstContactOn || null,
-      // Clearing the stage clears the reason with it, so a client who came
-      // back does not keep the note explaining why they left.
+      // Clearing the stage clears the reason.
       lost_reason: input.stage === "lost" ? (input.lostReason?.trim() ?? null) : null,
       notes: input.notes?.trim() || null,
     })
@@ -138,15 +114,7 @@ export async function updateClientRecord(
   return undefined;
 }
 
-/**
- * The two FormData shims RecordFormDialog needs.
- *
- * That component drives every create/edit dialog in the app and hands its
- * action a (state, formData) pair, so the typed functions above get a thin
- * adapter rather than a second dialog being written by hand. `?? null`
- * everywhere because an untouched input arrives as "" and a blank mobile
- * is not the empty string.
- */
+/** FormData adapters for RecordFormDialog. `?? null` because an untouched input arrives as "". */
 function clientFromForm(formData: FormData): ClientInput {
   return {
     name: text(formData, "name"),
@@ -176,18 +144,9 @@ export async function updateClientForm(
   return updateClientRecord(clientId, clientFromForm(formData));
 }
 
-// ---------------------------------------------------------------------
-// Adding them to the master
-// ---------------------------------------------------------------------
-
 /**
- * Give a client their plot. This is the founder's "once they are a client
- * they can be added to the master" — the one moment CRM writes Masters'
- * data, through the security-definer function declared in 0050 §3 rather
- * than by touching `units` directly.
- *
- * Flipping the person to 'client' is part of the same action on purpose:
- * a prospect holding a plot is a state nobody would ever mean.
+ * Gives a client their plot: the one moment CRM writes Masters' data, through the security-definer function in 0050.
+ * Flipping the person to 'client' is part of it: a prospect holding a plot means nothing.
  */
 export async function assignPlot(
   clientId: string,
@@ -212,8 +171,7 @@ export async function assignPlot(
     .eq("id", clientId)
     .eq("stage", "prospect");
   if (stageError) {
-    // The plot IS assigned at this point. Say so rather than implying
-    // nothing happened and inviting a second click.
+    // The plot IS assigned here; say so rather than invite a second click.
     console.error("Plot assigned but stage not updated:", stageError);
     return { error: "Plot assigned, but could not mark them as a client. Edit them to fix it." };
   }
@@ -222,14 +180,6 @@ export async function assignPlot(
   revalidatePath(`/client-relations/${clientId}`);
   return undefined;
 }
-
-// The plot record itself is saved one field at a time by updatePlot in
-// next-steps-actions.ts — chips that save when tapped (root plan.md,
-// seventh piece).
-
-// ---------------------------------------------------------------------
-// The payment schedule
-// ---------------------------------------------------------------------
 
 export type MilestoneInputPatch = {
   dueAmount: number | null;
@@ -270,10 +220,6 @@ export async function saveMilestone(
   return undefined;
 }
 
-// ---------------------------------------------------------------------
-// Receipts — money in
-// ---------------------------------------------------------------------
-
 export type ReceiptInputData = {
   engagementId: string;
   milestoneId: string | null;
@@ -298,8 +244,7 @@ export async function addReceipt(input: ReceiptInputData): Promise<ActionState> 
   const supabase = await createClient();
   const { error } = await supabase.from("client_receipts").insert({
     engagement_id: input.engagementId,
-    // Blank means "arrived, not yet filed against a stage" — legal, and
-    // the dues arithmetic spreads it across the oldest unpaid rungs.
+    // Blank = arrived, not yet filed against a stage; dues spread it across the oldest unpaid rungs.
     milestone_id: input.milestoneId || null,
     amount: input.amount,
     received_on: input.receivedOn,

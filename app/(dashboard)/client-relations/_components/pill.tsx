@@ -4,13 +4,8 @@ import Link from "next/link";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 /**
- * The Saarang tracker's pills — a plot, a date, a person, a status — in
- * the toolbox's materials (root plan.md, seventh piece, "The look").
- *
- * Status tones carry fixed meaning (DESIGN.md): danger is overdue or
- * waiting on management, info is due soon, warning is waiting on the
- * client or a missing date, success is done. Words always ride with the
- * colour — "3 days overdue", never a red dot alone.
+ * Status tones carry fixed meaning (DESIGN.md): danger = overdue or waiting on management, info = due soon,
+ * warning = waiting on the client or a missing date, success = done. Words always ride with the colour.
  */
 export type PillTone = "plain" | "danger" | "info" | "warning" | "success" | "ink" | "dashed";
 
@@ -45,7 +40,6 @@ export function Pill({
   return <span className={cn(pillClassName(tone), className)}>{children}</span>;
 }
 
-/** A pill that opens a menu or does something — the trigger of every chip menu. */
 export function PillButton({
   tone = "plain",
   className,
@@ -64,7 +58,6 @@ export function PillButton({
   );
 }
 
-/** "10 · Sanjeev Sudheer" — a plot by its number, set like a surveyed lot. */
 export function PlotChip({
   number,
   clientName,
@@ -95,7 +88,6 @@ export function PlotChip({
   );
 }
 
-/** A face and a first name. */
 export function PersonName({ name, size = 20 }: { name: string; size?: number }) {
   return (
     <span className="inline-flex min-w-0 items-center gap-1.5">

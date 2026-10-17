@@ -17,17 +17,7 @@ import type { ReactNode } from "react";
 
 import { StepCard } from "./step-card";
 
-/**
- * The Actions board's server-rendered parts — the tracker's section heads,
- * its team strip and greeting, its filter chips (root plan.md, seventh
- * piece, "The look"). Every filter is a link, so the board is a plain URL
- * a person can bookmark or send, and works before any script has loaded.
- */
-
-// ---------------------------------------------------------------------
-// Section heads and the list
-// ---------------------------------------------------------------------
-
+/** The Actions board's server-rendered parts. Every filter is a link, so the board is a bookmarkable URL and works before any script loads. */
 export function SectionHead({
   title,
   count,
@@ -84,7 +74,6 @@ const SECTIONS: Record<
 
 const ORDER: ActionBucket[] = ["confirm", "management", "overdue", "week", "later", "done"];
 
-/** The tracker's sections, top to bottom; an empty one is left out. */
 export function StepSections({
   steps,
   today,
@@ -131,10 +120,6 @@ export function StepSections({
   );
 }
 
-// ---------------------------------------------------------------------
-// Filter chips — links that look like the tracker's chips
-// ---------------------------------------------------------------------
-
 export function FilterChips({
   label,
   items,
@@ -158,10 +143,6 @@ export function FilterChips({
     </nav>
   );
 }
-
-// ---------------------------------------------------------------------
-// The team strip (managers) and the greeting (everyone else)
-// ---------------------------------------------------------------------
 
 function LoadBar({ load }: { load: Load }) {
   const total = Math.max(load.open, 1);
@@ -333,7 +314,6 @@ export function Greeting({
   name: string;
   hour: number;
   load: Load;
-  /** Finished by their owners, waiting for this person's tick. */
   toConfirm?: number;
 }) {
   const overdue = load.overdue;

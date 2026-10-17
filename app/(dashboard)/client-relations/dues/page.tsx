@@ -19,12 +19,7 @@ import Link from "next/link";
 import { SectionHead } from "../_components/board-parts";
 import { Pill, PlotChip } from "../_components/pill";
 
-/**
- * Who owes what — read the way Actions reads: overdue first, then the
- * next seven days, then later (root plan.md, seventh piece, "edit the
- * current tool to match the vibe"). Amounts stay in a table, monospaced,
- * because a column of money reads as one (DESIGN.md).
- */
+/** Amounts stay in a monospaced table: a column of money reads as one (DESIGN.md). */
 
 type Group = "overdue" | "week" | "later" | "undated";
 

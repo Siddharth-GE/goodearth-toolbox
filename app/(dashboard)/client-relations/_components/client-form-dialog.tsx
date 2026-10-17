@@ -24,12 +24,7 @@ type ClientLike = {
   notes: string | null;
 };
 
-/**
- * One dialog for both jobs, because a prospect and a client are the same
- * record at different stages — the founder's "a new client can be a
- * prospect or a client". Adding a second form for prospects would mean
- * re-entering everything at the moment they buy.
- */
+/** One dialog for prospect and client: the same record at different stages. */
 export function ClientFormDialog({
   client,
   owners,
@@ -38,16 +33,12 @@ export function ClientFormDialog({
 }: {
   client?: ClientLike;
   owners: Person[];
-  /**
-   * Who a NEW prospect is handled by unless changed — the team member
-   * adding them, who would otherwise not see them in their own list (0123).
-   */
+  /** Who a NEW prospect goes to: the member adding them, who would otherwise not see them (0123). */
   defaultOwnerId?: string | null;
   trigger?: React.ReactNode;
 }) {
   const isEdit = !!client;
-  // Watched so the "why was it lost" box only appears when it applies —
-  // the database refuses a lost record without a reason.
+  // The "why lost" box shows only when it applies; the database refuses a lost record without a reason.
   const [stage, setStage] = useState(client?.stage ?? "prospect");
 
   return (

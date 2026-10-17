@@ -20,13 +20,7 @@ import { RECEIPT_MODES, milestoneLabel } from "@/lib/client-relations/stages";
 import { formatMoney } from "@/lib/format";
 import { useState, useTransition } from "react";
 
-/**
- * Record money arriving. The first place in this whole app where a rupee
- * comes IN — everything monetary before Client Relations was payables.
- *
- * No approval step: Bills has one because approving a wrong bill pays
- * money out, whereas this records money that has already landed.
- */
+/** Records money arriving. No approval step, unlike Bills: this records money that has already landed. */
 export function ReceiptDialog({
   engagementId,
   milestones,
@@ -45,8 +39,7 @@ export function ReceiptDialog({
         <DialogHeader>
           <DialogTitle>Record a payment</DialogTitle>
         </DialogHeader>
-        {/* Inside DialogContent, which Radix unmounts on close, so every
-            open starts from a clean form rather than last time's error. */}
+        {/* Radix unmounts DialogContent on close, so every open starts from a clean form. */}
         <ReceiptForm
           engagementId={engagementId}
           milestones={milestones}
@@ -133,9 +126,7 @@ function ReceiptForm({
           value={milestoneId}
           onChange={(event) => setMilestoneId(event.target.value)}
         >
-          {/* Leaving this blank is legal and normal: money often arrives
-              before anyone decides which instalment it settles, and it
-              still counts towards what is owed. */}
+          {/* Blank is legal: money often arrives before anyone decides which instalment it settles, and it still counts. */}
           <option value="">Not decided yet</option>
           {milestones.map((milestone) => (
             <option key={milestone.id} value={milestone.id}>

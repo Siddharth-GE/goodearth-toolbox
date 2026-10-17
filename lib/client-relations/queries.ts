@@ -27,23 +27,14 @@ import {
 } from "./stages";
 
 /**
- * Reads for Client Relations.
- *
- * Every export opens with requireTool("/client-relations") — the app grant
- * IS the permission boundary, and the three CRM tables are RLS-gated on it
- * for SELECT as well as writes (0050 §10). Sidebar visibility is cosmetic.
- *
- * Queries may throw; a failed read has no partial answer worth showing.
- * But `error` is checked explicitly everywhere below, because an empty
- * result and a failed read mean opposite things and here the difference
- * between them is a due of zero and a due of forty lakh.
+ * Every export opens with requireTool: the app grant is the boundary, and RLS gates SELECT on it too (0050).
+ * `error` is always checked so a failed read never looks like a due of zero.
  */
 
 const CRM_PAGE_SIZE = 50;
 
 const GRANT = "/client-relations";
 
-/** Delegates to the shared readFailed. */
 function fail(context: string, error: { message: string } | null): asserts error is null {
   assertRead("Client Relations", context, error);
 }
@@ -52,13 +43,8 @@ type Supabase = Awaited<ReturnType<typeof createClient>>;
 type User = Awaited<ReturnType<typeof requireTool>>;
 
 /**
- * Which clients a team member's screens list: the ones they look after,
- * and the buyers of the plots they can see — the database decides which
- * plots those are (0123). Null for an admin or a team lead: everyone.
- *
- * A filter for PostgREST's `or`, not a boundary. Client records are
- * Masters' shared list, readable by everyone signed in (0004); what 0123
- * locks is the CRM's own work on them — plots, actions, payments.
+ * Which clients a team member's screens list: theirs, plus buyers of plots they can see (0123). Null for admins and leads.
+ * A filter, not a boundary: client records are shared (0004); 0123 locks the CRM's own work on them.
  */
 async function clientScope(supabase: Supabase, user: User): Promise<string | null> {
   if (await isToolLead(user, GRANT)) return null;
@@ -75,8 +61,7 @@ async function clientScope(supabase: Supabase, user: User): Promise<string | nul
     : `crm_owner_id.eq.${user.id}`;
 }
 
-/** Headline counts for the tool's welcome screen. Counts only — dues,
- * receipts and every other rupee stay behind the doors. */
+/** Counts only: no rupees on the welcome screen. */
 export async function getWelcomeCounts() {
   const user = await requireTool(GRANT);
   const supabase = await createClient();
@@ -90,8 +75,7 @@ export async function getWelcomeCounts() {
     return scope ? query.or(scope) : query;
   };
 
-  // Exact database counts, head-only — never rows.length. No embeds
-  // here on purpose: a bad select string passes every CI gate.
+  // Head-only counts, never rows.length.
   const [clients, prospects, engaged] = await Promise.all([
     countClients("client"),
     countClients("prospect"),
@@ -108,10 +92,6 @@ export async function getWelcomeCounts() {
   };
 }
 
-// ---------------------------------------------------------------------
-// Shared lookups
-// ---------------------------------------------------------------------
-
 async function nameMap(
   supabase: Awaited<ReturnType<typeof createClient>>,
   ids: string[],
@@ -126,11 +106,10 @@ async function nameMap(
 export type FilterOptions = {
   projects: { id: string; name: string }[];
   owners: { id: string; name: string }[];
-  /** Who is asking, and whether they see everyone's work (0122). */
+  /** seesAll: admin or team lead (0122). */
   me: { id: string; seesAll: boolean };
 };
 
-/** Projects and the staff who can own a plot — the two dropdowns. */
 export async function getFilterOptions(): Promise<FilterOptions> {
   const user = await requireTool(GRANT);
   const supabase = await createClient();
@@ -155,10 +134,6 @@ export async function getFilterOptions(): Promise<FilterOptions> {
   };
 }
 
-// ---------------------------------------------------------------------
-// The client list
-// ---------------------------------------------------------------------
-
 export type ClientListRow = {
   id: string;
   name: string;
@@ -167,7 +142,6 @@ export type ClientListRow = {
   stage: ClientStage;
   isActive: boolean;
   ownerName: string | null;
-  /** Every plot this client holds, for the chips on the card. */
   plots: {
     unitId: string;
     unitName: string;
@@ -175,7 +149,6 @@ export type ClientListRow = {
     engagementId: string | null;
     number: string;
   }[];
-  /** Their plots' open actions, and how many of those are overdue. */
   openSteps: number;
   overdueSteps: number;
 };
@@ -187,18 +160,13 @@ export type ClientFilters = {
   page?: number;
 };
 
-/**
- * The landing screen: one row per person, prospects and clients together.
- *
- * A stated limit with a real database count, never rows.length.
- */
+/** One row per person. The total is a database count, never rows.length. */
 export async function listClientsPage(
   filters: ClientFilters = {},
 ): Promise<PagedResult<ClientListRow>> {
   const user = await requireTool(GRANT);
   const supabase = await createClient();
   const search = cleanSearch(filters.search);
-  // A team member's list is their own clients (clientScope).
   const scope = await clientScope(supabase, user);
 
   const page = await pagedList<{
@@ -325,23 +293,9 @@ export async function listClientsPage(
   };
 }
 
-// ---------------------------------------------------------------------
-// The plot register — the spreadsheet, as rows
-// ---------------------------------------------------------------------
-
 /**
- * NOTE THE `!units_plot_id_fkey` ON `plots`, and do not drop it.
- *
- * `units` has TWO foreign keys to `plots` — the plain `units_plot_id_fkey`
- * and the composite `units_plot_same_project` added by 0029 to guarantee a
- * unit's plot belongs to the unit's project. PostgREST cannot choose
- * between them, so a bare `plots(...)` embed returns HTTP 300 PGRST201,
- * "Could not embed because more than one relationship was found", and
- * every screen using this select dies on the error boundary.
- *
- * Nothing local catches this: it is not a type error, `next build` compiles
- * it happily, and the tests are pure logic with no database. It is only
- * visible by running the query against PostgREST.
+ * Keep `!units_plot_id_fkey`: units has two FKs to plots (also units_plot_same_project, 0029), so a bare embed
+ * returns PGRST201 and the screen dies. Only running the query shows it.
  */
 const ENGAGEMENT_SELECT = `
   id, unit_id, project_id, crm_owner_id,
@@ -411,7 +365,6 @@ export type EngagementRow = {
   unitStatus: string;
   unitType: string | null;
   plotName: string | null;
-  /** "10", "22-23" — the tracker's plot number, set in monospace. */
   plotNumber: string;
   projectId: string;
   projectName: string;
@@ -435,11 +388,10 @@ export type EngagementRow = {
   permitOn: string | null;
   workingDrawingOn: string | null;
   kaadalStage: KaadalStage | null;
-  /** The Interior owner — the plot's second owner, beside the Construction owner (`ownerId`). */
+  /** The Interior owner, beside the Construction owner (`ownerId`). */
   kaadalOwnerId: string | null;
   kaadalOwnerName: string | null;
   kaadalNote: string | null;
-  /** When the plot's own record last changed. */
   updatedAt: string;
   invoiceStage: MilestoneStage | null;
   dues: DuesSummary;
@@ -494,18 +446,7 @@ function toRow(
   };
 }
 
-// ---------------------------------------------------------------------
-// Money, loaded whole
-// ---------------------------------------------------------------------
-
-/**
- * Milestones and receipts for a set of engagements.
- *
- * fetchAll, not a plain select: nine milestones per engagement means 43
- * plots already carry 387 rows, and a dues total computed from a silently
- * truncated page is a wrong number that looks right. fetchAll throws if a
- * page fails, which is the behaviour money wants.
- */
+/** fetchAll, not a plain select: a dues total from a silently truncated page is a wrong number that looks right. */
 async function loadMoney(
   supabase: Awaited<ReturnType<typeof createClient>>,
   engagementIds: string[],
@@ -584,10 +525,6 @@ async function loadMoney(
   return { milestones, receipts };
 }
 
-// ---------------------------------------------------------------------
-// Relay — read directly, never through lib/relay
-// ---------------------------------------------------------------------
-
 export type RelayTrail = {
   chainId: string;
   unitId: string;
@@ -603,18 +540,8 @@ export type RelayTrail = {
 };
 
 /**
- * What Relay says is happening on these villas.
- *
- * Read straight off `pusher_chain_state`, which is granted to
- * `authenticated` with no app gate of its own (0043). Relay's own
- * lib/relay/queries.ts cannot be reused — every function there opens
- * requireTool("/relay"), and one tool never imports another tool's code.
- *
- * WHAT THIS CANNOT SAY, and the screen must not imply: the view exposes
- * is_finished for a WHOLE TRAIL only. There is no per-activity completion
- * anywhere, and project_stages is per-project rather than per-unit (0039
- * deferred that deliberately). So "3 trails running, 1 cold" is honest;
- * "Foundation complete" would be a lie.
+ * Read straight off pusher_chain_state (granted to authenticated, 0043); lib/relay is another tool's code.
+ * It says a trail is running or finished, never that a stage is done: no per-activity completion exists (0039).
  */
 export async function getRelayForUnits(unitIds: string[]): Promise<Map<string, RelayTrail[]>> {
   await requireTool(GRANT);
@@ -656,10 +583,6 @@ export async function getRelayForUnits(unitIds: string[]): Promise<Map<string, R
   return byUnit;
 }
 
-// ---------------------------------------------------------------------
-// One plot, in full
-// ---------------------------------------------------------------------
-
 export type MilestoneRow = MilestoneDue & {
   invoiceNo: string | null;
   note: string | null;
@@ -686,12 +609,9 @@ export type EngagementDetail = EngagementRow & {
   milestones: MilestoneRow[];
   receipts: ReceiptRow[];
   trails: RelayTrail[];
-  /** Latest issued design revision, the one design fact that is real data. */
   issuedRevision: number | null;
   issuedAt: string | null;
-  /** The plot's next steps — open first by date, then done. */
   steps: NextStep[];
-  /** The same plot as a lot card: status, health, rail, build stage. */
   card: PlotCard;
 };
 
@@ -727,8 +647,6 @@ async function buildDetail(records: EngagementRecord[]): Promise<EngagementDetai
     }
   }
 
-  // The full milestone/receipt rows, re-read from the maps loadMoney built
-  // plus the fields the summary does not carry.
   const detailMilestones = await fetchAll<{
     id: string;
     engagement_id: string;
@@ -811,7 +729,6 @@ async function buildDetail(records: EngagementRecord[]): Promise<EngagementDetai
   });
 }
 
-/** One plot, for the standalone plot page (including unsold ones). */
 export async function getEngagement(engagementId: string): Promise<EngagementDetail | null> {
   await requireTool(GRANT);
   const supabase = await createClient();
@@ -827,10 +744,6 @@ export async function getEngagement(engagementId: string): Promise<EngagementDet
   const [detail] = await buildDetail([data as unknown as EngagementRecord]);
   return detail ?? null;
 }
-
-// ---------------------------------------------------------------------
-// One client, in full
-// ---------------------------------------------------------------------
 
 export type ClientRecord = {
   id: string;
@@ -851,15 +764,10 @@ export type ClientRecord = {
 export type ClientDetail = {
   client: ClientRecord;
   engagements: EngagementDetail[];
-  /** Every plot's dues rolled into one, for the header figures. */
   totals: DuesSummary;
 };
 
-/**
- * Null when there is no such client — or, for a team member, when the
- * client is not theirs: nobody they look after, and none of the client's
- * plots in their sight (0123). The page says which.
- */
+/** Null when there is no such client, or it is not this team member's (0123). */
 export async function getClientDetail(clientId: string): Promise<ClientDetail | null> {
   const user = await requireTool(GRANT);
   const supabase = await createClient();
@@ -919,16 +827,10 @@ export async function getClientDetail(clientId: string): Promise<ClientDetail | 
       ownerName: client.crm_owner_id ? (owners.get(client.crm_owner_id) ?? null) : null,
     },
     engagements,
-    // Each plot's dues were worked out on its own ledger; only the answers
-    // are added up. See combineSummaries for why merging the inputs would
-    // let one villa's payment settle another villa's instalment.
+    // Dues are worked out per plot; only the answers are added (combineSummaries).
     totals: combineSummaries(engagements.map((engagement) => engagement.dues)),
   };
 }
-
-// ---------------------------------------------------------------------
-// Dues, across everything
-// ---------------------------------------------------------------------
 
 export type DueLine = {
   engagementId: string;
@@ -948,22 +850,16 @@ export type DueLine = {
 export type DuesBoard = {
   lines: DueLine[];
   totals: DuesSummary;
-  /** Plots carrying an outstanding balance, for the figure strip. */
   plotsOwing: number;
 };
 
-/**
- * Who owes what, oldest first. The one screen the sheet could not produce
- * at all, because "Due date for Plot amount" was a column of text.
- */
 export async function listDues(
   filters: { project?: string; overdueOnly?: boolean } = {},
 ): Promise<DuesBoard> {
   await requireTool(GRANT);
   const supabase = await createClient();
 
-  // Read to completion: a dues board cut off at 1,000 rows is money owed
-  // that nobody is chasing. fetchAll throws if a page fails.
+  // Read to completion: a board cut off at 1,000 rows is money nobody is chasing.
   const data = await fetchAll((from, to) => {
     let query = supabase.from("client_engagements").select(ENGAGEMENT_SELECT);
     if (filters.project) query = query.eq("project_id", filters.project);
@@ -1011,8 +907,7 @@ export async function listDues(
     }
   }
 
-  // Overdue first, then by due date, then by plot — a line with no due date
-  // sorts last rather than pretending to be urgent.
+  // Overdue first, then due date, then plot; undated lines sort last.
   lines.sort((a, b) => {
     if (a.isOverdue !== b.isOverdue) return a.isOverdue ? -1 : 1;
     if (a.dueOn !== b.dueOn) {
@@ -1029,10 +924,6 @@ export async function listDues(
     plotsOwing: owing.size,
   };
 }
-
-// ---------------------------------------------------------------------
-// The figure strip — the sheet's hand-typed header, computed
-// ---------------------------------------------------------------------
 
 export type Headlines = {
   plots: number;
@@ -1091,10 +982,6 @@ export async function getHeadlines(projectId?: string): Promise<Headlines> {
   };
 }
 
-// ---------------------------------------------------------------------
-// Plots a prospect could be given
-// ---------------------------------------------------------------------
-
 export type AssignableUnit = {
   id: string;
   name: string;
@@ -1104,7 +991,6 @@ export type AssignableUnit = {
   projectName: string;
 };
 
-/** Unsold plots, for the Assign a plot dialog. */
 export async function listAssignableUnits(): Promise<AssignableUnit[]> {
   await requireTool(GRANT);
   const supabase = await createClient();

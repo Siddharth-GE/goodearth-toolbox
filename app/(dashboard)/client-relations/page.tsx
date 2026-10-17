@@ -3,11 +3,7 @@ import { getWelcomeCounts } from "@/lib/client-relations/queries";
 
 import { ToolWelcome } from "../_components/tool-welcome";
 
-// The welcome screen (founder, 2026-08-13: every Operations and
-// Management tool opens on one). No PageTitle here — the layout renders
-// the title and nav for every screen in this tool. Counts only: dues and
-// receipts stay behind the doors below. Actions is the main door since
-// the Saarang tracker came in (root plan.md, seventh piece).
+// Welcome screen. No PageTitle: the layout renders title and nav. Counts only; dues and receipts stay behind the doors.
 export default async function ClientRelationsPage() {
   const [counts, actions] = await Promise.all([getWelcomeCounts(), getActionCounts()]);
 

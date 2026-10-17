@@ -1,15 +1,6 @@
 /**
- * Every vocabulary Client Relations uses, in one place.
- *
- * The database CHECK constraints in migration 0050 are the real boundary;
- * these lists are the mirror that renders the dropdowns and the badges.
- * When one changes, both change — a value the database accepts but this
- * file has never heard of shows up on screen as a raw snake_case string,
- * which is how "signed_chess_cafe_original" ends up in front of a client.
- *
- * Pure, with no imports, so it is safe in Server Components, Client
- * Components and tests alike. `tone` is a components/ui/badge.tsx variant
- * name, deliberately a plain string here so this file never imports React.
+ * The database CHECKs (0050) are the boundary; these lists mirror them. Change both together, or a new value shows as raw snake_case.
+ * Pure, no imports, so it is safe anywhere. `tone` is a badge variant name, a plain string so React is never imported.
  */
 
 export type BadgeTone = "default" | "neutral" | "success" | "warning" | "danger" | "info";
@@ -20,27 +11,14 @@ export type Option<T extends string> = {
   tone: BadgeTone;
 };
 
-// ---------------------------------------------------------------------
-// The client lifecycle
-// ---------------------------------------------------------------------
-
 export type ClientStage = "prospect" | "client" | "lost";
 
-/**
- * One list holds both, per the founder: "a new client can be a prospect
- * or a client and once they are a client they can be added to the master."
- * Becoming a client is not a dropdown choice — it is what assigning a
- * plot leaves behind. See assignPlot in actions.ts.
- */
+/** Prospect and client share one list. Assigning a plot makes a client (assignPlot in actions.ts); it is not a dropdown choice. */
 export const CLIENT_STAGES: Option<ClientStage>[] = [
   { value: "prospect", label: "Prospect", tone: "info" },
   { value: "client", label: "Client", tone: "success" },
   { value: "lost", label: "Lost", tone: "neutral" },
 ];
-
-// ---------------------------------------------------------------------
-// Sale deed and construction agreement
-// ---------------------------------------------------------------------
 
 export type DeedStatus = "not_started" | "drafting" | "not_signed" | "signed";
 export type OriginalWith = "client" | "bank" | "chess_cafe" | "sreejayan" | "tarana";
@@ -48,15 +26,8 @@ export type Acknowledgement =
   "received" | "with_bank" | "with_sreejayan" | "requested_from_client" | "pending";
 
 /**
- * The sheet writes these as one value — "Signed, Bank Original" — but they
- * are two independent facts, and splitting them is what turns the sheet's
- * hand-typed "Sale deed: 29" into a single equality rather than a growing
- * chain of ORs. Same vocabulary serves the construction agreement, which
- * is why neither is named for the document it belongs to.
- *
- * The Saarang tracker's lists, in its order (0120 widened every CHECK).
- * 'not_signed' stays the database default, so an untouched plot reads
- * "Not signed" — the honest reading of a deed nobody has recorded.
+ * The sheet wrote "Signed, Bank Original" as one value; they are two independent facts. Serves the construction agreement too.
+ * 'not_signed' is the database default (0120).
  */
 export const DEED_STATUSES: Option<DeedStatus>[] = [
   { value: "not_started", label: "Not started", tone: "neutral" },
@@ -65,7 +36,6 @@ export const DEED_STATUSES: Option<DeedStatus>[] = [
   { value: "signed", label: "Signed", tone: "success" },
 ];
 
-/** Who holds the signed original. Labels are short: they sit in chips. */
 export const ORIGINAL_WITH: Option<OriginalWith>[] = [
   { value: "client", label: "Client", tone: "info" },
   { value: "bank", label: "Bank", tone: "warning" },
@@ -82,17 +52,9 @@ export const ACKNOWLEDGEMENTS: Option<Acknowledgement>[] = [
   { value: "pending", label: "Pending", tone: "neutral" },
 ];
 
-// ---------------------------------------------------------------------
-// Registration
-// ---------------------------------------------------------------------
-
 export type RegistrationStage = "not_due" | "due" | "scheduled" | "registered";
 
-/**
- * A ladder rather than prose because the sheet's own header aggregates it
- * ("Plots for registration 5 9 27 30 33 36 37 38 40"). Anything the
- * founder counts by hand has to be countable here.
- */
+/** A ladder, so the sheet's registration counts stay countable. */
 export const REGISTRATION_STAGES: Option<RegistrationStage>[] = [
   { value: "not_due", label: "Not due", tone: "neutral" },
   { value: "due", label: "Due", tone: "warning" },
@@ -100,21 +62,12 @@ export const REGISTRATION_STAGES: Option<RegistrationStage>[] = [
   { value: "registered", label: "Registered", tone: "success" },
 ];
 
-// ---------------------------------------------------------------------
-// Bottlenecks — several at once
-// ---------------------------------------------------------------------
-
 export type Bottleneck =
   "design" | "client" | "payments" | "management" | "interiors" | "legal" | "bank_loan";
 
 /**
- * Stored as a `text[]`, because the sheet genuinely holds more than one at
- * a time ("Interior design, Payments"). Note that 'design' here means
- * "the design team is what this plot is waiting on" — it is not a design
- * STATUS; the three design checks on the plot are (0120).
- *
- * The tracker's last two are appended, not interleaved: the order here is
- * the order a plot's chips render in, and existing plots keep theirs.
+ * A `text[]`: a plot can wait on several things. 'design' means the design team is the holdup, not a design status (0120).
+ * New values are appended: this order is the order chips render in.
  */
 export const BOTTLENECKS: Option<Bottleneck>[] = [
   { value: "design", label: "Design", tone: "warning" },
@@ -128,15 +81,7 @@ export const BOTTLENECKS: Option<Bottleneck>[] = [
 
 const BOTTLENECK_ORDER = new Map(BOTTLENECKS.map((b, i) => [b.value, i]));
 
-/**
- * Canonicalise before writing: drop anything unknown, drop duplicates, and
- * sort into the order above.
- *
- * Without this, `{payments,design}` and `{design,payments}` are different
- * arrays holding the same meaning — they render in whatever order the
- * boxes were ticked, and two identical plots look different. The database
- * CHECK rejects unknown values but has no opinion on order or repeats.
- */
+/** Drop unknowns and repeats, sort into the order above: the CHECK ignores order, so equal sets would render differently. */
 export function normaliseBottlenecks(raw: readonly string[]): Bottleneck[] {
   const seen = new Set<Bottleneck>();
   for (const value of raw) {
@@ -144,10 +89,6 @@ export function normaliseBottlenecks(raw: readonly string[]): Bottleneck[] {
   }
   return [...seen].sort((a, b) => (BOTTLENECK_ORDER.get(a) ?? 0) - (BOTTLENECK_ORDER.get(b) ?? 0));
 }
-
-// ---------------------------------------------------------------------
-// The payment ladder
-// ---------------------------------------------------------------------
 
 export type MilestoneStage =
   | "plot"
@@ -160,12 +101,7 @@ export type MilestoneStage =
   | "painting_polishing"
   | "completed";
 
-/**
- * All nine, in order, seeded onto every engagement by
- * create_client_engagement (0050 §7). The Collections tab is this list —
- * a fixed grid you fill in, with no "add a row" step, which is the shape
- * the sheet already had.
- */
+/** All nine, seeded onto every engagement by create_client_engagement (0050): a fixed grid, no add-a-row. */
 export const MILESTONE_STAGES: { value: MilestoneStage; label: string; sortOrder: number }[] = [
   { value: "plot", label: "Plot amount", sortOrder: 10 },
   { value: "booking", label: "Booking", sortOrder: 20 },
@@ -184,24 +120,12 @@ export function milestoneLabel(stage: string): string {
   return MILESTONE_LABELS.get(stage as MilestoneStage) ?? stage;
 }
 
-/**
- * The eight the sheet calls "Current Stage of Invoice Raising".
- *
- * `plot` is excluded on purpose: it is the sheet's separate "Due date for
- * Plot amount to be received" column, and including it would put a value
- * in the invoice-stage cell that the founder's own sheet never shows.
- */
+/** The sheet's eight invoice stages; `plot` is its separate due-date column, so it is left out. */
 export const INVOICE_STAGES = MILESTONE_STAGES.filter((s) => s.value !== "plot");
 
 /**
- * The sheet's invoice stage, DERIVED rather than stored: the furthest
- * stage anyone has raised an invoice for.
- *
- * Derived because a stored ladder position and the rows behind it can
- * disagree, and when they do there is no way to tell which one lied.
- * Returns null when nothing has been invoiced — rendered as a dash, not
- * as "Booking", because "not started" and "at the first rung" are
- * different answers.
+ * Derived, not stored: the furthest stage anyone has raised an invoice for (a stored position can disagree with the rows).
+ * Null when nothing is invoiced: a dash, not "Booking".
  */
 export function invoiceStageOf(
   milestones: readonly { stage: string; invoicedOn: string | null }[],
@@ -218,10 +142,6 @@ export function invoiceStageOf(
   return best?.stage ?? null;
 }
 
-// ---------------------------------------------------------------------
-// Receipts
-// ---------------------------------------------------------------------
-
 export type ReceiptMode = "bank" | "cheque" | "upi" | "cash" | "other";
 
 export const RECEIPT_MODES: Option<ReceiptMode>[] = [
@@ -232,10 +152,6 @@ export const RECEIPT_MODES: Option<ReceiptMode>[] = [
   { value: "other", label: "Other", tone: "neutral" },
 ];
 
-// ---------------------------------------------------------------------
-// Kaadal interiors (0120)
-// ---------------------------------------------------------------------
-
 export type KaadalStage =
   | "to_pitch"
   | "pitch_done"
@@ -245,7 +161,7 @@ export type KaadalStage =
   | "execution"
   | "closed";
 
-/** The tracker's interiors ladder, in its order. Closed ends it either way. */
+/** Closed ends the ladder either way. */
 export const KAADAL_STAGES: Option<KaadalStage>[] = [
   { value: "to_pitch", label: "To pitch", tone: "neutral" },
   { value: "pitch_done", label: "Pitch done", tone: "info" },
@@ -256,19 +172,11 @@ export const KAADAL_STAGES: Option<KaadalStage>[] = [
   { value: "closed", label: "Closed – no interiors", tone: "neutral" },
 ];
 
-// ---------------------------------------------------------------------
-// Actions — the next steps (0120)
-// ---------------------------------------------------------------------
-
 export type ActionStatus =
   "open" | "waiting_client" | "waiting_management" | "awaiting_confirmation" | "done";
 export type ActionTrack = "sales" | "kaadal";
 
-/**
- * "Waiting on management" is the flag a team member raises when only a
- * manager can clear it; it lifts the action into Needs management at the
- * top of everyone's list.
- */
+/** "Waiting on management" lifts an action into Needs management at the top of everyone's list. */
 export const ACTION_STATUSES: Option<ActionStatus>[] = [
   { value: "open", label: "Open", tone: "default" },
   { value: "waiting_client", label: "Waiting on client", tone: "warning" },
@@ -279,12 +187,8 @@ export const ACTION_STATUSES: Option<ActionStatus>[] = [
 ];
 
 /**
- * A plot's two sides, each with its own owner and its own actions: the
- * villa being built, and its interiors (founder, 2026-10-17: "some people
- * may get the interiors or construction of the same plot … call it interior
- * and construction, kaadal can be avoided"). The stored values are the
- * tracker's, from 0120 — `sales` is Construction, `kaadal` is Interior, as
- * are `crm_owner_id` and the `kaadal_*` columns. Only the words changed.
+ * A plot's two sides, each with its own owner and actions. Stored values are the tracker's (0120): `sales` is Construction,
+ * `kaadal` is Interior, as are `crm_owner_id` and the `kaadal_*` columns.
  */
 export const ACTION_TRACKS: Option<ActionTrack>[] = [
   { value: "sales", label: "Construction", tone: "default" },
@@ -296,26 +200,15 @@ export type SideParam = "construction" | "interior";
 
 const SIDE_TRACK: Record<SideParam, ActionTrack> = { construction: "sales", interior: "kaadal" };
 
-/** `?side=` → a track, or null for both sides (and for anything unknown). */
 export function trackForSide(param: string | undefined | null): ActionTrack | null {
   return param && Object.hasOwn(SIDE_TRACK, param) ? SIDE_TRACK[param as SideParam] : null;
 }
 
-/** A track → its `?side=` word. */
 export function sideForTrack(track: ActionTrack): SideParam {
   return track === "kaadal" ? "interior" : "construction";
 }
 
-// ---------------------------------------------------------------------
-// Shared lookup
-// ---------------------------------------------------------------------
-
-/**
- * Label and tone for a stored value, or a safe fallback.
- *
- * The fallback matters: a value written by a migration this file has not
- * caught up with should read as itself, not crash the row it is in.
- */
+/** Label and tone for a stored value, or a safe fallback: a value from a newer migration should read as itself, not crash the row. */
 export function optionFor<T extends string>(
   options: readonly Option<T>[],
   value: string | null | undefined,

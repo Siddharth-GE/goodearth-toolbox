@@ -1,7 +1,3 @@
-/**
- * The vocabularies, and the two functions that do more than list values.
- * The database CHECKs in 0050 are the real boundary; these pin the mirror.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -49,8 +45,7 @@ test("the nine seeded milestone stages match what create_client_engagement inser
       "completed",
     ],
   );
-  // The sort orders are the ones written into the migration, ten apart so
-  // a stage can be inserted between two without renumbering.
+  // Sort orders are the migration's, ten apart so a stage can slot between two.
   assert.deepEqual(
     MILESTONE_STAGES.map((s) => s.sortOrder),
     [10, 20, 30, 40, 50, 60, 70, 80, 90],

@@ -27,20 +27,8 @@ import {
 import { trackForSide, type ActionStatus, type ActionTrack, type KaadalStage } from "./stages";
 
 /**
- * Reads for the Saarang tracker's screens inside Client Relations — the
- * Actions board and the plot cards (root plan.md, seventh piece).
- *
- * Every export opens with requireTool("/client-relations"). Which plots and
- * actions come back is the database's answer, not this file's (0123): a
- * member sees the plots they own or hold an open action on, and the
- * actions they own, set, or that sit on their plots; an admin or a team
- * lead sees everything. So every count here is a count of what the viewer
- * may see. Who opens on whose list is decided here.
- *
- * Small on purpose: Saarang is ~70 plots and a few hundred actions a year,
- * so each screen reads its slice whole (fetchAll) and works in memory —
- * the same choice the dues board makes, and for the same reason: a count
- * worked out from a truncated page is a wrong number that looks right.
+ * Every export opens with requireTool. The database decides which plots and actions come back (0123): a member sees their own,
+ * an admin or lead sees all, so every count is what the viewer may see. Small on purpose: each screen reads its slice whole with fetchAll.
  */
 
 const GRANT = "/client-relations";
@@ -69,14 +57,7 @@ async function namesFor(supabase: Supabase, ids: string[]): Promise<Map<string, 
   return new Map((data ?? []).map((row) => [row.id, row.full_name ?? "—"]));
 }
 
-// ---------------------------------------------------------------------
-// Plots, as the tracker named them
-// ---------------------------------------------------------------------
-
-/**
- * `plots!units_plot_id_fkey` names its key: units has two FKs to plots
- * (BUGCATCHER #2, and the note on ENGAGEMENT_SELECT in queries.ts).
- */
+/** `plots!units_plot_id_fkey` names its key: units has two FKs to plots (BUGCATCHER #2, ENGAGEMENT_SELECT in queries.ts). */
 const PLOT_SELECT = `
   id, project_id, crm_owner_id, kaadal_owner_id, kaadal_stage, progress_stage_id,
   sale_deed_status, ca_status, updated_at,
@@ -113,16 +94,11 @@ type PlotRecord = {
 export type PlotRef = {
   engagementId: string;
   unitId: string;
-  /** "10", "22-23" — set in monospace. */
-  number: string;
-  /** For sorting: the plot code, compared numerically. */
-  sortKey: string;
   clientId: string | null;
   clientName: string | null;
   projectId: string;
   projectName: string;
   unitStatus: string;
-  /** Masters' villa name — "Villa 3 (1BHK Study)" carries its configuration. */
   unitName: string;
   /** Each side's owner, who every open step on that side belongs to (0125). */
   constructionOwnerId: string | null;
@@ -164,10 +140,6 @@ async function loadPlots(supabase: Supabase, engagementIds?: string[]): Promise<
   return data as unknown as PlotRecord[];
 }
 
-// ---------------------------------------------------------------------
-// Actions
-// ---------------------------------------------------------------------
-
 type StepRecord = {
   id: string;
   engagement_id: string | null;
@@ -203,7 +175,6 @@ export type NextStep = {
   /** Who set it — the one who closes it, with a manager (0121). */
   createdBy: string | null;
   setterName: string;
-  /** "Edited 15 Oct by Saurav", or "Added 29 Sep by Anu". */
   stamp: { edited: boolean; on: string; by: string | null };
   plot: PlotRef | null;
 };
@@ -261,13 +232,8 @@ function stepPeople(records: StepRecord[]): string[] {
   return records.flatMap((r) => [r.owner_id, r.created_by ?? "", r.updated_by ?? ""]);
 }
 
-// ---------------------------------------------------------------------
-// The Actions board
-// ---------------------------------------------------------------------
-
 export type BoardFilters = {
   project?: string;
-  /** One side only — Construction (`sales`) or Interior (`kaadal`). */
   side?: ActionTrack | null;
   /** "" = the default (a manager sees everyone, a member their own), "all", "mgmt", or a person's id. */
   who?: string;
@@ -277,24 +243,17 @@ export type BoardFilters = {
 export type ActionsBoard = {
   today: string;
   hour: number;
-  /**
-   * isManager: an admin — closes anyone's action (0121). seesAll: an admin
-   * or a team lead (0122) — everyone's work, and the team view.
-   */
+  /** isManager: admin, closes anyone's action (0121). seesAll: admin or team lead (0122). */
   me: { id: string; name: string; isManager: boolean; seesAll: boolean };
   team: Person[];
-  /** Resolved: "all", "mgmt", or a person's id. */
   who: string;
-  /** The list on screen: open steps, plus the latest done when asked. */
   steps: NextStep[];
   doneCount: number;
   /** Each team member's load across the scope (project / side), whatever `who` shows. */
   loads: { person: Person; load: Load }[];
   myLoad: Load;
-  /** Finished by their owners, waiting for my tick. */
   myToConfirm: number;
   management: number;
-  /** Every plot, for the composer's plot picker. */
   plots: PlotRef[];
   projects: { id: string; name: string }[];
   kpis: { sold: number; deedsSigned: number; casSigned: number; needCa: number };
@@ -419,7 +378,6 @@ export async function getActionsBoard(filters: BoardFilters = {}): Promise<Actio
   };
 }
 
-/** Counts only, for the welcome screen — never a rupee. */
 export async function getActionCounts(): Promise<{
   overdue: number;
   week: number;
@@ -435,10 +393,6 @@ export async function getActionCounts(): Promise<{
   );
   return { overdue: load.overdue, week: load.week, management: load.management };
 }
-
-// ---------------------------------------------------------------------
-// Plot cards
-// ---------------------------------------------------------------------
 
 export type PlotCard = PlotRef & {
   /** The Construction owner (`crm_owner_id`). */
@@ -462,7 +416,6 @@ export type PlotCard = PlotRef & {
   openCount: number;
 };
 
-/** Where each stage sits in the Masters list, and which one is the handover. */
 export function stageIndex(stages: ProgressStageRow[]) {
   const order = new Map(stages.map((stage, index) => [stage.id, index]));
   const active = stages.map((stage, index) => (stage.is_active ? index : -1)).filter((i) => i >= 0);
@@ -530,7 +483,6 @@ function buildCard(
   };
 }
 
-/** Cards for some plots — a client's page, or a plot's own header. */
 export async function readPlotCards(
   supabase: Supabase,
   engagementIds: string[],
@@ -561,7 +513,6 @@ export async function readPlotCards(
   );
 }
 
-/** Every step on these plots, open first by date, then the done ones. */
 export async function readPlotSteps(
   supabase: Supabase,
   engagementIds: string[],
@@ -596,13 +547,11 @@ export type PlotFilters = {
   who?: string;
   health?: string;
   q?: string;
-  /** "construction" or "interior", as the URL says it. */
   side?: string;
 };
 
 export type PlotBoard = {
   cards: PlotCard[];
-  /** Before the health filter: how many each chip would show. */
   counts: Record<Health | "all", number>;
   projects: { id: string; name: string }[];
   team: Person[];
@@ -693,11 +642,6 @@ export async function getPlotBoard(filters: PlotFilters = {}): Promise<PlotBoard
   };
 }
 
-/**
- * What a plot's or a client's page needs to host action cards and a
- * composer: today, the team, every plot (for "move to another plot") and
- * each person's open count (for the owner menu).
- */
 export async function getBoardBasics(): Promise<{
   today: string;
   meId: string;

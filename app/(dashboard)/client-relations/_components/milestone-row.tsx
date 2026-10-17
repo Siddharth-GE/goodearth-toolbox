@@ -12,15 +12,8 @@ import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
 import { useState } from "react";
 
 /**
- * One rung of the payment ladder, edited in place.
- *
- * All nine rows exist from the moment the plot does (seeded by
- * create_client_engagement), so there is no "add a row" step — you fill in
- * the amounts and dates that apply and leave the rest blank. That is the
- * shape the founder's sheet already had.
- *
- * Received and outstanding are computed, never typed: they come from the
- * receipts below via lib/client-relations/dues.ts.
+ * One rung of the payment ladder. All nine rows are seeded with the plot (create_client_engagement), so there is no add-a-row.
+ * Received and outstanding are computed from receipts (dues.ts), never typed.
  */
 export function MilestoneRowEditor({ milestone }: { milestone: MilestoneRow }) {
   const initial = {
@@ -132,7 +125,6 @@ export function MilestoneRowEditor({ milestone }: { milestone: MilestoneRow }) {
         />
       </TableCell>
 
-      {/* Computed, never typed. */}
       <TableCell className="text-muted text-right font-mono text-xs whitespace-nowrap">
         {milestone.received > 0 ? formatMoney(milestone.received) : "—"}
       </TableCell>

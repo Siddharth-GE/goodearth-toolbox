@@ -1,7 +1,3 @@
-/**
- * Reading the Saarang Tracker's export: which Masters plot a label means,
- * and when two spellings are the same buyer.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

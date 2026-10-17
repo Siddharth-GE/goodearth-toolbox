@@ -1,7 +1,3 @@
-/**
- * The dues arithmetic. Money owed and how late it is — the numbers the
- * founder currently keeps by hand, so the edges matter more than usual.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -170,10 +166,6 @@ test("rows come back in schedule order however they were handed in", () => {
   );
 });
 
-// -------------------------------------------------------------------
-// Rolling several plots together
-// -------------------------------------------------------------------
-
 test("combining summaries adds the money and keeps the soonest due date", () => {
   const villa17 = summariseDues(schedule(), [], TODAY);
   const villa39 = summariseDues(
@@ -200,13 +192,8 @@ test("combining an empty set is all zeroes rather than a crash", () => {
   assert.equal(total.nextDueOn, null);
 });
 
-/**
- * The bug this pins: rolling up by MERGING two plots' milestones and
- * receipts lets an unallocated receipt on one villa settle the other
- * villa's instalment. Each plot is its own ledger; only the answers add.
- */
+/** Merging plots' inputs lets one villa's unallocated receipt settle another's instalment; only the answers add. */
 test("one villa's unallocated payment never settles another villa's instalment", () => {
-  // Villa 17 owes on a rung that is not due yet.
   const villa17: MilestoneInput[] = [
     {
       id: "a1",
@@ -217,7 +204,6 @@ test("one villa's unallocated payment never settles another villa's instalment",
       invoicedOn: null,
     },
   ];
-  // Villa 39 owes on a rung that is already late.
   const villa39: MilestoneInput[] = [
     {
       id: "b1",
@@ -228,7 +214,6 @@ test("one villa's unallocated payment never settles another villa's instalment",
       invoicedOn: null,
     },
   ];
-  // The money arrived against VILLA 17, and nobody has filed it yet.
   const paid = [receipt({ id: "r1", amount: 1000 })];
 
   const correct = combineSummaries([
