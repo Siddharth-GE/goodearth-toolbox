@@ -10,14 +10,8 @@ import { useRef, useState } from "react";
 import { PersonPhoto } from "./person-photo";
 
 /**
- * A phone camera photo is 3-8MB and the Server Action body cap is 4mb, so
- * an unresized upload from site NEVER REACHES THE SERVER — what the person
- * sees is an opaque error with nothing to act on. Resizing here is not an
- * optimisation, it is the thing that makes upload work at all. ~40KB goes
- * up instead, which also matters on a site connection.
- *
- * The server re-normalises regardless: an action is a public endpoint, so
- * nothing a browser sends can be trusted to already be the right shape.
+ * Resizing here is what makes upload work: a phone photo is 3-8MB and the Server Action cap is 4mb, so an unresized
+ * upload NEVER REACHES THE SERVER and the person sees an opaque error. The server re-normalises anyway.
  */
 async function normaliseForUpload(file: File): Promise<Blob> {
   const bitmap = await createImageBitmap(file);
@@ -29,8 +23,7 @@ async function normaliseForUpload(file: File): Promise<Blob> {
     const context = canvas.getContext("2d");
     if (!context) throw new Error("no 2d context");
 
-    // `cover`: fill the square from the centre and let the edges go.
-    // A face cropped is better than a face letterboxed onto white.
+    // cover: fill the square from the centre; a cropped face beats a letterboxed one.
     const scale = Math.max(canvas.width / bitmap.width, canvas.height / bitmap.height);
     const width = bitmap.width * scale;
     const height = bitmap.height * scale;
@@ -102,9 +95,7 @@ export function PhotoUpload({
         ref={inputRef}
         type="file"
         accept="image/*"
-        // `capture` is deliberately absent: on a phone this offers the
-        // camera AND the gallery, which is what somebody who already has
-        // a good photo of themselves wants.
+        // No capture attribute: a phone then offers camera AND gallery.
         className="hidden"
         onChange={(event) => {
           const file = event.target.files?.[0];

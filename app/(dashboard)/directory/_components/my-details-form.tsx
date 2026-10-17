@@ -19,26 +19,16 @@ type Details = {
 };
 
 /**
- * The person's own half of their card, saved on blur — the same shape as
- * Settings' NameField, for the same reason: a Save button at the bottom
- * of five optional fields makes people fill in all of them or none.
- *
- * TEXT SAVES ON BLUR, THE DROPDOWN SAVES IMMEDIATELY. A <select> someone
- * changes and then clicks away from produces a blur too late to trust —
- * the Client Relations rule, learned there.
- *
- * Validation runs through the same pure functions the Server Action uses
- * (lib/directory/people.ts), so the sentence shown here and the rule
- * applied there cannot drift.
+ * The person's own half of their card, saved on blur (a bottom Save button makes people fill all five or none).
+ * TEXT SAVES ON BLUR, THE DROPDOWN SAVES IMMEDIATELY: a <select> blur comes too late to trust (Client Relations rule).
+ * Validation uses the same pure functions as the Server Action (lib/directory/people.ts).
  */
 export function MyDetailsForm({ initial }: { initial: Details }) {
   const [values, setValues] = useState(initial);
   const [error, setError] = useState<string>();
   const [savedField, setSavedField] = useState<string>();
 
-  // One flush for the whole card rather than five hooks: these five
-  // columns go up in a single UPDATE, so tracking them separately would
-  // mean five round trips to save one visit.
+  // One flush for the card: the five columns go up in a single UPDATE.
   const save = async (next: Details, field: string) => {
     if (JSON.stringify(next) === JSON.stringify(values)) return;
     setValues(next);
@@ -115,7 +105,6 @@ export function MyDetailsForm({ initial }: { initial: Details }) {
         </Field>
 
         <Field label="Blood group" saved={saved("blood")}>
-          {/* Dropdowns save on change, not on blur — see the header. */}
           <Select
             defaultValue={values.bloodGroup ?? ""}
             onChange={(event) => void save({ ...values, bloodGroup: event.target.value }, "blood")}

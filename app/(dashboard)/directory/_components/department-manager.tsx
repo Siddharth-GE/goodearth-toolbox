@@ -10,15 +10,7 @@ import type { DepartmentRow } from "@/lib/directory/queries";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState } from "react";
 
-/**
- * Relay's SimpleMaster, plus an inline rename — a department typed wrong
- * on the import has to be fixable without adding a second row beside it,
- * because the first one already has people in it.
- *
- * Nothing is ever deleted: somebody who has left still sits in a
- * department on every past record, and 0060 gives the table no delete
- * policy to make the other choice available.
- */
+/** Relay's SimpleMaster plus inline rename (an import typo must be fixable without a second row). Never deleted: leavers sit in departments on past records; 0060 has no delete policy. */
 export function DepartmentManager({ departments }: { departments: DepartmentRow[] }) {
   const [state, formAction, pending] = useActionState(createDepartment, undefined);
   const [busy, setBusy] = useState(false);
@@ -28,8 +20,7 @@ export function DepartmentManager({ departments }: { departments: DepartmentRow[
   const formRef = useRef<HTMLFormElement>(null);
   const wasPending = useRef(false);
 
-  // Clear the box only after a save that worked, so a rejected name is
-  // still there to fix.
+  // Clear the box only after a save that worked.
   useEffect(() => {
     if (wasPending.current && !pending && !state?.error) {
       formRef.current?.reset();

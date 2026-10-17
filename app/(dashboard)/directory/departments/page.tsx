@@ -5,13 +5,11 @@ import { listDepartments } from "@/lib/directory/queries";
 import { DepartmentManager } from "../_components/department-manager";
 
 export default async function DepartmentsPage() {
-  // The nav hides this tab for non-admins, but that is cosmetic — THIS is
-  // the boundary, and it redirects rather than erroring.
+  // The nav hides this tab for non-admins, but THIS is the boundary; it redirects.
   const user = await requireUser();
   await requireAdmin(user);
 
-  // Switched-off departments still show here; this is the screen where
-  // you turn one back on.
+  // Switched-off departments still show, so one can be turned back on.
   const departments = await listDepartments(true);
 
   return (

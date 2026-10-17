@@ -1,18 +1,8 @@
 /**
- * Birthday arithmetic for the Directory.
- *
- * Pure and dependency-free, so `npm test` can reach it — there is no
- * database and no browser in CI. Everything takes `today` as an argument
- * (todayInIndia() in lib/format.ts reads the clock), so the tests pin
- * the clock rather than hoping.
- *
- * THE YEAR IS NEVER DISPLAYED. `date_of_birth` stores a full date because
- * that is the fact, but `formatBirthday` gives day and month only and
- * nothing here computes an age. Nobody's age goes on a screen — that is a
- * decision, recorded in the tool's PLAN.md, not an oversight.
+ * Birthday arithmetic for the Directory. Pure; every function takes `today` so tests pin the clock.
+ * THE YEAR IS NEVER DISPLAYED and nothing computes an age: a decision in the tool's PLAN.md.
  */
 
-/** An ISO 'YYYY-MM-DD' date. */
 type IsoDate = string;
 
 const MONTHS = [
@@ -30,7 +20,6 @@ const MONTHS = [
   "December",
 ] as const;
 
-/** Parses 'YYYY-MM-DD' into its three numbers. No Date object, so no timezone. */
 function parts(iso: IsoDate): { year: number; month: number; day: number } {
   const [year, month, day] = iso.split("-").map(Number);
   return { year, month, day };
@@ -46,13 +35,7 @@ function daysBetween(from: IsoDate, to: IsoDate): number {
   );
 }
 
-/**
- * The next occurrence of a birthday on or after `today`, as an ISO date.
- *
- * 29 February in a non-leap year lands on 1 March, which is what
- * `Date.UTC(year, 1, 29)` does on its own — a birthday that would
- * otherwise vanish for three years in four.
- */
+/** Next occurrence on or after today. 29 February in a non-leap year lands on 1 March (Date.UTC does this), so the birthday doesn't vanish. */
 export function nextBirthday(dob: IsoDate, today: IsoDate): IsoDate {
   const born = parts(dob);
   const now = parts(today);
@@ -67,17 +50,11 @@ export function nextBirthday(dob: IsoDate, today: IsoDate): IsoDate {
   return today;
 }
 
-/** Days from `today` until the next occurrence. 0 on the day itself. */
 export function daysUntilBirthday(dob: IsoDate, today: IsoDate): number {
   return daysBetween(today, nextBirthday(dob, today));
 }
 
-/**
- * The people with a birthday in the next `windowDays`, soonest first.
- *
- * Anyone who has not filled in a date of birth is dropped rather than
- * sorted to the end — an empty field is not a birthday.
- */
+/** Birthdays in the next windowDays, soonest first. No date of birth means dropped, not sorted last. */
 export function upcomingBirthdays<T extends { dateOfBirth: string | null }>(
   people: T[],
   today: IsoDate,
@@ -90,13 +67,11 @@ export function upcomingBirthdays<T extends { dateOfBirth: string | null }>(
     .sort((a, b) => a.daysAway - b.daysAway);
 }
 
-/** "3 April" — day and month, never the year. See the file header. */
 export function formatBirthday(dob: IsoDate): string {
   const { month, day } = parts(dob);
   return `${day} ${MONTHS[month - 1]}`;
 }
 
-/** "Today", "Tomorrow", "In 6 days" — the label beside a name on the list. */
 export function birthdayLabel(daysAway: number): string {
   if (daysAway === 0) return "Today";
   if (daysAway === 1) return "Tomorrow";

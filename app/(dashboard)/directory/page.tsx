@@ -2,13 +2,7 @@ import { getWelcomeCounts } from "@/lib/directory/queries";
 
 import { ToolWelcome } from "../_components/tool-welcome";
 
-// The welcome screen (founder, 2026-08-13: every Operations and
-// Management tool opens on one). No PageTitle here — the layout renders
-// the title and nav for every screen in this tool.
-//
-// The second paragraph says the editing split out loud. That is the
-// honest place for it: someone who finds their department greyed out
-// should have been told why before they got there, not after.
+// No PageTitle: the layout renders title and nav. The second paragraph says the editing split out loud, so a greyed-out department is no surprise.
 export default async function DirectoryPage() {
   const counts = await getWelcomeCounts();
 

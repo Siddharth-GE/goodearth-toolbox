@@ -1,13 +1,6 @@
 import { ToolNav } from "@/components/ui/tool-nav";
 
-/**
- * NavTabs rather than Radix Tabs: these are separate routes with their own
- * data and their own loading.tsx, not panels of one page.
- *
- * The Departments tab is hidden for everyone but an admin. That is
- * cosmetic — /directory/departments calls requireAdmin itself, and that
- * call is the boundary.
- */
+/** NavTabs, not Radix Tabs: these are separate routes. The Departments tab is hidden for non-admins, but that is cosmetic; /directory/departments calls requireAdmin. */
 const TABS = [
   { key: "people", href: "/directory/people", label: "People" },
   { key: "birthdays", href: "/directory/birthdays", label: "Birthdays" },
@@ -18,7 +11,6 @@ const DEPARTMENTS = { key: "departments", href: "/directory/departments", label:
 
 export function DirectoryNav({ isAdmin }: { isAdmin: boolean }) {
   const tabs = isAdmin ? [...TABS, DEPARTMENTS] : [...TABS];
-  // Everything else (including one person's page) belongs to People
-  // unless a longer href says otherwise.
+  // Everything else (including a person's page) belongs to People unless a longer href matches.
   return <ToolNav root="/directory" tabs={tabs} defaultKey="people" />;
 }

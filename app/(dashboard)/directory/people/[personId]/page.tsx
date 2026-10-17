@@ -11,9 +11,7 @@ import { notFound } from "next/navigation";
 import { PersonPhoto } from "../../_components/person-photo";
 import { PostingFields } from "../../_components/posting-fields";
 
-/** One labelled fact. Renders an em dash rather than vanishing when
- *  empty — a missing phone number is information too, and a card whose
- *  rows come and go has no shape between one person and the next. */
+/** One labelled fact; an em dash when empty, so rows keep a shape between people. */
 function Detail({
   label,
   value,
@@ -51,9 +49,7 @@ export default async function PersonPage({ params }: { params: Promise<{ personI
   const { person, reportsTo, directReports } = result;
   const isAdmin = user.profile?.role === "admin";
 
-  // The admin's pickers, fetched only when they will be rendered.
-  // listPeopleOptions is passed the CURRENT reports-to so a deactivated
-  // manager stays selectable — see its comment in queries.ts.
+  // Admin pickers, fetched only when rendered. listPeopleOptions gets the CURRENT reports-to so a deactivated manager stays selectable.
   const [departments, people] = isAdmin
     ? await Promise.all([listDepartments(), listPeopleOptions(person.reportsToId)])
     : [[], []];
@@ -94,9 +90,6 @@ export default async function PersonPage({ params }: { params: Promise<{ personI
         </dl>
       </Card>
 
-      {/* The same section for everyone: editable for an admin, read-only
-          for everybody else. One page, one conditional — nobody has to
-          know a second screen exists. */}
       <Section
         title="Where they sit"
         note={
@@ -127,8 +120,7 @@ export default async function PersonPage({ params }: { params: Promise<{ personI
                 {reportsTo ? (
                   <Link href={`/directory/people/${reportsTo.id}`} className="hover:text-accent">
                     {reportsTo.name}
-                    {/* A reporting line pointing at somebody deactivated
-                        must be visibly odd, never silently absent. */}
+                    {/* A deactivated reporting line must be visibly odd, never absent. */}
                     {!reportsTo.isActive && <span className="text-muted"> (inactive)</span>}
                   </Link>
                 ) : (
@@ -162,9 +154,7 @@ export default async function PersonPage({ params }: { params: Promise<{ personI
         )}
       </Section>
 
-      {/* A quieter block, and it says who can see it. Blood group and
-          next-of-kin have not been in this app before; someone reading
-          their own card should not have to guess how far it travels. */}
+      {/* Blood group and next-of-kin are new to this app, so say who can see them. */}
       <Section
         title="In an emergency"
         note="Visible to everyone who can open the Directory. Each person fills in their own."

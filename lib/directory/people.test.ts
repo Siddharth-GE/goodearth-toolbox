@@ -1,8 +1,4 @@
-/**
- * Card validation and formatting. These rules exist twice on purpose —
- * here and as CHECK constraints in 0060 — so the tests care most about
- * the cases where the two must agree.
- */
+/** These rules exist twice on purpose (here and as CHECKs in 0060); the tests care where the two must agree. */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

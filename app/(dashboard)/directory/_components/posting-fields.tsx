@@ -16,16 +16,7 @@ type Posting = {
   joinedOn: string | null;
 };
 
-/**
- * The four columns the company owns, rendered only for an admin.
- *
- * The screen is the courtesy; staff_details_guard() (0060 §4) is the
- * boundary. A non-admin who reaches this action gets a redirect, and one
- * who reaches the table directly gets the guard's own sentence.
- *
- * Text saves on blur, dropdowns and dates save on change — a <select>
- * someone changes and clicks away from blurs too late to trust.
- */
+/** The four company-owned columns, admin only. The screen is the courtesy; staff_details_guard() (0060 §4) is the boundary. Text saves on blur, dropdowns and dates on change. */
 export function PostingFields({
   personId,
   initial,
@@ -35,9 +26,7 @@ export function PostingFields({
   personId: string;
   initial: Posting;
   departments: { id: string; name: string }[];
-  /** Active people PLUS whoever is currently selected, even if they have
-   *  been deactivated — otherwise saving any other field here silently
-   *  clears a reporting line pointing at somebody who has left. */
+  /** Active people PLUS the current pick even if deactivated, or saving another field clears a reporting line. */
   people: { id: string; name: string; isActive: boolean }[];
 }) {
   const [values, setValues] = useState(initial);
