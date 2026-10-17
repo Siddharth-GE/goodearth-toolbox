@@ -16,7 +16,6 @@ import {
   canSendBack,
   exceedsAnchor,
   exceedsApprovalLimit,
-  isContractBillable,
 } from "./workflow";
 
 const adminDecider = { isAdmin: true, isApprover: false };
@@ -113,12 +112,6 @@ test("a contract is approved by a decider, and only while pending", () => {
   assert.equal(canApproveContract("pending_approval", adminDecider), true);
   assert.equal(canApproveContract("pending_approval", bystander), false);
   assert.equal(canApproveContract("approved", approver), false);
-});
-
-test("a contract takes bills only once approved and while active", () => {
-  assert.equal(isContractBillable("approved", true), true);
-  assert.equal(isContractBillable("approved", false), false);
-  assert.equal(isContractBillable("pending_approval", true), false);
 });
 
 test("a contract's terms lock on approval", () => {

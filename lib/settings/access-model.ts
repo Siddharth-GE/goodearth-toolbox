@@ -41,17 +41,6 @@ export function effectiveApps(
   return [...new Set([...personalApps, ...roleApps])].sort();
 }
 
-export type ApprovalRight = {
-  /** Named personally (bill_approvers / indent_approvers). */
-  personal: boolean;
-  /** Whether the assigned role carries the right. */
-  fromRole: boolean;
-};
-
-export function canApproveEffective(right: ApprovalRight): boolean {
-  return right.personal || right.fromRole;
-}
-
 /**
  * The ceiling that actually applies, given both sources.
  *

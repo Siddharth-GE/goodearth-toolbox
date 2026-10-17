@@ -11,7 +11,7 @@
  * WHAT IT DOES, in one transaction:
  *
  *   1. A pair the tracker sells as one deal ("Plot 33-34") while Masters
- *      holds two plots becomes ONE plot, the import-saarang precedent
+ *      holds two plots becomes ONE plot, as the first register import did
  *      ("Plot 22 & 23", one villa): the first plot is renamed, the second
  *      plot, its villa and its empty Client Relations record are removed.
  *      Refused if the second has a buyer of its own or anything recorded
@@ -30,7 +30,7 @@
  *   4. A buyer the tracker names and Masters does not is ASSIGNED — the
  *      client found by name (case, titles and "&" aside) or created —
  *      and the villa and plot marked sold, as every named buyer was by
- *      scripts/import-saarang.ts.
+ *      the first register import.
  *
  * Masters' own placeholder in Saarang West ("Unit 1", no villa) is left as
  * it is. Re-runnable: a second run finds nothing to change.

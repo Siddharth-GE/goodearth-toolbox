@@ -12,7 +12,7 @@ import {
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
 import { useState, useTransition } from "react";
 
-import { ConfirmDialog } from "../../../_components/confirm-dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 /**
  * The note for site on a DRAFT transmittal, saved when the person leaves

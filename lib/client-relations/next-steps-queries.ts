@@ -61,11 +61,6 @@ export async function readTeam(supabase: Supabase): Promise<Person[]> {
   return (data ?? []).map((row) => ({ id: row.id, name: row.full_name ?? "—" }));
 }
 
-export async function getTeam(): Promise<Person[]> {
-  await requireTool(GRANT);
-  return readTeam(await createClient());
-}
-
 async function namesFor(supabase: Supabase, ids: string[]): Promise<Map<string, string>> {
   const unique = [...new Set(ids.filter(Boolean))];
   if (unique.length === 0) return new Map();

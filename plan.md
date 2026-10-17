@@ -68,12 +68,12 @@ Applied migrations are never edited, so their comments stay.
     - DESIGN.md's colour-transition line means the theme switch, not hover fades;
     - STATUS.md's contract table: Budgets reads Selections' `space_views`, and the Chat door's row needs fixing.
   - List every cut in the commit message, so the founder can veto any of them.
-- [ ] `[Haiku]` **Dead code.**
+- [x] `[Haiku]` **Dead code.** Done by `[Opus]`.
   - Remove 5 unused exports: `getTeam`, `OPEN_BUCKETS`, `DECK_PATH_PREFIX`, `DOCUMENT_TYPES`, `DOCUMENT_UPLOAD_LIMIT`.
   - Remove Design Management's own `confirm-dialog.tsx`.
   - Delete 7 superseded scripts (git keeps them): `import-material-master`, `import-vendors`, `import-contractors`, `import-works`, `import-catalogue`, `import-saarang`, `import-staff`.
-  - Drop `csv-parse` once nothing needs it.
-  - `[Opus]` decides the three rules only tests call (`canEditDetails`, `isContractBillable`, `canApproveEffective`): wire each where it belongs, or delete the rule and its test.
+  - Drop `csv-parse` once nothing needs it. **Kept:** `lib/csv.ts` reads Birdwing's expense uploads with it.
+  - `[Opus]` decides the three rules only tests call (`canEditDetails`, `isContractBillable`, `canApproveEffective`): wire each where it belongs, or delete the rule and its test. **`canEditDetails` wired** into the stay page (it hand-wrote the same check); **`isContractBillable` deleted** (`0106` refuses a bill on an unapproved or inactive work order); **`canApproveEffective` deleted** (a bare OR nothing called; the database decides approvers).
 - [ ] `[Sonnet]` **Thin the comments, one tool per commit** (`lib/<tool>` with `app/(dashboard)/<tool>`), shared code last.
   - Keep a comment only where it says a non-obvious why or rule, in two lines at most.
   - Cut history, dates, incident stories (point at BUGCATCHER #n instead), restated code, banners and commented-out code.

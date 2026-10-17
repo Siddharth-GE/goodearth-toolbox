@@ -118,11 +118,6 @@ export function canApproveContract(
   return !exceedsApprovalLimit(decider, contractValue);
 }
 
-/** A contract takes bills only once approved and while active. */
-export function isContractBillable(status: ContractStatus, isActive: boolean): boolean {
-  return status === "approved" && isActive;
-}
-
 /** A contract's terms are editable only before approval. */
 export function canEditContract(status: ContractStatus): boolean {
   return status === "pending_approval";

@@ -22,10 +22,6 @@ import { useId, useState, useTransition, type ReactNode } from "react";
  * before it happens, keeps any refusal inside the dialog, and, when the
  * record needs one, asks why (`reason`): the answer is handed to
  * `onConfirm`, and the button waits until something is typed.
- *
- * The third copy of Design Management's local ConfirmDialog (DESIGN.md:
- * the third copy is built into components/ui); that one converts when
- * its screen is next touched.
  */
 export function ConfirmDialog({
   trigger,

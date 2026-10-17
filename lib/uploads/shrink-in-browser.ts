@@ -13,9 +13,6 @@
  * and size again regardless — an action is a public endpoint.
  */
 
-export const DOCUMENT_UPLOAD_LIMIT = 4 * 1024 * 1024;
-export const DOCUMENT_TYPES = ["application/pdf", "image/jpeg", "image/png"] as const;
-
 const LONG_EDGE = 1600;
 const QUALITY = 0.82;
 

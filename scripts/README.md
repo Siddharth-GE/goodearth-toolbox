@@ -2,7 +2,7 @@
 
 Standalone Node scripts, not part of the app: migration tooling, schema checks, environment moves, data imports and a few ops checks. Run with `npx tsx scripts/<file>.ts` unless an npm alias is given.
 
-**House rules for anything that writes:** `--project <ref>` (or `--from`/`--to`) is required and never defaults; dry run by default, `--commit` to write; match on a natural key so a re-run writes nothing. Three early one-offs predate the rule — `import-catalogue.ts`, `import-saarang.ts`, `import-staff.ts` — and write to whatever `.env.local` points at (staging); they have been run and are kept as the record.
+**House rules for anything that writes:** `--project <ref>` (or `--from`/`--to`) is required and never defaults; dry run by default, `--commit` to write; match on a natural key so a re-run writes nothing.
 
 The `data/` files importers read are gitignored: real business data, some of it bank details.
 
@@ -32,8 +32,7 @@ The `data/` files importers read are gitignored: real business data, some of it 
 - `import-catalogue-sheet.ts` — the design team's catalogue workbook: pasted pictures and product links onto existing items (matched by content, never by the sheet's code — `lib/masters/catalogue-sheet.ts`), rows not there as new items. `--project <ref> --xlsx <path>`
 - `fetch-catalogue-images.ts` — finds the vendor's photo for items with only a link, then thumbnails every item with a picture into Storage. `--project <ref>` (`--limit 10` to try a few)
 - `import-masters-workbook.ts` — the founder's final masters workbook: vendors and contractors (bank details into the gated `vendor_payment_details`), works and their labour rates, material categories, materials, stages; deletes what it no longer lists, and stops while any record still points at it. `--project <ref> --xlsx <path>`
-- `import-material-master.ts`, `import-vendors.ts`, `import-contractors.ts`, `import-works.ts` — the first material master, suppliers, contractors and works. Superseded by `import-masters-workbook.ts` (on staging since 2026-10-07; running one there now would bring back what the workbook dropped) and kept as the record. `--project <ref>`
-- `import-catalogue.ts`, `import-saarang.ts`, `import-staff.ts` — the early one-offs above.
+- The first imports (material master, vendors, contractors, works, catalogue, the Saarang register, staff) are in git history; `import-masters-workbook.ts` superseded them.
 
 ## App checks
 

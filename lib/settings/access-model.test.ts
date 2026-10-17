@@ -8,12 +8,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import {
-  canApproveEffective,
-  effectiveApprovalLimit,
-  effectiveApps,
-  effectiveGrant,
-} from "./access-model";
+import { effectiveApprovalLimit, effectiveApps, effectiveGrant } from "./access-model";
 
 const personal = new Set(["/masters", "/indents"]);
 const role = new Set(["/bills", "/indents"]);
@@ -41,12 +36,6 @@ test("no role means personal grants stand exactly as they are", () => {
     granted: true,
     source: "personal",
   });
-});
-
-test("either source alone confers the right to approve", () => {
-  assert.equal(canApproveEffective({ personal: true, fromRole: false }), true);
-  assert.equal(canApproveEffective({ personal: false, fromRole: true }), true);
-  assert.equal(canApproveEffective({ personal: false, fromRole: false }), false);
 });
 
 test("unlimited from either side wins — combining rights never shrinks them", () => {

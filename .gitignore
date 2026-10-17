@@ -47,7 +47,7 @@ next-env.d.ts
 # scratch notes, not part of the project's documentation
 REPO-MAP.md
 
-# source CSVs for one-off imports (scripts/import-catalogue.ts) — business
+# source CSVs for one-off imports (the catalogue sheets) — business
 # data belongs in the database, not in git history
 /data
 

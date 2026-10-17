@@ -48,9 +48,6 @@ export function weekdayOf(iso: string): number {
 
 export type ActionBucket = "confirm" | "management" | "overdue" | "week" | "later" | "done";
 
-/** The sections of an open list, top to bottom. Done sits apart. */
-export const OPEN_BUCKETS = ["confirm", "management", "overdue", "week", "later"] as const;
-
 export type BucketInput = { status: string; dueOn: string | null };
 
 /**
