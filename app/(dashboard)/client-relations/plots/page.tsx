@@ -19,7 +19,13 @@ import { LotCard } from "../_components/lot-card";
 export default async function PlotsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; project?: string; who?: string; health?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    project?: string;
+    who?: string;
+    health?: string;
+    side?: string;
+  }>;
 }) {
   const params = await searchParams;
   const [board, headlines] = await Promise.all([
@@ -60,7 +66,9 @@ export default async function PlotsPage({
   ];
 
   const projects = [...new Set(board.cards.map((card) => card.projectId))];
-  const filtered = Boolean(params.q || params.project || params.who || params.health);
+  const filtered = Boolean(
+    params.q || params.project || params.who || params.health || params.side,
+  );
 
   return (
     <div className="space-y-4">
@@ -124,6 +132,17 @@ export default async function PlotsPage({
             options: board.projects.map((project) => ({ value: project.id, label: project.name })),
           },
           {
+            // A plot's two sides each have their own owner; Interior lists only
+            // plots with interior work (plotInList).
+            param: "side",
+            label: "Side",
+            allLabel: "Both sides",
+            options: [
+              { value: "construction", label: "Construction" },
+              { value: "interior", label: "Interior" },
+            ],
+          },
+          {
             param: "who",
             label: "Whose",
             allLabel: board.seesAll ? "Everyone" : "All of mine",
@@ -144,7 +163,7 @@ export default async function PlotsPage({
           description={
             board.seesAll || filtered
               ? "Try another chip, or clear the search."
-              : "A plot shows here once you are its Sales or Kaadal owner, or hold an open action on it. A team lead gives plots out."
+              : "A plot shows here once you are its Construction or Interior owner, or hold an open action on it. A team lead gives plots out."
           }
         />
       ) : (

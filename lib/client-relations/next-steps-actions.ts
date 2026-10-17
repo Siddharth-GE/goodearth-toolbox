@@ -96,7 +96,7 @@ export async function addNextStep(input: NewStep): Promise<ActionState> {
   if (action.length > 500) return { error: "Keep it under 500 characters — notes take the rest." };
   if (!input.ownerId) return { error: "Pick who owns it." };
   if (input.dueOn && !validDate(input.dueOn)) return { error: "That date does not look right." };
-  if (!known(ACTION_TRACKS, input.track)) return { error: "Pick Sales or Kaadal." };
+  if (!known(ACTION_TRACKS, input.track)) return { error: "Pick Construction or Interior." };
 
   const supabase = await createClient();
   const onTeam = await isOnTeam(supabase, input.ownerId);
@@ -189,7 +189,7 @@ export async function updateNextStep(stepId: string, patch: StepPatch): Promise<
     update.done_on = patch.status === "done" ? todayInIndia() : null;
   }
   if (patch.track !== undefined) {
-    if (!known(ACTION_TRACKS, patch.track)) return { error: "Pick Sales or Kaadal." };
+    if (!known(ACTION_TRACKS, patch.track)) return { error: "Pick Construction or Interior." };
     update.track = patch.track;
   }
   if (patch.notes !== undefined) {
@@ -336,7 +336,7 @@ export async function updatePlot(engagementId: string, patch: PlotPatch): Promis
   if (patch.progressStageId !== undefined) update.progress_stage_id = patch.progressStageId || null;
   if (patch.kaadalStage !== undefined) {
     if (patch.kaadalStage && !known(KAADAL_STAGES, patch.kaadalStage)) {
-      return { error: "Pick a Kaadal stage from the list." };
+      return { error: "Pick an interior stage from the list." };
     }
     update.kaadal_stage = patch.kaadalStage || null;
   }

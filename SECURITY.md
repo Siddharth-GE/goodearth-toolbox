@@ -84,7 +84,7 @@ Indents carries no money, and neither does a supervisor's phone — labour logs 
 
 The one scoped tool (_Auth and permissions_ above). Its rules are the founder's (Client Relations' `PLAN.md`, decision 6); these are the mechanics.
 
-- **A plot** — `client_engagements`, and with it `client_payment_milestones` and `client_receipts` — is seen by its Sales and Kaadal owners, by whoever owns or set an open action on it, and by admins and leads: `crm_sees_plot()`. **An action**, by its owner, its setter and its plot's owners: the row's own columns first, then `crm_sees_action()` by id. Admins and leads see every row.
+- **A plot** — `client_engagements`, and with it `client_payment_milestones` and `client_receipts` — is seen by its Construction and Interior owners (`crm_owner_id`, `kaadal_owner_id`), by whoever owns or set an open action on it, and by admins and leads: `crm_sees_plot()`. **An action**, by its owner, its setter and its plot's owners: the row's own columns first, then `crm_sees_action()` by id. Admins and leads see every row.
 - **Putting an action on a plot needs the plot in sight** (`crm_may_place_action()`, insert and update), so nobody makes a plot visible to themselves by hanging an action on it. The plot it is already on stays allowed, so a setter can reopen an action whose plot they saw only while it was open.
 - **Handing on is allowed, and the hander loses sight** — the update and its SELECT check read the plot or action as it was (_Auth and permissions_).
 - **The four helpers are `security definer`** so the two tables' policies can ask about each other without recursing; each answers only about the caller, every branch through `has_app('/client-relations')` or `is_lead()`, execute revoked from `public, anon`.

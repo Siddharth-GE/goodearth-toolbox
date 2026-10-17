@@ -278,10 +278,33 @@ export const ACTION_STATUSES: Option<ActionStatus>[] = [
   { value: "done", label: "Done", tone: "success" },
 ];
 
+/**
+ * A plot's two sides, each with its own owner and its own actions: the
+ * villa being built, and its interiors (founder, 2026-10-17: "some people
+ * may get the interiors or construction of the same plot … call it interior
+ * and construction, kaadal can be avoided"). The stored values are the
+ * tracker's, from 0120 — `sales` is Construction, `kaadal` is Interior, as
+ * are `crm_owner_id` and the `kaadal_*` columns. Only the words changed.
+ */
 export const ACTION_TRACKS: Option<ActionTrack>[] = [
-  { value: "sales", label: "Sales", tone: "default" },
-  { value: "kaadal", label: "Kaadal", tone: "info" },
+  { value: "sales", label: "Construction", tone: "default" },
+  { value: "kaadal", label: "Interior", tone: "info" },
 ];
+
+/** The side as a URL says it (`?side=interior`), never the stored value. */
+export type SideParam = "construction" | "interior";
+
+const SIDE_TRACK: Record<SideParam, ActionTrack> = { construction: "sales", interior: "kaadal" };
+
+/** `?side=` → a track, or null for both sides (and for anything unknown). */
+export function trackForSide(param: string | undefined | null): ActionTrack | null {
+  return param && Object.hasOwn(SIDE_TRACK, param) ? SIDE_TRACK[param as SideParam] : null;
+}
+
+/** A track → its `?side=` word. */
+export function sideForTrack(track: ActionTrack): SideParam {
+  return track === "kaadal" ? "interior" : "construction";
+}
 
 // ---------------------------------------------------------------------
 // Shared lookup

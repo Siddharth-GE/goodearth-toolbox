@@ -393,7 +393,7 @@ The founder: "in crm, and maybe other apps, there needs to be a assignment based
 - [x] `[Opus]` Checks: prettier, lint, typecheck, 1,134 tests, `next build`, `check:actions` — all green. The new PostgREST strings ran at staging (the plot-to-buyer embed, the scoped client list with and without search — two `or`s AND together). `NotYours`, the plot chip and the Settings tile rendered through a throwaway probe (deleted) at a true 390px phone, light and dark; nothing scrolls sideways. **No screen has been opened signed in.**
 - [x] ~~`[Fable]` Review `0122` and `0123`~~ — **skipped on the founder's word for this merge** (2026-10-17: "merge to staging"). In its place `[Opus]` re-reviewed the full diff against `SECURITY.md` and `BUGCATCHER.md`: `tool_leads` has RLS on, one SELECT policy (own rows or admin), admin-only insert and delete, no update and no anon policy (asserted); `is_lead()` and the four `crm_*` helpers are definers answering only about the caller, through `has_app()`/`is_admin()`, execute revoked from `public, anon` (asserted); `has_app()`/`is_admin()` untouched; each CRM table keeps one policy per command, altered in place, still no DELETE on actions or plots (asserted); the two views keep their columns and lose only `/client-relations`, revokes restated, manifest row changed with its reason; the buyer doors keep their `has_app` check and are only ever called directly (#11); no trigger on the four tables reads another CRM row as the person (#19 — read on staging: `client_actions_guard` asks only `is_admin()`, the rest are `audit_row` and `set_updated_at`). Code: no admin or browser client; every new read and action behind `requireTool` or `requireAdmin`, every `error` checked; colours are tokens only, seen light and dark (#4). No findings. **The Fable review is due before production.**
 - [x] `[Opus]` Applied to staging (`0001`–`0123`); regenerated types identical to the hand-written ones; `db:check` level, `db:check-views` clean; the trial re-run on the applied database, the migrations re-run inside it (both run twice cleanly); `is_lead` and `tool_leads` answer through the API.
-- [ ] `[Opus]` Pull request to `staging`; CI green; merge.
+- [x] `[Opus]` Pull request #100 to `staging`; CI green; signed out, the preview sent `/client-relations`, its plots and `/settings` to `/login`. Merged by the founder 2026-10-17.
 - [ ] Founder — the checklist below, on staging.
 - [ ] Production: with `0119`–`0121`, then `0122` and `0123`, before the tracker import.
 
@@ -405,7 +405,7 @@ With `/client-relations` given to Anu, Sayooj and Sebastina:
 2. **As Anu** (on her phone if you can): **Plots** shows only her plots; **Actions** opens on her own list, and **All I see** adds what she set for others and others' steps on her plots; **Clients** lists only her clients; the owner menu shows names without counts.
 3. Paste the link of one of Sayooj's plots (from your own view) into Anu's browser: "This plot is not one of yours".
 4. As Anu, add a step on one of her plots for Sayooj. **As Sayooj**: that plot appears, with that one step — not Anu's other steps on it. He ticks it finished; Anu closes it; the plot leaves Sayooj's list.
-5. As Anu, give one of her plots to Sebastina (Sales owner chip): the page turns into "This plot is not one of yours… it is with your colleague now". As Sebastina, it is in her Plots.
+5. As Anu, give one of her plots to Sebastina (Construction owner chip): the page turns into "This plot is not one of yours… it is with your colleague now". As Sebastina, it is in her Plots.
 6. Tick **Sayooj as Team lead**: his Actions opens on everyone with the team strip, Plots shows all of them, the owner menu shows counts. His access history says "Made team lead in Client Relations". Untick: back to his own.
 7. As yourself: everything as before. **Financial Management** and **Reporter** still show every plot's payments.
 8. As the **probe**: Client Relations is still refused.
@@ -491,3 +491,25 @@ Staging is becoming the real database, so this checklist issues nothing — an i
 4. Paste a real WorkDrive share link: in two seconds or so, "38 sheets" and their names. Paste the folder's own WorkDrive address instead — refused, asking for the share link. Add a file to the folder in WorkDrive, press **Read the folder again** — 39.
 5. Type _What changed_ — the line under the title says it is ready. **Don't issue: delete the draft.**
 6. After the team's next real issue: it reads **TB-000n**; its cover sheet carries the link and every sheet's name; on a supervisor's phone, **Supervisors → that villa → Open drawings** opens the folder.
+
+# Twelfth piece — Construction and Interior, two sides of a plot (2026-10-17)
+
+The founder: "in crm there are two tabs per plot kaadal and villas some people may get the interiors or construction, of the same plot so it needs to basically maybe be assigned twice and treated a bit differently … call it interior and construction kaadal can be avoided". Asked what each side's owner sees: **the whole plot** for an Interior owner, and **all of the Interior side** for the Construction owner — so `0123`'s visibility stands and this is screens only, no migration. Built by `[Opus]` on `feature/client-relations-sides`. The rule is Client Relations' `PLAN.md`, decision 8.
+
+On staging, 11 of the 24 plots with both owners have a different person on each side; 23 of 24 sales actions belong to the plot's sales owner and 19 of 20 Kaadal actions to its Kaadal owner — the split was already in the data.
+
+- [x] `[Opus]` The words: Sales is **Construction**, Kaadal is **Interior** on every Client Relations screen — the owners, the side chip (a hard hat and a sofa, always with the word), the cards, the menus, the errors. The stored values stay the tracker's (`stages.ts`, `trackForSide`; two tests).
+- [x] `[Opus]` Assigned twice: the plot page's header and every lot card show both owners; a card's next action shows its side.
+- [x] `[Opus]` Treated apart: the plot page's Next steps shows **Both sides · Construction · Interior** with their open counts, and a new step starts on that side with that side's owner (someone who holds only the Interior side starts there). Actions gets the same side chips in place of "Kaadal only" — the team strip's loads follow them. Plots gets a **Side** filter: Interior lists only plots with interior work, and a person matches a side by owning it or holding one of its open actions (`plotInList`, two tests).
+- [x] `[Opus]` Checks: prettier, lint, typecheck, 1,138 tests. Rendered through a throwaway probe (deleted) at a true 390px phone, light and dark — the side chips, a plot's two owners, an Interior step, the composer on the Interior side picking the Interior owner by itself, lot cards with and without an Interior side; nothing scrolls sideways. **No screen has been opened signed in.**
+- [x] `[Opus]` `next build` and `check:actions` green.
+- [ ] `[Opus]` Pull request to `staging`; CI green; the founder merges.
+- [ ] Founder — the checklist below, on staging.
+
+## Verification — the founder, on staging (twelfth piece)
+
+1. **Plots**: each card shows two owners — a hard hat for Construction, a sofa for Interior, with the interior stage beside it. The **Side** filter → Interior lists only plots with interior work; pick Interior + Sayooj — only plots where he owns the interiors or holds an interior step.
+2. Open a plot with both owners: the header names both. **Next steps** → **Interior**: only interior steps; type a step — the owner chip already says the Interior owner, and the side chip says Interior. Switch it to Construction: the owner becomes the Construction owner.
+3. On a step's **•••** → Side: move it to Construction; Undo brings it back.
+4. **Actions** → **Interior**: only interior steps, and the team strip counts only interior work.
+5. Nowhere in Client Relations says "Kaadal" or "Sales" any more (the plot record's **Construction** and **Interior** cards).

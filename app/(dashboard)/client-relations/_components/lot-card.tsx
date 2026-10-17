@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 
 import { Pill, PersonName } from "./pill";
+import { SideIcon } from "./side-mark";
 
 /**
  * A plot as the tracker drew it — a surveyed lot: its number large and
@@ -53,7 +54,7 @@ export function HealthPill({ health }: { health: PlotCard["health"] }) {
 export function LotCard({ card, today }: { card: PlotCard; today: string }) {
   const hasBuyer = Boolean(card.clientName);
   const next = card.next ? dueLabel({ ...card.next }, today) : null;
-  const kaadal = optionFor(KAADAL_STAGES, card.kaadalStage);
+  const interior = optionFor(KAADAL_STAGES, card.kaadalStage);
   // Saarang West's villas carry their configuration in their name, "Villa 3 (1BHK Study)".
   const configuration = /\(([^)]+)\)\s*$/.exec(card.unitName)?.[1] ?? null;
 
@@ -107,7 +108,12 @@ export function LotCard({ card, today }: { card: PlotCard; today: string }) {
           <div className="border-border flex flex-col items-start gap-1.5 border-t pt-2.5 text-sm">
             {card.next ? (
               <>
-                <span className="text-foreground/80 line-clamp-2 min-w-0">{card.next.action}</span>
+                <span className="text-foreground/80 line-clamp-2 min-w-0">
+                  {card.next.track === "kaadal" ? (
+                    <SideIcon track="kaadal" className="text-info mr-1 inline align-[-2px]" />
+                  ) : null}
+                  {card.next.action}
+                </span>
                 {next ? (
                   <Pill
                     tone={next.tone === "neutral" ? "plain" : next.tone}
@@ -130,16 +136,32 @@ export function LotCard({ card, today }: { card: PlotCard; today: string }) {
           </div>
         ) : null}
 
-        <div className="text-muted mt-auto flex min-w-0 items-center gap-2 text-xs">
-          {card.ownerName ? (
-            <PersonName name={card.ownerName} size={18} />
-          ) : (
-            <span>Unassigned</span>
-          )}
-          {kaadal ? (
-            <Pill tone="info" className="ml-auto h-6 truncate px-2 text-[11px]">
-              {kaadal.label}
-            </Pill>
+        {/* A plot's two sides, each with its own owner. */}
+        <div className="text-muted mt-auto space-y-1.5 text-xs">
+          <div className="flex min-w-0 items-center gap-2">
+            <SideIcon track="sales" />
+            <span className="sr-only">Construction owner:</span>
+            {card.ownerName ? (
+              <PersonName name={card.ownerName} size={18} />
+            ) : (
+              <span>No construction owner</span>
+            )}
+          </div>
+          {card.interiorOwnerName || interior ? (
+            <div className="flex min-w-0 items-center gap-2">
+              <SideIcon track="kaadal" />
+              <span className="sr-only">Interior owner:</span>
+              {card.interiorOwnerName ? (
+                <PersonName name={card.interiorOwnerName} size={18} />
+              ) : (
+                <span>No interior owner</span>
+              )}
+              {interior ? (
+                <Pill tone="info" className="ml-auto h-6 truncate px-2 text-[11px]">
+                  {interior.label}
+                </Pill>
+              ) : null}
+            </div>
           ) : null}
         </div>
       </Card>
