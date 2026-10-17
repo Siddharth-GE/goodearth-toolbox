@@ -381,9 +381,13 @@ The founder: the app is "Toolbox by Kaadal" under the Kaadal K; Goodearth stays 
 
 The design team's first day on staging (2026-10-16: six transmittals issued on Villas 1, 26, 40 and 41, two drafts) came back as four points: the transmittal number cannot be changed; the revision number cannot be changed; "only Sheet 9 is being uploaded" — the founder: "in a drawing set only 9 sheets are getting uploaded when there are almost 30-40"; the transmittal sheet shows only the drawing set's name. The data shows the workaround: set names carrying the Excel number, revision and date ("Transmittal - 018 - Plot 26 - Plumbing Layout R0- 15102026"), and the team's own Excel cover sheet uploaded as one of the sheets (Villa 26 sheet 1, Villa 40 sheet 5). Planned by `[Opus]` at the founder's request — `MODELS.md` gives planning to Fable, so the migration still waits for a Fable review. Branch `feature/design-management`, migration `0122`.
 
-## The founder's decision (2026-10-17)
+## The founder's decisions (2026-10-17)
 
-**The number stays the toolbox's, marked as the toolbox's.** "its ok if transmittal number can't be changed just make a tool box id addition, since we had an already ongoing series from excel … a tb or something with the rest of the transmittal number will make it unique anyway". So Issue mints **`TB-0003`** where it minted `TR-0003`: still counted per villa, each villa's counter carrying on, and never mistakable for the Excel series.
+1. **The number stays the toolbox's, marked as the toolbox's.** "its ok if transmittal number can't be changed just make a tool box id addition, since we had an already ongoing series from excel … a tb or something with the rest of the transmittal number will make it unique anyway". So Issue mints **`TB-0003`** where it minted `TR-0003`: still counted per villa, each villa's counter carrying on, and never mistakable for the Excel series.
+2. **No more file handling: a revision's drawings are a Google Drive link.** Told the upload errors, the founder: "lets not get into file handling, new transmittal is created and they paste a link of our drive into it and that link can be shared with supervisors". The drawings live in the team's Drive; the toolbox keeps the record — number, stage, set, revision, what changed, who, when — and the link. It also keeps the app inside Supabase's free file storage (about 1 GB), which 30–40 sheets a set, every revision, across the villas would outgrow.
+3. **Shared with Goodearth only.** The supervisors have company Google accounts (founder: "they do"), so a folder is shared with _people at Goodearth with the link_, and a forwarded link opens for nobody outside.
+
+The team rule that comes with decision 2, which the toolbox cannot enforce: **one Drive folder per revision, never touched once issued — the next revision is a new folder.** The toolbox freezes the link on Issue; what is in the folder is the team's word, with Drive's own version history behind it.
 
 ## What it does
 
@@ -392,7 +396,7 @@ The design team's first day on staging (2026-10-16: six transmittals issued on V
 - `issue_transmittal()` restated whole from `0093`, one change: `'TB-'` for `'TR-'`. Its grants restated (`revoke … from public, anon`; `grant … to authenticated`).
 - The six already issued keep `TR-0001`/`TR-0002` — an issued transmittal never changes (`0092`'s precedent). Villa 41's next is `TB-0003`.
 - The cover sheet's file name gains the villa: `Goodearth-Transmittal-Villa41-TB-0003.pdf` — a per-villa number is unique only with it.
-- Sheet downloads follow by themselves: `SAA-Saarang-Villa41-WD-TB0003-GFP.pdf` (`sheet-name.ts` takes the number as given; its tests and comments move to TB).
+- `sheet-name.ts` (the names of sheets uploaded before) takes the number as given; its tests and comments move to TB.
 
 **2. The revision number is the designer's to set, while draft** (`0122`)
 
@@ -401,54 +405,55 @@ The design team's first day on staging (2026-10-16: six transmittals issued on V
 - `setDraftRevisionNumber(revisionId, n)` in `actions.ts`: `requireTool`, a whole number 0–99, the database's sentence on refusal, `revalidatePath("/design-management", "layout")`.
 - R1 and above still need _What changed_ before Issue (`0093`): a set brought in at R3 says what changed since the Excel R2.
 
-**3. Every sheet by its name — on screen and on the cover sheet** (no migration)
+**3. The Drive link replaces the upload** (`0122`)
 
-- A sheet's **title** is the name its file was uploaded under, less the extension ("Plot 41,42 - Plinth beam Layout") — already stored as `file_name`, so no column. Renaming a title is not in this build.
-- **The cover sheet**: the set, its revision, the stage and _What changed_ in the header block; then **one row per sheet** — # · Sheet (code) · Title · Rev. Today it has one row per set with a count, which is what "only the drawing set name" describes. A forty-sheet set runs onto a second page, and is rendered and looked at that way (BUGCATCHER #8's forty-rows case). Issued transmittals get the new layout too (the PDF is built on demand).
-- **On screen** — the draft workspace, an issued transmittal, and Supervisors' drawings (through `lib/drawings/`, which already returns `fileName`): each sheet shows its title, with the name it downloads under beneath it, small. Today only the download name shows, so a sheet uploaded as "Plinth beam Layout" with code 9 reads as `…-DRAFT-9.pdf`.
+- `drawing_revisions.drawings_url text` — a Google Drive address only (`https://drive.google.com/…`: a CHECK in the database, and a pure `parseDriveLink` with tests on the screen's side, which trims it, finds the folder or file id, and says plainly what is wrong). Frozen with the note once the revision leaves draft (the guard's freeze list gains it).
+- The release gate (`0093`'s "no drawing without a file", founder 2026-08-22) becomes **a Drive link or an uploaded sheet**, in both places it lives: the guard's draft → released check and `issue_transmittal`'s pre-check, which names the set ("… has no Drive link — paste the folder's link before issuing"). `readiness.ts` mirrors it; its tests follow.
+- **The draft workspace**: _Drive link_ (saves on leaving the field, like the note), an **Open** beside it to check it, and under it "Share the folder with Goodearth, and make a new folder for each revision." The upload control goes; `uploadDrawingRevisionFile` is deleted, and with it this tool's only use of `sharp`.
+- **What was uploaded stays.** The six issued transmittals keep their sheets, opened and downloaded as today (the files route, `lib/drawings/sheet-name.ts`). The two drafts (Villas 1 and 41, ARCHITECTURE-GFC) keep theirs, each still removable; either can issue with its sheets, a link, or both.
 
-**4. A set of 30–40 sheets goes up in one go**
+**4. The toolbox reads the folder: the count and every sheet's name, automatically** (`0122`)
 
-What was checked (2026-10-17): **nothing in the toolbox stops a set at 9.** The database took sheets 10–40 on Villa 1's draft from a single-grant `/design-management` person under RLS (a rolled-back trial); every file in the `drawings` bucket has its row, so no upload died half-way; the error log has nothing since 13 October. Both sets that stop at 9 (Villa 1's ARCHITECTURE-GFC draft, Villa 41's Foundation detail) stopped without a crash — so the 10th sheet was refused with a message on screen, or never tried. The screen refuses a sheet for three reasons: over 4 MB, not a PDF/JPG/PNG, or a code already used.
+The founder: "is there a way that an uploaded link autocounts and extracts the name etc to make the transmittal list?" Yes — Google Drive answers "what files are in this folder" (names, sizes, a fingerprint of each file's contents, when each last changed) without the toolbox ever touching a file. The Chat door already signs in to Google as a robot account with no library (`lib/google-chat/app-token.ts`); this is the same, read-only.
 
-_4a — many at once_ (no migration)
+- **A robot account that can only look** (the founder's setup, once): in Google Cloud, the Drive API switched on and a service account `toolbox-drawings` made, its key handed over and written to Vercel through `scripts/vercel-env.ts` as `GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY`; in Drive, **one top folder for the toolbox's drawings, shared once with the robot as Viewer** — every revision folder made inside it can be read, nothing outside it. Scope `drive.readonly`. If Goodearth's Workspace refuses sharing with an outside address, the admin allows that one address. **Key unset = link only**: the link is saved and opens, nothing is read, and everything else works.
+- **Reading**: `lib/google/` (new, shared — both Google doors may use it; the Chat door moves onto it later, not in this build) signs the robot in and lists one folder: its files, top level only, paged, five-second ceiling, never throws, never logs a credential (the `app-token.ts` rules). A link to a single file reads as one sheet.
+- **On the draft**, once a link is saved: "38 sheets" and the list of names, in name order (PLOT 01 FIRST FLOOR -R0, PLOT 01 GROUND FLOOR -R0 …), with **Read the folder again**. A sub-folder is named as skipped. A folder the robot cannot see says so in a sentence: "The toolbox can't see this folder — make it inside Toolbox drawings."
+- **At Issue, the list is kept**: the action reads the folder once more and writes it — each file's Drive id, name, size, fingerprint and last-changed time — to a new table, `drawing_revision_drive_sheets`, before `issue_transmittal`. RLS on, the same SELECT shape as `drawing_revision_files` (design team, or `/supervisors` once not draft), writes `/design-management` while draft only, through the same draft-only trigger, so once issued it never changes. **This puts back what the link alone gave up**: the toolbox again answers "what did site have on the 22nd", sheet by sheet, whatever later happens in the folder. If Drive cannot be read at that moment, Issue still goes, with the link only and the reason on screen — Google being slow never stops a drawing reaching site.
+- **The cover sheet**: set, revision, stage, issued, by whom, what changed, and **Drawings: the link** (printed in full, clickable in the PDF); then **one row per sheet** — # · Sheet name · Last changed. A transmittal with uploaded sheets lists those the same way, so the six already issued answer "only the drawing set name" too. A forty-sheet set runs onto a second page and is rendered and looked at that way (BUGCATCHER #8). The PDF's file name gains the villa.
+- **Supervisors** (through `lib/drawings/`, which gains the link and the kept list on a released set): each set at its latest revision has **Open drawings** (the folder, in the Drive app on a phone) and its sheets by name, each opening that file in Drive; the revision history as today. Sets from before keep their uploaded sheets.
+- Not in this build, and easy after it: a line on an issued transmittal when its folder no longer matches what was kept ("3 sheets changed in Drive since this was issued").
 
-- **Choose sheets** takes one file or forty. They line up in a short list: each with its title, a code box filled with the next free number (1, 2, 3 … after the highest number there — what the team typed by hand on every set), and a ×. A code can be changed (GFP) before **Upload 40 sheets**.
-- Each file still goes up on its own request, one after another, saying "Uploading 12 of 40". A refused file stays in the list with its reason, by name, and the rest carry on — so a set can never quietly stop part-way.
-- The next-free-number rule is a pure helper with tests. Day one's nine Villa 41 sheets took seven minutes, one at a time, each code typed.
+What was checked before the upload was dropped (2026-10-17): nothing in the toolbox stopped a set at 9 — the database took sheets 10–40 on Villa 1's draft from a single-grant designer (a rolled-back trial), no upload died half-way, and the error log is empty since 13 October; the 10th sheet was refused on screen (over 4 MB, wrong type, or a code used) or never tried.
 
-_4b — sheets over 4 MB_ (`0122`) — **only if the designer saw "over 4 MB"** (the question below)
+## The founder's setup
 
-- Design Management's `PLAN.md` names the escape hatch: a PDF over 4 MB goes **straight to Storage**. The action checks the grant, the draft and the code, then asks Storage (through the RLS client, so the bucket's insert policy still decides) for a one-time upload address for one path; the browser sends the file there with a plain `fetch` — no Supabase client in the browser, the red line holds; a second action reads what landed (size, type), writes the row, and removes the object if anything is wrong.
-- `0122` raises the `drawings` bucket's `file_size_limit` from 4 MB to 50 MB (Supabase's ceiling on the free plan). Photos keep going through the server, which resizes them.
-- A `SECURITY.md` line for the one-time upload address, and Fable's review of it with `0122`.
-
-## Open — for the founder to ask the designer
-
-- **What did the screen say when the 10th sheet would not go up?** "Over 4 MB" → 4b is in this build. Nothing, or they stopped — 4a alone answers it. A code already used → 4a's numbering answers it.
+1. In the Google Cloud project the Chat app lives in: switch on the **Google Drive API**; make a service account **`toolbox-drawings`** (no roles needed); make a JSON key and hand it to a session as one line in `.env.local`.
+2. In Drive: a top folder **Toolbox drawings** (or the team's existing drawings folder), shared with the robot's address as **Viewer**, and with the design team and supervisors as Goodearth people. Every revision folder goes inside it.
+3. If Drive refuses to share with the robot's address, allow it in the Google Admin console.
 
 ## Steps
 
 - [ ] Founder — approve this plan.
-- [ ] `[Opus]` `0122` and `scripts/trials/design-numbers-as-designer.sql`, dry-run on staging as a single-grant `/design-management` person under RLS: Issue mints TB; a draft's number moves up, never to or below one already used, never once released. Proved to bite: with the TR mint, and with the "above" check removed, it fails.
-- [ ] `[Fable]` Review `0122` — it restates a function's grants and a guard trigger. Or the founder's word to skip it for staging, with `[Opus]` reviewing in its place.
-- [ ] `[Opus]` Apply to staging; `db:check`, `db:check-views`; types unchanged (no new column).
-- [ ] `[Opus]` The revision field and `setDraftRevisionNumber`.
-- [ ] `[Sonnet]` The cover sheet one row per sheet, the PDF's file name, titles on the three screens. Rendered from staging's Villa 41 TR-0002 (nine sheets) and looked at (BUGCATCHER #8).
-- [ ] `[Opus]` Choose sheets, many at once (4a). Then 4b if the designer's answer calls for it — its bucket change rides in `0122`, so the answer comes before `0122` is reviewed.
+- [ ] `[Opus]` `0122` — the TB mint, the movable draft number, `drawings_url`, the gate "a link or a sheet", `drawing_revision_drive_sheets` — and `scripts/trials/design-links-as-designer.sql`, dry-run on staging as a single-grant `/design-management` person and a single-grant `/supervisors` person under RLS: Issue mints TB; a draft with a link and no upload issues, one with neither is refused; a non-Drive address is refused; the link and the kept list never change once issued; a supervisor sees a released revision's list and never a draft's; the draft's number moves up only. Proved to bite: with the TR mint, without the "above" check, and without the draft-only trigger on the new table, it fails.
+- [ ] `[Fable]` Review `0122` — a new table and its policies, a guard trigger, and a function's grants restated. Or the founder's word to skip it for staging, with `[Opus]` reviewing in its place.
+- [ ] `[Opus]` Apply to staging; `db:check`, `db:check-views`; types regenerated (`db:types:staging`).
+- [ ] `[Opus]` The draft workspace: the revision field, the Drive link with `parseDriveLink`, `readiness.ts`; the upload goes.
+- [ ] `[Opus]` `lib/google/` and the folder read: the list on the draft, the kept list at Issue, link-only when the key is unset. Pure parts (the folder id from a link, name ordering, Google's answer to rows) tested. A `SECURITY.md` line for the robot account: read-only scope, one shared folder, key in Vercel only.
+- [ ] Founder — the setup above; then a session writes the key to Vercel Preview and redeploys `staging`.
+- [ ] `[Sonnet]` The cover sheet (link and one row per sheet), the PDF's file name, the issued transmittal page, Supervisors' **Open drawings** and sheet list. Rendered from staging — Villa 41's nine uploaded sheets and a forty-row folder list — and looked at (BUGCATCHER #8).
 - [ ] `[Opus]` prettier, lint, typecheck, tests, `next build`, `check:actions`; every changed `select` run at staging's PostgREST.
-- [ ] `[Opus]` Docs: Design Management's `PLAN.md` (decisions 8–10, the number rule, the guard table), `STATUS.md` (migrations), `TODO.md`.
+- [ ] `[Opus]` Docs: Design Management's `PLAN.md` (decisions 3 and 6 superseded — a revision's drawings are a Drive link, sheet codes are the old uploads' only; the folder rule; the number rule; the gate; the guard table; Files and storage kept as history), `STATUS.md` (the tool's line, migrations; the contract row stays — Supervisors still reads through `lib/drawings/`), `TODO.md`.
 - [ ] `[Fable]` Approval pass, or the founder's word; pull request to `staging`; CI green; merge.
 - [ ] Founder — the checklist below, on staging.
 
 ## Verification — the founder, on staging (tenth piece)
 
-Staging is becoming the real database, so this checklist issues nothing — an issued transmittal can never be deleted. The TB mint is proved by the trial; the team's next real issue shows it.
+Staging is becoming the real database, so this checklist issues nothing — an issued transmittal can never be deleted. The TB mint and the kept list are proved by the trial; the team's next real issue shows them.
 
-1. **Villa 41 → TR-0002 → Cover sheet (PDF)**: all nine sheets listed, each with its code and title; the file is named `Goodearth-Transmittal-Villa41-TR-0002.pdf`.
-2. **Villa 40 → New transmittal → Structural → Foundation Layout → Revise to R1.** On the draft, set Revision to **0** — refused, in a sentence. Set **3** — saved; the label reads R3.
-3. **Choose sheets** → pick a whole real set at once (30 or more PDFs) → they line up as 1, 2, 3 … with their titles. Change one code to GFP. **Upload** → "Uploading 12 of 30 …", then each is listed by title with its download name beneath — all of them.
-4. Pick a file over 4 MB with two others — with 4b it goes up like the rest; without it, it stays in the list with its reason and the other two go up.
-5. **Delete the draft** (bottom of the page): nothing issued, nothing burned.
-6. **Supervisors → Villa 41 → Drawings**: each sheet shows its title.
-7. After the team's next real issue: it reads **TB-000n**, and its cover sheet lists every sheet.
+1. **Villa 41 → TR-0002 → Cover sheet (PDF)**: its nine uploaded sheets listed by name; the file is named `Goodearth-Transmittal-Villa41-TR-0002.pdf`.
+2. **Villa 40 → New transmittal → Structural → Foundation Layout → Revise to R1.** On the draft, set Revision to **0** — refused, in a sentence. Set **3** — saved; it reads R3.
+3. Paste a WhatsApp link as the Drive link — refused, in a sentence. Paste a folder link from **outside** Toolbox drawings — saved, and "The toolbox can't see this folder".
+4. Paste a real folder from inside Toolbox drawings: within a second, "38 sheets" and their names. Add a file to the folder in Drive, press **Read the folder again** — 39.
+5. Type _What changed_ — the line under the title says it is ready. **Don't issue: delete the draft.**
+6. After the team's next real issue: it reads **TB-000n**; its cover sheet carries the link and every sheet's name; on a supervisor's phone, **Supervisors → that villa → Open drawings** opens the folder in Drive, and a sheet opens on its own; the same link sent to a personal Gmail does not open.
