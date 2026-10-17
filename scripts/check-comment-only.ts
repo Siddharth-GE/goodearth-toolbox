@@ -6,6 +6,7 @@
  *   npx tsx scripts/check-comment-only.ts            # working tree vs HEAD
  *   npx tsx scripts/check-comment-only.ts <ref>      # working tree vs <ref>
  *   npx tsx scripts/check-comment-only.ts <a> <b>    # commit <b> vs <a>
+ *   … -- lib/bills "app/(dashboard)/bills"           # only these paths
  */
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
@@ -49,9 +50,14 @@ function tokens(code: string): string[] {
 }
 
 function main() {
-  const [a, b] = process.argv.slice(2);
+  const argv = process.argv.slice(2);
+  const split = argv.indexOf("--");
+  const [a, b] = split === -1 ? argv : argv.slice(0, split);
+  const paths = split === -1 ? [] : ["--", ...argv.slice(split + 1)];
   const base = a ?? "HEAD";
-  const changed = (b ? git("diff", "--name-status", a, b) : git("diff", "--name-status", base))
+  const changed = (
+    b ? git("diff", "--name-status", a, b, ...paths) : git("diff", "--name-status", base, ...paths)
+  )
     .trim()
     .split("\n")
     .filter(Boolean)
