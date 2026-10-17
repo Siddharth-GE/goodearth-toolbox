@@ -160,6 +160,13 @@ Dexter's viewer sandboxed HTML and SVG and nothing else, so an `.xml` (or `.xhtm
 **Rule.** Untrusted files get the sandbox on every response; browsers ignore it on non-documents, so there is nothing to choose.
 **Check.** `lib/dexter/headers.test.ts` walks every type, including an unknown one and a file with no extension.
 
+### 22. A policy written before the second factor existed never learned it
+
+`user_apps`' grant, revoke and admin-read policies came from `0003` and checked `profiles.role = 'admin'` directly. `0062` taught `is_admin()` the emailed code and `is_active`, and every later policy used it, but nobody went back: an admin's password alone could grant any tool to anyone. Each new migration's asserts covered only its own tables. Found by the 2026-10-17 audit; `0127` closes it.
+
+**Rule.** A policy asks `is_admin()` or `has_app()`, never `profiles.role`. When a helper learns a new condition, search every policy that bypasses it.
+**Check.** Live: `select tablename, policyname from pg_policies where qual ilike '%role%' or with_check ilike '%role%'`, which should list nothing (Phase 3's `db:check-policies` will run it on every pull request). Run a trial as an admin with an unverified `session_id`, as `scripts/trials/user-apps-is-admin.sql` does.
+
 ## Adding to this file
 
 When something breaks that a green build said was fine, it belongs here, numbered next. Four things, short: **what happened, why every gate missed it, the rule, and the one check** — the check is the part that matters. Keep the whole page readable in five minutes.

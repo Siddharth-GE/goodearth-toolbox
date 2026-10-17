@@ -30,6 +30,7 @@ Switch day is the founder's to run. Before it, three things must be done:
   - New migration: `is_admin()` in each, and one SELECT policy, `user_id = auth.uid() or is_admin()`.
   - Trial: an admin session with no verified-session row is refused.
   - _Check:_ in Settings, grant `/indents` to the probe, then take it away.
+  - [x] `[Opus]` Drafted as `0127_user_apps_is_admin.sql` on branch `feature/refactor-user-apps`, with `scripts/trials/user-apps-is-admin.sql`. Dry-run on staging: it passes, and without `0127` the trial fails at step 1 (an admin without the emailed code grants a tool today). **Waiting for Fable's review before `db:apply`.**
 - [x] `[Opus]` **H3: one place names the databases.** After the switch, the real site would wear the practice banner, and the "staging only" wipe script would accept the real database.
   - `lib/environment.ts` exports each ref with its role (production, practice).
   - `scripts/wipe-staging-records.ts`, `dry-run-migrations.ts`, `google-chat-usage-test.ts` and the practice banner's link import it.
@@ -43,9 +44,9 @@ Switch day is the founder's to run. Before it, three things must be done:
   - Done: each function returns a refusal ready to show; a count it cannot read or write refuses ("Could not check…"), and a failed clear is logged. Run against staging with a made-up address: the 10th wrong password and the 10th wrong PIN lock for 10 minutes, a correct one clears it, and with the database unreachable every check refuses.
 - [x] `[Sonnet]` **M7: rotate the Marathon admin PIN.** `0002` seeds "2026" in this public repo. `scripts/rotate-marathon-pins.ts` must also rotate `marathon_config`'s admin PIN, and SHIPPING.md runs it on every new database.
   - Done by `[Opus]` in Sonnet's place, on the founder's "keep going". The script checks and rotates the admin PIN (to six random digits), with `2026` added to the published list; checked against `0002`'s own seed. Staging's admin PIN is already off it (dry run: nothing to do).
-- [ ] `[Opus]` **BUGCATCHER #21 and #22.**
+- [x] `[Opus]` **BUGCATCHER #21 and #22.**
   - [x] #21: a sandbox that lists the types it covers leaves every other type open.
-  - #22: a policy written before the second factor existed never learned it.
+  - [x] #22: a policy written before the second factor existed never learned it (with `0127`).
 
 ## Phase 1: cut the fat
 
