@@ -1,6 +1,6 @@
 import "server-only";
 
-import { requireTool } from "@/lib/auth/access";
+import { isToolLead, requireTool } from "@/lib/auth/access";
 import { cleanSearch, pagedList, type PagedResult } from "@/lib/masters/paged";
 import { todayInIndia } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
@@ -48,19 +48,58 @@ function fail(context: string, error: { message: string } | null): asserts error
   assertRead("Client Relations", context, error);
 }
 
+type Supabase = Awaited<ReturnType<typeof createClient>>;
+type User = Awaited<ReturnType<typeof requireTool>>;
+
+/**
+ * Which clients a team member's screens list: the ones they look after,
+ * and the buyers of the plots they can see — the database decides which
+ * plots those are (0123). Null for an admin or a team lead: everyone.
+ *
+ * A filter for PostgREST's `or`, not a boundary. Client records are
+ * Masters' shared list, readable by everyone signed in (0004); what 0123
+ * locks is the CRM's own work on them — plots, actions, payments.
+ */
+async function clientScope(supabase: Supabase, user: User): Promise<string | null> {
+  if (await isToolLead(user, GRANT)) return null;
+  const plots = await fetchAll<{ units: { client_id: string | null } }>((from, to) =>
+    supabase
+      .from("client_engagements")
+      .select("units!inner(client_id)")
+      .order("id")
+      .range(from, to),
+  );
+  const buyers = [...new Set(plots.map((plot) => plot.units.client_id).filter(Boolean))];
+  return buyers.length
+    ? `crm_owner_id.eq.${user.id},id.in.(${buyers.join(",")})`
+    : `crm_owner_id.eq.${user.id}`;
+}
+
 /** Headline counts for the tool's welcome screen. Counts only — dues,
  * receipts and every other rupee stay behind the doors. */
 export async function getWelcomeCounts() {
-  await requireTool(GRANT);
+  const user = await requireTool(GRANT);
   const supabase = await createClient();
+  const scope = await clientScope(supabase, user);
+
+  const countClients = (stage: string) => {
+    const query = supabase
+      .from("clients")
+      .select("id", { count: "exact", head: true })
+      .eq("stage", stage);
+    return scope ? query.or(scope) : query;
+  };
 
   // Exact database counts, head-only — never rows.length. No embeds
   // here on purpose: a bad select string passes every CI gate.
   const [clients, prospects, engaged] = await Promise.all([
-    supabase.from("clients").select("id", { count: "exact", head: true }).eq("stage", "client"),
-    supabase.from("clients").select("id", { count: "exact", head: true }).eq("stage", "prospect"),
+    countClients("client"),
+    countClients("prospect"),
     supabase.from("client_engagements").select("id", { count: "exact", head: true }),
   ]);
+  fail("clients", clients.error);
+  fail("prospects", prospects.error);
+  fail("plots", engaged.error);
 
   return {
     clients: clients.count ?? 0,
@@ -87,14 +126,17 @@ async function nameMap(
 export type FilterOptions = {
   projects: { id: string; name: string }[];
   owners: { id: string; name: string }[];
+  /** Who is asking, and whether they see everyone's work (0122). */
+  me: { id: string; seesAll: boolean };
 };
 
 /** Projects and the staff who can own a plot — the two dropdowns. */
 export async function getFilterOptions(): Promise<FilterOptions> {
-  await requireTool(GRANT);
+  const user = await requireTool(GRANT);
   const supabase = await createClient();
 
-  const [projectRes, ownerRes] = await Promise.all([
+  const [seesAll, projectRes, ownerRes] = await Promise.all([
+    isToolLead(user, GRANT),
     supabase.from("projects").select("id, name").order("name").order("id"),
     supabase
       .from("profiles")
@@ -109,6 +151,7 @@ export async function getFilterOptions(): Promise<FilterOptions> {
   return {
     projects: projectRes.data ?? [],
     owners: (ownerRes.data ?? []).map((row) => ({ id: row.id, name: row.full_name ?? "—" })),
+    me: { id: user.id, seesAll },
   };
 }
 
@@ -152,9 +195,11 @@ export type ClientFilters = {
 export async function listClientsPage(
   filters: ClientFilters = {},
 ): Promise<PagedResult<ClientListRow>> {
-  await requireTool(GRANT);
+  const user = await requireTool(GRANT);
   const supabase = await createClient();
   const search = cleanSearch(filters.search);
+  // A team member's list is their own clients (clientScope).
+  const scope = await clientScope(supabase, user);
 
   const page = await pagedList<{
     id: string;
@@ -175,6 +220,8 @@ export async function listClientsPage(
 
       if (filters.stage) query = query.eq("stage", filters.stage);
       if (filters.owner) query = query.eq("crm_owner_id", filters.owner);
+      if (scope) query = query.or(scope);
+      // A second `or` is ANDed with the first by PostgREST.
       if (search) query = query.or(`name.ilike.%${search}%,mobile.ilike.%${search}%`);
       return query;
     },
@@ -805,8 +852,13 @@ export type ClientDetail = {
   totals: DuesSummary;
 };
 
+/**
+ * Null when there is no such client — or, for a team member, when the
+ * client is not theirs: nobody they look after, and none of the client's
+ * plots in their sight (0123). The page says which.
+ */
 export async function getClientDetail(clientId: string): Promise<ClientDetail | null> {
-  await requireTool(GRANT);
+  const user = await requireTool(GRANT);
   const supabase = await createClient();
 
   const { data: client, error } = await supabase
@@ -833,6 +885,16 @@ export async function getClientDetail(clientId: string): Promise<ClientDetail | 
       .order("id");
     fail("this client's plots", engagementRes.error);
     engagements = await buildDetail((engagementRes.data ?? []) as unknown as EngagementRecord[]);
+  }
+
+  // The engagements read above came back through 0123's policies, so an
+  // empty list for a client with plots means none of them is this person's.
+  if (
+    client.crm_owner_id !== user.id &&
+    engagements.length === 0 &&
+    !(await isToolLead(user, GRANT))
+  ) {
+    return null;
   }
 
   const owners = await nameMap(supabase, [client.crm_owner_id ?? ""]);

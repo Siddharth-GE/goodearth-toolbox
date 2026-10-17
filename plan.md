@@ -377,7 +377,40 @@ The founder: the app is "Toolbox by Kaadal" under the Kaadal K; Goodearth stays 
 - [ ] Founder — on staging: the sidebar's K and name, the tab icon (hard refresh), the sign-in page, and one PDF (Goodearth letterhead, "Toolbox by Kaadal" in its details or the report footer).
 - [ ] At the switch to the new production: the practice banner's link (`lib/environment.ts`) and the sign-in emails' "Goodearth Toolbox (PRACTICE SITE)" change with the domain.
 
-# Tenth piece — transmittals the design team can use (2026-10-17)
+# Tenth piece — each person sees the work assigned to them (2026-10-17)
+
+The founder: "in crm, and maybe other apps, there needs to be a assignment based visibility, so that only those who are assigned a task or own a deal get to see the work except for admins … can we do that for apps we decide that need that feature?" Asked who else sees everything: **"admin and team lead"**; every other recommendation taken ("rest whatever you said is fine"). Built by `[Opus]` on `feature/client-relations-scope`. The rules live in Client Relations' `PLAN.md` (decision 6, rules 14–15), Settings' `PLAN.md` (_Team leads_) and SECURITY.md (_Assigned work_).
+
+- **Built once, for any tool:** `0122` — a **Team lead** tick per person per tool, beside the grant in Settings, offered for tools flagged `scoped` in `lib/tools.ts`; `is_lead()` in the database. Another tool joins with its own migration saying what "assigned" means for its rows — Supervisors would first need to record who supervises which villa.
+- **Client Relations:** `0123` — a plot shows to its Sales and Kaadal owners and whoever owns or set an open action on it; an action to its owner, its setter and its plot's owners; payments follow the plot; unowned plots only to admins and leads. Handing a plot or action to a colleague still works, and takes it out of your sight. The two CRM payment views go back to Reporter and Financial Management only (they let any member read every plot's money). Assigning or releasing a plot stops at plots you can see; selling an unsold plot makes it the client's handler's, else the seller's.
+- **On staging today nobody holds `/client-relations`** (checked 2026-10-17), and every sold Saarang plot already has a Sales owner — so nothing anyone should see disappears.
+
+## Steps
+
+- [x] `[Opus]` `0122`, `0123` and `scripts/trials/client-relations-scope.sql`: dry-run on staging under RLS as two single-grant members, one of them then a lead, and the admin — seven trials (a member sees only theirs and none of the money views; cannot hang an action, a receipt or a buyer change on a plot they cannot see; hands an action on and loses sight; a setter undoes a close; a plot handed on moves sight; an unsold plot sold becomes the seller's; a lead sees all, a lead row without the grant nothing). Proved to bite three ways: with plots left open it fails at TRIAL 1 (staff saw 71 of 3); with actions checked over their own columns only, the hand-over is refused (Postgres checks the updated row against the read policy — why `crm_sees_action` asks by id); without "the plot it is already on", Undo is refused.
+- [x] `[Opus]` Settings: the Team lead tick under a scoped grant (`LeadCheckbox`, `setToolLead`), removed with the grant (`revokeApp`), in the person's access history (one test).
+- [x] `[Opus]` Client Relations' screens: a lead or an admin gets the team view (`seesAll`, apart from `isManager`, which still alone closes anyone's action); a member's owner menu shows no counts; a member's Clients list and welcome count their own clients (`clientScope`); a plot or client that is not yours says so (`NotYours`) instead of "not found"; a closed action on a colleague's plot reads "A colleague's plot"; a new prospect is handled by whoever adds it; a refused write answers in a sentence.
+- [x] `[Opus]` Checks: prettier, lint, typecheck, 1,134 tests, `next build`, `check:actions` — all green. The new PostgREST strings ran at staging (the plot-to-buyer embed, the scoped client list with and without search — two `or`s AND together). `NotYours`, the plot chip and the Settings tile rendered through a throwaway probe (deleted) at a true 390px phone, light and dark; nothing scrolls sideways. **No screen has been opened signed in.**
+- [x] ~~`[Fable]` Review `0122` and `0123`~~ — **skipped on the founder's word for this merge** (2026-10-17: "merge to staging"). In its place `[Opus]` re-reviewed the full diff against `SECURITY.md` and `BUGCATCHER.md`: `tool_leads` has RLS on, one SELECT policy (own rows or admin), admin-only insert and delete, no update and no anon policy (asserted); `is_lead()` and the four `crm_*` helpers are definers answering only about the caller, through `has_app()`/`is_admin()`, execute revoked from `public, anon` (asserted); `has_app()`/`is_admin()` untouched; each CRM table keeps one policy per command, altered in place, still no DELETE on actions or plots (asserted); the two views keep their columns and lose only `/client-relations`, revokes restated, manifest row changed with its reason; the buyer doors keep their `has_app` check and are only ever called directly (#11); no trigger on the four tables reads another CRM row as the person (#19 — read on staging: `client_actions_guard` asks only `is_admin()`, the rest are `audit_row` and `set_updated_at`). Code: no admin or browser client; every new read and action behind `requireTool` or `requireAdmin`, every `error` checked; colours are tokens only, seen light and dark (#4). No findings. **The Fable review is due before production.**
+- [x] `[Opus]` Applied to staging (`0001`–`0123`); regenerated types identical to the hand-written ones; `db:check` level, `db:check-views` clean; the trial re-run on the applied database, the migrations re-run inside it (both run twice cleanly); `is_lead` and `tool_leads` answer through the API.
+- [ ] `[Opus]` Pull request to `staging`; CI green; merge.
+- [ ] Founder — the checklist below, on staging.
+- [ ] Production: with `0119`–`0121`, then `0122` and `0123`, before the tracker import.
+
+## Verification — the founder, on staging (tenth piece)
+
+With `/client-relations` given to Anu, Sayooj and Sebastina:
+
+1. **Settings → People → Sayooj**: under Client Relations, a **Team lead** tick. Leave it off for now.
+2. **As Anu** (on her phone if you can): **Plots** shows only her plots; **Actions** opens on her own list, and **All I see** adds what she set for others and others' steps on her plots; **Clients** lists only her clients; the owner menu shows names without counts.
+3. Paste the link of one of Sayooj's plots (from your own view) into Anu's browser: "This plot is not one of yours".
+4. As Anu, add a step on one of her plots for Sayooj. **As Sayooj**: that plot appears, with that one step — not Anu's other steps on it. He ticks it finished; Anu closes it; the plot leaves Sayooj's list.
+5. As Anu, give one of her plots to Sebastina (Sales owner chip): the page turns into "This plot is not one of yours… it is with your colleague now". As Sebastina, it is in her Plots.
+6. Tick **Sayooj as Team lead**: his Actions opens on everyone with the team strip, Plots shows all of them, the owner menu shows counts. His access history says "Made team lead in Client Relations". Untick: back to his own.
+7. As yourself: everything as before. **Financial Management** and **Reporter** still show every plot's payments.
+8. As the **probe**: Client Relations is still refused.
+
+# Eleventh piece — transmittals the design team can use (2026-10-17)
 
 The design team's first day on staging (2026-10-16: six transmittals issued on Villas 1, 26, 40 and 41, two drafts) came back as four points: the transmittal number cannot be changed; the revision number cannot be changed; "only Sheet 9 is being uploaded" — the founder: "in a drawing set only 9 sheets are getting uploaded when there are almost 30-40"; the transmittal sheet shows only the drawing set's name. The data shows the workaround: set names carrying the Excel number, revision and date ("Transmittal - 018 - Plot 26 - Plumbing Layout R0- 15102026"), and the team's own Excel cover sheet uploaded as one of the sheets (Villa 26 sheet 1, Villa 40 sheet 5). Planned by `[Opus]` at the founder's request — `MODELS.md` gives planning to Fable, so the migration still waits for a Fable review. Branch `feature/design-management`, migration `0124`.
 
@@ -448,7 +481,7 @@ What was checked before the upload was dropped (2026-10-17): nothing in the tool
 - [ ] `[Fable]` Approval pass, or the founder's word; pull request to `staging`; CI green; merge.
 - [ ] Founder — the checklist below, on staging.
 
-## Verification — the founder, on staging (tenth piece)
+## Verification — the founder, on staging (eleventh piece)
 
 Staging is becoming the real database, so this checklist issues nothing — an issued transmittal can never be deleted. The TB mint and the kept list are proved by the trial; the team's next real issue shows them.
 

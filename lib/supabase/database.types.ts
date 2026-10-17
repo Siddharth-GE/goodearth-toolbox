@@ -9204,6 +9204,35 @@ export type Database = {
           },
         ]
       }
+      tool_leads: {
+        Row: {
+          app: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          app: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          app?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tool_leads_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tool_team_apps: {
         Row: {
           app: string
@@ -11209,7 +11238,14 @@ export type Database = {
         Args: { p_client_id: string; p_status: string; p_unit_id: string }
         Returns: undefined
       }
+      crm_may_place_action: {
+        Args: { p_action_id: string; p_engagement_id: string }
+        Returns: boolean
+      }
+      crm_owns_plot: { Args: { p_engagement_id: string }; Returns: boolean }
       crm_release_unit: { Args: { p_unit_id: string }; Returns: undefined }
+      crm_sees_action: { Args: { p_action_id: string }; Returns: boolean }
+      crm_sees_plot: { Args: { p_engagement_id: string }; Returns: boolean }
       decide_indent_line: {
         Args: { p_decision: string; p_line_id: string; p_note: string }
         Returns: undefined
@@ -11259,6 +11295,7 @@ export type Database = {
       }
       is_admin: { Args: never; Returns: boolean }
       is_bill_approver: { Args: never; Returns: boolean }
+      is_lead: { Args: { slug: string }; Returns: boolean }
       issue_selection: { Args: { p_selection_id: string }; Returns: undefined }
       issue_transmittal: { Args: { p_transmittal_id: string }; Returns: string }
       make_estimate_official: {

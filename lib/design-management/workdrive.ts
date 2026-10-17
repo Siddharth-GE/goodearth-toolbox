@@ -10,7 +10,7 @@ import {
 
 /**
  * Reads a WorkDrive share link's folder the way its own public page does
- * (0124; plan.md, tenth piece). Goodearth has no Zoho API access, and the
+ * (0124; plan.md, eleventh piece). Goodearth has no Zoho API access, and the
  * links are "anyone can view": the link's page names the folder it
  * shares and hands the visitor that link's viewing cookies, and with them
  * `api/v1/files/<folder>/files` on the same host answers the list —

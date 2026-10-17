@@ -38,8 +38,12 @@ const CRM_GUARD_PHRASES = [
   "no longer exists",
   "You need the Client Relations app",
   "Unknown unit status",
+  // crm_assign_unit and crm_release_unit, on a plot someone else owns (0123).
+  "That plot is not one of yours",
 ] as const;
-function friendly(error: { message: string }, fallback: string): ActionState {
+function friendly(error: { message: string; code?: string }, fallback: string): ActionState {
+  // A row policy refusing the new row (0123): the plot is someone else's.
+  if (error.code === "42501") return { error: "That plot is not one of yours." };
   const state = guardError(error, fallback, CRM_GUARD_PHRASES);
   if (state?.error === fallback) console.error("Client Relations write failed:", error);
   return state;

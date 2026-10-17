@@ -24,7 +24,7 @@ Every conversation starts the same way: the founder says **"read CLAUDE.md"**, a
 
 ## The one principle
 
-**It's a toolbox.** Each tool is a self-contained instrument. Adding one touches only its own folders plus a registry entry; breaking one must not take the others down. Tools connect through exactly three threads: the shell (auth, `lib/tools.ts`, per-user grants, the sidebar's teams in `lib/nav/`), the shared database (including the line chain), and shared UI/utilities (`components/ui/*`, `components/masters/*`, `lib/masters/`, `lib/hooks/`, `lib/format.ts`, `lib/pdf/`, `lib/charts/`, `lib/design-views/`, `lib/drawings/`, `lib/uploads/`).
+**It's a toolbox.** Each tool is a self-contained instrument. Adding one touches only its own folders plus a registry entry; breaking one must not take the others down. Tools connect through exactly three threads: the shell (auth, `lib/tools.ts`, per-user grants and team leads, the sidebar's teams in `lib/nav/`), the shared database (including the line chain), and shared UI/utilities (`components/ui/*`, `components/masters/*`, `lib/masters/`, `lib/hooks/`, `lib/format.ts`, `lib/pdf/`, `lib/charts/`, `lib/design-views/`, `lib/drawings/`, `lib/uploads/`).
 
 **One tool never imports another tool's code, and shared code never imports a tool's.** When two tools want the same read, the answer is a shared module, not an import. `lib/overview/` is the shell's home, not a tool — the **one** module allowed to import other tools' queries (reads only, each call wrapped so one tool's failure can't take down the home page).
 
@@ -41,6 +41,7 @@ Every conversation starts the same way: the founder says **"read CLAUDE.md"**, a
 - **All database access is server-side** — no browser Supabase client exists; do not add one. Tools use the RLS-scoped client, never the admin client.
 - **RLS on for every table, always.** Every new view ships with its write revokes and every new function with its execute revokes, in the same migration — named roles, not `public`.
 - **Never add a money column to a fact view. Never add a second SELECT policy to a gated table** — widen the existing qual.
+- **A tool whose work is assigned is `scoped`** (`lib/tools.ts`): its own migration narrows each policy in place to the grant and "mine", admins and its team leads see all through `is_lead()`, and no view over its tables admits its grant.
 - **Redefining `has_app()` or `is_admin()` must carry `session_is_verified()` forward.**
 - Every unauthenticated route goes in `PUBLIC_PATHS` as an **exact string** (`/deck/`, Dexter's public viewer, is the one prefix — `SECURITY.md`).
 - Actions return `ActionState`, never throw. **Never re-export a type from a `"use server"` file** — `export type { X }`, `export { type X }`, `export type * from` — a plain `export type X = …` declaration is fine, and `check:actions` enforces exactly that line.

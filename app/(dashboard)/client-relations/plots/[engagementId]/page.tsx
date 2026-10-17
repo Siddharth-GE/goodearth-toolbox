@@ -14,6 +14,7 @@ import { SectionHead } from "../../_components/board-parts";
 import { CollectionsPanel } from "../../_components/collections-panel";
 import { Composer } from "../../_components/composer";
 import { HealthPill, PlotRail } from "../../_components/lot-card";
+import { NotYours } from "../../_components/not-yours";
 import { Pill } from "../../_components/pill";
 import {
   BuildCard,
@@ -110,7 +111,12 @@ export default async function PlotDetailPage({
     getBoardBasics(),
     listProgressStages(),
   ]);
-  if (!engagement) notFound();
+  // A member asking for a plot that is not theirs — or one they just
+  // handed on — gets a sentence, not "not found" (0123).
+  if (!engagement) {
+    if (!basics.seesAll) return <NotYours kind="plot" />;
+    notFound();
+  }
 
   const { card, steps } = engagement;
   const fields = plotFields(engagement);
