@@ -22,6 +22,7 @@ The founder gives the steps. Before the switch:
 3. Fable's pass over the reviews skipped for staging (`plan.md` Phase 0).
 4. **Supabase Pro** for the new production database. It's the only way to get backups, and it ends the pausing.
 5. At the switch:
+   - `lib/environment.ts` names the new production and practice databases and the new domain; `npm test` then lists every other place that must follow (CI and `package.json`);
    - a new `.rbz` for Goodearth QS for SketchUp, with its default address on the production domain;
    - the Google Chat app pointed at production (the checklist is in `lib/google-chat/PLAN.md`).
 

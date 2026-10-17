@@ -29,6 +29,7 @@
  * what it finds would apply an unreviewed migration to production from
  * CI, on a database with no backups.
  */
+import { DATABASES } from "../lib/environment";
 import { compareToLedger, readLedger, readMigrations } from "./migration-ledger";
 import { requireProjectRef } from "./supabase-management";
 
@@ -60,7 +61,7 @@ async function main() {
       "\nThe code that needs a column must never reach a database without it, so this\n" +
         "branch must not be merged yet. Apply them first:\n\n" +
         `  npm run db:apply -- --project ${ref} --commit\n` +
-        `  npm run db:types${ref === "ipstebqawrvhkyntctrv" ? ":staging" : ""}\n\n` +
+        `  npm run db:types${ref === DATABASES.practice ? ":staging" : ""}\n\n` +
         "Then push the regenerated types and this check goes green.\n",
     );
   }

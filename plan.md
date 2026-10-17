@@ -30,11 +30,12 @@ Switch day is the founder's to run. Before it, three things must be done:
   - New migration: `is_admin()` in each, and one SELECT policy, `user_id = auth.uid() or is_admin()`.
   - Trial: an admin session with no verified-session row is refused.
   - _Check:_ in Settings, grant `/indents` to the probe, then take it away.
-- [ ] `[Opus]` **H3: one place names the databases.** After the switch, the real site would wear the practice banner, and the "staging only" wipe script would accept the real database.
+- [x] `[Opus]` **H3: one place names the databases.** After the switch, the real site would wear the practice banner, and the "staging only" wipe script would accept the real database.
   - `lib/environment.ts` exports each ref with its role (production, practice).
   - `scripts/wipe-staging-records.ts`, `dry-run-migrations.ts`, `google-chat-usage-test.ts` and the practice banner's link import it.
   - `lib/environment.test.ts` reads `.github/workflows/ci.yml` and `package.json` (`db:types`) and fails if their refs disagree.
   - Switch day then changes one constant.
+  - Done: `DATABASES` and `PRODUCTION_SITE`, also read by `check-migrations.ts`; no other file in code names a ref. `dry-run-migrations` now runs on the practice database only, instead of refusing only production. The test was proven to bite with a wrong ref in `ci.yml`.
 - [ ] `[Opus]` **H4: Budgets.** `lib/budgets/queries.ts:241` (margins) and `:220` (spaces) must check `error`. A failed read is the error screen, never blank margins saved at cost.
 - [ ] `[Opus]` **M1: lockouts fail closed.** `lib/auth/rate-limit.ts:52, 61, 78` and `lib/marathon/rate-limit.ts:57, 70, 88`.
   - _Check:_ 10 wrong passwords still lock the account for 10 minutes.
