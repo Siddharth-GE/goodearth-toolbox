@@ -492,11 +492,11 @@ Staging is becoming the real database, so this checklist issues nothing — an i
 5. Type _What changed_ — the line under the title says it is ready. **Don't issue: delete the draft.**
 6. After the team's next real issue: it reads **TB-000n**; its cover sheet carries the link and every sheet's name; on a supervisor's phone, **Supervisors → that villa → Open drawings** opens the folder.
 
-# Twelfth piece — the design board: each villa passed from stage to stage (2026-10-17) — DRAFT
+# Twelfth piece — the design board: each villa passed from stage to stage (2026-10-17)
 
 The founder: "in design management we need a setup with a similar ui like crm, where each plot can be passed from one stage to another and so to different people, like design, permit, wd, structure, interiors … there may be revisions here and its not a clean linear line it can go back and forth but the stage that a house is in is marked by the latest stage even tho revisions may happen backwards etc, each house will have multiple people working on it, and then you need actions". Drafted by `[Opus]` at the founder's request ("make a plan and then wel execute"), against the code and staging's real rows. `MODELS.md` gives planning to Fable, so the migration waits for a Fable review unless the founder waives it. Branch `feature/design-pipeline`; migration drafted as `0125`, numbered when it lands (parallel work may take numbers first).
 
-**Nothing is built until the founder answers the questions below.**
+**The founder's answer (2026-10-17): "build it full forget relay".** Question 1 is answered in so many words; the other four take their recommendations, as the draft said "yes to all" would, and Concept and Approvals are renamed Design and Permit — the founder's own words for them. The Fable review was not waived, so `0125` reaches `db:apply` only after it, or the founder's word in its place.
 
 ## The founder's questions
 
