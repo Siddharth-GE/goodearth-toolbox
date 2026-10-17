@@ -1,47 +1,18 @@
 /**
- * What a business plan IS: the document the founder types, and nothing
- * that can be worked out from it.
+ * A business plan as the founder types it, and nothing that can be worked out from it.
+ * A plan is a set of LINES plus whole-project items (financing rate, overheads, common
+ * infrastructure, the land deal). Two line kinds:
+ *   SALE: build and sell. The zeros do the work: a bare plot has no built-up area, so no
+ *         construction; an apartment has no plot area, so it sells built-up area only.
+ *   HOLD: build and keep earning (senior living, leased commercial, hospitality).
  *
- * A plan is a set of LINES — row houses, plotted development,
- * apartments, commercial, senior living — plus the handful of things
- * that belong to the whole project rather than to any one line
- * (financing rate, company overheads, common infrastructure, the land
- * deal). Some projects are one line; most are a mix.
+ * 1. Inputs only: anything derived (revenue per unit, capex, a stage's month) lives in model.ts.
+ * 2. Percentages are percents: `financingRatePct: 15` means 15%. The engine divides by 100 once.
+ * 3. Months are 1-based; there is no month 0.
  *
- * Two line kinds cover every product the founder named:
- *
- *   SALE — you build it and sell it. Plotted development, row houses,
- *          villas, apartments, commercial-for-sale. The zeros do the
- *          work: a bare-plot line has no built-up area and therefore no
- *          construction; an apartment line has no saleable plot area and
- *          sells only built-up area. Same arithmetic, no special cases.
- *   HOLD — you build it and keep earning from it. Senior living, leased
- *          commercial, hospitality. (Arrives in a later migration of
- *          this file; the union is already open for it.)
- *
- * THREE RULES THIS FILE ENFORCES
- *
- * 1. INPUTS ONLY. If it can be derived it does not live here. Revenue
- *    per unit, total capex, the month a stage lands — all of that is
- *    model.ts, recomputed on every read. Same doctrine as Relay's
- *    schedule: dates are worked out, never typed.
- *
- * 2. PERCENTAGES ARE PERCENTS. `financingRatePct: 15` means 15%, not
- *    1500% and not 0.15. Every field ending `Pct` is the number a person
- *    types into a box labelled "%", and the engine divides by 100 once,
- *    at the point of use. The alternative — storing 0.15 and rendering
- *    15 — is one forgotten conversion away from a plan that is off by a
- *    factor of a hundred and looks plausible.
- *
- * 3. MONTHS ARE 1-BASED. Month 1 is the first month of the project.
- *    There is no month 0. The workbook this replaces used both.
- *
- * `parsePlanInputs` is the ONLY way a stored document becomes a
- * `PlanInputs`. The database holds this as one jsonb column and cannot
- * check a thing about it (0048 says why), so this function is the whole
- * validation boundary: every field is coerced, defaulted and clamped,
- * which is also what lets a document saved before a field existed still
- * open.
+ * `parsePlanInputs` is the only way a stored document becomes `PlanInputs`. The jsonb column
+ * checks nothing (0048), so the parser coerces, defaults and clamps every field, which also
+ * lets a document saved before a field existed open.
  */
 
 export const PLAN_SCHEMA_VERSION = 1;
@@ -49,10 +20,6 @@ export const PLAN_SCHEMA_VERSION = 1;
 /** Base, Moderate, High — the three velocities, in this order, always. */
 export const SCENARIOS = ["Base", "Moderate", "High"] as const;
 export type ScenarioIndex = 0 | 1 | 2;
-
-// ---------------------------------------------------------------------
-// Lines
-// ---------------------------------------------------------------------
 
 export type SaleLine = {
   id: string;
@@ -80,25 +47,11 @@ export type SaleLine = {
   constructionPsf: number;
 
   /**
-   * WHEN the building work happens, which is the difference between two
-   * completely different businesses.
-   *
-   *   "on-sale"   — a unit is built because it sold. Plotted development,
-   *                 villas, row houses: `buildMonths` is one unit's cycle,
-   *                 starting the month that unit goes. Nothing is spent
-   *                 ahead of a buyer, so the project largely funds itself
-   *                 out of collections.
-   *
-   *   "scheduled" — the WHOLE line is built on its own calendar whether
-   *                 anything has sold or not. An apartment tower: you
-   *                 cannot build the 14th floor to order. `buildMonths`
-   *                 is the whole building, from `buildStartMonth`.
-   *
-   * The second is the case the tool could not express at all, and it is
-   * the one that actually hurts: construction finishes in month 30 while
-   * sales run to month 60, so the entire build is carried on debt against
-   * flats nobody has bought yet. With no equity the interest starts at
-   * land acquisition and compounds for the whole gap.
+   * When the building work happens:
+   *   "on-sale": a unit is built because it sold; `buildMonths` is one unit's cycle from its sale
+   *              month. Nothing is spent ahead of a buyer.
+   *   "scheduled": the whole line is built on its own calendar (an apartment tower) from
+   *              `buildStartMonth`; unsold flats are carried on debt.
    */
   buildMode: "on-sale" | "scheduled";
   /** First month of construction. `scheduled` only; ignored on-sale. */
@@ -109,11 +62,7 @@ export type SaleLine = {
   salesStartMonth: number;
   /** Units per month for Base, Moderate, High. */
   velocity: [number, number, number];
-  /**
-   * Staggered launch: stay at zero until this share of every OTHER
-   * line's units has sold. null = launch straight away. The workbook
-   * holds row houses back until 70% of the plotted villas are gone.
-   */
+  /** Staggered launch: stay at zero until this share of every OTHER line's units has sold. null = launch straight away. */
   launchTriggerPct: number | null;
 
   /** Overrides of the plan-level collection terms. null = use the plan's. */
@@ -122,20 +71,9 @@ export type SaleLine = {
 };
 
 /**
- * A line you build and keep earning from: senior living, leased
- * commercial, hospitality.
- *
- * The area build-up is the founder's, and the order matters because
- * three different areas do three different jobs:
- *
- *   carpet  — what a resident occupies, and what charges are set against
- *   BUA     — carpet ÷ efficiency. What CONSTRUCTION is costed on, and
- *             always the largest, because walls and circulation are real
- *   SBA     — carpet × (1 + loading). What it would SELL for, if sold
- *
- * Costing construction on carpet instead of BUA is the classic way to
- * understate a build by a third, which is why these are three fields
- * rather than one.
+ * A line you build and keep earning from. Three areas do three jobs: carpet (what charges are
+ * set against), BUA = carpet ÷ efficiency (what construction is costed on, always the largest)
+ * and SBA = carpet × (1 + loading) (what it would sell for). Costing on carpet understates a build.
  */
 export type HoldLine = {
   id: string;
@@ -180,7 +118,6 @@ export type HoldLine = {
   /** Whatever the occupancy: management, security, insurance, reserve. */
   fixedOpexMonth: number;
 
-  /** The long-horizon hold question, in years and rates. */
   holdYears: number;
   discountRatePct: number;
   exitCapRatePct: number;
@@ -197,10 +134,6 @@ export type HoldLine = {
 
 export type PlanLine = SaleLine | HoldLine;
 
-// ---------------------------------------------------------------------
-// Plan-level costs
-// ---------------------------------------------------------------------
-
 /** A retainer or salary that runs every month between two months. */
 export type OverheadItem = {
   id: string;
@@ -208,20 +141,7 @@ export type OverheadItem = {
   monthly: number;
   startMonth: number;
   endMonth: number;
-  /**
-   * Stop paying this the month the last unit sells, if that comes first.
-   *
-   * The difference between a cost the PROJECT carries and one the COMPANY
-   * carries. A marketing retainer and a site sales office end when there
-   * is nothing left to sell; head-office salaries do not. Until this
-   * existed every overhead ran to a fixed calendar month, so a plan that
-   * sold out in month 16 still paid the marketing retainer for another
-   * forty-four months — and profit came out identical whatever the
-   * velocity, which is what made the scenarios look broken.
-   *
-   * This is the ONLY plan-level cost that varies by scenario, because the
-   * last sale month does.
-   */
+  /** Stop paying the month the last unit sells, if that comes first: a marketing retainer ends when nothing is left to sell, head-office salaries do not. The only plan-level cost that varies by scenario. */
   endsWithSales: boolean;
 };
 
@@ -241,12 +161,7 @@ export type OneTimeItem = {
   month: number;
 };
 
-/**
- * Infrastructure the whole project shares and no one line owns — roads,
- * a clubhouse, the biodiversity park. Capex spreads evenly over
- * `capexMonths` from `capexStartMonth`; opex runs monthly at one twelfth
- * of `annualOpex` between its two months.
- */
+/** Infrastructure the whole project shares (roads, clubhouse). Capex spreads evenly over `capexMonths` from `capexStartMonth`; opex runs monthly at one twelfth of `annualOpex`. */
 export type CommonInfraItem = {
   id: string;
   name: string;
@@ -259,10 +174,6 @@ export type CommonInfraItem = {
   opexEndMonth: number | null;
 };
 
-// ---------------------------------------------------------------------
-// The plan
-// ---------------------------------------------------------------------
-
 export type PlanInputs = {
   horizonMonths: number;
   /** Annual financing rate, percent. Drives interest on the revolver. */
@@ -270,12 +181,7 @@ export type PlanInputs = {
   /** Cash in the pool at month 1, before anything is spent. */
   openingEquity: number;
 
-  /**
-   * The land deal is ONE deal, so its terms sit here; each line still
-   * carries its own area and rate. "cash" pays at month 1; "jv" defers
-   * to `landSettlementMonth` and pays `landPremiumPct` more for the
-   * privilege.
-   */
+  /** One land deal, so its terms sit here (each line carries its own area and rate). "cash" pays at month 1; "jv" defers to `landSettlementMonth` and pays `landPremiumPct` more. */
   landTerms: "cash" | "jv";
   landPremiumPct: number;
   landSettlementMonth: number;
@@ -297,20 +203,11 @@ export type PlanInputs = {
   activeScenario: ScenarioIndex;
 };
 
-// ---------------------------------------------------------------------
-// Factories
-// ---------------------------------------------------------------------
-
 function newId(): string {
   return crypto.randomUUID();
 }
 
-/**
- * A brand-new plan: the assumptions a Kerala project starts from, and no
- * lines, no overheads, no invented figures. The fast path to a fully
- * populated plan is Duplicate, not a template full of numbers that were
- * true for somewhere else.
- */
+/** A brand-new plan: Kerala starting assumptions, no lines, no invented figures. Duplicate is the fast path, not a template of numbers true elsewhere. */
 export function defaultPlanInputs(): PlanInputs {
   return {
     horizonMonths: 72,
@@ -356,15 +253,7 @@ export function newSaleLine(name = "New line"): SaleLine {
   };
 }
 
-/**
- * A hold line starts with the shape of the thing filled in — efficiency,
- * loading, escalations, a cap rate — and every rupee at zero.
- *
- * Those are conventions, not somebody else's numbers: 50% efficiency and
- * 100% loading are what a serviced-residence build actually runs at, and
- * a plan with them blank would divide by zero rather than tell you
- * anything. Prices and areas stay at zero, where you have to type them.
- */
+/** A hold line starts with its conventional shape filled in (efficiency, loading, escalations, cap rate) and every rupee at zero; blank would divide by zero. */
 export function newHoldLine(name = "New line"): HoldLine {
   return {
     id: newId(),
@@ -405,8 +294,7 @@ export function newHoldLine(name = "New line"): HoldLine {
 }
 
 export function newOverhead(): OverheadItem {
-  // Off by default: a new overhead behaves the way every existing one
-  // does, and turning it on is a deliberate statement about that cost.
+  // Off by default: turning it on is a deliberate statement about that cost.
   return { id: newId(), name: "", monthly: 0, startMonth: 1, endMonth: 60, endsWithSales: false };
 }
 
@@ -431,24 +319,15 @@ export function newCommonInfra(): CommonInfraItem {
   };
 }
 
-// ---------------------------------------------------------------------
-// The parser — the only door in
-// ---------------------------------------------------------------------
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/**
- * A finite number, or the fallback. Rejects NaN, Infinity, strings and
- * nulls alike — a plan with `NaN` in it poisons every total downstream
- * and shows up as a blank cell nobody can explain.
- */
+/** A finite number, or the fallback: a `NaN` in a plan poisons every total downstream. */
 function num(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
-/** A finite number clamped into a range. */
 function clamped(value: unknown, fallback: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, num(value, fallback)));
 }
@@ -476,11 +355,7 @@ function array(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
 }
 
-/**
- * Twelve years. Long enough for any village the founder has described,
- * short enough that a fat-fingered horizon can't allocate a 300MB array
- * on the server. Every month field is clamped to it.
- */
+/** Twelve years: stops a fat-fingered horizon allocating a huge array on the server. Every month field is clamped to it. */
 export const MAX_HORIZON_MONTHS = 144;
 
 function parseSaleLine(raw: Record<string, unknown>): SaleLine {
@@ -498,10 +373,8 @@ function parseSaleLine(raw: Record<string, unknown>): SaleLine {
     landPricePsf: Math.max(0, num(raw.landPricePsf, 0)),
     housePricePsf: Math.max(0, num(raw.housePricePsf, 0)),
     constructionPsf: Math.max(0, num(raw.constructionPsf, 0)),
-    // At least one month: a build cycle of zero divides by zero when the
-    // construction spend is spread across it.
-    // Anything that isn't the literal "scheduled" is on-sale, so a plan
-    // written before this field existed keeps behaving exactly as it did.
+    // At least one month: a zero build cycle divides by zero. Anything but "scheduled" is on-sale,
+    // so older plans behave as before.
     buildMode: raw.buildMode === "scheduled" ? "scheduled" : "on-sale",
     buildStartMonth: month(raw.buildStartMonth, 1),
     buildMonths: month(raw.buildMonths, 18),
@@ -557,8 +430,7 @@ function parseHoldLine(raw: Record<string, unknown>): HoldLine {
 
     holdYears: Math.round(clamped(raw.holdYears, base.holdYears, 1, 50)),
     discountRatePct: clamped(raw.discountRatePct, base.discountRatePct, 0, 100),
-    // Never zero: the terminal value is NOI DIVIDED by this, and a zero
-    // cap rate values the asset at infinity.
+    // Never zero: terminal value is NOI divided by this.
     exitCapRatePct: clamped(raw.exitCapRatePct, base.exitCapRatePct, 0.1, 100),
     chargeEscalationPct: clamped(raw.chargeEscalationPct, base.chargeEscalationPct, 0, 100),
     opexEscalationPct: clamped(raw.opexEscalationPct, base.opexEscalationPct, 0, 100),
@@ -574,9 +446,7 @@ function parseLine(raw: unknown): PlanLine | null {
   if (!isRecord(raw)) return null;
   if (raw.kind === "hold") return parseHoldLine(raw);
   if (raw.kind === "sale") return parseSaleLine(raw);
-  // An unrecognised kind is dropped rather than guessed at. Guessing
-  // would silently turn a HOLD line written by a newer version of the
-  // app into a SALE line worth nothing.
+  // An unrecognised kind is dropped, not guessed: guessing could turn a newer app's HOLD line into a worthless SALE line.
   return null;
 }
 
@@ -605,8 +475,7 @@ export function parsePlanInputs(raw: unknown): PlanInputs {
         monthly: Math.max(0, num(item.monthly, 0)),
         startMonth: month(item.startMonth, 1),
         endMonth: month(item.endMonth, horizonMonths),
-        // A plan saved before this field existed keeps behaving exactly
-        // as it did — rule 5, the parser is the only door in.
+        // A plan saved before this field existed keeps its old behaviour.
         endsWithSales: item.endsWithSales === true,
       })),
 
@@ -651,12 +520,7 @@ export function parsePlanInputs(raw: unknown): PlanInputs {
   };
 }
 
-/**
- * A deep copy with fresh ids on everything, for Duplicate. New ids
- * matter: React keys and the "which line is open" state are keyed on
- * them, and two plans sharing a line id is the kind of thing that only
- * misbehaves once both are open in two tabs.
- */
+/** A deep copy with fresh ids for Duplicate: React keys and the open-line state are keyed on them. */
 export function cloneInputs(inputs: PlanInputs): PlanInputs {
   return {
     ...inputs,

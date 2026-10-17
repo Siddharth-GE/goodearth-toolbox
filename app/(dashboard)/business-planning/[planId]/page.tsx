@@ -9,11 +9,9 @@ import { RenamePlanDialog } from "./_components/rename-plan-dialog";
 
 export default async function PlanPage({ params }: { params: Promise<{ planId: string }> }) {
   const { planId } = await params;
-  // Projects feed the optional targets link (0057) — the shared master,
-  // which every tool may read; the plan itself stays independent.
+  // Projects feed the optional targets link (0057), a shared master every tool may read.
   const [plan, projects] = await Promise.all([getPlan(planId), listProjects()]);
-  // Null covers both "no such plan" and "not visible to you" — RLS makes
-  // those indistinguishable, and notFound() is the right answer to each.
+  // Null covers "no such plan" and "not visible to you": RLS makes them indistinguishable.
   if (!plan) notFound();
 
   return (
@@ -40,9 +38,7 @@ export default async function PlanPage({ params }: { params: Promise<{ planId: s
         }
       />
 
-      {/* The whole document goes to the client: the model recalculates as
-          the founder types, which needs the inputs and the engine in the
-          same place. It is a few kilobytes. */}
+      {/* The whole document goes to the client: the model recalculates as the founder types. */}
       <PlanEditor planId={plan.id} initial={plan.inputs} />
     </div>
   );

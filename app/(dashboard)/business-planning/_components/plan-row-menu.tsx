@@ -24,17 +24,9 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 /**
- * Duplicate and Delete for one row of the list.
- *
- * Duplicate redirects into the copy, so this component unmounts and
- * `busy` never has to be cleared. Delete stays on the page and calls
- * router.refresh(), and deliberately asks first — a plan is the only
- * copy of a piece of thinking.
- *
- * Plain useState booleans rather than useTransition: router.refresh()
- * inside an async transition leaves isPending true for as long as the
- * refresh is in flight, which greys the row out and never comes back
- * (the Relay schedule-editor bug).
+ * Duplicate and Delete for one row. Duplicate redirects, so `busy` never needs clearing. Plain
+ * useState rather than useTransition: router.refresh() in an async transition leaves isPending
+ * true while the refresh is in flight and greys the row out for good (Relay schedule-editor bug).
  */
 export function PlanRowMenu({ planId, planName }: { planId: string; planName: string }) {
   const router = useRouter();
@@ -46,7 +38,6 @@ export function PlanRowMenu({ planId, planName }: { planId: string; planName: st
     setBusy(true);
     setError(undefined);
     const result = await duplicatePlan(planId);
-    // Only reached when the action returned instead of redirecting.
     setBusy(false);
     if (result?.error) setError(result.error);
   }

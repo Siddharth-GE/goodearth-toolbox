@@ -16,17 +16,9 @@ import { cn } from "@/lib/utils";
 import { useMemo } from "react";
 
 /**
- * Twenty-five runs of the whole model: what you sell for against what it
- * costs to build.
- *
- * The workbook swings two named cells — the plotted house price and the
- * plotted construction cost — which cannot work once a plan has as many
- * lines as it likes. So both axes are proportional and move every line
- * at once, which is also the more honest question: prices do not fall on
- * villas and hold on row houses.
- *
- * Cells that turn a loss are marked, because the row where a plan stops
- * working is the only row anybody is really looking for.
+ * Twenty-five runs of the whole model: what you sell for against what it costs to build. Both
+ * axes are proportional and move every line at once (the workbook's two named cells cannot
+ * work with many lines). Cells that turn a loss are marked.
  */
 export function SensitivityGrid({ inputs }: { inputs: PlanInputs }) {
   const grid = useMemo(() => sensitivityGrid(inputs), [inputs]);

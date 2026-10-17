@@ -12,18 +12,9 @@ import { useId } from "react";
 import { MonthField, NumberField, PercentField, TextField } from "./fields";
 
 /**
- * One SALE line's inputs, grouped the way the founder described them:
- * land, then product and price, then when it sells, then how buyers pay.
- *
- * The zeros carry the product types. A bare-plot line has no built-up
- * area, so its construction row goes to zero on its own; an apartment
- * line has no saleable plot area and sells only built-up area. There is
- * no "type" to choose and no fields to hide.
- *
- * The three velocities sit together in a cluster of their own rather than
- * strung along a four-column row with an unrelated field on the end —
- * they are one decision expressed three ways, and they are the only input
- * in the whole tool that differs between scenarios.
+ * One SALE line's inputs, grouped as the founder described them. The zeros carry the product
+ * types (no type to choose, no fields to hide). The three velocities sit together: one
+ * decision, and the only input that differs between scenarios.
  */
 export function SaleLineForm({
   line,
@@ -43,9 +34,8 @@ export function SaleLineForm({
   const buildModeId = useId();
 
   const scheduled = line.buildMode === "scheduled";
-  // At the ACTIVE velocity, roughly when the last unit goes. Only ever a
-  // sanity check against the build calendar, so the arithmetic is the
-  // simple one rather than the engine's launch-trigger-aware version.
+  // At the ACTIVE velocity, roughly when the last unit goes: a sanity check against the build
+  // calendar, so simple arithmetic rather than the engine's.
   const activeVelocity = line.velocity[plan.activeScenario];
   const sellsOutMonth =
     activeVelocity > 0 && line.units > 0
@@ -360,17 +350,9 @@ export function SaleLineForm({
 }
 
 /**
- * What this line does on its own, at the ACTIVE velocity.
- *
- * The margin here is struck against the cost of what SOLD — the full
- * build of every home whose price was counted, plus the sold share of the
- * land — which is why it does not move when the velocity does. Unit
- * economics are a property of the product, not of how fast it goes.
- *
- * The interest is this line carrying itself with no equity behind it,
- * which is why it will not add up to the plan's consolidated figure:
- * pooled, a line in surplus funds a line in deficit. The Summary tab
- * shows both and names the gap.
+ * What this line does on its own at the ACTIVE velocity. Margin is struck against the cost of
+ * what SOLD, so it does not move with velocity. Interest is the line carrying itself with no
+ * equity, so it won't sum to the plan's figure; the Summary tab names the gap.
  */
 function LineOutcome({ result, units }: { result: SaleLineResult; units: number }) {
   const shortfall = result.unitsUnsold > 0.0001;
@@ -417,8 +399,7 @@ function LineOutcome({ result, units }: { result: SaleLineResult; units: number 
         />
       </div>
 
-      {/* Only a scheduled line can have this, and when it does it is the
-          whole risk of building ahead of the buyers. */}
+      {/* Only a scheduled line can have this: the whole risk of building ahead of buyers. */}
       {result.unsoldStock > 0 ? (
         <p className="text-warning mt-3 flex items-start gap-1.5 text-xs">
           <AlertTriangle className="mt-px size-3.5 shrink-0" aria-hidden />

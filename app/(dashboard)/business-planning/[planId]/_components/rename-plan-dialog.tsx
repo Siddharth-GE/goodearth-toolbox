@@ -19,16 +19,9 @@ import { Pencil } from "lucide-react";
 import { useActionState, useEffect, useRef, useState } from "react";
 
 /**
- * Rename a plan, or move it.
- *
- * Separate from the autosave that writes the model: the name and
- * location live in their own columns, not in the jsonb document, and
- * renaming is a deliberate act rather than something a debounce should
- * fire mid-keystroke.
- *
- * The action revalidates this route, so the heading updates underneath —
- * and because the editor holds the model in its own state and is not
- * remounted, nothing typed into the plan is lost by renaming it.
+ * Rename a plan or move it, apart from the autosave: name and location live in their own
+ * columns, not the jsonb document, and renaming is deliberate. The editor keeps its state across
+ * the revalidate, so nothing typed into the plan is lost.
  */
 export type PlanProjectOption = { id: string; name: string };
 
@@ -42,7 +35,6 @@ export function RenamePlanDialog({
   planId: string;
   name: string;
   location: string | null;
-  /** The published-targets link (0057); null = targets withdrawn. */
   projectId: string | null;
   projects: PlanProjectOption[];
 }) {
@@ -60,8 +52,7 @@ export function RenamePlanDialog({
         <DialogHeader>
           <DialogTitle>Rename this plan</DialogTitle>
         </DialogHeader>
-        {/* Inside DialogContent, which Radix unmounts on close, so every
-            open starts from the saved values with no stale error. */}
+        {/* Radix unmounts DialogContent on close, so every open starts from the saved values. */}
         <RenameForm
           planId={planId}
           name={name}
@@ -93,8 +84,7 @@ function RenameForm({
   const [state, formAction, pending] = useActionState(renamePlan.bind(null, planId), undefined);
   const wasPending = useRef(false);
 
-  // Close only after a save that actually worked — closing on submit
-  // would throw away the error message.
+  // Close only after a save that worked: closing on submit would throw away the error message.
   useEffect(() => {
     if (wasPending.current && !pending && !state?.error) onSaved();
     wasPending.current = pending;

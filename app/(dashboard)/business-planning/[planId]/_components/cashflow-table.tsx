@@ -15,19 +15,9 @@ import { cn } from "@/lib/utils";
 import { useMemo, useState } from "react";
 
 /**
- * The money, month by month — where it comes from, where it goes, and
- * what the balance does.
- *
- * Quarterly by default. Seventy-two monthly columns is a table nobody
- * reads; twenty-four quarters fits the shape of the thing (a dip, a
- * recovery) on one screen, and monthly is a switch away for the month a
- * particular payment lands.
- *
- * Buckets SUM their months, except the balance rows, which take the LAST
- * month of the bucket — averaging a closing balance would be meaningless
- * and summing it absurd. The trough figure quoted underneath is always
- * the true monthly one, so a quarterly view can never hide the worst
- * month inside a bucket.
+ * The money month by month. Quarterly by default (72 monthly columns is unreadable), monthly
+ * one switch away. Buckets SUM their months except the balance rows, which take the LAST month.
+ * The trough quoted underneath is always the true monthly one.
  */
 
 type Grain = "month" | "quarter" | "year";
@@ -99,9 +89,7 @@ export function CashflowTable({ result }: { result: ScenarioResult }) {
           </TableRow>
         </TableHead>
         <TableBody>
-          {/* Where the money came from, before where it went. On a plan
-              run entirely on debt this row is empty and the Borrowed row
-              at the bottom carries the whole project. */}
+          {/* Where the money came from, before where it went; empty on an all-debt plan. */}
           {showPlanRows ? (
             <Row label="Equity in" values={buckets.map((b) => b.equity)} tone="in" />
           ) : null}
@@ -109,10 +97,7 @@ export function CashflowTable({ result }: { result: ScenarioResult }) {
           <Row label="Land" values={buckets.map((b) => -b.land)} />
           <Row label="Development" values={buckets.map((b) => -b.development)} />
           <Row label="Construction" values={buckets.map((b) => -b.construction)} />
-          {/* Only a HOLD line has running costs, so the row would be a
-              line of zeros on a purely residential plan. It was missing
-              altogether, which meant a held asset's rows did not add up
-              to its own Net. */}
+          {/* Only a HOLD line has running costs; the row would be zeros on a purely residential plan. */}
           {buckets.some((b) => b.operating !== 0) ? (
             <Row label="Running held assets" values={buckets.map((b) => -b.operating)} />
           ) : null}
@@ -152,10 +137,8 @@ type Bucket = {
   land: number;
   development: number;
   construction: number;
-  /** Money put in rather than borrowed. Zero all the way across on a
-      plan funded entirely by debt, which is the normal shape here. */
+  /** Money put in rather than borrowed. Zero across on a plan funded entirely by debt. */
   equity: number;
-  /** Running a held asset: staff, food, utilities, maintenance. */
   operating: number;
   overheads: number;
   commonInfra: number;
@@ -185,8 +168,7 @@ function bucketise(series: MonthlySeries, size: number): Bucket[] {
       interest: 0,
       net: 0,
       closing: series.closing[end - 1],
-      // The worst point inside the bucket, not the last — a quarter that
-      // dipped and recovered still had to be funded through the dip.
+      // The worst point inside the bucket, not the last: a quarter that dipped and recovered still had to be funded.
       revolver: Math.max(...series.revolver.slice(start, end)),
     };
     for (let m = start; m < end; m += 1) {
@@ -218,10 +200,8 @@ function Row({
   values: number[];
   strong?: boolean;
   tone?: "in";
-  /** Colour a negative balance as a warning; ordinary outflows aren't. */
   signed?: boolean;
 }) {
-  // A row of nothing is noise on a table this wide.
   if (values.every((value) => Math.abs(value) < 0.5)) return null;
 
   return (

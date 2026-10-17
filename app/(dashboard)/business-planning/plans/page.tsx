@@ -71,9 +71,7 @@ export default async function BusinessPlanningPage() {
                     </>
                   )}
                 </TableCell>
-                {/* Figures come from the same pure engine the plan page
-                    runs in the browser, so the list and the plan cannot
-                    show different numbers. */}
+                {/* Same pure engine as the plan page, so the list and the plan cannot disagree. */}
                 <TableCell className="text-right font-mono">
                   {plan.lineCount === 0 ? "—" : formatCrore(plan.revenue)}
                 </TableCell>

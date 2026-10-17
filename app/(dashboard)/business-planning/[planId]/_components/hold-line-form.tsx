@@ -9,23 +9,11 @@ import { formatCrore, formatMoney, formatPercent, formatQuantity } from "@/lib/f
 import { MoneyField, MonthField, NumberField, PercentField, TextField } from "./fields";
 
 /**
- * One HOLD line: something you build and keep earning from.
- *
- * Thirty-two fields, which is the most of any form in the toolbox, so how
- * they are grouped IS the design. They used to sit in seven identical
- * four-column blocks one after another — nine grids by the time the
- * results were counted — and the eye had nowhere to rest.
- *
- * Three sections open, two shut. What is open answers "what is this and
- * what does it earn"; what is shut is the cost build-up and the long-run
- * escalation assumptions, both set once when the line is created and
- * rarely opened again. Each closed section still reports its own total in
- * the header, so nothing is hidden — only folded.
- *
- * The area build-up stays first and deliberately explicit: the three
- * areas do three different jobs and mixing them up is the single most
- * expensive mistake available here — construction is costed on BUILT-UP
- * area, which at 50% efficiency is twice the carpet.
+ * One HOLD line: something you build and keep earning from. Thirty-two fields, so grouping is
+ * the design: three sections open ("what is this and what does it earn"), two shut (cost
+ * build-up and long-run escalation), each reporting its total in its header. The area build-up
+ * stays first and explicit: construction is costed on BUILT-UP area, twice the carpet at 50%
+ * efficiency.
  */
 export function HoldLineForm({
   line,
@@ -347,14 +335,7 @@ export function HoldLineForm({
   );
 }
 
-/**
- * The verdict, and the figures behind it.
- *
- * On its own surface, not on the field grid, because everything here is
- * something the model worked out rather than something to type. Three
- * figures are large — what it costs, what it yields, what it returns —
- * because those are the ones a decision turns on.
- */
+/** The verdict and the figures behind it, on its own surface: everything here is worked out, not typed. */
 function HoldOutcome({ result }: { result: HoldLineResult }) {
   const holding = result.verdict === "hold";
   const gap = Math.abs(result.holdValue - result.sellValue);
@@ -396,10 +377,7 @@ function HoldOutcome({ result }: { result: HoldLineResult }) {
           }
         />
         <Figure label="Stabilised NOI" value={formatCrore(result.stabilisedNoi)} hint="a year" />
-        {/* Two answers to "what is it worth", computed differently on
-            purpose: this one is today's money at today's NOI, the next is
-            year-N nominal discounted back. Labelled so the gap between
-            them reads as the two questions it is, not as a discrepancy. */}
+        {/* Two answers to "what is it worth": today's money at today's NOI versus year-N nominal discounted back. Labelled so the gap reads as two questions. */}
         <Figure
           label="Worth today"
           value={formatCrore(result.terminalValue)}

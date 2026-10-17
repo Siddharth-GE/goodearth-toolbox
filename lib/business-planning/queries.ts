@@ -9,17 +9,9 @@ import { parsePlanInputs, SCENARIOS, type PlanInputs } from "./inputs";
 import { runScenario } from "./model";
 
 /**
- * Reads for Business Planning.
- *
- * Every function here opens with `requireTool("/business-planning")` —
- * the RLS policies in 0048 gate SELECT as well as writes, so an
- * ungranted user would get an empty list rather than an error, which
- * reads as "no plans yet" instead of "not for you". The explicit check
- * redirects them instead of lying.
- *
- * This module reads NOTHING outside its own table except `profiles`,
- * which is shared. That is the founder's "keep this app simple and
- * independent completely", honoured literally.
+ * Every function opens with requireTool: the 0048 policies gate SELECT too, so an ungranted
+ * user would get an empty list instead of a redirect. Reads nothing outside its own table
+ * except `profiles`.
  */
 
 export type PlanSummaryRow = {
@@ -27,8 +19,7 @@ export type PlanSummaryRow = {
   name: string;
   location: string | null;
   lineCount: number;
-  /** The ACTIVE scenario's headline figures, from the same engine the
-      editor uses — so the list and the plan can never disagree. */
+  /** The ACTIVE scenario's headline figures, from the same engine the editor uses. */
   scenarioName: string;
   revenue: number;
   pbt: number;
@@ -49,13 +40,7 @@ export type PlanDetail = {
   updated_by_name: string | null;
 };
 
-/**
- * Every plan, newest touch first.
- *
- * fetchAll rather than a plain select: this is the only way to reach a
- * plan, so a silent 1,000-row cap would one day hide one. Plans are
- * counted in dozens, so this is one page in practice.
- */
+/** Every plan, newest touch first. fetchAll, since a silent 1,000-row cap would one day hide a plan. */
 export async function listPlans(): Promise<PlanSummaryRow[]> {
   await requireTool("/business-planning");
   const supabase = await createClient();
@@ -76,10 +61,7 @@ export async function listPlans(): Promise<PlanSummaryRow[]> {
 
   return rows.map((row) => {
     const inputs = parsePlanInputs(row.inputs);
-    // The engine is pure, so it runs here as happily as it does in the
-    // browser — and running it is the only way the figure on this list
-    // and the figure inside the plan cannot drift apart. Plans are
-    // counted in dozens; this is microseconds.
+    // The engine is pure, so running it here keeps the list figures identical to the plan's.
     const active = runScenario(inputs, inputs.activeScenario);
     return {
       id: row.id,
@@ -98,12 +80,8 @@ export async function listPlans(): Promise<PlanSummaryRow[]> {
 }
 
 /**
- * One plan, parsed. `cache()` because the page and its metadata both
- * want it and neither should pay for the round trip twice.
- *
- * Returns null for "no such plan" AND for "not visible to you" — RLS
- * makes those indistinguishable here, and both end at notFound(), which
- * is the right answer to either.
+ * One plan, parsed. `cache()` because the page and its metadata both want it. Null for "no such
+ * plan" and "not visible to you": RLS makes them indistinguishable, and both end at notFound().
  */
 export const getPlan = cache(async (planId: string): Promise<PlanDetail | null> => {
   await requireTool("/business-planning");

@@ -3,9 +3,7 @@ import { listPlans } from "@/lib/business-planning/queries";
 
 import { ToolWelcome } from "../_components/tool-welcome";
 
-// The welcome screen (founder, 2026-08-13: every Operations and
-// Management tool opens on one). Counts only — the money stays on the
-// plans list and inside each plan.
+// The welcome screen: counts only, the money stays on the plans list and inside each plan.
 export default async function BusinessPlanningPage() {
   const plans = await listPlans();
   const lineCount = plans.reduce((sum, plan) => sum + plan.lineCount, 0);

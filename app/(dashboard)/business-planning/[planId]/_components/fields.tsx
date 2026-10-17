@@ -7,19 +7,10 @@ import { formatCrore } from "@/lib/format";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 /**
- * The input primitives a model screen needs, and nothing more.
- *
- * These are local to Business Planning rather than shared: DESIGN.md's
- * rule is to build the THIRD copy into components/ui, not the first, and
- * no other tool in the app types forty numbers into one page.
- *
- * The one idea they all share: WHAT YOU TYPE IS TEXT, WHAT THE MODEL
- * HOLDS IS A NUMBER. A field keeps its own string while you are in it,
- * so "1.", "" and "0.0" are all things you can be halfway through
- * typing; it emits a number to the plan on every keystroke that parses.
- * Bind an <input type="number"> straight to a number and clearing it to
- * retype puts NaN through the whole model for as long as the box is
- * empty.
+ * Input primitives local to Business Planning (DESIGN.md: build the third copy into
+ * components/ui, not the first). What you type is text, what the model holds is a number: a
+ * field keeps its own string and emits a number on each keystroke that parses, so clearing a
+ * box never puts NaN through the model.
  */
 
 /** Select-on-focus, because every one of these is typed over, not into. */
@@ -66,7 +57,6 @@ export function NumberField({
   value: number;
   onChange: (value: number) => void;
   hint?: ReactNode;
-  /** A unit shown inside the field's right edge: sqft, mo, %. */
   suffix?: string;
   step?: string;
   min?: number;
@@ -75,10 +65,8 @@ export function NumberField({
 }) {
   const id = useId();
   const [text, setText] = useState(() => String(value));
-  // What we last sent up. If `value` arrives different from this, the
-  // change came from somewhere else (a reset, a duplicate) and the box
-  // should follow it. Without the guard, echoing our own emission back
-  // would rewrite "1." to "1" mid-keystroke.
+  // What we last sent up. A `value` that differs came from elsewhere (reset, duplicate) and the
+  // box follows it; echoing our own emission would rewrite "1." to "1" mid-keystroke.
   const emitted = useRef(value);
 
   useEffect(() => {
@@ -103,9 +91,7 @@ export function NumberField({
           onChange={(event) => {
             const next = event.target.value;
             setText(next);
-            // An empty box is zero in a plan — there is no "unpriced"
-            // here, every assumption has a numeric value — but the box
-            // stays visually empty until it loses focus.
+            // An empty box is zero in a plan, but stays visually empty until it loses focus.
             const parsed = next.trim() === "" ? 0 : Number(next);
             if (Number.isFinite(parsed)) {
               emitted.current = parsed;
@@ -125,13 +111,7 @@ export function NumberField({
   );
 }
 
-/**
- * A rupee amount, with the crore/lakh reading of itself underneath.
- *
- * Typing 132000000 and having "₹13.20 Cr" appear below it is the whole
- * point: it is the only way to catch the extra zero, which on a land
- * cost is the difference between a project and a disaster.
- */
+/** A rupee amount with its crore/lakh reading underneath, to catch an extra zero. */
 export function MoneyField({
   label,
   value,

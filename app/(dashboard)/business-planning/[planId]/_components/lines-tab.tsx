@@ -20,21 +20,7 @@ import { useState } from "react";
 import { HoldLineForm } from "./hold-line-form";
 import { SaleLineForm } from "./sale-line-form";
 
-/**
- * The lines. "Some projects may just be one thing, other projects will
- * be a mix of some" — so this is a list you add to, not a fixed set of
- * columns.
- *
- * Two kinds cover every product the founder named. A SALE line is
- * plotted development, row houses, villas, apartments or commercial you
- * sell; a HOLD line is senior living, leased commercial or hospitality.
- * The name is yours — two SALE lines can behave completely differently.
- *
- * Each card's header carries that line's live figures, so what a line
- * contributes is readable without opening it. One line is open at a
- * time: these are twenty-field forms, and three of them unfolded at once
- * is a page nobody can find anything in.
- */
+/** The lines: a list you add to, since a project may be one thing or a mix. SALE lines are sold, HOLD lines kept; the name is yours. Each card's header carries live figures, and one line is open at a time. */
 export function LinesTab({
   inputs,
   result,
@@ -178,8 +164,7 @@ export function LinesTab({
               </IconButton>
             </div>
 
-            {/* Confirm inline rather than in a dialog: a line is one of
-                several on the page, and a modal loses which one. */}
+            {/* Confirm inline, not in a dialog: a modal loses which of several lines it is about. */}
             {confirming ? (
               <div className="border-border bg-danger/5 flex flex-wrap items-center justify-between gap-2 border-t px-4 py-3">
                 <p className="text-sm">Remove “{line.name || "this line"}” and everything in it?</p>

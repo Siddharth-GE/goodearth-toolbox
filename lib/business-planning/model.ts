@@ -1,71 +1,22 @@
 /**
- * The engine. Takes a plan's inputs, returns every number the screens
- * show, for all three scenarios.
+ * The engine: a plan's inputs in, every number the screens show out, for all three scenarios.
+ * Pure (no imports, I/O or clock), so the browser and the server can never disagree.
  *
- * Pure: no imports, no I/O, no clock. It runs unchanged in the browser
- * (recalculating as the founder types, before anything is saved) and on
- * the server (the list page's figures) — which is the only arrangement
- * where the two can never disagree.
+ * 1. Cash is monthly. Every series is `horizonMonths` numbers (index 0 = month 1); money that
+ *    moves after the horizon is genuinely absent.
+ * 2. Profit is matched. A sale books in full the month it happens while its build spreads over
+ *    `buildMonths`, so cutting both at the horizon would reward a scenario for not finishing.
+ *    The `*Cost` series are cash (interest, funding, Cashflow tab); `matchedCost` is the cost of
+ *    what sold, whenever spent (PBT, margin). `costOutsideHorizon` is the gap.
+ * 3. Round only when displaying.
+ * 4. Null is not zero: a margin with no revenue and an uncomputable IRR are `null`, but an IRR
+ *    of exactly 0 is a real answer.
+ * 5. One root, three scenarios: they differ only in sale velocity per line. Out-of-order
+ *    velocities are flagged, never rewritten (`velocityOutOfOrder`).
  *
- * THE FIVE RULES
- *
- * 1. MONTHLY, ALWAYS — FOR CASH. Every series is `horizonMonths` numbers,
- *    index 0 = month 1. Cash totals are sums of those series, never a
- *    shortcut, so money that moves after the horizon is genuinely absent.
- *    The founder's workbook does the same and it is why its Base
- *    construction figure is ₹39.43 Cr and not ₹42.34 Cr: the last row
- *    houses sell too late for their build to finish inside six years.
- *
- * 2. MATCHED COST FOR PROFIT — SEE RULE 1 AND WHY IT IS NOT ENOUGH.
- *    A home's price is booked in FULL the month it sells; its build is
- *    spread over `buildMonths`. Truncating both at the horizon therefore
- *    counts all of the revenue and only some of the cost, and margin
- *    rewards a scenario for failing to finish. On Vihara that put Base
- *    (6.2 homes unsold) at 23.3% against Moderate's 22.2% — the worst
- *    case reading best, which is how this was found.
- *
- *    So there are two totals, and they answer different questions:
- *
- *      * `*Cost` / the monthly series — CASH. What leaves the account
- *        inside the horizon. Drives interest, the trough and peak
- *        funding, and is what the Cashflow tab shows. Unchanged.
- *      * `matchedCost` — the cost OF WHAT SOLD. Every rupee of build for
- *        every home whose revenue was counted, whenever it is spent, plus
- *        the sold share of land and infra. Drives PBT and margin.
- *
- *    `costOutsideHorizon` is the gap, reported so a screen can show the
- *    two reconciling rather than quietly disagreeing.
- *
- * 3. ROUND ONLY WHEN DISPLAYING. Full precision throughout; formatting
- *    happens in lib/format.ts at the very end.
- *
- * 4. NULL IS NOT ZERO. A margin with no revenue behind it is `null`, not
- *    0%. An IRR that cannot be computed is `null`, not a made-up number.
- *    The screens render a dash. Note the converse: an IRR of exactly zero
- *    is a real answer and must NOT collapse to null.
- *
- * 5. ONE ROOT, THREE SCENARIOS. Base, Moderate and High differ in
- *    exactly one input — sale velocity per line — so the whole model
- *    runs three times over the same document rather than branching.
- *    Nothing here enforces that they are in ascending order; a plan whose
- *    "High" is its slowest is a mistake worth flagging on screen, not
- *    worth silently rewriting. See `velocityOutOfOrder`.
- *
- * WHERE THIS DELIBERATELY IMPROVES ON THE WORKBOOK
- *
- *   * Interest. In Excel, interest on a revolver depends on the balance,
- *     which depends on the interest — a circular reference the sheet has
- *     to work around, and its ex-SL block simply does not charge any. A
- *     sequential monthly loop just does it correctly.
- *   * Collections. The sheet convolves against a fixed 31-month window,
- *     so a product with a build cycle over ~30 months silently loses the
- *     instalments that fall past it. Here the convolution runs to the
- *     horizon.
- *   * Peak funding. The sheet reports `-MIN(closing cash)`, which for
- *     Vihara is a NEGATIVE number — the cash never actually goes below
- *     zero. That is the trough of a positive balance, not money anyone
- *     has to raise. Both figures are returned here, named for what they
- *     are: `cashTrough` and `peakFunding`.
+ * Deliberately better than the workbook: interest is a sequential loop (no circular reference),
+ * collections convolve to the horizon (not a fixed 31 months), and `cashTrough` and
+ * `peakFunding` are separate (the sheet's -MIN(closing cash) is a trough, not money to raise).
  */
 
 import {
@@ -76,10 +27,6 @@ import {
   type SaleLine,
   type ScenarioIndex,
 } from "./inputs";
-
-// ---------------------------------------------------------------------
-// Shapes
-// ---------------------------------------------------------------------
 
 /** One row of the cashflow table, as parallel series. Index 0 = month 1. */
 export type MonthlySeries = {
@@ -96,47 +43,29 @@ export type MonthlySeries = {
   outflow: number[];
   /** collections − outflow. Excludes interest and the equity injection. */
   net: number[];
-  /**
-   * Equity put in, by month. Today that is the whole opening balance in
-   * month 1, and it is a row of its own because a plan run on ZERO
-   * equity — every rupee borrowed, land included — is the normal shape
-   * here, and the cashflow has to show that the money came from
-   * somewhere. Zero throughout means the revolver funded everything.
-   */
+  /** Equity put in, by month: the opening balance in month 1. All zeros means the revolver funded everything. */
   equity: number[];
   interest: number[];
-  /** Balance at the end of the month, after interest. */
   closing: number[];
-  /** What is drawn on the revolver at the end of the month. */
   revolver: number[];
 };
 
-/** What every line reports, whichever kind it is. */
 type LineResultBase = {
   id: string;
   name: string;
-  /** Money earned inside the horizon. */
   revenue: number;
-  /** Acquiring the parcel. Follows the plan's land terms. */
   landCost: number;
   /** CASH out inside the horizon. Excludes plan-level overheads. */
   directCost: number;
-  /** Revenue − direct cost. The cash pair; see `matchedProfit`. */
   grossProfit: number;
   /**
-   * The cost OF WHAT SOLD, whenever it is spent — rule 2. Always ≥
-   * `directCost` for a sale line, because it puts back the build that
-   * falls past the horizon; can be lower where units went unsold, because
-   * only the sold share of land and infra is charged.
+   * Cost of what sold, whenever spent (rule 2). Adds back build past the horizon, drops the
+   * unsold share of land and infra, so it can sit above or below `directCost`.
    */
   matchedCost: number;
   /** Revenue − matched cost. Before plan-level overheads and interest. */
   matchedProfit: number;
-  /**
-   * Interest this line would carry ON ITS OWN, starting from no equity.
-   * It will not add up to the plan's consolidated interest, and should
-   * not: pooled, a line in surplus funds a line in deficit.
-   */
+  /** Interest this line would carry alone with no equity; pooled lines fund each other, so it need not sum to the plan's. */
   interest: number;
   profit: number;
   cashTrough: number;
@@ -149,42 +78,20 @@ export type SaleLineResult = LineResultBase & {
   unitsSold: number;
   unitsUnsold: number;
   developmentCost: number;
-  /** CASH construction inside the horizon. */
   constructionCost: number;
-  /** Full build cost of every home that sold, horizon or no horizon. */
   constructionMatched: number;
-  /** The sold share of land and of development. */
   landMatched: number;
   developmentMatched: number;
-  /**
-   * Build cost of units put up but not sold — finished stock the money
-   * is already in. Always 0 on an "on-sale" line, where nothing is built
-   * without a buyer; on a "scheduled" line it is the whole risk of the
-   * mode, and the reason cash spent exceeds cost of sales.
-   */
+  /** Build cost of units put up but unsold. Always 0 on an "on-sale" line; on a "scheduled" line it is the mode's whole risk. */
   unsoldStock: number;
-  /**
-   * Matched profit over revenue, as a percent. Gross — before plan
-   * overheads and before interest, which is reported separately because
-   * a line's standalone interest is not meant to add up (PLAN.md rule 4).
-   *
-   * This is the ONLY sale-margin formula. It used to be computed here one
-   * way, on the Summary tab another way, and read from here by nothing.
-   */
+  /** Matched profit over revenue, percent, before overheads and interest. The only sale-margin formula. */
   marginPct: number | null;
 };
 
 export type HoldLineResult = LineResultBase & {
   kind: "hold";
-  /**
-   * Deliberately NO marginPct. A held asset's capex is not an expense
-   * against six years of rent, so a "margin" here is a capital-versus-
-   * operating mix that reads as a large negative next to a sale line's
-   * +22% in the same column. What a held asset is actually judged on is
-   * `yieldOnCostPct` and `holdIrrPct`, both below.
-   */
+  /** No marginPct on purpose: capex against rent reads as a large negative. Judge a hold line by `yieldOnCostPct` and `holdIrrPct`. */
 
-  /** The three areas, because they do three different jobs. */
   carpetTotal: number;
   /** Built-up. What construction is costed on. */
   buaTotal: number;
@@ -196,7 +103,6 @@ export type HoldLineResult = LineResultBase & {
   capexPerUnit: number | null;
   capexPerBuaSqft: number | null;
 
-  /** Inside the plan's horizon. */
   entryFees: number;
   recurringCharges: number;
   operatingOpex: number;
@@ -204,10 +110,8 @@ export type HoldLineResult = LineResultBase & {
   /** At steady state, whatever the horizon. */
   stabilisedNoi: number;
   yieldOnCostPct: number | null;
-  /** Stabilised NOI ÷ exit cap rate. What the asset is worth, held. */
   terminalValue: number;
 
-  /** The own-versus-sell question, over the full hold period. */
   holdValue: number;
   sellValue: number;
   verdict: "hold" | "sell";
@@ -224,17 +128,14 @@ export type ScenarioResult = {
 
   revenue: number;
 
-  /* CASH costs — what leaves the account inside the horizon. These drive
-     the Cashflow tab, the trough and peak funding. */
+  // Cash costs: what leaves the account inside the horizon.
   landCost: number;
   developmentCost: number;
   /** SALE construction plus HOLD capex — everything built, inside the horizon. */
   constructionCost: number;
-  /** Running the held assets, inside the horizon. */
   operatingCost: number;
 
-  /* MATCHED costs — the cost of what sold, whenever spent. These drive
-     PBT and margin. Rule 2. */
+  // Matched costs: the cost of what sold, whenever spent. They drive PBT and margin (rule 2).
   landMatched: number;
   developmentMatched: number;
   constructionMatched: number;
@@ -246,46 +147,22 @@ export type ScenarioResult = {
   commonInfraOpex: number;
   /** Overheads and common infrastructure: everything no single line owns. */
   planCost: number;
-  /** Every CASH cost except interest. */
   totalCost: number;
   /** Every MATCHED cost except interest. What PBT is struck against. */
   matchedTotalCost: number;
-  /** Money actually banked inside the horizon. */
   collected: number;
   /**
-   * Sold, owed, and NOT yet banked when the horizon ends.
-   *
-   * The mirror of `costOutsideHorizon` on the income side. A home sold in
-   * month 70 books its whole price that month but collects it over the
-   * following build, and `spreadForward` drops whatever lands past the
-   * last month — so the cash series is short by money that is
-   * contractually due. It never touches PBT (which is struck on
-   * bookings), but it inflates the funding gap, and `peakFunding` is
-   * read as "money to raise". On Vihara at 0.5 units a month the whole
-   * ₹9.70 Cr of apparent peak funding is ₹11.19 Cr of late collections.
+   * Sold and owed but not banked by the horizon. Never touches PBT, but it inflates `peakFunding`
+   * (Vihara at 0.5 units a month: ₹9.70 Cr of apparent funding is ₹11.19 Cr of late collections).
    */
   receivableAtHorizon: number;
-  /**
-   * `matchedTotalCost − totalCost`: cost the plan owes on what it sold but
-   * does not pay inside the horizon, less the share of land and infra
-   * sitting under units that never sold. Shown as its own row so the
-   * Summary tab visibly adds up to PBT.
-   */
+  /** `matchedTotalCost − totalCost`, its own row so the Summary tab adds up to PBT. */
   costOutsideHorizon: number;
-  /** On the pooled cash position — see LineResult.interest. */
   interest: number;
-  /** Sum of each line's standalone interest, for the gap the summary names. */
   standaloneInterest: number;
 
   pbt: number;
-  /**
-   * What the held assets are worth at the end, on top of PBT.
-   *
-   * Kept OUT of pbt on purpose. PBT is money that has actually moved;
-   * this is an asset you still own, and adding the two without saying so
-   * is how a plan reports a profit that nobody can spend. Shown beside
-   * PBT as `pbtWithHeldValue`, which is the workbook's Block 3 row 41.
-   */
+  /** Worth of the held assets at the end. Kept out of pbt (PBT is money that moved); `pbtWithHeldValue` adds it (workbook Block 3 row 41). */
   terminalValue: number;
   pbtWithHeldValue: number;
   marginPct: number | null;
@@ -305,10 +182,6 @@ export type PlanResult = {
   scenarios: [ScenarioResult, ScenarioResult, ScenarioResult];
   active: ScenarioResult;
 };
-
-// ---------------------------------------------------------------------
-// Small pure helpers
-// ---------------------------------------------------------------------
 
 function zeros(n: number): number[] {
   return new Array<number>(n).fill(0);
@@ -340,14 +213,7 @@ function emptySeries(months: number): MonthlySeries {
   };
 }
 
-/**
- * Land, by the plan's terms.
- *
- * The deal is one deal — cash at month 1, or deferred to a settlement
- * month at a premium — so the terms come from the plan and only the area
- * and rate come from the line. Both kinds of line pay for land the same
- * way, which is why this is shared.
- */
+/** Land cost by the plan's terms (cash at month 1, or deferred to a settlement month at a premium); area and rate come from the line. */
 function landSpend(areaSqft: number, costPsf: number, plan: PlanInputs, months: number): number[] {
   const spend = zeros(months);
   const base = areaSqft * costPsf;
@@ -356,21 +222,14 @@ function landSpend(areaSqft: number, costPsf: number, plan: PlanInputs, months: 
   const isJv = plan.landTerms === "jv";
   const payable = isJv ? base * (1 + plan.landPremiumPct / 100) : base;
   const payMonth = isJv ? plan.landSettlementMonth : 1;
-  // A settlement month past the horizon means this land is genuinely
-  // never paid for inside the plan. The Setup tab says so on the field.
+  // A settlement month past the horizon means the land is never paid for inside the plan.
   if (payMonth >= 1 && payMonth <= months) spend[payMonth - 1] += payable;
   return spend;
 }
 
 /**
- * The share of a unit's price collected `offset` months after it sells.
- *
- * Booking percent lands at offset 0; the balance arrives in equal
- * instalments spaced `round(buildMonths / instalments)` months apart.
- * The schedule always sums to 1 — every rupee of a sale is collected
- * eventually, and `collectionScheduleSum` is asserted in the tests
- * because a schedule that quietly sums to 0.98 is a 2% error nobody
- * would ever spot on screen.
+ * Share of a unit's price collected `offset` months after it sells: the booking percent at 0,
+ * the balance in equal instalments. Always sums to 1; a test asserts it.
  */
 export function collectionSchedule(
   bookingPct: number,
@@ -393,14 +252,7 @@ export function constructionSchedule(buildMonths: number): number[] {
   return new Array<number>(months).fill(1 / months);
 }
 
-/**
- * Convolution: each month's `source` value spread forward by `schedule`.
- *
- * `out[m] = Σ source[m - k] × schedule[k]`. Anything landing past the
- * horizon is lost, deliberately — that money does arrive, but not inside
- * the period being modelled, and pretending otherwise is how a plan
- * shows profit it will not see.
- */
+/** Spread each month's `source` forward by `schedule`. What lands past the horizon is dropped on purpose. */
 function spreadForward(source: number[], schedule: number[], months: number): number[] {
   const out = zeros(months);
   for (let m = 0; m < months; m += 1) {
@@ -415,10 +267,6 @@ function spreadForward(source: number[], schedule: number[], months: number): nu
   return out;
 }
 
-// ---------------------------------------------------------------------
-// IRR
-// ---------------------------------------------------------------------
-
 function npv(rate: number, cashflows: number[]): number {
   let total = 0;
   for (let i = 0; i < cashflows.length; i += 1) total += cashflows[i] / (1 + rate) ** i;
@@ -427,18 +275,8 @@ function npv(rate: number, cashflows: number[]): number {
 
 /**
  * The periodic rate at which these cashflows break even, or null.
- *
- * Bisection, not Newton: Newton diverges on the long, lumpy flows a
- * property plan produces, and reports whatever it landed on.
- *
- * Two guards, both of which return null rather than a number:
- *
- *   * The flow must start with money going OUT. A flow that opens
- *     positive has no rate of return to speak of, and asking anyway is
- *     how the founder's workbook came to report a Venture IRR of 1150%
- *     for Moderate and −52% for High off the same model.
- *   * The root must be bracketed. If NPV has the same sign at both ends
- *     of the search range there is nothing to find.
+ * Bisection, not Newton, which diverges on long lumpy flows. Null if the flow does not open
+ * with money going OUT (the workbook reported a 1150% IRR that way) or the root is not bracketed.
  */
 export function irr(cashflows: number[]): number | null {
   const firstNonZero = cashflows.find((value) => value !== 0);
@@ -468,26 +306,13 @@ export function irr(cashflows: number[]): number | null {
   return (lo + hi) / 2;
 }
 
-/** A monthly rate as an annual percentage. */
 function annualisePct(monthlyRate: number | null): number | null {
   if (monthlyRate === null) return null;
   const annual = (1 + monthlyRate) ** 12 - 1;
   return Number.isFinite(annual) ? annual * 100 : null;
 }
 
-// ---------------------------------------------------------------------
-// Cash
-// ---------------------------------------------------------------------
-
-/**
- * Walk a monthly net cashflow into a balance, charging interest on any
- * month the balance ends below zero.
- *
- * The interest compounds into the balance, which is what a revolver
- * does: you borrow to cover the shortfall, and next month you owe the
- * shortfall plus the interest. Straightforward here; a circular
- * reference in a spreadsheet.
- */
+/** Walk monthly net cashflow into a balance, compounding interest on any month that ends below zero (a revolver). */
 function runCash(net: number[], monthlyRate: number, openingEquity: number) {
   const months = net.length;
   const interest = zeros(months);
@@ -516,24 +341,14 @@ function runCash(net: number[], monthlyRate: number, openingEquity: number) {
   };
 }
 
-// ---------------------------------------------------------------------
-// The run
-// ---------------------------------------------------------------------
-
 function isSaleLine(line: { kind: string }): line is SaleLine {
   return line.kind === "sale";
 }
 
 /**
- * Month-by-month unit sales for every line at once, because a launch
- * trigger makes them interdependent.
- *
- * A triggered line stays at zero until the given share of every OTHER
- * line's units has sold. Lines are evaluated in list order within each
- * month, so a trigger sees the current month's sales from lines above it
- * and not from lines below — the same order a spreadsheet column
- * evaluates in, and the reason Vihara's row houses release the month
- * plotted crosses 70% rather than the month after.
+ * Month-by-month unit sales for every line at once. A triggered line stays at zero until the
+ * given share of every OTHER line's units has sold; lines evaluate in list order, so a trigger
+ * sees this month's sales from lines above it only.
  */
 function unitsSoldByMonth(lines: SaleLine[], scenario: ScenarioIndex, months: number): number[][] {
   const sold = lines.map(() => zeros(months));
@@ -555,8 +370,7 @@ function unitsSoldByMonth(lines: SaleLine[], scenario: ScenarioIndex, months: nu
           othersUnits += totalUnits[j];
           othersCumulative += cumulative[j];
         }
-        // A single-line plan with a trigger set has nothing to wait for,
-        // so it launches rather than never selling anything.
+        // A single-line plan with a trigger has nothing to wait for, so it launches.
         if (othersUnits > 0 && othersCumulative < (line.launchTriggerPct / 100) * othersUnits) {
           continue;
         }
@@ -595,11 +409,8 @@ function runSaleLine(
     months,
   );
 
-  // The two businesses. On-sale, a unit is built because it sold, so the
-  // spend follows the sales curve and the project largely funds itself.
-  // Scheduled, the whole building goes up on its own calendar whether
-  // anything has sold or not — and every rupee of it is carried until a
-  // buyer turns up. That gap is the entire point of the mode.
+  // On-sale: build follows the sales curve. Scheduled: the whole building goes up on its own
+  // calendar and every unsold rupee is carried.
   const construction = zeros(months);
   if (line.buildMode === "scheduled") {
     const buildMonths = Math.max(1, Math.round(line.buildMonths));
@@ -619,8 +430,7 @@ function runSaleLine(
 
   const land = landSpend(line.landAreaSqft, line.landCostPsf, plan, months);
 
-  // Development and infrastructure: this line's parcel, spread evenly
-  // over the plan's development period from month 1.
+  // This line's parcel development, spread evenly over the development period.
   const development = zeros(months);
   const developmentTotal = line.landAreaSqft * line.devCostPsf;
   if (developmentTotal > 0) {
@@ -637,9 +447,7 @@ function runSaleLine(
     net[m] = collections[m] - outflow[m];
   }
 
-  // Standalone: no equity. This answers "what does this line do on its
-  // own", and handing every line the plan's whole equity cushion would
-  // count the same rupees once per line.
+  // Standalone, no equity: giving every line the plan's cushion would count the same rupees per line.
   const cash = runCash(net, monthlyRate, 0);
 
   const monthly: MonthlySeries = {
@@ -654,7 +462,6 @@ function runSaleLine(
     commonInfra: zeros(months),
     outflow,
     net,
-    // A line stands alone with no equity behind it — see runCash above.
     equity: zeros(months),
     interest: cash.interest,
     closing: cash.closing,
@@ -669,26 +476,15 @@ function runSaleLine(
   const directCost = landCost + developmentCost + constructionCost;
   const grossProfit = revenue - directCost;
 
-  // Rule 2. Revenue was booked in full the month each home sold, so the
-  // cost set against it has to be the full cost of those same homes.
-  //
-  //   * Construction: every rupee of build for the homes that sold, even
-  //     the months landing past the horizon. `constructionCost` above
-  //     stopped at the horizon and stays that way — that is the cash.
-  //   * Land and development: the parcel is bought whole, but only the
-  //     sold share earned anything. Charging all of it against part of
-  //     the revenue is the same error pointing the other way.
+  // Rule 2: cost against booked revenue is the full cost of the homes sold, build past the horizon
+  // included. Land and development: only the sold share earned anything, so only it is charged.
   const soldShare = line.units > 0 ? totalUnitsSold / line.units : 0;
   const constructionMatched = totalUnitsSold * constructionPerUnit;
   const landMatched = landCost * soldShare;
   const developmentMatched = developmentCost * soldShare;
   const matchedCost = landMatched + developmentMatched + constructionMatched;
 
-  // Built and not sold. On a SCHEDULED line the whole tower goes up
-  // regardless, so unsold flats are finished stock the money is already
-  // sunk into — the "if we don't sell we have a problem" number, and the
-  // reason a scheduled line's cash cost exceeds its cost of sales. On an
-  // on-sale line it is always zero: nothing is built without a buyer.
+  // Built and not sold: finished stock the money is sunk into. Zero on an on-sale line.
   const unsoldStock =
     line.buildMode === "scheduled"
       ? Math.max(0, line.units - totalUnitsSold) * constructionPerUnit
@@ -721,27 +517,11 @@ function runSaleLine(
   };
 }
 
-// ---------------------------------------------------------------------
-// HOLD lines
-// ---------------------------------------------------------------------
-
-/**
- * Carpet → built-up → super built-up, and what building it costs.
- *
- * The order is the whole point. Construction is costed on BUILT-UP area
- * (carpet ÷ efficiency), which is always the largest of the three;
- * costing it on carpet is how a build gets understated by a third.
- * Super built-up (carpet × (1 + loading)) is only used if the thing is
- * SOLD rather than kept.
- */
+/** Carpet → built-up (carpet ÷ efficiency) → super built-up (carpet × (1 + loading)). Construction is costed on built-up; super built-up applies only if sold. */
 export function holdAreasAndCapex(line: HoldLine) {
   const carpetTotal = line.units * line.carpetSqftPerUnit;
-  // parsePlanInputs clamps efficiency to ≥1% on the way in and out, but
-  // the editor recalculates on RAW keystrokes, so the engine sees the 0
-  // the moment it is typed. Dividing by it turns every figure downstream
-  // into Infinity until the next save round trip. The engine is the
-  // shared surface; it should never emit a non-finite number, whoever
-  // calls it. Same reasoning for the exit cap rate in runHoldLine.
+  // Clamped: the editor recalculates on raw keystrokes, so a typed 0 must not become Infinity.
+  // Same for the exit cap rate in runHoldLine.
   const buaTotal = carpetTotal / (Math.max(1, line.efficiencyPct) / 100);
   const sbaTotal = carpetTotal * (1 + line.loadingPct / 100);
 
@@ -770,17 +550,9 @@ export function holdAreasAndCapex(line: HoldLine) {
 }
 
 /**
- * The long-horizon question: is this worth more held or sold?
- *
- * Annual, in years from completion, and independent of the plan's
- * monthly horizon — a 20-year hold is a different question from a 6-year
- * development, and squeezing it into the same grid would answer neither.
- *
- * Occupancy ramps at the fill rate to a stabilised level. Charges, opex
- * and entry fees each escalate at their own rate. Turnover matters
- * because a resident leaving and being replaced earns another entry fee.
- * Exit is the following year's NOI capitalised at the exit cap rate, in
- * the final year only.
+ * Hold versus sell over the full hold period: annual from completion, independent of the
+ * monthly horizon. Occupancy ramps to a stabilised level; charges, opex and entry fees escalate
+ * separately; turnover earns another entry fee. Exit is next year's NOI at the exit cap rate.
  */
 export function holdEconomics(line: HoldLine, capex: number, sbaTotal: number) {
   const years = Math.max(1, Math.round(line.holdYears));
@@ -809,8 +581,7 @@ export function holdEconomics(line: HoldLine, capex: number, sbaTotal: number) {
     netCash.push(revenue - opex + entry);
   }
 
-  // Clamped for the same reason as efficiency in holdAreasAndCapex: a cap
-  // rate of 0 typed into the editor must not become an infinite exit.
+  // Clamped like efficiency in holdAreasAndCapex.
   const exitValue = (noi[years] * chargeEsc) / (Math.max(0.1, line.exitCapRatePct) / 100);
 
   let holdValue = 0;
@@ -824,17 +595,13 @@ export function holdEconomics(line: HoldLine, capex: number, sbaTotal: number) {
   const sellValue = sbaTotal * line.sellPricePsf * (1 - line.sellingCostPct / 100);
   const totalCash = netCash.reduce((a, b) => a + b, 0) + exitValue;
 
-  // Rule 4 both ways: no capex or no bracketed root is null, but an asset
-  // that exactly breaks even returns 0%, which is an answer. The previous
-  // `(irr(...) ?? NaN) * 100 || null` collapsed that 0 to null and showed
-  // a dash, because `0 || null` is null.
+  // Rule 4 both ways: no capex or no bracketed root is null, but exactly 0% is a real answer.
   const irrRate = capex > 0 ? irr(irrFlow) : null;
 
   return {
     holdValue,
     sellValue,
-    // A tie goes to selling: holding costs attention, and a model that
-    // says "hold" on an identical number is telling you nothing.
+    // A tie goes to selling.
     verdict: (holdValue > sellValue ? "hold" : "sell") as "hold" | "sell",
     holdIrrPct: irrRate === null ? null : irrRate * 100,
     equityMultiple: capex > 0 ? totalCash / capex : null,
@@ -850,7 +617,6 @@ function runHoldLine(
 ): HoldLineResult {
   const areas = holdAreasAndCapex(line);
 
-  // Capex spreads evenly across the build, from the month it starts.
   const construction = zeros(months);
   const buildMonths = Math.max(1, Math.round(line.buildMonths));
   for (let i = 0; i < buildMonths; i += 1) {
@@ -860,7 +626,6 @@ function runHoldLine(
 
   const land = landSpend(line.landAreaSqft, line.landCostPsf, plan, months);
 
-  // Ready the month after the last month of building.
   const readyMonth = line.buildStartMonth + buildMonths;
   const stabilisedUnits = line.units * (line.occupancyPct / 100);
 
@@ -876,9 +641,7 @@ function runHoldLine(
       stabilisedUnits,
       (monthNumber - readyMonth + 1) * line.fillRatePerMonth,
     );
-    // Inside the plan's horizon there is no turnover — that is a
-    // long-horizon effect, and it belongs to holdEconomics. Here an
-    // entry fee is earned only by a unit filling for the first time.
+    // No turnover inside the horizon (that is holdEconomics): an entry fee is earned only on first filling.
     entry[m] = Math.max(0, occupied - previousOccupied) * line.entryFeePerUnit;
     recurring[m] = occupied * line.chargePerUnitMonth;
     operating[m] = line.fixedOpexMonth + occupied * line.varOpexPerUnitMonth;
@@ -890,8 +653,7 @@ function runHoldLine(
   const outflow = zeros(months);
   const net = zeros(months);
   for (let m = 0; m < months; m += 1) {
-    // A held asset earns as the money arrives — there is nothing to
-    // recognise up front, so bookings and collections are the same.
+    // Held income is earned as it arrives: bookings equal collections.
     bookings[m] = entry[m] + recurring[m];
     collections[m] = bookings[m];
     outflow[m] = land[m] + construction[m] + operating[m];
@@ -900,7 +662,6 @@ function runHoldLine(
 
   const cash = runCash(net, monthlyRate, 0);
 
-  // Stabilised, whatever the horizon: what it earns in a steady year.
   const stabilisedRevenue = stabilisedUnits * line.chargePerUnitMonth * 12;
   const stabilisedOpex = (line.fixedOpexMonth + stabilisedUnits * line.varOpexPerUnitMonth) * 12;
   const stabilisedNoi = stabilisedRevenue - stabilisedOpex;
@@ -916,11 +677,7 @@ function runHoldLine(
   const revenue = entryFees + recurringCharges;
   const directCost = landCost + capexInHorizon + operatingOpex;
 
-  // Rule 2, the hold version. Rent and opex already accrue in step month
-  // by month, so the only thing to put back is the build: `terminalValue`
-  // below values this asset off its STABILISED NOI — a finished, filled
-  // building — so charging only the capex that happened to fall inside
-  // the horizon hands the plan a completed asset it part-paid for.
+  // Rule 2 for hold: put back the build past the horizon, because `terminalValue` values a finished building.
   const matchedCost = landCost + areas.capex + operatingOpex;
 
   return {
@@ -976,13 +733,8 @@ function runHoldLine(
 
 /** Overheads, selling cost, one-timers and common infrastructure, by month. */
 /**
- * The month the last unit sells, or `months` if selling never stops
- * inside the horizon.
- *
- * `months` rather than 0 for a plan with no sales at all: an overhead
- * that "ends with sales" on a plan that has not sold anything has no
- * earlier date to end on, and cutting it to zero would silently make an
- * empty plan look profitable.
+ * The month the last unit sells, or `months` if sales never stop. `months` (not 0) for a plan
+ * with no sales, so an "ends with sales" overhead does not vanish and make an empty plan look profitable.
  */
 function lastSaleMonth(unitsSold: number[], months: number): number {
   for (let m = unitsSold.length - 1; m >= 0; m -= 1) {
@@ -998,8 +750,7 @@ function runPlanCosts(plan: PlanInputs, bookings: number[], unitsSold: number[],
   const infraCapex = zeros(months);
   const infraOpex = zeros(months);
 
-  // The only plan-level figure that differs between Base, Moderate and
-  // High — see OverheadItem.endsWithSales.
+  // The only plan-level figure that differs by scenario (OverheadItem.endsWithSales).
   const soldOut = lastSaleMonth(unitsSold, months);
 
   for (const item of plan.overheads) {
@@ -1056,8 +807,7 @@ export function runScenario(plan: PlanInputs, scenario: ScenarioIndex): Scenario
   const months = Math.min(Math.max(1, Math.round(plan.horizonMonths)), MAX_HORIZON_MONTHS);
   const monthlyRate = plan.financingRatePct / 100 / 12;
 
-  // Sales first, together, because a launch trigger makes them
-  // interdependent; then each line's own series.
+  // Sales first, together: a launch trigger makes them interdependent.
   const saleLines = plan.lines.filter(isSaleLine);
   const sold = unitsSoldByMonth(saleLines, scenario, months);
   let saleIndex = 0;
@@ -1067,11 +817,8 @@ export function runScenario(plan: PlanInputs, scenario: ScenarioIndex): Scenario
       : runHoldLine(line, plan, months, monthlyRate),
   );
 
-  // Consolidate the lines, then add what no line owns.
   const monthly = emptySeries(months);
-  // Selling cost is a percentage of SALE bookings only. A senior-living
-  // resident's monthly charge does not attract brokerage, and folding
-  // hold income into the base would quietly tax it.
+  // Selling cost applies to SALE bookings only; hold income attracts no brokerage.
   const saleBookings = zeros(months);
   for (const line of lines) {
     for (let m = 0; m < months; m += 1) {
@@ -1106,10 +853,7 @@ export function runScenario(plan: PlanInputs, scenario: ScenarioIndex): Scenario
     monthly.closing[m] = cash.closing[m];
     monthly.revolver[m] = cash.revolver[m];
   }
-  // Where the money came from, as its own row. runCash puts the whole
-  // opening balance in at month 1; on a zero-equity plan this row is
-  // empty all the way across and the revolver funded every rupee,
-  // starting with the land.
+  // Equity is its own row; on a zero-equity plan it is empty and the revolver funded everything.
   if (months > 0) monthly.equity[0] = plan.openingEquity;
 
   const revenue = sum(monthly.bookings);
@@ -1130,17 +874,9 @@ export function runScenario(plan: PlanInputs, scenario: ScenarioIndex): Scenario
     planCosts.infraOpexTotal;
   const totalCost = landCost + developmentCost + constructionCost + operatingCost + planCost;
 
-  // Rule 2: PBT and margin are struck against the cost of what SOLD, not
-  // against the cash that happened to move before month `months`. The
-  // plan's own costs — overheads, selling cost, common infrastructure —
-  // go in unchanged: they are committed inside the horizon and there is
-  // no unit to match them to.
-  //
-  // A HOLD line's development sits inside its capex (`landDevelopment` in
-  // holdAreasAndCapex) and its monthly `development` series is zeros, so
-  // it contributes to construction here and not to development — the same
-  // split the cash rows use, which is what keeps the two columns
-  // comparable line for line.
+  // Rule 2: PBT and margin are struck against the cost of what SOLD. Plan costs go in unchanged:
+  // there is no unit to match them to. A hold line's development sits inside its capex, so it
+  // counts as construction here, as in the cash rows.
   let landMatched = 0;
   let developmentMatched = 0;
   let constructionMatched = 0;
@@ -1154,13 +890,11 @@ export function runScenario(plan: PlanInputs, scenario: ScenarioIndex): Scenario
       constructionMatched += line.capex;
     }
   }
-  // Each line's matchedCost already carries its own operating opex, so
-  // this is every line plus what no line owns — nothing counted twice.
+  // Each line's matchedCost already carries its operating opex: nothing is counted twice.
   const matchedTotalCost = lines.reduce((total, line) => total + line.matchedCost, 0) + planCost;
   const pbt = revenue - matchedTotalCost - cash.totalInterest;
 
-  // The workbook's "money multiple": every rupee that came in over every
-  // rupee that went out, on the operating flow, ignoring when.
+  // Workbook's money multiple: all money in over all money out on the operating flow, ignoring timing.
   let inflowTotal = 0;
   let outflowTotal = 0;
   for (const value of monthly.net) {
@@ -1205,15 +939,7 @@ export function runScenario(plan: PlanInputs, scenario: ScenarioIndex): Scenario
   };
 }
 
-/**
- * Does any sale line have its three velocities out of ascending order?
- *
- * Rule 5. The parser clamps each velocity to ≥ 0 independently, so
- * nothing stops "High" being the slowest — and every screen still labels
- * the columns Base, Moderate, High in fixed order, so the plan quietly
- * reads backwards. Flagged rather than clamped: silently rewriting what
- * the founder typed is worse than telling them it looks wrong.
- */
+/** Any sale line with velocities out of ascending order? Flagged, not clamped: rewriting what the founder typed is worse than saying it looks wrong (rule 5). */
 export function velocityOutOfOrder(plan: PlanInputs): boolean {
   return plan.lines.some(
     (line) =>
@@ -1222,7 +948,6 @@ export function velocityOutOfOrder(plan: PlanInputs): boolean {
   );
 }
 
-/** Every scenario, plus whichever one the plan currently reads as ACTIVE. */
 export function runPlan(plan: PlanInputs): PlanResult {
   const scenarios: [ScenarioResult, ScenarioResult, ScenarioResult] = [
     runScenario(plan, 0),
@@ -1232,23 +957,7 @@ export function runPlan(plan: PlanInputs): PlanResult {
   return { scenarios, active: scenarios[plan.activeScenario] };
 }
 
-// ---------------------------------------------------------------------
-// Sensitivity
-// ---------------------------------------------------------------------
-
-/**
- * The same plan with every price, or every build cost, moved by a
- * percentage.
- *
- * The workbook's two-way table swings two named cells — the plotted
- * house price and the plotted construction cost. That cannot work here,
- * because a plan has as many lines as it has, and there is no single
- * "the price". So the axes are proportional and apply to every line:
- * what you SELL for (and charge, on a held line) against what it costs
- * to BUILD. Those are the two numbers a Kerala project is actually at
- * the mercy of, and moving all of them together is the honest version of
- * the question — prices do not fall on villas and hold on row houses.
- */
+/** The same plan with every price, or every build cost, moved by a percentage. The axes are proportional across all lines because a plan has no single "the price". */
 export function adjustPlan(
   plan: PlanInputs,
   { pricePct, buildCostPct }: { pricePct: number; buildCostPct: number },
@@ -1268,8 +977,7 @@ export function adjustPlan(
           }
         : {
             ...line,
-            // What a held line earns moves with prices; what it would
-            // fetch if sold moves with them too.
+            // Held-line income and its sale value both move with prices.
             chargePerUnitMonth: line.chargePerUnitMonth * price,
             entryFeePerUnit: line.entryFeePerUnit * price,
             sellPricePsf: line.sellPricePsf * price,
@@ -1281,7 +989,6 @@ export function adjustPlan(
   };
 }
 
-/** The percentage swings each axis of the sensitivity grid steps through. */
 export const SENSITIVITY_STEPS = [-10, -5, 0, 5, 10] as const;
 
 export type SensitivityCell = {
@@ -1292,14 +999,7 @@ export type SensitivityCell = {
   peakFunding: number;
 };
 
-/**
- * Twenty-five runs of the whole model, at the ACTIVE velocity.
- *
- * Cheap precisely because the engine is pure and takes no I/O: the grid
- * is just the model called again with different numbers, so it can never
- * drift from the headline figures the way a separate sensitivity formula
- * in a spreadsheet does.
- */
+/** Twenty-five runs of the whole model at the ACTIVE velocity: the same engine, so the grid cannot drift from the headline figures. */
 export function sensitivityGrid(plan: PlanInputs): SensitivityCell[][] {
   return SENSITIVITY_STEPS.map((buildCostPct) =>
     SENSITIVITY_STEPS.map((pricePct) => {

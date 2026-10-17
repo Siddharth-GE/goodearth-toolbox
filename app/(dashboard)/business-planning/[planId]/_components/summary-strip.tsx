@@ -9,19 +9,7 @@ import { formatCrore, formatPercent, formatQuantity } from "@/lib/format";
 import { AlertTriangle } from "lucide-react";
 import type { ReactNode } from "react";
 
-/**
- * The answer, pinned above the tabs and recomputed on every keystroke.
- *
- * It is sticky because the whole value of the screen is watching these
- * move while you change an assumption three scrolls down. The scenario
- * picker lives here rather than in Setup for the same reason: flipping
- * Base to High is a thing you do while looking at the answer.
- *
- * Profit and margin lead, at a size a step above the rest rather than a
- * billboard. This used to be six equal figures at body-text size, which
- * meant the screen never said which number was the point of it — you had
- * to read all six labels to find the one you came for.
- */
+/** The answer, pinned above the tabs and recomputed on every keystroke. Sticky so you can watch it move while changing an assumption far below; the scenario picker lives here for the same reason. Profit and margin lead. */
 export function SummaryStrip({
   result,
   activeScenario,
@@ -33,7 +21,6 @@ export function SummaryStrip({
   activeScenario: ScenarioIndex;
   onScenarioChange: (scenario: ScenarioIndex) => void;
   saveState: "idle" | "saving" | "saved" | "error";
-  /** Some line has its three velocities out of ascending order. */
   velocityWarning: boolean;
 }) {
   const profitable = result.pbt >= 0;
@@ -76,16 +63,13 @@ export function SummaryStrip({
           </div>
         </div>
 
-        {/* One band rather than four stretched cards: these are four views
-            of the same plan, not four separate things. */}
+        {/* One band rather than four cards: four views of the same plan. */}
         <FigureBand className="mt-4">
           <FigureBandCell>
             <Figure label="Revenue" value={formatCrore(result.revenue)} />
           </FigureBandCell>
           <FigureBandCell>
-            {/* Two different questions, and the workbook conflated them.
-                Peak funding is what you must raise; the trough is how
-                close the balance came to the floor. */}
+            {/* Two questions the workbook conflated: peak funding is what you must raise, the trough is how close the balance came to the floor. */}
             <Figure
               label="Peak funding"
               value={formatCrore(result.peakFunding)}
@@ -146,7 +130,6 @@ export function SummaryStrip({
   );
 }
 
-/** A plain sentence about something that will mislead if left unsaid. */
 function Note({ children }: { children: ReactNode }) {
   return (
     <p className="border-warning/40 bg-warning/5 text-foreground mt-3 flex items-start gap-2 rounded-xl border px-3 py-2 text-xs">
