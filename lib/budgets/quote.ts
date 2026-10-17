@@ -7,20 +7,8 @@ import { lineAmount } from "./math";
 import { quoteReference } from "./reference";
 
 /**
- * The client quote's data — and, just as importantly, the shape of what
- * the client quote is NOT allowed to see.
- *
- * There is no `unit_cost` and no `margin_pct` field anywhere in these
- * types. That is the point. The quote could have been rendered from
- * BudgetDetail with those columns left out of the template, but then the
- * numbers would still be sitting in the props, one careless edit away from
- * being printed. Here they are stripped once, deliberately, in a function
- * whose whole job is stripping them — and the document that follows
- * cannot print what it was never handed.
- *
- * This mirrors what the database already enforces (migration 0011 gates
- * reads on those tables to /budgets). Belt and braces, because the failure
- * being guarded against is the one that would actually harm the business.
+ * The client quote's data. No `unit_cost` or `margin_pct` anywhere: they are stripped once, here, so the document can't print what it was never handed.
+ * Mirrors the database (migration 0011 gates those tables to /budgets).
  */
 
 export type QuoteLine = {
@@ -29,7 +17,6 @@ export type QuoteLine = {
   item_brand: string | null;
   quantity: number;
   uom: string;
-  /** What the client pays per unit. Cost plus margin, already applied. */
   rate: number | null;
   amount: number | null;
 };
@@ -49,29 +36,24 @@ export type QuoteData = {
   project_name: string;
   unit_name: string;
   revision_no: number;
-  /** Which pricing of that design revision this quotation represents. */
   version: number;
   /** Unique per document sent: QT/PLOT6/R2-V2. */
   reference: string;
   approved_at: string | null;
-  /** True until the budget is approved — the document watermarks itself. */
   isDraft: boolean;
   spaces: QuoteSpace[];
   total: number;
-  /** Lines still without a price, so the caller can warn before sending. */
   unpricedCount: number;
 };
 
 export async function getQuote(budgetId: string): Promise<QuoteData | null> {
-  // getBudget enforces the /budgets grant, so nothing here needs to
-  // re-check it — and nothing here reads a table it hasn't already.
+  // getBudget enforces the /budgets grant, so nothing here re-checks it.
   const budget = await getBudget(budgetId);
   if (!budget) return null;
 
   const viewRows = await listSpaceViews(budget.spaces.map((space) => space.space_id));
 
-  // All spaces at once, not one after another — the downloads are the
-  // slow part, and a ten-space quote was ten sequential batches of them.
+  // All spaces at once: the downloads are the slow part.
   const spaces: QuoteSpace[] = await Promise.all(
     budget.spaces.map(async (space) => {
       const lines: QuoteLine[] = space.lines.map((line) => ({
@@ -84,8 +66,7 @@ export async function getQuote(budgetId: string): Promise<QuoteData | null> {
         amount: lineAmount(line),
       }));
 
-      // The bucket is private, so there is no URL react-pdf could fetch —
-      // the bytes come down here, exactly as the design document does it.
+      // The bucket is private, so react-pdf can't fetch a URL: the bytes come down here.
       const views = await Promise.all(
         (viewRows.get(space.space_id) ?? []).map(async (view) => {
           const data = await downloadSpaceView(view.storage_path);
@@ -98,11 +79,9 @@ export async function getQuote(budgetId: string): Promise<QuoteData | null> {
         label: space.label,
         space_type_name: space.space_type_name,
         lines,
-        // A view whose file has gone missing is dropped rather than
-        // failing the whole quote.
+        // A missing view file is dropped rather than failing the whole quote.
         views: views.filter((view): view is QuoteView => view !== null),
-        // The space's own full-precision sum, so the column adds up to
-        // the total printed under it.
+        // The space's own full-precision sum, so the column adds up to the total under it.
         total: space.totals.client,
       };
     }),

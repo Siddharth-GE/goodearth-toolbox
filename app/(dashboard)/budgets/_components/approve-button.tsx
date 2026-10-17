@@ -6,12 +6,8 @@ import { approveBudget, reopenBudget } from "@/lib/budgets/actions";
 import { useState, useTransition } from "react";
 
 /**
- * Approve is disabled until every line has a cost, using the live count
- * from the grid rather than what was on screen at page load — someone who
- * has just finished the last line shouldn't have to reload to approve it.
- *
- * The check is enforced again in the action against the database, because
- * a disabled button is a courtesy, not a rule.
+ * Disabled until every line has a cost, from the grid's live count.
+ * The action re-checks against the database: a disabled button is a courtesy, not a rule.
  */
 export function ApproveButton({
   budgetId,

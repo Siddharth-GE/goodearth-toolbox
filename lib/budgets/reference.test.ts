@@ -1,8 +1,3 @@
-/**
- * The quotation reference is the client-facing identity of a document —
- * the string someone reads back on the phone — so its exact shape is
- * pinned here.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -13,8 +8,7 @@ test("builds QT/<unit>/R<n>-V<v>", () => {
 });
 
 test("re-approval after a re-open changes the reference", () => {
-  // The whole reason the version exists (migration 0012): the corrected
-  // quotation must never carry the same reference as the one already sent.
+  // The corrected quotation must never carry the same reference as the one already sent (migration 0012).
   assert.notEqual(quoteReference("Plot 6", 2, 1), quoteReference("Plot 6", 2, 2));
 });
 

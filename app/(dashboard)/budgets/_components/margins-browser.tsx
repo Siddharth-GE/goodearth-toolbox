@@ -23,15 +23,7 @@ import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
 import { PackageOpen, Search } from "lucide-react";
 import { useState } from "react";
 
-/**
- * Search the catalogue and set a default margin per product.
- *
- * Reuses /api/catalogue rather than a new endpoint — the same reasons hold
- * (a GET doesn't queue behind other requests and doesn't re-render the
- * route), and that endpoint returns no cost or margin of its own, so
- * nothing secret travels through it. The margins themselves come from the
- * server component and are updated here as they're saved.
- */
+/** Reuses /api/catalogue, which returns no cost or margin, so nothing secret travels through it. */
 export function MarginsBrowser({
   initialMargins,
   categories,
@@ -112,9 +104,6 @@ export function MarginsBrowser({
         />
       )}
 
-      {/* Was missing entirely: a search matching nothing rendered a table
-          header over an empty body, which reads as broken rather than as
-          "no results". */}
       {!loading && result.items.length === 0 ? (
         <EmptyState
           icon={PackageOpen}
@@ -165,12 +154,10 @@ function MarginRow({
 }) {
   const [value, setValue] = useState(margin === null ? "" : String(margin));
 
-  // No re-sync when the search results change: each row is keyed on the
-  // item id, so a different product is a different component instance with
-  // its own fresh state rather than a stale one to reconcile.
+  // Rows are keyed on item id, so a different product is a fresh instance: no re-sync needed.
   const { flush, error, saved } = useSaveOnBlur<string>({
     initial: margin === null ? "" : String(margin),
-    // Blank means "no default", which is not the same as 0%.
+    // Blank means "no default", not 0%.
     validate: (raw) => {
       if (raw.trim() === "") return undefined;
       const parsed = Number(raw.trim());

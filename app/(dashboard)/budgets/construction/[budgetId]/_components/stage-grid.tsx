@@ -30,14 +30,7 @@ import { useState, useTransition } from "react";
 
 type Option = { id: string; name: string };
 
-/**
- * The stage-wise plan editor: one section per stage, rows saved on blur,
- * items added through the shared catalogue picker — a stage is nothing
- * but the text its lines carry, so "adding a stage" is picking one from
- * the construction stages master (0053; managed in Masters → Stages)
- * and putting the first items in it. Picked, never typed — the founder's
- * rule, and the database enforces it either way.
- */
+/** A stage is only the text its lines carry: adding one means picking from the construction stages master (0053), never typing. */
 export function StageGrid({
   planId,
   stages,
@@ -47,13 +40,10 @@ export function StageGrid({
 }: {
   planId: string;
   stages: ConstructionStageGroup[];
-  /** Active names from the construction stages master. */
   stageOptions: string[];
   categories: Option[];
   brands: Option[];
 }) {
-  // Which stage the picker is open for — an existing one, or the one
-  // just picked in the add-stage form below.
   const [pickerStage, setPickerStage] = useState<string | null>(null);
   const [newStage, setNewStage] = useState("");
 
@@ -79,9 +69,7 @@ export function StageGrid({
         />
       ))}
 
-      {/* Adding a stage = picking it and choosing its first items.
-          Nothing is created until the picker commits, so an abandoned
-          pick costs nothing. */}
+      {/* Nothing is created until the picker commits, so an abandoned pick costs nothing. */}
       <div className="border-border bg-surface flex flex-wrap items-end gap-2 rounded-2xl border p-4">
         <div className="min-w-[220px] flex-1 space-y-1.5">
           <label
@@ -171,10 +159,7 @@ function StageSection({
         </TableHead>
         <TableBody>
           {group.lines.map((line) => (
-            // Keyed on quantity too: the picker can raise an existing
-            // line's quantity server-side, and a remount is the honest way
-            // to show it — the row's own edits never revalidate, so this
-            // can't steal focus mid-typing.
+            // Keyed on quantity too: the picker can raise a line's quantity server-side, and a remount shows it without stealing focus mid-typing.
             <LineRow key={`${line.id}-${line.quantity}`} planId={planId} line={line} />
           ))}
         </TableBody>
@@ -183,9 +168,7 @@ function StageSection({
   );
 }
 
-/** The stage heading, movable to another stage from the master list —
- * one UPDATE over the stage's lines, and moving onto a stage already in
- * the plan merges the two sections. */
+/** Moving onto a stage already in the plan merges the two sections (one UPDATE over the stage's lines). */
 function StageName({
   planId,
   stage,

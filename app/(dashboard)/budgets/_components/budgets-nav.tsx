@@ -1,11 +1,6 @@
 import { ToolNav } from "@/components/ui/tool-nav";
 
-/**
- * The two trees inside Budgets: Interiors (priced revisions, client
- * quotes — the original tool) and Construction (the QS team's stage-wise
- * quantity plans). Rendered on the two list screens only; detail screens
- * keep their back-links instead.
- */
+/** Interiors (priced revisions, client quotes) and Construction (QS stage-wise quantity plans). Shown on the two list screens only. */
 const TABS = [
   { key: "interiors", href: "/budgets/interiors", label: "Interiors" },
   { key: "construction", href: "/budgets/construction", label: "Construction" },

@@ -22,7 +22,6 @@ export function StartPlanDialog({ units }: { units: StartableUnit[] }) {
   const [error, setError] = useState<string>();
   const [starting, startTransition] = useTransition();
 
-  // Units grouped by project so the select stays readable past a handful.
   const groups = useMemo(() => {
     const byProject = new Map<string, StartableUnit[]>();
     for (const unit of units) {

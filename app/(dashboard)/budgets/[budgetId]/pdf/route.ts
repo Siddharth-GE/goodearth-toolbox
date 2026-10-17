@@ -4,11 +4,8 @@ import { getBudget } from "@/lib/budgets/queries";
 import { createElement, type ReactElement } from "react";
 
 /**
- * Document B — the internal budget sheet, as a PDF download.
- *
- * getBudget enforces the /budgets grant, so someone without it gets
- * redirected rather than a file. Generated on demand rather than stored,
- * so it can never drift from the figures it represents.
+ * The internal budget sheet (Document B). getBudget enforces the /budgets grant.
+ * Generated on demand, so it can't drift from the figures.
  */
 export async function GET(
   _request: Request,
@@ -24,8 +21,7 @@ export async function GET(
   );
 
   const safe = (value: string) => value.replace(/[^\w-]+/g, "-").replace(/^-|-$/g, "");
-  // "INTERNAL" in the filename, not only on the page: the name is what
-  // someone reads before deciding what to attach to an email.
+  // "INTERNAL" in the filename: it is what someone reads before attaching to an email.
   const filename = `Goodearth-Budget-INTERNAL-${safe(budget.project_name)}-${safe(
     budget.unit_name,
   )}-R${budget.revision_no}-v${budget.version}.pdf`;

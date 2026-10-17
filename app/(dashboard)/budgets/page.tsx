@@ -3,10 +3,7 @@ import { listInbox } from "@/lib/budgets/queries";
 
 import { ToolWelcome } from "../_components/tool-welcome";
 
-// The welcome screen (founder, 2026-08-13: every Operations and
-// Management tool opens on one). Counts only — the rupees stay on the
-// screens behind the doors below. The inbox is a complete fetchAll read,
-// so deriving counts from it is safe.
+// Counts only, never rupees. The inbox is a complete fetchAll read, so counts derived from it are safe.
 export default async function BudgetsPage() {
   const inbox = await listInbox();
   const waiting = inbox.filter((row) => !row.budget_id).length;

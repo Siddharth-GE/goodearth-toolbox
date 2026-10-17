@@ -13,9 +13,7 @@ export function StartPricingButton({ selectionId }: { selectionId: string }) {
     <div className="space-y-1">
       <Button
         variant="secondary"
-        // One budget per revision is a unique constraint, so a double-click
-        // would otherwise reach the database twice. The action handles the
-        // race too, by landing the loser on the budget that won.
+        // One budget per revision is unique, so a double-click would hit the database twice; the action lands the loser on the winning budget.
         disabled={pending}
         onClick={() =>
           startTransition(async () => {

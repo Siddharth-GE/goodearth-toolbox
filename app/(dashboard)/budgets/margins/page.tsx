@@ -21,9 +21,7 @@ export default async function MarginsPage() {
       />
 
       <MarginsBrowser
-        // Only products that already have a margin are sent up front; the
-        // rest are searched for on demand. Shipping all 2,600 to the
-        // browser to fill in a handful of fields would be the slow way.
+        // Only products with a margin are sent up front; the rest are searched on demand (~2,600 items).
         initialMargins={Object.fromEntries(margins)}
         categories={categories.map((category) => ({ id: category.id, name: category.name }))}
         brands={brands.map((brand) => ({ id: brand.id, name: brand.name }))}

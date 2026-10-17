@@ -3,24 +3,14 @@ import { getQuote } from "@/lib/budgets/quote";
 import { QuoteDocument } from "@/lib/budgets/quote-document";
 import { createElement, type ReactElement } from "react";
 
-/**
- * Document C — the client quotation, as a PDF download.
- *
- * The data comes from getQuote, whose returned type has no cost and no
- * margin field at all, so this route could not leak them even if the
- * template asked. See lib/budgets/quote.ts.
- */
+/** The client quotation (Document C), built from getQuote, whose type has no cost or margin field, so it cannot leak them. */
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ budgetId: string }> },
 ) {
   const { budgetId } = await params;
 
-  // getQuote reads the design photographs, and that read THROWS on
-  // failure rather than quietly producing a quotation with none of them
-  // A quote is a document a client sees, so refusing
-  // to build it beats building a wrong one — but say why in English
-  // instead of a bare 500 on a download the browser cannot explain.
+  // getQuote throws if the design photographs fail to load: refuse a wrong quote, but say why in English.
   let quote;
   try {
     quote = await getQuote(budgetId);
@@ -37,8 +27,7 @@ export async function GET(
   );
 
   const safe = (value: string) => value.replace(/[^\w-]+/g, "-").replace(/^-|-$/g, "");
-  // The version is in the filename too: a folder of these must not have
-  // two different quotations sharing a name.
+  // Version in the filename too, so two quotations never share a name.
   const filename = `Goodearth-Quotation-${safe(quote.project_name)}-${safe(quote.unit_name)}-R${
     quote.revision_no
   }-v${quote.version}.pdf`;

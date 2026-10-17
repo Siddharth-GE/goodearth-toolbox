@@ -65,8 +65,6 @@ export default async function BudgetsPage() {
                   ) : row.budget_status === "pricing" ? (
                     <div className="flex items-center gap-2">
                       <Badge variant="warning">Pricing</Badge>
-                      {/* The number that says whether this is nearly done or
-                          barely started, without having to open it. */}
                       <span className="text-muted text-xs">
                         {row.priced_count} of {row.line_count} priced
                       </span>

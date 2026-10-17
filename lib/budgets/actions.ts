@@ -7,37 +7,15 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-// Safe to import as a value from a "use server" file: carry-forward.ts is
-// pure and imports nothing, so it drags no server-only chain behind it.
+// carry-forward.ts is pure and imports nothing, so it is safe to import as a value from a "use server" file.
 import { planCarryForward } from "./carry-forward";
 
-// Type-only import, and deliberately NOT re-exported: a bare
-// `export type { X };` in a "use server" file survives into the compiled
-// module's runtime export list, where X doesn't exist — every action in
-// the chunk then dies at module load ("ActionState is not defined", the
-// 2026-08-03 production outage). Import ActionState from
-// "@/lib/action-state" directly instead.
+// Type-only import, deliberately NOT re-exported: a type re-export from a "use server" file kills every action at module load. Import ActionState from "@/lib/action-state".
 import type { ActionState } from "@/lib/action-state";
 
-// ---------------------------------------------------------------------
-// Starting a budget
-// ---------------------------------------------------------------------
-
 /**
- * Opens a budget against an issued revision.
- *
- * Budgets creates this row itself — Selections has no idea Budgets exists,
- * and that one-way coupling is what lets later tools consume a revision
- * without Selections ever being touched again.
- *
- * For a first revision only the header is written: the pricing screen
- * takes its spine from the revision's own lines, so every line shows up
- * whether or not it has a budget row yet, and lines are created the moment
- * someone prices one (see saveLine).
- *
- * For R+1 onward this also CARRIES PRICING FORWARD from the previous
- * revision's budget — the point of the whole line_key design. See
- * carryForward below.
+ * Opens a budget against an issued revision. Budgets creates the row itself; Selections never knows Budgets exists.
+ * A first revision writes only the header (lines appear when priced); R+1 also carries pricing forward from the previous budget.
  */
 export async function startPricing(selectionId: string): Promise<ActionState> {
   const user = await requireTool("/budgets");
@@ -69,8 +47,7 @@ export async function startPricing(selectionId: string): Promise<ActionState> {
     .single();
 
   if (error) {
-    // 23505 = selection_id is unique. Two people pressed Start pricing at
-    // once; the loser should land on the budget rather than see an error.
+    // 23505: selection_id is unique, so a double Start pricing lands the loser on the winning budget.
     if (error.code === "23505") {
       const { data: existing, error: existingError } = await supabase
         .from("budgets")
@@ -91,15 +68,10 @@ export async function startPricing(selectionId: string): Promise<ActionState> {
     revisionNo: selection.revision_no,
   });
   if (carryError) {
-    // Leaving the budget behind would be worse than failing: it would
-    // look like a revision nobody has priced, and the team would redo
-    // work they had already done. Removing it makes this retryable.
+    // Remove the budget on failure: leaving it would look like an unpriced revision. Makes this retryable.
     const { error: cleanupError } = await supabase.from("budgets").delete().eq("id", data.id);
     if (cleanupError) {
-      // The cleanup itself failed, so a budget row survives and
-      // selection_id is unique — every retry from here would fail on the
-      // duplicate key with a message about carry-forward, which explains
-      // nothing. Say what actually happened instead of swallowing it.
+      // If cleanup fails the budget survives and retries would fail on the duplicate key; say so instead of swallowing it.
       console.error("startPricing cleanup failed:", cleanupError);
       return {
         error:
@@ -114,21 +86,11 @@ export async function startPricing(selectionId: string): Promise<ActionState> {
 }
 
 /**
- * Copies the previous revision's pricing into a new budget.
- *
- * Matched on `line_key`, which `create_next_revision()` carries forward
- * when a designer branches R+1 (migration 0007). Without this, issuing R3
- * with one changed quantity would hand the budget team a blank sheet for
- * all 200 lines — the single most likely reason they'd stop using this
- * and go back to a spreadsheet.
- *
- * The decision rules live in carry-forward.ts, pure and tested. This
- * function only fetches and writes.
+ * Copies pricing from the previous revision, matched on line_key (carried by create_next_revision(), migration 0007).
+ * The rules live in carry-forward.ts; this only fetches and writes.
  */
 type BudgetsClient = Awaited<ReturnType<typeof createClient>>;
 
-// Split out only so carryForward's three completeness-critical reads can
-// be named in a `let` above the try that catches them.
 function readPreviousBudgetLines(supabase: BudgetsClient, budgetId: string) {
   return fetchAll((from, to) =>
     supabase
@@ -165,21 +127,13 @@ async function carryForward(
     revisionNo: number;
   },
 ): Promise<string | null> {
-  // Every budget this unit already has, with the revision it prices.
-  // Filtered and sorted here rather than in the query: a unit has a
-  // handful of revisions, and ordering by an embedded column is more
-  // trouble in PostgREST than it's worth.
+  // Filtered and sorted here: ordering by an embedded column is more trouble in PostgREST.
   const { data: priorBudgets, error: priorBudgetsError } = await supabase
     .from("budgets")
     .select("id, selection_id, selections(revision_no)")
     .eq("unit_id", unitId);
 
-  // Checked, because "no rows" and "the read failed" mean opposite
-  // things three lines below: an empty list is read as "a first budget
-  // for this unit, nothing to carry" and returns null, so an unchecked
-  // failure here would silently hand the budget team a blank sheet for
-  // lines they had already priced — the same data loss fetchAll exists
-  // to prevent, arriving by a different door.
+  // Checked: an empty list means "first budget" and returns null, so an unchecked failure would hand over a blank sheet for lines already priced.
   if (priorBudgetsError) {
     console.error("carryForward read failed:", priorBudgetsError);
     return "Could not read the previous budget. Try again.";
@@ -194,15 +148,10 @@ async function carryForward(
     .filter((budget) => budget.revision_no >= 0 && budget.revision_no < revisionNo)
     .sort((a, b) => b.revision_no - a.revision_no)[0];
 
-  // A first budget for the unit. Nothing to carry, and not an error.
   if (!previous) return null;
 
-  // Read to COMPLETION, not to PostgREST's silent 1,000-row cap. A
-  // truncated read here doesn't fail — it quietly hands the budget team a
-  // blank sheet for lines they already priced, which is the single most
-  // likely reason they'd abandon the tool for a spreadsheet.
-  // fetchAll raises rather than handing back a partial list; caught here
-  // because this feeds a Server Action, which answers with a message.
+  // Read to COMPLETION (PostgREST caps at 1,000): a truncated read would silently drop carried-forward pricing.
+  // fetchAll raises; caught here because this feeds a Server Action.
   let previousBudgetLines: Awaited<ReturnType<typeof readPreviousBudgetLines>>;
   let previousSelectionLines: Awaited<ReturnType<typeof readSelectionQuantities>>;
   let currentSelectionLines: Awaited<ReturnType<typeof readSelectionQuantities>>;
@@ -249,8 +198,7 @@ async function carryForward(
       margin_pct: line.margin_pct,
       notes: line.notes,
       needs_review: line.needs_review,
-      // priced_by stays null: nobody priced these in this budget. The
-      // budget they came from still records who did.
+      // priced_by stays null: nobody priced these in this budget.
     })),
   );
 
@@ -262,10 +210,6 @@ async function carryForward(
   return null;
 }
 
-// ---------------------------------------------------------------------
-// Pricing a line
-// ---------------------------------------------------------------------
-
 export type LineInput = {
   quantity: number;
   expectedVendorId: string | null;
@@ -275,19 +219,8 @@ export type LineInput = {
 };
 
 /**
- * Saves one line's pricing, creating its budget row if this is the first
- * time anyone has touched it.
- *
- * `client_rate` is deliberately absent: it is a generated column in the
- * database (migration 0011), so the internal budget sheet and the client
- * quote cannot drift apart, and nothing the app sends could disagree with
- * it. lib/budgets/math.ts computes the same figure only so the screen can
- * show it live before saving.
- *
- * No revalidatePath, following the Selections line grid: the row on screen
- * already shows what was typed, and revalidating would re-run every query
- * on the page each time someone tabs out of a field. Totals update from
- * local state and are re-read from the database on the next full load.
+ * client_rate is a generated column (migration 0011), so the sheet and the quote cannot drift; math.ts mirrors it for the live screen.
+ * No revalidatePath, as with the Selections grid: the row already shows what was typed.
  */
 export async function saveLine(
   budgetId: string,
@@ -311,19 +244,13 @@ export async function saveLine(
       quantity: input.quantity,
       expected_vendor_id: input.expectedVendorId,
       unit_cost: input.unitCost,
-      // A blank margin on a priced line means 0% — charged exactly cost,
-      // and said so. Migration 0017 forbids the ambiguous state (a cost
-      // with a NULL margin printed an empty rate on the client quote while
-      // its at-cost value hid inside the total); the coalesce here is what
-      // keeps clearing the margin field a valid way to say "no markup".
+      // A blank margin on a priced line means 0%, charged at cost (migration 0017 forbids a cost with a NULL margin).
       margin_pct: input.unitCost === null ? input.marginPct : (input.marginPct ?? 0),
       notes: input.notes?.trim() || null,
-      // Clearing the flag is the point of editing a carried-forward line:
-      // someone has now looked at it.
+      // Clearing the flag: someone has now looked at the line.
       needs_review: false,
       priced_by: user.id,
       priced_at: new Date().toISOString(),
-      // updated_at is the set_updated_at trigger's job (migration 0016).
     },
     { onConflict: "budget_id,line_key" },
   );
@@ -340,19 +267,7 @@ export async function saveLine(
   return undefined;
 }
 
-// ---------------------------------------------------------------------
-// Approval
-// ---------------------------------------------------------------------
-
-/**
- * Locks the budget's prices.
- *
- * The "every line priced" rule is checked twice on purpose. Here, so an
- * incomplete budget gets a message that says how many lines are missing;
- * and in budgets_guard() (migration 0017), which compares the budget's
- * row count against the revision's line count under the row lock — the
- * backstop that holds even for a write this function never sees.
- */
+/** "Every line priced" is checked twice: here, for a message with the missing count, and in budgets_guard() (0017) as the backstop. */
 export async function approveBudget(budgetId: string): Promise<ActionState> {
   const user = await requireTool("/budgets");
   const supabase = await createClient();
@@ -365,12 +280,8 @@ export async function approveBudget(budgetId: string): Promise<ActionState> {
   if (!budget) return { error: "Could not find that budget." };
   if (budget.status === "approved") return { error: "This budget is already approved." };
 
-  // Exact database counts, never rows.length — an un-ranged read caps at
-  // 1,000 rows, and deriving this check from one could approve a budget
-  // with unpriced lines and then lock the trigger against fixing them.
-  // Every priced budget line references a line of this same revision
-  // (composite FK, migration 0011), so priced is a subset of total and
-  // the subtraction is safe.
+  // Exact database counts, never rows.length: a capped read could approve a budget with unpriced lines.
+  // Priced is a subset of total (composite FK, 0011), so the subtraction is safe.
   const [totalResult, pricedResult] = await Promise.all([
     supabase
       .from("selection_lines")
@@ -416,19 +327,8 @@ export async function approveBudget(budgetId: string): Promise<ActionState> {
 }
 
 /**
- * Unlocks an approved budget so a genuine pricing error can be corrected,
- * and starts the next version of it.
- *
- * Deliberately possible, unlike un-issuing a design revision: a cost
- * estimate is fallible in a way a specification is not, and the
- * alternative — a whole new revision to fix one wrong rate — would be
- * worse. The version bump is what keeps that from being lossy: the
- * quotation already sent stays identified as v1, and everything priced
- * from here becomes v2.
- *
- * Runs as a database function because the version increments from its own
- * current value; doing that as a read-then-write would let two people
- * re-opening at once both produce v2. See migration 0012.
+ * Unlocks an approved budget to fix a pricing error and starts the next version (the sent quote stays v1). Deliberate, unlike un-issuing a design revision.
+ * A database function, so two people re-opening at once can't both produce v2 (migration 0012).
  */
 export async function reopenBudget(budgetId: string): Promise<ActionState> {
   await requireTool("/budgets");
@@ -446,17 +346,7 @@ export async function reopenBudget(budgetId: string): Promise<ActionState> {
   return undefined;
 }
 
-// ---------------------------------------------------------------------
-// Per-product margins
-// ---------------------------------------------------------------------
-
-/**
- * Sets a product's default margin.
- *
- * Only ever affects future pricing: a budget line copies the margin when
- * it is priced and keeps its own copy, so changing this never re-prices
- * work that has already been done — least of all an approved budget.
- */
+/** Affects future pricing only: a budget line copies the margin when priced, so this never re-prices approved work. */
 export async function setItemMargin(
   itemId: string,
   marginPct: number | null,
@@ -464,7 +354,7 @@ export async function setItemMargin(
   const user = await requireTool("/budgets");
   const supabase = await createClient();
 
-  // Clearing a margin means "no default", which is not the same as 0%.
+  // Clearing means "no default", not 0%.
   if (marginPct === null) {
     const { error } = await supabase.from("item_margins").delete().eq("item_id", itemId);
     if (error) {

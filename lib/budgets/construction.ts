@@ -8,16 +8,7 @@ import { listUnits } from "@/lib/masters/units";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 
-/**
- * Reads for the Construction tree — the stage-wise quantity plan per unit
- * that the QS team maintains and site indents pull from.
- *
- * Deliberately a separate file from queries.ts: interiors budgets and
- * construction plans share a tool (and the /budgets grant) but nothing
- * else — no revisions, no approval, and, above all, NO MONEY. Nothing in
- * this module touches budget_lines, item_margins or any other table on
- * the secret side of the 0011 boundary.
- */
+/** Separate from queries.ts on purpose: construction plans share only the tool and the /budgets grant, and touch NO MONEY (nothing across the 0011 boundary). */
 
 export type ConstructionPlanListRow = {
   id: string;
@@ -32,11 +23,7 @@ export async function listConstructionPlans(): Promise<ConstructionPlanListRow[]
   await requireTool("/budgets");
   const supabase = await createClient();
 
-  // Both reads go to completion: the counts beside each plan are a merge
-  // of the two, and a truncated read would show a plan with fewer stages
-  // than it has (the catalogue-pagination lesson). The lines read is
-  // scoped to the listed plans — un-filtered it paged the entire table,
-  // every plan's every line, just to compute two counts per row.
+  // Both reads go to completion: a truncated read would show a plan with fewer stages. The lines read is scoped to the listed plans.
   const plans = await fetchAll((from, to) =>
     supabase
       .from("construction_budgets")
@@ -101,9 +88,7 @@ export type ConstructionPlanDetail = {
   unit_name: string;
   project_name: string;
   updated_at: string;
-  /** Stages in the order the QS team created them, not alphabetical —
-   * "Foundation, Sill, Lintel" is construction order, and sorting the
-   * text would shuffle it. */
+  /** Stages in creation order, not alphabetical: construction order is the point. */
   stages: ConstructionStageGroup[];
   line_count: number;
 };
@@ -134,8 +119,6 @@ export const getConstructionPlan = cache(
 
     if (!plan) return null;
 
-    // Group by stage in first-appearance order (rows arrive in creation
-    // order, so a stage sits where the QS team started it).
     const groups = new Map<string, ConstructionLineRow[]>();
     for (const line of lines) {
       const item = line.items as {
@@ -179,7 +162,6 @@ export type StartableUnit = {
   project_name: string;
 };
 
-/** Units that don't have a construction plan yet — the Start plan picker. */
 export async function listStartableUnits(): Promise<StartableUnit[]> {
   await requireTool("/budgets");
   const supabase = await createClient();
