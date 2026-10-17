@@ -1,6 +1,6 @@
 # Relay — the rules
 
-The relay layer for site and design. Grant `/relay`. Relay replaced the planned Project Management tool: drawing approvals, selections handoffs, fire NOCs and site handovers are all **activities**, tracked identically. It tracks **accountability only** — where a task is, with whom, for how long. It stores no drawing, decision or document; the drawings are Design Management's (**Relay keeps who-has-the-baton; Design Management keeps the artefacts**).
+The relay layer for site and design. Grant `/relay`. Drawing approvals, selections handoffs, fire NOCs and site handovers are all **activities**, tracked identically. It tracks **accountability only** — where a task is, with whom, for how long. It stores no drawing, decision or document; the drawings, and the design team's own hand-offs, are Design Management's, and **nothing links the two**.
 
 ## The model
 

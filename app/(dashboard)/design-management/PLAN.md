@@ -4,15 +4,13 @@ Each villa's design from stage to stage — who is on it, what is next, what wen
 
 ## The boundary with Relay
 
-> **The design team's hand-offs and to-dos live here** (founder, 2026-10-17: "build it full forget relay"). Relay keeps whatever trails are filed in it; **nothing links the two**.
-
-Until `0126` this tool kept only the artefacts and Relay the baton. The board (below) reversed that for design, the call the founder made for Client Relations' build progress (its decision 4) — on staging Relay held no trails at all. Nothing in Relay stores a file, and a `'transmittal'` link kind in Relay stays left out.
+> **The design team's hand-offs and to-dos live here** (founder, 2026-10-17: "build it full forget relay"). Relay keeps whatever trails are filed in it; **nothing links the two**. Relay stores no file and has no `'transmittal'` link kind.
 
 ## The founder's decisions
 
-1. **Its own design-stage list** (Design, Permit, Working Drawings, Structural, MEP, Interiors, Typical Details, Landscape), renameable and retirable — what a transmittal is filed under, and, for the stages **on the board**, the columns a villa moves through. Concept and Approvals became Design and Permit in `0126`, the founder's words.
+1. **Its own design-stage list** (Design, Permit, Working Drawings, Structural, MEP, Interiors, Typical Details, Landscape), renameable and retirable — what a transmittal is filed under, and, for the stages **on the board**, the columns a villa moves through.
 2. **Revisions live per drawing set per villa** — R0, R1, … each with a note. The Selections model one level finer.
-3. **A revision's drawings are a Zoho WorkDrive share link** (2026-10-17: "lets not get into file handling, new transmittal is created and they paste a link of our drive into it"), "anyone can view", so site needs no Zoho login. Before `0124` a revision held uploaded sheet files; those stay, and nothing new is uploaded.
+3. **A revision's drawings are a Zoho WorkDrive share link** (2026-10-17: "lets not get into file handling, new transmittal is created and they paste a link of our drive into it"), "anyone can view", so site needs no Zoho login. Sheets uploaded before `0124` stay; nothing new uploads.
 4. **Sharing is in-app plus a letterhead PDF cover sheet**, forwarded by hand. No outbound email.
 5. **One transmittal is one stage, one drawing set and its sheets** (2026-09-27): a set belongs to a stage, several named sets may share one, and each issue sends the set's full set of sheets — a whole WorkDrive folder.
 6. **The cover sheet lists every sheet by name** (2026-10-17: "the transmittal sheet displays only the drawing set name"), after the set, its revision and the link. Sheet codes typed at upload (GFP) and the download name built from them (`SAA-Saarang-Villa12-WD-TB0003-GFP.pdf`) belong to the uploaded sheets only.
@@ -35,7 +33,7 @@ Until `0126` this tool kept only the artefacts and Relay the baton. The board (b
 | `…/actions`                      | the design team's actions: the team strip for an admin, the greeting for everyone else                        | welcome     |
 | `…/stages`                       | the stage list: name, code, **On the board**, retire, reorder                                                 | welcome     |
 
-The Board keeps the Villas screen's address, so every link into a villa and its transmittals still works.
+The Board lives at `…/villas`, so every link into a villa and its transmittals works.
 
 ## The board — each villa from stage to stage
 
@@ -59,9 +57,9 @@ The rules are `lib/design-management/board.ts`, pure and tested; the reads `boar
 ## The transmittal is the workspace
 
 - **Starting a transmittal is one action** (`startTransmittal`): the stage, then a set of that stage on this villa ("Revise to R3", or "Continue R2" for a draft on no transmittal) or a new name. It makes the revision, the header and the one line, and takes back what it made if a later step fails. The stage and the set never change afterwards — `transmittals_stage_locked` and `transmittal_lines_stage_match` hold that.
-- **One line per transmittal** (`transmittal_lines_one_per_transmittal`), and **the set is of the transmittal's stage** (`transmittal_lines_stage_match`). Re-sending a released revision unchanged is gone: every issue is a new revision with its full set of sheets.
+- **One line per transmittal** (`transmittal_lines_one_per_transmittal`), and **the set is of the transmittal's stage** (`transmittal_lines_stage_match`). Every issue is a new revision with its full set of sheets.
 - **The workspace** is the note for site, the revision number, what changed (each saves on leaving the field), the WorkDrive link with the folder's sheets, and Issue. A readiness line under the title (`readiness.ts`) names what `issue_transmittal` would refuse, before the press; Issue stays pressable and the database's sentence replaces the line.
-- **A draft lives on exactly one draft transmittal.** Deleting the draft transmittal deletes its draft revision, its kept list and any uploaded sheets too, after a confirmation that says so; the WorkDrive folder is never touched. A draft on no transmittal (from before) is picked up by "Continue".
+- **A draft lives on exactly one draft transmittal.** Deleting the draft transmittal deletes its draft revision, its kept list and any uploaded sheets too, after a confirmation that says so; the WorkDrive folder is never touched. A draft on no transmittal is picked up by "Continue".
 
 ## The lifecycle, which is the whole tool
 
@@ -122,7 +120,7 @@ Supervisors shows released drawings (a Drawings section on the villa page — **
 - **Names merge through `Map`s, never embeds** (BUGCATCHER #2).
 - Per-stage counts are derived each render, never stored.
 - **The board reads its slice whole** (~70 villas, a few hundred steps and actions) and works in memory; every count is over complete reads.
-- **The shared pieces**: the action rules (`lib/next-steps/`), the plot number (`lib/masters/plot-number.ts`), the pill and the Undo bar (`components/ui/`). The board's screens are this tool's own; Client Relations holds its copies until it moves onto the shared ones (`TODO.md`).
+- **The shared pieces**: the action rules (`lib/next-steps/`), the plot number (`lib/masters/plot-number.ts`), the pill and the Undo bar (`components/ui/`).
 
 ## Deliberately not built
 

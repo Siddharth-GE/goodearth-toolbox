@@ -21,7 +21,7 @@ A unit has **spaces** (Living, Bedroom 1, Bath 2 — real rooms, named). A **sel
 The picker was rebuilt once after it felt slow. Both causes are easy to reintroduce:
 
 - **Catalogue search is a Route Handler** (`app/api/catalogue/route.ts`), not a Server Action. Actions dispatch one at a time per client, so keystrokes queue behind each other, and a revalidating action re-renders the whole route server-side.
-- **The basket is local.** Pressing + costs nothing; the whole lot is written in one `addLines` call. Twelve items used to be twelve round trips, each re-running every query on the page.
+- **The basket is local.** Pressing + costs nothing; the whole lot is written in one `addLines` call. One round trip, not one per item.
 
 ## Choosing by picture (2026-09-26)
 

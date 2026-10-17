@@ -8,7 +8,7 @@ Three movements and one balance. **Goods receipts** (`GRN/<project>/NNN`) are al
 
 ## Batches and their rates (`0108`)
 
-The founder reversed "no money in Inventory" on 2026-10-08, for `/inventory` holders only: a store-keeper values what goes out.
+Rates are for `/inventory` holders only (founder, 2026-10-08): a store-keeper values what goes out.
 
 - **A batch is a store receipt line.** Its name, `GRN/SAA/012-1`, is the receipt's reference and the line's place on the delivery note (created, then id) — derived, never stored. A direct-to-site delivery is used where it lands and is no batch. Wherever a screen names a batch it uses `BatchId` (`_components/batch-id.tsx`): the ID large, with a copy button — it goes on boxes and into messages (founder, 2026-10-12).
 - **The money lives in one gated table, `goods_receipt_line_rates`** (who reads and writes it: `SECURITY.md`). A definer trigger copies the PO line's net rate (after its discount, before GST) and GST at receiving, because a store-keeper cannot read `purchase_order_lines`. The keeper may change the rate, GST and a note when the delivery bill differs; the PO's own figures stay beside them (a guard refuses moving them), and any difference shows in amber on the delivery note for accounts. The stock views never carry a rate — `batch_on_hand`'s manifest row says so.
