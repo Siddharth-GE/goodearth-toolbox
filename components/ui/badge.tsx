@@ -3,18 +3,9 @@ import type { HTMLAttributes } from "react";
 
 type Variant = "default" | "neutral" | "success" | "warning" | "danger" | "info";
 
-// The four status variants are for anything with fixed meaning
-// (Pending/Approved/Rejected, validation states) — see DESIGN.md.
-//
-// "default" applies no colour at all, for badges that supply their own
-// identity colour via className (Marathon's CategoryBadge), which
-// tailwind-merge lets win over these.
-//
-// "neutral" is the one to reach for otherwise. Plain "default" renders as
-// bare text with padding — so an "Inactive" badge sat invisibly next to a
-// green "Active" on the vendors and stores screens, reading as if nothing
-// were there. One screen had already worked around it by hand with
-// `className="bg-muted/15 text-muted"`; this is that, named.
+// The four status variants are for anything with fixed meaning (DESIGN.md). "default" applies no colour,
+// so badges can supply their own via className. "neutral" is the one to reach for otherwise:
+// plain "default" renders as bare text with padding.
 const variantClasses: Record<Variant, string> = {
   default: "",
   neutral: "bg-muted/15 text-muted",

@@ -8,17 +8,8 @@ import { Moon, Sun } from "lucide-react";
 import type { ComponentProps } from "react";
 
 /**
- * The light/dark switch.
- *
- * Deliberately holds no React state and takes no props. What it shows is
- * decided by CSS — each label and icon is rendered twice and the `dark:`
- * variant hides one — so it is correct on the server's first frame
- * without knowing anything, and there is nothing to get out of step with
- * the page or to mismatch during hydration.
- *
- * That also means flipping it needs no re-render: setting the attribute
- * on <html> is what changes the page, instantly and everywhere at once,
- * including any Radix menu portalled outside this tree.
+ * The light/dark switch. Holds no React state: CSS (`dark:`) shows the right label and icon, so the first server frame is correct
+ * and nothing can mismatch on hydration. Setting the attribute on <html> repaints everything, including Radix menus portalled outside this tree.
  */
 function flip() {
   const root = document.documentElement;
@@ -29,24 +20,13 @@ function flip() {
   const next = nextTheme(current);
 
   const apply = () => {
-    // Repaints the page.
     root.dataset.theme = next;
-    // Survives the next full load, where the root layout's script reads
-    // it back before the first paint. See lib/theme.ts.
+    // Survives a reload: the root layout's script reads it back before first paint (lib/theme.ts).
     document.cookie = themeCookie(next);
   };
 
-  // Crossfade the whole page rather than snapping it. The browser
-  // snapshots before and after and fades between them, which covers
-  // everything at once — background, text, borders, and the switch's own
-  // icon swapping — for one call and no state.
-  //
-  // Both guards fall through to applying it instantly, which is the
-  // behaviour this replaced: an older browser still gets a working
-  // switch, and someone who asked their operating system for stillness
-  // gets no animation. The global reduced-motion block in globals.css
-  // cannot do that job here — it selects `*`, and these are
-  // ::view-transition pseudo-elements, which `*` never matches.
+  // Crossfade the page via the view-transition API. Both guards fall through to applying instantly (old browsers, reduced motion);
+  // the global reduced-motion block in globals.css cannot do that job: `*` never matches ::view-transition pseudo-elements.
   const start = document.startViewTransition?.bind(document);
   const wantsStillness = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -58,15 +38,10 @@ function flip() {
   start(apply);
 }
 
-/** Shown only in light mode — it offers the other one. */
 const inLight = "dark:hidden";
-/** Shown only in dark mode. */
 const inDark = "hidden dark:block";
 
-/**
- * For the user menu in the sidebar. Stays open on click so the change is
- * visible where it was made, rather than the menu vanishing over it.
- */
+/** For the sidebar's user menu. Stays open on click so the change shows where it was made. */
 export function ThemeMenuItem({
   className,
   ...props
@@ -88,10 +63,7 @@ export function ThemeMenuItem({
   );
 }
 
-/**
- * For screens with no user menu to hang off — the login page. Icon only,
- * so the label has to cover both modes rather than name the destination.
- */
+/** For screens with no user menu (login). Icon only, so the label covers both modes. */
 export function ThemeIconButton({ className }: { className?: string }) {
   return (
     <IconButton aria-label="Switch between light and dark" onClick={flip} className={className}>

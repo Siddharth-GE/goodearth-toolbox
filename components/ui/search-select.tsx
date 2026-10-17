@@ -8,21 +8,13 @@ import { useId, useMemo, useState, type KeyboardEvent } from "react";
 export type SearchOption = {
   value: string;
   label: string;
-  /** A second line in the list: a unit, a price, a code. */
   hint?: string;
-  /** Options with the same group are listed under one heading. */
   group?: string;
 };
 
 /**
- * A single choice out of a long list, found by typing — the native
- * <Select> scrolled through two thousand materials with no way to search.
- *
- * Filters in the browser (every word typed must appear, in any order),
- * shows at most `limit` matches, and renders the matches in the flow
- * below the box rather than floating over the page, so it behaves inside
- * a dialog's bottom sheet on a phone. The choice travels in a hidden
- * input called `name`, so a plain <form action> sees it like a select.
+ * A single choice from a long list, found by typing. Filters in the browser (every word typed must appear), shows at most `limit` matches,
+ * and renders them in the flow below the box so it works inside a phone bottom sheet. The choice travels in a hidden input `name`.
  */
 export function SearchSelect({
   id,
@@ -41,7 +33,6 @@ export function SearchSelect({
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
-  /** Shown under the box while nothing is typed — "2,058 materials". */
   emptyHint?: string;
   limit?: number;
   className?: string;

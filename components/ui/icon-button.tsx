@@ -1,19 +1,7 @@
 import { cn } from "@/lib/utils";
 import type { ButtonHTMLAttributes } from "react";
 
-/**
- * A square button holding only an icon.
- *
- * Four of these were written by hand across Selections alone — a delete
- * control, a view reorder control, and two quantity steppers that were
- * the same component twice, differing only by `size-8` versus `size-7`.
- * They drifted: some had a focus ring, some didn't; some dimmed when
- * disabled, some stayed clickable.
- *
- * `aria-label` is required, not optional. An icon-only control with no
- * label is invisible to a screen reader, and making it a required prop
- * is the only way that stays true as more get added.
- */
+/** A square button holding only an icon. `aria-label` is required so the control is never invisible to a screen reader. */
 type Tone = "default" | "danger";
 type Size = "sm" | "md";
 
@@ -38,7 +26,6 @@ export function IconButton({
   "aria-label": string;
   tone?: Tone;
   size?: Size;
-  /** Steppers and reorder controls read better with an outline. */
   bordered?: boolean;
 }) {
   return (

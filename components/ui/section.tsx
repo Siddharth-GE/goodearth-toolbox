@@ -6,19 +6,8 @@ import { ChevronDown } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
 
 /**
- * A card with a heading, an optional figure or button docked to its right,
- * and — when the fields inside are ones you set once and rarely revisit —
- * the ability to stay shut until asked.
- *
- * Built for the same reason as Figure: the header-inside-a-Card block had
- * been hand-written five times in Business Planning and again in Budgets
- * and Purchase Orders, each with its own spacing.
- *
- * Collapsing matters more than it sounds. A screen that opens with forty
- * fields showing has no shape, and the two or three that get touched on a
- * normal visit are buried among the thirty-seven that do not. The closed
- * header keeps its `aside`, so a section can report its own total without
- * being opened.
+ * A card with a heading, an optional `aside` docked right, and optionally collapsible for fields set once and rarely revisited.
+ * The closed header keeps its `aside`, so a section can report its total without being opened.
  */
 export function Section({
   title,
@@ -33,15 +22,10 @@ export function Section({
 }: {
   title: string;
   note?: string;
-  /** A running total, an Add button — anything that belongs in the header. */
   aside?: ReactNode;
   collapsible?: boolean;
   defaultOpen?: boolean;
-  /**
-   * This Section sits inside another Card, so it recesses instead of
-   * lifting. `surface` and `surface-raised` are the same white in light
-   * mode, so a card on a card would be told apart by its border alone.
-   */
+  /** Inside another Card, so it recesses instead of lifting (surface and surface-raised are both white in light mode). */
   nested?: boolean;
   className?: string;
   bodyClassName?: string;
@@ -93,16 +77,7 @@ export function Section({
   );
 }
 
-/**
- * A row of fields inside a Section, at a column count that suits how many
- * there are rather than a fixed four.
- *
- * The `cols` prop exists because Business Planning laid out sixteen
- * consecutive groups on `lg:grid-cols-4` regardless of content, which is
- * what made the whole tool read as one undifferentiated matrix. Three
- * related fields on a four-track leave a hole; six on a four-track wrap
- * two onto a lonely second row. Pick the number that matches the group.
- */
+/** A row of fields at a column count that suits how many there are; pick `cols` to match the group. */
 export function FieldRow({
   cols = 4,
   className,

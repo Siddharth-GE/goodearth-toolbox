@@ -2,21 +2,8 @@ import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
 
 /**
- * A label over a number the app worked out. Not an input — a conclusion.
- *
- * Built because the same block had been hand-written four times inside
- * Business Planning alone, with four slightly different label styles, and
- * a dozen more times across the other tools. DESIGN.md's rule is to build
- * the THIRD copy into a shared component; this was well past it.
- *
- * `size` is the whole point of having it. A screen where every figure is
- * `text-sm` has no hierarchy, and the reader has to work out which number
- * is the answer. One `hero` per screen, a few `lg`, the rest `sm`.
- *
- * The steps are deliberately close together. `hero` only has to be the
- * FIRST thing read, not a billboard — a working screen someone stares at
- * all afternoon is not a landing page, and an oversized number crowds out
- * the figures that qualify it.
+ * A label over a number the app worked out: a conclusion, not an input. `size` is the point:
+ * one `hero` per screen, a few `lg`, the rest `sm`, or there is no hierarchy. The steps stay close together.
  */
 export function Figure({
   label,
@@ -56,20 +43,11 @@ export function Figure({
   );
 }
 
-/**
- * Several figures reading as one object rather than as separate cards.
- *
- * Four stretched cards say "four things"; one divided band says "four
- * views of the same thing", which is what a set of summary figures
- * usually is. Stacks on a phone, where the dividers would only crowd it.
- */
+/** Several figures as one divided band, not separate cards. Stacks on a phone. */
 export function FigureBand({ className, children }: { className?: string; children: ReactNode }) {
   return (
     <div
-      // The hairlines are the 1px gaps of the grid with the border colour
-      // showing through, so they land in both directions when it wraps —
-      // divide-x would only rule the columns and leave a wrapped row
-      // touching the one above it.
+      // The hairlines are the grid's 1px gaps with the border colour showing through, so they land both ways when it wraps (divide-x would not).
       className={cn(
         "border-border bg-border grid gap-px overflow-hidden rounded-2xl border",
         "sm:grid-cols-2 lg:grid-cols-4",
@@ -92,15 +70,7 @@ export function FigureBandCell({
   return <div className={cn("bg-surface px-4 py-3", className)}>{children}</div>;
 }
 
-/**
- * The block a form uses to show what the model concluded from the fields
- * above it.
- *
- * Deliberately a different surface from the input grid. Business Planning
- * used the same grid, gap and label style for "type this" and "the model
- * says this", so the only thing distinguishing them was whether a box had
- * a border — which is not a distinction anyone reads.
- */
+/** What the model concluded from the fields above it, on a different surface from the input grid so "type this" and "the model says this" read apart. */
 export function ResultPanel({
   title,
   aside,
@@ -110,19 +80,12 @@ export function ResultPanel({
 }: {
   title?: string;
   aside?: ReactNode;
-  /**
-   * This panel sits on a recessed surface (inside a `nested` Section), so
-   * it lifts rather than recessing. Without it the panel and its parent
-   * are the same colour and the distinction disappears.
-   */
+  /** On a recessed surface (inside a `nested` Section) it lifts instead of recessing. */
   raised?: boolean;
   className?: string;
   children: ReactNode;
 }) {
-  // Recessed by default — the page colour showing through a card. Not
-  // bg-surface-raised: in light mode `surface` and `surface-raised` are
-  // both white, so a "raised" panel inside a white card would be told
-  // apart by nothing but its border.
+  // Recessed by default. Not bg-surface-raised: in light mode surface and surface-raised are both white.
   return (
     <div
       className={cn(

@@ -12,16 +12,13 @@ const variantClasses: Record<Variant, string> = {
 };
 
 const sizeClasses: Record<Size, string> = {
-  // sm exists because screens kept fighting `md` with an override, e.g.
-  // `<Button size="md" className="h-7 px-2.5 text-xs">`.
+  // sm exists so screens stop overriding `md` by hand.
   sm: "h-8 px-2.5 text-xs",
   md: "h-10 px-4 text-sm",
   lg: "h-12 px-6 text-base",
 };
 
-// disabled:opacity-50 lives here rather than on `primary`, where it used
-// to be — every disabled secondary and ghost button in the app looked
-// fully enabled, including the pagination controls at the end of a list.
+// disabled:opacity-50 lives here, not on `primary`, so every variant dims when disabled.
 const base =
   "inline-flex items-center justify-center gap-2 rounded-xl font-medium transition-[transform,background-color,border-color,opacity,box-shadow] duration-150 ease-out-quint active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent/25";
 
@@ -34,10 +31,7 @@ export function Button({
   className,
   variant = "primary",
   size = "md",
-  // A <button> inside a <form> defaults to type="submit", which caught
-  // seven dialogs out — each one had to pass type="button" by hand to
-  // stop a Cancel button submitting the form. Defaulting to "button"
-  // means a submit is something you ask for, not something you inherit.
+  // Defaults to type="button": a submit is something you ask for, not inherit.
   type = "button",
   ...props
 }: ButtonProps) {
@@ -56,17 +50,9 @@ interface LinkButtonProps {
   size?: Size;
   className?: string;
   children: React.ReactNode;
-  /**
-   * Renders a plain anchor instead of a next/link. Use for anything that
-   * isn't an app route — a file download, an external site. next/link
-   * prefetches on hover, which for a generated file means the server
-   * builds the whole thing just because a cursor passed over the button.
-   */
+  /** Plain anchor instead of next/link, for downloads and external sites: next/link prefetches on hover and would build a generated file. */
   plain?: boolean;
-  /**
-   * Another site, opened in a new tab with no referrer — a WorkDrive
-   * folder, say. Implies `plain`.
-   */
+  /** Another site, in a new tab with no referrer. Implies `plain`. */
   newTab?: boolean;
 }
 

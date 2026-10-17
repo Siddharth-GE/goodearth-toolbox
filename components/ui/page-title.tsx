@@ -3,17 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-/**
- * The title block at the top of a dashboard screen: name, one-line
- * description, optional back-link above and actions beside.
- *
- * Eight pages carried this same block hand-typed — identical classes,
- * eight chances to drift — before it became a component. It is NOT
- * PageHeader (app/marathon/_components/page-header.tsx): that one is
- * the sticky, backdrop-blurred bar for kiosk-style screens with real
- * scroll length (Marathon); this is the static heading a dashboard
- * page starts with.
- */
+/** The static heading a dashboard page starts with. Not PageHeader (app/marathon/_components), the sticky bar for kiosk screens. */
 export function PageTitle({
   title,
   description,
@@ -24,10 +14,8 @@ export function PageTitle({
 }: {
   title: ReactNode;
   description?: ReactNode;
-  /** Rendered as "← backLabel" above the title. */
   backHref?: string;
   backLabel?: ReactNode;
-  /** Buttons/badges laid against the right edge, wrapping under on small screens. */
   actions?: ReactNode;
   className?: string;
 }) {

@@ -17,11 +17,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useId, useState, useTransition, type ReactNode } from "react";
 
 /**
- * "Are you sure?" before a press that cannot be taken back — cancelling a
- * stay or an invoice, removing a receipt. It names what will happen
- * before it happens, keeps any refusal inside the dialog, and, when the
- * record needs one, asks why (`reason`): the answer is handed to
- * `onConfirm`, and the button waits until something is typed.
+ * "Are you sure?" before a press that cannot be taken back. Names what will happen, keeps any refusal inside the dialog,
+ * and with `reason` asks why: the answer goes to `onConfirm` and the button waits until something is typed.
  */
 export function ConfirmDialog({
   trigger,
@@ -35,7 +32,6 @@ export function ConfirmDialog({
   open: controlledOpen,
   onOpenChange,
 }: {
-  /** What opens it; omit when a menu item opens it through `open`. */
   trigger?: ReactNode;
   title: string;
   description: string;

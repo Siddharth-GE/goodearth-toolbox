@@ -1,10 +1,6 @@
 "use client";
 
-/**
- * The card a chart sits in: Card on surface, recessive chrome, a
- * custom legend when two or more series share the plot — identity is
- * never carried by colour alone, so the legend always names them.
- */
+/** A chart's card. Two or more series get a legend: identity is never carried by colour alone. */
 
 import { Card } from "@/components/ui/card";
 import type { ChartSeries } from "@/lib/charts/series";
@@ -19,9 +15,7 @@ export function ChartCard({
   children,
 }: {
   title?: string;
-  /** Legend entries; rendered when there are two or more. */
   series?: ChartSeries[];
-  /** A quiet sentence under the chart (e.g. why it was split). */
   note?: string;
   children: ReactNode;
 }) {

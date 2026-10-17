@@ -15,25 +15,7 @@ import { type ReactNode, useActionState, useEffect, useRef, useState } from "rea
 
 type FormState = { error?: string } | undefined;
 
-/**
- * The create/edit dialog every Masters record uses.
- *
- * Seven of these existed — vendors, clients, stores, units, items, plots,
- * projects — and the outer 30 lines were identical in all seven, down to
- * the `wasPending` ref used to close the dialog only after a successful
- * save. Only the fields inside differed. Adding an eighth master meant
- * copying the whole thing again and hoping the copy stayed in step.
- *
- * Callers now supply the record's fields as children and nothing else:
- *
- *   <RecordFormDialog
- *     label="Vendor"
- *     isEdit={!!vendor}
- *     action={vendor ? updateVendor.bind(null, vendor.id) : createVendor}
- *   >
- *     …inputs…
- *   </RecordFormDialog>
- */
+/** The create/edit dialog every Masters record uses: callers supply only the fields, as children. */
 export function RecordFormDialog({
   label,
   isEdit,
@@ -48,16 +30,9 @@ export function RecordFormDialog({
   isEdit: boolean;
   action: (state: FormState, formData: FormData) => Promise<FormState>;
   children: ReactNode;
-  /** Override the default trigger button when a screen needs its own. */
   trigger?: ReactNode;
-  /**
-   * Called when the dialog opens, for the rare form holding state of its
-   * own — Units filters its plot list by the chosen project and has to
-   * reset that. Deliberately a handler on the open action rather than an
-   * effect watching `open`.
-   */
+  /** Called when the dialog opens, for a form holding its own state (Units resets its plot list). A handler, not an effect on `open`. */
   onOpen?: () => void;
-  /** A wider card for a form carrying a paragraph of text (Terms). */
   wide?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -90,12 +65,8 @@ export function RecordFormDialog({
 }
 
 /**
- * The form lives INSIDE the dialog content, which Radix unmounts on
- * close — so every open starts from a clean slate: no error message or
- * half-finished save carried over from last time (the founder-reported
- * "saved, reopened, popup was stuck" bug). While the save round-trip
- * runs, the whole fieldset is disabled so the dialog reads as busy
- * rather than half-dead, and a double submit is impossible.
+ * The form lives inside the dialog content, which Radix unmounts on close, so every open starts clean.
+ * The fieldset is disabled while saving: the dialog reads busy and a double submit is impossible.
  */
 function RecordForm({
   action,
@@ -109,8 +80,7 @@ function RecordForm({
   const [state, formAction, pending] = useActionState(action, undefined);
   const wasPending = useRef(false);
 
-  // Close only after a save that actually succeeded. Closing on submit
-  // would throw away the error message the user needs to read.
+  // Close only after a success: closing on submit would discard the error to read.
   useEffect(() => {
     if (wasPending.current && !pending && !state?.error) onSaved();
     wasPending.current = pending;

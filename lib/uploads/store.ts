@@ -4,17 +4,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 
 /**
- * Putting one uploaded document into a private bucket, and proving it
- * landed whole — the steps every tool's upload repeats
- * (lib/design-management/files-actions.ts, lib/directory/actions.ts),
- * here for the tools that store a document as it came.
- *
- * Type and size are checked first. Storage is handed a BLOB, never a raw
- * Buffer (BUGCATCHER #1: under Next's patched fetch a Buffer is text-
- * decoded and stored as rubbish with the right content type). What landed
- * is read back and its size compared; a mismatch removes the object.
- *
- * Returns null on success, or the sentence to show.
+ * Puts one uploaded document into a private bucket and proves it landed whole.
+ * Storage gets a Blob, never a raw Buffer (BUGCATCHER #1). Returns null on success, or the sentence to show.
  */
 
 export const STORED_TYPES = ["application/pdf", "image/jpeg", "image/png"];

@@ -10,16 +10,7 @@ import {
   type ReactNode,
 } from "react";
 
-/**
- * The line at the foot of the screen after an everyday change — "Marked
- * done", with Undo for five seconds — instead of an "are you sure" before
- * it (the Saarang tracker's flow, root plan.md seventh piece).
- *
- * Relay's celebrate.tsx held the first copy and Client Relations' board
- * the second; Design Management's board is the third, so it lives here
- * (DESIGN.md: build the third copy into a shared component). The other
- * two move onto it when next touched.
- */
+/** The line at the foot of the screen after an everyday change, with Undo for five seconds, instead of an "are you sure" before it. */
 type Shown = { id: number; message: string; undo?: () => void };
 type Show = (message: string, undo?: () => void) => void;
 
@@ -74,7 +65,6 @@ export function UndoBarProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/** Show a line at the foot of the screen, with Undo when one is given. */
 export function useUndoBar(): Show {
   return useContext(UndoBarContext);
 }

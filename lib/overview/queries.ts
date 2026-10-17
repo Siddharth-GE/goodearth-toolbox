@@ -4,22 +4,10 @@ import { getMarathonHome } from "@/lib/marathon/queries";
 import { createClient } from "@/lib/supabase/server";
 
 /**
- * The read layer of the platform home (app/(dashboard)/page.tsx) — not
- * a tool. Its whole job is the cross-tool glance, so it is the one
- * module allowed to import other tools' queries (reads only — never
- * their actions, never their components). Tools never import overview,
- * and still never import each other.
- *
- * Everything here is deliberately ungated: the Overview is the shell's
- * home and every signed-in user sees it, whether or not they hold any
- * tool grant — a gate would redirect a designer off their own
- * dashboard. Safe because nothing here returns money: the reads are
- * open-by-design tables and the money-free facts views (bill_facts,
- * po_facts). COUNTS ONLY, never a rupee figure.
+ * The home page's reads: not a tool, and the one module allowed to import other tools' queries (reads only, never actions or components).
+ * Ungated on purpose, so a user with no grant still gets a home page. Counts only, never a rupee figure.
  */
 
-/** Counts for the Overview pipeline's first stage. Indents carry no
- * money by design. */
 export async function countIndentsPipeline(): Promise<{
   raisedThisMonth: number;
   lineCount: number;
@@ -33,8 +21,7 @@ export async function countIndentsPipeline(): Promise<{
   startOfMonth.setHours(0, 0, 0, 0);
   const since = startOfMonth.toISOString();
 
-  // Exact database counts, head-only — never rows.length (the rule the
-  // codebase has now learned four separate times).
+  // Exact head-only counts, never rows.length.
   const [raised, lines, submitted, approved] = await Promise.all([
     supabase.from("indents").select("id", { count: "exact", head: true }).gte("created_at", since),
     supabase
@@ -57,8 +44,6 @@ export async function countIndentsPipeline(): Promise<{
   };
 }
 
-/** Counts for the Overview pipeline's second stage — the po_facts view
- * (migration 0022) carries no money columns. */
 export async function countPosPipeline(): Promise<{
   issuedThisMonth: number;
   draftCount: number;
@@ -71,7 +56,6 @@ export async function countPosPipeline(): Promise<{
   startOfMonth.setHours(0, 0, 0, 0);
   const since = startOfMonth.toISOString();
 
-  // Exact database counts, head-only — never rows.length.
   const [issued, drafts, deletions] = await Promise.all([
     supabase
       .from("po_facts")
@@ -92,8 +76,6 @@ export async function countPosPipeline(): Promise<{
   };
 }
 
-/** Counts for the Overview pipeline's third stage — Inventory carries
- * no money at all. */
 export async function countReceiptsPipeline(): Promise<{
   receivedThisMonth: number;
   awaitingDelivery: number;
@@ -105,7 +87,6 @@ export async function countReceiptsPipeline(): Promise<{
   startOfMonth.setHours(0, 0, 0, 0);
   const since = startOfMonth.toISOString().slice(0, 10);
 
-  // Exact database counts, head-only — never rows.length.
   const [received, outstanding] = await Promise.all([
     supabase
       .from("goods_receipts")
@@ -120,9 +101,6 @@ export async function countReceiptsPipeline(): Promise<{
   };
 }
 
-/** Counts for the Overview pipeline's last two stages — the bill_facts
- * view (migration 0025) carries no money columns; bill money is
- * /bills-gated. */
 export async function countBillsPipeline(): Promise<{
   bookedThisMonth: number;
   awaitingApproval: number;
@@ -136,7 +114,6 @@ export async function countBillsPipeline(): Promise<{
   startOfMonth.setHours(0, 0, 0, 0);
   const since = startOfMonth.toISOString();
 
-  // Exact database counts, head-only — never rows.length.
   const [booked, awaiting, paid, unpaid] = await Promise.all([
     supabase
       .from("bill_facts")
@@ -163,18 +140,8 @@ export async function countBillsPipeline(): Promise<{
 }
 
 /**
- * Headcount for the home page's People card.
- *
- * DELIBERATELY NOT `lib/directory/queries.ts`. Every function there opens
- * with requireTool("/directory"), which `redirect("/")`s — and this runs
- * on `/`. A person without the grant would be redirected from the home
- * page to the home page, which renders this again: ERR_TOO_MANY_REDIRECTS,
- * for everyone who has not been granted the Directory.
- *
- * So the counts are read here instead, from two tables whose SELECT
- * policy is `using (true)` for any signed-in user — profiles (0001) and
- * staff_departments (0060 §5). No grant needed, no cross-tool import, no
- * loop. Counts only, like everything else in this module.
+ * Not lib/directory/queries.ts: its requireTool redirects to "/", which loops on the home page for anyone without the grant.
+ * Reads tables open to any signed-in user (profiles, staff_departments).
  */
 export async function countPeople(): Promise<{ people: number; departments: number }> {
   const supabase = await createClient();
@@ -191,18 +158,8 @@ export async function countPeople(): Promise<{ people: number; departments: numb
 }
 
 /**
- * The four fields the home page's live card shows — the dashboard's
- * only window into Marathon. The service-role client stays confined to
- * lib/marathon; this adapter just narrows what leaves it.
- *
- * Returns null rather than throwing, and the card renders nothing.
- * Marathon is the one tool on this page reached through the service-role
- * client, so it is the one read that can throw outright — createAdminClient
- * does, the moment SUPABASE_SERVICE_ROLE_KEY is missing. The card sits
- * inside <Suspense>, which handles pending and catches nothing, so that
- * throw took down the signed-in home page of every member of staff. A
- * kiosk tool's environment variable must not be able to do that: the
- * shell does not depend on a tool.
+ * The only window into Marathon (the service-role client stays in lib/marathon).
+ * Returns null, not a throw, so a missing env key cannot take down the home page.
  */
 export async function getMarathonPulse() {
   try {

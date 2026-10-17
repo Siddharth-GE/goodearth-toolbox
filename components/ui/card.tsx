@@ -6,7 +6,6 @@ export function Card({
   interactive = false,
   ...props
 }: HTMLAttributes<HTMLDivElement> & {
-  /** A card that is itself a link/button — lifts and picks up the float shadow on hover. */
   interactive?: boolean;
 }) {
   return (

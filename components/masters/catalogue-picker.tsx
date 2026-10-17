@@ -12,9 +12,7 @@ import { Select } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { formatCount, formatMoney } from "@/lib/format";
 import { useDebouncedSearch } from "@/lib/hooks/use-debounced-search";
-// Types only — the contract of /api/catalogue, deliberately import-free
-// (see the note at the top of that module), living on the shared
-// masters surface every tool may read.
+// Types only: the import-free contract of /api/catalogue.
 import type { CatalogueItem, CatalogueSearchResult } from "@/lib/masters/catalogue";
 import { Minus, Plus, Search } from "lucide-react";
 import { useMemo, useState, useTransition, type ReactNode } from "react";
@@ -22,17 +20,8 @@ import { useMemo, useState, useTransition, type ReactNode } from "react";
 export type PickedLine = { item: CatalogueItem; quantity: number };
 
 /**
- * The catalogue picker — search, filters, thumbnail tiles, a local
- * basket and one commit bar — shared by Selections, the Construction
- * tree and the Indents direct-add (DESIGN.md's "build the third copy
- * into a shared component").
- *
- * Parent-controlled: the caller renders its own trigger and passes
- * open/onOpenChange, because what "Add items" means (which stage, which
- * indent, which spaces) is the caller's business — headerSlot and
- * extraAction are the hooks for that business, not for restyling. The
- * basket lives entirely in the browser and nothing is written until
- * onCommit — pressing + costs nothing.
+ * Search, filters, tiles, a local basket and one commit bar, shared by Selections, the Construction tree and Indents.
+ * Parent-controlled: the caller owns the trigger and what "Add items" means. Nothing is written until onCommit.
  */
 export function CataloguePickerDialog({
   open,
@@ -50,25 +39,18 @@ export function CataloguePickerDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
-  /** Where the basket lands, for the commit bar: "the Foundation stage". */
   targetLabel: string;
   categories: { id: string; name: string }[];
   brands: { id: string; name: string }[];
-  /** Rendered between the title and the search row — the caller's own
-   * target controls (Selections' space chips). */
+  /** Between the title and the search row: the caller's own target controls. */
   headerSlot?: ReactNode;
-  /** Rendered in the empty state and beside the footer count — an
-   * escape hatch when the catalogue has no answer (Selections' "request
-   * item"). `addToBasket` pushes an externally created item into the
-   * basket; `search` is the current search text, for prefilling. */
+  /** Empty state and footer escape hatch; `addToBasket` pushes an external item, `search` prefills. */
   extraAction?: (addToBasket: (item: CatalogueItem) => void, search: string) => ReactNode;
-  /** Multiplies the indicative basket value shown in the commit bar —
-   * for callers whose basket lands in several places at once. */
+  /** Multiplies the basket value, for callers whose basket lands in several places. */
   valueMultiplier?: number;
   /** The caller's veto on the Add button (no target selected). */
   commitDisabled?: boolean;
-  /** Writes the whole basket in one call. Resolving without an error
-   * clears the basket and closes the dialog. */
+  /** Writes the whole basket; resolving without an error clears it and closes the dialog. */
   onCommit: (lines: PickedLine[]) => Promise<{ error?: string } | undefined | void>;
 }) {
   const [search, setSearch] = useState("");
@@ -80,14 +62,12 @@ export function CataloguePickerDialog({
   const { result, loading } = useDebouncedSearch<CatalogueSearchResult>({
     url: "/api/catalogue",
     params: { page, q: search, category: categoryId, brand: brandId, placement },
-    // Idle until the dialog opens: no reason to search a catalogue nobody
-    // is looking at.
+    // Idle until the dialog opens.
     enabled: open,
     initial: { items: [], total: 0, pageCount: 1 },
   });
 
-  // Holds the item itself, not just a count, so the summary keeps working
-  // after the item scrolls out of the current search results.
+  // Holds the item, not a count, so the summary survives a scroll out of the results.
   const [basket, setBasket] = useState<Record<string, PickedLine>>({});
   const [error, setError] = useState<string>();
   const [saving, startSaving] = useTransition();
@@ -118,10 +98,7 @@ export function CataloguePickerDialog({
     [basketEntries, valueMultiplier],
   );
 
-  // A just-created external item (a Selections provisional) goes
-  // straight into the basket at quantity 1. It won't be in the current
-  // search results, which is exactly why the basket stores the item
-  // itself rather than looking it up.
+  // An external item is not in the search results, so the basket stores the item itself.
   const addToBasket = (item: CatalogueItem) => step(item, 1);
 
   const reset = () => {
@@ -236,14 +213,11 @@ export function CataloguePickerDialog({
                 ? "Searching…"
                 : `${formatCount(result.total)} ${result.total === 1 ? "item" : "items"}`}
             </p>
-            {/* Also here, not only in the empty state: the caller's
-                escape hatch is often wanted without searching first. */}
             {result.items.length > 0 && extraAction?.(addToBasket, search)}
           </div>
           <Pagination page={page} pageCount={result.pageCount} onPageChange={setPage} />
         </div>
 
-        {/* Nothing has been written yet — this bar is the commit point. */}
         <div className="border-border bg-surface flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3">
           <div className="min-w-0">
             {distinctItems === 0 ? (
@@ -296,8 +270,6 @@ function ItemCard({
         selected ? "border-accent" : "border-border",
       ].join(" ")}
     >
-      {/* The whole tile is the + target: one click to take one, which is
-          the overwhelmingly common case. */}
       <button
         type="button"
         onClick={() => onStep(1)}
@@ -314,9 +286,7 @@ function ItemCard({
         {item.brand_name && (
           <p className="text-muted mt-0.5 truncate text-[11px] font-medium">{item.brand_name}</p>
         )}
-        {/* The name alone ("Bench") cannot tell the tiles apart; the
-            description can. Clamped to keep the grid even — the full text
-            is the tooltip, and the product page is one tap below. */}
+        {/* The name alone cannot tell tiles apart; the description can. Clamped to keep the grid even. */}
         {item.description && (
           <p className="text-muted mt-1 line-clamp-3 text-[11px]" title={item.description}>
             {item.description}
@@ -330,8 +300,7 @@ function ItemCard({
         </p>
       </button>
 
-      {/* Outside the button: a link inside it would be a control inside a
-          control, and a tap meant for the page would add the item. */}
+      {/* Outside the button: a link inside it would nest controls. */}
       <ProductLink href={item.source_url} itemName={item.name} className="mt-1 self-start py-0.5" />
 
       <div className="mt-auto flex items-center justify-between gap-1 pt-2">

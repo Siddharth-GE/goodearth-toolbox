@@ -16,15 +16,11 @@ export function DialogContent({
 }: ComponentProps<typeof DialogPrimitive.Content>) {
   return (
     <DialogPrimitive.Portal>
-      {/* Radix keeps both of these mounted for the length of the exit
-          animation and flips data-state to "closed", so the -out
-          animations run without any extra code here. */}
+      {/* Radix keeps both mounted during the exit, so the -out animations need no extra code. */}
       <DialogPrimitive.Overlay className="data-[state=closed]:animate-fade-out data-[state=open]:animate-fade-in fixed inset-0 z-50 bg-black/30 backdrop-blur-sm" />
       <DialogPrimitive.Content
         className={cn(
-          // Centred card on a laptop; on a phone (max-sm) the same dialog
-          // becomes a bottom sheet that rises from the edge and scrolls,
-          // so a long form keeps its Cancel and Save reachable.
+          // Centred card on a laptop; a bottom sheet on a phone (max-sm), so a long form keeps Cancel and Save reachable.
           "border-border/60 bg-surface-raised shadow-float data-[state=closed]:animate-pop-out data-[state=open]:animate-pop-in fixed top-1/2 left-1/2 z-50 w-[calc(100%-2.5rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-3xl border p-6 focus:outline-none",
           "max-sm:data-[state=closed]:animate-sheet-out max-sm:data-[state=open]:animate-sheet-in max-sm:inset-x-0 max-sm:top-auto max-sm:bottom-0 max-sm:max-h-[90dvh] max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:overflow-y-auto max-sm:rounded-b-none",
           className,

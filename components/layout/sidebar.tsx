@@ -38,8 +38,7 @@ function NavRow({
       href={href}
       onClick={onNavigate}
       className={cn(
-        // Nav is ink, not green: the tool you are in is simply darker
-        // than the rest, and green is left to say "press this".
+        // Nav is ink, not green: green is left to say "press this".
         "flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-[13px] font-medium transition-colors",
         active
           ? "bg-foreground/[0.06] text-foreground"
@@ -52,11 +51,7 @@ function NavRow({
   );
 }
 
-/**
- * One team: a row that opens and closes, and its tools under a hairline
- * when open. No animation — the list simply appears (DESIGN.md: nothing
- * moves outside the motion vocabulary).
- */
+/** One team: a row that opens and closes. No animation (DESIGN.md: nothing moves outside the motion vocabulary). */
 function TeamRow({
   section,
   open,
@@ -67,7 +62,6 @@ function TeamRow({
 }: {
   section: ToolSection;
   open: boolean;
-  /** The page you are on is one of this team's tools. */
   holdsPage: boolean;
   pathname: string;
   onToggle: () => void;
@@ -95,8 +89,7 @@ function TeamRow({
         <span className="text-muted text-xs tabular-nums">{section.tools.length}</span>
       </button>
       {open && (
-        // The hairline sits under the chevron's centre, so the tools read
-        // as the team's contents.
+        // The hairline sits under the chevron's centre.
         <div
           id={listId}
           className="border-border mt-0.5 mb-1 ml-[17px] space-y-0.5 border-l pl-1.5"
@@ -128,7 +121,6 @@ function Brand() {
   );
 }
 
-/** Everything inside the panel — shared by the desktop rail and the phone drawer. */
 function SidebarContent({
   sections,
   openKeys,
@@ -142,7 +134,6 @@ function SidebarContent({
   onToggle: (key: string) => void;
   userName: string;
   pathname: string;
-  /** The phone drawer closes itself when a link is tapped. */
   onNavigate?: () => void;
 }) {
   const pageKey = sectionKeyOf(sections, pathname);
@@ -204,28 +195,8 @@ function SidebarContent({
 }
 
 /**
- * The dashboard shell's navigation, in two forms.
- *
- * Desktop: a rail pinned with `sticky top-0 h-screen` — the PAGE scrolls,
- * the rail doesn't. (It used to be a plain flex child, so it scrolled
- * away with the content and ended mid-air.) Its nav has its own
- * overflow-y for when the tool list outgrows the viewport. The rail is
- * page-coloured, not paper: rail and content are one material, and a
- * hairline is all that separates them.
- *
- * Phone: the rail is hidden; a slim frosted top bar carries the brand and
- * a menu button that opens the same content as a drawer. Radix Dialog
- * underneath, so focus-trapping, ESC and the backdrop click are correct
- * for free. The drawer slides in from the left and slides back out again
- * — Radix keeps it mounted while the closing animation runs, so both
- * directions are plain CSS on its data-state. It closes itself on
- * navigation.
- *
- * Tools sit under closed teams (Settings → Teams). The team holding the
- * page you are on opens by itself — on arrival and whenever you move into
- * another team's tool — and a person with only one team sees it open.
- * Which teams are open is held here, not in each panel, so the rail and
- * the drawer agree; it lasts while the app is open and resets on a reload.
+ * The dashboard shell's navigation: a sticky desktop rail (the page scrolls, not the rail) and a phone top bar opening the same content in a Radix Dialog drawer.
+ * The team holding the current page opens itself; open state is held here so the rail and the drawer agree.
  */
 export function Sidebar({ sections, userName }: { sections: ToolSection[]; userName: string }) {
   const pathname = usePathname();
@@ -235,9 +206,7 @@ export function Sidebar({ sections, userName }: { sections: ToolSection[]; userN
     const keys = sections.length === 1 ? [sections[0].key] : [];
     return pageKey && !keys.includes(pageKey) ? [...keys, pageKey] : keys;
   });
-  // Moving into another team's tool opens that team. Adjusted while
-  // rendering rather than in an effect, so the list never paints closed
-  // for a frame first.
+  // Adjusted while rendering, not in an effect, so the list never paints closed for a frame.
   const [seenPageKey, setSeenPageKey] = useState(pageKey);
   if (pageKey !== seenPageKey) {
     setSeenPageKey(pageKey);
@@ -249,7 +218,6 @@ export function Sidebar({ sections, userName }: { sections: ToolSection[]; userN
 
   return (
     <>
-      {/* Desktop rail */}
       <aside className="border-border/60 bg-background sticky top-0 hidden h-screen w-60 shrink-0 flex-col self-start border-r md:flex">
         <SidebarContent
           sections={sections}
@@ -260,7 +228,6 @@ export function Sidebar({ sections, userName }: { sections: ToolSection[]; userN
         />
       </aside>
 
-      {/* Phone top bar */}
       <header className="border-border/60 bg-background/80 sticky top-0 z-40 flex items-center gap-2 border-b px-3 py-2.5 backdrop-blur-xl md:hidden">
         <button
           type="button"
@@ -273,7 +240,6 @@ export function Sidebar({ sections, userName }: { sections: ToolSection[]; userN
         <Brand />
       </header>
 
-      {/* Phone drawer */}
       <DialogPrimitive.Root open={open} onOpenChange={setOpen}>
         <DialogPrimitive.Portal>
           <DialogPrimitive.Overlay className="data-[state=closed]:animate-fade-out data-[state=open]:animate-fade-in fixed inset-0 z-50 bg-black/40 md:hidden" />
@@ -288,9 +254,7 @@ export function Sidebar({ sections, userName }: { sections: ToolSection[]; userN
             >
               <X className="size-4" />
             </DialogPrimitive.Close>
-            {/* Tapping a link navigates but keeps the drawer mounted —
-                onNavigate closes it, or the new page appears behind an
-                open menu. */}
+            {/* onNavigate closes the drawer, or the new page appears behind an open menu. */}
             <SidebarContent
               sections={sections}
               openKeys={openKeys}

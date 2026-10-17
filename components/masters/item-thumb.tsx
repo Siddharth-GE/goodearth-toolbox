@@ -4,34 +4,14 @@ import Image from "next/image";
 import type { CSSProperties } from "react";
 
 /**
- * The hash colours are one fixed set (lib/color-hash.ts) used on both a
- * white tile and a near-black one, so the same recipe cannot serve both.
- * At 8% the tint is a whisper on white and invisible on dark; the raw
- * colour is legible on white and, for the blue and the indigo, close to
- * unreadable on dark.
- *
- * So the colour arrives as a custom property and the mode decides what to
- * do with it — a heavier tint and a lifted text colour in dark. The
- * palette itself stays untouched, as DESIGN.md requires.
+ * The hash colours are one fixed set used on white and near-black tiles, so the colour arrives as a custom property
+ * and the mode picks the treatment (heavier tint, lifted text in dark). The palette itself stays untouched (DESIGN.md).
  */
 const TILE_TINT =
   "bg-[color-mix(in_srgb,var(--thumb)_8%,transparent)] dark:bg-[color-mix(in_srgb,var(--thumb)_16%,transparent)]";
 const TILE_TEXT = "text-[var(--thumb)] dark:text-[color-mix(in_srgb,var(--thumb)_70%,#fff)]";
 
-/**
- * An item's picture — or its stand-in.
- *
- * Most catalogue items have a thumbnail (2,660 of 2,772 since the design
- * team's workbook came in, 2026-09-26); the construction materials have
- * none, so the no-image case is still common. It gets a tinted tile
- * carrying the item's code rather than a broken-image icon: same shape,
- * same weight, zero network requests, and it reads as a design decision
- * instead of something that failed to load.
- *
- * Colour comes from lib/color-hash.ts — the same by-name hashing used for
- * avatars and Marathon's category badges, so an item keeps its colour
- * everywhere it appears.
- */
+/** An item's picture, or a tinted tile with its code (no broken-image icon, no request). Colour from lib/color-hash.ts. */
 export function ItemThumb({
   code,
   name,

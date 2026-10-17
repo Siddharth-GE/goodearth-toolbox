@@ -2,18 +2,8 @@ import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
 
 /**
- * One tap picks a value: a row of chips instead of a dropdown, for a short
- * fixed list a person sets often — a deed's status, who holds the
- * original, a Kaadal stage. The Saarang tracker's choice (root plan.md,
- * seventh piece), and the shape Birdwing's attendance, Relay's department
- * picker and Reporter's builder had each hand-rolled — so it lives here
- * from its fourth copy on.
- *
- * A chosen chip is ink, the toolbox's "this is selected" (DESIGN.md: nav
- * is ink, accent is action); an option marked `good` turns green instead
- * when chosen — Signed, a design check done. Tapping the chosen chip
- * clears it unless the choice is `required`. Saving is the caller's: the
- * chips only say what was tapped.
+ * One tap picks a value: a row of chips for a short fixed list set often. A chosen chip is ink (DESIGN.md: nav is ink, accent is action);
+ * `good` turns green instead. Tapping the chosen chip clears it unless `required`. Saving is the caller's.
  */
 export type ChoiceOption<T extends string> = {
   value: T;
@@ -34,7 +24,6 @@ type Single<T extends string> = Common<T> & {
   multiple?: false;
   value: T | null;
   onChange: (value: T | null) => void;
-  /** Tapping the chosen chip leaves it chosen instead of clearing it. */
   required?: boolean;
 };
 

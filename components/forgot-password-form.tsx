@@ -19,7 +19,6 @@ export function ForgotPasswordForm() {
         <Label htmlFor="email">Email</Label>
         <Input id="email" name="email" type="email" autoComplete="email" required />
       </div>
-      {/* The expired-link notice makes way as soon as the form talks. */}
       <FormMessage
         error={
           state?.error ??
