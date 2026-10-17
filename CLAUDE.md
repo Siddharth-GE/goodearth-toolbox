@@ -34,6 +34,7 @@ Every conversation starts the same way: the founder says **"read CLAUDE.md"**, a
 - Every Operations and Management tool **opens on a welcome screen** (`_components/tool-welcome.tsx`): plain English, live counts, never rupees. The real first screen sits one click in, so actions must `revalidatePath("/<tool>", "layout")` — an exact-path call refreshes only the welcome and leaves the moved list stale.
 - Kiosk tools with their own auth live top-level. `app/marathon/` is the only one and **not the pattern to copy**.
 - New tool → register in `lib/tools.ts`, add its row to STATUS.md's contract table, and extend **both** `user_apps_app_known` and `role_apps_app_known` CHECKs in the same migration, or granting fails at the database. A stub ships by flipping `built: true` and replacing its `page.tsx`. A new tool sits under "Other" in the sidebar until the founder gives it a team in Settings → Teams.
+- **A comment says why in a line or two, never the story, the date or the incident**: history is git, incidents are BUGCATCHER. Delete what the code already says.
 
 ## Red lines — one-line form; `SECURITY.md` and `SHIPPING.md` carry the why
 

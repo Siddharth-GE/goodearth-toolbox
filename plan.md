@@ -57,7 +57,7 @@ The founder wants the code thinned massively, and every note and TODO that will 
 
 Applied migrations are never edited, so their comments stay.
 
-- [ ] `[Opus]` **The rule comes first, so the fat doesn't grow back.** Add to CLAUDE.md, _Structure_: "A comment says why in a line or two, never the story, the date or the incident: history is git, incidents are BUGCATCHER. Delete what the code already says."
+- [x] `[Opus]` **The rule comes first, so the fat doesn't grow back.** Add to CLAUDE.md, _Structure_: "A comment says why in a line or two, never the story, the date or the incident: history is git, incidents are BUGCATCHER. Delete what the code already says."
 - [ ] `[Opus]` **Thin the docs.**
   - This file: each finished piece's story goes. Its vet checklist stays only while the founder hasn't tried it, and git keeps the rest (`git show 88749ab:plan.md`).
   - Tool `PLAN.md` files: the rules and the founder's decisions only, no build history.
