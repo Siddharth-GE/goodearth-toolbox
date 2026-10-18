@@ -37,6 +37,7 @@ The `data/` files importers read are gitignored: real business data, some of it 
 ## App checks
 
 - `check-server-actions.ts` — refuses a type re-export in a `"use server"` file (BUGCATCHER #5). `npm run check:actions`, after a build.
+- `check-boundaries.ts` — fails when one tool imports another's code, or shared code imports a tool's (CLAUDE.md); `lib/overview/` is the one exception. `npm run check:boundaries`, in CI.
 - `check-errors.ts` — fails when a Supabase result's `error` is never read; an exception carries `// error ignored: <why>`. `npm run check:errors`, in CI.
 - `check-comment-only.ts` — proves a change touched comments and layout only: each changed file compiles to the same code before and after. `npm run check:comments [base] [head]`.
 - `google-chat-usage-test.ts` (+ `google-chat-usage-loader.mjs`) — drives the Chat door in-process against staging with Google-shaped events. `npm run chat:usage -- --as <email>`

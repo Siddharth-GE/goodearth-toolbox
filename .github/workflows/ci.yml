@@ -1,6 +1,6 @@
 # Every push and pull request. The static checks each run even when
 # one fails, so one push shows every verdict; the build and everything
-# after it wait for all four.
+# after it wait for all of them.
 #
 # One secret: SUPABASE_ACCESS_TOKEN, the management API key, for the two
 # database checks at the end. It is account-level and reaches both
@@ -53,6 +53,10 @@ jobs:
       - name: Every database error is read
         if: ${{ !cancelled() }}
         run: npm run check:errors
+
+      - name: No tool imports another tool
+        if: ${{ !cancelled() }}
+        run: npm run check:boundaries
 
       - name: Build
         run: npm run build
