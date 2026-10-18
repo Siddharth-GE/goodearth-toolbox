@@ -272,11 +272,15 @@ export async function approveBudget(budgetId: string): Promise<ActionState> {
   const user = await requireTool("/budgets");
   const supabase = await createClient();
 
-  const { data: budget } = await supabase
+  const { data: budget, error: budgetError } = await supabase
     .from("budgets")
     .select("id, selection_id, status")
     .eq("id", budgetId)
     .maybeSingle();
+  if (budgetError) {
+    console.error("approveBudget read failed:", budgetError);
+    return { error: "Could not check this budget. Try again." };
+  }
   if (!budget) return { error: "Could not find that budget." };
   if (budget.status === "approved") return { error: "This budget is already approved." };
 

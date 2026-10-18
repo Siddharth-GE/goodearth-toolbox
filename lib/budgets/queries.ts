@@ -140,11 +140,12 @@ export const getBudget = cache(async (budgetId: string): Promise<BudgetDetail | 
   await requireTool("/budgets");
   const supabase = await createClient();
 
-  const { data: budget } = await supabase
+  const { data: budget, error: budgetError } = await supabase
     .from("budgets")
     .select("*, selections(revision_no, issued_at, units(name, projects(name)))")
     .eq("id", budgetId)
     .maybeSingle();
+  assertRead("budgets", "this budget", budgetError);
   if (!budget) return null;
 
   const selection = budget.selections as {
