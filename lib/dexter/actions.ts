@@ -252,9 +252,13 @@ async function verifyEntrySize(
   entryPath: string,
   expectedBytes: number,
 ): Promise<{ error?: string }> {
-  const { data: stored } = await supabase.storage
+  const { data: stored, error } = await supabase.storage
     .from(DEXTER_BUCKET)
     .list(folder, { search: entryPath });
+  if (error) {
+    console.error("verifyEntrySize list failed:", error);
+    return { error: "The deck did not save correctly. Try again." };
+  }
   // Match the exact name: `search` is a substring match, so index.html and print-index.html would
   // be confused and a good upload rolled back.
   const storedSize = stored?.find((object) => object.name === entryPath)?.metadata?.size as
@@ -344,7 +348,8 @@ export async function uploadDeck(projectId: string, formData: FormData): Promise
 
   const uploadResult = await uploadPlannedFiles(supabase, folder, plan.files);
   if (uploadResult.error) {
-    await supabase.from("dexter_decks").delete().eq("id", deckId);
+    const { error: cleanupError } = await supabase.from("dexter_decks").delete().eq("id", deckId);
+    if (cleanupError) console.error("uploadDeck cleanup failed:", cleanupError);
     return { error: uploadResult.error };
   }
 
@@ -355,7 +360,8 @@ export async function uploadDeck(projectId: string, formData: FormData): Promise
       supabase,
       plan.files.map((file) => `${folder}/${file.deckPath}`),
     );
-    await supabase.from("dexter_decks").delete().eq("id", deckId);
+    const { error: cleanupError } = await supabase.from("dexter_decks").delete().eq("id", deckId);
+    if (cleanupError) console.error("uploadDeck cleanup failed:", cleanupError);
     return { error: sizeCheck.error };
   }
 
