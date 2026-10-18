@@ -1,6 +1,6 @@
 # Bugcatcher — what a green build does not prove
 
-CI runs prettier, lint, typecheck and test, then build and `check:actions`. **Every bug on this page passed all of them.** Nothing on a developer's machine could have caught these, so the only defence is knowing they exist and running the one check that does. Read this before merging anything that touches a database read, a file upload, a permission or a colour.
+CI runs prettier, lint, typecheck, test, `check:errors`, `check:boundaries`, `check:selects`, then build and `check:actions`, and against the database `db:check`, `db:check-views` and `db:check-policies`. **Every bug on this page passed what CI ran at the time**; several of those checks exist because of one. Nothing on a developer's machine could have caught these, so the only defence is knowing they exist and running the one check that does. Read this before merging anything that touches a database read, a file upload, a permission or a colour.
 
 ## Before you merge
 
