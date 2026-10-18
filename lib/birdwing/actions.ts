@@ -31,6 +31,7 @@ import {
   isInternalUse,
   oneOf,
 } from "./shared";
+import { roundPaise } from "@/lib/line-money";
 
 /** Every action opens with requireTool and revalidates the layout (the welcome counts sit one screen away).
  * The 0115 guards refuse in plain English; `GUARD_PHRASES` lets those through, else the action's fallback shows. */
@@ -756,7 +757,7 @@ export async function settleStays(
       stay_id: stay.id,
       kind,
       cost_centre_id: kind === "cross_charge" ? stay.cost_centre_id : null,
-      amount: Math.round((pending.get(stay.id) ?? 0) * 100) / 100,
+      amount: roundPaise(pending.get(stay.id) ?? 0),
       charged_month: stay.accounting_month,
       note: note.trim() || null,
       created_by: user.id,

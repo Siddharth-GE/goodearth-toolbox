@@ -7,6 +7,7 @@
  * upload adds nothing and a line already in is reported, never overwritten.
  */
 import { parseCsv } from "@/lib/csv";
+import { roundPaise } from "@/lib/line-money";
 
 export const UPLOAD_COLUMNS = [
   "Month",
@@ -72,7 +73,7 @@ export function readDay(raw: string): string | null {
 export function readAmount(raw: string): number | null {
   const cleaned = raw.replace(/[,\s₹]/g, "");
   if (!/^\d+(\.\d+)?$/.test(cleaned)) return null;
-  return Math.round(Number(cleaned) * 100) / 100;
+  return roundPaise(Number(cleaned));
 }
 
 export function readExpenseUpload(

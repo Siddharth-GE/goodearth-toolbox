@@ -2,6 +2,7 @@
 // One kind, contractor and project per bill. Daily wages: heads × day rate per trade. Piece-work: quantity (lump sum: 1) × rate, from the approved work order first, then the rate book. GST on each, to the paisa.
 
 import type { DayRates } from "./lines";
+import { roundPaise } from "@/lib/line-money";
 
 export type LabourEntry = {
   id: string;
@@ -14,8 +15,6 @@ export type LabourEntry = {
   others: number;
   quantity: number | null;
 };
-
-const paisa = (value: number) => Math.round(value * 100) / 100;
 
 export function entriesProblem(entries: LabourEntry[]): string | undefined {
   if (entries.length === 0) return "Tick the labour entries to bill.";
@@ -56,7 +55,7 @@ export function dayRatesProblem(heads: Heads, rates: DayRates): string | undefin
 }
 
 export function dailyWagesTotal(heads: Heads, rates: DayRates, gstPct: number): number {
-  return paisa(
+  return roundPaise(
     (heads.masons * (rates.mason ?? 0) +
       heads.helpers * (rates.helper ?? 0) +
       heads.others * (rates.other ?? 0)) *
@@ -69,10 +68,10 @@ export function pieceWorkTotal(
   rates: Record<string, number | null>,
   gstPct: number,
 ): number {
-  return paisa(
+  return roundPaise(
     entries.reduce(
       (sum, entry) =>
-        sum + paisa((entry.quantity ?? 1) * (rates[entry.id] ?? 0) * (1 + gstPct / 100)),
+        sum + roundPaise((entry.quantity ?? 1) * (rates[entry.id] ?? 0) * (1 + gstPct / 100)),
       0,
     ),
   );

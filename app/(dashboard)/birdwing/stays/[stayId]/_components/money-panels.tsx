@@ -14,6 +14,7 @@ import { MODE_LABELS, RECEIPT_MODES } from "@/lib/birdwing/shared";
 import { formatDate, formatMoney } from "@/lib/format";
 import { Trash2 } from "lucide-react";
 import { useActionState, useState } from "react";
+import { roundPaise } from "@/lib/line-money";
 
 const money = (value: number) => formatMoney(value, { paise: value % 1 !== 0 });
 
@@ -126,7 +127,7 @@ function ReceiptForm({
             id="receipt-amount"
             name="amount"
             inputMode="decimal"
-            defaultValue={pending >= 1 ? String(Math.round(pending * 100) / 100) : ""}
+            defaultValue={pending >= 1 ? String(roundPaise(pending)) : ""}
             required
             autoFocus
           />
@@ -298,7 +299,7 @@ export function SettlePanel({
                 id="settle-amount"
                 name="amount"
                 inputMode="decimal"
-                defaultValue={String(Math.round(pending * 100) / 100)}
+                defaultValue={String(roundPaise(pending))}
                 required
               />
             </div>

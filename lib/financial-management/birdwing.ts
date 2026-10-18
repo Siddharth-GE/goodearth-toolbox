@@ -14,6 +14,7 @@
  */
 import { ACCENT_TOKEN, chartToken } from "@/lib/charts/palette";
 import type { CartesianModel } from "@/lib/charts/series";
+import { roundPaise } from "@/lib/line-money";
 
 export type BirdwingMonth = {
   month: string;
@@ -61,9 +62,8 @@ export type BirdwingTiles = {
   monthCount: number;
 };
 
-const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 const sum = (rows: BirdwingMonth[], pick: (row: BirdwingMonth) => number) =>
-  round2(rows.reduce((total, row) => total + pick(row), 0));
+  roundPaise(rows.reduce((total, row) => total + pick(row), 0));
 
 export function shortMonth(month: string): string {
   return new Date(`${month.slice(0, 7)}-01T00:00:00Z`).toLocaleDateString("en-IN", {
@@ -102,13 +102,13 @@ export function birdwingTiles(rows: BirdwingMonth[], today: string): BirdwingTil
     pendingInternal: sum(months, (row) => row.pendingInternal),
     crossCharged: sum(months, (row) => row.crossCharged),
     expenses,
-    resultBilled: round2(billed - expenses),
-    resultCash: round2(collected - expenses),
+    resultBilled: roundPaise(billed - expenses),
+    resultCash: roundPaise(collected - expenses),
     occupancy: capacity > 0 ? roomNights / capacity : null,
     occupancyRoomNights: roomNights,
     occupancyCapacity: capacity,
     occupancyEstimated: complete.some((row) => row.roomNightsEstimated),
-    averageRoomRate: roomNights > 0 ? round2(roomRevenue / roomNights) : null,
+    averageRoomRate: roomNights > 0 ? roundPaise(roomRevenue / roomNights) : null,
     monthCount: months.length,
   };
 }
@@ -155,7 +155,7 @@ export function resultModel(months: BirdwingMonth[]): CartesianModel {
     categoryLabel: "Month",
     points: months.map((row) => ({
       category: shortMonth(row.month),
-      values: { result: round2(row.billed - row.expenses) },
+      values: { result: roundPaise(row.billed - row.expenses) },
     })),
     series: [{ id: "result", label: "Billed − expenses", color: ACCENT_TOKEN }],
     money: true,
@@ -201,7 +201,7 @@ export function expenseStackModel(
   for (const line of lines) {
     const values = byMonth.get(line.month) ?? {};
     const key = keyOf(line.head);
-    values[key] = round2((values[key] ?? 0) + line.amount);
+    values[key] = roundPaise((values[key] ?? 0) + line.amount);
     byMonth.set(line.month, values);
   }
   const ids = folded ? [...kept, "Other"] : kept;

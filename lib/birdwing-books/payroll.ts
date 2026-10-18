@@ -11,6 +11,7 @@
  * Pure.
  */
 import type { AttendanceStatus } from "./shared";
+import { roundPaise } from "@/lib/line-money";
 
 export type PayRule = {
   effectiveFrom: string;
@@ -47,8 +48,6 @@ export type SalaryPreview = {
   /** Days worked with no in/out times while the rule has a shift. */
   missingTimes: string[];
 };
-
-const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 
 const WORKED: readonly AttendanceStatus[] = ["present", "half_day"];
 
@@ -115,11 +114,11 @@ export function computeSalary(input: {
     else otMinutes += minutes;
   }
 
-  const otHours = round2(otMinutes / 60);
-  const otAmount = round2(otHours * rule.otRatePerHr);
-  const roomAmount = round2(roomDays * rule.roomDayRate);
-  const guestAmount = round2(guestDays * rule.guestDayRate);
-  const base = round2(rule.baseSalary);
+  const otHours = roundPaise(otMinutes / 60);
+  const otAmount = roundPaise(otHours * rule.otRatePerHr);
+  const roomAmount = roundPaise(roomDays * rule.roomDayRate);
+  const guestAmount = roundPaise(guestDays * rule.guestDayRate);
+  const base = roundPaise(rule.baseSalary);
   return {
     base,
     otHours,
@@ -128,7 +127,7 @@ export function computeSalary(input: {
     roomAmount,
     guestDays,
     guestAmount,
-    gross: round2(base + otAmount + roomAmount + guestAmount),
+    gross: roundPaise(base + otAmount + roomAmount + guestAmount),
     workedDays: count("present"),
     halfDays: count("half_day"),
     leaveDays: count("leave") + count("holiday_leave"),

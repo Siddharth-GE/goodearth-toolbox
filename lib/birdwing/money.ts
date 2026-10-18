@@ -1,8 +1,8 @@
+import { roundPaise } from "@/lib/line-money";
 // line = qty × rate (+ GST unless inclusive); billed = lines − OTA commission − discount; pending = billed − collected − settled.
 // `chargeAmount` mirrors birdwing_stay_charges.amount (0115): change both. Full paisa precision; round only on screen.
 
 // EPSILON nudges 1.005-style floats the way Postgres' exact numeric rounds them.
-const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 
 export type ChargeInput = {
   qty: number;
@@ -13,11 +13,11 @@ export type ChargeInput = {
 
 export function chargeAmount(line: ChargeInput): number {
   const gross = line.qty * line.rate;
-  return round2(line.rateIncludesGst ? gross : gross * (1 + line.gstPct / 100));
+  return roundPaise(line.rateIncludesGst ? gross : gross * (1 + line.gstPct / 100));
 }
 
 export function taxableOf(amount: number, gstPct: number): number {
-  return round2(amount / (1 + gstPct / 100));
+  return roundPaise(amount / (1 + gstPct / 100));
 }
 
 export type StayMoney = {
@@ -35,12 +35,12 @@ export function stayMoney(input: {
   receipts: number[];
   settlements: number[];
 }): StayMoney {
-  const sum = (values: number[]) => round2(values.reduce((total, value) => total + value, 0));
+  const sum = (values: number[]) => roundPaise(values.reduce((total, value) => total + value, 0));
   const charged = sum(input.chargeAmounts);
-  const billed = round2(charged - input.otaCommission - input.discount);
+  const billed = roundPaise(charged - input.otaCommission - input.discount);
   const collected = sum(input.receipts);
   const settled = sum(input.settlements);
-  return { charged, billed, collected, settled, pending: round2(billed - collected - settled) };
+  return { charged, billed, collected, settled, pending: roundPaise(billed - collected - settled) };
 }
 
 /** Within a rupee of zero is settled: the sheet is full of ₹0.50 roundings. */
@@ -68,11 +68,11 @@ export function gstBreakdown(lines: { amount: number; gstPct: number }[]): GstRo
   return [...byRate.entries()]
     .sort(([a], [b]) => a - b)
     .map(([gstPct, row]) => {
-      const amount = round2(row.amount);
-      const taxable = round2(row.taxable);
-      const gst = round2(amount - taxable);
-      const cgst = round2(gst / 2);
-      return { gstPct, taxable, cgst, sgst: round2(gst - cgst), amount };
+      const amount = roundPaise(row.amount);
+      const taxable = roundPaise(row.taxable);
+      const gst = roundPaise(amount - taxable);
+      const cgst = roundPaise(gst / 2);
+      return { gstPct, taxable, cgst, sgst: roundPaise(gst - cgst), amount };
     });
 }
 

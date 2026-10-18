@@ -22,6 +22,7 @@ import {
   type AttendanceStatus,
   type ExpenseStatus,
 } from "./shared";
+import { roundPaise } from "@/lib/line-money";
 
 /**
  * Every function opens with requireTool(GRANT): the 0116 policies gate SELECT too. Reads nothing
@@ -272,9 +273,9 @@ export async function listExpenses(
   return {
     rows,
     byHead: [...sums.entries()]
-      .map(([name, amount]) => ({ name, amount: Math.round(amount * 100) / 100 }))
+      .map(([name, amount]) => ({ name, amount: roundPaise(amount) }))
       .sort((a, b) => b.amount - a.amount),
-    total: Math.round(total * 100) / 100,
+    total: roundPaise(total),
   };
 }
 

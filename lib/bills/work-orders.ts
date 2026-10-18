@@ -1,3 +1,4 @@
+import { roundPaise } from "@/lib/line-money";
 // Pure rules. While an order has lines its value is their sum (the database writes it, rounded to paise); this says the same sum before saving.
 
 export type WorkOrderLineInput = {
@@ -18,7 +19,7 @@ export function workOrderLineAmount(line: WorkOrderLineInput): number | null {
 
 export function workOrderTotal(lines: WorkOrderLineInput[]): number {
   const sum = lines.reduce((total, line) => total + (workOrderLineAmount(line) ?? 0), 0);
-  return Math.round(sum * 100) / 100;
+  return roundPaise(sum);
 }
 
 /** What is wrong with one line, in words — the 0105 shape CHECK, said first. */

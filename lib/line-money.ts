@@ -60,3 +60,12 @@ export type GstSplit = { cgst: number; sgst: number; igst: number };
 export function splitGst(gst: number, interState: boolean): GstSplit {
   return interState ? { cgst: 0, sgst: 0, igst: gst } : { cgst: gst / 2, sgst: gst / 2, igst: 0 };
 }
+
+/**
+ * To the paisa, half away from zero, as the figure reads in decimal: 1.005 is
+ * 1.01, as Postgres's round(x, 2) has it, though the float underneath is 1.00499….
+ */
+export function roundPaise(value: number): number {
+  const paise = Math.round(Number((Math.abs(value) * 100).toPrecision(15)));
+  return paise === 0 ? 0 : (Math.sign(value) * paise) / 100;
+}

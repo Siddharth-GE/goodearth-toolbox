@@ -2,6 +2,7 @@
 // Kinds: a PO material, daily wages by trade (nmr), piece-work by quantity (pw_qty) or lump sum (pw_lump), other.
 
 import type { BillLineMoney } from "./math";
+import { roundPaise } from "@/lib/line-money";
 
 export const BILL_LINE_KINDS = ["material", "nmr", "pw_qty", "pw_lump", "other"] as const;
 export type BillLineKind = (typeof BILL_LINE_KINDS)[number];
@@ -30,8 +31,6 @@ export const lineMoneyOf = (line: BillLineDraft): BillLineMoney => ({
   discount_amount: line.discountAmount,
   other_charges: line.otherCharges,
 });
-
-const paisa = (value: number) => Math.round(value * 100) / 100;
 
 /** What is wrong with one line, in words — 0106's CHECKs, said first. */
 export function billLineProblem(line: BillLineDraft): string | undefined {
@@ -104,9 +103,9 @@ export function linesFromPo(poLines: PoLineForBill[]): BillLineDraft[] {
       const rate = line.rate;
       const discount =
         line.discount_pct != null && rate !== null
-          ? paisa((quantity * rate * line.discount_pct) / 100)
+          ? roundPaise((quantity * rate * line.discount_pct) / 100)
           : line.discount_amount != null
-            ? paisa(line.discount_amount * share)
+            ? roundPaise(line.discount_amount * share)
             : null;
       return {
         kind: "material" as const,
@@ -120,7 +119,7 @@ export function linesFromPo(poLines: PoLineForBill[]): BillLineDraft[] {
         rate,
         gstPct: line.gst_pct ?? 0,
         discountAmount: discount || null,
-        otherCharges: line.other_charges ? paisa(line.other_charges * share) : null,
+        otherCharges: line.other_charges ? roundPaise(line.other_charges * share) : null,
         note: null,
       };
     });

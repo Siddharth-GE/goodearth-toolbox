@@ -1,5 +1,5 @@
 // Pure. Header figures are what the database STORES (bill_lines_roll_up rounds each sum to the paisa), so this rounds the same way and the live preview never disagrees.
-import { lineMoney, type LineMoneyInput } from "@/lib/line-money";
+import { lineMoney, roundPaise, type LineMoneyInput } from "@/lib/line-money";
 
 export type BillLineMoney = LineMoneyInput;
 
@@ -10,8 +10,6 @@ export type BillTotals = {
   total: number;
   unpricedCount: number;
 };
-
-const paisa = (value: number) => Math.round(value * 100) / 100;
 
 export function rollUpBill(lines: BillLineMoney[]): BillTotals {
   let taxable = 0;
@@ -29,14 +27,14 @@ export function rollUpBill(lines: BillLineMoney[]): BillTotals {
     gst += money.gst;
     other += money.other;
   }
-  const t = paisa(taxable);
-  const g = paisa(gst);
-  const o = paisa(other);
-  return { taxable: t, gst: g, other: o, total: paisa(t + g + o), unpricedCount };
+  const t = roundPaise(taxable);
+  const g = roundPaise(gst);
+  const o = roundPaise(other);
+  return { taxable: t, gst: g, other: o, total: roundPaise(t + g + o), unpricedCount };
 }
 
 export function pendingOnBill(total: number, paid: number, recovered: number): number {
-  return Math.max(0, paisa(total - paid - recovered));
+  return Math.max(0, roundPaise(total - paid - recovered));
 }
 
 export function billLineMoney(line: BillLineMoney) {

@@ -12,6 +12,7 @@ import {
   type ContractorPosition,
 } from "./ledger";
 import { pendingOnBill } from "./math";
+import { roundPaise } from "@/lib/line-money";
 
 // A bill's paid state is derived: payments plus advance recoveries against its total. All /bills-gated (or /reporter on read).
 
@@ -150,7 +151,7 @@ export async function getOpenAdvances(vendorId: string): Promise<OpenAdvance[]> 
         id: advance.id,
         amount: advance.amount,
         recovered: back,
-        outstanding: Math.max(0, Math.round((advance.amount - back) * 100) / 100),
+        outstanding: Math.max(0, roundPaise(advance.amount - back)),
         paid_on: advance.paid_on,
         payment_ref: advance.payment_ref,
         project_name: (advance.projects as { name: string } | null)?.name ?? "—",

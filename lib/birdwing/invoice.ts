@@ -2,6 +2,7 @@
 // a DRAFT uses the current charges and settings. Pure: the route reads, this shapes, invoice-document.tsx draws.
 import type { LetterheadCompany } from "@/lib/pdf/document";
 import { gstBreakdown, taxableOf, type GstRow } from "./money";
+import { roundPaise } from "@/lib/line-money";
 
 export type InvoiceLine = {
   head: string;
@@ -53,7 +54,7 @@ function totalsOf(lines: InvoiceLine[], discount: number) {
     lines.map((line) => ({ amount: line.amount, gstPct: line.gstPct })),
   );
   const sum = (pick: (row: GstRow) => number) =>
-    Math.round(taxSummary.reduce((total, row) => total + pick(row), 0) * 100) / 100;
+    roundPaise(taxSummary.reduce((total, row) => total + pick(row), 0));
   const total = sum((row) => row.amount);
   return {
     taxSummary,
@@ -62,7 +63,7 @@ function totalsOf(lines: InvoiceLine[], discount: number) {
     sgst: sum((row) => row.sgst),
     total,
     discount,
-    payable: Math.round((total - discount) * 100) / 100,
+    payable: roundPaise(total - discount),
   };
 }
 

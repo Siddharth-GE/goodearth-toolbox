@@ -2,6 +2,7 @@
 import { formatMoney } from "@/lib/format";
 
 import { pendingOnBill } from "./math";
+import { roundPaise } from "@/lib/line-money";
 
 /** The Monday (YYYY-MM-DD) of the week a date falls in — cash_requests.week_of. */
 export function mondayOf(isoDate: string): string {
@@ -25,8 +26,6 @@ export type ContractorPosition = {
   advancesOutstanding: number;
 };
 
-const paisa = (value: number) => Math.round(value * 100) / 100;
-
 export function contractorPosition(
   bills: LedgerBill[],
   advances: LedgerAdvance[],
@@ -41,13 +40,13 @@ export function contractorPosition(
   const advancesGiven = advances.reduce((sum, advance) => sum + advance.amount, 0);
   const advancesRecovered = advances.reduce((sum, advance) => sum + advance.recovered, 0);
   return {
-    billed: paisa(billed),
-    paid: paisa(paid),
-    recoveredOnBills: paisa(recoveredOnBills),
-    pending: paisa(pending),
-    advancesGiven: paisa(advancesGiven),
-    advancesRecovered: paisa(advancesRecovered),
-    advancesOutstanding: paisa(Math.max(0, advancesGiven - advancesRecovered)),
+    billed: roundPaise(billed),
+    paid: roundPaise(paid),
+    recoveredOnBills: roundPaise(recoveredOnBills),
+    pending: roundPaise(pending),
+    advancesGiven: roundPaise(advancesGiven),
+    advancesRecovered: roundPaise(advancesRecovered),
+    advancesOutstanding: roundPaise(Math.max(0, advancesGiven - advancesRecovered)),
   };
 }
 
@@ -78,15 +77,15 @@ export function cashRequestFigures(lines: CashRequestLine[]): {
   const paid = lines.reduce((sum, line) => sum + line.paid, 0);
   const toPay = lines.reduce((sum, line) => sum + lineLeftToPay(line), 0);
   return {
-    requested: paisa(requested),
-    released: paisa(released),
-    paid: paisa(paid),
-    toPay: paisa(toPay),
+    requested: roundPaise(requested),
+    released: roundPaise(released),
+    paid: roundPaise(paid),
+    toPay: roundPaise(toPay),
   };
 }
 
 export function lineLeftToPay(line: CashRequestLine): number {
-  return Math.max(0, paisa((line.released ?? 0) - line.paid));
+  return Math.max(0, roundPaise((line.released ?? 0) - line.paid));
 }
 
 /** The settlement guard's refusals, said first. `pending` is what the bill still has to settle; `cap` what is left of the released line it is paid from. */

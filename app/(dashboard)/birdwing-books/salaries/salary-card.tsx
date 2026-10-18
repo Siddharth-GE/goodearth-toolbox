@@ -12,6 +12,7 @@ import type { SalaryCard } from "@/lib/birdwing-books/queries";
 import { monthLabel } from "@/lib/birdwing-books/shared";
 import { formatDate, formatMoney, formatQuantity } from "@/lib/format";
 import { useState } from "react";
+import { roundPaise } from "@/lib/line-money";
 
 const money = (value: number) => formatMoney(value, { paise: value % 1 !== 0 });
 
@@ -100,7 +101,7 @@ export function SalaryCardView({
 
   const extra = Number(incentives.replace(/[,₹\s]/g, "")) || 0;
   const less = Number(deductions.replace(/[,₹\s]/g, "")) || 0;
-  const total = Math.round((preview.gross + extra - less) * 100) / 100;
+  const total = roundPaise(preview.gross + extra - less);
 
   return (
     <Section title={staff.name} note={ruleLine ?? undefined}>

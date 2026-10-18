@@ -9,6 +9,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { mondayOf } from "./ledger";
+import { roundPaise } from "@/lib/line-money";
 
 // Rules live in the database: bill_settlement_guard (money only against an approved bill, never past its total; an advance only from the same contractor and never past what is left), the paid-in-full trigger, and the cash-request guards.
 // Money is append-only. Each guard's refusal is written for a person, so it is passed on as is.
@@ -45,7 +46,7 @@ export async function recordBillPayment(
   const supabase = await createClient();
   const { error } = await supabase.from("bill_payments").insert({
     bill_id: billId,
-    amount: Math.round(input.amount * 100) / 100,
+    amount: roundPaise(input.amount),
     paid_on: input.paidOn,
     payment_ref: cleanRef(input.reference),
     note: input.note?.trim() || null,
@@ -72,7 +73,7 @@ export async function recoverAdvance(
   const { error } = await supabase.from("advance_recoveries").insert({
     advance_id: input.advanceId,
     bill_id: billId,
-    amount: Math.round(input.amount * 100) / 100,
+    amount: roundPaise(input.amount),
     recovered_on: input.recoveredOn,
     note: input.note?.trim() || null,
     created_by: user.id,
@@ -106,7 +107,7 @@ export async function recordAdvance(input: {
     vendor_id: input.vendorId,
     project_id: input.projectId,
     labour_contract_id: input.labourContractId || null,
-    amount: Math.round(input.amount * 100) / 100,
+    amount: roundPaise(input.amount),
     paid_on: input.paidOn,
     payment_ref: cleanRef(input.reference),
     note: input.note?.trim() || null,
@@ -149,7 +150,7 @@ export async function addBillsToCashRequest(
       cash_request_id: requestId,
       item_kind: "bill",
       bill_id: bill.billId,
-      requested_amount: Math.round(bill.amount * 100) / 100,
+      requested_amount: roundPaise(bill.amount),
       created_by: user.id,
       updated_by: user.id,
     })),
@@ -185,7 +186,7 @@ export async function addAdvanceToCashRequest(
     vendor_id: input.vendorId,
     project_id: input.projectId,
     labour_contract_id: input.labourContractId || null,
-    requested_amount: Math.round(input.amount * 100) / 100,
+    requested_amount: roundPaise(input.amount),
     note: input.note?.trim() || null,
     created_by: user.id,
     updated_by: user.id,
@@ -213,8 +214,8 @@ export async function setCashRequestAmount(
     .from("cash_request_items")
     .update({
       ...(input.requested !== undefined
-        ? { requested_amount: Math.round(input.requested * 100) / 100 }
-        : { released_amount: Math.round((input.released ?? 0) * 100) / 100 }),
+        ? { requested_amount: roundPaise(input.requested) }
+        : { released_amount: roundPaise(input.released ?? 0) }),
       updated_by: user.id,
     })
     .eq("id", itemId);

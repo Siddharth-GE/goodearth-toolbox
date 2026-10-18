@@ -1,3 +1,4 @@
+import { roundPaise } from "@/lib/line-money";
 // Pure half of scripts/import-masters-workbook.ts. A repeated vendor name is one vendor; look-alike names stay apart for Masters to merge.
 // Contradictory works rows are fixed in the tables below, matched on code AND text so a later sheet edit fails loudly.
 
@@ -23,8 +24,6 @@ function lines(cell: Cell): string | null {
   return value === "" ? null : value;
 }
 
-const money = (value: number) => Math.round(value * 100) / 100;
-
 export function looseKey(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
@@ -36,7 +35,7 @@ function number(cell: Cell, where: string): number | null {
   if (!Number.isFinite(parsed) || parsed < 0) {
     throw new Error(`${where}: "${value}" is not a price.`);
   }
-  return money(parsed);
+  return roundPaise(parsed);
 }
 
 function underHeader(rows: SheetRow[], sheet: string, expected: string[]): SheetRow[] {

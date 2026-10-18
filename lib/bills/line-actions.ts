@@ -10,6 +10,7 @@ import { redirect } from "next/navigation";
 
 import { billLinesProblem, lineMoneyOf, type BillLineDraft } from "./lines";
 import { rollUpBill } from "./math";
+import { roundPaise } from "@/lib/line-money";
 
 // Rules live in the database: bill_lines_guard (lines move only while the bill is recorded; a material names a line of the bill's own PO, 0111) and bill_lines_roll_up (header from lines, to the paisa).
 
@@ -172,7 +173,7 @@ export async function setBillTotalOverride(
     }
     if (!input.note?.trim()) return { error: "Say why the total differs from heads × rates." };
     update = {
-      total_amount: Math.round(input.total * 100) / 100,
+      total_amount: roundPaise(input.total),
       total_override_note: input.note.trim(),
     };
   }

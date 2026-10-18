@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { gstRegime, lineMoney, splitGst } from "./line-money";
+import { gstRegime, lineMoney, roundPaise, splitGst } from "./line-money";
 
 test("quantity × rate, the team's example", () => {
   const money = lineMoney({ quantity: 2, rate: 4000, gst_pct: 0 });
@@ -49,4 +49,16 @@ test("same state splits CGST + SGST; another state is IGST", () => {
   assert.deepEqual(gstRegime(null, "Kerala"), { interState: false, assumed: true });
   assert.deepEqual(splitGst(3240, false), { cgst: 1620, sgst: 1620, igst: 0 });
   assert.deepEqual(splitGst(3240, true), { cgst: 0, sgst: 0, igst: 3240 });
+});
+
+test("roundPaise: half a paisa goes away from zero, as written in decimal", () => {
+  assert.equal(roundPaise(1.005), 1.01);
+  assert.equal(roundPaise(2.675), 2.68);
+  assert.equal(roundPaise(1234567.895), 1234567.9);
+  assert.equal(roundPaise(-1.005), -1.01);
+  assert.equal(roundPaise(0.1 + 0.2), 0.3);
+  assert.equal(roundPaise(1.004), 1);
+  assert.equal(roundPaise(-0.004), 0);
+  assert.ok(!Object.is(roundPaise(-0.004), -0), "never a negative zero");
+  assert.equal(roundPaise(7980), 7980);
 });
