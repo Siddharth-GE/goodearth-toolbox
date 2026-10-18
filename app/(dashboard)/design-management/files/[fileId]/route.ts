@@ -22,11 +22,15 @@ export async function GET(_request: Request, { params }: { params: Promise<{ fil
   const { fileId } = await params;
   const supabase = await createClient();
 
-  const { data: file } = await supabase
+  const { data: file, error: fileError } = await supabase
     .from("drawing_revision_files")
     .select("storage_path, file_name, content_type, sheet_code, drawing_revision_id")
     .eq("id", fileId)
     .maybeSingle();
+  if (fileError) {
+    console.error("drawing sheet lookup failed:", fileError);
+    return new Response("Could not load the file", { status: 500 });
+  }
   if (!file) return new Response("Not found", { status: 404 });
 
   const { data: object, error } = await supabase.storage
