@@ -7,6 +7,7 @@ import type { CatalogueItem } from "@/lib/masters/catalogue";
 import { RequestItemDialog } from "./request-item-dialog";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { chipClassName } from "@/components/ui/choice-chips";
 
 type Space = { id: string; label: string };
 
@@ -94,12 +95,7 @@ export function CataloguePicker({
                         : [...current, space.id],
                     )
                   }
-                  className={[
-                    "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-                    on
-                      ? "border-accent bg-accent text-accent-foreground"
-                      : "border-border text-muted hover:text-foreground",
-                  ].join(" ")}
+                  className={chipClassName(on)}
                 >
                   {space.label}
                 </button>

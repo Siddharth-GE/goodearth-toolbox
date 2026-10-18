@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@/lib/utils";
+import { chipClassName } from "@/components/ui/choice-chips";
 
 /** Departments as toggle chips: a trail is often in several (Design and Purchase), and chips keep it two taps on a phone. */
 export function DepartmentPicker({
@@ -33,12 +33,7 @@ export function DepartmentPicker({
             onClick={() =>
               onChange(on ? selected.filter((id) => id !== d.id) : [...selected, d.id])
             }
-            className={cn(
-              "rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-50",
-              on
-                ? "border-accent bg-accent text-accent-foreground"
-                : "border-border text-muted hover:text-foreground",
-            )}
+            className={chipClassName(on)}
           >
             {d.name}
           </button>
