@@ -10,7 +10,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { GROUND_SWATCH } from "@/components/ui/ground";
-import { Wordmark } from "@/components/ui/logo";
 import { ThemeMenuItem } from "@/components/ui/theme-toggle";
 import { isInTool, sectionKeyOf, type ToolSection } from "@/lib/nav/arrange";
 import { TOOL_ICONS } from "@/lib/tools";
@@ -116,14 +115,10 @@ function TeamRow({
   );
 }
 
+/** Inside the app the name is just "Toolbox"; "Kaadal Toolbox" is for outside (sign-in, the tab, documents). */
 function Brand() {
   return (
-    <div className="flex items-end gap-2.5">
-      <Wordmark className="fill-ground-mark h-6" />
-      <span className="text-on-ground/70 pb-px text-[11px] font-medium tracking-[0.14em] uppercase">
-        Toolbox
-      </span>
-    </div>
+    <span className="text-ground-mark font-display text-2xl leading-none font-medium">Toolbox</span>
   );
 }
 

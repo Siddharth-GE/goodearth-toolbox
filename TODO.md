@@ -9,7 +9,7 @@ The founder's decision (2026-10-16):
 - Staging's database (`ipstebqawrvhkyntctrv`) becomes production.
 - The old production project is deleted.
 - A new, empty project becomes the practice database.
-- The app is Toolbox by Kaadal, at `toolbox.kaadalgroup.com`.
+- The app is Kaadal Toolbox, at `toolbox.kaadalgroup.com`.
 
 The founder gives the steps. Before the switch:
 

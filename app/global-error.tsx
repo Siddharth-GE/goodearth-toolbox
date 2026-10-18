@@ -23,17 +23,11 @@ export default function GlobalError({
             worse than not matching their exact choice. Values quoted from
             app/globals.css, which this file must not import. */}
         <style>{`
-          :root { color-scheme: light dark; }
+          :root { color-scheme: light; }
           body { background: #f0eeea; color: #180b0f; }
           .ge-muted { color: #6b6563; }
           .ge-faint { color: #8a8381; }
           .ge-button { background: #521323; border: 1px solid #521323; color: #ffffff; }
-          @media (prefers-color-scheme: dark) {
-            body { background: #180b0f; color: #f2e8e9; }
-            .ge-muted { color: #a99a97; }
-            .ge-faint { color: #7d6f6c; }
-            .ge-button { background: #dec8b7; border-color: #dec8b7; color: #180b0f; }
-          }
         `}</style>
       </head>
       <body

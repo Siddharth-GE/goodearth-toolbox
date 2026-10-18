@@ -3,23 +3,13 @@
 /* ---------------------------------------------------------------------
    Kaadal brand (Brandkit 2026). Solid colour only: no textures, no glass.
 
-   Dark comes from `data-theme` on <html> (the switch), else from the
-   device. The dark block is written twice, once per selector, because CSS
-   cannot share one block across a media query: keep the two in step.
+   Light by default. Dark only when someone picks it with the switch, which
+   sets `data-theme="dark"` on <html>; the device's own setting is ignored.
    `color-scheme` sits beside the tokens so the browser's own date pickers,
    selects and scrollbars follow the mode (BUGCATCHER #4).
    --------------------------------------------------------------------- */
 
-@custom-variant dark {
-  &:where([data-theme="dark"], [data-theme="dark"] *) {
-    @slot;
-  }
-  @media (prefers-color-scheme: dark) {
-    &:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) {
-      @slot;
-    }
-  }
-}
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 :root {
   color-scheme: light;
@@ -177,7 +167,7 @@
   --ground-mark: #ffffff;
 }
 
-/* Dark, asked for: the brand's ink, with blush as the action colour. */
+/* Dark, when chosen: the brand's ink, with blush as the action colour. */
 :root[data-theme="dark"] {
   color-scheme: dark;
 
@@ -210,43 +200,6 @@
   --chart-6: #e66767;
   --chart-7: #3987e5;
   --chart-8: #d95926;
-}
-
-/* Dark, inherited from the device — unless the switch says light. */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    color-scheme: dark;
-
-    --background: #180b0f;
-    --foreground: #f2e8e9;
-    --surface: #20131a;
-    --surface-raised: #2a1c22;
-    --border: #3a2a31;
-    --accent: #dec8b7;
-    --accent-hover: #ead9cb;
-    --accent-foreground: #180b0f;
-    --muted: #a99a97;
-
-    --shadow-float: 0 16px 48px -12px rgb(0 0 0 / 0.7), 0 1px 0 rgb(255 255 255 / 0.04);
-
-    --success: #a9b98a;
-    --success-foreground: #180b0f;
-    --warning: #d9a75f;
-    --warning-foreground: #180b0f;
-    --danger: #ef7a6f;
-    --danger-foreground: #180b0f;
-    --info: #8fb9c2;
-    --info-foreground: #180b0f;
-
-    --chart-1: #199e70;
-    --chart-2: #c98500;
-    --chart-3: #d55181;
-    --chart-4: #008300;
-    --chart-5: #9085e9;
-    --chart-6: #e66767;
-    --chart-7: #3987e5;
-    --chart-8: #d95926;
-  }
 }
 
 body {

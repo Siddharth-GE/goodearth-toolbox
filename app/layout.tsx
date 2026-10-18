@@ -29,17 +29,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Toolbox by Kaadal",
+  title: "Kaadal Toolbox",
   description: "Kaadal's internal tools",
 };
 
-// Paints the phone's address bar to match the brand top bar (burgundy, deep teal in dark).
-// Static <meta> tags resolve before our code, so they follow prefers-color-scheme, not the switch.
+// Paints the phone's address bar to match the burgundy top bar.
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#521323" },
-    { media: "(prefers-color-scheme: dark)", color: "#102228" },
-  ],
+  themeColor: "#521323",
 };
 
 /**

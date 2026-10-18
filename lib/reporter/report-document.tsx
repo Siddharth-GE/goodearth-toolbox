@@ -90,7 +90,7 @@ export function ReportDocument({
   const meta = {
     documentType: "REPORT",
     reference: name,
-    footerLeft: `Generated ${generatedOn} · Toolbox by Kaadal`,
+    footerLeft: `Generated ${generatedOn} · Kaadal Toolbox`,
   };
 
   const filterNote =
@@ -99,7 +99,7 @@ export function ReportDocument({
       : "";
 
   return (
-    <Document title={name} author="Toolbox by Kaadal">
+    <Document title={name} author="Kaadal Toolbox">
       <DocumentPage meta={meta}>
         <Text style={styles.title}>{name}</Text>
         {description && <Text style={styles.description}>{description}</Text>}

@@ -1,4 +1,4 @@
-# Toolbox by Kaadal — design system
+# Kaadal Toolbox — design system
 
 The shared visual language every tool is built from: **the Kaadal brand (Brandkit 2026), set for work.** Solid brand colour, Gambetta titles, near-square controls, hairlines; no textures, gradients or glass. The brand is warmth and precision — "never loud, never distant". The mode is _operate_: someone is here to finish a task, so the brand frames the screen (the burgundy rail, a team's coloured band, a Gambetta title) and stays out of the task itself. The brand kit's source files live outside the repo; its colours, fonts and logo paths are copied in here and nowhere else.
 
@@ -38,14 +38,13 @@ A **ground** is a solid brand block: the sidebar rail, the phone top bar and dra
 
 ### Light and dark
 
-Both palettes live in `app/globals.css` only. Dark comes from `data-theme="dark"|"light"` on `<html>` — the switch in the user menu and on the login screen (`components/ui/theme-toggle.tsx`), remembered in a cookie and applied by a blocking inline script before first paint — else from `prefers-color-scheme`. Nothing is stored on anyone's account. `lib/theme.ts` holds the rule as pure functions; an unrecognised cookie means "follow the device".
+**Light by default** (founder's choice); the device's own setting is ignored. Dark only when someone picks it: `data-theme="dark"` on `<html>`, set by the switch in the user menu and on the login screen (`components/ui/theme-toggle.tsx`), remembered in a cookie and applied by a blocking inline script before first paint. Nothing is stored on anyone's account. Both palettes live in `app/globals.css` only; `lib/theme.ts` holds the rule as pure functions, and an unrecognised cookie means light.
 
-- **`@custom-variant dark`** teaches Tailwind the same two rules, or `dark:` utilities ignore the switch.
-- **The dark token block is written twice** (one per selector — CSS cannot share a block across a media query). Change both, including `--shadow-float`.
+- **`@custom-variant dark`** teaches Tailwind the same rule, or `dark:` utilities ignore the switch.
 - **`color-scheme` is declared beside the tokens**, so date pickers, steppers, selects and scrollbars follow (BUGCATCHER #4).
 - **Don't read the cookie in the layout body** — it costs static rendering (BUGCATCHER #6).
-- The `themeColor` values in `app/layout.tsx` quote the phone top bar's ground (burgundy, deep teal in dark); move them with it.
-- PDFs (`lib/pdf/theme.ts`) deliberately ignore the theme: a document's letterhead is its company's (`PRODUCT.md`). The logo (`components/ui/logo.tsx`: the K mark and the wordmark, paths copied from the brand artwork) uses brand colours, never tokens: the K is burgundy on light, blush on dark; the wordmark takes its ground's mark colour. The tab icon is the K as a tile. The app is "Toolbox by Kaadal".
+- The `themeColor` in `app/layout.tsx` quotes the phone top bar's burgundy; move it with it.
+- PDFs (`lib/pdf/theme.ts`) deliberately ignore the theme: a document's letterhead is its company's (`PRODUCT.md`). The logo (`components/ui/logo.tsx`: the K mark and the wordmark, paths copied from the brand artwork) uses brand colours, never tokens: the K is burgundy on light, blush on dark; the wordmark takes its ground's mark colour. The tab icon is the K as a tile. **The name is "Kaadal Toolbox" outside** (sign-in, the browser tab, document metadata) **and just "Toolbox" inside** (the sidebar, in Gambetta in the rail's mark colour).
 
 ### The other colour systems
 

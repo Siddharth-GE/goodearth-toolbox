@@ -13,11 +13,7 @@ import type { ComponentProps } from "react";
  */
 function flip() {
   const root = document.documentElement;
-  const current = effectiveTheme(
-    root.dataset.theme,
-    window.matchMedia("(prefers-color-scheme: dark)").matches,
-  );
-  const next = nextTheme(current);
+  const next = nextTheme(effectiveTheme(root.dataset.theme));
 
   const apply = () => {
     root.dataset.theme = next;

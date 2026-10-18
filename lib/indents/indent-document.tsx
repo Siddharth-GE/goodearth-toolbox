@@ -89,7 +89,7 @@ export function IndentDocument({ data }: { data: IndentPdfData }) {
     <Document
       title={`Goodearth Indent — ${indent.reference}`}
       author="Goodearth"
-      creator="Toolbox by Kaadal"
+      creator="Kaadal Toolbox"
     >
       <DocumentPage meta={meta}>
         <DocumentHeading
