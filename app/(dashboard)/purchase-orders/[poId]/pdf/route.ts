@@ -1,4 +1,5 @@
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
+import { pdfResponse, safeFileNamePart } from "@/lib/pdf/response";
 import { PoDocument } from "@/lib/purchase-orders/po-document";
 import { getPoPdfData } from "@/lib/purchase-orders/queries";
 import { createElement, type ReactElement } from "react";
@@ -14,15 +15,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ poI
     createElement(PoDocument, { data }) as ReactElement<DocumentProps>,
   );
 
-  const safe = (value: string) => value.replace(/[^\w-]+/g, "-").replace(/^-|-$/g, "");
   const draftTag = data.po.status === "draft" ? "-DRAFT" : "";
-  const filename = `Goodearth-PO-${safe(data.po.reference)}${draftTag}.pdf`;
+  const filename = `Goodearth-PO-${safeFileNamePart(data.po.reference)}${draftTag}.pdf`;
 
-  return new Response(new Uint8Array(buffer), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${filename}"`,
-      "Cache-Control": "no-store",
-    },
-  });
+  return pdfResponse(buffer, filename, { disposition: "attachment" });
 }

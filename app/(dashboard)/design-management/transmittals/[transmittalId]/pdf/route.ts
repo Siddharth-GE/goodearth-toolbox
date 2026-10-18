@@ -1,4 +1,5 @@
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
+import { pdfResponse, safeFileNamePart } from "@/lib/pdf/response";
 import { getTransmittalDetail } from "@/lib/design-management/queries";
 import { TransmittalDocument } from "@/lib/design-management/transmittal-document";
 import { createElement, type ReactElement } from "react";
@@ -21,18 +22,11 @@ export async function GET(
   );
 
   // The number counts per villa (0092), so the villa is in the name (TB-0003 alone names a transmittal on every villa). A draft has no number, so it is marked a draft.
-  const safe = (value: string) => value.replace(/[^\w-]+/g, "-").replace(/^-|-$/g, "");
   const villa = transmittal.villaName.replace(/[^A-Za-z0-9]+/g, "") || "Villa";
   const filename = transmittal.number
-    ? `Goodearth-Transmittal-${villa}-${safe(transmittal.number)}.pdf`
+    ? `Goodearth-Transmittal-${villa}-${safeFileNamePart(transmittal.number)}.pdf`
     : `Goodearth-Transmittal-${villa}-Draft.pdf`;
 
-  return new Response(new Uint8Array(buffer), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${filename}"`,
-      // A draft's contents change while assembled: never cache.
-      "Cache-Control": "no-store",
-    },
-  });
+  // A draft's contents change while assembled: never cache.
+  return pdfResponse(buffer, filename, { disposition: "attachment" });
 }

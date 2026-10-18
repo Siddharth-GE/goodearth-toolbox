@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth/dal";
 import { STAYS_BUCKET } from "@/lib/birdwing/storage";
 import { idParam } from "@/lib/list-params";
 import { createClient } from "@/lib/supabase/server";
+import { storedFileResponse } from "@/lib/uploads/stored-file";
 
 /** The row is looked up BY ID through the RLS-scoped client first, so a path never leaves the server for anyone without
  * /birdwing. Private cache and nosniff: the file's type is what the row says, nothing a browser guesses. */
@@ -27,18 +28,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ fil
   }
   if (!file) return new Response("Not found", { status: 404 });
 
-  const { data: object, error } = await supabase.storage
-    .from(STAYS_BUCKET)
-    .download(file.storage_path);
-  if (error || !object) return new Response("Not found", { status: 404 });
-
-  const asciiName = file.file_name.replace(/[^ -~]/g, "_").replace(/"/g, "");
-  return new Response(await object.arrayBuffer(), {
-    headers: {
-      "Content-Type": file.content_type,
-      "Content-Disposition": `inline; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(file.file_name)}`,
-      "Cache-Control": "private, max-age=3600",
-      "X-Content-Type-Options": "nosniff",
-    },
+  return storedFileResponse(supabase, STAYS_BUCKET, file.storage_path, {
+    contentType: file.content_type,
+    fileName: file.file_name,
+    nosniff: true,
   });
 }

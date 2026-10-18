@@ -1,4 +1,5 @@
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
+import { pdfResponse, safeFileNamePart } from "@/lib/pdf/response";
 import { IndentDocument } from "@/lib/indents/indent-document";
 import { getIndent } from "@/lib/indents/queries";
 import { getProjectCompany } from "@/lib/masters/companies";
@@ -28,15 +29,8 @@ export async function GET(
     }) as ReactElement<DocumentProps>,
   );
 
-  const safe = (value: string) => value.replace(/[^\w-]+/g, "-").replace(/^-|-$/g, "");
   const draftTag = indent.status === "draft" ? "-DRAFT" : "";
-  const filename = `Goodearth-Indent-${safe(indent.reference)}${draftTag}.pdf`;
+  const filename = `Goodearth-Indent-${safeFileNamePart(indent.reference)}${draftTag}.pdf`;
 
-  return new Response(new Uint8Array(buffer), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${filename}"`,
-      "Cache-Control": "no-store",
-    },
-  });
+  return pdfResponse(buffer, filename, { disposition: "inline" });
 }

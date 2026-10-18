@@ -1,4 +1,5 @@
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
+import { pdfResponse, safeFileNamePart } from "@/lib/pdf/response";
 import { getQuote } from "@/lib/budgets/quote";
 import { QuoteDocument } from "@/lib/budgets/quote-document";
 import { createElement, type ReactElement } from "react";
@@ -26,17 +27,10 @@ export async function GET(
     createElement(QuoteDocument, { quote }) as ReactElement<DocumentProps>,
   );
 
-  const safe = (value: string) => value.replace(/[^\w-]+/g, "-").replace(/^-|-$/g, "");
   // Version in the filename too, so two quotations never share a name.
-  const filename = `Goodearth-Quotation-${safe(quote.project_name)}-${safe(quote.unit_name)}-R${
+  const filename = `Goodearth-Quotation-${safeFileNamePart(quote.project_name)}-${safeFileNamePart(quote.unit_name)}-R${
     quote.revision_no
   }-v${quote.version}.pdf`;
 
-  return new Response(new Uint8Array(buffer), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${filename}"`,
-      "Cache-Control": "no-store",
-    },
-  });
+  return pdfResponse(buffer, filename, { disposition: "attachment" });
 }

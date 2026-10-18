@@ -1,4 +1,5 @@
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
+import { pdfResponse, safeFileNamePart } from "@/lib/pdf/response";
 import { BillDocument } from "@/lib/bills/bill-document";
 import { getBillLines } from "@/lib/bills/line-queries";
 import { getBillSettlement } from "@/lib/bills/payment-queries";
@@ -25,15 +26,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ bil
     }) as ReactElement<DocumentProps>,
   );
 
-  const safe = (value: string) => value.replace(/[^\w-]+/g, "-").replace(/^-|-$/g, "");
   const draftTag = bill.status === "recorded" ? "-DRAFT" : "";
-  const filename = `Goodearth-Bill-${safe(bill.reference)}${draftTag}.pdf`;
+  const filename = `Goodearth-Bill-${safeFileNamePart(bill.reference)}${draftTag}.pdf`;
 
-  return new Response(new Uint8Array(buffer), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${filename}"`,
-      "Cache-Control": "no-store",
-    },
-  });
+  return pdfResponse(buffer, filename, { disposition: "inline" });
 }

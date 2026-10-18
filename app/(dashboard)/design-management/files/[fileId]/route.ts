@@ -4,6 +4,7 @@ import { DRAWINGS_BUCKET } from "@/lib/design-management/storage";
 import { sheetNamingContext } from "@/lib/drawings/sheet-context";
 import { sheetFileName } from "@/lib/drawings/sheet-name";
 import { createClient } from "@/lib/supabase/server";
+import { storedFileResponse } from "@/lib/uploads/stored-file";
 
 /**
  * Serves one drawing sheet. The private `drawings` bucket's SELECT policy (0091) is coarser than the table's, so the narrow gate is here:
@@ -33,11 +34,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ fil
   }
   if (!file) return new Response("Not found", { status: 404 });
 
-  const { data: object, error } = await supabase.storage
-    .from(DRAWINGS_BUCKET)
-    .download(file.storage_path);
-  if (error || !object) return new Response("Not found", { status: 404 });
-
   let downloadName = file.file_name;
   try {
     const context = (await sheetNamingContext(supabase, [file.drawing_revision_id])).get(
@@ -55,13 +51,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ fil
     console.error("drawing sheet name lookup failed:", error);
   }
 
-  const asciiName = downloadName.replace(/[^ -~]/g, "_").replace(/"/g, "");
-  return new Response(await object.arrayBuffer(), {
-    headers: {
-      "Content-Type": file.content_type,
-      "Content-Disposition": `inline; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(downloadName)}`,
-      // Private, so no shared cache; a replacement is a new path, so these bytes never change.
-      "Cache-Control": "private, max-age=3600",
-    },
+  return storedFileResponse(supabase, DRAWINGS_BUCKET, file.storage_path, {
+    contentType: file.content_type,
+    fileName: downloadName,
   });
 }

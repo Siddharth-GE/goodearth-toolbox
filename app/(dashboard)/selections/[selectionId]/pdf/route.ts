@@ -1,4 +1,5 @@
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
+import { pdfResponse, safeFileNamePart } from "@/lib/pdf/response";
 import { getBudgetHandoff } from "@/lib/selections/queries";
 import { SelectionDocument, type ViewImage } from "@/lib/selections/selection-document";
 import { downloadSpaceView, listSpaceViews } from "@/lib/design-views/queries";
@@ -42,17 +43,10 @@ export async function GET(
     createElement(SelectionDocument, { handoff, viewsBySpace }) as ReactElement<DocumentProps>,
   );
 
-  const safe = (value: string) => value.replace(/[^\w-]+/g, "-").replace(/^-|-$/g, "");
-  const filename = `Goodearth-Selections-${safe(handoff.selection.project_name)}-${safe(
+  const filename = `Goodearth-Selections-${safeFileNamePart(handoff.selection.project_name)}-${safeFileNamePart(
     handoff.selection.unit_name,
   )}-R${handoff.selection.revision_no}.pdf`;
 
-  return new Response(new Uint8Array(buffer), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${filename}"`,
-      // A draft's contents can change, so never let a browser or CDN cache one.
-      "Cache-Control": "no-store",
-    },
-  });
+  // A draft's contents can change, so never let a browser or CDN cache one.
+  return pdfResponse(buffer, filename, { disposition: "attachment" });
 }

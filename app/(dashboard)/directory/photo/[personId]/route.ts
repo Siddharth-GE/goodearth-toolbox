@@ -2,6 +2,7 @@ import { hasApp } from "@/lib/auth/access";
 import { getCurrentUser } from "@/lib/auth/dal";
 import { STAFF_PHOTOS_BUCKET } from "@/lib/directory/photo";
 import { createClient } from "@/lib/supabase/server";
+import { storedFileResponse } from "@/lib/uploads/stored-file";
 
 /**
  * Serves a staff photo. The bucket is private, so this is the only way to see one, and a staff photo must not sit at a URL that outlives their account.
@@ -33,16 +34,7 @@ export async function GET(
   }
   if (!card?.photo_path) return new Response("Not found", { status: 404 });
 
-  const { data: file, error } = await supabase.storage
-    .from(STAFF_PHOTOS_BUCKET)
-    .download(card.photo_path);
-  if (error || !file) return new Response("Not found", { status: 404 });
-
-  return new Response(await file.arrayBuffer(), {
-    headers: {
-      "Content-Type": "image/jpeg",
-      // Private: no shared cache. The browser may hold it, since a replacement is a new path and ?v= changes.
-      "Cache-Control": "private, max-age=3600",
-    },
+  return storedFileResponse(supabase, STAFF_PHOTOS_BUCKET, card.photo_path, {
+    contentType: "image/jpeg",
   });
 }

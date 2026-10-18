@@ -1,4 +1,5 @@
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
+import { pdfResponse, safeFileNamePart } from "@/lib/pdf/response";
 import { WorkOrderDocument } from "@/lib/bills/work-order-document";
 import { getWorkOrder } from "@/lib/bills/work-order-queries";
 import { createElement, type ReactElement } from "react";
@@ -14,15 +15,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     createElement(WorkOrderDocument, { order }) as ReactElement<DocumentProps>,
   );
 
-  const safe = (value: string) => value.replace(/[^\w-]+/g, "-").replace(/^-|-$/g, "");
   const draftTag = order.status === "approved" ? "" : "-DRAFT";
-  const filename = `Goodearth-WorkOrder-${safe(order.reference ?? order.id)}${draftTag}.pdf`;
+  const filename = `Goodearth-WorkOrder-${safeFileNamePart(order.reference ?? order.id)}${draftTag}.pdf`;
 
-  return new Response(new Uint8Array(buffer), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${filename}"`,
-      "Cache-Control": "no-store",
-    },
-  });
+  return pdfResponse(buffer, filename, { disposition: "inline" });
 }

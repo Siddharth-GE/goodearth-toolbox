@@ -1,4 +1,5 @@
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
+import { pdfResponse, safeFileNamePart } from "@/lib/pdf/response";
 import { BudgetDocument } from "@/lib/budgets/budget-document";
 import { getBudget } from "@/lib/budgets/queries";
 import { createElement, type ReactElement } from "react";
@@ -20,17 +21,10 @@ export async function GET(
     createElement(BudgetDocument, { budget }) as ReactElement<DocumentProps>,
   );
 
-  const safe = (value: string) => value.replace(/[^\w-]+/g, "-").replace(/^-|-$/g, "");
   // "INTERNAL" in the filename: it is what someone reads before attaching to an email.
-  const filename = `Goodearth-Budget-INTERNAL-${safe(budget.project_name)}-${safe(
+  const filename = `Goodearth-Budget-INTERNAL-${safeFileNamePart(budget.project_name)}-${safeFileNamePart(
     budget.unit_name,
   )}-R${budget.revision_no}-v${budget.version}.pdf`;
 
-  return new Response(new Uint8Array(buffer), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${filename}"`,
-      "Cache-Control": "no-store",
-    },
-  });
+  return pdfResponse(buffer, filename, { disposition: "attachment" });
 }

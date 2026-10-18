@@ -1,4 +1,5 @@
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
+import { pdfResponse, safeFileNamePart } from "@/lib/pdf/response";
 import { InvoiceDocument } from "@/lib/birdwing/invoice-document";
 import { getInvoicePrint } from "@/lib/birdwing/queries";
 import { idParam } from "@/lib/list-params";
@@ -18,16 +19,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ stay
     createElement(InvoiceDocument, { invoice }) as ReactElement<DocumentProps>,
   );
 
-  const safe = (value: string) => value.replace(/[^\w-]+/g, "-").replace(/^-|-$/g, "");
   const name = invoice.number
-    ? `Birdwing-Invoice-${safe(invoice.number)}${invoice.mode === "cancelled" ? "-CANCELLED" : ""}`
-    : `Birdwing-Invoice-${safe(invoice.stay.ref)}-DRAFT`;
+    ? `Birdwing-Invoice-${safeFileNamePart(invoice.number)}${invoice.mode === "cancelled" ? "-CANCELLED" : ""}`
+    : `Birdwing-Invoice-${safeFileNamePart(invoice.stay.ref)}-DRAFT`;
 
-  return new Response(new Uint8Array(buffer), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${name}.pdf"`,
-      "Cache-Control": "no-store",
-    },
-  });
+  return pdfResponse(buffer, `${name}.pdf`, { disposition: "inline" });
 }
