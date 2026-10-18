@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
-// The Kaadal 'K' mark from the brand artwork (`kaadal-k-*.svg`); change the paths only from that artwork.
-// Brand colours, not theme tokens: burgundy on light, blush on dark, so the mark is never just the text colour.
+// The Kaadal 'K' mark and wordmark from the brand artwork (`kaadal-k-*.svg`, `kaadal-wordmark-*.svg`); change the paths only from it.
+// Logo colours are the Brandkit's approved pairings, never theme tokens.
 const MARK_PATHS = [
   "M36.57 0.00L63.77 0.00C61.11 9.14 46.99 20.49 30.44 26.74C46.30 9.72 36.57 0.00 36.57 0.00",
   "M24.77 65.74L0.00 65.74C1.73 63.89 2.31 61.57 2.31 58.91L2.31 6.25C2.31 3.82 1.73 1.85 0.00 0.00L21.76 0.00L21.76 58.91C21.76 61.57 22.92 63.89 24.77 65.74",
@@ -12,10 +12,39 @@ export function Logo({ className }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 67.13 65.74"
-      className={cn("size-7 shrink-0 fill-[#521323] dark:fill-[#dec8b7]", className)}
+      className={cn("fill-brand-burgundy dark:fill-brand-blush size-7 shrink-0", className)}
       aria-hidden="true"
     >
       {MARK_PATHS.map((d) => (
+        <path key={d} d={d} />
+      ))}
+    </svg>
+  );
+}
+
+const WORDMARK_PATHS = [
+  "M28.15 0L49.08 0C47.03 7.03 36.16 15.76 23.43 20.57C35.63 7.48 28.15 0 28.15 0M19.06 50.59L0 50.59C1.34 49.16 1.78 47.38 1.78 45.33L1.78 4.81C1.78 2.94 1.34 1.42 0 0L16.75 0L16.75 45.33C16.75 47.38 17.64 49.16 19.06 50.59M41.42 50.59L51.66 50.59C47.03 48.27 41.86 30.99 40.62 27.34C40.62 27.34 33.93 32.24 23.43 22.89L30.28 43.28C32.15 49.25 38.12 50.59 41.42 50.59",
+  "M170.33 50.47L170.33 0L187.03 0C185.7 1.42 185.26 2.93 185.26 4.8L185.26 45.23C185.26 47.27 185.7 49.05 187.03 50.47Z",
+  "M241.68 45.22L241.68 0L258.38 0C257.05 1.42 256.61 2.93 256.61 4.8L256.61 45.22C256.61 47.27 257.05 49.05 258.38 50.47L243.37 50.47L239.9 50.47C241.24 49.05 241.68 47.27 241.68 45.22",
+  "M216.62 43.71L207.47 16.17L214.76 16.17C218.04 16.17 224.17 17.24 225.68 23.1L234.66 50.65L228.08 50.65C224.8 50.65 218.58 49.58 216.62 43.71",
+  "M213.78 46.29C202.58 42.38 199.92 27.37 206.14 17.24L193.34 32.34C186.77 43.8 197.69 51.36 202.85 51.36Z",
+  "M77.74 43.71L68.59 16.17L75.88 16.17C79.16 16.17 85.29 17.24 86.8 23.1L95.78 50.65L89.2 50.65C85.92 50.65 79.7 49.58 77.74 43.71",
+  "M74.9 46.29C63.7 42.38 61.04 27.37 67.26 17.24L54.46 32.34C47.89 43.8 58.81 51.36 63.97 51.36Z",
+  "M167.04 46.29C157.09 38.38 157.53 24.61 166.86 16.26L148.83 30.56C140.3 40.78 150.96 51.36 156.11 51.36Z",
+  "M124.57 43.71L115.42 16.17L122.7 16.17C125.99 16.17 132.12 17.24 133.63 23.1L142.61 50.65L136.03 50.65C132.74 50.65 126.52 49.58 124.57 43.71",
+  "M121.72 46.29C110.53 42.38 107.86 27.37 114.08 17.24L101.29 32.34C94.71 43.8 105.64 51.36 110.8 51.36Z",
+];
+
+/** The Kaadal wordmark; its colour comes from `fill-*` in className (on a ground, `fill-ground-mark`). */
+export function Wordmark({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 258.38 51.36"
+      className={cn("h-6 w-auto shrink-0", className)}
+      role="img"
+      aria-label="Kaadal"
+    >
+      {WORDMARK_PATHS.map((d) => (
         <path key={d} d={d} />
       ))}
     </svg>

@@ -24,15 +24,15 @@ export default function GlobalError({
             app/globals.css, which this file must not import. */}
         <style>{`
           :root { color-scheme: light dark; }
-          body { background: #fafaf9; color: #1c1c1a; }
-          .ge-muted { color: #6b6b66; }
-          .ge-faint { color: #9a9a92; }
-          .ge-button { background: #ffffff; border: 1px solid #e7e5e2; color: inherit; }
+          body { background: #f0eeea; color: #180b0f; }
+          .ge-muted { color: #6b6563; }
+          .ge-faint { color: #8a8381; }
+          .ge-button { background: #521323; border: 1px solid #521323; color: #ffffff; }
           @media (prefers-color-scheme: dark) {
-            body { background: #121210; color: #f2f2ef; }
-            .ge-muted { color: #9a9a92; }
-            .ge-faint { color: #6b6b66; }
-            .ge-button { background: #1a1a17; border-color: #2c2c28; }
+            body { background: #180b0f; color: #f2e8e9; }
+            .ge-muted { color: #a99a97; }
+            .ge-faint { color: #7d6f6c; }
+            .ge-button { background: #dec8b7; border-color: #dec8b7; color: #180b0f; }
           }
         `}</style>
       </head>
@@ -48,7 +48,9 @@ export default function GlobalError({
         }}
       >
         <div>
-          <h1 style={{ fontSize: "1.125rem", fontWeight: 700 }}>Something went wrong</h1>
+          <h1 style={{ fontFamily: "Georgia, serif", fontSize: "1.75rem", fontWeight: 500 }}>
+            Something went wrong
+          </h1>
           <p className="ge-muted" style={{ marginTop: "0.5rem", fontSize: "0.875rem" }}>
             The Toolbox couldn&apos;t load. Trying again usually fixes it.
           </p>
@@ -58,9 +60,9 @@ export default function GlobalError({
             style={{
               marginTop: "1.25rem",
               padding: "0.6rem 1.2rem",
-              borderRadius: "0.75rem",
+              borderRadius: "2px",
               cursor: "pointer",
-              fontWeight: 600,
+              fontWeight: 500,
             }}
           >
             Try again

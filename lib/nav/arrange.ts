@@ -12,7 +12,14 @@ export type ToolArrangement = {
   teamOf: Record<string, string>;
 };
 
-export type ToolSection = { key: string; name: string; tools: Tool[] };
+/** A team's brand colour, for its sidebar mark and its tools' welcome band. */
+export type TeamGround = "burgundy" | "teal" | "olive" | "ochre" | "sage" | "blush" | "ink";
+
+/** By the team's place in Settings → Teams, so everyone sees a team in the same colour; Other is always ink. */
+const TEAM_GROUNDS: TeamGround[] = ["burgundy", "teal", "olive", "ochre", "sage", "blush"];
+const OTHER_GROUND: TeamGround = "ink";
+
+export type ToolSection = { key: string; name: string; ground: TeamGround; tools: Tool[] };
 
 /** A tool with no team sits here, always last, so it never vanishes from the sidebar. */
 export const OTHER_SECTION = { key: "other", name: "Other" } as const;
@@ -22,13 +29,14 @@ export const NO_ARRANGEMENT: ToolArrangement = { teams: [], teamOf: {} };
 
 /** Teams in order, Other last; tools keep lib/tools.ts order inside a team. A team with none of `tools` is left out. */
 export function arrangeTools(tools: Tool[], arrangement: ToolArrangement): ToolSection[] {
-  const sections: ToolSection[] = arrangement.teams.map((team) => ({
+  const sections: ToolSection[] = arrangement.teams.map((team, index) => ({
     key: team.id,
     name: team.name,
+    ground: TEAM_GROUNDS[index % TEAM_GROUNDS.length],
     tools: [],
   }));
   const byKey = new Map(sections.map((section) => [section.key, section]));
-  const other: ToolSection = { ...OTHER_SECTION, tools: [] };
+  const other: ToolSection = { ...OTHER_SECTION, ground: OTHER_GROUND, tools: [] };
 
   for (const tool of tools) {
     const teamId = arrangement.teamOf[tool.href];
@@ -47,4 +55,10 @@ export function isInTool(href: string, pathname: string) {
 export function sectionKeyOf(sections: ToolSection[], pathname: string): string | null {
   const section = sections.find((s) => s.tools.some((tool) => isInTool(tool.href, pathname)));
   return section?.key ?? null;
+}
+
+/** The colour of the team holding the tool at `href`. */
+export function teamGroundOf(arrangement: ToolArrangement, href: string): TeamGround {
+  const index = arrangement.teams.findIndex((team) => team.id === arrangement.teamOf[href]);
+  return index < 0 ? OTHER_GROUND : TEAM_GROUNDS[index % TEAM_GROUNDS.length];
 }

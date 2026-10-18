@@ -27,7 +27,7 @@ export default async function DashboardHome() {
   return (
     <div>
       <div className="mt-4 mb-6">
-        <h1 className="text-foreground text-4xl font-semibold tracking-tight text-balance md:text-5xl">
+        <h1 className="text-foreground font-display text-4xl font-medium text-balance md:text-6xl">
           {greeting()}
           {firstName ? `, ${firstName}.` : "."}
         </h1>

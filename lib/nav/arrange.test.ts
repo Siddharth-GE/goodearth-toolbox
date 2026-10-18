@@ -4,7 +4,7 @@ import { test } from "node:test";
 
 import type { Tool } from "@/lib/tools";
 
-import { arrangeTools, isInTool, NO_ARRANGEMENT, sectionKeyOf } from "./arrange";
+import { arrangeTools, isInTool, NO_ARRANGEMENT, sectionKeyOf, teamGroundOf } from "./arrange";
 
 function tool(href: string): Tool {
   return { name: href, description: "", href, icon: "Boxes", built: true };
@@ -80,4 +80,22 @@ test("the open section is the one holding the page; the home page opens none", (
   assert.equal(sectionKeyOf(sections, "/inventory/receipts/1"), "t-site");
   assert.equal(sectionKeyOf(sections, "/dexter"), "t-design");
   assert.equal(sectionKeyOf(sections, "/"), null);
+});
+
+test("a team's colour follows its place in the team list, whoever is looking", () => {
+  assert.deepEqual(
+    arrangeTools([indents, dexter, fresh], arrangement).map((s) => [s.name, s.ground]),
+    [
+      ["Design", "burgundy"],
+      ["Site", "teal"],
+      ["Other", "ink"],
+    ],
+  );
+  assert.deepEqual(
+    arrangeTools([indents], arrangement).map((s) => s.ground),
+    ["teal"],
+  );
+  assert.equal(teamGroundOf(arrangement, "/inventory"), "teal");
+  assert.equal(teamGroundOf(arrangement, "/relay"), "ink");
+  assert.equal(teamGroundOf(NO_ARRANGEMENT, "/indents"), "ink");
 });

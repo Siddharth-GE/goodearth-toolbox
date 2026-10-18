@@ -9,7 +9,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Logo } from "@/components/ui/logo";
+import { GROUND_SWATCH } from "@/components/ui/ground";
+import { Wordmark } from "@/components/ui/logo";
 import { ThemeMenuItem } from "@/components/ui/theme-toggle";
 import { isInTool, sectionKeyOf, type ToolSection } from "@/lib/nav/arrange";
 import { TOOL_ICONS } from "@/lib/tools";
@@ -38,14 +39,14 @@ function NavRow({
       href={href}
       onClick={onNavigate}
       className={cn(
-        // Nav is ink, not green: green is left to say "press this".
-        "flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-[13px] font-medium transition-colors",
+        // The rail is a brand ground: everything on it is drawn in its on-ground colour.
+        "focus-visible:ring-on-ground/60 flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-[13px] font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none",
         active
-          ? "bg-foreground/[0.06] text-foreground"
-          : "text-muted hover:text-foreground hover:bg-foreground/[0.05]",
+          ? "bg-on-ground/[0.14] text-on-ground"
+          : "text-on-ground/70 hover:text-on-ground hover:bg-on-ground/[0.08]",
       )}
     >
-      <Icon className={cn("size-4 shrink-0", active && "text-accent")} />
+      <Icon className={cn("size-4 shrink-0", active && "text-ground-mark")} />
       <span className="truncate">{label}</span>
     </Link>
   );
@@ -78,21 +79,26 @@ function TeamRow({
         aria-expanded={open}
         aria-controls={listId}
         className={cn(
-          "focus-visible:ring-accent flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] font-medium focus-visible:ring-2 focus-visible:outline-none",
-          open || holdsPage
-            ? "text-foreground hover:bg-foreground/[0.05]"
-            : "text-muted hover:text-foreground hover:bg-foreground/[0.05]",
+          "focus-visible:ring-on-ground/60 hover:bg-on-ground/[0.08] flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] font-medium focus-visible:ring-2 focus-visible:outline-none",
+          open || holdsPage ? "text-on-ground" : "text-on-ground/70 hover:text-on-ground",
         )}
       >
         <ChevronRight className={cn("size-4 shrink-0", open && "rotate-90")} />
+        <span
+          aria-hidden
+          className={cn(
+            "ring-on-ground/40 size-2.5 shrink-0 rounded-[1px] ring-1",
+            GROUND_SWATCH[section.ground],
+          )}
+        />
         <span className="min-w-0 flex-1 truncate">{section.name}</span>
-        <span className="text-muted text-xs tabular-nums">{section.tools.length}</span>
+        <span className="text-on-ground/60 text-xs tabular-nums">{section.tools.length}</span>
       </button>
       {open && (
         // The hairline sits under the chevron's centre.
         <div
           id={listId}
-          className="border-border mt-0.5 mb-1 ml-[17px] space-y-0.5 border-l pl-1.5"
+          className="border-on-ground/20 mt-0.5 mb-1 ml-[17px] space-y-0.5 border-l pl-1.5"
         >
           {section.tools.map((tool) => (
             <NavRow
@@ -112,10 +118,10 @@ function TeamRow({
 
 function Brand() {
   return (
-    <div className="flex items-center gap-2.5">
-      <Logo />
-      <span className="text-foreground text-sm font-semibold tracking-tight">
-        Toolbox <span className="text-muted">by Kaadal</span>
+    <div className="flex items-end gap-2.5">
+      <Wordmark className="fill-ground-mark h-6" />
+      <span className="text-on-ground/70 pb-px text-[11px] font-medium tracking-[0.14em] uppercase">
+        Toolbox
       </span>
     </div>
   );
@@ -140,7 +146,7 @@ function SidebarContent({
 
   return (
     <>
-      <div className="px-5 py-5">
+      <div className="px-5 pt-6 pb-5">
         <Brand />
       </div>
 
@@ -170,15 +176,15 @@ function SidebarContent({
         )}
 
         {sections.length === 0 && (
-          <p className="text-muted mt-4 px-2.5 text-sm">No tools assigned yet.</p>
+          <p className="text-on-ground/70 mt-4 px-2.5 text-sm">No tools assigned yet.</p>
         )}
       </nav>
 
-      <div className="border-border border-t p-3">
+      <div className="border-on-ground/15 border-t p-3">
         <DropdownMenu>
-          <DropdownMenuTrigger className="focus-visible:ring-accent hover:bg-foreground/[0.05] flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left outline-none focus-visible:ring-2">
+          <DropdownMenuTrigger className="focus-visible:ring-on-ground/60 hover:bg-on-ground/[0.08] flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left outline-none focus-visible:ring-2">
             <Avatar name={userName} size={28} />
-            <span className="text-foreground truncate text-sm font-medium">{userName}</span>
+            <span className="text-on-ground truncate text-sm font-medium">{userName}</span>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-56">
             <ThemeMenuItem />
@@ -218,7 +224,7 @@ export function Sidebar({ sections, userName }: { sections: ToolSection[]; userN
 
   return (
     <>
-      <aside className="border-border/60 bg-background sticky top-0 hidden h-screen w-60 shrink-0 flex-col self-start border-r md:flex">
+      <aside className="ground-burgundy dark:ground-teal bg-ground text-on-ground sticky top-0 hidden h-screen w-60 shrink-0 flex-col self-start md:flex">
         <SidebarContent
           sections={sections}
           openKeys={openKeys}
@@ -228,12 +234,12 @@ export function Sidebar({ sections, userName }: { sections: ToolSection[]; userN
         />
       </aside>
 
-      <header className="border-border/60 bg-background/80 sticky top-0 z-40 flex items-center gap-2 border-b px-3 py-2.5 backdrop-blur-xl md:hidden">
+      <header className="ground-burgundy dark:ground-teal bg-ground sticky top-0 z-40 flex items-center gap-2 px-3 py-2.5 md:hidden">
         <button
           type="button"
           onClick={() => setOpen(true)}
           aria-label="Open menu"
-          className="text-foreground focus-visible:ring-accent hover:bg-foreground/[0.05] flex size-9 items-center justify-center rounded-xl focus-visible:ring-2 focus-visible:outline-none"
+          className="text-on-ground focus-visible:ring-on-ground/60 hover:bg-on-ground/[0.08] flex size-9 items-center justify-center rounded-xl focus-visible:ring-2 focus-visible:outline-none"
         >
           <Menu className="size-5" />
         </button>
@@ -242,15 +248,15 @@ export function Sidebar({ sections, userName }: { sections: ToolSection[]; userN
 
       <DialogPrimitive.Root open={open} onOpenChange={setOpen}>
         <DialogPrimitive.Portal>
-          <DialogPrimitive.Overlay className="data-[state=closed]:animate-fade-out data-[state=open]:animate-fade-in fixed inset-0 z-50 bg-black/40 md:hidden" />
+          <DialogPrimitive.Overlay className="data-[state=closed]:animate-fade-out data-[state=open]:animate-fade-in bg-brand-ink/50 fixed inset-0 z-50 md:hidden" />
           <DialogPrimitive.Content
             aria-describedby={undefined}
-            className="bg-surface shadow-float data-[state=closed]:animate-slide-out-left data-[state=open]:animate-slide-in-left fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col rounded-r-3xl outline-none md:hidden"
+            className="ground-burgundy dark:ground-teal bg-ground text-on-ground shadow-float data-[state=closed]:animate-slide-out-left data-[state=open]:animate-slide-in-left fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col outline-none md:hidden"
           >
             <DialogPrimitive.Title className="sr-only">Navigation</DialogPrimitive.Title>
             <DialogPrimitive.Close
               aria-label="Close menu"
-              className="text-muted focus-visible:ring-accent hover:bg-foreground/[0.05] absolute top-4 right-3 rounded-lg p-1.5 focus-visible:ring-2 focus-visible:outline-none"
+              className="text-on-ground/70 hover:text-on-ground focus-visible:ring-on-ground/60 hover:bg-on-ground/[0.08] absolute top-5 right-3 rounded-lg p-1.5 focus-visible:ring-2 focus-visible:outline-none"
             >
               <X className="size-4" />
             </DialogPrimitive.Close>
