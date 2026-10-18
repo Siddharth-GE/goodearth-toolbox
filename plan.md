@@ -146,7 +146,7 @@ With `/client-relations` given to Anu, Sayooj and Sebastina:
 3. Paste the link of one of Sayooj's plots (from your own view) into Anu's browser: "This plot is not one of yours".
 4. As Anu, add a step on one of her plots for Sayooj. **As Sayooj**: that plot appears, with that one step — not Anu's other steps on it. He ticks it finished; Anu closes it; the plot leaves Sayooj's list.
 5. As Anu, give one of her plots to Sebastina (Construction owner chip): the page turns into "This plot is not one of yours… it is with your colleague now". As Sebastina, it is in her Plots.
-6. Tick **Sayooj as Team lead**: his Actions opens on everyone with the team strip, Plots shows all of them, the owner menu shows counts. His access history says "Made team lead in Client Relations". Untick: back to his own.
+6. Tick **Sayooj as Team lead**: their Actions opens on everyone with the team strip, Plots shows all of them, the owner menu shows counts. Their access history says "Made team lead in Client Relations". Untick: back to their own.
 7. As yourself: everything as before. **Financial Management** and **Reporter** still show every plot's payments.
 8. As the **probe**: Client Relations is still refused.
 
@@ -167,7 +167,7 @@ Staging is becoming the real database, so this checklist issues nothing — an i
 
 _Construction and Interior, two sides of a plot._
 
-1. **Plots**: each card shows two owners — a hard hat for Construction, a sofa for Interior, with the interior stage beside it. The **Side** filter → Interior lists only plots with interior work; pick Interior + Sayooj — only plots where he owns the interiors or holds an interior step.
+1. **Plots**: each card shows two owners — a hard hat for Construction, a sofa for Interior, with the interior stage beside it. The **Side** filter → Interior lists only plots with interior work; pick Interior + Sayooj — only plots where Sayooj owns the interiors or holds an interior step.
 2. Open a plot with both owners: the header names both. **Next steps** → **Interior**: only interior steps; type a step — the owner chip already says the Interior owner, and the side chip says Interior. Switch it to Construction: the owner becomes the Construction owner.
 3. On a step's **•••** → Side: move it to Construction; Undo brings it back.
 4. **Actions** → **Interior**: only interior steps, and the team strip counts only interior work.
@@ -186,7 +186,7 @@ Staging is becoming the real database, so use villas the team is really working 
 5. On its **Design** card, **Send back for revision** — the button waits until you say why. "Client changed the staircase" → Villa 41 stays in Structural; its card reads **Revising Design**, red; the villa's **History** has the line with the reason. Tap **Done** on Design — the revision is over.
 6. On Villa 40, **Set where it is** → Design; then **Start Interiors** beside it — both Working; Villa 40 sits in the Interiors column.
 7. On a stage, **+ Add** puts someone on; the cross takes them off, with Undo. **•••** → Take back the start returns a stage started by mistake to Not started.
-8. **Actions**: the team strip (you are admin). Type "Send the revised plan to the client", pick Villa 41, **Design**, Jiljith, **Tomorrow** → **Add**: under _Next 7 days_, and on Villa 41's page under Next steps. As Jiljith (or ask him), tick it — "Waiting for Siddharth to confirm"; as you, tick it closed; Undo works.
+8. **Actions**: the team strip (you are admin). Type "Send the revised plan to the client", pick Villa 41, **Design**, Jiljith, **Tomorrow** → **Add**: under _Next 7 days_, and on Villa 41's page under Next steps. As Jiljith (or ask them), tick it — "Waiting for Siddharth to confirm"; as you, tick it closed; Undo works.
 9. Villa 41's page still lists its transmittals, and **New transmittal** works as before.
 10. On a phone: the Board stacks a stage at a time; a lot card opens its villa; nothing scrolls sideways.
 11. As the **probe** (`/estimator`, `/inventory`): Design Management is not in the sidebar, and `/design-management/actions` sends it home.
