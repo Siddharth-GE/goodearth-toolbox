@@ -141,25 +141,28 @@ Fable designs this as one migration. Done as `0129` by `[Opus]` on the founder's
 
 ## Phase 5: one home for each helper
 
-- [ ] `[Sonnet]` **`lib/dates.ts`**, with a test: add days, days between, shift month, month label. The Birdwing calendar, Books, Financial Management's cash flow, Relay and `lib/next-steps` move onto it.
-- [ ] `[Sonnet]` **`roundPaise` in `lib/line-money.ts`.** 22 copies disagree on half a paisa. `[Fable]` picks the rule, and a test pins 1.005.
-- [ ] `[Sonnet]` **`pdfResponse()` in `lib/pdf/`** for 10 routes, and one stored-file route helper in `lib/uploads/` for 3.
-- [ ] `[Sonnet]` **Form and number reading through `lib/form-data.ts`**: 118 inline reads, and 10 client-side number parsers moved onto `parseNumber`.
-- [ ] `[Sonnet]` **`lib/hooks/use-action-runner.ts`** replaces the 15 local runners. That also fixes Indents, POs and Bills never clearing an old error.
-- [ ] `[Opus]` **Shared pieces.**
+- [x] `[Sonnet]` **`lib/dates.ts`**, with a test: add days, days between, shift month, month label. The Birdwing calendar, Books, Financial Management's cash flow, Relay and `lib/next-steps` move onto it.
+- [x] `[Sonnet]` **`roundPaise` in `lib/line-money.ts`.** 22 copies disagree on half a paisa. `[Fable]` picks the rule, and a test pins 1.005.
+- [x] `[Sonnet]` **`pdfResponse()` in `lib/pdf/`** for 10 routes, and one stored-file route helper in `lib/uploads/` for 3.
+- [x] `[Sonnet]` **Form and number reading through `lib/form-data.ts`**: 118 inline reads, and 10 client-side number parsers moved onto `parseNumber`.
+- [x] `[Sonnet]` **`lib/hooks/use-action-runner.ts`** replaces the 15 local runners. That also fixes Indents, POs and Bills never clearing an old error.
+- [x] `[Opus]` **Shared pieces.**
   - Client Relations moves onto `lib/next-steps/`, `lib/masters/plot-number.ts`, `components/ui/pill.tsx` and `undo-bar.tsx`.
   - Relay's `celebrate.tsx` toast moves onto the Undo bar.
   - The chip styling hand-written in six files moves onto `choice-chips`.
+
+- Done 2026-10-18. `roundPaise` rounds half a paisa away from zero as the figure reads in decimal (1.005 → 1.01, as Postgres does), decided by `[Opus]` on the founder's word. `useActionRunner` moved 74 screens, not 15, and every one now clears an old error on the next try. Form reads: 119 of 139 through `lib/form-data.ts` (plus `rawText` and `checked`); the rest would change behaviour and stay. Typed numbers: 19 screens on `parseNumber`, the last few with the approval limit's server and screen together. Chips: Relay's department picker, Selections' space filter and Reporter's two use `chipClassName`; Relay's red bounce reasons and Birdwing's attendance grid are not chips and stay.
 
 ## Phase 6: split the big files
 
 These are pure moves.
 
-- [ ] `[Sonnet]` `lib/indents/queries.ts` (1,314 lines) splits into list, indent detail and pull queries.
-- [ ] `[Sonnet]` `lib/purchase-orders/queries.ts` (1,150): ordering from indents moves out.
-- [ ] `[Sonnet]` `lib/design-management/actions.ts` (964) splits into stages, revisions and transmittals.
-- [ ] `[Opus]` `estimator/estimates/[estimateId]/page.tsx` (878) becomes a pure, tested view model plus section components.
-- [ ] `[Sonnet]` `reporter/_components/report-builder.tsx` (one 554-line function) splits into its five sections.
+- [x] `[Sonnet]` `lib/indents/queries.ts` (1,314 lines) splits into list, indent detail and pull queries.
+- [x] `[Sonnet]` `lib/purchase-orders/queries.ts` (1,150): ordering from indents moves out.
+- [x] `[Sonnet]` `lib/design-management/actions.ts` (964) splits into stages, revisions and transmittals.
+- [x] `[Opus]` `estimator/estimates/[estimateId]/page.tsx` (878) becomes a pure, tested view model plus section components.
+- [x] `[Sonnet]` `reporter/_components/report-builder.tsx` (one 554-line function) splits into its five sections.
+- Done 2026-10-18: Indents' queries into list, detail and pull; Purchase Orders' ordering-from-indents reads into `indent-queries.ts`; Design Management's actions into stages, revisions and transmittals; the estimate page into a tested view model (`lib/estimator/estimate-view.ts`) and five sections; Reporter's builder into five sections and a tested `lib/reporter/draft.ts`. Each a pure move, line counts checked.
 
 **Leave alone:**
 
