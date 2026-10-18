@@ -9,6 +9,7 @@ import { listProjects } from "@/lib/masters/projects";
 import { listWorkCategories, listWorkItems } from "@/lib/masters/works";
 import { listUnits } from "@/lib/masters/units";
 import { fetchAll } from "@/lib/supabase/fetch-all";
+import { assertRead } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
 import { withRetry } from "@/lib/supabase/transient";
 
@@ -72,6 +73,8 @@ export async function getWelcomeCounts() {
       .eq("status", "approved")
       .gte("created_at", since),
   ]);
+
+  assertRead("indents", "the welcome counts", submitted.error ?? drafts.error ?? approved.error);
 
   return {
     awaitingApproval: submitted.count ?? 0,
@@ -314,7 +317,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
   await requireTool("/indents");
   const supabase = await createClient();
 
-  const [{ data: indent }, lines] = await Promise.all([
+  const [{ data: indent, error: indentError }, lines] = await Promise.all([
     supabase
       .from("indents")
       .select(
@@ -335,6 +338,7 @@ export const getIndent = cache(async (indentId: string): Promise<IndentDetail | 
     ),
   ]);
 
+  assertRead("indents", "this indent", indentError);
   if (!indent) return null;
 
   // One profiles read, not embeds (several FKs to profiles).
@@ -613,7 +617,7 @@ export async function listApprovedBudgetsForProject(
   const unitNames = new Map(units.map((unit) => [unit.id, unit.name]));
   const unitIds = units.map((unit) => unit.id);
 
-  const [budgets, { data: issuedSelections }] = await Promise.all([
+  const [budgets, { data: issuedSelections, error: selectionsError }] = await Promise.all([
     fetchAll((from, to) =>
       supabase
         .from("approved_budgets")
@@ -629,6 +633,7 @@ export async function listApprovedBudgetsForProject(
       .in("unit_id", unitIds)
       .eq("status", "issued"),
   ]);
+  assertRead("indents", "the issued designs", selectionsError);
   if (budgets.length === 0) return { pullable: [], pending: [] };
 
   const issuedByUnit = new Map<string, IssuedRevision>(
