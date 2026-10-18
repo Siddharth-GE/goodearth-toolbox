@@ -2,6 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
+import { withRetry } from "@/lib/supabase/transient";
 
 /**
  * Puts one uploaded document into a private bucket and proves it landed whole.
@@ -41,11 +42,20 @@ export async function storeUpload(
 
   const folder = path.slice(0, path.lastIndexOf("/"));
   const name = path.slice(path.lastIndexOf("/") + 1);
-  const { data: stored } = await supabase.storage.from(bucket).list(folder, { search: name });
+  const { data: stored, error: listError } = await withRetry(() =>
+    supabase.storage.from(bucket).list(folder, { search: name }),
+  );
   const storedSize = stored?.[0]?.metadata?.size as number | undefined;
-  if (storedSize !== undefined && storedSize !== bytes.length) {
-    await supabase.storage.from(bucket).remove([path]);
-    console.error(`storeUpload: stored ${storedSize} bytes of ${bytes.length} in ${bucket}`);
+  if (listError || (storedSize !== undefined && storedSize !== bytes.length)) {
+    // Unconfirmed is treated as broken: a truncated file must not stand.
+    const { error: removeError } = await supabase.storage.from(bucket).remove([path]);
+    if (removeError) console.error(`storeUpload: could not remove ${path}:`, removeError);
+    console.error(
+      listError
+        ? `storeUpload: could not confirm ${path} in ${bucket}:`
+        : `storeUpload: stored ${storedSize} bytes of ${bytes.length} in ${bucket}`,
+      listError ?? "",
+    );
     return "The file did not save correctly. Try again.";
   }
   return null;

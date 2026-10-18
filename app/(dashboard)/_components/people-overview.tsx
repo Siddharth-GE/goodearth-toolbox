@@ -7,7 +7,18 @@ import Link from "next/link";
  * redirect the home page to itself. Training shows dashes: it isn't built, and "0%" would read as never training.
  */
 export async function PeopleOverview() {
-  const { people, departments } = await countPeople();
+  const counts = await countPeople().catch(() => null);
+  if (!counts) {
+    return (
+      <Card className="p-5">
+        <h2 className="text-foreground text-sm font-semibold">People</h2>
+        <p className="text-muted mt-3 text-sm">
+          Couldn&apos;t load the people count just now. Refresh to try again.
+        </p>
+      </Card>
+    );
+  }
+  const { people, departments } = counts;
 
   const stats = [
     { value: people, label: people === 1 ? "person" : "people" },

@@ -75,11 +75,15 @@ export async function login(_state: LoginState, formData: FormData): Promise<Log
 
   // Switched-off accounts are refused here, not let into a dashboard that
   // redirects everywhere (0032). The throwaway session can read its own row.
-  const { data: profile } = await bare
+  const { data: profile, error: profileError } = await bare
     .from("profiles")
     .select("is_active")
     .eq("id", data.user.id)
     .maybeSingle();
+  if (profileError) {
+    console.error("login: profile read failed:", profileError.message);
+    return { error: "Could not check your account just now. Try again." };
+  }
   if (profile && !profile.is_active) {
     return { error: "This account has been deactivated. Ask an admin to switch it back on." };
   }

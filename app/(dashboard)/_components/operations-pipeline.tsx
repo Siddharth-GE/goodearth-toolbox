@@ -7,13 +7,36 @@ import {
   countReceiptsPipeline,
 } from "@/lib/overview/queries";
 
+async function readPipeline() {
+  try {
+    const [indents, pos, receipts, bills] = await Promise.all([
+      countIndentsPipeline(),
+      countPosPipeline(),
+      countReceiptsPipeline(),
+      countBillsPipeline(),
+    ]);
+    return { indents, pos, receipts, bills };
+  } catch {
+    return null;
+  }
+}
+
+// A failed count says so in this card; the rest of the home page still loads.
 export async function OperationsPipeline() {
-  const [indents, pos, receipts, bills] = await Promise.all([
-    countIndentsPipeline(),
-    countPosPipeline(),
-    countReceiptsPipeline(),
-    countBillsPipeline(),
-  ]);
+  const pipeline = await readPipeline();
+  if (!pipeline) {
+    return (
+      <Card className="p-5">
+        <h2 className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
+          Operations pipeline
+        </h2>
+        <p className="text-muted mt-3 text-sm">
+          Couldn&apos;t load the pipeline just now. Refresh to try again.
+        </p>
+      </Card>
+    );
+  }
+  const { indents, pos, receipts, bills } = pipeline;
 
   return (
     <Card className="p-5">

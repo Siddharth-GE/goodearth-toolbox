@@ -1,6 +1,13 @@
 import "server-only";
 
+import { readFailed } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
+
+/** A head count, or a throw: the card catches it and says it could not load, never a zero. */
+function counted(result: { count: number | null; error: { message: string } | null }): number {
+  if (result.error) readFailed("overview", "the home page counts", result.error);
+  return result.count ?? 0;
+}
 
 /**
  * The home page's reads: not a tool, and the one module allowed to import other tools' queries (reads only, never actions or components).
@@ -36,10 +43,10 @@ export async function countIndentsPipeline(): Promise<{
   ]);
 
   return {
-    raisedThisMonth: raised.count ?? 0,
-    lineCount: lines.count ?? 0,
-    awaitingApproval: submitted.count ?? 0,
-    approved: approved.count ?? 0,
+    raisedThisMonth: counted(raised),
+    lineCount: counted(lines),
+    awaitingApproval: counted(submitted),
+    approved: counted(approved),
   };
 }
 
@@ -69,9 +76,9 @@ export async function countPosPipeline(): Promise<{
   ]);
 
   return {
-    issuedThisMonth: issued.count ?? 0,
-    draftCount: drafts.count ?? 0,
-    awaitingDeletion: deletions.count ?? 0,
+    issuedThisMonth: counted(issued),
+    draftCount: counted(drafts),
+    awaitingDeletion: counted(deletions),
   };
 }
 
@@ -95,8 +102,8 @@ export async function countReceiptsPipeline(): Promise<{
   ]);
 
   return {
-    receivedThisMonth: received.count ?? 0,
-    awaitingDelivery: outstanding.count ?? 0,
+    receivedThisMonth: counted(received),
+    awaitingDelivery: counted(outstanding),
   };
 }
 
@@ -131,10 +138,10 @@ export async function countBillsPipeline(): Promise<{
   ]);
 
   return {
-    bookedThisMonth: booked.count ?? 0,
-    awaitingApproval: awaiting.count ?? 0,
-    paidThisMonth: paid.count ?? 0,
-    unpaidCount: unpaid.count ?? 0,
+    bookedThisMonth: counted(booked),
+    awaitingApproval: counted(awaiting),
+    paidThisMonth: counted(paid),
+    unpaidCount: counted(unpaid),
   };
 }
 
@@ -153,5 +160,5 @@ export async function countPeople(): Promise<{ people: number; departments: numb
       .eq("is_active", true),
   ]);
 
-  return { people: people.count ?? 0, departments: departments.count ?? 0 };
+  return { people: counted(people), departments: counted(departments) };
 }

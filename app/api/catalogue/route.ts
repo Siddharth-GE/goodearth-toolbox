@@ -32,11 +32,15 @@ export async function GET(request: Request) {
   // Brands resolve to ids first: PostgREST can't put a joined column in a top-level `or`.
   let brandMatchIds: string[] = [];
   if (search) {
-    const { data: brands } = await supabase
+    const { data: brands, error: brandsError } = await supabase
       .from("brands")
       .select("id")
       .ilike("name", `%${search}%`)
       .limit(50);
+    if (brandsError) {
+      console.error("catalogue brand search failed:", brandsError);
+      return Response.json({ items: [], total: 0, pageCount: 1 }, { status: 500 });
+    }
     brandMatchIds = (brands ?? []).map((brand) => brand.id);
   }
 
