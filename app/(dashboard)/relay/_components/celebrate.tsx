@@ -1,12 +1,13 @@
 "use client";
 
+import { UndoBarProvider, useUndoBar } from "@/components/ui/undo-bar";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
 /**
  * Relay's reward moments: a points float on every move, a banner and confetti on finish.
  * DESIGN.md's one-payoff rule is waived here (moving a baton IS the product); it stays in this tool.
- * All of it honours prefers-reduced-motion; the toast still shows.
+ * All of it honours prefers-reduced-motion; the toast, which is the shared Undo bar, still shows.
  */
 
 type Celebration = {
@@ -57,7 +58,15 @@ function confetti(count = 14) {
 }
 
 export function CelebrateProvider({ children }: { children: ReactNode }) {
-  const [toastText, setToastText] = useState<string | null>(null);
+  return (
+    <UndoBarProvider>
+      <Celebrations>{children}</Celebrations>
+    </UndoBarProvider>
+  );
+}
+
+function Celebrations({ children }: { children: ReactNode }) {
+  const showToast = useUndoBar();
   const [flowText, setFlowText] = useState<string | null>(null);
   const [bannerText, setBannerText] = useState<string | null>(null);
 
@@ -74,14 +83,7 @@ export function CelebrateProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value: Celebration = {
-    toast: useCallback(
-      (message) => {
-        setTick((t) => t + 1);
-        setToastText(message);
-        after(2600, () => setToastText(null));
-      },
-      [after],
-    ),
+    toast: showToast,
     flow: useCallback(
       (message) => {
         if (prefersReducedMotion()) return;
@@ -107,16 +109,6 @@ export function CelebrateProvider({ children }: { children: ReactNode }) {
   return (
     <CelebrateContext.Provider value={value}>
       {children}
-
-      {toastText && (
-        <div
-          key={`toast-${tick}`}
-          role="status"
-          className="bg-foreground text-background fixed bottom-6 left-1/2 z-[60] max-w-[92vw] -translate-x-1/2 truncate rounded-full px-5 py-2.5 text-sm font-medium shadow-lg"
-        >
-          {toastText}
-        </div>
-      )}
 
       {flowText && (
         <div
