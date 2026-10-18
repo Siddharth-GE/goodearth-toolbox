@@ -166,7 +166,7 @@ function check(file: string): string[] {
       ts.isIdentifier(node.name) &&
       node.initializer &&
       !ts.isAwaitExpression(node.initializer) &&
-      /\.(from|rpc)\(/.test(node.initializer.getText(source))
+      isSupabaseChain(node.initializer, source, new Set())
     ) {
       builders.add(node.name.text);
     }
