@@ -202,3 +202,15 @@ _One owner per side._
 5. Try to set the Interior owner to nobody while it has open steps — refused, in a sentence.
 6. On a step's **•••** → Side → Construction: "Moved to Construction · (the Construction owner)'s now".
 7. On **Actions**, a step with **no plot** still lets you pick any owner.
+
+## Verification — the founder, on staging (the Kaadal look)
+
+_The Kaadal look._ The founder waived Fable's approval pass for this merge ("merge", 2026-10-18). Opus re-reviewed the full diff: no migration, policy, view, action or money read is touched; dark mode still declares `color-scheme`; `/login`, `/forgot-password`, `/_not-found` and `/_global-error` still prerender. The rules are `DESIGN.md`.
+
+1. Open staging in a private window: light, whatever the device says; the tab reads **Kaadal Toolbox**; sign-in is the burgundy page with the white panel.
+2. Sign in. The sidebar reads **Toolbox** and lists teams; click a team — its page opens, a band in its colour and a box per tool.
+3. Open a tool from the box: its opening band is in the team's colour, and **← (team)** goes back. Only that team lists its tools in the sidebar.
+4. The home page shows each team as a colour block, in Settings → Teams order: burgundy, teal, olive, ochre, sage, blush, then round again; Other is ink.
+5. Inside a tool, the tabs are underlined in burgundy; on a phone they swipe sideways. Bills, Indents and PO "Lines" headings are in Gambetta.
+6. As the probe (single grant), the home page and the team page show only the probe's tools, and a team the probe has nothing in is not there.
+7. Switch to dark once: the rail and sign-in are deep teal, the page ink; open a date picker — it is dark too.

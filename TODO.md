@@ -40,6 +40,7 @@ Each checklist is in `plan.md`, under the heading named.
 - **Client Relations, two sides of a plot, one owner each** (`0125`): _twelfth_ and _fourteenth pieces_.
 - **Design Management** (`0099`, `0124`, `0126`): _eleventh_ and _thirteenth pieces_. Bring each villa already under way in with **Set where it is**.
 - **Relay × Google Chat, round two**: the checks are in `lib/google-chat/PLAN.md`.
+- **The Kaadal look** (no migration): _the Kaadal look_.
 - **Dexter saved answers** (`0100`):
   - Open the "Dexter answers test" deck's link in a private window, type, close and reopen. The answers are back.
   - Send marks it Sent, and Clear answers empties it.
