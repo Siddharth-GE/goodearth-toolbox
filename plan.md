@@ -114,7 +114,7 @@ _The Saarang tracker, inside Client Relations._
 
 1. **Masters → Stages**: the Build progress card lists the nine stages in order, the last marked Handover. Add "Waterproofing", move it up between the slabs with the arrows, then deactivate it.
 2. **Client Relations** opens on its welcome: overdue, this week, waiting on management. **Actions** is the first door.
-3. **Actions**: the team strip shows Anu, Sayooj and Sebastina with the imported counts (Anu 26 open). Click Anu — only hers. **Needs you** is empty.
+3. **Actions**: the team strip shows Anu, Sayooj and Sebastina with the imported counts (Anu 26 open). Click Anu — only Anu's. **Needs you** is empty.
 4. Type "Share 3D with client", pick Plot 4, Sayooj, **Tomorrow** → **Add**: it appears under _Next 7 days_.
 5. Tick it — it leaves the list; **Undo** brings it back. Tick an overdue one, then _Show done_.
 6. On a _date assumed_ action pick **This Friday** — the flag goes and it moves to _Next 7 days_.
