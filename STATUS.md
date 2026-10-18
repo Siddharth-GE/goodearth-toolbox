@@ -4,7 +4,7 @@ A snapshot, not a changelog: what exists now. Next work is `TODO.md`, each tool'
 
 ## Environments
 
-Production is `toolbox.goodearthkannur.org` (from `master`); staging is `staging.goodearthkannur.org` (from `staging`, and behind every preview and `npm run dev`). The two databases, and every rule keeping them apart, are `SHIPPING.md`.
+Production is `toolbox.goodearthkannur.org` (from `master`); staging is `staging.goodearthkannur.org` (from `staging`, and behind every preview and `npm run dev`). **`toolbox.kaadalgroup.com` also serves `staging`**, the database the team already works in, with no practice banner on that address; it moves to the real deployment on switch day. The two databases, and every rule keeping them apart, are `SHIPPING.md`.
 
 - **Production is paused** (free tier, despite the weekly keep-alive). Restoring it is the founder's — `TODO.md`.
 - **Staging carries work production does not have yet** — `TODO.md` lists it.

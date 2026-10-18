@@ -3,6 +3,7 @@ import { Geist_Mono, Outfit } from "next/font/google";
 import localFont from "next/font/local";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { PracticeBanner } from "@/components/ui/practice-banner";
+import { PRODUCTION_SITE } from "@/lib/environment";
 import { THEME_COOKIE } from "@/lib/theme";
 import "./globals.css";
 
@@ -44,6 +45,9 @@ export const viewport: Viewport = {
  */
 const APPLY_SAVED_THEME = `try{var m=document.cookie.match(/(?:^|; )${THEME_COOKIE}=(light|dark)/);if(m)document.documentElement.dataset.theme=m[1]}catch(e){}`;
 
+/** Marks the real toolbox's address before paint, so the practice banner never flashes there (lib/environment.ts' isProductionHost). */
+const MARK_PRODUCTION_HOST = `if(location.hostname.toLowerCase()===${JSON.stringify(PRODUCTION_SITE)})document.documentElement.dataset.site="production"`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -57,7 +61,9 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="flex min-h-full flex-col" suppressHydrationWarning>
-        <script dangerouslySetInnerHTML={{ __html: APPLY_SAVED_THEME }} />
+        <script
+          dangerouslySetInnerHTML={{ __html: APPLY_SAVED_THEME + ";" + MARK_PRODUCTION_HOST }}
+        />
         {/* In the root layout so sign-in and the kiosk show it too: know which site you are on before typing a password. */}
         <PracticeBanner />
         {children}

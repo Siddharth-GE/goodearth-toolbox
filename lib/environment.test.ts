@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, test } from "node:test";
 
-import { DATABASES, isPracticeSite, PRODUCTION_SITE } from "./environment";
+import { DATABASES, isPracticeSite, isProductionHost, PRODUCTION_SITE } from "./environment";
 
 const PRODUCTION_URL = `https://${DATABASES.production}.supabase.co`;
 const PRACTICE_URL = `https://${DATABASES.practice}.supabase.co`;
@@ -35,6 +35,21 @@ for (const [name, url] of [
     assert.equal(isPracticeSite(), true);
   });
 }
+
+test("only the real toolbox's own address hides the banner by host", () => {
+  assert.equal(isProductionHost(PRODUCTION_SITE), true);
+  assert.equal(isProductionHost(PRODUCTION_SITE.toUpperCase()), true);
+  for (const host of [
+    "staging.goodearthkannur.org",
+    "goodearth-toolbox-abc123-siddharth-ges-projects.vercel.app",
+    "localhost",
+    `evil.${PRODUCTION_SITE}`,
+    `${PRODUCTION_SITE}.evil.com`,
+    "",
+  ]) {
+    assert.equal(isProductionHost(host), false, host);
+  }
+});
 
 test("an undefined variable does not throw", () => {
   delete process.env.NEXT_PUBLIC_SUPABASE_URL;
