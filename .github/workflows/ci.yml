@@ -1,4 +1,4 @@
-# Every push and pull request. The four static checks each run even when
+# Every push and pull request. The static checks each run even when
 # one fails, so one push shows every verdict; the build and everything
 # after it wait for all four.
 #
@@ -49,6 +49,10 @@ jobs:
       - name: Tests
         if: ${{ !cancelled() }}
         run: npm test
+
+      - name: Every database error is read
+        if: ${{ !cancelled() }}
+        run: npm run check:errors
 
       - name: Build
         run: npm run build
