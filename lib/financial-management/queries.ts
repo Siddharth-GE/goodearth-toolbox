@@ -179,11 +179,8 @@ export async function getWelcomeCounts() {
   await requireTool("/financial-management");
   const supabase = await createClient();
 
-  const startOfMonth = new Date();
-  startOfMonth.setDate(1);
-  startOfMonth.setHours(0, 0, 0, 0);
-  // received_on is a date, not a timestamp.
-  const since = startOfMonth.toISOString().slice(0, 10);
+  // received_on is a date, not a timestamp. This month starts on India's calendar.
+  const since = `${todayInIndia().slice(0, 8)}01`;
 
   // Exact database counts, head-only — never rows.length.
   const [facilities, approvedUnpaid, receipts] = await Promise.all([

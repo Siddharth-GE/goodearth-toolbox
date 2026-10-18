@@ -8,11 +8,11 @@ import { Select } from "@/components/ui/select";
 import { paymentProblem } from "@/lib/bills/ledger";
 import { recordBillPayment, recoverAdvance } from "@/lib/bills/payment-actions";
 import type { OpenAdvance } from "@/lib/bills/payment-queries";
-import { formatDate, formatMoney } from "@/lib/format";
+import { formatDate, formatMoney, todayInIndia } from "@/lib/format";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => todayInIndia();
 
 export function SettlementPanel({
   billId,

@@ -11,6 +11,7 @@ import { deleteLabourLog, recordLabourLog, updateLabourLog } from "@/lib/supervi
 import { LABOUR_KIND_LABEL, LABOUR_KINDS, type LabourKind } from "@/lib/supervisors/labour";
 import type { ContractorOption, LabourLogRow, WorkOption } from "@/lib/supervisors/queries";
 import { useState, useTransition } from "react";
+import { todayInIndia } from "@/lib/format";
 
 function WorkSelect({
   works,
@@ -92,7 +93,7 @@ export function LabourLogDialog({
   trigger?: React.ReactNode;
 }) {
   const isEdit = !!log;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInIndia();
   const [kind, setKind] = useState<LabourKind>(log?.kind ?? "nmr");
   const [work, setWork] = useState(log?.workItemId ?? workItemId ?? "");
   const workUom = works.find((option) => option.id === work)?.uom ?? null;

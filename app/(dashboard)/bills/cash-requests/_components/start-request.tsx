@@ -6,9 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createCashRequest } from "@/lib/bills/payment-actions";
 import { useState, useTransition } from "react";
+import { todayInIndia } from "@/lib/format";
 
 export function StartRequest() {
-  const [day, setDay] = useState(() => new Date().toISOString().slice(0, 10));
+  const [day, setDay] = useState(() => todayInIndia());
   const [error, setError] = useState<string>();
   const [starting, startTransition] = useTransition();
 

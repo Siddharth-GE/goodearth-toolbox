@@ -2,6 +2,7 @@ import "server-only";
 
 import { readFailed } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
+import { todayInIndia } from "@/lib/format";
 
 /** A head count, or a throw: the card catches it and says it could not load, never a zero. */
 function counted(result: { count: number | null; error: { message: string } | null }): number {
@@ -88,10 +89,7 @@ export async function countReceiptsPipeline(): Promise<{
 }> {
   const supabase = await createClient();
 
-  const startOfMonth = new Date();
-  startOfMonth.setDate(1);
-  startOfMonth.setHours(0, 0, 0, 0);
-  const since = startOfMonth.toISOString().slice(0, 10);
+  const since = `${todayInIndia().slice(0, 8)}01`;
 
   const [received, outstanding] = await Promise.all([
     supabase

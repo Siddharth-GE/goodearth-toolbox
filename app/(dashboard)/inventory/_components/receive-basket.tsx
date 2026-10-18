@@ -15,7 +15,7 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/components/ui/table";
-import { formatQuantity } from "@/lib/format";
+import { formatQuantity, todayInIndia } from "@/lib/format";
 import { recordGoodsReceipt } from "@/lib/inventory/actions";
 import type { ReceivePool } from "@/lib/inventory/receipts-queries";
 import { isFullyReceivedOrder } from "@/lib/inventory/stock";
@@ -32,7 +32,7 @@ export function ReceiveBasket({ pool, works }: { pool: ReceivePool; works: WorkO
   const [toSite, setToSite] = useState(false);
   const [workItemId, setWorkItemId] = useState("");
   const [challanNo, setChallanNo] = useState("");
-  const [receivedAt, setReceivedAt] = useState(() => new Date().toISOString().slice(0, 10));
+  const [receivedAt, setReceivedAt] = useState(() => todayInIndia());
   const [note, setNote] = useState("");
   const [error, setError] = useState<string>();
   const [saving, startSaving] = useTransition();

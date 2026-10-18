@@ -4,7 +4,7 @@ import { createElement, type ReactElement } from "react";
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 
 import { safeFilename } from "@/lib/csv";
-import { formatDate } from "@/lib/format";
+import { formatDate, todayInIndia } from "@/lib/format";
 
 import { DATASETS } from "./datasets";
 import { runSpec } from "./queries";
@@ -45,7 +45,7 @@ export async function reportPdfResponse(
     }) as ReactElement<DocumentProps>,
   );
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInIndia();
   const filename = `Goodearth-Report-${safeFilename(name)}-${today}.pdf`;
 
   return new Response(new Uint8Array(buffer), {

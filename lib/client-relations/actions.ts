@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 
 // Type-only and NOT re-exported: a bare `export type { X }` in a "use server" file crashes every action in the chunk (check:actions).
 import type { ActionState } from "@/lib/action-state";
+import { todayInIndia } from "@/lib/format";
 
 /** Every export opens with requireTool; RLS refuses anything that slips past. Actions return ActionState, never throw. */
 
@@ -164,7 +165,7 @@ export async function assignPlot(
   });
   if (error) return friendly(error, "Could not assign that plot. Try again.");
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInIndia();
   const { error: stageError } = await supabase
     .from("clients")
     .update({ stage: "client", converted_on: today, lost_reason: null })

@@ -33,7 +33,7 @@ import {
   submitCashRequest,
 } from "@/lib/bills/payment-actions";
 import type { CashRequestDetail, CashRequestItem, PayableBill } from "@/lib/bills/payment-queries";
-import { formatDate, formatMoney } from "@/lib/format";
+import { formatDate, formatMoney, todayInIndia } from "@/lib/format";
 import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -251,7 +251,7 @@ function PayForm({
 }) {
   const { run, error, pending } = useRun();
   const [amount, setAmount] = useState(String(cap));
-  const [paidOn, setPaidOn] = useState(() => new Date().toISOString().slice(0, 10));
+  const [paidOn, setPaidOn] = useState(() => todayInIndia());
   const [reference, setReference] = useState("");
   const value = Number(amount);
   const problem = paymentProblem({

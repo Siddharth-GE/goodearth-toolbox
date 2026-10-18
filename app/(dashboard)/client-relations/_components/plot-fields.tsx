@@ -19,7 +19,7 @@ import {
   ORIGINAL_WITH,
   REGISTRATION_STAGES,
 } from "@/lib/client-relations/stages";
-import { formatDate } from "@/lib/format";
+import { formatDate, todayInIndia } from "@/lib/format";
 import type { ProgressStageRow } from "@/lib/masters/progress-stages";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -439,7 +439,7 @@ function DesignChecks({ engagement }: { engagement: PlotFields }) {
           if (!changed) return;
           const turnOn = next.includes(changed.key);
           const before = on;
-          setOn({ ...on, [changed.key]: turnOn ? new Date().toISOString().slice(0, 10) : null });
+          setOn({ ...on, [changed.key]: turnOn ? todayInIndia() : null });
           save({ [changed.key]: turnOn }, () => setOn(before));
         }}
       />

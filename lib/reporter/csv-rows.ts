@@ -8,6 +8,7 @@ import type { ReportResult, ReportValue } from "./aggregate";
 import type { DatasetDef, FieldType } from "./datasets";
 import { measureLabel } from "./labels";
 import { measureId, type ReportSpec } from "./spec";
+import { todayInIndia } from "@/lib/format";
 
 export function reportCsvFilename(dataset: DatasetDef, today: string): string {
   return `Goodearth-Report-${safeFilename(dataset.label)}-${safeFilename(today)}.csv`;
@@ -104,6 +105,6 @@ export function reportCsvResponse(
       ]),
     ),
   );
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInIndia();
   return csvResponse(rows, reportCsvFilename(dataset, today));
 }

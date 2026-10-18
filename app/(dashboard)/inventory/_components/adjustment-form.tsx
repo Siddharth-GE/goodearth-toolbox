@@ -7,7 +7,7 @@ import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { formatQuantity } from "@/lib/format";
+import { formatQuantity, todayInIndia } from "@/lib/format";
 import { recordStockAdjustment } from "@/lib/inventory/actions";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -30,7 +30,7 @@ export function AdjustmentForm({
   const [direction, setDirection] = useState<"add" | "remove">("add");
   const [quantity, setQuantity] = useState("");
   const [reason, setReason] = useState("");
-  const [adjustedAt, setAdjustedAt] = useState(() => new Date().toISOString().slice(0, 10));
+  const [adjustedAt, setAdjustedAt] = useState(() => todayInIndia());
   const [pickerOpen, setPickerOpen] = useState(false);
   const [error, setError] = useState<string>();
   const [saved, setSaved] = useState<string>();

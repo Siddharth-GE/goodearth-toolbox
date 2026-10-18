@@ -15,7 +15,7 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/components/ui/table";
-import { formatMoney, formatQuantity } from "@/lib/format";
+import { formatMoney, formatQuantity, todayInIndia } from "@/lib/format";
 import { recordStockIssue } from "@/lib/inventory/actions";
 import { issueValue, planBatches, type Batch } from "@/lib/inventory/batches";
 import type { IssueFormOptions } from "@/lib/inventory/issues-queries";
@@ -49,7 +49,7 @@ export function IssueForm({
   const [workItemId, setWorkItemId] = useState(request?.workItemId ?? "");
   const [toStoreId, setToStoreId] = useState("");
   const [projectId, setProjectId] = useState(store.project_id ?? "");
-  const [issuedAt, setIssuedAt] = useState(() => new Date().toISOString().slice(0, 10));
+  const [issuedAt, setIssuedAt] = useState(() => todayInIndia());
   const [note, setNote] = useState("");
   const [picked, setPicked] = useState<Record<string, number>>(() =>
     request && holdings.some((row) => row.item_id === request.itemId)

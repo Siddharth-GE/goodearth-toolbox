@@ -20,17 +20,15 @@ import {
   type ReceiptLineRate,
 } from "./queries";
 import { remainingToReceive } from "./stock";
+import { todayInIndia } from "@/lib/format";
 
 /** Counts of movements only: a welcome screen never shows rupees. */
 export async function getWelcomeCounts() {
   await requireTool("/inventory");
   const supabase = await createClient();
 
-  const startOfMonth = new Date();
-  startOfMonth.setDate(1);
-  startOfMonth.setHours(0, 0, 0, 0);
-  // received_at and issued_at are dates, not timestamps.
-  const since = startOfMonth.toISOString().slice(0, 10);
+  // received_at and issued_at are dates, not timestamps. This month starts on India's calendar.
+  const since = `${todayInIndia().slice(0, 8)}01`;
 
   const [awaiting, received, issued] = await Promise.all([
     supabase.from("po_facts").select("id", { count: "exact", head: true }).eq("status", "issued"),

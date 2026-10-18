@@ -17,7 +17,7 @@ import { Select } from "@/components/ui/select";
 import { addReceipt } from "@/lib/client-relations/actions";
 import type { MilestoneRow } from "@/lib/client-relations/queries";
 import { RECEIPT_MODES, milestoneLabel } from "@/lib/client-relations/stages";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, todayInIndia } from "@/lib/format";
 import { useState, useTransition } from "react";
 
 /** Records money arriving. No approval step, unlike Bills: this records money that has already landed. */
@@ -60,7 +60,7 @@ function ReceiptForm({
   onSaved: () => void;
 }) {
   const [amount, setAmount] = useState("");
-  const [receivedOn, setReceivedOn] = useState(new Date().toISOString().slice(0, 10));
+  const [receivedOn, setReceivedOn] = useState(todayInIndia());
   const [milestoneId, setMilestoneId] = useState("");
   const [mode, setMode] = useState("bank");
   const [reference, setReference] = useState("");
