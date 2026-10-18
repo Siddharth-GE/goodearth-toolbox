@@ -1,5 +1,6 @@
 "use client";
 
+import { Heading } from "@/components/ui/heading";
 import { SitePicker } from "@/components/masters/site-picker";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -247,7 +248,7 @@ export function WorkOrderEditor({
       </div>
 
       <div className="flex flex-wrap items-end justify-between gap-2">
-        <h2 className="text-foreground text-lg font-bold tracking-tight">Works</h2>
+        <Heading>Works</Heading>
         {options.templates.length > 0 && (
           // A picker that resets itself: choosing fills the works below.
           <Select

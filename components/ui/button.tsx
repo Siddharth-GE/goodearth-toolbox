@@ -2,13 +2,17 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import type { ButtonHTMLAttributes } from "react";
 
-type Variant = "primary" | "secondary" | "ghost";
+type Variant = "primary" | "secondary" | "ghost" | "ground" | "groundOutline";
 type Size = "sm" | "md" | "lg";
 
 const variantClasses: Record<Variant, string> = {
-  primary: "bg-accent text-accent-foreground hover:bg-accent/90",
-  secondary: "bg-surface-raised text-foreground border border-border hover:border-foreground/20",
+  primary: "bg-accent text-accent-foreground hover:bg-accent-hover",
+  secondary: "bg-surface-raised text-foreground border border-border hover:border-foreground/30",
   ghost: "text-foreground hover:bg-foreground/[0.05]",
+  // On a brand ground (DESIGN.md): the ground colours inverted, and a hairline of the ground ink.
+  ground: "bg-on-ground text-ground hover:bg-on-ground/90 focus-visible:ring-on-ground/40",
+  groundOutline:
+    "border border-on-ground/45 text-on-ground hover:bg-on-ground/10 focus-visible:ring-on-ground/40",
 };
 
 const sizeClasses: Record<Size, string> = {
@@ -20,7 +24,7 @@ const sizeClasses: Record<Size, string> = {
 
 // disabled:opacity-50 lives here, not on `primary`, so every variant dims when disabled.
 const base =
-  "inline-flex items-center justify-center gap-2 rounded-xl font-medium transition-[transform,background-color,border-color,opacity,box-shadow] duration-150 ease-out-quint active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent/25";
+  "inline-flex items-center justify-center gap-2 rounded-xl font-medium tracking-[0.02em] transition-[transform,background-color,border-color,opacity,box-shadow] duration-150 ease-out-quint active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent/25";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;

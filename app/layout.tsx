@@ -1,13 +1,26 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist_Mono, Outfit } from "next/font/google";
+import localFont from "next/font/local";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { PracticeBanner } from "@/components/ui/practice-banner";
 import { THEME_COOKIE } from "@/lib/theme";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+// Outfit stands in for the brand's Gilroy until a web licence exists; Gambetta is the brand's heading face.
+const outfit = Outfit({
+  variable: "--font-outfit",
+  subsets: ["latin", "latin-ext"],
+});
+
+const gambetta = localFont({
+  variable: "--font-gambetta",
+  src: [
+    { path: "./fonts/Gambetta-400.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/Gambetta-400-italic.woff2", weight: "400", style: "italic" },
+    { path: "./fonts/Gambetta-500.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/Gambetta-500-italic.woff2", weight: "500", style: "italic" },
+    { path: "./fonts/Gambetta-600.woff2", weight: "600", style: "normal" },
+  ],
 });
 
 const geistMono = Geist_Mono({
@@ -16,17 +29,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Toolbox by Kaadal",
+  title: "Kaadal Toolbox",
   description: "Kaadal's internal tools",
 };
 
-// Paints the phone's address bar to match the page. Static <meta> tags resolve before our code,
-// so they follow prefers-color-scheme, not the switch.
+// Paints the phone's address bar to match the burgundy top bar.
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f4f2ee" },
-    { media: "(prefers-color-scheme: dark)", color: "#141311" },
-  ],
+  themeColor: "#521323",
 };
 
 /**
@@ -43,7 +52,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${outfit.variable} ${gambetta.variable} ${geistMono.variable} h-full antialiased`}
       // The script changes <html> before hydration: the mismatch this suppresses.
       suppressHydrationWarning
     >

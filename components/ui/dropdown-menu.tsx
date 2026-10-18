@@ -18,7 +18,7 @@ export function DropdownMenuContent({
       <DropdownMenuPrimitive.Content
         sideOffset={sideOffset}
         className={cn(
-          "border-border/60 bg-surface-raised/95 shadow-float animate-menu-in z-50 min-w-40 rounded-xl border p-1 backdrop-blur-xl focus:outline-none",
+          "border-border bg-surface-raised shadow-float animate-menu-in z-50 min-w-40 rounded-xl border p-1 focus:outline-none",
           className,
         )}
         {...props}

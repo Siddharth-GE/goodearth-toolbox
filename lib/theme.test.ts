@@ -1,4 +1,4 @@
-// An unreadable cookie means "follow the device", never a guessed colour.
+// Light by default; dark only when chosen. An unreadable cookie means no choice.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -9,7 +9,7 @@ test("the two real choices survive the round trip", () => {
   assert.equal(resolveTheme("dark"), "dark");
 });
 
-test("no cookie means follow the device, not a default colour", () => {
+test("no cookie means no choice", () => {
   assert.equal(resolveTheme(undefined), null);
   assert.equal(resolveTheme(null), null);
   assert.equal(resolveTheme(""), null);
@@ -27,20 +27,18 @@ test("the switch flips both ways", () => {
   assert.equal(nextTheme("dark"), "light");
 });
 
-test("an explicit choice beats the device, both ways round", () => {
-  assert.equal(effectiveTheme("light", true), "light");
-  assert.equal(effectiveTheme("dark", false), "dark");
+test("an explicit choice is what shows", () => {
+  assert.equal(effectiveTheme("light"), "light");
+  assert.equal(effectiveTheme("dark"), "dark");
 });
 
-test("with no choice made, the device decides", () => {
-  assert.equal(effectiveTheme(undefined, true), "dark");
-  assert.equal(effectiveTheme(undefined, false), "light");
+test("with no choice made, it is light, whatever the device says", () => {
+  assert.equal(effectiveTheme(undefined), "light");
+  assert.equal(effectiveTheme("system"), "light");
 });
 
-test("the switch always flips away from what is on screen", () => {
-  // Device dark, no choice yet: one press must give light.
-  assert.equal(nextTheme(effectiveTheme(undefined, true)), "light");
-  assert.equal(nextTheme(effectiveTheme(undefined, false)), "dark");
+test("the first press of the switch gives dark", () => {
+  assert.equal(nextTheme(effectiveTheme(undefined)), "dark");
 });
 
 test("the written cookie is one the reader accepts back", () => {

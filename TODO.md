@@ -9,7 +9,7 @@ The founder's decision (2026-10-16):
 - Staging's database (`ipstebqawrvhkyntctrv`) becomes production.
 - The old production project is deleted.
 - A new, empty project becomes the practice database.
-- The app is Toolbox by Kaadal, at `toolbox.kaadalgroup.com`.
+- The app is Kaadal Toolbox, at `toolbox.kaadalgroup.com`.
 
 The founder gives the steps. Before the switch:
 
@@ -40,6 +40,7 @@ Each checklist is in `plan.md`, under the heading named.
 - **Client Relations, two sides of a plot, one owner each** (`0125`): _twelfth_ and _fourteenth pieces_.
 - **Design Management** (`0099`, `0124`, `0126`): _eleventh_ and _thirteenth pieces_. Bring each villa already under way in with **Set where it is**.
 - **Relay × Google Chat, round two**: the checks are in `lib/google-chat/PLAN.md`.
+- **The Kaadal look** (no migration): _the Kaadal look_.
 - **Dexter saved answers** (`0100`):
   - Open the "Dexter answers test" deck's link in a private window, type, close and reopen. The answers are back.
   - Send marks it Sent, and Clear answers empties it.
@@ -84,7 +85,7 @@ These `scripts/trials/` fail against today's staging data, with or without the l
 - **Phone-first lists and forms.** Indents, Inventory, Supervisors and Directory first.
 - **A sidebar search** over `lib/tools.ts`.
 - **The structure underneath:**
-  - one heading style (50 raw `<h2>` headings in 42 files);
+  - the remaining raw `<h2>` headings (small card headings and labels) onto `Section`, `Heading` and the label style;
   - one page rhythm;
   - a shared notice banner.
 

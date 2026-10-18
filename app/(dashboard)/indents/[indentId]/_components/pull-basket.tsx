@@ -1,5 +1,6 @@
 "use client";
 
+import { Heading } from "@/components/ui/heading";
 import { ItemThumb } from "@/components/masters/item-thumb";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -89,7 +90,7 @@ export function PullBasket({
         return (
           <section key={group.label} className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-foreground text-lg font-bold tracking-tight">{group.label}</h2>
+              <Heading>{group.label}</Heading>
               <div className="flex items-center gap-3">
                 <span className="text-muted text-xs">
                   {formatCount(group.lines.length)} {group.lines.length === 1 ? "line" : "lines"}

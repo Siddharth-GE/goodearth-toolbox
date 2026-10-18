@@ -1,4 +1,3 @@
-import { Logo } from "@/components/ui/logo";
 import { VerifyCodeForm } from "@/components/verify-code-form";
 import { getChallenge, maskEmail } from "@/lib/auth/verified-session";
 import Link from "next/link";
@@ -12,9 +11,8 @@ export default async function VerifyLoginPage() {
   return (
     <div className="w-full max-w-sm">
       <div className="mb-6 flex flex-col items-center text-center">
-        <Logo className="mb-4 size-11" />
-        <h1 className="text-foreground text-2xl font-semibold tracking-tight">Check your email</h1>
-        <p className="text-muted mt-1 text-sm">
+        <h1 className="text-foreground font-display text-3xl font-medium">Check your email</h1>
+        <p className="text-muted mt-2 text-sm">
           We sent a 6-digit code to {maskEmail(challenge.subject)}. It works for 10 minutes.
         </p>
       </div>

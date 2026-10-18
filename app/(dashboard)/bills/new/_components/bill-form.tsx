@@ -1,5 +1,6 @@
 "use client";
 
+import { Heading } from "@/components/ui/heading";
 import { SitePicker } from "@/components/masters/site-picker";
 import { Button, LinkButton } from "@/components/ui/button";
 import { FormMessage } from "@/components/ui/form-message";
@@ -330,7 +331,7 @@ export function BillForm({
 
       {(kind === "nmr" || anchorId) && (
         <div className="space-y-2">
-          <h2 className="text-foreground text-lg font-bold tracking-tight">Lines</h2>
+          <Heading>Lines</Heading>
           {kind === "po" && lines.length === 0 && (
             <p className="text-muted text-sm">
               Nothing on this PO has been received and left unbilled. A bill against it waits until

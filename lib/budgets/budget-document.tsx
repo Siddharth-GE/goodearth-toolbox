@@ -143,7 +143,7 @@ export function BudgetDocument({ budget }: { budget: BudgetDetail }) {
     <Document
       title={`Goodearth Budget (Internal) — ${budget.unit_name} R${budget.revision_no}`}
       author="Goodearth"
-      creator="Toolbox by Kaadal"
+      creator="Kaadal Toolbox"
     >
       <DocumentPage meta={meta}>
         <Text style={styles.h1}>{budget.unit_name}</Text>

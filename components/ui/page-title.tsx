@@ -33,13 +33,13 @@ export function PageTitle({
         )}
         <h1
           className={cn(
-            "text-foreground text-2xl font-semibold tracking-tight text-balance",
+            "text-foreground font-display text-3xl font-medium text-balance md:text-4xl",
             backHref && "mt-1",
           )}
         >
           {title}
         </h1>
-        {description && <p className="text-muted mt-1 max-w-prose text-sm">{description}</p>}
+        {description && <p className="text-muted mt-2 max-w-prose text-sm">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>

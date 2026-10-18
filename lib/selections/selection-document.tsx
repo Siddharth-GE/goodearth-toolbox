@@ -118,7 +118,7 @@ export function SelectionDocument({
     <Document
       title={`Goodearth Selections — ${selection.unit_name} R${selection.revision_no}`}
       author="Goodearth"
-      creator="Toolbox by Kaadal"
+      creator="Kaadal Toolbox"
     >
       <DocumentPage meta={meta}>
         <Text style={styles.h1}>{selection.unit_name}</Text>

@@ -20,7 +20,7 @@ export function TransmittalList({
 
   return (
     <Tabs defaultValue="all" className="space-y-3">
-      <TabsList className="flex-wrap">
+      <TabsList>
         <TabsTrigger value="all">All</TabsTrigger>
         {stages.map((stage) => (
           <TabsTrigger key={stage.id} value={stage.id}>

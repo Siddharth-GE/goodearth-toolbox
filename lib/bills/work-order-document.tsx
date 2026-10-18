@@ -83,7 +83,7 @@ export function WorkOrderDocument({ order }: { order: WorkOrderDetail }) {
     <Document
       title={`Goodearth Work Order — ${reference}`}
       author="Goodearth"
-      creator="Toolbox by Kaadal"
+      creator="Kaadal Toolbox"
     >
       <DocumentPage meta={meta}>
         <DocumentHeading

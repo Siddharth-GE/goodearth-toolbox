@@ -1,88 +1,54 @@
 @import "tailwindcss";
 
 /* ---------------------------------------------------------------------
-   Light and dark
+   Kaadal brand (Brandkit 2026). Solid colour only: no textures, no glass.
 
-   Dark mode is chosen in two ways, and this file is the only place that
-   knows the difference:
-
-   - `data-theme` on <html>, written by the switch in the user menu
-     (see components/ui/theme-toggle.tsx). An explicit choice always wins.
-   - the device's own setting, for anyone who never touches the switch.
-     That was the ONLY way until the switch existed, and stays the default.
-
-   `color-scheme` is declared alongside the tokens on purpose. It is what
-   makes the BROWSER's own furniture follow us — date pickers, number
-   steppers, select menus, scrollbars. Without it those are drawn light on
-   a dark page, which is how ~30 forms shipped a white calendar popup.
-
-   The dark palette below is written out twice, once per selector. CSS has
-   no way to share one declaration block across a media query, and the
-   alternatives (light-dark(), a toggle hack) are either newer than some of
-   the site phones or too clever to keep straight. **Keep the two blocks
-   in step** — a value changed in one must change in the other.
+   Light by default. Dark only when someone picks it with the switch, which
+   sets `data-theme="dark"` on <html>; the device's own setting is ignored.
+   `color-scheme` sits beside the tokens so the browser's own date pickers,
+   selects and scrollbars follow the mode (BUGCATCHER #4).
    --------------------------------------------------------------------- */
 
-/* Teach Tailwind's `dark:` variant the same two rules. Without this it
-   stays on its default `prefers-color-scheme` behaviour and every `dark:`
-   utility in the app would ignore the switch — a dark page with light
-   badges on it. */
-@custom-variant dark {
-  &:where([data-theme="dark"], [data-theme="dark"] *) {
-    @slot;
-  }
-  @media (prefers-color-scheme: dark) {
-    &:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) {
-      @slot;
-    }
-  }
-}
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 :root {
   color-scheme: light;
 
-  /* Warm stone neutrals. Three tones, not two: the page is linen, a card
-     is paper, and anything floating above it is white — so a card reads
-     as a card without needing a shadow to say so. */
-  --background: #f4f2ee;
-  --foreground: #1d1c19;
-  --surface: #fcfbf9;
+  /* The brand's own colours: the same in both modes, for grounds, the logo and team marks. */
+  --k-ink: #180b0f;
+  --k-teal: #102228;
+  --k-burgundy: #521323;
+  --k-olive: #7c783f;
+  --k-ochre: #be904c;
+  --k-sage: #bfc9b3;
+  --k-blush: #dec8b7;
+  --k-cream: #fdf3f6;
+
+  /* Three tones: the page is paper, a card a lighter paper, what floats or takes typing is white. */
+  --background: #f0eeea;
+  --foreground: #180b0f;
+  --surface: #faf8f6;
   --surface-raised: #ffffff;
-  --border: #e5e1da;
-  --accent: #1f7a5c;
+  --border: #dcd8d4;
+  --accent: #521323;
+  --accent-hover: #3f0e1a;
   --accent-foreground: #ffffff;
-  --muted: #726f69;
+  --muted: #6b6563;
 
-  /* The one shadow in the system, and it means "this is floating" —
-     menus, dialogs, the phone drawer, a card being hovered. Soft and
-     ambient rather than a hard drop; resting surfaces use a hairline. */
-  --shadow-float: 0 12px 40px -12px rgb(29 28 25 / 0.18), 0 1px 2px rgb(29 28 25 / 0.06);
+  --shadow-float: 0 1px 2px rgb(24 11 15 / 0.06), 0 8px 24px rgb(24 11 15 / 0.1);
 
-  /* Semantic status — the only fixed-meaning colors in the system.
-     Distinct from lib/color-hash.ts's 7-color identity palette (used
-     for avatars/category badges), which is arbitrary-by-hash, not
-     semantic, and stays a plain JS array rather than tokens here. */
-  --success: #16a34a;
+  /* Fixed-meaning status, tuned to the brand's earth tones; danger stays a clear brick red beside burgundy. */
+  --success: #56662a;
   --success-foreground: #ffffff;
-  --warning: #d97706;
+  --warning: #94661c;
   --warning-foreground: #ffffff;
-  --danger: #dc2626;
+  --danger: #b3261e;
   --danger-foreground: #ffffff;
-  --info: #2563eb;
+  --info: #2f5d66;
   --info-foreground: #ffffff;
 
-  /* The chart palette, beside the status colours above and lib/color-hash.ts's
-     identity palette. Categorical series only, in slot order, assigned by
-     lib/charts/palette.ts.
-
-     THE ORDER IS THE ACCESSIBILITY MECHANISM, NOT A TASTE CHOICE.
-     Validated against this app's real chart surfaces (#ffffff light,
-     #1a1a17 dark): worst adjacent colour-blind ΔE 9.1 light / 8.4 dark,
-     worst normal-vision ΔE 19.6 / 19.3, all slots ≥3:1 contrast on
-     dark. Two other orderings were measured and REJECTED. Do not
-     re-order this list by eye; re-measure and choose only among passing
-     orders. Single-series and emphasis charts use --accent, not slot 1.
-     Status colours are never issued as series colours. */
+  /* Chart slots in a measured order (colour-blind separation, dark contrast): never re-order by eye.
+     Assigned by lib/charts/palette.ts; single-series charts use --accent. */
   --chart-1: #1baf7a;
   --chart-2: #eda100;
   --chart-3: #e87ba4;
@@ -100,6 +66,7 @@
   --color-surface-raised: var(--surface-raised);
   --color-border: var(--border);
   --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
   --color-accent-foreground: var(--accent-foreground);
   --color-muted: var(--muted);
   --color-success: var(--success);
@@ -118,18 +85,26 @@
   --color-chart-6: var(--chart-6);
   --color-chart-7: var(--chart-7);
   --color-chart-8: var(--chart-8);
-  --font-sans: var(--font-geist-sans);
+
+  --color-brand-ink: var(--k-ink);
+  --color-brand-teal: var(--k-teal);
+  --color-brand-burgundy: var(--k-burgundy);
+  --color-brand-olive: var(--k-olive);
+  --color-brand-ochre: var(--k-ochre);
+  --color-brand-sage: var(--k-sage);
+  --color-brand-blush: var(--k-blush);
+  --color-brand-cream: var(--k-cream);
+
+  /* A ground is a solid brand block (sidebar, sign-in, a team's band); set by a `ground-*` utility below. */
+  --color-ground: var(--ground);
+  --color-on-ground: var(--on-ground);
+  --color-ground-mark: var(--ground-mark);
+
+  --font-sans: var(--font-outfit);
+  --font-display: var(--font-gambetta);
   --font-mono: var(--font-geist-mono);
 
-  /* Registered here so each one becomes a utility: `shadow-float`,
-     `ease-out-quint`, `animate-pop-in` and the rest. Tailwind's own
-     scales (node_modules/tailwindcss/theme.css) work the same way, which
-     is why a custom name sits beside `shadow-sm` and `ease-out` rather
-     than in an arbitrary class of its own.
-
-     A name added here must also be declared in lib/utils.ts, or
-     tailwind-merge will not know it is a shadow/easing/animation and a
-     caller's `shadow-none` will sit next to it instead of replacing it. */
+  /* Every custom shadow, ease and animate name here must also be listed in lib/utils.ts for tailwind-merge. */
   --shadow-float: var(--shadow-float);
 
   --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
@@ -146,35 +121,77 @@
   --animate-slide-out-left: slide-out-left 160ms var(--ease-out-quint) both;
 }
 
-/* Dark, asked for. */
+/* The brand's corners, applied to Tailwind's own names: controls near-square, cards gently rounded, panels soft. */
+@theme {
+  --radius-md: 2px;
+  --radius-lg: 2px;
+  --radius-xl: 2px;
+  --radius-2xl: 14px;
+  --radius-3xl: 24px;
+}
+
+/* Grounds pair each brand colour with the text and logo colour the Brandkit approves on it. */
+@utility ground-burgundy {
+  --ground: var(--k-burgundy);
+  --on-ground: var(--k-cream);
+  --ground-mark: var(--k-sage);
+}
+@utility ground-teal {
+  --ground: var(--k-teal);
+  --on-ground: var(--k-sage);
+  --ground-mark: var(--k-olive);
+}
+@utility ground-olive {
+  --ground: var(--k-olive);
+  --on-ground: #ffffff;
+  --ground-mark: #ffffff;
+}
+@utility ground-ochre {
+  --ground: var(--k-ochre);
+  --on-ground: var(--k-ink);
+  --ground-mark: var(--k-cream);
+}
+@utility ground-sage {
+  --ground: var(--k-sage);
+  --on-ground: var(--k-burgundy);
+  --ground-mark: var(--k-burgundy);
+}
+@utility ground-blush {
+  --ground: var(--k-blush);
+  --on-ground: var(--k-burgundy);
+  --ground-mark: var(--k-burgundy);
+}
+@utility ground-ink {
+  --ground: var(--k-ink);
+  --on-ground: #ffffff;
+  --ground-mark: #ffffff;
+}
+
+/* Dark, when chosen: the brand's ink, with blush as the action colour. */
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  /* The same three tones in warm charcoal. --surface stays #1a1a17: the
-     chart palette was measured on it. */
-  --background: #141311;
-  --foreground: #efede8;
-  --surface: #1a1a17;
-  --surface-raised: #232220;
-  --border: #2b2a26;
-  --accent: #34a37a;
-  --accent-foreground: #0a0a09;
-  --muted: #9b978f;
+  --background: #180b0f;
+  --foreground: #f2e8e9;
+  --surface: #20131a;
+  --surface-raised: #2a1c22;
+  --border: #3a2a31;
+  --accent: #dec8b7;
+  --accent-hover: #ead9cb;
+  --accent-foreground: #180b0f;
+  --muted: #a99a97;
 
-  --shadow-float: 0 16px 48px -12px rgb(0 0 0 / 0.6), 0 1px 0 rgb(255 255 255 / 0.04);
+  --shadow-float: 0 16px 48px -12px rgb(0 0 0 / 0.7), 0 1px 0 rgb(255 255 255 / 0.04);
 
-  --success: #22c55e;
-  --success-foreground: #0a0a09;
-  --warning: #f59e0b;
-  --warning-foreground: #0a0a09;
-  --danger: #ef4444;
-  --danger-foreground: #0a0a09;
-  --info: #3b82f6;
-  --info-foreground: #0a0a09;
+  --success: #a9b98a;
+  --success-foreground: #180b0f;
+  --warning: #d9a75f;
+  --warning-foreground: #180b0f;
+  --danger: #ef7a6f;
+  --danger-foreground: #180b0f;
+  --info: #8fb9c2;
+  --info-foreground: #180b0f;
 
-  /* Chart slots, re-tuned for the dark surface. Same rule as light:
-     the order is measured, not aesthetic — change both blocks together
-     and only to another measured-passing order. */
   --chart-1: #199e70;
   --chart-2: #c98500;
   --chart-3: #d55181;
@@ -185,48 +202,15 @@
   --chart-8: #d95926;
 }
 
-/* Dark, inherited from the device — unless the switch says light. */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    color-scheme: dark;
-
-    /* The same three tones in warm charcoal. --surface stays #1a1a17: the
-       chart palette was measured on it. */
-    --background: #141311;
-    --foreground: #efede8;
-    --surface: #1a1a17;
-    --surface-raised: #232220;
-    --border: #2b2a26;
-    --accent: #34a37a;
-    --accent-foreground: #0a0a09;
-    --muted: #9b978f;
-
-    --shadow-float: 0 16px 48px -12px rgb(0 0 0 / 0.6), 0 1px 0 rgb(255 255 255 / 0.04);
-
-    --success: #22c55e;
-    --success-foreground: #0a0a09;
-    --warning: #f59e0b;
-    --warning-foreground: #0a0a09;
-    --danger: #ef4444;
-    --danger-foreground: #0a0a09;
-    --info: #3b82f6;
-    --info-foreground: #0a0a09;
-
-    --chart-1: #199e70;
-    --chart-2: #c98500;
-    --chart-3: #d55181;
-    --chart-4: #008300;
-    --chart-5: #9085e9;
-    --chart-6: #e66767;
-    --chart-7: #3987e5;
-    --chart-8: #d95926;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-outfit), Arial, Helvetica, sans-serif;
+}
+
+::selection {
+  background: var(--k-blush);
+  color: var(--k-ink);
 }
 
 /* The light/dark switch crossfades the page instead of snapping it.

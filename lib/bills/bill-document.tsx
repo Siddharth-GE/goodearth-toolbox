@@ -120,7 +120,7 @@ export function BillDocument({ data }: { data: BillPdfData }) {
     <Document
       title={`Goodearth Bill — ${bill.reference}`}
       author="Goodearth"
-      creator="Toolbox by Kaadal"
+      creator="Kaadal Toolbox"
     >
       <DocumentPage meta={meta}>
         <DocumentHeading

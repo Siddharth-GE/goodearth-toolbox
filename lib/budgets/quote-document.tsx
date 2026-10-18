@@ -115,7 +115,7 @@ export function QuoteDocument({ quote }: { quote: QuoteData }) {
     <Document
       title={`Goodearth Quotation — ${quote.unit_name} R${quote.revision_no}`}
       author="Goodearth"
-      creator="Toolbox by Kaadal"
+      creator="Kaadal Toolbox"
     >
       <DocumentPage meta={meta}>
         <Text style={styles.h1}>{quote.unit_name}</Text>

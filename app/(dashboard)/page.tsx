@@ -7,7 +7,7 @@ import { visibleTools } from "@/lib/tools";
 import { Suspense } from "react";
 import { OperationsPipeline } from "./_components/operations-pipeline";
 import { PeopleOverview } from "./_components/people-overview";
-import { ToolGrid } from "./_components/tool-grid";
+import { TeamGrid } from "./_components/team-grid";
 
 function greeting() {
   const hour = new Date().getHours();
@@ -26,16 +26,16 @@ export default async function DashboardHome() {
 
   return (
     <div>
-      <div className="mt-4 mb-6">
-        <h1 className="text-foreground text-4xl font-semibold tracking-tight text-balance md:text-5xl">
+      <div className="mt-4 mb-10">
+        <h1 className="text-foreground font-display text-4xl font-medium text-balance md:text-6xl">
           {greeting()}
           {firstName ? `, ${firstName}.` : "."}
         </h1>
-        <p className="text-muted mt-2 text-sm">{today}</p>
+        <p className="text-muted mt-3 text-sm">{today}</p>
       </div>
 
       <div className="space-y-8">
-        <ToolGrid sections={sections} />
+        <TeamGrid sections={sections} />
         {/* Fetches its own counts, so it gets its own boundary rather than holding up the page. */}
         <Suspense
           fallback={
