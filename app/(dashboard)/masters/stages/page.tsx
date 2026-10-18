@@ -38,9 +38,9 @@ export default async function StagesPage() {
             Construction stages
           </p>
           <p className="text-muted mt-1 text-sm">
-            What the money is for — the stages an indent or a construction budget picks from,
-            picked, never typed, so reports group cleanly. Renaming a stage renames it on every
-            indent that carries it. Deactivating stops new picks; a stage in use cannot be deleted.
+            What the money is for — the stages an indent picks from, picked, never typed, so reports
+            group cleanly. Renaming a stage renames it on every indent that carries it. Deactivating
+            stops new picks; a stage in use cannot be deleted.
           </p>
         </div>
         <StageForm

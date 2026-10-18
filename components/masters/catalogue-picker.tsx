@@ -20,7 +20,7 @@ import { useMemo, useState, useTransition, type ReactNode } from "react";
 export type PickedLine = { item: CatalogueItem; quantity: number };
 
 /**
- * Search, filters, tiles, a local basket and one commit bar, shared by Selections, the Construction tree and Indents.
+ * Search, filters, tiles, a local basket and one commit bar, shared by Selections and Indents.
  * Parent-controlled: the caller owns the trigger and what "Add items" means. Nothing is written until onCommit.
  */
 export function CataloguePickerDialog({

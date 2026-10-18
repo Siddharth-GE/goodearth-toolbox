@@ -12,7 +12,6 @@ import {
 import { listInbox } from "@/lib/budgets/queries";
 import { PiggyBank } from "lucide-react";
 import Link from "next/link";
-import { BudgetsNav } from "../_components/budgets-nav";
 import { StartPricingButton } from "../_components/start-pricing-button";
 import { formatDate } from "@/lib/format";
 
@@ -31,8 +30,6 @@ export default async function BudgetsPage() {
           </Link>
         }
       />
-
-      <BudgetsNav />
 
       {rows.length === 0 ? (
         <EmptyState

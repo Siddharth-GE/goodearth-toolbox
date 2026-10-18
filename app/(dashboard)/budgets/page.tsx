@@ -17,7 +17,6 @@ export default async function BudgetsPage() {
         icon="PiggyBank"
         intro={[
           "The moment the design team issues a revision, it lands here to be priced — every line, space by space, with the margins this team alone can see. An approved budget is what Indents draws against, so nothing is purchased that was never priced.",
-          "Interiors carries the priced revisions and client quotes; Construction carries the QS team's stage-wise quantity plans.",
         ]}
         stats={[
           { label: "Waiting to price", value: waiting, hint: "issued, not started" },
@@ -26,7 +25,6 @@ export default async function BudgetsPage() {
         ]}
         links={[
           { label: "Pricing inbox", href: "/budgets/interiors", primary: true },
-          { label: "Construction", href: "/budgets/construction" },
           { label: "Product margins", href: "/budgets/margins" },
         ]}
       />
