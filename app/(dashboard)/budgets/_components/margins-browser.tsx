@@ -91,9 +91,9 @@ export function MarginsBrowser({
       </div>
 
       {loading ? (
-        <p className="text-muted inline-flex items-center gap-1.5 text-xs">
+        <div className="text-muted inline-flex items-center gap-1.5 text-xs">
           <Spinner className="size-3.5 border-2" /> Searching…
-        </p>
+        </div>
       ) : (
         <Pagination
           page={page}

@@ -263,7 +263,7 @@ export async function addLines(
     }
   }
 
-  revalidatePath(`/selections/${selectionId}`);
+  revalidatePath("/selections", "layout");
   return undefined;
 }
 
@@ -304,7 +304,7 @@ export async function removeLine(selectionId: string, lineId: string): Promise<A
     return { error: "Could not remove the item. Try again." };
   }
 
-  revalidatePath(`/selections/${selectionId}`);
+  revalidatePath("/selections", "layout");
   return undefined;
 }
 

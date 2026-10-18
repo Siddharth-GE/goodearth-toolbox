@@ -146,7 +146,7 @@ export async function addPoolLines(poId: string, lines: PoolLineInput[]): Promis
     const { error } = await supabase.from("purchase_order_lines").insert(insert);
     if (error) {
       console.error("addPoolLines insert failed:", error);
-      revalidatePath(`/purchase-orders/${poId}`);
+      revalidatePath("/purchase-orders", "layout");
       const friendly = guardError(error, "Could not add those lines. Try again.", PO_GUARD_PHRASES);
       return {
         error:
@@ -158,8 +158,7 @@ export async function addPoolLines(poId: string, lines: PoolLineInput[]): Promis
     added++;
   }
 
-  revalidatePath(`/purchase-orders/${poId}`);
-  revalidatePath(`/purchase-orders/${poId}/pull`);
+  revalidatePath("/purchase-orders", "layout");
   if (skipped > 0) {
     // Only reachable if the PO changed underneath; the screen disables lines it holds.
     return {
@@ -242,7 +241,7 @@ export async function removePoLine(poId: string, lineId: string): Promise<Action
     return guardError(error, "Could not remove that line. Try again.", PO_GUARD_PHRASES);
   }
 
-  revalidatePath(`/purchase-orders/${poId}`);
+  revalidatePath("/purchase-orders", "layout");
   return undefined;
 }
 
@@ -279,7 +278,7 @@ export async function updatePoHeader(
     console.error("updatePoHeader failed:", error);
     return guardError(error, "Could not save. Try again.", PO_GUARD_PHRASES);
   }
-  revalidatePath(`/purchase-orders/${poId}`);
+  revalidatePath("/purchase-orders", "layout");
   return undefined;
 }
 
@@ -328,7 +327,7 @@ export async function issuePo(poId: string): Promise<ActionState> {
     return guardError(error, "Could not issue. Try again.", PO_GUARD_PHRASES);
   }
 
-  revalidatePath(`/purchase-orders/${poId}`);
+  revalidatePath("/purchase-orders", "layout");
   revalidatePath("/purchase-orders", "layout");
   return undefined;
 }
@@ -358,7 +357,7 @@ export async function requestPoDeletion(poId: string, note: string): Promise<Act
     return guardError(error, "Could not request deletion. Try again.", PO_GUARD_PHRASES);
   }
 
-  revalidatePath(`/purchase-orders/${poId}`);
+  revalidatePath("/purchase-orders", "layout");
   revalidatePath("/purchase-orders", "layout");
   return undefined;
 }
@@ -383,7 +382,7 @@ export async function withdrawPoDeletion(poId: string): Promise<ActionState> {
     return guardError(error, "Could not withdraw the request. Try again.", PO_GUARD_PHRASES);
   }
 
-  revalidatePath(`/purchase-orders/${poId}`);
+  revalidatePath("/purchase-orders", "layout");
   revalidatePath("/purchase-orders", "layout");
   return undefined;
 }
@@ -407,7 +406,7 @@ export async function approvePoDeletion(poId: string): Promise<ActionState> {
     return guardError(error, "Could not cancel this purchase order. Try again.", PO_GUARD_PHRASES);
   }
 
-  revalidatePath(`/purchase-orders/${poId}`);
+  revalidatePath("/purchase-orders", "layout");
   revalidatePath("/purchase-orders", "layout");
   return undefined;
 }

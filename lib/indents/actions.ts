@@ -221,7 +221,7 @@ export async function addDirectLines(
     }
   }
 
-  revalidatePath(`/indents/${indentId}`);
+  revalidatePath("/indents", "layout");
   return undefined;
 }
 
@@ -357,8 +357,7 @@ export async function addBudgetPullLines(
     return guardError(error, "Could not add those lines. Try again.", INDENT_GUARD_PHRASES);
   }
 
-  revalidatePath(`/indents/${indentId}`);
-  revalidatePath(`/indents/${indentId}/pull-interiors`);
+  revalidatePath("/indents", "layout");
   if (skipped > 0) {
     // The screen disables what is already here, so this only fires on a race.
     return {
@@ -446,7 +445,7 @@ export async function removeLine(indentId: string, lineId: string): Promise<Acti
     return guardError(error, "Could not remove that line. Try again.", INDENT_GUARD_PHRASES);
   }
 
-  revalidatePath(`/indents/${indentId}`);
+  revalidatePath("/indents", "layout");
   return undefined;
 }
 
@@ -529,7 +528,7 @@ export async function submitIndent(indentId: string): Promise<ActionState> {
     return guardError(error, "Could not submit. Try again.", INDENT_GUARD_PHRASES);
   }
 
-  revalidatePath(`/indents/${indentId}`);
+  revalidatePath("/indents", "layout");
   revalidatePath("/indents", "layout");
   return undefined;
 }
@@ -575,7 +574,7 @@ export async function approveIndent(indentId: string): Promise<ActionState> {
     return guardError(error, "Could not approve this indent. Try again.", INDENT_GUARD_PHRASES);
   }
 
-  revalidatePath(`/indents/${indentId}`);
+  revalidatePath("/indents", "layout");
   revalidatePath("/indents", "layout");
   return undefined;
 }
@@ -604,7 +603,7 @@ export async function rejectIndent(indentId: string, note: string): Promise<Acti
     return guardError(error, "Could not send this indent back. Try again.", INDENT_GUARD_PHRASES);
   }
 
-  revalidatePath(`/indents/${indentId}`);
+  revalidatePath("/indents", "layout");
   revalidatePath("/indents", "layout");
   return undefined;
 }
