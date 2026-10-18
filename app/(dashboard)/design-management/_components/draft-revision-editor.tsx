@@ -12,7 +12,7 @@ import {
   setDraftRevisionNumber,
   setDrawingRevisionWorks,
   updateDraftRevisionNote,
-} from "@/lib/design-management/actions";
+} from "@/lib/design-management/revision-actions";
 import { deleteDrawingRevisionFile } from "@/lib/design-management/files-actions";
 import type { DrawingRevisionRow } from "@/lib/design-management/queries";
 import { parseWorkDriveLink } from "@/lib/design-management/workdrive-link";

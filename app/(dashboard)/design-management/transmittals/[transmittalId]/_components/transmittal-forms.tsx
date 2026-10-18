@@ -8,7 +8,7 @@ import {
   deleteDraftTransmittal,
   issueTransmittal,
   setDraftTransmittalNote,
-} from "@/lib/design-management/actions";
+} from "@/lib/design-management/transmittal-actions";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { useState } from "react";

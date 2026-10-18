@@ -13,7 +13,7 @@ import {
   setDesignStageActive,
   setDesignStageCode,
   setDesignStageOnBoard,
-} from "@/lib/design-management/actions";
+} from "@/lib/design-management/stage-actions";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { useActionState, useEffect, useRef, useState } from "react";
