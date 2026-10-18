@@ -2,6 +2,7 @@ import "server-only";
 
 import { requireTool } from "@/lib/auth/access";
 import { fetchAll } from "@/lib/supabase/fetch-all";
+import { assertRead } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
 import { cache } from "react";
 
@@ -100,10 +101,7 @@ export const listPeople = cache(async (): Promise<{ id: string; name: string }[]
     .eq("is_active", true)
     .order("full_name");
 
-  if (error) {
-    console.error("relay listPeople failed:", error);
-    return [];
-  }
+  assertRead("relay", "the people", error);
   return (data ?? []).map((p) => ({ id: p.id, name: p.full_name ?? "Unnamed" }));
 });
 
@@ -278,10 +276,7 @@ export const getTrail = cache(async (chainId: string): Promise<TrailDetail | nul
     .eq("id", chainId)
     .maybeSingle();
 
-  if (error) {
-    console.error("relay getTrail failed:", error);
-    return null;
-  }
+  assertRead("relay", "the trail", error);
   if (!chain) return null;
 
   // Must be complete (fetchAll): a missing event changes who the holder is.
@@ -368,10 +363,7 @@ export async function listDepartments(includeInactive = false) {
   if (!includeInactive) query = query.eq("is_active", true);
 
   const { data, error } = await query;
-  if (error) {
-    console.error("relay listDepartments failed:", error);
-    return [];
-  }
+  assertRead("relay", "the departments", error);
   return data ?? [];
 }
 
@@ -387,10 +379,7 @@ export async function listActivities(includeInactive = false) {
   if (!includeInactive) query = query.eq("is_active", true);
 
   const { data, error } = await query;
-  if (error) {
-    console.error("relay listActivities failed:", error);
-    return [];
-  }
+  assertRead("relay", "the activities", error);
   return data ?? [];
 }
 
@@ -490,6 +479,8 @@ export async function getTrailFormOptions() {
     getActivityDefaults(),
   ]);
 
+  assertRead("relay", "the projects", projects.error);
+
   return {
     projects: projects.data ?? [],
     units: units.sort((a, b) => a.name.localeCompare(b.name)),
@@ -531,6 +522,9 @@ export async function listProjectSchedules() {
         .range(from, to),
     ),
   ]);
+
+  assertRead("relay", "the projects", projects.error);
+  assertRead("relay", "the project start dates", plans.error);
 
   const startByProject = new Map(
     (plans.data ?? []).map((p) => [p.project_id, p.start_date as string]),
@@ -597,6 +591,8 @@ export async function getProjectSchedule(projectId: string) {
     nameMap(),
   ]);
 
+  assertRead("relay", "this project", project.error);
+  assertRead("relay", "this project's start date", plan.error);
   if (!project.data) return null;
 
   const rows = trails.map((t) => ({
@@ -657,6 +653,12 @@ export async function getRelayPulse(userId: string) {
       .eq("is_with_client", true),
   ]);
 
+  assertRead(
+    "relay",
+    "the trail counts",
+    live.error ?? cold.error ?? mine.error ?? withClient.error,
+  );
+
   return {
     live: live.count ?? 0,
     cold: cold.count ?? 0,
@@ -709,10 +711,7 @@ export async function listTrailSets(includeInactive = false): Promise<TrailSet[]
     ),
   ]);
 
-  if (sets.error) {
-    console.error("relay listTrailSets failed:", sets.error);
-    return [];
-  }
+  assertRead("relay", "the trail types", sets.error);
 
   const activities = await listActivities(true);
   const nameById = new Map(activities.map((a) => [a.id, a.name]));
@@ -821,6 +820,7 @@ export async function getHouse(projectId: string, unitId: string) {
     nameMap(),
   ]);
 
+  assertRead("relay", "this house", unit.error ?? project.error ?? plan.error);
   if (!unit.data || !project.data) return null;
 
   const rows = trails.map((t) => ({ ...toRow(t, names), projectStageId: t.project_stage_id }));

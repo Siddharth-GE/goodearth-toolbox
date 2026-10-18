@@ -401,14 +401,17 @@ export async function moveProjectStage(
   await requireTool("/relay");
 
   const supabase = await createClient();
-  const { data: stages } = await supabase
+  const { data: stages, error: readError } = await supabase
     .from("project_stages")
     .select("id, sort_order")
     .eq("project_id", projectId)
     .order("sort_order")
     .order("id");
 
-  if (!stages) return { error: "Could not reorder the stages." };
+  if (readError || !stages) {
+    console.error("reading stages to reorder failed:", readError);
+    return { error: "Could not reorder the stages." };
+  }
 
   const index = stages.findIndex((s) => s.id === stageId);
   const swapWith = direction === "up" ? index - 1 : index + 1;
@@ -557,11 +560,17 @@ export async function applyTrailSet(
   if (!projectId || !unitId) return { error: "Pick a house first." };
   if (!setId) return { error: "Pick a trail type first." };
 
-  const [sets, defaults, departments] = await Promise.all([
-    listTrailSets(true),
-    getActivityDefaults(),
-    getDepartmentsByTrailSet(),
-  ]);
+  // These reads throw on failure; an action must answer in a sentence instead.
+  let sets, defaults, departments;
+  try {
+    [sets, defaults, departments] = await Promise.all([
+      listTrailSets(true),
+      getActivityDefaults(),
+      getDepartmentsByTrailSet(),
+    ]);
+  } catch {
+    return { error: "Could not load the trail type. Try again." };
+  }
   const set = sets.find((s) => s.id === setId);
   if (!set) return { error: "That trail type no longer exists." };
   if (set.activities.length === 0) {
@@ -601,10 +610,11 @@ export async function applyTrailSet(
   const departmentIds = departments.get(setId) ?? [];
   if (chainId && departmentIds.length > 0) {
     // Best effort: the trail is correct without its department tags.
-    await supabase.rpc("set_chain_departments", {
+    const { error: tagError } = await supabase.rpc("set_chain_departments", {
       p_chain_id: chainId,
       p_department_ids: departmentIds,
     });
+    if (tagError) console.error("tagging the trail's departments failed:", tagError);
   }
 
   revalidateRelay();
