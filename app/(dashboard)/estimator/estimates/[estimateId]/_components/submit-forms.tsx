@@ -12,7 +12,8 @@ import {
 } from "@/components/ui/dialog";
 import { FormMessage } from "@/components/ui/form-message";
 import { makeOfficial } from "@/lib/estimator/estimate-actions";
-import { useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useState } from "react";
 
 /** Make official (0098), behind a confirm saying exactly what happens: a numbered copy is frozen for the stores and site check, and the working estimate stays open. */
 export function MakeOfficialButton({
@@ -29,8 +30,7 @@ export function MakeOfficialButton({
   hasOfficial: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run, clearError } = useActionRunner();
   const blocked =
     lineCount === 0
       ? "Add a work first"
@@ -43,7 +43,7 @@ export function MakeOfficialButton({
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (next) setError(undefined);
+        if (next) clearError();
       }}
     >
       <DialogTrigger asChild>
@@ -74,13 +74,12 @@ export function MakeOfficialButton({
           </DialogClose>
           <Button
             disabled={pending}
-            onClick={() =>
-              startTransition(async () => {
-                const result = await makeOfficial(estimateId);
-                if (result?.error) setError(result.error);
-                else setOpen(false);
-              })
-            }
+            onClick={async () => {
+              const result = await run(() => makeOfficial(estimateId));
+              if (!result?.error) {
+                setOpen(false);
+              }
+            }}
           >
             {pending ? "Making it official…" : "Make official"}
           </Button>

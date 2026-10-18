@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { ActionState } from "@/lib/action-state";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useActionState, useEffect, useRef, useState } from "react";
 
 export function StageForm({
   action,
@@ -53,24 +54,18 @@ export function StageNameField({
   rename: (id: string, name: string) => Promise<ActionState>;
 }) {
   const [value, setValue] = useState(name);
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
-  const save = () => {
+  const save = async () => {
     const next = value.trim();
     if (!next || next === name) {
       setValue(name);
       return;
     }
-    startTransition(async () => {
-      const result = await rename(id, next);
-      if (result?.error) {
-        setError(result.error);
-        setValue(name);
-      } else {
-        setError(undefined);
-      }
-    });
+    const result = await run(() => rename(id, next));
+    if (result?.error) {
+      setValue(name);
+    }
   };
 
   return (
@@ -101,8 +96,7 @@ export function StageToggle({
   isActive: boolean;
   setActive: (id: string, isActive: boolean) => Promise<ActionState>;
 }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
   return (
     <div className="flex items-center justify-end gap-2">
@@ -112,12 +106,7 @@ export function StageToggle({
         variant="ghost"
         size="sm"
         disabled={pending}
-        onClick={() =>
-          startTransition(async () => {
-            const result = await setActive(id, !isActive);
-            setError(result?.error);
-          })
-        }
+        onClick={() => run(() => setActive(id, !isActive))}
       >
         {pending ? "Saving…" : isActive ? "Deactivate" : "Activate"}
       </Button>
@@ -138,13 +127,8 @@ export function StageMove({
   last: boolean;
   move: (id: string, direction: "up" | "down") => Promise<ActionState>;
 }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
-  const go = (direction: "up" | "down") =>
-    startTransition(async () => {
-      const result = await move(id, direction);
-      setError(result?.error);
-    });
+  const { pending, error, run } = useActionRunner();
+  const go = (direction: "up" | "down") => run(() => move(id, direction));
 
   return (
     <div className="flex items-center gap-1">

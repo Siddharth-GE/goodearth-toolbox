@@ -18,7 +18,8 @@ import { addReceipt } from "@/lib/client-relations/actions";
 import type { MilestoneRow } from "@/lib/client-relations/queries";
 import { RECEIPT_MODES, milestoneLabel } from "@/lib/client-relations/stages";
 import { formatMoney, todayInIndia } from "@/lib/format";
-import { useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useState } from "react";
 
 /** Records money arriving. No approval step, unlike Bills: this records money that has already landed. */
 export function ReceiptDialog({
@@ -65,16 +66,14 @@ function ReceiptForm({
   const [mode, setMode] = useState("bank");
   const [reference, setReference] = useState("");
   const [note, setNote] = useState("");
-  const [error, setError] = useState<string>();
-  const [pending, startTransition] = useTransition();
+  const { pending, error, run } = useActionRunner();
 
   const amountNumber = Number(amount);
   const valid = amount !== "" && Number.isFinite(amountNumber) && amountNumber > 0 && !!receivedOn;
 
-  const submit = () => {
-    setError(undefined);
-    startTransition(async () => {
-      const result = await addReceipt({
+  const submit = async () => {
+    const result = await run(() =>
+      addReceipt({
         engagementId,
         milestoneId: milestoneId || null,
         amount: amountNumber,
@@ -82,13 +81,10 @@ function ReceiptForm({
         mode,
         reference: reference || null,
         note: note || null,
-      });
-      if (result?.error) {
-        setError(result.error);
-        return;
-      }
-      onSaved();
-    });
+      }),
+    );
+    if (result?.error) return;
+    onSaved();
   };
 
   return (

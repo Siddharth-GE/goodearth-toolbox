@@ -10,7 +10,8 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { createIssueRequest, withdrawIssueRequest } from "@/lib/supervisors/actions";
 import type { EstimateQuickPick, WorkOption } from "@/lib/supervisors/queries";
-import { useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useState } from "react";
 
 type ChosenItem = { id: string; name: string; uom: string };
 
@@ -172,8 +173,7 @@ export function RequestIssueDialog({
 }
 
 export function WithdrawRequestButton({ requestId }: { requestId: string }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
   return (
     <span className="inline-flex items-center gap-2">
@@ -183,12 +183,7 @@ export function WithdrawRequestButton({ requestId }: { requestId: string }) {
         variant="ghost"
         size="sm"
         disabled={pending}
-        onClick={() =>
-          startTransition(async () => {
-            const result = await withdrawIssueRequest(requestId);
-            setError(result?.error);
-          })
-        }
+        onClick={() => run(() => withdrawIssueRequest(requestId))}
       >
         Withdraw
       </Button>

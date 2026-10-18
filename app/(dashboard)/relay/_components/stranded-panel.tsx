@@ -18,7 +18,8 @@ import { handBaton } from "@/lib/relay/actions";
 import type { ChainRow } from "@/lib/relay/queries";
 import { AlertTriangle } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useState } from "react";
 
 /** Batons held by deactivated accounts; nothing else would say they cannot move. Admins only, like the hand-over. */
 export function StrandedPanel({
@@ -31,15 +32,14 @@ export function StrandedPanel({
   const [target, setTarget] = useState<ChainRow | null>(null);
   const [toUser, setToUser] = useState("");
   const [note, setNote] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const { pending, error, run, clearError } = useActionRunner();
   const router = useRouter();
 
   const close = () => {
     setTarget(null);
     setToUser("");
     setNote("");
-    setError(null);
+    clearError();
   };
 
   return (
@@ -132,17 +132,12 @@ export function StrandedPanel({
               </Button>
               <Button
                 disabled={pending}
-                onClick={() =>
-                  startTransition(async () => {
-                    const result = await handBaton(target.chainId, toUser, note);
-                    if (result?.error) {
-                      setError(result.error);
-                      return;
-                    }
-                    router.refresh();
-                    close();
-                  })
-                }
+                onClick={async () => {
+                  const result = await run(() => handBaton(target.chainId, toUser, note));
+                  if (result?.error) return;
+                  router.refresh();
+                  close();
+                }}
               >
                 {pending ? "Working…" : "Hand over"}
               </Button>

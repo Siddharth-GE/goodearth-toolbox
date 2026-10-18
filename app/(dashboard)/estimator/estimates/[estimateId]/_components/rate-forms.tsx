@@ -26,7 +26,8 @@ import {
 import { setItemPrice } from "@/lib/masters/items-actions";
 import { formatMoney, formatQuantity } from "@/lib/format";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useMemo, useState } from "react";
 import { chosenUom, componentOptions } from "../../../_components/component-options";
 
 /** One row of what a unit of the work uses, as written in the list (mixes not expanded). `ref` is "mix:<id>" or "material:<id>". */
@@ -93,13 +94,8 @@ export function LineRateDialog({
   options: RateOptions;
   canEditMasters: boolean;
 }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
-  const change = (next: RecipeChange) =>
-    startTransition(async () => {
-      const result = await changeLineRecipe(view.lineId, next);
-      setError(result?.error);
-    });
+  const { pending, error, run } = useActionRunner();
+  const change = (next: RecipeChange) => run(() => changeLineRecipe(view.lineId, next));
 
   const materialsCost = view.prices.every((row) => row.cost !== null)
     ? view.prices.reduce((sum, row) => sum + (row.cost ?? 0), 0)
@@ -142,12 +138,7 @@ export function LineRateDialog({
                   variant="ghost"
                   size="sm"
                   disabled={pending}
-                  onClick={() =>
-                    startTransition(async () => {
-                      const result = await resetEstimateLine(view.lineId);
-                      setError(result?.error);
-                    })
-                  }
+                  onClick={() => run(() => resetEstimateLine(view.lineId))}
                 >
                   ↺ Back to the rate book
                 </Button>
@@ -490,18 +481,14 @@ function LabourRateField({
   unit: string;
 }) {
   const [value, setValue] = useState(villaRate === null ? "" : String(villaRate));
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run, setError } = useActionRunner();
 
-  const save = (next: number | null) => {
+  const save = async (next: number | null) => {
     if (next === villaRate) return;
-    startTransition(async () => {
-      const result = await updateEstimateLineLabourRate(lineId, next);
-      if (result?.error) {
-        setError(result.error);
-        setValue(villaRate === null ? "" : String(villaRate));
-      } else setError(undefined);
-    });
+    const result = await run(() => updateEstimateLineLabourRate(lineId, next));
+    if (result?.error) {
+      setValue(villaRate === null ? "" : String(villaRate));
+    }
   };
 
   return (
@@ -572,10 +559,9 @@ export function VillaPriceField({
   label: string;
 }) {
   const [value, setValue] = useState(villaPrice === null ? "" : String(villaPrice));
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run, setError } = useActionRunner();
 
-  const save = () => {
+  const save = async () => {
     const cleaned = value.replace(/[,\s₹]/g, "");
     const next = cleaned === "" ? null : Number(cleaned);
     if (next !== null && (!Number.isFinite(next) || next < 0)) {
@@ -584,13 +570,10 @@ export function VillaPriceField({
       return;
     }
     if (next === villaPrice) return;
-    startTransition(async () => {
-      const result = await setEstimateItemRate(estimateId, itemId, next);
-      if (result?.error) {
-        setError(result.error);
-        setValue(villaPrice === null ? "" : String(villaPrice));
-      } else setError(undefined);
-    });
+    const result = await run(() => setEstimateItemRate(estimateId, itemId, next));
+    if (result?.error) {
+      setValue(villaPrice === null ? "" : String(villaPrice));
+    }
   };
 
   return (
@@ -618,8 +601,7 @@ export function VillaPriceField({
 function MastersPriceField({ itemId, label, uom }: { itemId: string; label: string; uom: string }) {
   const router = useRouter();
   const [value, setValue] = useState("");
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run, setError } = useActionRunner();
 
   return (
     <span className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto">
@@ -636,20 +618,16 @@ function MastersPriceField({ itemId, label, uom }: { itemId: string; label: stri
         size="sm"
         variant="secondary"
         disabled={pending || value.trim() === ""}
-        onClick={() => {
+        onClick={async () => {
           const price = Number(value.replace(/[,\s₹]/g, ""));
           if (!Number.isFinite(price) || price < 0) {
             setError("The price must be a number.");
             return;
           }
-          startTransition(async () => {
-            const result = await setItemPrice(itemId, price);
-            if (result?.error) setError(result.error);
-            else {
-              setError(undefined);
-              router.refresh();
-            }
-          });
+          const result = await run(() => setItemPrice(itemId, price));
+          if (!result?.error) {
+            router.refresh();
+          }
         }}
       >
         Set in Masters

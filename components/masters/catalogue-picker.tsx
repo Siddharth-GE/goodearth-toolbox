@@ -11,11 +11,13 @@ import { Pagination } from "@/components/ui/pagination";
 import { Select } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { formatCount, formatMoney } from "@/lib/format";
+import type { ActionState } from "@/lib/action-state";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { useDebouncedSearch } from "@/lib/hooks/use-debounced-search";
 // Types only: the import-free contract of /api/catalogue.
 import type { CatalogueItem, CatalogueSearchResult } from "@/lib/masters/catalogue";
 import { Minus, Plus, Search } from "lucide-react";
-import { useMemo, useState, useTransition, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 export type PickedLine = { item: CatalogueItem; quantity: number };
 
@@ -69,8 +71,7 @@ export function CataloguePickerDialog({
 
   // Holds the item, not a count, so the summary survives a scroll out of the results.
   const [basket, setBasket] = useState<Record<string, PickedLine>>({});
-  const [error, setError] = useState<string>();
-  const [saving, startSaving] = useTransition();
+  const { pending: saving, error, run, clearError } = useActionRunner();
 
   const applyFilter = (apply: () => void) => {
     apply();
@@ -103,19 +104,15 @@ export function CataloguePickerDialog({
 
   const reset = () => {
     setBasket({});
-    setError(undefined);
+    clearError();
   };
 
-  const commit = () =>
-    startSaving(async () => {
-      const outcome = await onCommit(basketEntries);
-      if (outcome && outcome.error) {
-        setError(outcome.error);
-        return;
-      }
-      reset();
-      onOpenChange(false);
-    });
+  const commit = async () => {
+    const outcome = await run(async () => (await onCommit(basketEntries)) as ActionState);
+    if (outcome?.error) return;
+    reset();
+    onOpenChange(false);
+  };
 
   return (
     <Dialog

@@ -10,7 +10,8 @@ import {
   setDraftTransmittalNote,
 } from "@/lib/design-management/actions";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
-import { useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useState } from "react";
 
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
@@ -55,8 +56,7 @@ export function IssueBar({
   problem: string | null;
   sheetCount: number;
 }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
   return (
     <div className="border-border bg-surface flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3">
@@ -79,13 +79,7 @@ export function IssueBar({
         type="button"
         disabled={pending}
         className="w-full sm:w-auto"
-        onClick={() => {
-          setError(undefined);
-          startTransition(async () => {
-            const result = await issueTransmittal(transmittalId);
-            if (result?.error) setError(result.error);
-          });
-        }}
+        onClick={() => run(() => issueTransmittal(transmittalId))}
       >
         {pending ? "Issuing…" : "Issue to site"}
       </Button>

@@ -20,7 +20,8 @@ import { recordGoodsReceipt } from "@/lib/inventory/actions";
 import type { ReceivePool } from "@/lib/inventory/receipts-queries";
 import { isFullyReceivedOrder } from "@/lib/inventory/stock";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useMemo, useState } from "react";
 
 /** Every ordered line stays visible (fully delivered ones disabled); nothing is written until the commit bar. */
 type WorkOption = { id: string; code: string; name: string; category: string };
@@ -34,8 +35,7 @@ export function ReceiveBasket({ pool, works }: { pool: ReceivePool; works: WorkO
   const [challanNo, setChallanNo] = useState("");
   const [receivedAt, setReceivedAt] = useState(() => todayInIndia());
   const [note, setNote] = useState("");
-  const [error, setError] = useState<string>();
-  const [saving, startSaving] = useTransition();
+  const { pending: saving, error, run } = useActionRunner();
 
   const pickedEntries = useMemo(() => Object.entries(picked), [picked]);
 
@@ -84,9 +84,9 @@ export function ReceiveBasket({ pool, works }: { pool: ReceivePool; works: WorkO
   const destinationChosen = (toSite && hasSite && workItemId !== "") || (!toSite && storeId !== "");
   const workCategories = useMemo(() => [...new Set(works.map((work) => work.category))], [works]);
 
-  const commit = () =>
-    startSaving(async () => {
-      const result = await recordGoodsReceipt({
+  const commit = async () => {
+    const result = await run(() =>
+      recordGoodsReceipt({
         poId: pool.po_id,
         storeId: toSite ? null : storeId,
         toSite,
@@ -95,14 +95,14 @@ export function ReceiveBasket({ pool, works }: { pool: ReceivePool; works: WorkO
         receivedAt: receivedAt || null,
         note: note || null,
         lines: pickedEntries.map(([poLineId, quantity]) => ({ poLineId, quantity })),
-      });
-      if (result?.error) {
-        setError(result.error);
-        // A partial record still changed the order: drop what went in so a second press can't book it twice.
-        router.refresh();
-        setPicked({});
-      }
-    });
+      }),
+    );
+    if (result?.error) {
+      // A partial record still changed the order: drop what went in so a second press can't book it twice.
+      router.refresh();
+      setPicked({});
+    }
+  };
 
   return (
     <div className="space-y-6 pb-28">

@@ -28,7 +28,8 @@ import {
 } from "@/lib/bills/labour-billing";
 import type { LabourBillingOptions, UnbilledEntry } from "@/lib/bills/labour-queries";
 import { formatCount, formatDate, formatMoney, formatQuantity } from "@/lib/format";
-import { useMemo, useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useMemo, useState } from "react";
 
 // The figure shown is the figure the bill will carry. Piece-work rate: the work order's for that work, else the rate book's; a lump sum is typed.
 const asEntry = (row: UnbilledEntry): LabourEntry => ({
@@ -65,8 +66,7 @@ export function SendToBill({
   const [reference, setReference] = useState("");
   const [billDate, setBillDate] = useState("");
   const [note, setNote] = useState("");
-  const [error, setError] = useState<string>();
-  const [sending, startSending] = useTransition();
+  const { pending: sending, error, run, clearError } = useActionRunner();
 
   const rateBook = useMemo(() => new Map(Object.entries(options.rateBook)), [options.rateBook]);
   const chosen = entries.filter((entry) => ticked.has(entry.id));
@@ -100,7 +100,7 @@ export function SendToBill({
     if (on) next.add(entry.id);
     else next.delete(entry.id);
     setTicked(next);
-    setError(undefined);
+    clearError();
     if (on) suggestFor(entry, next);
   };
 
@@ -148,11 +148,10 @@ export function SendToBill({
         ? "Pick the bill date."
         : undefined);
 
+  // A success lands on the new bill; only a refusal comes back.
   const send = () =>
-    startSending(async () => {
-      setError(undefined);
-      // A success lands on the new bill; only a refusal comes back.
-      const result = await sendLabourToBill({
+    run(() =>
+      sendLabourToBill({
         logIds: chosen.map((entry) => entry.id),
         kind: isDaily ? "nmr" : "pw",
         labourContractId: isDaily ? null : workOrderId,
@@ -164,9 +163,8 @@ export function SendToBill({
         totalOverride: isDaily ? overrideValue : null,
         overrideNote: isDaily ? overrideNote || null : null,
         note: note || null,
-      });
-      if (result?.error) setError(result.error);
-    });
+      }),
+    );
 
   return (
     <div className="space-y-4 pb-6">

@@ -27,10 +27,11 @@ import {
   type WorkOrderLineInput,
 } from "@/lib/bills/work-orders";
 import { formatMoney } from "@/lib/format";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { buildSiteOptions, decodeSite } from "@/lib/masters/site-options";
 import { Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 
 type LineState = {
   key: string;
@@ -84,9 +85,8 @@ export function WorkOrderEditor({
   const [lines, setLines] = useState<LineState[]>(() =>
     initial.lines.length ? initial.lines.map(keyed) : [blankLine()],
   );
-  const [error, setError] = useState<string>();
   const [saved, setSaved] = useState(false);
-  const [saving, startSaving] = useTransition();
+  const { pending: saving, error, run } = useActionRunner();
 
   const workOptions = useMemo(
     () =>
@@ -153,31 +153,28 @@ export function WorkOrderEditor({
   const total = workOrderTotal(inputs);
   const problem = workOrderProblem({ vendorId, projectId, description, lines: inputs });
 
-  const save = () =>
-    startSaving(async () => {
-      setError(undefined);
-      setSaved(false);
-      const { plotId, unitId } = decodeSite(site);
-      const input = {
-        vendorId,
-        projectId,
-        plotId,
-        unitId,
-        description,
-        terms: terms || null,
-        lines: inputs,
-      };
-      // A new order lands on its own page; only a refusal comes back.
-      const result = orderId ? await saveWorkOrder(orderId, input) : await createWorkOrder(input);
-      if (result?.error) {
-        setError(result.error);
-        return;
-      }
-      if (orderId) {
-        setSaved(true);
-        router.refresh();
-      }
-    });
+  const save = async () => {
+    setSaved(false);
+    const { plotId, unitId } = decodeSite(site);
+    const input = {
+      vendorId,
+      projectId,
+      plotId,
+      unitId,
+      description,
+      terms: terms || null,
+      lines: inputs,
+    };
+    // A new order lands on its own page; only a refusal comes back.
+    const result = await run(() =>
+      orderId ? saveWorkOrder(orderId, input) : createWorkOrder(input),
+    );
+    if (result?.error) return;
+    if (orderId) {
+      setSaved(true);
+      router.refresh();
+    }
+  };
 
   return (
     <div className="space-y-4">

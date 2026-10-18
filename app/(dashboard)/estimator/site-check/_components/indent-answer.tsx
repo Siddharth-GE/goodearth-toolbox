@@ -14,7 +14,8 @@ import { FormMessage } from "@/components/ui/form-message";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { decideIndentLine } from "@/lib/estimator/indent-actions";
-import { useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useState } from "react";
 
 /** Approve or refuse one indent line outside the estimate (0113). A refusal asks why, because the indent's approver reads it. An answer can change while the indent waits. */
 export function IndentLineAnswer({
@@ -30,18 +31,14 @@ export function IndentLineAnswer({
 }) {
   const [refusing, setRefusing] = useState(false);
   const [note, setNote] = useState("");
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run, clearError } = useActionRunner();
 
-  const answer = (next: "approved" | "refused", text: string) =>
-    startTransition(async () => {
-      const result = await decideIndentLine({ lineId, decision: next, note: text });
-      if (result?.error) setError(result.error);
-      else {
-        setError(undefined);
-        setRefusing(false);
-      }
-    });
+  const answer = async (next: "approved" | "refused", text: string) => {
+    const result = await run(() => decideIndentLine({ lineId, decision: next, note: text }));
+    if (!result?.error) {
+      setRefusing(false);
+    }
+  };
 
   return (
     <div className="space-y-1 text-right">
@@ -53,7 +50,7 @@ export function IndentLineAnswer({
             disabled={pending}
             onClick={() => {
               setNote("");
-              setError(undefined);
+              clearError();
               setRefusing(true);
             }}
           >

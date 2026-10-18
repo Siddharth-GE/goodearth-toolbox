@@ -3,8 +3,9 @@
 import { Button } from "@/components/ui/button";
 import { FormMessage } from "@/components/ui/form-message";
 import { Select } from "@/components/ui/select";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { retagIssueWork } from "@/lib/inventory/actions";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
 type WorkOption = { id: string; code: string; name: string; category: string };
 
@@ -19,8 +20,7 @@ export function RetagWork({
   works: WorkOption[];
 }) {
   const [value, setValue] = useState(workItemId ?? "");
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
   const [saved, setSaved] = useState(false);
   const categories = [...new Set(works.map((work) => work.category))];
 
@@ -52,13 +52,11 @@ export function RetagWork({
         size="sm"
         variant="secondary"
         disabled={pending || !value || value === workItemId}
-        onClick={() =>
-          startTransition(async () => {
-            const result = await retagIssueWork(issueId, value);
-            setError(result?.error);
-            setSaved(!result?.error);
-          })
-        }
+        onClick={async () => {
+          setSaved(false);
+          const result = await run(() => retagIssueWork(issueId, value));
+          setSaved(!result?.error);
+        }}
       >
         {pending ? "Saving…" : "Save"}
       </Button>

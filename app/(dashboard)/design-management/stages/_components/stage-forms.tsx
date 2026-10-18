@@ -15,7 +15,8 @@ import {
   setDesignStageOnBoard,
 } from "@/lib/design-management/actions";
 import { ArrowDown, ArrowUp } from "lucide-react";
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useActionState, useEffect, useRef, useState } from "react";
 
 export function DesignStageForm() {
   const [state, formAction, pending] = useActionState(addDesignStage, undefined);
@@ -46,24 +47,18 @@ export function DesignStageForm() {
 /** A rename follows through to every transmittal carrying it, so no confirmation. */
 export function DesignStageNameField({ id, name }: { id: string; name: string }) {
   const [value, setValue] = useState(name);
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
-  const save = () => {
+  const save = async () => {
     const next = value.trim();
     if (!next || next === name) {
       setValue(name);
       return;
     }
-    startTransition(async () => {
-      const result = await renameDesignStage(id, next);
-      if (result?.error) {
-        setError(result.error);
-        setValue(name);
-      } else {
-        setError(undefined);
-      }
-    });
+    const result = await run(() => renameDesignStage(id, next));
+    if (result?.error) {
+      setValue(name);
+    }
   };
 
   return (
@@ -88,24 +83,18 @@ export function DesignStageNameField({ id, name }: { id: string; name: string })
 /** The stage's short code in every sheet's file name; a change renames those sheets on their next download. */
 export function DesignStageCodeField({ id, code }: { id: string; code: string | null }) {
   const [value, setValue] = useState(code ?? "");
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
-  const save = () => {
+  const save = async () => {
     const next = value.trim().toUpperCase();
     if (next === (code ?? "")) {
       setValue(code ?? "");
       return;
     }
-    startTransition(async () => {
-      const result = await setDesignStageCode(id, next);
-      if (result?.error) {
-        setError(result.error);
-        setValue(code ?? "");
-      } else {
-        setError(undefined);
-      }
-    });
+    const result = await run(() => setDesignStageCode(id, next));
+    if (result?.error) {
+      setValue(code ?? "");
+    }
   };
 
   return (
@@ -130,8 +119,7 @@ export function DesignStageCodeField({ id, code }: { id: string; code: string | 
 }
 
 export function DesignStageToggle({ id, isActive }: { id: string; isActive: boolean }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
   return (
     <div className="flex items-center justify-end gap-2">
@@ -141,12 +129,7 @@ export function DesignStageToggle({ id, isActive }: { id: string; isActive: bool
         variant="ghost"
         size="sm"
         disabled={pending}
-        onClick={() =>
-          startTransition(async () => {
-            const result = await setDesignStageActive(id, !isActive);
-            setError(result?.error);
-          })
-        }
+        onClick={() => run(() => setDesignStageActive(id, !isActive))}
       >
         {pending ? "Saving…" : isActive ? "Retire" : "Reactivate"}
       </Button>
@@ -165,8 +148,7 @@ export function DesignStageBoardSwitch({
   onBoard: boolean;
   disabled?: boolean;
 }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
   return (
     <div className="flex flex-col gap-1">
@@ -177,10 +159,7 @@ export function DesignStageBoardSwitch({
           aria-label={`${name} on the design board`}
           onChange={(event) => {
             const next = event.currentTarget.checked;
-            startTransition(async () => {
-              const result = await setDesignStageOnBoard(id, next);
-              setError(result?.error);
-            });
+            run(() => setDesignStageOnBoard(id, next));
           }}
         />
         {pending ? "Saving…" : onBoard ? "On the board" : "Off"}
@@ -201,14 +180,9 @@ export function DesignStageMoveButtons({
   isFirst: boolean;
   isLast: boolean;
 }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
-  const move = (direction: "up" | "down") =>
-    startTransition(async () => {
-      const result = await moveDesignStage(id, direction);
-      setError(result?.error);
-    });
+  const move = (direction: "up" | "down") => run(() => moveDesignStage(id, direction));
 
   return (
     <>

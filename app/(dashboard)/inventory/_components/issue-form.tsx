@@ -22,7 +22,8 @@ import type { IssueFormOptions } from "@/lib/inventory/issues-queries";
 import type { SiteRequestRow } from "@/lib/inventory/requests-queries";
 import type { StoreHolding } from "@/lib/inventory/stock-queries";
 import { wouldGoNegative } from "@/lib/inventory/stock";
-import { useMemo, useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useMemo, useState } from "react";
 import { BatchDraws } from "./batch-draws";
 
 type Destination = "plot" | "store";
@@ -58,8 +59,7 @@ export function IssueForm({
   );
   /** The batch to draw first, per item; absent or "" means oldest. */
   const [preferred, setPreferred] = useState<Record<string, string>>({});
-  const [error, setError] = useState<string>();
-  const [saving, startSaving] = useTransition();
+  const { pending: saving, error, run } = useActionRunner();
 
   const pickedEntries = useMemo(() => Object.entries(picked), [picked]);
   const availableById = useMemo(
@@ -114,8 +114,8 @@ export function IssueForm({
     });
 
   const submit = () =>
-    startSaving(async () => {
-      const result = await recordStockIssue({
+    run(() =>
+      recordStockIssue({
         storeId: store.id,
         toStoreId: destination === "store" ? toStoreId : null,
         plotId: destination === "plot" ? plotId : null,
@@ -129,9 +129,8 @@ export function IssueForm({
           quantity,
           preferredReceiptLineId: preferred[itemId] || null,
         })),
-      });
-      if (result?.error) setError(result.error);
-    });
+      }),
+    );
 
   return (
     <div className="space-y-6 pb-28">

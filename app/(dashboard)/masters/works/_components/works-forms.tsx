@@ -19,7 +19,8 @@ import {
   updateWorkGroup,
   updateWorkItem,
 } from "@/lib/masters/works-actions";
-import { useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useState } from "react";
 
 export function WorkCategoryFormDialog({
   category,
@@ -259,8 +260,7 @@ export function WorksToggle({
   id: string;
   isActive: boolean;
 }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
   return (
     <div className="flex items-center justify-end gap-2">
@@ -270,12 +270,7 @@ export function WorksToggle({
         variant="ghost"
         size="sm"
         disabled={pending}
-        onClick={() =>
-          startTransition(async () => {
-            const result = await TOGGLE_ACTIONS[kind](id, !isActive);
-            setError(result?.error);
-          })
-        }
+        onClick={() => run(() => TOGGLE_ACTIONS[kind](id, !isActive))}
       >
         {pending ? "Saving…" : isActive ? "Deactivate" : "Activate"}
       </Button>

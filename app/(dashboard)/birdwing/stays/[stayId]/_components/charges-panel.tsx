@@ -23,8 +23,9 @@ import { chargeAmount } from "@/lib/birdwing/money";
 import type { RateCardRow, StayCharge } from "@/lib/birdwing/queries";
 import { CHARGE_KINDS, KIND_LABELS } from "@/lib/birdwing/shared";
 import { formatMoney, formatQuantity } from "@/lib/format";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { Trash2 } from "lucide-react";
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useState } from "react";
 
 const OTHER = "__other";
 
@@ -106,8 +107,7 @@ export function ChargesPanel({
 }
 
 function ChargeRow({ charge, editable }: { charge: StayCharge; editable: boolean }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
   return (
     <TableRow>
       <TableCell>
@@ -132,12 +132,7 @@ function ChargeRow({ charge, editable }: { charge: StayCharge; editable: boolean
             tone="danger"
             size="sm"
             disabled={pending}
-            onClick={() =>
-              startTransition(async () => {
-                const result = await deleteCharge(charge.id);
-                if (result?.error) setError(result.error);
-              })
-            }
+            onClick={() => run(() => deleteCharge(charge.id))}
           >
             <Trash2 className="size-4" />
           </IconButton>

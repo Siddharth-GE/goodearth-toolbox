@@ -21,7 +21,8 @@ import {
 } from "@/lib/birdwing-books/shared";
 import { formatDate, formatLongDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useActionState, useEffect, useRef, useState } from "react";
 
 export type BoardRecord = {
   status: AttendanceStatus;
@@ -179,12 +180,10 @@ function TodayCard({
   closed: Set<string>;
   onOpen: (person: Person) => void;
 }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
   const unmarked = staff.filter((person) => !records[person.id]?.[today]).length;
 
   const quick = (person: Person, status: AttendanceStatus) => {
-    setError(undefined);
     const formData = new FormData();
     formData.set("status", status);
     const record = records[person.id]?.[today];
@@ -193,10 +192,7 @@ function TodayCard({
       formData.set("out_at", record.outAt ?? "");
       formData.set("break_minutes", String(record.breakMinutes));
     }
-    startTransition(async () => {
-      const result = await saveAttendance(person.id, today, undefined, formData);
-      if (result?.error) setError(result.error);
-    });
+    run(() => saveAttendance(person.id, today, undefined, formData));
   };
 
   return (
@@ -206,16 +202,7 @@ function TodayCard({
           Today · {formatLongDate(today)}
         </h2>
         {unmarked > 0 && (
-          <Button
-            size="sm"
-            disabled={pending}
-            onClick={() =>
-              startTransition(async () => {
-                const result = await markAllPresent(today);
-                if (result?.error) setError(result.error);
-              })
-            }
-          >
+          <Button size="sm" disabled={pending} onClick={() => run(() => markAllPresent(today))}>
             Everyone not marked: present
           </Button>
         )}
@@ -283,8 +270,7 @@ function DayForm({
     saveAttendance.bind(null, person.id, day),
     undefined,
   );
-  const [clearing, startClear] = useTransition();
-  const [clearError, setClearError] = useState<string>();
+  const { pending: clearing, error: clearError, run } = useActionRunner();
   const was = useRef(false);
   useEffect(() => {
     if (was.current && !pending && !state?.error) onDone();
@@ -349,13 +335,12 @@ function DayForm({
             variant="ghost"
             className="text-danger"
             disabled={pending || clearing}
-            onClick={() =>
-              startClear(async () => {
-                const result = await clearAttendance(person.id, day);
-                if (result?.error) setClearError(result.error);
-                else onDone();
-              })
-            }
+            onClick={async () => {
+              const result = await run(() => clearAttendance(person.id, day));
+              if (!result?.error) {
+                onDone();
+              }
+            }}
           >
             Clear the day
           </Button>

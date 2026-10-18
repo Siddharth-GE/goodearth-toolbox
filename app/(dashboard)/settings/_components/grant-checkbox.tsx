@@ -2,7 +2,8 @@
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { grantApp, revokeApp } from "@/lib/settings/actions";
-import { useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useState } from "react";
 
 export function GrantCheckbox({
   userId,
@@ -13,10 +14,9 @@ export function GrantCheckbox({
   app: string;
   granted: boolean;
 }) {
-  const [isPending, startTransition] = useTransition();
+  const { pending: isPending, error, run } = useActionRunner();
   // Controlled, not defaultChecked: an uncontrolled box stays ticked after a failed write, claiming access nobody has.
   const [checked, setChecked] = useState(granted);
-  const [error, setError] = useState<string>();
 
   return (
     <div className="inline-flex flex-col items-center gap-1">
@@ -24,18 +24,15 @@ export function GrantCheckbox({
         checked={checked}
         disabled={isPending}
         aria-label={`${checked ? "Revoke" : "Grant"} ${app}`}
-        onChange={(event) => {
+        onChange={async (event) => {
           const next = event.target.checked;
           // Optimistic: the box moves at once and moves back if the server disagrees.
           setChecked(next);
-          setError(undefined);
-          startTransition(async () => {
-            const result = next ? await grantApp(userId, app) : await revokeApp(userId, app);
-            if (result?.error) {
-              setChecked(!next);
-              setError(result.error);
-            }
-          });
+
+          const result = await run(() => (next ? grantApp(userId, app) : revokeApp(userId, app)));
+          if (result?.error) {
+            setChecked(!next);
+          }
         }}
       />
       {error && (

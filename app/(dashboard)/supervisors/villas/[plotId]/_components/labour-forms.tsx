@@ -10,7 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { deleteLabourLog, recordLabourLog, updateLabourLog } from "@/lib/supervisors/actions";
 import { LABOUR_KIND_LABEL, LABOUR_KINDS, type LabourKind } from "@/lib/supervisors/labour";
 import type { ContractorOption, LabourLogRow, WorkOption } from "@/lib/supervisors/queries";
-import { useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useState } from "react";
 import { todayInIndia } from "@/lib/format";
 
 function WorkSelect({
@@ -214,8 +215,7 @@ export function LabourLogDialog({
 }
 
 export function DeleteLabourLogButton({ logId }: { logId: string }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
   return (
     <span className="inline-flex items-center gap-2">
@@ -225,12 +225,7 @@ export function DeleteLabourLogButton({ logId }: { logId: string }) {
         variant="ghost"
         size="sm"
         disabled={pending}
-        onClick={() =>
-          startTransition(async () => {
-            const result = await deleteLabourLog(logId);
-            setError(result?.error);
-          })
-        }
+        onClick={() => run(() => deleteLabourLog(logId))}
       >
         Delete
       </Button>

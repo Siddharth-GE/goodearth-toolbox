@@ -15,11 +15,13 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/components/ui/table";
+import type { ActionState } from "@/lib/action-state";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { assignCostCentre, markReviewed, settleStays } from "@/lib/birdwing/actions";
 import type { ReviewRow } from "@/lib/birdwing/queries";
 import { formatCount, formatDate, formatMoney } from "@/lib/format";
 import Link from "next/link";
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 import { UseBadge } from "../_components/stay-badges";
 
 export function ReviewBoard({
@@ -31,23 +33,19 @@ export function ReviewBoard({
 }) {
   const [ticked, setTicked] = useState<Set<string>>(new Set());
   const [centreId, setCentreId] = useState("");
-  const [pending, startTransition] = useTransition();
-  const [message, setMessage] = useState<{ error?: string; success?: string }>({});
+  const { pending, error, run: runAction, clearError } = useActionRunner();
+  const [success, setSuccess] = useState<string>();
 
   const chosen = useMemo(() => rows.filter((row) => ticked.has(row.id)), [rows, ticked]);
   const chosenPending = chosen.reduce((sum, row) => sum + Math.max(0, row.pending), 0);
   const allTicked = ticked.size === rows.length;
 
-  const run = (work: () => Promise<{ error?: string } | undefined>, done: string) => {
-    setMessage({});
-    startTransition(async () => {
-      const result = await work();
-      if (result?.error) setMessage({ error: result.error });
-      else {
-        setMessage({ success: done });
-        setTicked(new Set());
-      }
-    });
+  const run = async (work: () => Promise<ActionState>, done: string) => {
+    setSuccess(undefined);
+    const result = await runAction(work);
+    if (result?.error) return;
+    setSuccess(done);
+    setTicked(new Set());
   };
 
   const toggle = (id: string) =>
@@ -106,7 +104,8 @@ export function ReviewBoard({
             onConfirm={async () => {
               const result = await settleStays(ids, "cross_charge", "");
               if (!result?.error) {
-                setMessage({ success: "Charged to their cost centres." });
+                clearError();
+                setSuccess("Charged to their cost centres.");
                 setTicked(new Set());
               }
               return result;
@@ -126,7 +125,8 @@ export function ReviewBoard({
             onConfirm={async (why) => {
               const result = await settleStays(ids, "write_off", why);
               if (!result?.error) {
-                setMessage({ success: "Written off." });
+                clearError();
+                setSuccess("Written off.");
                 setTicked(new Set());
               }
               return result;
@@ -140,7 +140,7 @@ export function ReviewBoard({
             Mark reviewed
           </Button>
         </div>
-        <FormMessage error={message.error} success={message.success} />
+        <FormMessage error={error} success={success} />
       </Card>
 
       <Table>

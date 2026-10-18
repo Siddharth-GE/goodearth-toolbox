@@ -7,12 +7,13 @@ import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { openTrail } from "@/lib/relay/actions";
 import { Plus, X } from "lucide-react";
 
 import { DepartmentPicker } from "../../_components/department-picker";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
 type Leg = { activityId: string; assigneeId: string; expectedDays: number };
 
@@ -53,8 +54,7 @@ export function OpenTrailForm({
   const [legs, setLegs] = useState<Leg[]>([{ ...BLANK_LEG }]);
   const [departmentIds, setDepartmentIds] = useState<string[]>([]);
   const [startNow, setStartNow] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const { pending, error, run } = useActionRunner();
 
   const projectUnits = units.filter((u) => u.project_id === projectId);
 
@@ -92,8 +92,7 @@ export function OpenTrailForm({
     setLegs((current) => current.map((leg, i) => (i === index ? { ...leg, ...patch } : leg)));
 
   const submit = () =>
-    startTransition(async () => {
-      setError(null);
+    run(async () => {
       const result = await openTrail({
         projectId,
         unitId: unitId || null,
@@ -106,11 +105,8 @@ export function OpenTrailForm({
         departmentIds,
         start: startNow,
       });
-      if (result.error) {
-        setError(result.error);
-        return;
-      }
-      router.push(`/relay/trails/${result.chainId}`);
+      if (!result.error) router.push(`/relay/trails/${result.chainId}`);
+      return result;
     });
 
   return (

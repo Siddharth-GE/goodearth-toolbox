@@ -17,7 +17,8 @@ import { formatCount, formatQuantity } from "@/lib/format";
 import { addPoolLines } from "@/lib/purchase-orders/actions";
 import type { PoolIndentGroup } from "@/lib/purchase-orders/queries";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useMemo, useState } from "react";
 
 // Nothing is written until Add. Lines already on this PO, or fully ordered elsewhere, show disabled, never hidden.
 export function PoolBasket({
@@ -31,8 +32,7 @@ export function PoolBasket({
 }) {
   const router = useRouter();
   const [picked, setPicked] = useState<Record<string, number>>({});
-  const [error, setError] = useState<string>();
-  const [saving, startSaving] = useTransition();
+  const { pending: saving, error, run } = useActionRunner();
 
   const pickedEntries = useMemo(() => Object.entries(picked), [picked]);
 
@@ -72,19 +72,17 @@ export function PoolBasket({
     ([id, quantity]) => quantity > (remainingById.get(id) ?? 0),
   );
 
-  const commit = () =>
-    startSaving(async () => {
-      const lines = pickedEntries.map(([indentLineId, quantity]) => ({ indentLineId, quantity }));
-      const result = await addPoolLines(poId, lines);
-      if (result?.error) {
-        setError(result.error);
-        // A partial add still changed the PO: refresh so a second press can't ask twice.
-        router.refresh();
-        setPicked({});
-        return;
-      }
-      router.push(`/purchase-orders/${poId}`);
-    });
+  const commit = async () => {
+    const lines = pickedEntries.map(([indentLineId, quantity]) => ({ indentLineId, quantity }));
+    const result = await run(() => addPoolLines(poId, lines));
+    if (result?.error) {
+      // A partial add still changed the PO: refresh so a second press can't ask twice.
+      router.refresh();
+      setPicked({});
+      return;
+    }
+    router.push(`/purchase-orders/${poId}`);
+  };
 
   return (
     <div className="space-y-6 pb-28">

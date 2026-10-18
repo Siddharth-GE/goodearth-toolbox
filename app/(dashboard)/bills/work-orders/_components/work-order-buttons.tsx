@@ -8,9 +8,8 @@ import {
   saveWorkOrderAsTemplate,
   setWorkOrderTemplateActive,
 } from "@/lib/bills/work-order-actions";
-import { useState, useTransition } from "react";
-
-type Result = { error?: string } | undefined;
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useState } from "react";
 
 // Approve is for bill approvers only (the database re-checks, limit included). Correcting an approved order means switching it off and making a new one.
 export function WorkOrderActions({
@@ -22,15 +21,7 @@ export function WorkOrderActions({
   isActive: boolean;
   showApprove: boolean;
 }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
-
-  const run = (action: () => Promise<Result>) =>
-    startTransition(async () => {
-      setError(undefined);
-      const result = await action();
-      if (result?.error) setError(result.error);
-    });
+  const { pending, error, run } = useActionRunner();
 
   return (
     <div className="inline-flex flex-col items-end gap-1">
@@ -61,9 +52,8 @@ export function WorkOrderActions({
 export function SaveAsTemplate({ orderId }: { orderId: string }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [error, setError] = useState<string>();
   const [done, setDone] = useState(false);
-  const [saving, startSaving] = useTransition();
+  const { pending: saving, error, run } = useActionRunner();
 
   if (!open) {
     return (
@@ -86,19 +76,13 @@ export function SaveAsTemplate({ orderId }: { orderId: string }) {
       <Button
         size="sm"
         disabled={saving || !name.trim()}
-        onClick={() =>
-          startSaving(async () => {
-            setError(undefined);
-            const result = await saveWorkOrderAsTemplate(orderId, name);
-            if (result?.error) {
-              setError(result.error);
-              return;
-            }
-            setDone(true);
-            setOpen(false);
-            setName("");
-          })
-        }
+        onClick={async () => {
+          const result = await run(() => saveWorkOrderAsTemplate(orderId, name));
+          if (result?.error) return;
+          setDone(true);
+          setOpen(false);
+          setName("");
+        }}
       >
         {saving ? "Saving…" : "Save"}
       </Button>
@@ -117,8 +101,7 @@ export function TemplateSwitch({
   templateId: string;
   isActive: boolean;
 }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
   return (
     <span className="inline-flex items-center gap-2">
       <FormMessage error={error} size="xs" />
@@ -126,12 +109,7 @@ export function TemplateSwitch({
         variant="ghost"
         size="sm"
         disabled={pending}
-        onClick={() =>
-          startTransition(async () => {
-            const result = await setWorkOrderTemplateActive(templateId, !isActive);
-            setError(result?.error);
-          })
-        }
+        onClick={() => run(() => setWorkOrderTemplateActive(templateId, !isActive))}
       >
         {isActive ? "Switch off" : "Switch back on"}
       </Button>

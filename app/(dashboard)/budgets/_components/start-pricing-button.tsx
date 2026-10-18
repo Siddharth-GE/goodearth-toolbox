@@ -3,11 +3,10 @@
 import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
 import { startPricing } from "@/lib/budgets/actions";
-import { useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 
 export function StartPricingButton({ selectionId }: { selectionId: string }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
   return (
     <div className="space-y-1">
@@ -15,12 +14,7 @@ export function StartPricingButton({ selectionId }: { selectionId: string }) {
         variant="secondary"
         // One budget per revision is unique, so a double-click would hit the database twice; the action lands the loser on the winning budget.
         disabled={pending}
-        onClick={() =>
-          startTransition(async () => {
-            const result = await startPricing(selectionId);
-            if (result?.error) setError(result.error);
-          })
-        }
+        onClick={() => run(() => startPricing(selectionId))}
       >
         {pending ? "Starting…" : "Start pricing"}
       </Button>

@@ -22,7 +22,8 @@ import {
   updateEstimate,
 } from "@/lib/estimator/estimate-actions";
 import type { EstimateDetail } from "@/lib/estimator/estimate-queries";
-import { useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useState } from "react";
 
 /** An estimate's name and note; a villa or project change would be a different estimate. */
 export function EstimateFormDialog({
@@ -140,8 +141,7 @@ export function DeleteEstimateButton({
   description: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -160,15 +160,7 @@ export function DeleteEstimateButton({
           <DialogClose asChild>
             <Button variant="secondary">Keep it</Button>
           </DialogClose>
-          <Button
-            disabled={pending}
-            onClick={() =>
-              startTransition(async () => {
-                const result = await deleteEstimate(estimateId);
-                setError(result?.error);
-              })
-            }
-          >
+          <Button disabled={pending} onClick={() => run(() => deleteEstimate(estimateId))}>
             {pending ? "Deleting…" : label}
           </Button>
         </DialogFooter>

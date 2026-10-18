@@ -20,9 +20,10 @@ import type { BillFormOptions } from "@/lib/bills/queries";
 import { GENERAL_SCOPE, resolveScopeCode } from "@/lib/bills/reference";
 import { exceedsAnchor } from "@/lib/bills/workflow";
 import { formatMoney } from "@/lib/format";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { buildSiteOptions, decodeSite } from "@/lib/masters/site-options";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 import {
   BillLinesEditor,
   draftsOf,
@@ -61,8 +62,7 @@ export function BillForm({
   const [lines, setLines] = useState<EditorLine[]>(() =>
     prefill.lines.map((draft) => toEditorLine(draft)),
   );
-  const [error, setError] = useState<string>();
-  const [recording, startTransition] = useTransition();
+  const { pending: recording, error, run } = useActionRunner();
 
   const go = (next: { kind: FormKind; vendorId?: string; anchorId?: string }) => {
     const params = new URLSearchParams({ kind: next.kind });
@@ -128,11 +128,10 @@ export function BillForm({
         ? "Pick the date."
         : linesProblem);
 
+  // A success lands on the new bill, so only refusals come back.
   const record = () =>
-    startTransition(async () => {
-      setError(undefined);
-      // A success lands on the new bill, so only refusals come back.
-      const result = await createBillWithLines({
+    run(() =>
+      createBillWithLines({
         kind,
         poId: kind === "po" ? anchorId : null,
         labourContractId: kind === "contract" ? anchorId : null,
@@ -144,9 +143,8 @@ export function BillForm({
         invoiceDate,
         note: note || null,
         lines: drafts,
-      });
-      if (result?.error) setError(result.error);
-    });
+      }),
+    );
 
   return (
     <div className="space-y-4">

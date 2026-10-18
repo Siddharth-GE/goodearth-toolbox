@@ -35,6 +35,7 @@ import {
 import type { MeasurementFields } from "@/lib/estimator/measurement-rules";
 import type { MeasurementRow } from "@/lib/estimator/estimate-queries";
 import { formatQuantity } from "@/lib/format";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import {
   useActionState,
   useEffect,
@@ -193,10 +194,9 @@ function EditableMeasurementRow({ row, workUom }: { row: MeasurementRow; workUom
     depth: show(row.depth),
   };
   const [values, setValues] = useState(initial);
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
-  const save = () => {
+  const save = async () => {
     const fields: MeasurementFields = {
       description: values.description.trim() || null,
       nos: readBox(values.nos),
@@ -211,13 +211,10 @@ function EditableMeasurementRow({ row, workUom }: { row: MeasurementRow; workUom
       fields.breadth === row.breadth &&
       fields.depth === row.depth;
     if (unchanged) return;
-    startTransition(async () => {
-      const result = await updateLineMeasurement(row.id, fields);
-      if (result?.error) {
-        setError(result.error);
-        setValues(initial);
-      } else setError(undefined);
-    });
+    const result = await run(() => updateLineMeasurement(row.id, fields));
+    if (result?.error) {
+      setValues(initial);
+    }
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -319,14 +316,13 @@ function ModelMeasurementRow({ row, workUom }: { row: MeasurementRow; workUom: s
 function RowActionButton({
   label,
   pendingLabel,
-  run,
+  run: action,
 }: {
   label: string;
   pendingLabel: string;
   run: () => Promise<{ error?: string } | undefined>;
 }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
   return (
     <span className="inline-flex items-center gap-1">
@@ -336,12 +332,7 @@ function RowActionButton({
         variant="ghost"
         size="sm"
         disabled={pending}
-        onClick={() =>
-          startTransition(async () => {
-            const result = await run();
-            setError(result?.error);
-          })
-        }
+        onClick={() => run(action)}
       >
         {pending ? pendingLabel : label}
       </Button>

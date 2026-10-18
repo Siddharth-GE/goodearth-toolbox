@@ -15,8 +15,9 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { startTransmittal } from "@/lib/design-management/actions";
 import type { VillaDrawingSetState } from "@/lib/design-management/queries";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
 /** A stage, then one drawing set of THAT stage: only this villa's sets at the chosen stage are offered (0099 refuses a mismatch too). */
 export function NewTransmittalDialog({
@@ -35,8 +36,7 @@ export function NewTransmittalDialog({
   const [open, setOpen] = useState(false);
   const [stageId, setStageId] = useState(initialStage);
   const [name, setName] = useState("");
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run, clearError } = useActionRunner();
 
   if (stages.length === 0) {
     return (
@@ -49,14 +49,9 @@ export function NewTransmittalDialog({
   const stageName = stages.find((stage) => stage.id === stageId)?.name ?? "";
   const stageSets = sets.filter((set) => set.stageId === stageId);
 
-  const start = (choice: { setId: string } | { newSetName: string }) => {
-    setError(undefined);
-    startTransition(async () => {
-      // Success redirects to the new transmittal; only a refusal returns.
-      const result = await startTransmittal(unitId, stageId, choice);
-      if (result?.error) setError(result.error);
-    });
-  };
+  // Success redirects to the new transmittal; only a refusal returns.
+  const start = (choice: { setId: string } | { newSetName: string }) =>
+    run(() => startTransmittal(unitId, stageId, choice));
 
   return (
     <Dialog
@@ -64,7 +59,7 @@ export function NewTransmittalDialog({
       onOpenChange={(next) => {
         if (pending) return;
         setOpen(next);
-        if (!next) setError(undefined);
+        if (!next) clearError();
       }}
     >
       <DialogTrigger asChild>
@@ -87,7 +82,7 @@ export function NewTransmittalDialog({
               value={stageId}
               onChange={(event) => {
                 setStageId(event.target.value);
-                setError(undefined);
+                clearError();
               }}
             >
               {stages.map((stage) => (

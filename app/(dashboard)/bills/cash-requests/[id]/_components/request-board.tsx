@@ -18,6 +18,7 @@ import {
   TableTotalCell,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import type { ActionState } from "@/lib/action-state";
 import { lineLeftToPay, paymentProblem } from "@/lib/bills/ledger";
 import {
   addAdvanceToCashRequest,
@@ -34,28 +35,23 @@ import {
 } from "@/lib/bills/payment-actions";
 import type { CashRequestDetail, CashRequestItem, PayableBill } from "@/lib/bills/payment-queries";
 import { formatDate, formatMoney, todayInIndia } from "@/lib/format";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
-type Result = { error?: string } | undefined;
 type Option = { id: string; name: string };
 
 function useRun() {
   const router = useRouter();
-  const [error, setError] = useState<string>();
-  const [pending, startTransition] = useTransition();
-  const run = (action: () => Promise<Result>, after?: () => void) =>
-    startTransition(async () => {
-      setError(undefined);
-      const result = await action();
-      if (result?.error) {
-        setError(result.error);
-        return;
-      }
-      after?.();
-      router.refresh();
-    });
+  const { pending, error, run: runAction } = useActionRunner();
+  // Refreshes once the transition has ended: a refresh inside it leaves `pending` stuck on.
+  const run = async (action: () => Promise<ActionState>, after?: () => void) => {
+    const result = await runAction(action);
+    if (result?.error) return;
+    after?.();
+    router.refresh();
+  };
   return { run, error, pending };
 }
 

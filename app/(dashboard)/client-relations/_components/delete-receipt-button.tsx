@@ -12,24 +12,18 @@ import {
 } from "@/components/ui/dialog";
 import { FormMessage } from "@/components/ui/form-message";
 import { deleteReceipt } from "@/lib/client-relations/actions";
-import { useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useState } from "react";
 
 /** A mistyped receipt must be removable (that is why the delete policy exists), but not on one click. The audit trigger keeps the before-image. */
 export function DeleteReceiptButton({ receiptId, amount }: { receiptId: string; amount: string }) {
   const [open, setOpen] = useState(false);
-  const [error, setError] = useState<string>();
-  const [pending, startTransition] = useTransition();
+  const { pending, error, run } = useActionRunner();
 
-  const remove = () => {
-    setError(undefined);
-    startTransition(async () => {
-      const result = await deleteReceipt(receiptId);
-      if (result?.error) {
-        setError(result.error);
-        return;
-      }
-      setOpen(false);
-    });
+  const remove = async () => {
+    const result = await run(() => deleteReceipt(receiptId));
+    if (result?.error) return;
+    setOpen(false);
   };
 
   return (

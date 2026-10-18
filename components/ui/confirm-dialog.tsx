@@ -14,7 +14,8 @@ import {
 import { FormMessage } from "@/components/ui/form-message";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useId, useState, useTransition, type ReactNode } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useId, useState, type ReactNode } from "react";
 
 /**
  * "Are you sure?" before a press that cannot be taken back. Names what will happen, keeps any refusal inside the dialog,
@@ -51,8 +52,7 @@ export function ConfirmDialog({
     if (onOpenChange) onOpenChange(next);
     else setOwnOpen(next);
   };
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run, clearError } = useActionRunner();
   const [why, setWhy] = useState("");
   const reasonId = useId();
 
@@ -63,7 +63,7 @@ export function ConfirmDialog({
         if (pending) return;
         setOpen(next);
         if (!next) {
-          setError(undefined);
+          clearError();
           setWhy("");
         }
       }}
@@ -100,13 +100,11 @@ export function ConfirmDialog({
               tone === "danger" ? "bg-danger text-danger-foreground hover:bg-danger/90" : undefined
             }
             disabled={pending || (reason !== undefined && why.trim() === "")}
-            onClick={() => {
-              setError(undefined);
-              startTransition(async () => {
-                const result = await onConfirm(why.trim());
-                if (result?.error) setError(result.error);
-                else setOpen(false);
-              });
+            onClick={async () => {
+              const result = await run(() => onConfirm(why.trim()));
+              if (!result?.error) {
+                setOpen(false);
+              }
             }}
           >
             {pending ? pendingLabel : confirmLabel}

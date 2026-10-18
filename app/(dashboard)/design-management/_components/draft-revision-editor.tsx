@@ -17,10 +17,11 @@ import { deleteDrawingRevisionFile } from "@/lib/design-management/files-actions
 import type { DrawingRevisionRow } from "@/lib/design-management/queries";
 import { parseWorkDriveLink } from "@/lib/design-management/workdrive-link";
 import { formatShortDate } from "@/lib/format";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
 import type { WorksTreeCategory } from "@/lib/masters/works";
 import { ChevronDown, ChevronUp, ExternalLink, FileText, RefreshCw, Trash2 } from "lucide-react";
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 
 import { FolderSheetList } from "./folder-sheet-list";
 import { WorksCheckboxTree } from "./works-checkbox-tree";
@@ -142,22 +143,13 @@ function DrawingsField({
   sheets: DrawingRevisionRow["folderSheets"];
 }) {
   const [value, setValue] = useState(drawingsUrl ?? "");
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
   // Compared as the server will store it, so a pasted link with a slash or
   // a query on the end still reads as the saved one.
   const parsed = parseWorkDriveLink(value);
   const changed = (parsed.ok ? parsed.url : value.trim()) !== (drawingsUrl ?? "");
   const readAt = sheets[0]?.readAt ?? null;
-
-  const run = (action: () => Promise<{ error?: string } | undefined>) => {
-    setError(undefined);
-    startTransition(async () => {
-      const result = await action();
-      if (result?.error) setError(result.error);
-    });
-  };
 
   return (
     <div className="space-y-2">
@@ -233,17 +225,12 @@ function DrawingsField({
 /** Sheets uploaded before 0124 go to site with the draft unless taken off. */
 function UploadedSheets({ files }: { files: DrawingRevisionRow["files"] }) {
   const [removingId, setRemovingId] = useState<string>();
-  const [error, setError] = useState<string>();
-  const [removing, startRemove] = useTransition();
+  const { pending: removing, error, run } = useActionRunner();
 
-  const remove = (fileId: string) => {
-    setError(undefined);
+  const remove = async (fileId: string) => {
     setRemovingId(fileId);
-    startRemove(async () => {
-      const result = await deleteDrawingRevisionFile(fileId);
-      if (result?.error) setError(result.error);
-      setRemovingId(undefined);
-    });
+    await run(() => deleteDrawingRevisionFile(fileId));
+    setRemovingId(undefined);
   };
 
   return (
@@ -292,8 +279,7 @@ function WorksEditor({
   workItemIds: string[];
 }) {
   const [checked, setChecked] = useState<Set<string>>(() => new Set(workItemIds));
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
   const [justSaved, setJustSaved] = useState(false);
   const [open, setOpen] = useState(false);
 
@@ -327,13 +313,9 @@ function WorksEditor({
     });
   };
 
-  const save = () => {
-    setError(undefined);
-    startTransition(async () => {
-      const result = await setDrawingRevisionWorks(revisionId, [...checked]);
-      if (result?.error) setError(result.error);
-      else setJustSaved(true);
-    });
+  const save = async () => {
+    const result = await run(() => setDrawingRevisionWorks(revisionId, [...checked]));
+    if (!result?.error) setJustSaved(true);
   };
 
   // Folded until asked for; unsaved ticks keep it open so a change is never hidden.

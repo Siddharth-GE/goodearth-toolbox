@@ -5,7 +5,8 @@ import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { addGstRate, setGstRateActive } from "@/lib/masters/gst-rates-actions";
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useActionState, useEffect, useRef } from "react";
 
 export function GstRateForm() {
   const [state, formAction, pending] = useActionState(addGstRate, undefined);
@@ -44,8 +45,7 @@ export function GstRateForm() {
 }
 
 export function GstRateToggle({ rate, isActive }: { rate: number; isActive: boolean }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
   return (
     <div className="flex items-center justify-end gap-2">
@@ -55,12 +55,7 @@ export function GstRateToggle({ rate, isActive }: { rate: number; isActive: bool
         variant="ghost"
         size="sm"
         disabled={pending}
-        onClick={() =>
-          startTransition(async () => {
-            const result = await setGstRateActive(rate, !isActive);
-            setError(result?.error);
-          })
-        }
+        onClick={() => run(() => setGstRateActive(rate, !isActive))}
       >
         {pending ? "Saving…" : isActive ? "Deactivate" : "Activate"}
       </Button>

@@ -1,7 +1,8 @@
 "use client";
 
 import { Checkbox } from "@/components/ui/checkbox";
-import { useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useState } from "react";
 
 /** Sibling of GrantCheckbox calling one action with a boolean; the indents and bills columns share it. */
 export function ApproverCheckbox({
@@ -15,10 +16,9 @@ export function ApproverCheckbox({
   action: (userId: string, canApprove: boolean) => Promise<{ error?: string } | undefined>;
   label: string;
 }) {
-  const [isPending, startTransition] = useTransition();
+  const { pending: isPending, error, run } = useActionRunner();
   // Controlled: the state the server confirmed, rolled back if the write fails.
   const [checked, setChecked] = useState(isApprover);
-  const [error, setError] = useState<string>();
 
   return (
     <div className="inline-flex flex-col items-center gap-1">
@@ -26,17 +26,14 @@ export function ApproverCheckbox({
         checked={checked}
         disabled={isPending}
         aria-label={`${checked ? "Remove" : "Make"} ${label}`}
-        onChange={(event) => {
+        onChange={async (event) => {
           const next = event.target.checked;
           setChecked(next);
-          setError(undefined);
-          startTransition(async () => {
-            const result = await action(userId, next);
-            if (result?.error) {
-              setChecked(!next);
-              setError(result.error);
-            }
-          });
+
+          const result = await run(() => action(userId, next));
+          if (result?.error) {
+            setChecked(!next);
+          }
         }}
       />
       {error && (

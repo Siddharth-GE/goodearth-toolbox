@@ -11,7 +11,8 @@ import { buildSiteOptions, decodeSite } from "@/lib/masters/site-options";
 import { createPurchaseOrder } from "@/lib/purchase-orders/actions";
 import type { PoFormOptions } from "@/lib/purchase-orders/queries";
 import { GENERAL_SCOPE, resolveScopeCode } from "@/lib/purchase-orders/reference";
-import { useMemo, useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useMemo, useState } from "react";
 
 // The scope is part of the PO number and permanent once created; the form says so and previews the number.
 export function PoForm({
@@ -30,8 +31,7 @@ export function PoForm({
   const [expectedBy, setExpectedBy] = useState("");
   const [terms, setTerms] = useState(defaultTerms ?? "");
   const [note, setNote] = useState("");
-  const [error, setError] = useState<string>();
-  const [creating, startTransition] = useTransition();
+  const { pending: creating, error, run } = useActionRunner();
 
   const project = options.projects.find((candidate) => candidate.id === projectId);
   const siteOptions = useMemo(
@@ -52,8 +52,8 @@ export function PoForm({
   const missingScopeCode = scope !== "" && scopeCode === null;
 
   const create = () =>
-    startTransition(async () => {
-      const result = await createPurchaseOrder({
+    run(() =>
+      createPurchaseOrder({
         projectId,
         plotId,
         unitId,
@@ -63,9 +63,8 @@ export function PoForm({
         expectedBy: expectedBy || null,
         terms: terms || null,
         note: note || null,
-      });
-      if (result?.error) setError(result.error);
-    });
+      }),
+    );
 
   return (
     <div className="border-border bg-surface max-w-xl space-y-4 rounded-2xl border p-5">

@@ -6,9 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { setBillTotalOverride, updateBillDetails } from "@/lib/bills/line-actions";
 import { formatDate, formatMoney } from "@/lib/format";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
 // The taxable, GST and total are the lines' sums (the database writes them), so they are shown, not typed.
 export function DetailsFields({
@@ -128,20 +129,14 @@ export function TotalOverride({
   const [open, setOpen] = useState(false);
   const [total, setTotal] = useState(String(currentTotal));
   const [note, setNote] = useState(overrideNote ?? "");
-  const [error, setError] = useState<string>();
-  const [saving, startSaving] = useTransition();
+  const { pending: saving, error, run: runAction } = useActionRunner();
 
-  const run = (input: { total: number | null; note: string | null }) =>
-    startSaving(async () => {
-      setError(undefined);
-      const result = await setBillTotalOverride(billId, input);
-      if (result?.error) {
-        setError(result.error);
-        return;
-      }
-      setOpen(false);
-      router.refresh();
-    });
+  const run = async (input: { total: number | null; note: string | null }) => {
+    const result = await runAction(() => setBillTotalOverride(billId, input));
+    if (result?.error) return;
+    setOpen(false);
+    router.refresh();
+  };
 
   if (overrideNote && !open) {
     return (

@@ -9,8 +9,9 @@ import { paymentProblem } from "@/lib/bills/ledger";
 import { recordBillPayment, recoverAdvance } from "@/lib/bills/payment-actions";
 import type { OpenAdvance } from "@/lib/bills/payment-queries";
 import { formatDate, formatMoney, todayInIndia } from "@/lib/format";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
 const today = () => todayInIndia();
 
@@ -30,8 +31,7 @@ export function SettlementPanel({
   const [reference, setReference] = useState("");
   const [note, setNote] = useState("");
   const [advanceId, setAdvanceId] = useState(advances[0]?.id ?? "");
-  const [error, setError] = useState<string>();
-  const [saving, startSaving] = useTransition();
+  const { pending: saving, error, run, clearError } = useActionRunner();
 
   const advance = advances.find((candidate) => candidate.id === advanceId);
   const value = Number(amount);
@@ -52,38 +52,34 @@ export function SettlementPanel({
 
   const open = (next: "pay" | "recover") => {
     setMode(next);
-    setError(undefined);
+    clearError();
     setAmount(
       String(next === "recover" && advance ? Math.min(pending, advance.outstanding) : pending),
     );
   };
 
-  const save = () =>
-    startSaving(async () => {
-      setError(undefined);
-      const result =
-        mode === "pay"
-          ? await recordBillPayment(billId, {
-              amount: value,
-              paidOn,
-              reference,
-              note: note || null,
-            })
-          : await recoverAdvance(billId, {
-              advanceId,
-              amount: value,
-              recoveredOn: paidOn,
-              note: note || null,
-            });
-      if (result?.error) {
-        setError(result.error);
-        return;
-      }
-      setMode(null);
-      setReference("");
-      setNote("");
-      router.refresh();
-    });
+  const save = async () => {
+    const result = await run(() =>
+      mode === "pay"
+        ? recordBillPayment(billId, {
+            amount: value,
+            paidOn,
+            reference,
+            note: note || null,
+          })
+        : recoverAdvance(billId, {
+            advanceId,
+            amount: value,
+            recoveredOn: paidOn,
+            note: note || null,
+          }),
+    );
+    if (result?.error) return;
+    setMode(null);
+    setReference("");
+    setNote("");
+    router.refresh();
+  };
 
   if (!mode) {
     return (

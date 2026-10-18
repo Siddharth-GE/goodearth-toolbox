@@ -8,9 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { formatQuantity, todayInIndia } from "@/lib/format";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { recordStockAdjustment } from "@/lib/inventory/actions";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
 type ChosenItem = { id: string; name: string; code: string | null; thumb_url: string | null };
 
@@ -32,9 +33,8 @@ export function AdjustmentForm({
   const [reason, setReason] = useState("");
   const [adjustedAt, setAdjustedAt] = useState(() => todayInIndia());
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [error, setError] = useState<string>();
   const [saved, setSaved] = useState<string>();
-  const [saving, startSaving] = useTransition();
+  const { pending: saving, error, run } = useActionRunner();
 
   const amount = Number(quantity);
   const ready =
@@ -56,30 +56,27 @@ export function AdjustmentForm({
     return Promise.resolve(undefined);
   };
 
-  const submit = () =>
-    startSaving(async () => {
-      if (!item) return;
-      setError(undefined);
-      setSaved(undefined);
-      const result = await recordStockAdjustment({
+  const submit = async () => {
+    if (!item) return;
+    setSaved(undefined);
+    const result = await run(() =>
+      recordStockAdjustment({
         storeId,
         itemId: item.id,
         quantity: direction === "add" ? amount : -amount,
         reason,
         adjustedAt: adjustedAt || null,
-      });
-      if (result?.error) {
-        setError(result.error);
-        return;
-      }
-      setSaved(
-        `${direction === "add" ? "Added" : "Removed"} ${formatQuantity(amount)} ${uom} of ${item.name}.`,
-      );
-      setItem(null);
-      setQuantity("");
-      setReason("");
-      router.refresh();
-    });
+      }),
+    );
+    if (result?.error) return;
+    setSaved(
+      `${direction === "add" ? "Added" : "Removed"} ${formatQuantity(amount)} ${uom} of ${item.name}.`,
+    );
+    setItem(null);
+    setQuantity("");
+    setReason("");
+    router.refresh();
+  };
 
   return (
     <section className="border-border bg-surface space-y-4 rounded-2xl border p-4">

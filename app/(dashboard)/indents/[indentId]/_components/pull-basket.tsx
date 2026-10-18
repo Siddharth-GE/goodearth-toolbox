@@ -17,7 +17,8 @@ import { formatCount, formatQuantity } from "@/lib/format";
 import { addBudgetPullLines } from "@/lib/indents/actions";
 import type { BudgetPullLineRow, PullLineRow } from "@/lib/indents/queries";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useMemo, useState } from "react";
 
 type Row = PullLineRow & Partial<Pick<BudgetPullLineRow, "vendor_name">>;
 export type PullGroup = { label: string; lines: Row[] };
@@ -40,8 +41,7 @@ export function PullBasket({
 }) {
   const router = useRouter();
   const [picked, setPicked] = useState<Record<string, number>>({});
-  const [error, setError] = useState<string>();
-  const [saving, startSaving] = useTransition();
+  const { pending: saving, error, run } = useActionRunner();
 
   const pickedEntries = useMemo(() => Object.entries(picked), [picked]);
 
@@ -67,19 +67,17 @@ export function PullBasket({
       return next;
     });
 
-  const commit = () =>
-    startSaving(async () => {
-      const lines = pickedEntries.map(([sourceId, quantity]) => ({ sourceId, quantity }));
-      const result = await addBudgetPullLines(indentId, budgetId, lines);
-      if (result?.error) {
-        setError(result.error);
-        // A partial add still changed the indent: refresh so a second press can't ask twice.
-        router.refresh();
-        setPicked({});
-        return;
-      }
-      router.push(`/indents/${indentId}`);
-    });
+  const commit = async () => {
+    const lines = pickedEntries.map(([sourceId, quantity]) => ({ sourceId, quantity }));
+    const result = await run(() => addBudgetPullLines(indentId, budgetId, lines));
+    if (result?.error) {
+      // A partial add still changed the indent: refresh so a second press can't ask twice.
+      router.refresh();
+      setPicked({});
+      return;
+    }
+    router.push(`/indents/${indentId}`);
+  };
 
   return (
     <div className="space-y-6 pb-28">

@@ -17,7 +17,8 @@ import { formatCount, formatQuantity } from "@/lib/format";
 import { addEstimatePullLines } from "@/lib/indents/actions";
 import type { EstimatePullRow } from "@/lib/indents/queries";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useMemo, useState } from "react";
 
 // A needs-quantity row (an estimate from before materials were items) asks a person for the procurement quantity; an unlinked row cannot be picked.
 export function EstimatePullBasket({
@@ -34,8 +35,7 @@ export function EstimatePullBasket({
   const router = useRouter();
   // "" = ticked but no quantity typed yet (a needs_qty row).
   const [picked, setPicked] = useState<Record<string, number | "">>({});
-  const [error, setError] = useState<string>();
-  const [saving, startSaving] = useTransition();
+  const { pending: saving, error, run } = useActionRunner();
 
   const pickedEntries = useMemo(() => Object.entries(picked), [picked]);
   const missingQty = pickedEntries.some(([, qty]) => qty === "" || qty <= 0);
@@ -55,18 +55,14 @@ export function EstimatePullBasket({
       [itemId]: raw === "" ? "" : Number(raw),
     }));
 
-  const commit = () =>
-    startSaving(async () => {
-      const lines = pickedEntries
-        .filter((entry): entry is [string, number] => entry[1] !== "" && entry[1] > 0)
-        .map(([itemId, quantity]) => ({ itemId, quantity }));
-      const result = await addEstimatePullLines(indentId, estimateId, lines);
-      if (result?.error) {
-        setError(result.error);
-        return;
-      }
-      router.push(`/indents/${indentId}`);
-    });
+  const commit = async () => {
+    const lines = pickedEntries
+      .filter((entry): entry is [string, number] => entry[1] !== "" && entry[1] > 0)
+      .map(([itemId, quantity]) => ({ itemId, quantity }));
+    const result = await run(() => addEstimatePullLines(indentId, estimateId, lines));
+    if (result?.error) return;
+    router.push(`/indents/${indentId}`);
+  };
 
   return (
     <div className="space-y-3">

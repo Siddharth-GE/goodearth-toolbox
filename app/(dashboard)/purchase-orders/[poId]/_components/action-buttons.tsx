@@ -12,6 +12,8 @@ import {
 import { FormMessage } from "@/components/ui/form-message";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import type { ActionState } from "@/lib/action-state";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import {
   approvePoDeletion,
   deleteDraftPo,
@@ -27,7 +29,7 @@ import {
   type PoActor,
   type PoStatus,
 } from "@/lib/purchase-orders/workflow";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
 // Buttons come from lib/purchase-orders/workflow.ts; purchase_orders_guard enforces every rule, so a hidden button is a courtesy.
 export function ActionButtons({
@@ -47,19 +49,16 @@ export function ActionButtons({
   lineCount: number;
   fullyPriced: boolean;
 }) {
-  const [pending, startTransition] = useTransition();
+  const { pending, error, run: runAction, clearError } = useActionRunner();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
   const [requesting, setRequesting] = useState(false);
   const [note, setNote] = useState("");
-  const [error, setError] = useState<string>();
 
-  const run = (action: () => Promise<{ error?: string } | undefined>) =>
-    startTransition(async () => {
-      const result = await action();
-      if (result?.error) setError(result.error);
-      else setRequesting(false);
-    });
+  const run = async (action: () => Promise<ActionState>) => {
+    const result = await runAction(action);
+    if (!result?.error) setRequesting(false);
+  };
 
   if (status === "deletion_requested") {
     const mayWithdraw = canWithdrawDeletion(status, actor, deletionRequestedBy);
@@ -138,7 +137,7 @@ export function ActionButtons({
             setRequesting(open);
             if (open) {
               setNote("");
-              setError(undefined);
+              clearError();
             }
           }}
         >

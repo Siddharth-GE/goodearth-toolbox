@@ -4,11 +4,10 @@ import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
 import { createNextRevision } from "@/lib/selections/actions";
 import { ArrowRight } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 
 export function NextRevisionButton({ fromSelectionId }: { fromSelectionId: string }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
   return (
     <div className="space-y-1">
@@ -16,12 +15,7 @@ export function NextRevisionButton({ fromSelectionId }: { fromSelectionId: strin
         variant="secondary"
         // The database refuses a second open draft; block the button in flight so a double-click doesn't surface that as an error.
         disabled={pending}
-        onClick={() =>
-          startTransition(async () => {
-            const outcome = await createNextRevision(fromSelectionId);
-            if (outcome?.error) setError(outcome.error);
-          })
-        }
+        onClick={() => run(() => createNextRevision(fromSelectionId))}
       >
         {pending ? "Creating…" : "Start next revision"}
         {!pending && <ArrowRight className="size-4" />}

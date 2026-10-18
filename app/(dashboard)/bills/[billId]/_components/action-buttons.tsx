@@ -12,10 +12,12 @@ import {
 import { FormMessage } from "@/components/ui/form-message";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import type { ActionState } from "@/lib/action-state";
 import { approveBill, deleteBill, sendBackBill } from "@/lib/bills/actions";
 import { canApprove, canDeleteBill, canSendBack, type BillStatus } from "@/lib/bills/workflow";
 import { formatMoney } from "@/lib/format";
-import { useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useState } from "react";
 
 // Buttons come from lib/bills/workflow.ts; bills_guard() enforces every rule, so a hidden button is a courtesy.
 export function ActionButtons({
@@ -31,20 +33,15 @@ export function ActionButtons({
   createdBy: string | null;
   totalAmount: number;
 }) {
-  const [pending, startTransition] = useTransition();
+  const { pending, error, run: runAction, clearError } = useActionRunner();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [sendingBack, setSendingBack] = useState(false);
   const [note, setNote] = useState("");
-  const [error, setError] = useState<string>();
 
-  const run = (action: () => Promise<{ error?: string } | undefined>) =>
-    startTransition(async () => {
-      const result = await action();
-      if (result?.error) setError(result.error);
-      else {
-        setSendingBack(false);
-      }
-    });
+  const run = async (action: () => Promise<ActionState>) => {
+    const result = await runAction(action);
+    if (!result?.error) setSendingBack(false);
+  };
 
   if (status === "approved") {
     const decider = canSendBack(status, actor);
@@ -64,7 +61,7 @@ export function ActionButtons({
             setSendingBack(open);
             if (open) {
               setNote("");
-              setError(undefined);
+              clearError();
             }
           }}
         >

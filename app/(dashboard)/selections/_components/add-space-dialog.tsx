@@ -13,7 +13,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { addSpaces } from "@/lib/selections/actions";
 import { Minus, Plus } from "lucide-react";
-import { useMemo, useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useMemo, useState } from "react";
 
 type SpaceType = { id: string; code: string; name: string };
 type ExistingSpace = { label: string; space_type_id: string };
@@ -34,8 +35,7 @@ export function AddSpaceDialog({
   const [counts, setCounts] = useState<Record<string, number>>({});
   // Labels the designer overrode, keyed by position; untouched ones keep following the suggestion.
   const [overrides, setOverrides] = useState<Record<string, string>>({});
-  const [error, setError] = useState<string>();
-  const [saving, startSaving] = useTransition();
+  const { pending: saving, error, run, clearError } = useActionRunner();
 
   /** One of a type is "Kitchen"; several are "Bedroom 1", "Bedroom 2". Numbering continues past what the unit has and skips taken names. */
   const planned = useMemo(() => {
@@ -80,25 +80,23 @@ export function AddSpaceDialog({
   const reset = () => {
     setCounts({});
     setOverrides({});
-    setError(undefined);
+    clearError();
   };
 
-  const commit = () =>
-    startSaving(async () => {
-      const outcome = await addSpaces(
+  const commit = async () => {
+    const outcome = await run(() =>
+      addSpaces(
         unitId,
         planned.map((row) => ({
           spaceTypeId: row.spaceTypeId,
           label: overrides[row.key]?.trim() || row.suggestion,
         })),
-      );
-      if (outcome?.error) {
-        setError(outcome.error);
-        return;
-      }
-      reset();
-      setOpen(false);
-    });
+      ),
+    );
+    if (outcome?.error) return;
+    reset();
+    setOpen(false);
+  };
 
   return (
     <Dialog

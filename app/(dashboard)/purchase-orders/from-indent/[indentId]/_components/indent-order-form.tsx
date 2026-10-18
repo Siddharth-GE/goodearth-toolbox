@@ -26,7 +26,8 @@ import {
   type PriceSuggestion,
 } from "@/lib/purchase-orders/from-indent";
 import type { IndentOrderLine } from "@/lib/purchase-orders/queries";
-import { useMemo, useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useMemo, useState } from "react";
 
 type Row = {
   picked: boolean;
@@ -69,8 +70,7 @@ export function IndentOrderForm({
     ),
   );
   const [everyVendor, setEveryVendor] = useState("");
-  const [error, setError] = useState<string>();
-  const [creating, startCreating] = useTransition();
+  const { pending: creating, error, run } = useActionRunner();
 
   const vendorOptions = useMemo(
     () => vendors.map((vendor) => ({ value: vendor.id, label: vendor.name })),
@@ -124,12 +124,7 @@ export function IndentOrderForm({
   const problem = blocked ?? picksProblem(picks, left);
   const groups = splitByVendor(picks.filter((pick) => pick.vendorId));
 
-  const create = () =>
-    startCreating(async () => {
-      setError(undefined);
-      const result = await createPosFromIndent(indentId, picks);
-      if (result?.error) setError(result.error);
-    });
+  const create = () => run(() => createPosFromIndent(indentId, picks));
 
   return (
     <div className="space-y-4 pb-28">

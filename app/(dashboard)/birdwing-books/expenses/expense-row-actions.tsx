@@ -16,8 +16,9 @@ import { deleteExpense, setExpenseStatus } from "@/lib/birdwing-books/actions";
 import { deleteExpenseFile, uploadExpenseFile } from "@/lib/birdwing-books/files-actions";
 import type { ExpenseRow, HeadRow } from "@/lib/birdwing-books/queries";
 import { formatMoney } from "@/lib/format";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { FileText, MoreHorizontal } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { ExpenseDialog } from "./expense-dialog";
 
 /** A line's bill and controls. A salary line belongs to its confirmed run; a confirmed line must be marked recorded again before it can be changed or removed (0116's guard). */
@@ -30,19 +31,11 @@ export function ExpenseRowActions({
   heads: HeadRow[];
   vendors: SearchOption[];
 }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
   const [removing, setRemoving] = useState<"line" | "bill" | null>(null);
 
   if (row.isSalary) return <Badge variant="neutral">Salary</Badge>;
 
-  const run = (work: () => Promise<{ error?: string } | undefined>) => {
-    setError(undefined);
-    startTransition(async () => {
-      const result = await work();
-      if (result?.error) setError(result.error);
-    });
-  };
   const recorded = row.status === "recorded";
 
   return (

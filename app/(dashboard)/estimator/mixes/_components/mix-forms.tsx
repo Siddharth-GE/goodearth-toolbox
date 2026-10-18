@@ -20,7 +20,8 @@ import {
 import type { MixDetail, MixRow } from "@/lib/estimator/mixes-queries";
 import type { MaterialItemRow } from "@/lib/estimator/shared";
 import { removeWorkComponent, updateWorkComponentQty } from "@/lib/estimator/works-actions";
-import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 
 export function MixFormDialog({
   mix,
@@ -168,26 +169,20 @@ export function ComponentQtyField({
   kind: "mix" | "work";
 }) {
   const [value, setValue] = useState(String(qty));
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
-  const save = () => {
+  const save = async () => {
     const next = Number(value);
     if (!Number.isFinite(next) || next <= 0 || next === qty) {
       setValue(String(qty));
       return;
     }
-    startTransition(async () => {
-      const result = await (kind === "mix"
-        ? updateMixComponentQty(id, next)
-        : updateWorkComponentQty(id, next));
-      if (result?.error) {
-        setError(result.error);
-        setValue(String(qty));
-      } else {
-        setError(undefined);
-      }
-    });
+    const result = await run(() =>
+      kind === "mix" ? updateMixComponentQty(id, next) : updateWorkComponentQty(id, next),
+    );
+    if (result?.error) {
+      setValue(String(qty));
+    }
   };
 
   return (
@@ -219,8 +214,7 @@ export function RemoveComponentButton({
   kind: "mix" | "work";
   label: string;
 }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
   return (
     <div className="flex items-center justify-end gap-2">
@@ -232,12 +226,7 @@ export function RemoveComponentButton({
         aria-label={`Remove ${label}`}
         disabled={pending}
         onClick={() =>
-          startTransition(async () => {
-            const result = await (kind === "mix"
-              ? removeMixComponent(id)
-              : removeWorkComponent(id));
-            setError(result?.error);
-          })
+          run(() => (kind === "mix" ? removeMixComponent(id) : removeWorkComponent(id)))
         }
       >
         {pending ? "Removing…" : "Remove"}
@@ -247,8 +236,7 @@ export function RemoveComponentButton({
 }
 
 export function DeleteMixButton({ mixId }: { mixId: string }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
   return (
     <div className="flex items-center gap-2">
@@ -257,12 +245,7 @@ export function DeleteMixButton({ mixId }: { mixId: string }) {
         type="button"
         variant="secondary"
         disabled={pending}
-        onClick={() =>
-          startTransition(async () => {
-            const result = await deleteMix(mixId);
-            setError(result?.error);
-          })
-        }
+        onClick={() => run(() => deleteMix(mixId))}
       >
         {pending ? "Deleting…" : "Delete mix"}
       </Button>
