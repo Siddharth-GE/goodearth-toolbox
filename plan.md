@@ -1,6 +1,6 @@
 # Native apps on iPhone and Android
 
-**Approved by the founder 2026-10-18 ("everything looks good"). Build Android first:** A1, A2 and A4 on Android, then the founder's Android vet; the iPhone (A3) after. Work on `feature/native-apps`, branched from `feature/android-app` (PR #112, the website's half it needs), in its own worktree. Each `[Fable]` step still needs Fable's pass before it is built, unless the founder waives it in so many words. Every new package is a release at least two weeks old (Capacitor 8.5.3 was days old on 2026-10-18).
+**Approved by the founder 2026-10-18 ("everything looks good"). Build Android first:** A1, A2 and A4 on Android, then the founder's Android vet; the iPhone (A3) after. Work on `feature/native-apps`, branched from `feature/android-app` (PR #112, the website's half it needs), in its own worktree. **The founder waived every Fable review for this build** (2026-10-18: "waive all the fable reviews, i trust you"), so Opus takes each `[Fable]` step and the approval pass before each merge, and says so here. Every new package is a release at least two weeks old (Capacitor 8.5.3 was days old on 2026-10-18).
 
 The founder's choices (2026-10-18): **one shared app in both stores**, built with Capacitor 8, showing today's Toolbox screens and adding **push notifications, Face ID / fingerprint, and camera and scanning**. iPhone on the **public App Store**; no Mac, so iPhone builds run on GitHub's free macOS machines (the repo is public). Same ID on both: `com.kaadalgroup.toolbox`.
 
