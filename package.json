@@ -15,6 +15,7 @@
     "check:comments": "tsx scripts/check-comment-only.ts",
     "check:boundaries": "tsx scripts/check-boundaries.ts",
     "check:errors": "tsx scripts/check-errors.ts",
+    "check:selects": "tsx scripts/check-selects.ts",
     "db:types": "supabase gen types typescript --project-id pajfrgnkapicdgangjey --schema public > lib/supabase/database.types.ts",
     "db:types:staging": "supabase gen types typescript --project-id ipstebqawrvhkyntctrv --schema public > lib/supabase/database.types.ts",
     "db:apply": "tsx scripts/apply-migrations.ts",

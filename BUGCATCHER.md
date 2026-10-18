@@ -29,7 +29,7 @@ A 40 KB JPEG stored as 124 KB of rubbish, every non-UTF-8 byte replaced with `EF
 
 An ambiguous embed answers HTTP 300 (`PGRST201`) at runtime; it is not a type error and the tests have no database. Client Relations shipped four dead screens this way. A table with two foreign keys to the same target needs the key named — `plots!units_plot_id_fkey` (`units` has had two paths to `plots` since `0029`); `staff_details` has four FKs to `profiles`, which is why Directory forbids embeds and merges through a `Map`.
 
-**Check.** Open the page, or run the `select` string straight at the REST API.
+**Check.** `npm run check:selects` (in CI) checks every literal `select` string against the generated types; a string built at runtime still needs the page opened, or the string run straight at the REST API.
 
 ### 3. Supabase's default privileges grant more than the migrations ask for
 

@@ -58,6 +58,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: npm run check:boundaries
 
+      - name: Every select string matches the database types
+        if: ${{ !cancelled() }}
+        run: npm run check:selects
+
       - name: Build
         run: npm run build
         env:
