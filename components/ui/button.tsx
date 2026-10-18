@@ -2,13 +2,17 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import type { ButtonHTMLAttributes } from "react";
 
-type Variant = "primary" | "secondary" | "ghost";
+type Variant = "primary" | "secondary" | "ghost" | "ground" | "groundOutline";
 type Size = "sm" | "md" | "lg";
 
 const variantClasses: Record<Variant, string> = {
   primary: "bg-accent text-accent-foreground hover:bg-accent-hover",
   secondary: "bg-surface-raised text-foreground border border-border hover:border-foreground/30",
   ghost: "text-foreground hover:bg-foreground/[0.05]",
+  // On a brand ground (DESIGN.md): the ground colours inverted, and a hairline of the ground ink.
+  ground: "bg-on-ground text-ground hover:bg-on-ground/90 focus-visible:ring-on-ground/40",
+  groundOutline:
+    "border border-on-ground/45 text-on-ground hover:bg-on-ground/10 focus-visible:ring-on-ground/40",
 };
 
 const sizeClasses: Record<Size, string> = {

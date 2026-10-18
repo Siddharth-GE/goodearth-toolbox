@@ -4,7 +4,7 @@ import { test } from "node:test";
 
 import type { Tool } from "@/lib/tools";
 
-import { arrangeTools, isInTool, NO_ARRANGEMENT, sectionKeyOf, teamGroundOf } from "./arrange";
+import { arrangeTools, isInTool, NO_ARRANGEMENT, sectionOfPage, teamOfTool } from "./arrange";
 
 function tool(href: string): Tool {
   return { name: href, description: "", href, icon: "Boxes", built: true };
@@ -75,13 +75,6 @@ test("a page belongs to its tool, and not to a tool that merely shares a prefix"
   assert.ok(!isInTool("/bills", "/bills-archive"));
 });
 
-test("the open section is the one holding the page; the home page opens none", () => {
-  const sections = arrangeTools([inventory, indents, dexter], arrangement);
-  assert.equal(sectionKeyOf(sections, "/inventory/receipts/1"), "t-site");
-  assert.equal(sectionKeyOf(sections, "/dexter"), "t-design");
-  assert.equal(sectionKeyOf(sections, "/"), null);
-});
-
 test("a team's colour follows its place in the team list, whoever is looking", () => {
   assert.deepEqual(
     arrangeTools([indents, dexter, fresh], arrangement).map((s) => [s.name, s.ground]),
@@ -95,7 +88,34 @@ test("a team's colour follows its place in the team list, whoever is looking", (
     arrangeTools([indents], arrangement).map((s) => s.ground),
     ["teal"],
   );
-  assert.equal(teamGroundOf(arrangement, "/inventory"), "teal");
-  assert.equal(teamGroundOf(arrangement, "/relay"), "ink");
-  assert.equal(teamGroundOf(NO_ARRANGEMENT, "/indents"), "ink");
+  assert.equal(teamOfTool(arrangement, "/inventory").ground, "teal");
+  assert.equal(teamOfTool(arrangement, "/relay").ground, "ink");
+  assert.equal(teamOfTool(NO_ARRANGEMENT, "/indents").ground, "ink");
+});
+
+test("each team has its own page address, Other included, and a clash never shares one", () => {
+  const clash = {
+    teams: [
+      { id: "a", name: "Site & Stores" },
+      { id: "b", name: "site stores" },
+      { id: "c", name: "Other" },
+      { id: "d", name: "!!" },
+    ],
+    teamOf: { "/indents": "a", "/inventory": "b", "/relay": "c", "/dexter": "d" },
+  };
+  assert.deepEqual(
+    arrangeTools([indents, inventory, relay, dexter, fresh], clash).map((s) => s.slug),
+    ["site-stores", "site-stores-2", "other-2", "team-4", "other"],
+  );
+  assert.equal(teamOfTool(clash, "/inventory").slug, "site-stores-2");
+  assert.equal(teamOfTool(clash, "/fresh").slug, "other");
+});
+
+test("a page belongs to its team page or to a tool inside the team", () => {
+  const sections = arrangeTools([indents, inventory, dexter], arrangement);
+  assert.equal(sectionOfPage(sections, "/team/site")?.name, "Site");
+  assert.equal(sectionOfPage(sections, "/indents/new")?.name, "Site");
+  assert.equal(sectionOfPage(sections, "/dexter")?.name, "Design");
+  assert.equal(sectionOfPage(sections, "/"), null);
+  assert.equal(sectionOfPage(sections, "/team/nowhere"), null);
 });

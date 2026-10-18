@@ -1,4 +1,3 @@
-import { Wordmark } from "@/components/ui/logo";
 import { LoginForm } from "@/components/login-form";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -8,14 +7,9 @@ import { Suspense } from "react";
 export default function LoginPage() {
   return (
     <div className="w-full max-w-sm">
-      <div className="mb-6 flex flex-col items-center text-center">
-        <h1 className="flex items-end gap-3" aria-label="Kaadal Toolbox">
-          <Wordmark className="fill-brand-burgundy dark:fill-brand-blush h-10" />
-          <span className="text-muted pb-0.5 text-xs font-medium tracking-[0.14em] uppercase">
-            Toolbox
-          </span>
-        </h1>
-        <p className="text-muted mt-4 text-sm">Sign in with your work email</p>
+      <div className="mb-6 text-center">
+        <h1 className="text-foreground font-display text-3xl font-medium">Sign in</h1>
+        <p className="text-muted mt-2 text-sm">With your work email</p>
       </div>
       <Suspense>
         <LoginForm />
