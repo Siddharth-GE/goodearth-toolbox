@@ -104,16 +104,26 @@ function enclosingScope(node: ts.Node): ts.Node {
   return current ?? node.getSourceFile();
 }
 
+/** A name in a key or declaration position, not a reference to the variable. */
+function isNotAReference(node: ts.Identifier): boolean {
+  const parent = node.parent;
+  return (
+    (ts.isPropertyAccessExpression(parent) && parent.name === node) ||
+    (ts.isBindingElement(parent) && parent.propertyName === node) ||
+    (ts.isPropertyAssignment(parent) && parent.name === node) ||
+    (ts.isVariableDeclaration(parent) && parent.name === node) ||
+    (ts.isParameter(parent) && parent.name === node) ||
+    (ts.isPropertySignature(parent) && parent.name === node)
+  );
+}
+
 /** Is `name` used anywhere in `scope` other than at `declared`? */
 function isRead(name: string, scope: ts.Node, declared: ts.Node): boolean {
   let found = false;
   const visit = (node: ts.Node) => {
     if (found) return;
     if (ts.isIdentifier(node) && node.text === name && node !== declared) {
-      const parent = node.parent;
-      const isKeyOfAccess = ts.isPropertyAccessExpression(parent) && parent.name === node;
-      const isBindingKey = ts.isBindingElement(parent) && parent.propertyName === node;
-      if (!isKeyOfAccess && !isBindingKey) found = true;
+      if (!isNotAReference(node)) found = true;
     }
     ts.forEachChild(node, visit);
   };
@@ -130,7 +140,7 @@ function resultHandled(name: string, scope: ts.Node, declared: ts.Node): boolean
       const parent = node.parent;
       if (ts.isPropertyAccessExpression(parent) && parent.expression === node) {
         if (parent.name.text === "error") found = true;
-      } else if (!(ts.isPropertyAccessExpression(parent) && parent.name === node)) {
+      } else if (!isNotAReference(node)) {
         // Passed, returned, spread or destructured whole: someone else reads it.
         found = true;
       }

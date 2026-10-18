@@ -1,5 +1,8 @@
 import "server-only";
 
+import { readFailed } from "@/lib/supabase/read-failed";
+import { withRetry } from "@/lib/supabase/transient";
+
 export type PagedResult<T> = {
   rows: T[];
   total: number;
@@ -17,7 +20,8 @@ type CountedResponse = PromiseLike<{
 
 /**
  * `build` gets the 1-based page and must apply its own `.range()`.
- * A page past the end re-fetches the last real page.
+ * A page past the end re-fetches the last real page. A dropped connection
+ * is retried; any other failure is the error screen, never an empty list.
  */
 export async function pagedList<T>(
   build: (page: number) => CountedResponse,
@@ -25,11 +29,8 @@ export async function pagedList<T>(
   pageSize: number,
 ): Promise<PagedResult<T>> {
   const requested = Math.max(1, Math.floor(requestedPage || 1));
-  const first = await build(requested);
-  if (first.error) {
-    console.error("pagedList failed:", first.error);
-    return { rows: [], total: 0, page: requested, pageSize, pageCount: 1 };
-  }
+  const first = await withRetry(() => build(requested));
+  if (first.error) readFailed("pagedList", "this list", first.error);
 
   let data = first.data;
   const total = first.count ?? 0;
@@ -38,7 +39,9 @@ export async function pagedList<T>(
   let page = requested;
   if (requested > pageCount && total > 0) {
     page = pageCount;
-    ({ data } = await build(page));
+    const last = await withRetry(() => build(page));
+    if (last.error) readFailed("pagedList", "this list", last.error);
+    data = last.data;
   }
 
   return { rows: (data ?? []) as T[], total, page, pageSize, pageCount };
