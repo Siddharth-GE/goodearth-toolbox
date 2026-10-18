@@ -2,6 +2,7 @@
 
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
+import { checked, optionalText, rawText, text } from "@/lib/form-data";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
@@ -9,19 +10,15 @@ import { revalidatePath } from "next/cache";
 const GSTIN_SHAPE = /^[0-9]{2}[A-Z0-9]{13}$/;
 
 function readCompanyForm(formData: FormData) {
-  const text = (key: string) => String(formData.get(key) ?? "").trim() || null;
   return {
-    name: String(formData.get("name") ?? "").trim(),
-    legal_name: text("legal_name"),
-    address: text("address"),
-    gstin:
-      String(formData.get("gstin") ?? "")
-        .toUpperCase()
-        .replace(/\s+/g, "") || null,
-    state: String(formData.get("state") ?? "").trim(),
-    phone: text("phone"),
-    email: text("email"),
-    is_active: formData.get("is_active") === "1",
+    name: text(formData, "name"),
+    legal_name: optionalText(formData, "legal_name"),
+    address: optionalText(formData, "address"),
+    gstin: rawText(formData, "gstin").toUpperCase().replace(/\s+/g, "") || null,
+    state: text(formData, "state"),
+    phone: optionalText(formData, "phone"),
+    email: optionalText(formData, "email"),
+    is_active: checked(formData, "is_active", "1"),
   };
 }
 

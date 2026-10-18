@@ -4,7 +4,7 @@
 // in the chunk at module load. Import it from "@/lib/action-state".
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
-import { parseNumber, text } from "@/lib/form-data";
+import { checked, parseNumber, text } from "@/lib/form-data";
 import { createClient } from "@/lib/supabase/server";
 import {
   applyEstimateOverrides,
@@ -28,7 +28,7 @@ export async function startVillaEstimate(
   await requireTool(GRANT);
   const unitId = text(formData, "unit_id");
   const sourceId = text(formData, "source_estimate_id");
-  const everything = formData.get("everything") === "on";
+  const everything = checked(formData, "everything");
   const name = text(formData, "name");
 
   if (!unitId) return { error: "Which villa?" };

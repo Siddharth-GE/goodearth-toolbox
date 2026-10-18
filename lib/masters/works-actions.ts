@@ -1,5 +1,6 @@
 "use server";
 
+import { checked, optionalText, text } from "@/lib/form-data";
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
@@ -34,14 +35,12 @@ function sortOrderFromCode(code: string, fallback: number): number {
 
 function readWorksForm(formData: FormData) {
   return {
-    code: String(formData.get("code") ?? "")
-      .trim()
-      .toUpperCase(),
-    name: String(formData.get("name") ?? "").trim(),
-    category_id: String(formData.get("category_id") ?? "").trim(),
-    group_id: String(formData.get("group_id") ?? "").trim() || null,
+    code: text(formData, "code").toUpperCase(),
+    name: text(formData, "name"),
+    category_id: text(formData, "category_id"),
+    group_id: optionalText(formData, "group_id"),
     // Checkbox: checked posts "1", unchecked posts nothing; only update actions read it.
-    is_active: formData.get("is_active") === "1",
+    is_active: checked(formData, "is_active", "1"),
   };
 }
 

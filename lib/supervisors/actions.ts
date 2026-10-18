@@ -20,7 +20,7 @@ const NOTE_LIMIT = 2000;
  * and revalidates the layout, or the welcome counts go stale (the exact-path trap in CLAUDE.md). */
 
 function count(formData: FormData, field: string): number {
-  const raw = String(formData.get(field) ?? "").trim();
+  const raw = text(formData, field);
   if (!raw) return 0;
   return Number(raw);
 }

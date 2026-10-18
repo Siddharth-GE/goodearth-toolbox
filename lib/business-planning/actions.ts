@@ -2,6 +2,7 @@
 
 // Not re-exported: `export type { ActionState }` in a "use server" file survives into the runtime
 // exports and every action dies at load (BUGCATCHER). Import it from "@/lib/action-state".
+import { text } from "@/lib/form-data";
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
@@ -71,8 +72,8 @@ async function syncPlanTargets(planId: string, userId: string): Promise<void> {
 export async function createPlan(_state: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireTool("/business-planning");
 
-  const name = String(formData.get("name") ?? "").trim();
-  const location = String(formData.get("location") ?? "").trim();
+  const name = text(formData, "name");
+  const location = text(formData, "location");
   if (!name) return { error: "Give the plan a name." };
   if (name.length > NAME_LIMIT) return { error: `Keep the name under ${NAME_LIMIT} characters.` };
 
@@ -108,10 +109,10 @@ export async function renamePlan(
 ): Promise<ActionState> {
   const user = await requireTool("/business-planning");
 
-  const name = String(formData.get("name") ?? "").trim();
-  const location = String(formData.get("location") ?? "").trim();
+  const name = text(formData, "name");
+  const location = text(formData, "location");
   // "" = no project = targets withdrawn; the FK refuses anything but a projects.id.
-  const projectId = String(formData.get("project_id") ?? "").trim();
+  const projectId = text(formData, "project_id");
   if (!name) return { error: "Give the plan a name." };
   if (name.length > NAME_LIMIT) return { error: `Keep the name under ${NAME_LIMIT} characters.` };
 

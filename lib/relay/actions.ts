@@ -1,5 +1,6 @@
 "use server";
 
+import { text } from "@/lib/form-data";
 import { requireTool } from "@/lib/auth/access";
 import { getCurrentUser } from "@/lib/auth/dal";
 import { guardError } from "@/lib/db-error";
@@ -473,7 +474,7 @@ export async function createDepartment(
 ): Promise<ActionState> {
   await requireTool("/relay");
 
-  const name = String(formData.get("name") ?? "").trim();
+  const name = text(formData, "name");
   if (!name) return { error: "A department needs a name." };
 
   const supabase = await createClient();
@@ -512,7 +513,7 @@ export async function createActivity(
 ): Promise<ActionState> {
   await requireTool("/relay");
 
-  const name = String(formData.get("name") ?? "").trim();
+  const name = text(formData, "name");
   if (!name) return { error: "An activity needs a name." };
 
   const supabase = await createClient();
@@ -652,7 +653,7 @@ export async function createTrailSet(
 ): Promise<ActionState> {
   await requireTool("/relay");
 
-  const name = String(formData.get("name") ?? "").trim();
+  const name = text(formData, "name");
   if (!name) return { error: "A trail type needs a name." };
 
   const supabase = await createClient();

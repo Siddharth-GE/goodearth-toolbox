@@ -4,7 +4,7 @@
 // exports and every action dies at load (BUGCATCHER). Import it from "@/lib/action-state".
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
-import { parseNumber } from "@/lib/form-data";
+import { parseNumber, rawText, text } from "@/lib/form-data";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -24,12 +24,12 @@ type FacilityFields = {
 };
 
 function readFacilityFields(formData: FormData): FacilityFields | { error: string } {
-  const party = String(formData.get("party") ?? "").trim();
+  const party = text(formData, "party");
   if (!party) return { error: "Name the bank or investor." };
   if (party.length > PARTY_LIMIT)
     return { error: `Keep the name under ${PARTY_LIMIT} characters.` };
 
-  const kind = String(formData.get("kind") ?? "");
+  const kind = rawText(formData, "kind");
   if (!(FACILITY_KINDS as readonly string[]).includes(kind)) {
     return { error: "Pick what kind of money this is." };
   }
@@ -47,11 +47,11 @@ function readFacilityFields(formData: FormData): FacilityFields | { error: strin
     return { error: "The sanctioned amount must be a number above zero, or blank for no cap." };
   }
 
-  const startDate = String(formData.get("start_date") ?? "").trim();
+  const startDate = text(formData, "start_date");
   if (startDate && !ISO_DATE.test(startDate))
     return { error: "Pick the start date from the calendar." };
 
-  const terms = String(formData.get("terms") ?? "").trim();
+  const terms = text(formData, "terms");
   if (terms.length > TEXT_LIMIT) return { error: `Keep the terms under ${TEXT_LIMIT} characters.` };
 
   return {
@@ -175,7 +175,7 @@ export async function recordMovement(
 ): Promise<ActionState> {
   const user = await requireTool("/financial-management");
 
-  const kind = String(formData.get("kind") ?? "");
+  const kind = rawText(formData, "kind");
   if (!(MOVEMENT_KINDS as readonly string[]).includes(kind)) {
     return { error: "Pick what kind of movement this is." };
   }
@@ -185,11 +185,11 @@ export async function recordMovement(
     return { error: "Enter the amount as a number above zero." };
   }
 
-  const happenedOn = String(formData.get("happened_on") ?? "").trim();
+  const happenedOn = text(formData, "happened_on");
   if (!ISO_DATE.test(happenedOn)) return { error: "Pick the date from the calendar." };
 
-  const reference = String(formData.get("reference") ?? "").trim();
-  const note = String(formData.get("note") ?? "").trim();
+  const reference = text(formData, "reference");
+  const note = text(formData, "note");
   if (reference.length > TEXT_LIMIT || note.length > TEXT_LIMIT) {
     return { error: `Keep the reference and note under ${TEXT_LIMIT} characters.` };
   }

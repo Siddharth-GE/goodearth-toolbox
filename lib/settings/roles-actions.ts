@@ -1,5 +1,6 @@
 "use server";
 
+import { checked, rawText, text } from "@/lib/form-data";
 import { requireAdmin } from "@/lib/auth/access";
 import { requireUser } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
@@ -28,18 +29,18 @@ export async function createRole(_state: ActionState, formData: FormData): Promi
   const user = await requireUser();
   await requireAdmin(user);
 
-  const name = String(formData.get("name") ?? "").trim();
+  const name = text(formData, "name");
   if (!name) return { error: "Give the role a name, e.g. Site Engineer." };
   if (name.length > 60) return { error: "Keep the name under 60 characters." };
 
-  const parsed = readLimit(String(formData.get("bill_approval_limit") ?? ""));
+  const parsed = readLimit(rawText(formData, "bill_approval_limit"));
   if ("error" in parsed) return { error: parsed.error };
 
   const supabase = await createClient();
   const { error } = await supabase.from("roles").insert({
     name,
-    can_approve_indents: formData.get("can_approve_indents") === "1",
-    can_approve_bills: formData.get("can_approve_bills") === "1",
+    can_approve_indents: checked(formData, "can_approve_indents", "1"),
+    can_approve_bills: checked(formData, "can_approve_bills", "1"),
     bill_approval_limit: parsed.limit,
     created_by: user.id,
   });
@@ -61,11 +62,11 @@ export async function updateRole(
   const user = await requireUser();
   await requireAdmin(user);
 
-  const name = String(formData.get("name") ?? "").trim();
+  const name = text(formData, "name");
   if (!name) return { error: "Give the role a name, e.g. Site Engineer." };
   if (name.length > 60) return { error: "Keep the name under 60 characters." };
 
-  const parsed = readLimit(String(formData.get("bill_approval_limit") ?? ""));
+  const parsed = readLimit(rawText(formData, "bill_approval_limit"));
   if ("error" in parsed) return { error: parsed.error };
 
   const supabase = await createClient();
@@ -73,8 +74,8 @@ export async function updateRole(
     .from("roles")
     .update({
       name,
-      can_approve_indents: formData.get("can_approve_indents") === "1",
-      can_approve_bills: formData.get("can_approve_bills") === "1",
+      can_approve_indents: checked(formData, "can_approve_indents", "1"),
+      can_approve_bills: checked(formData, "can_approve_bills", "1"),
       bill_approval_limit: parsed.limit,
       updated_by: user.id,
     })

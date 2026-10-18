@@ -1,5 +1,6 @@
 "use server";
 
+import { text } from "@/lib/form-data";
 import { revalidatePath } from "next/cache";
 
 // sharp loads LAZILY in the resize branch: a top-level import with a missing native binary would kill every action in this file at load.
@@ -253,7 +254,7 @@ export async function createDepartment(
   const user = await requireUser();
   await requireAdmin(user);
 
-  const name = String(formData.get("name") ?? "").trim();
+  const name = text(formData, "name");
   if (!name) return { error: "Give the department a name." };
   if (name.length > 40) return { error: "Keep the name under 40 characters." };
 

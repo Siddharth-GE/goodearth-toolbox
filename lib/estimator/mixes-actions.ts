@@ -4,7 +4,7 @@
 // in the chunk at module load. Import it from "@/lib/action-state".
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
-import { parseNumber, text } from "@/lib/form-data";
+import { checked, parseNumber, text } from "@/lib/form-data";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -33,7 +33,7 @@ function readMixFields(formData: FormData): MixFields | { error: string } {
     name,
     uom,
     description: description || null,
-    is_active: formData.get("is_active") === "1",
+    is_active: checked(formData, "is_active", "1"),
   };
 }
 

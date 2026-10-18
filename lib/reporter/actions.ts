@@ -1,6 +1,7 @@
 "use server";
 
 // Type-only import; never re-export it from a "use server" file (BUGCATCHER #5).
+import { rawText, text } from "@/lib/form-data";
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
@@ -18,8 +19,8 @@ const DESCRIPTION_LIMIT = 300;
 type Named = { name: string; description: string | null };
 
 function readName(formData: FormData): Named | { error: string } {
-  const name = String(formData.get("name") ?? "").trim();
-  const description = String(formData.get("description") ?? "").trim();
+  const name = text(formData, "name");
+  const description = text(formData, "description");
   if (!name) return { error: "Give the report a name." };
   if (name.length > NAME_LIMIT) return { error: `Keep the name under ${NAME_LIMIT} characters.` };
   if (description.length > DESCRIPTION_LIMIT) {
@@ -34,7 +35,7 @@ export async function saveReport(_state: ActionState, formData: FormData): Promi
   const named = readName(formData);
   if ("error" in named) return { error: named.error };
 
-  const raw = decodeSpecParam(String(formData.get("spec") ?? ""));
+  const raw = decodeSpecParam(rawText(formData, "spec"));
   if (raw === null) {
     return { error: "That report could not be read. Run it again and save from the report page." };
   }

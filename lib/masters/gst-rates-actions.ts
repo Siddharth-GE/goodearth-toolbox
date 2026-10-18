@@ -1,5 +1,6 @@
 "use server";
 
+import { text } from "@/lib/form-data";
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
@@ -8,7 +9,7 @@ import { revalidatePath } from "next/cache";
 export async function addGstRate(_state: ActionState, formData: FormData): Promise<ActionState> {
   await requireTool("/masters");
 
-  const raw = String(formData.get("rate") ?? "").trim();
+  const raw = text(formData, "rate");
   const rate = Number(raw);
   if (raw === "" || !Number.isFinite(rate)) return { error: "Enter a GST percentage." };
   if (rate < 0 || rate > 100) return { error: "GST is a percentage between 0 and 100." };

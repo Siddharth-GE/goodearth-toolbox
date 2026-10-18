@@ -1,5 +1,6 @@
 "use server";
 
+import { optionalText, rawText, text } from "@/lib/form-data";
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
@@ -9,14 +10,14 @@ import { isActiveUom } from "./uoms";
 
 function readItemForm(formData: FormData) {
   return {
-    code: String(formData.get("code") ?? "").trim() || null,
-    name: String(formData.get("name") ?? "").trim(),
-    description: String(formData.get("description") ?? "").trim() || null,
-    kind: String(formData.get("kind") ?? "") as ItemKind,
-    category_id: String(formData.get("category_id") ?? ""),
-    brand_id: String(formData.get("brand_id") ?? "") || null,
-    placement: (String(formData.get("placement") ?? "") || null) as Placement | null,
-    default_uom: String(formData.get("default_uom") ?? ""),
+    code: optionalText(formData, "code"),
+    name: text(formData, "name"),
+    description: optionalText(formData, "description"),
+    kind: rawText(formData, "kind") as ItemKind,
+    category_id: rawText(formData, "category_id"),
+    brand_id: rawText(formData, "brand_id") || null,
+    placement: (rawText(formData, "placement") || null) as Placement | null,
+    default_uom: rawText(formData, "default_uom"),
     indicative_price: formData.get("indicative_price")
       ? Number(formData.get("indicative_price"))
       : null,

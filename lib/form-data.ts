@@ -18,3 +18,13 @@ export function parseNumber(raw: FormDataEntryValue | null): number | null {
   if (!cleaned) return null;
   return Number(cleaned);
 }
+
+/** The field exactly as sent — ids, enum values and passwords, where trimming would change meaning. */
+export function rawText(formData: FormData, field: string): string {
+  return String(formData.get(field) ?? "");
+}
+
+/** A ticked checkbox. Most forms send "on"; the masters' toggles send "1". */
+export function checked(formData: FormData, field: string, sent = "on"): boolean {
+  return formData.get(field) === sent;
+}

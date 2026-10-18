@@ -1,5 +1,6 @@
 "use server";
 
+import { checked, rawText, text } from "@/lib/form-data";
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
@@ -8,11 +9,11 @@ import { isTermsKind } from "./constants";
 
 function readTermsForm(formData: FormData) {
   return {
-    kind: String(formData.get("kind") ?? ""),
-    name: String(formData.get("name") ?? "").trim(),
-    body: String(formData.get("body") ?? "").trim(),
-    is_active: formData.get("is_active") === "1",
-    is_default: formData.get("is_default") === "1",
+    kind: rawText(formData, "kind"),
+    name: text(formData, "name"),
+    body: text(formData, "body"),
+    is_active: checked(formData, "is_active", "1"),
+    is_default: checked(formData, "is_default", "1"),
   };
 }
 

@@ -4,7 +4,7 @@
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { dbErrorMessage } from "@/lib/db-error";
-import { optionalText, text } from "@/lib/form-data";
+import { checked, optionalText, text } from "@/lib/form-data";
 import { todayInIndia } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
@@ -404,7 +404,7 @@ export async function saveCheckinDetails(
       food_preferences: optionalText(formData, "food_preferences"),
       allergies: optionalText(formData, "allergies"),
       requirements: optionalText(formData, "requirements"),
-      id_verified: formData.get("id_verified") === "on",
+      id_verified: checked(formData, "id_verified"),
       updated_by: user.id,
     })
     .eq("id", stayId);
@@ -485,7 +485,7 @@ export async function addCharge(
   const rate = parseRupees(text(formData, "rate"), "Rate", { blank: null });
   if (!rate.ok) return { error: rate.error };
   if (rate.value === null) return { error: "Type the rate." };
-  const inclusive = formData.get("rate_includes_gst") === "on";
+  const inclusive = checked(formData, "rate_includes_gst");
 
   // From the rate card: head, kind, GST and SAC are COPIED onto the line, so a new rate card never rewrites an old invoice.
   const rateCardId = optionalText(formData, "rate_card_id");

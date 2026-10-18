@@ -1,5 +1,6 @@
 "use server";
 
+import { optionalText } from "@/lib/form-data";
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { designView } from "@/lib/pdf/theme";
@@ -33,7 +34,7 @@ export async function uploadSpaceView(
     return { error: "Upload a JPG, PNG, WebP or AVIF." };
   }
 
-  const caption = String(formData.get("caption") ?? "").trim() || null;
+  const caption = optionalText(formData, "caption");
 
   let normalised: Buffer;
   try {

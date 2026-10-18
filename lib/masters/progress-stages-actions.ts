@@ -1,5 +1,6 @@
 "use server";
 
+import { rawText } from "@/lib/form-data";
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { fetchAll } from "@/lib/supabase/fetch-all";
@@ -28,7 +29,7 @@ export async function addProgressStage(
   formData: FormData,
 ): Promise<ActionState> {
   const user = await requireTool("/masters");
-  const name = validName(String(formData.get("name") ?? ""));
+  const name = validName(rawText(formData, "name"));
   if (typeof name !== "string") return name;
 
   const supabase = await createClient();

@@ -5,7 +5,7 @@ import type { ActionState } from "@/lib/action-state";
 import { requireAdmin } from "@/lib/auth/access";
 import { requireUser } from "@/lib/auth/dal";
 import { dbErrorMessage } from "@/lib/db-error";
-import { optionalText, text } from "@/lib/form-data";
+import { checked, optionalText, text } from "@/lib/form-data";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { parseCount, parseGstPct, parseRupees } from "./forms";
@@ -48,7 +48,7 @@ export async function saveRoom(
     name,
     max_guests: capacity.value || null,
     sort_order: sort.value,
-    is_active: formData.get("is_active") === "on",
+    is_active: checked(formData, "is_active"),
     updated_by: user.id,
   };
   const supabase = await createClient();
@@ -84,7 +84,7 @@ export async function saveRateCardItem(
     gst_pct: gst.value,
     sac: optionalText(formData, "sac"),
     sort_order: sort.value,
-    is_active: formData.get("is_active") === "on",
+    is_active: checked(formData, "is_active"),
     updated_by: user.id,
   };
   const supabase = await createClient();
@@ -110,7 +110,7 @@ export async function saveCostCentre(
   const row = {
     name,
     sort_order: sort.value,
-    is_active: formData.get("is_active") === "on",
+    is_active: checked(formData, "is_active"),
     updated_by: user.id,
   };
   const supabase = await createClient();

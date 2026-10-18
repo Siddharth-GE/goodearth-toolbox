@@ -1,5 +1,6 @@
 "use server";
 
+import { rawText, text } from "@/lib/form-data";
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
@@ -11,17 +12,13 @@ const UNIT_STATUSES = ["available", "reserved", "sold"];
 
 function readUnitForm(formData: FormData) {
   return {
-    project_id: String(formData.get("project_id") ?? ""),
-    plot_id: String(formData.get("plot_id") ?? ""),
-    name: String(formData.get("name") ?? "").trim(),
+    project_id: rawText(formData, "project_id"),
+    plot_id: rawText(formData, "plot_id"),
+    name: text(formData, "name"),
     // Uppercase, no spaces, as poReference() expects. The DB CHECK (migration 0021) is the backstop.
-    code:
-      String(formData.get("code") ?? "")
-        .trim()
-        .toUpperCase()
-        .replace(/\s+/g, "") || null,
-    unit_type: String(formData.get("unit_type") ?? "") as UnitType,
-    client_id: String(formData.get("client_id") ?? "") || null,
+    code: text(formData, "code").toUpperCase().replace(/\s+/g, "") || null,
+    unit_type: rawText(formData, "unit_type") as UnitType,
+    client_id: rawText(formData, "client_id") || null,
     status: String(formData.get("status") ?? "available") as UnitStatus,
   };
 }

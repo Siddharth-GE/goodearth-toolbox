@@ -5,7 +5,7 @@ import type { ActionState } from "@/lib/action-state";
 import { requireAdmin } from "@/lib/auth/access";
 import { requireUser } from "@/lib/auth/dal";
 import { dbErrorMessage } from "@/lib/db-error";
-import { optionalText, text } from "@/lib/form-data";
+import { checked, optionalText, text } from "@/lib/form-data";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { readAmount } from "./upload";
@@ -45,7 +45,7 @@ export async function saveStaff(
     joined_on: joinedOn,
     profile_id: optionalText(formData, "profile_id"),
     sort_order: Number(text(formData, "sort_order") || "100") || 100,
-    is_active: formData.get("is_active") === "on",
+    is_active: checked(formData, "is_active"),
     updated_by: user.id,
   };
   const supabase = await createClient();
@@ -125,7 +125,7 @@ export async function saveHead(
   const row = {
     name,
     sort_order: Number(text(formData, "sort_order") || "100") || 100,
-    is_active: formData.get("is_active") === "on",
+    is_active: checked(formData, "is_active"),
     updated_by: user.id,
   };
   const supabase = await createClient();

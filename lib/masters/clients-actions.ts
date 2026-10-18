@@ -1,5 +1,6 @@
 "use server";
 
+import { checked, optionalText, text } from "@/lib/form-data";
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
@@ -7,11 +8,11 @@ import { revalidatePath } from "next/cache";
 
 function readClientForm(formData: FormData) {
   return {
-    name: String(formData.get("name") ?? "").trim(),
-    mobile: String(formData.get("mobile") ?? "").trim() || null,
-    email: String(formData.get("email") ?? "").trim() || null,
-    notes: String(formData.get("notes") ?? "").trim() || null,
-    is_active: formData.get("is_active") === "1",
+    name: text(formData, "name"),
+    mobile: optionalText(formData, "mobile"),
+    email: optionalText(formData, "email"),
+    notes: optionalText(formData, "notes"),
+    is_active: checked(formData, "is_active", "1"),
   };
 }
 

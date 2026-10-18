@@ -1,5 +1,6 @@
 "use server";
 
+import { rawText, text } from "@/lib/form-data";
 import { requireAdmin } from "@/lib/auth/access";
 import { requireUser } from "@/lib/auth/dal";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -41,11 +42,9 @@ export async function inviteUser(_state: ActionState, formData: FormData): Promi
   const user = await requireUser();
   await requireAdmin(user);
 
-  const fullName = String(formData.get("full_name") ?? "").trim();
-  const email = String(formData.get("email") ?? "")
-    .trim()
-    .toLowerCase();
-  const password = String(formData.get("password") ?? "");
+  const fullName = text(formData, "full_name");
+  const email = text(formData, "email").toLowerCase();
+  const password = rawText(formData, "password");
 
   const invalid = validateInvite({ fullName, email, password });
   if (invalid) return { error: invalid };

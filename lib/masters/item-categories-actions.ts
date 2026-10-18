@@ -1,5 +1,6 @@
 "use server";
 
+import { checked, rawText, text } from "@/lib/form-data";
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
@@ -12,8 +13,8 @@ export async function createItemCategory(
 ): Promise<ActionState> {
   await requireTool("/masters");
 
-  const name = String(formData.get("name") ?? "").trim();
-  const kind = String(formData.get("kind") ?? "");
+  const name = text(formData, "name");
+  const kind = rawText(formData, "kind");
   if (!name) return { error: "Enter a category name." };
   if (!isItemKind(kind)) return { error: "Choose catalogue or material." };
 
@@ -37,8 +38,8 @@ export async function updateItemCategory(
 ): Promise<ActionState> {
   const user = await requireTool("/masters");
 
-  const name = String(formData.get("name") ?? "").trim();
-  const is_active = formData.get("is_active") === "1";
+  const name = text(formData, "name");
+  const is_active = checked(formData, "is_active", "1");
   if (!name) return { error: "Enter a category name." };
 
   const supabase = await createClient();
