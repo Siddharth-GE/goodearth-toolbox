@@ -730,7 +730,13 @@ export async function settleStays(
   if (stayIds.length === 0) return { error: "Tick at least one stay." };
   if (kind === "write_off" && !note.trim()) return { error: "Say why they are written off." };
   const supabase = await createClient();
-  const pending = await pendingByStay(stayIds);
+  // The reader throws on failure; an action answers in a sentence.
+  let pending: Awaited<ReturnType<typeof pendingByStay>>;
+  try {
+    pending = await pendingByStay(stayIds);
+  } catch {
+    return { error: "Could not read what those stays owe. Try again." };
+  }
 
   const { data: stays, error: readError } = await supabase
     .from("birdwing_stays")

@@ -135,6 +135,15 @@ export type UploadPreview = { error?: string; lines?: PreviewLine[] };
 
 async function readUpload(csv: string): Promise<UploadPreview> {
   if (csv.length > 2_000_000) return { error: "That file is too large — split it by year." };
+  // The readers throw on failure; an action answers in a sentence.
+  try {
+    return await previewLines(csv);
+  } catch {
+    return { error: "Could not check the file against the books. Try again." };
+  }
+}
+
+async function previewLines(csv: string): Promise<UploadPreview> {
   const heads = await listHeads();
   const { lines, error } = readExpenseUpload(
     csv,
@@ -163,7 +172,12 @@ export async function commitExpenseUpload(
   const preview = await readUpload(csv);
   if (preview.error || !preview.lines) return { error: preview.error ?? "Nothing to add." };
 
-  const heads = await listHeads();
+  let heads: Awaited<ReturnType<typeof listHeads>>;
+  try {
+    heads = await listHeads();
+  } catch {
+    return { error: "Could not read the expense heads. Try again." };
+  }
   const headId = new Map(heads.map((head) => [head.name.toLowerCase(), head.id]));
   const fresh = preview.lines.filter((line) => line.state === "new");
   const rows = fresh.map((line) => ({
@@ -310,7 +324,12 @@ export async function confirmSalary(
   const note = optionalText(formData, "note");
   if (deductions > 0 && !note) return { error: "Say what the deduction is for." };
 
-  const found = await getSalaryPreview(staffId, first);
+  let found: Awaited<ReturnType<typeof getSalaryPreview>>;
+  try {
+    found = await getSalaryPreview(staffId, first);
+  } catch {
+    return { error: "Could not work out the salary. Try again." };
+  }
   if (!found)
     return { error: "This person has no pay rule for that month — an admin adds one in Settings." };
   const { preview, recordedElsewhere } = found;

@@ -486,7 +486,12 @@ export async function createPosFromIndent(
     (indent.units as { name: string } | null)?.name ??
     (indent.plots as { name: string } | null)?.name ??
     null;
-  const terms = await getDefaultTerms("po");
+  let terms: string | null;
+  try {
+    terms = await getDefaultTerms("po");
+  } catch {
+    return { error: "Could not read the default terms. Try again." };
+  }
 
   const made: string[] = [];
   const stopped = (reason: string): ActionState => {
