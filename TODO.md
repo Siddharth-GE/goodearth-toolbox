@@ -18,7 +18,8 @@ The founder gives the steps. Before the switch:
 3. Fable's pass over the reviews skipped for staging (`0096`–`0126`, each piece's section in `plan.md`), unless the founder waives it, as for the refactor's own migrations.
 4. **Supabase Pro** for the new production database. It's the only way to get backups, and it ends the pausing.
 5. At the switch:
-   - `lib/environment.ts` names the new production and practice databases and the new domain; `npm test` then lists every other place that must follow (CI and `package.json`);
+   - `toolbox.kaadalgroup.com` already serves `staging` (Vercel domain on the `staging` branch, DNS a Cloudflare CNAME, DNS only); it moves to the production deployment, and staging's Supabase Site URL follows;
+   - `lib/environment.ts` names the new production and practice databases; `npm test` then lists every other place that must follow (CI and `package.json`);
    - a new `.rbz` for Goodearth QS for SketchUp, with its default address on the production domain;
    - the Google Chat app pointed at production (the checklist is in `lib/google-chat/PLAN.md`).
 

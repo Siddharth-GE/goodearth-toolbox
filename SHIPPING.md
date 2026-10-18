@@ -33,7 +33,7 @@ Both are reached from this machine through the management API (`/database/query`
 - **Vercel holds the Supabase variables twice** — a Production entry (production database) and a Preview entry (staging). If a preview ever shows real data, check that first.
 - **Vercel Authentication is off** (Google must reach the Chat endpoint), so every preview URL is public — and reads staging, so trying a feature there can never touch real work.
 - **Secrets go into Vercel through its API** (`scripts/vercel-env.ts`), never pasted and never marked "sensitive" (BUGCATCHER #18).
-- Anything the platform holds outside the database — auth settings, email templates, redirect lists — is configuration too (BUGCATCHER #10). **Supabase's redirect allow-list** must cover previews: `https://goodearth-toolbox-*.vercel.app/**`.
+- Anything the platform holds outside the database — auth settings, email templates, redirect lists — is configuration too (BUGCATCHER #10). **Supabase's redirect allow-list** must cover previews: `https://goodearth-toolbox-*.vercel.app/**`, and every address a deployment answers on (staging's list has `toolbox.kaadalgroup.com`).
 
 Data scripts in `scripts/` are dry-run by default, `--commit` to write, and match on a natural key so a re-run writes nothing; never delete to re-insert, because live rows carry selections, budgets and indents.
 
@@ -46,6 +46,7 @@ Data scripts in `scripts/` are dry-run by default, `--commit` to write, and matc
 | `npm run dev`                 | your machine | **staging**    | you                               |
 | `feature/<tool>`              | any push     | **staging**    | you, on a preview URL             |
 | `staging.goodearthkannur.org` | `staging`    | **staging**    | the founder, for days of real use |
+| `toolbox.kaadalgroup.com`     | `staging`    | **staging**    | the team, until switch day        |
 | `toolbox.goodearthkannur.org` | `master`     | **production** | seventy people doing their jobs   |
 
 ### Building anything
@@ -75,7 +76,7 @@ git checkout staging && git merge master --ff-only && git push
 - **Staging is a snapshot, not a mirror.** The right place to prove a screen works, the wrong place to prove a number is correct.
 - **Staging emails real people.** The team's real addresses are there and colleagues sign in to try work (`STATUS.md`), so anything staging sends reaches a person — a script or trial that sends mail on staging needs the same care as production. `scripts/scramble-staging-emails.ts` turns them back into `@staging.invalid` if the founder ever wants staging closed again.
 - **Production has no backups** (free tier). Treat every production migration as unrepeatable.
-- **`staging.goodearthkannur.org` follows `staging` only**; a feature branch gets Vercel's generated address. A feature is not on the staging URL until merged into `staging`.
+- **`staging.goodearthkannur.org` and `toolbox.kaadalgroup.com` follow `staging` only** (the practice banner hides on the second, `isProductionHost`); a feature branch gets Vercel's generated address. A feature is not on the staging URL until merged into `staging`.
 
 ### Pausing
 

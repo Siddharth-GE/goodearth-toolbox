@@ -10,8 +10,16 @@ export const DATABASES = {
   practice: "ipstebqawrvhkyntctrv",
 } as const;
 
-/** Where the real toolbox lives, for the practice banner's link. */
-export const PRODUCTION_SITE = "toolbox.goodearthkannur.org";
+/**
+ * The real toolbox's address: the practice banner links here and never shows here.
+ * Until switch day it serves the `staging` branch, whose database the team already works in.
+ */
+export const PRODUCTION_SITE = "toolbox.kaadalgroup.com";
+
+/** True on the real toolbox's own address, whatever database the deployment reads. */
+export function isProductionHost(hostname: string): boolean {
+  return hostname.toLowerCase() === PRODUCTION_SITE;
+}
 
 /**
  * True unless this deployment is pointed at the production database.
