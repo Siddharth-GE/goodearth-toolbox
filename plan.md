@@ -91,24 +91,25 @@ Applied migrations are never edited, so their comments stay.
 
 ## Phase 2: make failures visible
 
-- [ ] `[Opus]` **One way to read.** `pagedList` (`lib/masters/paged.ts:39`, and its last-page retry) and the head counts go through the existing `readFailed` instead of returning empty. BUGCATCHER #9's retry then covers them.
-- [ ] `[Sonnet]` **M2: the 151 results that never read `error`**, one tool per commit, worst first:
+- [x] `[Opus]` **One way to read.** `pagedList` (`lib/masters/paged.ts:39`, and its last-page retry) and the head counts go through the existing `readFailed` instead of returning empty. BUGCATCHER #9's retry then covers them.
+- [x] `[Sonnet]` **M2: the 151 results that never read `error`**, one tool per commit, worst first:
   1. PO billed (`purchase-orders/queries.ts:478`);
   2. the Selections export (`selections/queries.ts:202`);
   3. Masters lists and items;
   4. the home page and welcome counts (46);
   5. single-row reads (35);
   6. writes and storage removes (18).
-- [ ] `[Sonnet]` **M6: six actions return `ActionState` instead of throwing.** They are `birdwing/actions.ts:776`, `birdwing-books/actions.ts:167, 177, 323`, `purchase-orders/actions.ts:487` and `relay/actions.ts:652`.
-- [ ] `[Sonnet]` **M9: one "today".** The 12 copies of `new Date().toISOString().slice(0, 10)` become `todayInIndia()`. Before 05:30 they give yesterday's date.
-- [ ] `[Opus]` **Unknown stays unknown.**
+- [x] `[Sonnet]` **M6: six actions return `ActionState` instead of throwing.** They are `birdwing/actions.ts:776`, `birdwing-books/actions.ts:167, 177, 323`, `purchase-orders/actions.ts:487` and `relay/actions.ts:652`.
+- [x] `[Sonnet]` **M9: one "today".** The 12 copies of `new Date().toISOString().slice(0, 10)` become `todayInIndia()`. Before 05:30 they give yesterday's date.
+- [x] `[Opus]` **Unknown stays unknown.**
   - M4: Client Relations dues are `null` when a step has no amount (`dues.ts:134`).
   - M5: the Estimator's in-use check goes through `fetchAll` (`works-actions.ts:222`).
   - M8: Birdwing checks its booking rollback (`birdwing/actions.ts:214, 278`).
   - Inventory's over-issued flag survives a failed read.
-- [ ] `[Sonnet]` **Lists refresh after line edits.**
+- [x] `[Sonnet]` **Lists refresh after line edits.**
   - `revalidatePath(…, "layout")` in `indents/actions.ts:259, 413, 511`, `purchase-orders/actions.ts:170, 182, 272, 312` and `selections/actions.ts:333, 377`.
   - The spinner moves out of the paragraph in `budgets/_components/margins-browser.tsx:102`.
+- Done 2026-10-18, on the founder's word to build the rest in one go. `check:errors` (Phase 3's first check, built first to find them) counted 120 unread errors, not 151, and they are at zero, enforced in CI. Beyond its reach: a read that logged and returned null or an empty list, which reads as "not found" or "nothing"; those found (Relay's five, the plan, the report, a facility, the over-issue check, four Selections reads) now throw too. The home page's cards each catch their own failure and say they could not load. Helpers did the bulk under `[Opus]`'s rules; `[Opus]` reviewed each diff, the security paths and the Chat door.
 
 ## Phase 3: checks that keep it fixed
 
