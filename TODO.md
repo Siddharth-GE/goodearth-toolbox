@@ -2,10 +2,6 @@
 
 Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, history is git.
 
-## First: the refactor before production
-
-**`plan.md`, _The refactor before production_.** The founder approved it on 2026-10-17: "the refactor must happen". The work runs on `feature/refactor`, and its Phase 0 lands before the switch.
-
 ## The switch: staging's database becomes production
 
 The founder's decision (2026-10-16):
@@ -17,9 +13,9 @@ The founder's decision (2026-10-16):
 
 The founder gives the steps. Before the switch:
 
-1. `plan.md` Phase 0, landed and vetted.
+1. ~~The refactor before production~~ — done and vetted 2026-10-18 (`plan.md`).
 2. The vet list below, tried or accepted as is.
-3. Fable's pass over the reviews skipped for staging (`plan.md` Phase 0).
+3. Fable's pass over the reviews skipped for staging (`0096`–`0126`, each piece's section in `plan.md`), unless the founder waives it, as for the refactor's own migrations.
 4. **Supabase Pro** for the new production database. It's the only way to get backups, and it ends the pausing.
 5. At the switch:
    - `lib/environment.ts` names the new production and practice databases and the new domain; `npm test` then lists every other place that must follow (CI and `package.json`);
