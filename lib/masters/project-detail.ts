@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import { assertRead, readFailed } from "@/lib/supabase/read-failed";
 import type { PlotRow } from "./plots";
 import type { ProjectRow } from "./projects";
 import type { UnitStatus } from "./units";
@@ -39,7 +40,12 @@ export async function getProjectDetail(
 ): Promise<ProjectDetail | null> {
   const supabase = await createClient();
 
-  const { data: project } = await supabase.from("projects").select("*").eq("id", id).maybeSingle();
+  const { data: project, error: projectError } = await supabase
+    .from("projects")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (projectError) readFailed("Masters", "this project", projectError);
   if (!project) return null;
 
   const [plotRes, unitRes, indentRes, poRes, billRes, clientRes] = await Promise.all([
@@ -62,6 +68,12 @@ export async function getProjectDetail(
     supabase.from("bill_facts").select("id", { count: "exact", head: true }).eq("project_id", id),
     supabase.from("clients").select("id, name"),
   ]);
+  assertRead("Masters", "this project's plots", plotRes.error);
+  assertRead("Masters", "this project's units", unitRes.error);
+  assertRead("Masters", "this project's indents", indentRes.error);
+  assertRead("Masters", "this project's purchase orders", poRes.error);
+  assertRead("Masters", "this project's bills", billRes.error);
+  assertRead("Masters", "the clients", clientRes.error);
 
   const plots = (plotRes.data ?? []) as PlotRow[];
   const units = unitRes.data ?? [];
@@ -71,18 +83,21 @@ export async function getProjectDetail(
   const [plotUnitRes, selectionRes, budgetRes] = await Promise.all([
     plotIds.length
       ? supabase.from("units").select("plot_id, name").in("plot_id", plotIds)
-      : Promise.resolve({ data: [] as { plot_id: string; name: string }[] }),
+      : Promise.resolve({ data: [] as { plot_id: string; name: string }[], error: null }),
     unitIds.length
       ? supabase
           .from("selections")
           .select("unit_id, revision_no")
           .in("unit_id", unitIds)
           .eq("status", "issued")
-      : Promise.resolve({ data: [] as { unit_id: string; revision_no: number }[] }),
+      : Promise.resolve({ data: [] as { unit_id: string; revision_no: number }[], error: null }),
     includeBudgets && unitIds.length
       ? supabase.from("approved_budgets").select("unit_id").in("unit_id", unitIds)
-      : Promise.resolve({ data: null }),
+      : Promise.resolve({ data: null, error: null }),
   ]);
+  assertRead("Masters", "this project's unit names", plotUnitRes.error);
+  assertRead("Masters", "this project's selections", selectionRes.error);
+  assertRead("Masters", "this project's budgets", budgetRes.error);
 
   const clientNames = new Map((clientRes.data ?? []).map((c) => [c.id, c.name]));
   const unitNameByPlot = new Map((plotUnitRes.data ?? []).map((u) => [u.plot_id, u.name]));
@@ -93,11 +108,12 @@ export async function getProjectDetail(
 
   let updatedByName: string | null = null;
   if (project.updated_by) {
-    const { data: editor } = await supabase
+    const { data: editor, error: editorError } = await supabase
       .from("profiles")
       .select("full_name")
       .eq("id", project.updated_by)
       .maybeSingle();
+    if (editorError) readFailed("Masters", "who last edited this project", editorError);
     updatedByName = editor?.full_name ?? null;
   }
 

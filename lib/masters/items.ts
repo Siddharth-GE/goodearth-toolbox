@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import { readFailed } from "@/lib/supabase/read-failed";
 
 export type { ItemKind, Placement } from "./constants";
 import type { ItemKind, Placement } from "./constants";
@@ -66,6 +67,7 @@ export async function listItems(filters: ItemFilters = {}): Promise<ItemPage> {
 
   const requested = Math.max(1, Math.floor(filters.page ?? 1));
   const first = await build(requested);
+  if (first.error) readFailed("Masters", "the items list", first.error);
   let data = first.data;
   const total = first.count ?? 0;
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
@@ -74,7 +76,9 @@ export async function listItems(filters: ItemFilters = {}): Promise<ItemPage> {
   let page = requested;
   if (requested > pageCount && total > 0) {
     page = pageCount;
-    ({ data } = await build(page));
+    const last = await build(page);
+    if (last.error) readFailed("Masters", "the items list", last.error);
+    data = last.data;
   }
 
   return { items: (data ?? []) as ItemRow[], total, page, pageSize, pageCount };

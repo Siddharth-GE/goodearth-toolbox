@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import { assertRead, readFailed } from "@/lib/supabase/read-failed";
 import type { VendorRow } from "./vendors";
 
 // Money confinement: reads only the money-free po_facts and bill_facts, never base tables or an amount column.
@@ -51,7 +52,12 @@ const RELATED_LIMIT = 50;
 export async function getVendorDetail(id: string): Promise<VendorDetail | null> {
   const supabase = await createClient();
 
-  const { data: vendor } = await supabase.from("vendors").select("*").eq("id", id).maybeSingle();
+  const { data: vendor, error: vendorError } = await supabase
+    .from("vendors")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (vendorError) readFailed("Masters", "this vendor", vendorError);
   if (!vendor) return null;
 
   const [poRes, billRes, projectRes, paymentRes] = await Promise.all([
@@ -78,16 +84,19 @@ export async function getVendorDetail(id: string): Promise<VendorDetail | null> 
       .eq("vendor_id", id)
       .maybeSingle(),
   ]);
-  if (paymentRes.error)
-    throw new Error(`vendor payment details read failed: ${paymentRes.error.message}`);
+  assertRead("Masters", "this vendor's purchase orders", poRes.error);
+  assertRead("Masters", "this vendor's bills", billRes.error);
+  assertRead("Masters", "the projects", projectRes.error);
+  assertRead("Masters", "this vendor's payment details", paymentRes.error);
 
   let updatedByName: string | null = null;
   if (vendor.updated_by) {
-    const { data: editor } = await supabase
+    const { data: editor, error: editorError } = await supabase
       .from("profiles")
       .select("full_name")
       .eq("id", vendor.updated_by)
       .maybeSingle();
+    if (editorError) readFailed("Masters", "who last edited this vendor", editorError);
     updatedByName = editor?.full_name ?? null;
   }
 
