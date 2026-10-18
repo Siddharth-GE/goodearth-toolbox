@@ -22,11 +22,15 @@ export async function GET(
 
   const supabase = await createClient();
 
-  const { data: card } = await supabase
+  const { data: card, error: cardError } = await supabase
     .from("staff_details")
     .select("photo_path")
     .eq("id", personId)
     .maybeSingle();
+  if (cardError) {
+    console.error("staff photo lookup failed:", cardError);
+    return new Response("Could not load the photo", { status: 500 });
+  }
   if (!card?.photo_path) return new Response("Not found", { status: 404 });
 
   const { data: file, error } = await supabase.storage

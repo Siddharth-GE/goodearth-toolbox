@@ -144,13 +144,16 @@ export async function uploadMyPhoto(formData: FormData): Promise<ActionState> {
   // Confirm the size that landed: silent binary corruption is permanent and shows up months later as a broken image.
   const folder = path.slice(0, path.lastIndexOf("/"));
   const filename = path.slice(path.lastIndexOf("/") + 1);
-  const { data: stored } = await supabase.storage
+  const { data: stored, error: listError } = await supabase.storage
     .from(STAFF_PHOTOS_BUCKET)
     .list(folder, { search: filename });
+  // The check is a safeguard; the upload itself succeeded, so carry on unverified.
+  if (listError) console.error("uploadMyPhoto size check failed:", listError);
   const storedSize = stored?.[0]?.metadata?.size as number | undefined;
 
   if (storedSize !== undefined && storedSize !== normalised.length) {
-    await supabase.storage.from(STAFF_PHOTOS_BUCKET).remove([path]);
+    const { error: removeError } = await supabase.storage.from(STAFF_PHOTOS_BUCKET).remove([path]);
+    if (removeError) console.error("uploadMyPhoto cleanup failed:", removeError);
     console.error(
       `uploadMyPhoto stored ${storedSize} bytes but sent ${normalised.length} — binary was mangled in transit`,
     );
@@ -158,11 +161,13 @@ export async function uploadMyPhoto(formData: FormData): Promise<ActionState> {
   }
 
   // Read the old path BEFORE overwriting so the previous object can be cleaned up.
-  const { data: existing } = await supabase
+  const { data: existing, error: existingError } = await supabase
     .from("staff_details")
     .select("photo_path")
     .eq("id", user.id)
     .maybeSingle();
+  // Only the old file's cleanup depends on this, so a failed read leaves an orphan, not wrong data.
+  if (existingError) console.error("uploadMyPhoto old photo read failed:", existingError);
 
   const { error } = await supabase
     .from("staff_details")
@@ -171,13 +176,17 @@ export async function uploadMyPhoto(formData: FormData): Promise<ActionState> {
 
   if (error) {
     // Object first, then row: a failed row write leaves an invisible orphan, not a card pointing at nothing.
-    await supabase.storage.from(STAFF_PHOTOS_BUCKET).remove([path]);
+    const { error: removeError } = await supabase.storage.from(STAFF_PHOTOS_BUCKET).remove([path]);
+    if (removeError) console.error("uploadMyPhoto cleanup failed:", removeError);
     console.error("uploadMyPhoto row write failed:", error);
     return { error: "Could not save the photo. Try again." };
   }
 
   if (existing?.photo_path && existing.photo_path !== path) {
-    await supabase.storage.from(STAFF_PHOTOS_BUCKET).remove([existing.photo_path]);
+    const { error: removeError } = await supabase.storage
+      .from(STAFF_PHOTOS_BUCKET)
+      .remove([existing.photo_path]);
+    if (removeError) console.error("uploadMyPhoto old photo removal failed:", removeError);
   }
 
   revalidateAll();
@@ -203,7 +212,10 @@ export async function removeMyPhoto(): Promise<ActionState> {
     .eq("id", user.id);
   if (error) return friendly(error, "Could not remove the photo. Try again.");
 
-  await supabase.storage.from(STAFF_PHOTOS_BUCKET).remove([existing.photo_path]);
+  const { error: removeError } = await supabase.storage
+    .from(STAFF_PHOTOS_BUCKET)
+    .remove([existing.photo_path]);
+  if (removeError) console.error("removeMyPhoto file removal failed:", removeError);
 
   revalidateAll();
   return undefined;
