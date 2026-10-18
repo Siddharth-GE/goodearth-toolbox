@@ -11,6 +11,9 @@ supabase/migrations/
 node_modules/
 data/
 
+# Bubblewrap writes the Android project and rewrites its settings file (android/PLAN.md).
+android/
+
 # The impeccable design skill's own files (third-party, vendored as-is) —
 # reformatting them would churn code we don't maintain.
 .claude/

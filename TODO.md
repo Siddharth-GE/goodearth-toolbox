@@ -2,6 +2,10 @@
 
 Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, history is git.
 
+## The Android app on Google Play
+
+Version 1 is built and signed. The founder's steps (Play Console, the reviewer account, the screenshots) and the one fingerprint still to add are the launch steps in `android/PLAN.md`.
+
 ## The switch: staging's database becomes production
 
 The founder's decision (2026-10-16):

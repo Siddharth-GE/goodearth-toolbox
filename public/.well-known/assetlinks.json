@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.kaadalgroup.toolbox",
+      "sha256_cert_fingerprints": [
+        "3D:4A:EB:BD:AC:EF:05:DC:47:AD:64:86:13:4D:F3:EC:5D:8E:5D:0A:36:37:0A:30:4D:53:E9:7C:A9:AA:D6:71"
+      ]
+    }
+  }
+]

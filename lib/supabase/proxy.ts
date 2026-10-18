@@ -14,6 +14,13 @@ const PUBLIC_PATHS = [
   "/api/google-chat",
   // The weekly keep-alive cron; the gate is CRON_SECRET, checked in the route.
   "/api/keep-alive",
+  // The Android app: Chrome, Play and Google's link check fetch these with no session (android/PLAN.md).
+  "/manifest.webmanifest",
+  "/icon-192.png",
+  "/icon-512.png",
+  "/icon-maskable-512.png",
+  "/.well-known/assetlinks.json",
+  "/privacy",
 ];
 
 // THE ONE PREFIX: Dexter's deck viewer must reach every file under its token,

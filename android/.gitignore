@@ -1,0 +1,5 @@
+# Bubblewrap regenerates all of this from twa-manifest.json (PLAN.md); only the settings and the plan are kept.
+*
+!.gitignore
+!twa-manifest.json
+!PLAN.md
