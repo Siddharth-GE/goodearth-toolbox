@@ -33,16 +33,19 @@ export type MilestoneDue = MilestoneInput & {
   isOverdue: boolean;
 };
 
+/** Totals that depend on every step's amount are null while any step has none: unknown, not zero. */
 export type DuesSummary = {
-  scheduled: number;
+  scheduled: number | null;
   invoiced: number;
   received: number;
   /** Scheduled minus received, floored at zero. */
-  outstanding: number;
+  outstanding: number | null;
   /** Outstanding on milestones already past due. */
   overdue: number;
   overdueCount: number;
-  overpaid: number;
+  overpaid: number | null;
+  /** Steps with no amount yet. */
+  unpricedCount: number;
   nextDueOn: string | null;
   nextDueAmount: number | null;
 };
@@ -97,7 +100,9 @@ export function summariseDues(
 ): DuesSummary {
   const rows = allocateReceipts(milestones, receipts, today);
 
-  const scheduled = rows.reduce((sum, row) => sum + (row.dueAmount ?? 0), 0);
+  const unpricedCount = rows.filter((row) => row.dueAmount === null).length;
+  const scheduled =
+    unpricedCount > 0 ? null : rows.reduce((sum, row) => sum + (row.dueAmount ?? 0), 0);
   const invoiced = rows.reduce((sum, row) => sum + (row.invoicedOn ? (row.dueAmount ?? 0) : 0), 0);
   // Every receipt, allocated or not: money in the bank is money in the bank.
   const received = receipts.reduce((sum, receipt) => sum + receipt.amount, 0);
@@ -113,10 +118,11 @@ export function summariseDues(
     scheduled,
     invoiced,
     received,
-    outstanding: Math.max(0, scheduled - received),
+    outstanding: scheduled === null ? null : Math.max(0, scheduled - received),
     overdue: overdueRows.reduce((sum, row) => sum + row.outstanding, 0),
     overdueCount: overdueRows.length,
-    overpaid: Math.max(0, received - scheduled),
+    overpaid: scheduled === null ? null : Math.max(0, received - scheduled),
+    unpricedCount,
     nextDueOn: nextDue?.dueOn ?? null,
     nextDueAmount: nextDue?.outstanding ?? null,
   };
@@ -126,16 +132,26 @@ export function summariseDues(
  * Add up summaries each worked out on its own. Never merge the inputs: an unallocated receipt spills into the oldest unpaid
  * rung, so a merged run would let Villa 17's money settle Villa 39's instalment. Each plot is its own ledger.
  */
+/** What sits under "Scheduled" while some steps have no amount. */
+export function unpricedNote(count: number): string | undefined {
+  if (count <= 0) return undefined;
+  return count === 1 ? "1 step has no amount" : `${count} steps have no amount`;
+}
+
+/** Unknown plus anything stays unknown. */
+const plus = (a: number | null, b: number | null) => (a === null || b === null ? null : a + b);
+
 export function combineSummaries(summaries: readonly DuesSummary[]): DuesSummary {
   const total = summaries.reduce(
     (acc, one) => ({
-      scheduled: acc.scheduled + one.scheduled,
+      scheduled: plus(acc.scheduled, one.scheduled),
       invoiced: acc.invoiced + one.invoiced,
       received: acc.received + one.received,
-      outstanding: acc.outstanding + one.outstanding,
+      outstanding: plus(acc.outstanding, one.outstanding),
       overdue: acc.overdue + one.overdue,
       overdueCount: acc.overdueCount + one.overdueCount,
-      overpaid: acc.overpaid + one.overpaid,
+      overpaid: plus(acc.overpaid, one.overpaid),
+      unpricedCount: acc.unpricedCount + one.unpricedCount,
       nextDueOn: null,
       nextDueAmount: null,
     }),
@@ -147,6 +163,7 @@ export function combineSummaries(summaries: readonly DuesSummary[]): DuesSummary
       overdue: 0,
       overdueCount: 0,
       overpaid: 0,
+      unpricedCount: 0,
       nextDueOn: null,
       nextDueAmount: null,
     } as DuesSummary,

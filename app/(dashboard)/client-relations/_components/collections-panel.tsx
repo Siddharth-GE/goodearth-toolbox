@@ -1,3 +1,4 @@
+import { unpricedNote } from "@/lib/client-relations/dues";
 import { Figure, FigureBand, FigureBandCell } from "@/components/ui/figure";
 import { Section } from "@/components/ui/section";
 import {
@@ -23,7 +24,12 @@ export function CollectionsPanel({ engagement }: { engagement: EngagementDetail 
     <div className="space-y-4">
       <FigureBand>
         <FigureBandCell>
-          <Figure label="Scheduled" value={formatMoney(dues.scheduled)} size="sm" />
+          <Figure
+            label="Scheduled"
+            value={formatMoney(dues.scheduled)}
+            hint={unpricedNote(dues.unpricedCount)}
+            size="sm"
+          />
         </FigureBandCell>
         <FigureBandCell>
           <Figure label="Invoiced" value={formatMoney(dues.invoiced)} size="sm" />
@@ -49,7 +55,7 @@ export function CollectionsPanel({ engagement }: { engagement: EngagementDetail 
         </FigureBandCell>
       </FigureBand>
 
-      {dues.overpaid > 0 && (
+      {(dues.overpaid ?? 0) > 0 && (
         <p className="text-warning text-sm">
           {formatMoney(dues.overpaid)} has come in beyond what the schedule adds up to — worth
           checking the amounts below.

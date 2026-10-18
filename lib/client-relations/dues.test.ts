@@ -5,6 +5,7 @@ import {
   allocateReceipts,
   combineSummaries,
   summariseDues,
+  unpricedNote,
   type MilestoneInput,
   type ReceiptInput,
 } from "./dues";
@@ -38,6 +39,10 @@ const schedule = (over: Partial<MilestoneInput>[] = []): MilestoneInput[] =>
       invoicedOn: null,
     },
   ].map((row, i) => ({ ...row, ...(over[i] ?? {}) })) as MilestoneInput[];
+
+/** The base schedule without its unpriced step: every total is known. */
+const priced = (over: Partial<MilestoneInput>[] = []): MilestoneInput[] =>
+  schedule(over).filter((row) => row.dueAmount !== null);
 
 const receipt = (over: Partial<ReceiptInput>): ReceiptInput => ({
   id: "r",
@@ -125,13 +130,13 @@ test("a part payment leaves the remainder overdue, not the whole rung", () => {
 });
 
 test("invoiced counts only the rungs someone has actually billed", () => {
-  const summary = summariseDues(schedule(), [], TODAY);
+  const summary = summariseDues(priced(), [], TODAY);
   assert.equal(summary.scheduled, 3000);
   assert.equal(summary.invoiced, 1000, "only the plot rung is invoiced");
 });
 
 test("overpayment floors outstanding at zero and is reported separately", () => {
-  const summary = summariseDues(schedule(), [receipt({ id: "r1", amount: 5000 })], TODAY);
+  const summary = summariseDues(priced(), [receipt({ id: "r1", amount: 5000 })], TODAY);
   assert.equal(summary.received, 5000);
   assert.equal(summary.outstanding, 0, "never negative");
   assert.equal(summary.overpaid, 2000);
@@ -139,7 +144,7 @@ test("overpayment floors outstanding at zero and is reported separately", () => 
 
 test("received counts every receipt, including ones not yet filed against a rung", () => {
   const summary = summariseDues(
-    schedule(),
+    priced(),
     [receipt({ id: "r1", milestoneId: "m1", amount: 1000 }), receipt({ id: "r2", amount: 250 })],
     TODAY,
   );
@@ -167,15 +172,15 @@ test("rows come back in schedule order however they were handed in", () => {
 });
 
 test("combining summaries adds the money and keeps the soonest due date", () => {
-  const villa17 = summariseDues(schedule(), [], TODAY);
+  const villa17 = summariseDues(priced(), [], TODAY);
   const villa39 = summariseDues(
-    schedule([{ id: "x1", dueAmount: 500, dueOn: "2026-09-01" }, { dueOn: null }]),
+    priced([{ id: "x1", dueAmount: 500, dueOn: "2026-09-01" }, { dueOn: null }]),
     [],
     TODAY,
   );
 
   const total = combineSummaries([villa17, villa39]);
-  assert.equal(total.scheduled, villa17.scheduled + villa39.scheduled);
+  assert.equal(total.scheduled, villa17.scheduled! + villa39.scheduled!);
   assert.equal(total.received, villa17.received + villa39.received);
   assert.equal(total.overdue, villa17.overdue + villa39.overdue);
   assert.equal(total.overdueCount, villa17.overdueCount + villa39.overdueCount);
@@ -238,4 +243,27 @@ test("a rounding-sized shortfall counts as settled, not as a due of half a paisa
   );
   assert.equal(rows[0].isSettled, true);
   assert.equal(rows[0].isOverdue, false);
+});
+
+test("a step with no amount makes the totals unknown, never smaller", () => {
+  const dues = summariseDues(schedule(), [], TODAY);
+  assert.equal(dues.unpricedCount, 1);
+  assert.equal(dues.scheduled, null);
+  assert.equal(dues.outstanding, null);
+  assert.equal(dues.overpaid, null);
+  // What is known still shows: the priced, past-due plot step.
+  assert.equal(dues.overdue, 1000);
+
+  const known = summariseDues(priced(), [], TODAY);
+  const total = combineSummaries([known, dues]);
+  assert.equal(total.scheduled, null);
+  assert.equal(total.outstanding, null);
+  assert.equal(total.unpricedCount, 1);
+  assert.equal(total.overdue, known.overdue + dues.overdue);
+});
+
+test("the note under Scheduled counts the steps with no amount", () => {
+  assert.equal(unpricedNote(0), undefined);
+  assert.equal(unpricedNote(1), "1 step has no amount");
+  assert.equal(unpricedNote(3), "3 steps have no amount");
 });

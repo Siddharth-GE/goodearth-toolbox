@@ -1,3 +1,4 @@
+import { unpricedNote } from "@/lib/client-relations/dues";
 import { Avatar } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { Figure, FigureBand, FigureBandCell } from "@/components/ui/figure";
@@ -148,7 +149,12 @@ export default async function ClientDetailPage({
             {/* Each plot's dues are worked out on its own ledger; only the answers are added (combineSummaries). */}
             <FigureBand>
               <FigureBandCell>
-                <Figure label="Scheduled" value={formatMoney(totals.scheduled)} size="sm" />
+                <Figure
+                  label="Scheduled"
+                  value={formatMoney(totals.scheduled)}
+                  hint={unpricedNote(totals.unpricedCount)}
+                  size="sm"
+                />
               </FigureBandCell>
               <FigureBandCell>
                 <Figure

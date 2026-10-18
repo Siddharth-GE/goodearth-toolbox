@@ -1,3 +1,4 @@
+import { unpricedNote } from "@/lib/client-relations/dues";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Figure, FigureBand, FigureBandCell } from "@/components/ui/figure";
 import { ListToolbar } from "@/components/ui/list-toolbar";
@@ -69,7 +70,12 @@ export default async function DuesPage({
     <div className="space-y-4">
       <FigureBand>
         <FigureBandCell>
-          <Figure label="Scheduled" value={formatMoney(board.totals.scheduled)} size="sm" />
+          <Figure
+            label="Scheduled"
+            value={formatMoney(board.totals.scheduled)}
+            hint={unpricedNote(board.totals.unpricedCount)}
+            size="sm"
+          />
         </FigureBandCell>
         <FigureBandCell>
           <Figure label="Invoiced" value={formatMoney(board.totals.invoiced)} size="sm" />
