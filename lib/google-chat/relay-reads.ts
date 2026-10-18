@@ -369,6 +369,8 @@ export async function readActivityDefaults(
     db.from("profiles").select("id").eq("is_active", true),
   ]);
 
+  // Both callers catch: a failed read here would blank every assignee and read as "no one has carried it".
+  if (people.error) throw new Error("active people read failed", { cause: people.error });
   const active = new Set((people.data ?? []).map((p) => p.id));
   const byActivity = new Map<string, { assigneeId: string; expectedDays: number }>();
   for (const leg of legs) {
