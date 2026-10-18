@@ -16,7 +16,7 @@ import { CollectionsPanel } from "../../_components/collections-panel";
 import { Composer } from "../../_components/composer";
 import { HealthPill, PlotRail } from "../../_components/lot-card";
 import { NotYours } from "../../_components/not-yours";
-import { PersonName, Pill } from "../../_components/pill";
+import { PersonName, Pill } from "@/components/ui/pill";
 import {
   BuildCard,
   ClientNameField,

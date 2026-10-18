@@ -5,7 +5,7 @@ import { KAADAL_STAGES, optionFor } from "@/lib/client-relations/stages";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
-import { Pill, PersonName } from "./pill";
+import { Pill, PersonName } from "@/components/ui/pill";
 import { SideIcon } from "./side-mark";
 
 const RAIL_STEPS = ["Buyer", "Sale deed", "Construction agreement", "Build", "Handed over"];

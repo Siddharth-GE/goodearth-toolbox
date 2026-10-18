@@ -12,7 +12,7 @@ import Link from "next/link";
 
 import { ClientFormDialog } from "../_components/client-form-dialog";
 import { ClientStageBadge } from "../_components/crm-badges";
-import { PersonName, Pill } from "../_components/pill";
+import { PersonName, Pill } from "@/components/ui/pill";
 
 export default async function ClientsPage({
   searchParams,

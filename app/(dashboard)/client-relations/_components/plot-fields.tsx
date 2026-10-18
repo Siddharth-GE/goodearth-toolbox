@@ -26,7 +26,8 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useState, useTransition, type ReactNode } from "react";
 
 import { Avatar } from "@/components/ui/avatar";
-import { useBoard, useToast } from "./board-context";
+import { useBoard } from "./board-context";
+import { useUndoBar } from "@/components/ui/undo-bar";
 import { SideIcon } from "./side-mark";
 
 /** A plot's record as the tracker's drawer laid it out: chips save when tapped, boxes when you leave them. A refused save reverts the chip and says why. */
@@ -67,7 +68,7 @@ export type PlotFields = Pick<
 type Person = { id: string; name: string };
 
 function useSavePlot(engagementId: string) {
-  const toast = useToast();
+  const toast = useUndoBar();
   const [, startTransition] = useTransition();
   return (patch: PlotPatch, revert?: () => void, message?: string) =>
     startTransition(async () => {
@@ -215,7 +216,7 @@ function peopleOptions(team: Person[], current: string | null, currentName: stri
 }
 
 export function ClientNameField({ clientId, name }: { clientId: string; name: string }) {
-  const toast = useToast();
+  const toast = useUndoBar();
   const [, startTransition] = useTransition();
   const [saved, setSaved] = useState(name);
   return (
@@ -455,7 +456,7 @@ export function BuildCard({
   stages: ProgressStageRow[];
 }) {
   const save = useSavePlot(engagement.id);
-  const toast = useToast();
+  const toast = useUndoBar();
   const [stageId, setStageId] = useState<string | null>(engagement.progressStageId);
   // The active list, plus the plot's own stage if Masters has since switched it off.
   const shown = stages.filter((stage) => stage.is_active || stage.id === stageId);

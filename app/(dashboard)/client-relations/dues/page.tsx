@@ -18,7 +18,7 @@ import { PiggyBank } from "lucide-react";
 import Link from "next/link";
 
 import { SectionHead } from "../_components/board-parts";
-import { Pill, PlotChip } from "../_components/pill";
+import { Pill, PlotChip } from "@/components/ui/pill";
 
 /** Amounts stay in a monospaced table: a column of money reads as one (DESIGN.md). */
 

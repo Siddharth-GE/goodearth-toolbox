@@ -22,7 +22,7 @@ import { ClientStageBadge } from "../_components/crm-badges";
 import { Composer } from "../_components/composer";
 import { LotCard } from "../_components/lot-card";
 import { NotYours } from "../_components/not-yours";
-import { Pill } from "../_components/pill";
+import { Pill } from "@/components/ui/pill";
 import { StepCard } from "../_components/step-card";
 
 export default async function ClientDetailPage({

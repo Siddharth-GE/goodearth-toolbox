@@ -18,8 +18,9 @@ import { CalendarDays, Check, MoreHorizontal, StickyNote } from "lucide-react";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 
-import { useBoard, useToast } from "./board-context";
-import { Pill, PillButton, PersonName, PlotChip, type PillTone } from "./pill";
+import { useBoard } from "./board-context";
+import { useUndoBar } from "@/components/ui/undo-bar";
+import { Pill, PillButton, PersonName, PlotChip, type PillTone } from "@/components/ui/pill";
 import { SideIcon, SideMark, sideLabel } from "./side-mark";
 import { DueMenu, MenuCheck, MenuLabel, OwnerMenu, PlotList } from "./step-menus";
 
@@ -41,7 +42,7 @@ export function StepCard({
   hideWhenDone?: boolean;
 }) {
   const { today, meId, isManager, team } = useBoard();
-  const toast = useToast();
+  const toast = useUndoBar();
   const [, startTransition] = useTransition();
   // The tick shows at once; the guess is dropped when the saved status moves, so the card ends on the server's word.
   const [optimistic, setOptimistic] = useState<string | null>(null);
@@ -368,7 +369,7 @@ function StepText({
   done: boolean;
   onSave: (action: string) => void;
 }) {
-  const toast = useToast();
+  const toast = useUndoBar();
   return (
     <textarea
       key={step.action}

@@ -8,8 +8,9 @@ import { cn } from "@/lib/utils";
 import { CalendarDays, MapPin, Plus, UserRound } from "lucide-react";
 import { useRef, useState, useTransition } from "react";
 
-import { useBoard, useToast } from "./board-context";
-import { PersonName, Pill, PillButton, type PillTone } from "./pill";
+import { useBoard } from "./board-context";
+import { useUndoBar } from "@/components/ui/undo-bar";
+import { PersonName, Pill, PillButton, type PillTone } from "@/components/ui/pill";
 import { SideMark, sideLabel } from "./side-mark";
 import { DueMenu, OwnerMenu, PlotMenu } from "./step-menus";
 
@@ -35,7 +36,7 @@ export function Composer({
   defaultTrack?: ActionTrack;
 }) {
   const { plots, team, today } = useBoard();
-  const toast = useToast();
+  const toast = useUndoBar();
   const input = useRef<HTMLInputElement>(null);
   const [pending, startTransition] = useTransition();
   const [plot, setPlot] = useState<string | null>(fixedPlot ?? null);
