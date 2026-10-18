@@ -2,9 +2,11 @@
 
 Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, history is git.
 
-## The Android app on Google Play
+## Native apps on iPhone and Android — next build
 
-Version 1 is built and signed. The founder's steps (Play Console, the reviewer account, the screenshots) and the one fingerprint still to add are the launch steps in `android/PLAN.md`.
+- **Now: the Capacitor app, Android first.** Approved 2026-10-18; the build is the top section of `plan.md`, starting at phase A.
+- **Meanwhile: the Play wrapper's version 1.** Built and signed; the founder's steps (Play Console, the reviewer account, the screenshots) and the fingerprint still to add are the launch steps in `android/PLAN.md`. The Capacitor app replaces it later as an update.
+- **Waiting on the founder:** PR #112's vet on its preview, and Fable's pass or a waiver; Apple's Organization enrolment; what staff would scan (phase D).
 
 ## The switch: staging's database becomes production
 

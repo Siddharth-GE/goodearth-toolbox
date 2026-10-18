@@ -1,4 +1,6 @@
-# Native apps on iPhone and Android — draft, waiting for approval
+# Native apps on iPhone and Android
+
+**Approved by the founder 2026-10-18 ("everything looks good"). Build Android first:** A1, A2 and A4 on Android, then the founder's Android vet; the iPhone (A3) after. Work on `feature/native-apps`, branched from `feature/android-app` (PR #112, the website's half it needs), in its own worktree. Each `[Fable]` step still needs Fable's pass before it is built, unless the founder waives it in so many words. Every new package is a release at least two weeks old (Capacitor 8.5.3 was days old on 2026-10-18).
 
 The founder's choices (2026-10-18): **one shared app in both stores**, built with Capacitor 8, showing today's Toolbox screens and adding **push notifications, Face ID / fingerprint, and camera and scanning**. iPhone on the **public App Store**; no Mac, so iPhone builds run on GitHub's free macOS machines (the repo is public). Same ID on both: `com.kaadalgroup.toolbox`.
 
@@ -21,7 +23,7 @@ Why this shape: every tool works on day one, a website fix still reaches both ap
 ## A. The shell, both stores
 
 - [ ] [Opus] `mobile/`: a Capacitor 8 project with its own `package.json` (the web app's dependencies untouched), pointed at `https://toolbox.kaadalgroup.com`, the offline screen, and the Kaadal K icon and splash.
-- [ ] [Opus] Android: built on this PC with the Java and SDK already here, signed with the existing upload key, version code 2.
+- [ ] [Opus] Android: built on this PC with the Java and SDK already here (`android/PLAN.md`, _Building a new version_, for the paths and the two shell traps), signed with the existing upload key, version code 2. Google sign-in is refused inside an Android web view too, so A4 belongs to the Android round.
 - [ ] [Opus] iPhone: a manually-run GitHub workflow on a macOS machine that builds, signs and uploads to TestFlight with the App Store Connect key held as GitHub secrets. Never runs on pull requests, so a fork can't reach the secrets.
 - [ ] [Fable] **Google sign-in out of the web view**: the button opens the system browser; Google returns to `https://toolbox.kaadalgroup.com/auth/callback`, which the phone hands to the app (Universal Link on iPhone through a public `/.well-known/apple-app-site-association`, App Link on Android through the existing `assetlinks.json`), and the app finishes the sign-in in its own web view, where the PKCE cookie lives. New public path, so `SECURITY.md` first.
 - [ ] [Opus] Build A4; the web app learns it is inside the app only through `lib/native/` (a shared module, `@capacitor/core` its one new web dependency) so no tool talks to the phone directly.
