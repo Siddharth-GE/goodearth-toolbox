@@ -38,6 +38,9 @@ export async function getWelcomeCounts(): Promise<{
       .eq("is_active", true),
   ]);
 
+  const failed = estimates.error ?? official.error ?? worksSetUp.error ?? materials.error;
+  if (failed) fail("the welcome counts", failed);
+
   return {
     estimates: estimates.count ?? 0,
     official: official.count ?? 0,

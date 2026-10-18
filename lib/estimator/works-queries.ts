@@ -146,6 +146,7 @@ export async function getWorkSetup(workItemId: string): Promise<WorkSetup | null
   ]);
 
   if (info.error) fail("the work setup", info.error);
+  if (lines.error) fail("the work's estimate lines", lines.error);
 
   const mixesById = new Map(mixes.map((m) => [m.id, m]));
   const itemDefs = await itemDefsByIds(supabase, [
