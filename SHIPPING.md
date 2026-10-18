@@ -37,6 +37,8 @@ Both are reached from this machine through the management API (`/database/query`
 
 Data scripts in `scripts/` are dry-run by default, `--commit` to write, and match on a natural key so a re-run writes nothing; never delete to re-insert, because live rows carry selections, budgets and indents.
 
+**A new database gets its Marathon PINs rotated** the day its migrations land: `0002` seeds published agent and admin PINs, so run `scripts/rotate-marathon-pins.ts --project <ref> --commit` and keep the PINs it prints once.
+
 ## The staging protocol
 
 **Nothing but `master` may ever touch production.**

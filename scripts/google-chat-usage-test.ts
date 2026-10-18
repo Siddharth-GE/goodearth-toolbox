@@ -45,12 +45,13 @@
 import { config } from "dotenv";
 import { resolve } from "node:path";
 
+import { DATABASES } from "../lib/environment";
 import type { ChatEvent } from "../lib/google-chat/events";
 
 config({ path: resolve(import.meta.dirname, "..", ".env.local") });
 
 /** The only database this script will speak to. */
-const STAGING_REF = "ipstebqawrvhkyntctrv";
+const STAGING_REF = DATABASES.practice;
 
 /**
  * The registered endpoint of the staging Chat app. `chatAudience()` and

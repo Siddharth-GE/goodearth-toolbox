@@ -15,7 +15,6 @@ import {
   ADMIN_TARGET,
   checkLockout,
   clearFailures,
-  lockoutMessage,
   recordFailure,
 } from "@/lib/marathon/rate-limit";
 import { redirect } from "next/navigation";
@@ -34,7 +33,7 @@ export async function verifyAgentPin(
   // all 10,000 combinations against this public URL learns nothing from
   // an attempt made while locked out.
   const locked = await checkLockout(agentId);
-  if (locked) return { error: lockoutMessage(locked) };
+  if (locked) return locked;
 
   const supabase = createAdminClient();
   const { data: agent, error: agentError } = await supabase
@@ -48,8 +47,7 @@ export async function verifyAgentPin(
   }
 
   if (!agent || !verifyPinHash(pin, agent.pin_hash, agent.pin_salt)) {
-    const nowLocked = await recordFailure(agentId);
-    return { error: nowLocked ? lockoutMessage(nowLocked) : "Wrong PIN. Try again." };
+    return (await recordFailure(agentId)) ?? { error: "Wrong PIN. Try again." };
   }
 
   await clearFailures(agentId);
@@ -72,11 +70,10 @@ export async function verifyAdminPinAction(
   // The admin PIN is shared and opens every screen, so it matters more
   // than any single agent's.
   const locked = await checkLockout(ADMIN_TARGET);
-  if (locked) return { error: lockoutMessage(locked) };
+  if (locked) return locked;
 
   if (!(await verifyAdminPin(pin))) {
-    const nowLocked = await recordFailure(ADMIN_TARGET);
-    return { error: nowLocked ? lockoutMessage(nowLocked) : "Wrong PIN. Try again." };
+    return (await recordFailure(ADMIN_TARGET)) ?? { error: "Wrong PIN. Try again." };
   }
 
   await clearFailures(ADMIN_TARGET);

@@ -3,6 +3,7 @@ import "server-only";
 import { requireTool } from "@/lib/auth/access";
 import { listVendors } from "@/lib/masters/vendors";
 import { fetchAll } from "@/lib/supabase/fetch-all";
+import { assertRead } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
 import { cache } from "react";
 
@@ -225,6 +226,8 @@ export const getBudget = cache(async (budgetId: string): Promise<BudgetDetail | 
       .order("label"),
   ]);
 
+  assertRead("budgets", "the budget's spaces", spacesResult.error);
+
   const budgetByKey = new Map(budgetLines.map((line) => [line.line_key, line]));
 
   // The product's default markup, shown on lines nobody has priced yet so
@@ -236,11 +239,13 @@ export const getBudget = cache(async (budgetId: string): Promise<BudgetDetail | 
   // would have meant that once margins were set on more than 1000 of the
   // 2,633 catalogue items, some lines would silently arrive with a blank
   // margin instead of the configured one — and a blank margin that gets
-  // saved is a line sold at cost.
+  // saved is a line sold at cost. A failed read stops the page for the
+  // same reason.
   const itemIds = [...new Set(selectionLines.map((line) => line.item_id))];
-  const { data: margins } = itemIds.length
+  const { data: margins, error: marginsError } = itemIds.length
     ? await supabase.from("item_margins").select("item_id, margin_pct").in("item_id", itemIds)
-    : { data: [] };
+    : { data: [], error: null };
+  assertRead("budgets", "the default margins", marginsError);
   const defaultMargin = new Map(
     (margins ?? []).map((row) => [row.item_id, Number(row.margin_pct)]),
   );

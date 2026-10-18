@@ -16,6 +16,7 @@ import {
   PREVIEW_SITE_NAME,
   previewTags,
 } from "@/lib/dexter/preview";
+import { deckFileHeaders } from "@/lib/dexter/headers";
 import { SHARE_TOKEN_PATTERN } from "@/lib/dexter/share";
 import { DEXTER_BUCKET, deckFolder } from "@/lib/dexter/storage";
 import { contentTypeFor, safeDeckPath } from "@/lib/dexter/unpack";
@@ -51,7 +52,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * by `lib/dexter/answers.ts` before anything is stored.
  *
  * The page is UNTRUSTED HTML served from the app's own origin, so every
- * document response carries a CSP `sandbox` WITHOUT `allow-same-origin`:
+ * deck file carries a CSP `sandbox` WITHOUT `allow-same-origin`
+ * (`lib/dexter/headers.ts`):
  * the page runs with an opaque origin — its scripts and relative assets
  * work, but it cannot read cookies, reach localStorage, or make a
  * credentialed request to the toolbox as whoever is viewing it. That
@@ -69,16 +71,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * dot-prefixed segment at upload, so no deck can contain a file by
  * either name — there is nothing for ours to shadow.
  */
-
-// `allow-popups-to-escape-sandbox` is there for the "visit our website"
-// link a client deck usually carries: without it the new tab inherits
-// the sandbox and the site it opens runs with an opaque origin — no
-// storage, no sign-in — and looks broken. It changes nothing about what
-// the DECK can do: the popup is another origin the deck cannot read, and
-// the deck's own document stays sandboxed. `allow-same-origin` is the
-// word that must never appear here.
-const SANDBOX =
-  "sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals";
 
 const STATE_HEADERS = {
   "Content-Type": "application/json",
@@ -247,22 +239,9 @@ export async function GET(
   if (downloadError || !object) return notFound();
 
   // From the extension, never from Storage's guess — the bucket has no
-  // MIME list, and nosniff below makes the browser take our word for it.
+  // MIME list, and nosniff makes the browser take our word for it.
   const contentType = contentTypeFor(relative);
-  const headers = new Headers({
-    "Content-Type": contentType,
-    "X-Content-Type-Options": "nosniff",
-    "X-Robots-Tag": "noindex",
-    "Referrer-Policy": "no-referrer",
-    // The browser may keep it briefly; no shared cache may — switching a
-    // link off must take effect at the next open, not in an hour.
-    "Cache-Control": "private, max-age=300",
-  });
-  // A document that can run script gets the sandbox: HTML, and SVG
-  // opened on its own (an <img> ignores scripts anyway).
-  if (contentType.startsWith("text/html") || contentType === "image/svg+xml") {
-    headers.set("Content-Security-Policy", SANDBOX);
-  }
+  const headers = deckFileHeaders(contentType);
 
   // Every HTML page gets the preview tags, in the response only.
   if (contentType.startsWith("text/html")) {
