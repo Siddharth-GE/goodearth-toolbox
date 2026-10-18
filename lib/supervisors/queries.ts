@@ -58,6 +58,9 @@ export async function getWelcomeCounts(): Promise<{
       .eq("is_active", true),
   ]);
 
+  const failed = villas.error ?? openRequests.error ?? contractors.error;
+  if (failed) fail("the welcome counts", failed);
+
   return {
     villas: villas.count ?? 0,
     workersThisWeek: weekLogs.reduce((sum, log) => sum + log.masons + log.helpers + log.others, 0),
