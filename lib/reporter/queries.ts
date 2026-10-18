@@ -9,6 +9,7 @@ import { listProjects } from "@/lib/masters/projects";
 import { listUnits } from "@/lib/masters/units";
 import { listVendors } from "@/lib/masters/vendors";
 import { fetchAll } from "@/lib/supabase/fetch-all";
+import { assertRead } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
 import { formatCount } from "@/lib/format";
 
@@ -223,6 +224,8 @@ export async function getWelcomeCounts() {
 
   const saved = await supabase.from("reports").select("id", { count: "exact", head: true });
 
+  assertRead("reporter", "the saved reports", saved.error);
+
   return { saved: saved.count ?? 0 };
 }
 
@@ -286,10 +289,7 @@ export const getReport = cache(async (reportId: string): Promise<LoadedReport | 
     .eq("id", reportId)
     .maybeSingle();
 
-  if (error) {
-    console.error("getReport failed:", error);
-    return null;
-  }
+  assertRead("reporter", "the report", error);
   if (!data) return null;
 
   const names = await profileNames(supabase, [data.updated_by]);
