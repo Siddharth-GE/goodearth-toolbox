@@ -5,6 +5,7 @@
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { parseNumber, text } from "@/lib/form-data";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { isModelMeasure } from "./model-takeoff";
@@ -178,7 +179,7 @@ export async function copyWorkSetup(
   if (!fromWorkItemId || targets.length === 0) return { error: "Tick the works to copy it to." };
 
   const supabase = await createClient();
-  const [info, components, targetInfo, targetLines] = await Promise.all([
+  const [info, components, targetInfo] = await Promise.all([
     supabase
       .from("estimator_work_info")
       .select("uom, labour_rate")
@@ -189,17 +190,30 @@ export async function copyWorkSetup(
       .select("item_id, mix_id, qty_per_unit")
       .eq("work_item_id", fromWorkItemId),
     supabase.from("estimator_work_info").select("work_item_id, uom").in("work_item_id", targets),
-    supabase.from("estimator_estimate_lines").select("work_item_id").in("work_item_id", targets),
   ]);
-  const readError = info.error ?? components.error ?? targetInfo.error ?? targetLines.error;
+  const readError = info.error ?? components.error ?? targetInfo.error;
   if (readError) {
     console.error("copyWorkSetup (read) failed:", readError);
+    return { error: "Could not read the rate book. Try again." };
+  }
+  // Every line, not the first 1,000: a missed one would let a unit change slip past the check below.
+  let targetLines: { work_item_id: string }[];
+  try {
+    targetLines = await fetchAll((from, to) =>
+      supabase
+        .from("estimator_estimate_lines")
+        .select("work_item_id")
+        .in("work_item_id", targets)
+        .order("id")
+        .range(from, to),
+    );
+  } catch {
     return { error: "Could not read the rate book. Try again." };
   }
   if (!info.data) return { error: "Set this work up first — there is nothing to copy yet." };
   const source = info.data;
 
-  const used = new Set((targetLines.data ?? []).map((line) => line.work_item_id));
+  const used = new Set(targetLines.map((line) => line.work_item_id));
   const unitClash = (targetInfo.data ?? []).filter(
     (row) => row.uom !== source.uom && used.has(row.work_item_id),
   );
