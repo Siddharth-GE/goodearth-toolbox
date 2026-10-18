@@ -9,6 +9,7 @@ import { listUnits } from "@/lib/masters/units";
 import { listVendors } from "@/lib/masters/vendors";
 import type { Filterable } from "@/lib/list-params";
 import { fetchAll } from "@/lib/supabase/fetch-all";
+import { assertRead } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
 
 import type { BillKind, BillStatus } from "./workflow";
@@ -59,6 +60,8 @@ export async function getWelcomeCounts() {
       .eq("status", "paid")
       .gte("paid_at", since),
   ]);
+
+  assertRead("bills", "the welcome counts", recorded.error ?? unpaid.error ?? paid.error);
 
   return {
     awaitingApproval: recorded.count ?? 0,
