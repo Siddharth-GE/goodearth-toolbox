@@ -3,12 +3,12 @@
 import type { Dispatch, SetStateAction } from "react";
 
 import { Select } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
 import type { UiChart, UiMeasure } from "@/lib/reporter/draft";
 import { measureLabel } from "@/lib/reporter/labels";
 import { measureId, type BuilderDataset, type ChartType } from "@/lib/reporter/spec";
 
 import { compactSelect, sectionLabel } from "./builder-styles";
+import { chipClassName } from "@/components/ui/choice-chips";
 
 const CHART_TYPE_LABELS: [ChartType, string][] = [
   ["bar", "Bars"],
@@ -102,12 +102,7 @@ export function BuilderChart({
                           emphasis: on && chart.emphasis === id ? "" : chart.emphasis,
                         })
                       }
-                      className={cn(
-                        "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                        on
-                          ? "border-accent bg-accent text-accent-foreground"
-                          : "border-border text-muted hover:text-foreground",
-                      )}
+                      className={chipClassName(on)}
                     >
                       {measureLabel(field?.label ?? measure.field, measure.agg)}
                     </button>

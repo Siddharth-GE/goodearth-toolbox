@@ -1,9 +1,9 @@
 "use client";
 
-import { cn } from "@/lib/utils";
 import type { BuilderDataset } from "@/lib/reporter/spec";
 
 import { sectionLabel } from "./builder-styles";
+import { chipClassName } from "@/components/ui/choice-chips";
 
 export function BuilderColumns({
   dataset,
@@ -26,12 +26,7 @@ export function BuilderColumns({
               type="button"
               aria-pressed={on}
               onClick={() => onToggle(field.key)}
-              className={cn(
-                "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                on
-                  ? "border-accent bg-accent text-accent-foreground"
-                  : "border-border text-muted hover:text-foreground",
-              )}
+              className={chipClassName(on)}
             >
               {field.label}
             </button>
