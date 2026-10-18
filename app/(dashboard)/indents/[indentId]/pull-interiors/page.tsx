@@ -10,11 +10,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDate } from "@/lib/format";
-import {
-  getBudgetPull,
-  getIndentHeader,
-  listApprovedBudgetsForProject,
-} from "@/lib/indents/queries";
+import { getIndentHeader } from "@/lib/indents/detail-queries";
+import { getBudgetPull, listApprovedBudgetsForProject } from "@/lib/indents/pull-queries";
 import { canEditIndent } from "@/lib/indents/workflow";
 import { Palette } from "lucide-react";
 import Link from "next/link";

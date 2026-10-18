@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/table";
 import { formatCount, formatQuantity } from "@/lib/format";
 import { addEstimatePullLines } from "@/lib/indents/actions";
-import type { EstimatePullRow } from "@/lib/indents/queries";
+import type { EstimatePullRow } from "@/lib/indents/pull-queries";
 import { useRouter } from "next/navigation";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { useMemo, useState } from "react";

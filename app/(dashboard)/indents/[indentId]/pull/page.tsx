@@ -1,7 +1,7 @@
 import { LinkButton } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageTitle } from "@/components/ui/page-title";
-import { getIndentHeader } from "@/lib/indents/queries";
+import { getIndentHeader } from "@/lib/indents/detail-queries";
 import { Calculator } from "lucide-react";
 import { notFound } from "next/navigation";
 

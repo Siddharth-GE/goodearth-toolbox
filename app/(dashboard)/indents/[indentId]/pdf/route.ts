@@ -1,7 +1,7 @@
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import { pdfResponse, safeFileNamePart } from "@/lib/pdf/response";
 import { IndentDocument } from "@/lib/indents/indent-document";
-import { getIndent } from "@/lib/indents/queries";
+import { getIndent } from "@/lib/indents/detail-queries";
 import { getProjectCompany } from "@/lib/masters/companies";
 import { listWorkItems } from "@/lib/masters/works";
 import { createElement, type ReactElement } from "react";

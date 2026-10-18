@@ -12,7 +12,7 @@ import {
   type LetterheadCompany,
 } from "@/lib/pdf/document";
 import { formatDate, formatQuantity } from "@/lib/format";
-import type { IndentDetail, IndentLineRow } from "./queries";
+import type { IndentDetail, IndentLineRow } from "./detail-queries";
 import { stillToBuy, waitsForEstimator } from "./workflow";
 
 export type IndentPdfData = {

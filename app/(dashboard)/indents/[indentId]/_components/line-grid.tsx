@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/table";
 import { formatCount, formatDate, formatQuantity } from "@/lib/format";
 import { addDirectLines, removeLine, updateLine } from "@/lib/indents/actions";
-import type { IndentLineRow, IndentLineSource } from "@/lib/indents/queries";
+import type { IndentLineRow, IndentLineSource } from "@/lib/indents/detail-queries";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
 import { stillToBuy, waitsForEstimator } from "@/lib/indents/workflow";
 import { Calculator, PackageOpen, Palette, Trash2 } from "lucide-react";
