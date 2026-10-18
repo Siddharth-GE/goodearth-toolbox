@@ -1,7 +1,8 @@
 import { EmptyState } from "@/components/ui/empty-state";
 import { LinkButton } from "@/components/ui/button";
 import { PageTitle } from "@/components/ui/page-title";
-import { getIndentPool, getPurchaseOrder } from "@/lib/purchase-orders/queries";
+import { getIndentPool } from "@/lib/purchase-orders/indent-queries";
+import { getPurchaseOrder } from "@/lib/purchase-orders/queries";
 import { canEditPo } from "@/lib/purchase-orders/workflow";
 import { ClipboardList } from "lucide-react";
 import { notFound, redirect } from "next/navigation";

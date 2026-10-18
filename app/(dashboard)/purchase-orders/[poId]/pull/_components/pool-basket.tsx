@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/table";
 import { formatCount, formatQuantity } from "@/lib/format";
 import { addPoolLines } from "@/lib/purchase-orders/actions";
-import type { PoolIndentGroup } from "@/lib/purchase-orders/queries";
+import type { PoolIndentGroup } from "@/lib/purchase-orders/indent-queries";
 import { useRouter } from "next/navigation";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { useMemo, useState } from "react";

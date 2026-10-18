@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/table";
 import { formatCount, formatDate } from "@/lib/format";
 import { searchParam } from "@/lib/list-params";
-import { listIndentsToOrder } from "@/lib/purchase-orders/queries";
+import { listIndentsToOrder } from "@/lib/purchase-orders/indent-queries";
 import { ClipboardList } from "lucide-react";
 import Link from "next/link";
 

@@ -25,7 +25,7 @@ import {
   type IndentPick,
   type PriceSuggestion,
 } from "@/lib/purchase-orders/from-indent";
-import type { IndentOrderLine } from "@/lib/purchase-orders/queries";
+import type { IndentOrderLine } from "@/lib/purchase-orders/indent-queries";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { useMemo, useState } from "react";
 
