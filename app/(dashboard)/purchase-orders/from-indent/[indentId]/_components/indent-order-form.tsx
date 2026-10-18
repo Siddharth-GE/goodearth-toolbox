@@ -17,6 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCount, formatMoney, formatQuantity } from "@/lib/format";
+import { parseNumber } from "@/lib/form-data";
 import { createPosFromIndent } from "@/lib/purchase-orders/actions";
 import {
   picksProblem,
@@ -38,7 +39,6 @@ type Row = {
 };
 
 const asText = (value: number | null | undefined) => (value == null ? "" : String(value));
-const typed = (text: string) => (text.trim() === "" ? null : Number(text.trim()));
 
 export function IndentOrderForm({
   indentId,
@@ -114,10 +114,10 @@ export function IndentOrderForm({
       const row = rows[line.indent_line_id];
       return {
         indentLineId: line.indent_line_id,
-        quantity: Number(row.quantity),
+        quantity: parseNumber(row.quantity) ?? 0,
         vendorId: row.vendorId,
-        rate: typed(row.rate),
-        gstPct: typed(row.gst),
+        rate: parseNumber(row.rate),
+        gstPct: parseNumber(row.gst),
       };
     });
   const left = new Map(lines.map((line) => [line.indent_line_id, line.left]));
@@ -161,7 +161,7 @@ export function IndentOrderForm({
         <TableBody>
           {lines.map((line) => {
             const row = rows[line.indent_line_id];
-            const quantity = Number(row.quantity);
+            const quantity = parseNumber(row.quantity) ?? 0;
             const tooMuch = row.picked && quantity > line.left + 1e-9;
             const lastPrice = row.vendorId
               ? prices[priceKey(line.item_id, row.vendorId)]

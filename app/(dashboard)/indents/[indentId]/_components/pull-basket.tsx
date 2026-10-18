@@ -14,6 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCount, formatQuantity } from "@/lib/format";
+import { parseNumber } from "@/lib/form-data";
 import { addBudgetPullLines } from "@/lib/indents/actions";
 import type { BudgetPullLineRow, PullLineRow } from "@/lib/indents/pull-queries";
 import { useRouter } from "next/navigation";
@@ -172,7 +173,7 @@ export function PullBasket({
                             min="0"
                             value={String(picked[line.source_id])}
                             onChange={(event) =>
-                              setQuantity(line.source_id, Number(event.target.value))
+                              setQuantity(line.source_id, parseNumber(event.target.value) ?? 0)
                             }
                             className="h-9"
                             aria-label={`Quantity to request for ${line.item_name}`}

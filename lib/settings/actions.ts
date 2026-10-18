@@ -1,6 +1,6 @@
 "use server";
 
-import { rawText, text } from "@/lib/form-data";
+import { parseNumber, rawText, text } from "@/lib/form-data";
 import { requireAdmin } from "@/lib/auth/access";
 import { requireUser } from "@/lib/auth/dal";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -268,14 +268,11 @@ export async function setBillApprovalLimit(userId: string, rawLimit: string): Pr
   const user = await requireUser();
   await requireAdmin(user);
 
-  const text = rawLimit.trim();
-  let limit: number | null = null;
-  if (text !== "") {
-    const parsed = Number(text.replace(/,/g, ""));
-    if (!Number.isFinite(parsed))
+  const limit = parseNumber(rawLimit);
+  if (limit !== null) {
+    if (!Number.isFinite(limit))
       return { error: "Enter an amount, or leave it blank for no limit." };
-    if (parsed <= 0) return { error: "Leave it blank for no limit — zero would approve nothing." };
-    limit = parsed;
+    if (limit <= 0) return { error: "Leave it blank for no limit — zero would approve nothing." };
   }
 
   const supabase = await createClient();

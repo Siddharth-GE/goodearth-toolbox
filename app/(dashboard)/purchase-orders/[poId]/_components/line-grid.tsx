@@ -18,6 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCount, formatMoney, formatPercent, formatQuantity } from "@/lib/format";
+import { parseNumber } from "@/lib/form-data";
 import { removePoLine, updatePoLine } from "@/lib/purchase-orders/actions";
 import {
   lineChargesProblem,
@@ -213,7 +214,6 @@ function AmountCell({
 
 type DiscountMode = "pct" | "amount";
 
-const typed = (text: string) => (text.trim() === "" ? null : Number(text.trim()));
 const finiteOrNull = (value: number | null) =>
   value !== null && Number.isFinite(value) ? value : null;
 
@@ -302,14 +302,14 @@ function LineRow({
     }> = {},
   ): Fields => {
     const mode = changed.mode ?? discountMode;
-    const discountValue = typed(changed.discount ?? discount);
+    const discountValue = parseNumber(changed.discount ?? discount);
     return {
-      quantity: Number((changed.quantity ?? quantity).trim()),
-      rate: typed(changed.rate ?? rate),
-      gstPct: typed(changed.gst ?? gst),
+      quantity: parseNumber(changed.quantity ?? quantity) ?? 0,
+      rate: parseNumber(changed.rate ?? rate),
+      gstPct: parseNumber(changed.gst ?? gst),
       discountPct: mode === "pct" ? discountValue : null,
       discountAmount: mode === "amount" ? discountValue : null,
-      otherCharges: typed(changed.charges ?? charges),
+      otherCharges: parseNumber(changed.charges ?? charges),
       note,
     };
   };

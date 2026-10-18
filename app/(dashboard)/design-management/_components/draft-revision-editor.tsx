@@ -17,6 +17,7 @@ import { deleteDrawingRevisionFile } from "@/lib/design-management/files-actions
 import type { DrawingRevisionRow } from "@/lib/design-management/queries";
 import { parseWorkDriveLink } from "@/lib/design-management/workdrive-link";
 import { formatShortDate } from "@/lib/format";
+import { parseNumber } from "@/lib/form-data";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
 import type { WorksTreeCategory } from "@/lib/masters/works";
@@ -65,7 +66,7 @@ function RevisionNumberField({
     initial: String(revisionNo),
     validate: (next) =>
       /^\d{1,2}$/.test(next.trim()) ? undefined : "A revision is a whole number from 0 to 99.",
-    save: (next) => setDraftRevisionNumber(revisionId, Number(next.trim())),
+    save: (next) => setDraftRevisionNumber(revisionId, parseNumber(next) ?? 0),
   });
 
   return (

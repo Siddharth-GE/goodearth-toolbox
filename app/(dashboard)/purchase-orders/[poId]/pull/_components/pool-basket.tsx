@@ -14,6 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCount, formatQuantity } from "@/lib/format";
+import { parseNumber } from "@/lib/form-data";
 import { addPoolLines } from "@/lib/purchase-orders/actions";
 import type { PoolIndentGroup } from "@/lib/purchase-orders/indent-queries";
 import { useRouter } from "next/navigation";
@@ -182,7 +183,10 @@ export function PoolBasket({
                               max={line.remaining}
                               value={String(picked[line.indent_line_id])}
                               onChange={(event) =>
-                                setQuantity(line.indent_line_id, Number(event.target.value))
+                                setQuantity(
+                                  line.indent_line_id,
+                                  parseNumber(event.target.value) ?? 0,
+                                )
                               }
                               className="h-9"
                               aria-label={`Quantity to order for ${line.item_name}`}

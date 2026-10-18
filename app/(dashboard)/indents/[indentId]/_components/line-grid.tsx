@@ -19,6 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCount, formatDate, formatQuantity } from "@/lib/format";
+import { parseNumber } from "@/lib/form-data";
 import { addDirectLines, removeLine, updateLine } from "@/lib/indents/actions";
 import type { IndentLineRow, IndentLineSource } from "@/lib/indents/detail-queries";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
@@ -238,7 +239,7 @@ function LineRow({
   });
 
   const save = (nextUom = uom) => {
-    const parsed = Number(quantity.trim());
+    const parsed = parseNumber(quantity) ?? 0;
     if (!Number.isFinite(parsed) || !(parsed > 0)) {
       setQuantity(String(line.quantity));
     }

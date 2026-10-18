@@ -14,6 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCount, formatQuantity } from "@/lib/format";
+import { parseNumber } from "@/lib/form-data";
 import { addEstimatePullLines } from "@/lib/indents/actions";
 import type { EstimatePullRow } from "@/lib/indents/pull-queries";
 import { useRouter } from "next/navigation";
@@ -52,7 +53,7 @@ export function EstimatePullBasket({
   const setQuantity = (itemId: string, raw: string) =>
     setPicked((current) => ({
       ...current,
-      [itemId]: raw === "" ? "" : Number(raw),
+      [itemId]: parseNumber(raw) ?? "",
     }));
 
   const commit = async () => {
