@@ -115,25 +115,26 @@ Applied migrations are never edited, so their comments stay.
 
 Keep `npm test` pure. Its 103 files (16,900 lines, `node:test`) are the right kind of test, and there are enough of them. Every high finding passed all of them by nature: a missing header type, a policy, a hard-coded ref, an unread `error`. What's missing is checks: small `tsx` scripts in CI beside `check:actions`, with no new library.
 
-- [ ] `[Opus]` **`check:errors`.** No Supabase result leaves `error` unread. Base it on the audit's scanner; after Phase 2 the count is zero, and it can only stay zero.
-- [ ] `[Opus]` **`check:selects`.** Every literal `select` string's columns and embeds must exist in `database.types.ts`, and a table with two keys to one target must name the key. Four dead screens shipped through this gap (BUGCATCHER #2).
-- [ ] `[Sonnet]` **`check:boundaries`.** No tool imports another tool, and shared code imports no tool; only `lib/overview/` may.
-- [ ] `[Sonnet]` **Two ESLint `no-restricted-syntax` rules** (core ESLint, no plugin): no `toISOString().slice(0, 10)` outside `lib/format.ts`, and no raw palette classes in `app/(dashboard)/**` or `components/**`.
-- [ ] `[Fable]` **`db:check-policies`**, run on every pull request beside `db:check-views`:
+- [x] `[Opus]` **`check:errors`.** No Supabase result leaves `error` unread. Base it on the audit's scanner; after Phase 2 the count is zero, and it can only stay zero.
+- [x] `[Opus]` **`check:selects`.** Every literal `select` string's columns and embeds must exist in `database.types.ts`, and a table with two keys to one target must name the key. Four dead screens shipped through this gap (BUGCATCHER #2).
+- [x] `[Sonnet]` **`check:boundaries`.** No tool imports another tool, and shared code imports no tool; only `lib/overview/` may.
+- [x] `[Sonnet]` **Two ESLint `no-restricted-syntax` rules** (core ESLint, no plugin): no `toISOString().slice(0, 10)` outside `lib/format.ts`, and no raw palette classes in `app/(dashboard)/**` or `components/**`.
+- [x] `[Fable]` **`db:check-policies`**, run on every pull request beside `db:check-views`:
   - row-level security on every table;
   - no policy checks `profiles.role` directly;
   - one permissive SELECT policy per table;
   - every definer sets `search_path`, and either checks a grant or is trigger-only with execute revoked;
   - after Phase 4, nothing callable by `anon`.
-- [ ] `[Fable]` **Keep the trials running after the switch.** The 19 in `scripts/trials/` need the staff and probe accounts and Saarang's plots, which today only staging has. Decide whether the practice database gets built with them (`scripts/clone-data.ts`, whose table list is out of date), and whether CI runs a migration's own trial there.
+- [x] `[Fable]` **Keep the trials running after the switch.** The 19 in `scripts/trials/` need the staff and probe accounts and Saarang's plots, which today only staging has. Decide whether the practice database gets built with them (`scripts/clone-data.ts`, whose table list is out of date), and whether CI runs a migration's own trial there.
+- Done 2026-10-18. `check:errors`, `check:boundaries` and `check:selects` run in CI beside the static checks, and `db:check-policies` beside `db:check-views`; each was proven against planted mistakes. The trials, decided by `[Opus]` on the founder's word: after the switch the practice database is built by `db:apply` from zero, then `scripts/clone-data.ts` (its table list brought up to date then) copies the masters and accounts the trials need. Trials stay a by-hand rehearsal before a migration is applied, not a CI step, since CI has no seeded database. Five are stale today (TODO.md).
 - Not added, on purpose: a browser test. Sign-in needs an emailed code, so CI would need a real login. The founder's vet and the probe cover it.
 
 ## Phase 4: database hardening
 
-Fable designs this as one migration.
+Fable designs this as one migration. Done as `0129` by `[Opus]` on the founder's word ("do what you think is best"): the 61 open read policies ask `session_is_verified()`, `profiles` also admits a person's own row for the sign-in flow, anon loses every function and view, and SECURITY.md names the definers that check no grant on purpose. Rehearsed with a trial that fails without it.
 
-- [ ] `[Fable]` **M3: the 63 `using (true)` read policies ignore the second factor.** A stolen password alone reads every profile, clients' contact details and notes, indents, stock and Relay trails. Decide whether they ask for `session_is_verified()`.
-- [ ] `[Opus]` **Tidy-up.**
+- [x] `[Fable]` **M3: the 63 `using (true)` read policies ignore the second factor.** A stolen password alone reads every profile, clients' contact details and notes, indents, stock and Relay trails. Decide whether they ask for `session_is_verified()`.
+- [x] `[Opus]` **Tidy-up.**
   - Revoke execute from `anon` on the 81 functions from before `0109`.
   - Revoke SELECT from `anon` on the four Birdwing views (`0116:408`; `0117:115, 140, 215`).
   - Document `pusher_current_stage`, `stock_qty_on_hand`, `profile_is_active` and `session_is_verified` in SECURITY.md as definer functions that skip the grant check.
