@@ -21,7 +21,7 @@ export function TeamGrid({ sections }: { sections: ToolSection[] }) {
               href={`/team/${section.slug}`}
               className={cn(
                 GROUND_CLASS[section.ground],
-                "bg-ground text-on-ground ease-out-quint hover:shadow-float focus-visible:ring-accent/40 flex min-h-40 flex-col rounded-2xl p-6 transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 focus-visible:ring-4 focus-visible:outline-none sm:min-h-56",
+                "bg-ground text-on-ground ease-out-quint hover:shadow-float dark:ring-border focus-visible:ring-accent/40 flex min-h-40 flex-col rounded-2xl p-6 transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 focus-visible:ring-4 focus-visible:outline-none sm:min-h-56 dark:ring-1",
               )}
             >
               <h2 className="font-display text-3xl font-medium text-balance">{section.name}</h2>

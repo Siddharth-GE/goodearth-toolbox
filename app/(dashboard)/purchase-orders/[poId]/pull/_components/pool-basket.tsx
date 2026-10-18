@@ -1,5 +1,6 @@
 "use client";
 
+import { Heading } from "@/components/ui/heading";
 import { ItemThumb } from "@/components/masters/item-thumb";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -94,11 +95,11 @@ export function PoolBasket({
         return (
           <section key={group.indent_id} className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-foreground text-lg font-bold tracking-tight">
+              <Heading>
                 {group.reference}
                 {group.place && <span className="text-muted ml-2 text-sm">· {group.place}</span>}
                 {group.stage && <span className="text-muted ml-2 text-sm">· {group.stage}</span>}
-              </h2>
+              </Heading>
               <div className="flex items-center gap-3">
                 <span className="text-muted text-xs">
                   {formatCount(group.lines.length)} {group.lines.length === 1 ? "line" : "lines"}

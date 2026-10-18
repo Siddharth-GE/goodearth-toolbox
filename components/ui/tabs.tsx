@@ -9,22 +9,24 @@ import type { ComponentProps } from "react";
 export const Tabs = TabsPrimitive.Root;
 export const TabsContent = TabsPrimitive.Content;
 
-const pillClasses =
-  "rounded-full px-3.5 py-1.5 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent";
-const pillActive = "bg-foreground text-background";
-const pillInactive = "text-muted hover:text-foreground hover:bg-foreground/[0.05]";
+// Underlined, not pills: the Brandkit keeps controls square. The row scrolls sideways on a phone rather than wrapping.
+const stripClasses = "border-border flex gap-6 overflow-x-auto border-b";
+const tabClasses =
+  "-mb-px shrink-0 whitespace-nowrap border-b-2 px-0.5 pt-1 pb-2.5 text-sm font-medium outline-none transition-colors focus-visible:text-foreground focus-visible:border-accent/60";
+const tabActive = "border-accent text-foreground";
+const tabInactive = "border-transparent text-muted hover:text-foreground";
 
 export function TabsList({ className, ...props }: ComponentProps<typeof TabsPrimitive.List>) {
-  return <TabsPrimitive.List className={cn("flex gap-2", className)} {...props} />;
+  return <TabsPrimitive.List className={cn(stripClasses, className)} {...props} />;
 }
 
 export function TabsTrigger({ className, ...props }: ComponentProps<typeof TabsPrimitive.Trigger>) {
   return (
     <TabsPrimitive.Trigger
       className={cn(
-        pillClasses,
-        pillInactive,
-        "data-[state=active]:bg-foreground data-[state=active]:text-background",
+        tabClasses,
+        tabInactive,
+        "data-[state=active]:border-accent data-[state=active]:text-foreground",
         className,
       )}
       {...props}
@@ -32,7 +34,7 @@ export function TabsTrigger({ className, ...props }: ComponentProps<typeof TabsP
   );
 }
 
-// NavTabs: the same pill visual for real ROUTES, plain next/link, not Radix.
+// NavTabs: the same strip for real ROUTES, plain next/link, not Radix.
 export function NavTabs({
   tabs,
   active,
@@ -41,17 +43,17 @@ export function NavTabs({
   active: string;
 }) {
   return (
-    // flex-wrap: an unwrapped pill row was wider than a phone screen.
-    <div className="flex flex-wrap gap-2">
+    <nav className={stripClasses}>
       {tabs.map((tab) => (
         <Link
           key={tab.key}
           href={tab.href}
-          className={cn(pillClasses, active === tab.key ? pillActive : pillInactive)}
+          aria-current={active === tab.key ? "page" : undefined}
+          className={cn(tabClasses, active === tab.key ? tabActive : tabInactive)}
         >
           {tab.label}
         </Link>
       ))}
-    </div>
+    </nav>
   );
 }

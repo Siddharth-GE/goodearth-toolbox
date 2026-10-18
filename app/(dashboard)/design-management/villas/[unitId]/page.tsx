@@ -78,8 +78,8 @@ export default async function VillaDesignPage({ params }: { params: Promise<{ un
             <p
               className={
                 card.clientName
-                  ? "text-foreground text-xl font-semibold tracking-tight"
-                  : "text-muted text-xl font-semibold tracking-tight"
+                  ? "text-foreground font-display text-2xl font-medium"
+                  : "text-muted font-display text-2xl font-medium"
               }
             >
               {card.clientName ?? "No buyer yet"}

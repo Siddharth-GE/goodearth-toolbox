@@ -63,7 +63,7 @@ export default async function StayPage({ params }: { params: Promise<{ stayId: s
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-foreground text-xl font-semibold tracking-tight">{title}</h2>
+              <h2 className="text-foreground font-display text-2xl font-medium">{title}</h2>
               <span className="text-muted font-mono text-sm">{stay.ref}</span>
             </div>
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">

@@ -84,7 +84,7 @@ These `scripts/trials/` fail against today's staging data, with or without the l
 - **Phone-first lists and forms.** Indents, Inventory, Supervisors and Directory first.
 - **A sidebar search** over `lib/tools.ts`.
 - **The structure underneath:**
-  - one heading style (50 raw `<h2>` headings in 42 files);
+  - the remaining raw `<h2>` headings (small card headings and labels) onto `Section`, `Heading` and the label style;
   - one page rhythm;
   - a shared notice banner.
 

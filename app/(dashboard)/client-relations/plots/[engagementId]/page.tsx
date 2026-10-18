@@ -160,7 +160,7 @@ export default async function PlotDetailPage({
             {engagement.clientId && engagement.clientName ? (
               <ClientNameField clientId={engagement.clientId} name={engagement.clientName} />
             ) : (
-              <p className="text-muted text-xl font-semibold tracking-tight">No buyer yet</p>
+              <p className="text-muted font-display text-2xl font-medium">No buyer yet</p>
             )}
             <div className="text-muted mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
               <span>

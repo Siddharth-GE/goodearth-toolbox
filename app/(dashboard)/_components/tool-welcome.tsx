@@ -39,7 +39,7 @@ export async function ToolWelcome({
       <section
         className={cn(
           GROUND_CLASS[team.ground],
-          "bg-ground text-on-ground rounded-2xl p-6 md:p-10",
+          "bg-ground text-on-ground dark:ring-border rounded-2xl p-6 md:p-10 dark:ring-1",
         )}
       >
         <div className="flex items-start justify-between gap-4">

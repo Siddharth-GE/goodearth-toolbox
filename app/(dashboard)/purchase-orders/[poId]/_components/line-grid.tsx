@@ -1,5 +1,6 @@
 "use client";
 
+import { Heading } from "@/components/ui/heading";
 import { ItemThumb } from "@/components/masters/item-thumb";
 import { Attribution } from "@/components/ui/attribution";
 import { Badge } from "@/components/ui/badge";
@@ -74,7 +75,7 @@ export function LineGrid({
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-foreground text-lg font-bold tracking-tight">Lines</h2>
+        <Heading>Lines</Heading>
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-muted text-xs">
             {formatCount(lines.length)} {lines.length === 1 ? "line" : "lines"}

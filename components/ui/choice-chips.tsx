@@ -35,7 +35,7 @@ type Multiple<T extends string> = Common<T> & {
 
 export function chipClassName(chosen: boolean, good = false): string {
   return cn(
-    "inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 py-1.5 text-left text-sm leading-tight font-medium",
+    "inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-left text-sm leading-tight font-medium",
     "transition-[transform,background-color,border-color] duration-150 ease-out-quint active:scale-[0.98]",
     "focus-visible:ring-accent/25 focus-visible:ring-4 focus-visible:outline-none",
     "disabled:pointer-events-none disabled:opacity-50",

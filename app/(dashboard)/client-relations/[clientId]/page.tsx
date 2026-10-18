@@ -78,7 +78,7 @@ export default async function ClientDetailPage({
           <div className="flex flex-wrap items-start gap-4">
             <Avatar name={client.name} size={52} />
             <div className="min-w-0 flex-1 basis-56">
-              <h2 className="text-2xl font-semibold tracking-tight text-balance">{client.name}</h2>
+              <h2 className="font-display text-3xl font-medium text-balance">{client.name}</h2>
               {client.stage === "lost" && client.lostReason ? (
                 <p className="text-muted mt-0.5 text-sm">{client.lostReason}</p>
               ) : null}

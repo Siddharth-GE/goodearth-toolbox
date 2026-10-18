@@ -1,3 +1,4 @@
+import { Heading } from "@/components/ui/heading";
 import { Attribution } from "@/components/ui/attribution";
 import { LinkButton } from "@/components/ui/button";
 import { PageTitle } from "@/components/ui/page-title";
@@ -207,7 +208,7 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
 
       {moneyMoves && settlement && (
         <div className="space-y-2">
-          <h2 className="text-foreground text-lg font-bold tracking-tight">Payments</h2>
+          <Heading>Payments</Heading>
           <p className="text-muted text-sm">
             {`Total ${formatMoney(bill.total_amount, { paise: true })} · paid ${formatMoney(settlement.paid, { paise: true })}${settlement.recovered > 0 ? ` · recovered from advances ${formatMoney(settlement.recovered, { paise: true })}` : ""} · pending ${formatMoney(settlement.pending, { paise: true })}`}
           </p>
@@ -247,7 +248,7 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
       )}
 
       <div className="space-y-2">
-        <h2 className="text-foreground text-lg font-bold tracking-tight">Lines</h2>
+        <Heading>Lines</Heading>
         {editable ? (
           <>
             {!itemised && (

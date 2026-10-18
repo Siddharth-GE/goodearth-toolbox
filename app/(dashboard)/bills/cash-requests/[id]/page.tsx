@@ -1,3 +1,4 @@
+import { Heading } from "@/components/ui/heading";
 import { Badge } from "@/components/ui/badge";
 import { Figure, FigureBand, FigureBandCell } from "@/components/ui/figure";
 import { PageTitle } from "@/components/ui/page-title";
@@ -98,14 +99,14 @@ export default async function CashRequestPage({ params }: { params: Promise<{ id
       {drafting && options && (
         <>
           <div className="space-y-2">
-            <h2 className="text-foreground text-lg font-bold tracking-tight">Add bills</h2>
+            <Heading>Add bills</Heading>
             <AddBills
               requestId={request.id}
               bills={payable.filter((bill) => !onRequest.has(bill.id))}
             />
           </div>
           <div className="space-y-2">
-            <h2 className="text-foreground text-lg font-bold tracking-tight">Add an advance</h2>
+            <Heading>Add an advance</Heading>
             <AddAdvance
               requestId={request.id}
               contractors={vendors

@@ -320,7 +320,7 @@ export function Greeting({
   return (
     <div className="border-border bg-surface flex flex-wrap items-end justify-between gap-5 rounded-2xl border p-5 md:p-6">
       <div className="min-w-0">
-        <h2 className="text-2xl font-semibold tracking-tight text-balance">
+        <h2 className="font-display text-3xl font-medium text-balance">
           {greetingFor(hour)}, {name.split(" ")[0]}.
         </h2>
         <p className="text-muted mt-1 text-sm">
