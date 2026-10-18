@@ -81,7 +81,11 @@ Applied migrations are never edited, so their comments stay.
   - **Proof each commit is comment-only:** every changed file transpiles to the same output before and after (`ts.transpileModule` with `removeComments: true`). Write it as a short `scripts/check-comment-only.ts` and run it on every commit.
   - Target: under 6,000 comment lines.
   - Done: 19,631 comment lines to 5,089. Twelve Sonnet helpers each thinned a group of tools; `[Opus]` thinned the security code itself, then checked and committed each tool's result. `check:comments` compares each changed file's compiled code and also its types: compiled code alone missed seven type lines cut in Client Relations, which the typecheck caught and which are restored.
-- [ ] Founder: **the cuts only you can make.** TODO.md, _Open questions_, has three: is Marathon finished, are the construction budget screens retired, does the Training stub stay. Each yes becomes its own step here.
+- [x] Founder: **the cuts only you can make.** TODO.md, _Open questions_, has three: is Marathon finished, are the construction budget screens retired, does the Training stub stay. Each yes becomes its own step here.
+  - Answered 2026-10-18: "remove the marathon, construction things happen in estimate indent po. only interiors happens in selection and budget." Training stays ("let it be for now").
+  - [x] `[Opus]` Marathon's code and docs removed.
+  - [x] `[Opus]` Budgets' construction screens and code removed; Budgets is interiors only.
+  - [x] `[Opus]` `0128` drops Marathon's seven tables and two functions and the two construction budget tables; `indent_lines.construction_line_id` stays, locked empty, because two indent guards still name it. Staging's rows backed up first (`data/backups/…-before-0128-drop-marathon-construction`, 16 race entries). Dry-run on staging alone and with the `erp-chain` and `indent-estimator-gate` trials: all pass (`erp-chain` step 11 needed its work-order number check loosened for the project code SAAVILLA; it failed without `0128` too). **Fable's review waived by the founder for this migration** (2026-10-18: "no fable review you are allowed to do it"); `[Opus]` reviewed it in its place. Applied to staging when Phase 1's pull request opens.
 - [ ] Founder: **delete the 15 feature branches** on GitHub that are already merged into `staging`.
 
 ## Phase 2: make failures visible

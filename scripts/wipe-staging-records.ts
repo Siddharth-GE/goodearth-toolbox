@@ -7,7 +7,7 @@
  *
  * Lists below: CLEARED (deleted), BLANKED (each villa's payment schedule keeps its nine
  * steps, which the app cannot re-add, and loses amounts, dates and invoices) and KEPT
- * (people, logins, access, clients, plots, design catalogue, Relay setup, Marathon). Every
+ * (people, logins, access, clients, plots, design catalogue, Relay setup). Every
  * table must be on one list, so a newly added table stops the run until someone decides.
  * PRACTICE DATABASE ONLY (`lib/environment.ts`): it refuses any other ref.
  * Every row and file is first written to data/backups/ (gitignored), and it refuses if a
@@ -45,8 +45,6 @@ const CLEARED = [
   "labour_logs",
   "budget_lines",
   "budgets",
-  "construction_budget_lines",
-  "construction_budgets",
   // Estimator: estimates, and the rate book's material recipes
   "estimator_estimate_item_rates",
   "estimator_estimate_line_components",
@@ -139,13 +137,6 @@ const KEPT = [
   "pusher_trail_sets",
   "pusher_trail_set_items",
   "google_chat_spaces",
-  "marathon_agents",
-  "marathon_categories",
-  "marathon_config",
-  "marathon_entries",
-  "marathon_groups",
-  "marathon_pin_attempts",
-  "marathon_runs",
 ] as const;
 
 const BLANKED = [

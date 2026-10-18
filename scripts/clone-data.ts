@@ -5,7 +5,7 @@
  *   npx tsx scripts/clone-data.ts --from <ref> --to <ref>            # dry run, writes nothing
  *   npx tsx scripts/clone-data.ts --from <ref> --to <ref> --commit
  *
- * Not copied, on purpose: the transaction chain, Marathon, test trails, the audit log
+ * Not copied, on purpose: the transaction chain, test trails, the audit log
  * and every *_counters row (so the first real PO is PO-0001).
  * Ids are preserved, so created_by, updated_by and every foreign key still match.
  * Auth users come whole, with the bcrypt hash and auth.identities, so logins keep passwords.
@@ -21,7 +21,6 @@ import { isCommit, literal, requireProjectRef, sql } from "./supabase-management
 //
 // Left out on purpose:
 //   the practice chain (selections, budgets, indents, POs, receipts, bills, stock_*, ...);
-//   marathon_* (the kiosk starts empty, which retires the PIN 1234 seed);
 //   pusher_chains and children (test trails; pusher_chain_departments hangs off them);
 //   vendors and stores (one test row each; real ones are entered in Masters);
 //   business_plans, business_plan_targets, funding_facilities (built in the tool,
@@ -73,7 +72,6 @@ const GUARD_TABLES = [
   "bills",
   "stock_issues",
   "client_receipts",
-  "marathon_entries",
 ];
 
 const BATCH = 500;
