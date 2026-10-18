@@ -8,6 +8,7 @@ import { Select } from "@/components/ui/select";
 import { paymentProblem } from "@/lib/bills/ledger";
 import { recordBillPayment, recoverAdvance } from "@/lib/bills/payment-actions";
 import type { OpenAdvance } from "@/lib/bills/payment-queries";
+import { parseNumber } from "@/lib/form-data";
 import { formatDate, formatMoney, todayInIndia } from "@/lib/format";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { useRouter } from "next/navigation";
@@ -34,7 +35,7 @@ export function SettlementPanel({
   const { pending: saving, error, run, clearError } = useActionRunner();
 
   const advance = advances.find((candidate) => candidate.id === advanceId);
-  const value = Number(amount);
+  const value = parseNumber(amount) ?? 0;
   const problem =
     mode === "pay"
       ? paymentProblem({ amount: value, reference, pending })

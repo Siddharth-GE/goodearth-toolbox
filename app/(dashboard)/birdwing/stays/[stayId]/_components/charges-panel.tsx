@@ -22,6 +22,7 @@ import { addCharge, deleteCharge } from "@/lib/birdwing/actions";
 import { chargeAmount } from "@/lib/birdwing/money";
 import type { RateCardRow, StayCharge } from "@/lib/birdwing/queries";
 import { CHARGE_KINDS, KIND_LABELS } from "@/lib/birdwing/shared";
+import { parseNumber } from "@/lib/form-data";
 import { formatMoney, formatQuantity } from "@/lib/format";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { Trash2 } from "lucide-react";
@@ -173,9 +174,9 @@ function AddChargeForm({
   );
 
   const preview = chargeAmount({
-    qty: Number(qty) || 0,
-    rate: Number(rate.replace(/[,₹\s]/g, "")) || 0,
-    gstPct: Number(picked ? picked.gstPct : gst) || 0,
+    qty: parseNumber(qty) || 0,
+    rate: parseNumber(rate) || 0,
+    gstPct: (picked ? picked.gstPct : parseNumber(gst)) || 0,
     rateIncludesGst: inclusive,
   });
 

@@ -20,6 +20,7 @@ import {
 import type { MixDetail, MixRow } from "@/lib/estimator/mixes-queries";
 import type { MaterialItemRow } from "@/lib/estimator/shared";
 import { removeWorkComponent, updateWorkComponentQty } from "@/lib/estimator/works-actions";
+import { parseNumber } from "@/lib/form-data";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 
@@ -172,7 +173,7 @@ export function ComponentQtyField({
   const { pending, error, run } = useActionRunner();
 
   const save = async () => {
-    const next = Number(value);
+    const next = parseNumber(value) ?? 0;
     if (!Number.isFinite(next) || next <= 0 || next === qty) {
       setValue(String(qty));
       return;

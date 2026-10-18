@@ -17,6 +17,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { Spinner } from "@/components/ui/spinner";
 import { setItemMargin } from "@/lib/budgets/actions";
 import type { CatalogueSearchResult } from "@/lib/masters/catalogue";
+import { parseNumber } from "@/lib/form-data";
 import { formatMoney } from "@/lib/format";
 import { useDebouncedSearch } from "@/lib/hooks/use-debounced-search";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
@@ -159,12 +160,12 @@ function MarginRow({
     initial: margin === null ? "" : String(margin),
     // Blank means "no default", not 0%.
     validate: (raw) => {
-      if (raw.trim() === "") return undefined;
-      const parsed = Number(raw.trim());
+      const parsed = parseNumber(raw);
+      if (parsed === null) return undefined;
       return Number.isFinite(parsed) && parsed >= 0 ? undefined : "Zero or more";
     },
     save: async (raw) => {
-      const parsed = raw.trim() === "" ? null : Number(raw.trim());
+      const parsed = parseNumber(raw);
       const result = await setItemMargin(item.id, parsed);
       if (!result?.error) onSaved(parsed);
       return result;

@@ -4,9 +4,13 @@ import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { updateBill } from "@/lib/bills/actions";
+import { parseNumber } from "@/lib/form-data";
 import { formatDate, formatMoney } from "@/lib/format";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
 import { useState } from "react";
+
+// A blank amount reads as 0, so the checks below speak up about the total only.
+const amountOf = (text: string) => parseNumber(text) ?? 0;
 
 // The anchor, vendor and scope are permanent (part of the number); a wrong anchor means delete and re-record.
 // The database guard refuses edits past recorded, so read-only here is honesty, not enforcement.
@@ -48,9 +52,9 @@ export function HeaderFields({
     validate: (value) => {
       if (!value.invoiceNo.trim()) return "The invoice number can't be blank.";
       if (!value.invoiceDate) return "The invoice date can't be blank.";
-      const taxable = Number(value.taxable);
-      const gst = Number(value.gst);
-      const total = Number(value.total);
+      const taxable = amountOf(value.taxable);
+      const gst = amountOf(value.gst);
+      const total = amountOf(value.total);
       if (!Number.isFinite(taxable) || taxable < 0) return "Taxable must be zero or more.";
       if (!Number.isFinite(gst) || gst < 0) return "GST must be zero or more.";
       if (!Number.isFinite(total) || total <= 0) return "The total must be more than zero.";
@@ -60,9 +64,9 @@ export function HeaderFields({
       updateBill(billId, {
         invoiceNo: value.invoiceNo,
         invoiceDate: value.invoiceDate,
-        taxableAmount: Number(value.taxable),
-        gstAmount: Number(value.gst),
-        totalAmount: Number(value.total),
+        taxableAmount: amountOf(value.taxable),
+        gstAmount: amountOf(value.gst),
+        totalAmount: amountOf(value.total),
         note: value.note || null,
       }),
   });

@@ -27,6 +27,7 @@ import {
   type LabourEntry,
 } from "@/lib/bills/labour-billing";
 import type { LabourBillingOptions, UnbilledEntry } from "@/lib/bills/labour-queries";
+import { parseNumber } from "@/lib/form-data";
 import { formatCount, formatDate, formatMoney, formatQuantity } from "@/lib/format";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { useMemo, useState } from "react";
@@ -44,7 +45,6 @@ const asEntry = (row: UnbilledEntry): LabourEntry => ({
   quantity: row.quantity,
 });
 
-const typed = (text: string) => (text.trim() === "" ? null : Number(text.trim()));
 const show = (value: number | null | undefined) => (value == null ? "" : String(value));
 
 export function SendToBill({
@@ -115,18 +115,18 @@ export function SendToBill({
     show(suggestedPieceRate(asEntry(entry), workOrder?.lines ?? [], rateBook));
 
   const rates = {
-    mason: typed(dayRates.mason),
-    helper: typed(dayRates.helper),
-    other: typed(dayRates.other),
+    mason: parseNumber(dayRates.mason),
+    helper: parseNumber(dayRates.helper),
+    other: parseNumber(dayRates.other),
   };
   const heads = headsOf(chosenEntries);
   const pieceRateValues = Object.fromEntries(
-    chosen.map((entry) => [entry.id, typed(rateFor(entry))]),
+    chosen.map((entry) => [entry.id, parseNumber(rateFor(entry))]),
   );
   const computed = isDaily
     ? dailyWagesTotal(heads, rates, gstPct)
     : pieceWorkTotal(chosenEntries, pieceRateValues, gstPct);
-  const overrideValue = typed(override);
+  const overrideValue = parseNumber(override);
 
   const problem =
     groupProblem ??

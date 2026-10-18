@@ -22,6 +22,7 @@ import {
   type WorkOrderLineForBill,
 } from "@/lib/bills/lines";
 import { billLineMoney, rollUpBill } from "@/lib/bills/math";
+import { parseNumber } from "@/lib/form-data";
 import { formatCount, formatMoney } from "@/lib/format";
 import { Plus, Trash2 } from "lucide-react";
 
@@ -50,16 +51,14 @@ export function toEditorLine(draft: BillLineDraft, id?: string): EditorLine {
   };
 }
 
-const typed = (text: string) => (text.trim() === "" ? null : Number(text.trim()));
-
 export function draftsOf(lines: EditorLine[]): (BillLineDraft & { id?: string })[] {
   return lines.map((line) => ({
     ...line.draft,
     id: line.id,
-    quantity: line.draft.kind === "pw_lump" ? null : typed(line.text.quantity),
-    rate: typed(line.text.rate),
-    discountAmount: typed(line.text.discount),
-    otherCharges: typed(line.text.charges),
+    quantity: line.draft.kind === "pw_lump" ? null : parseNumber(line.text.quantity),
+    rate: parseNumber(line.text.rate),
+    discountAmount: parseNumber(line.text.discount),
+    otherCharges: parseNumber(line.text.charges),
   }));
 }
 

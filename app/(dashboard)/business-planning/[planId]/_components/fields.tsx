@@ -3,6 +3,7 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { parseNumber } from "@/lib/form-data";
 import { formatCrore } from "@/lib/format";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
@@ -92,7 +93,7 @@ export function NumberField({
             const next = event.target.value;
             setText(next);
             // An empty box is zero in a plan, but stays visually empty until it loses focus.
-            const parsed = next.trim() === "" ? 0 : Number(next);
+            const parsed = parseNumber(next) ?? 0;
             if (Number.isFinite(parsed)) {
               emitted.current = parsed;
               onChange(parsed);

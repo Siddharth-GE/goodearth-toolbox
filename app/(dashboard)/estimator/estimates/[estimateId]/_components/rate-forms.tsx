@@ -24,6 +24,7 @@ import {
   type RecipeChange,
 } from "@/lib/estimator/estimate-actions";
 import { setItemPrice } from "@/lib/masters/items-actions";
+import { parseNumber } from "@/lib/form-data";
 import { formatMoney, formatQuantity } from "@/lib/format";
 import { useRouter } from "next/navigation";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
@@ -321,7 +322,7 @@ function ComponentRow({
   );
 
   const saveQty = () => {
-    const next = Number(value.replace(/[,\s]/g, ""));
+    const next = parseNumber(value) ?? 0;
     if (!Number.isFinite(next) || next <= 0 || next === row.qtyPerUnit) {
       setValue(String(row.qtyPerUnit));
       return;
@@ -425,7 +426,7 @@ function AddComponentForm({
   const uomOfChoice = chosenUom(choice, options.materials, options.mixes);
 
   const add = () => {
-    const amount = Number(qty.replace(/[,\s]/g, ""));
+    const amount = parseNumber(qty) ?? 0;
     if (!choice) return setError("Pick a material or a mix.");
     if (!Number.isFinite(amount) || amount <= 0) {
       return setError(`Enter how much of it one ${unit} needs.`);
@@ -500,8 +501,7 @@ function LabourRateField({
           value={value}
           onChange={(event) => setValue(event.target.value)}
           onBlur={() => {
-            const cleaned = value.replace(/[,\s₹]/g, "");
-            const next = cleaned === "" ? null : Number(cleaned);
+            const next = parseNumber(value);
             if (next !== null && (!Number.isFinite(next) || next < 0)) {
               setValue(villaRate === null ? "" : String(villaRate));
               setError("The labour rate must be a number, or blank for the rate book's.");
@@ -562,8 +562,7 @@ export function VillaPriceField({
   const { pending, error, run, setError } = useActionRunner();
 
   const save = async () => {
-    const cleaned = value.replace(/[,\s₹]/g, "");
-    const next = cleaned === "" ? null : Number(cleaned);
+    const next = parseNumber(value);
     if (next !== null && (!Number.isFinite(next) || next < 0)) {
       setValue(villaPrice === null ? "" : String(villaPrice));
       setError("The price must be a number, or blank for the Masters price.");
@@ -619,7 +618,7 @@ function MastersPriceField({ itemId, label, uom }: { itemId: string; label: stri
         variant="secondary"
         disabled={pending || value.trim() === ""}
         onClick={async () => {
-          const price = Number(value.replace(/[,\s₹]/g, ""));
+          const price = parseNumber(value) ?? 0;
           if (!Number.isFinite(price) || price < 0) {
             setError("The price must be a number.");
             return;

@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/table";
 import { saveLine } from "@/lib/budgets/actions";
 import { clientRate, lineAmount, rollUp } from "@/lib/budgets/math";
+import { parseNumber } from "@/lib/form-data";
 import { formatMoney, formatPercent, formatQuantity } from "@/lib/format";
 import type { BudgetSpaceGroup } from "@/lib/budgets/queries";
 import { type ReactNode, useMemo, useState } from "react";
@@ -31,10 +32,8 @@ type Draft = {
 
 /** Empty stays empty: a blank cost means unpriced, not zero. */
 function toNumber(value: string): number | null {
-  const trimmed = value.trim();
-  if (trimmed === "") return null;
-  const parsed = Number(trimmed);
-  return Number.isFinite(parsed) ? parsed : null;
+  const parsed = parseNumber(value);
+  return parsed !== null && Number.isFinite(parsed) ? parsed : null;
 }
 
 /**

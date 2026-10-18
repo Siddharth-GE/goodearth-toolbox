@@ -34,6 +34,7 @@ import {
 } from "@/lib/estimator/estimate-actions";
 import type { MeasurementFields } from "@/lib/estimator/measurement-rules";
 import type { MeasurementRow } from "@/lib/estimator/estimate-queries";
+import { parseNumber } from "@/lib/form-data";
 import { formatQuantity } from "@/lib/format";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import {
@@ -177,11 +178,6 @@ export function MeasurementSheetDialog({
   );
 }
 
-function readBox(value: string): number | null {
-  const cleaned = value.replace(/[,\s]/g, "");
-  return cleaned === "" ? null : Number(cleaned);
-}
-
 const show = (value: number | null) => (value === null ? "" : String(value));
 
 /** One row, every box saved on blur or Enter. A refused save puts the row back and says why. */
@@ -199,10 +195,10 @@ function EditableMeasurementRow({ row, workUom }: { row: MeasurementRow; workUom
   const save = async () => {
     const fields: MeasurementFields = {
       description: values.description.trim() || null,
-      nos: readBox(values.nos),
-      length: readBox(values.length),
-      breadth: readBox(values.breadth),
-      depth: readBox(values.depth),
+      nos: parseNumber(values.nos),
+      length: parseNumber(values.length),
+      breadth: parseNumber(values.breadth),
+      depth: parseNumber(values.depth),
     };
     const unchanged =
       fields.description === row.description &&
@@ -223,10 +219,10 @@ function EditableMeasurementRow({ row, workUom }: { row: MeasurementRow; workUom
   };
 
   const live = measurementQuantity({
-    nos: readBox(values.nos),
-    length: readBox(values.length),
-    breadth: readBox(values.breadth),
-    depth: readBox(values.depth),
+    nos: parseNumber(values.nos),
+    length: parseNumber(values.length),
+    breadth: parseNumber(values.breadth),
+    depth: parseNumber(values.depth),
   });
 
   return (

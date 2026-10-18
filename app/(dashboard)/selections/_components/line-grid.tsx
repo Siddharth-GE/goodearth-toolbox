@@ -20,6 +20,7 @@ import type { SelectionLineRow } from "@/lib/selections/queries";
 import { PackageOpen, Trash2 } from "lucide-react";
 import { type ReactNode, useState, useTransition } from "react";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
+import { parseNumber } from "@/lib/form-data";
 import { formatMoney, formatQuantity } from "@/lib/format";
 
 export function LineGrid({
@@ -92,7 +93,7 @@ function LineRow({
   });
 
   const save = () => {
-    const parsed = Number(quantity.trim());
+    const parsed = parseNumber(quantity) ?? 0;
     if (!Number.isFinite(parsed) || !(parsed > 0)) {
       // Put the last good value back so the row never shows a number that isn't stored.
       setQuantity(String(line.quantity));

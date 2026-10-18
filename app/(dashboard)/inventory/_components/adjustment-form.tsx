@@ -7,6 +7,7 @@ import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { parseNumber } from "@/lib/form-data";
 import { formatQuantity, todayInIndia } from "@/lib/format";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { recordStockAdjustment } from "@/lib/inventory/actions";
@@ -36,7 +37,7 @@ export function AdjustmentForm({
   const [saved, setSaved] = useState<string>();
   const { pending: saving, error, run } = useActionRunner();
 
-  const amount = Number(quantity);
+  const amount = parseNumber(quantity) ?? 0;
   const ready =
     storeId !== "" && item != null && Number.isFinite(amount) && amount > 0 && reason.trim() !== "";
 

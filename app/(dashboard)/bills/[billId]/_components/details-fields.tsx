@@ -5,6 +5,7 @@ import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { setBillTotalOverride, updateBillDetails } from "@/lib/bills/line-actions";
+import { parseNumber } from "@/lib/form-data";
 import { formatDate, formatMoney } from "@/lib/format";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
@@ -197,7 +198,7 @@ export function TotalOverride({
       <Button
         size="sm"
         disabled={saving}
-        onClick={() => run({ total: Number(total), note: note || null })}
+        onClick={() => run({ total: parseNumber(total) ?? 0, note: note || null })}
       >
         {saving ? "Saving…" : "Set the total"}
       </Button>

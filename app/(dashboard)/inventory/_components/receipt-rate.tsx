@@ -12,6 +12,7 @@ import {
 import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { parseNumber } from "@/lib/form-data";
 import { formatMoney, formatPercent } from "@/lib/format";
 import { updateReceiptLineRate } from "@/lib/inventory/actions";
 import { differsFromPo } from "@/lib/inventory/batches";
@@ -41,8 +42,8 @@ export function ReceiptRate({
   const save = async () => {
     const result = await run(() =>
       updateReceiptLineRate(receiptLineId, {
-        rate: rateText.trim() === "" ? Number.NaN : Number(rateText),
-        gstPct: gstText.trim() === "" ? Number.NaN : Number(gstText),
+        rate: parseNumber(rateText) ?? Number.NaN,
+        gstPct: parseNumber(gstText) ?? Number.NaN,
         note: note || null,
       }),
     );

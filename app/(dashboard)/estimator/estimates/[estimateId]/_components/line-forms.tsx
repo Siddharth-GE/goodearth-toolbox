@@ -18,6 +18,7 @@ import {
   removeEstimateLine,
   updateEstimateLineQty,
 } from "@/lib/estimator/estimate-actions";
+import { parseNumber } from "@/lib/form-data";
 import { formatCount } from "@/lib/format";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { useMemo, useState } from "react";
@@ -186,8 +187,7 @@ export function LineQtyField({
   const { pending, error, run } = useActionRunner();
 
   const save = async () => {
-    const cleaned = value.replace(/[,\s]/g, "");
-    const next = cleaned === "" ? null : Number(cleaned);
+    const next = parseNumber(value);
     if (next === qty) return;
     if (next !== null && (!Number.isFinite(next) || next <= 0)) {
       setValue(shown);

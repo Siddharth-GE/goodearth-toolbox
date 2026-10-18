@@ -34,11 +34,15 @@ import {
   submitCashRequest,
 } from "@/lib/bills/payment-actions";
 import type { CashRequestDetail, CashRequestItem, PayableBill } from "@/lib/bills/payment-queries";
+import { parseNumber } from "@/lib/form-data";
 import { formatDate, formatMoney, todayInIndia } from "@/lib/format";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+
+// A blank box is 0 here, as before: the server refuses it with its own message.
+const amountOf = (text: string) => parseNumber(text) ?? 0;
 
 type Option = { id: string; name: string };
 
@@ -169,8 +173,8 @@ function LineRow({
               value={requested}
               onChange={(event) => setRequested(event.target.value)}
               onBlur={() => {
-                if (Number(requested) !== item.requested) {
-                  run(() => setCashRequestAmount(item.id, { requested: Number(requested) }));
+                if (amountOf(requested) !== item.requested) {
+                  run(() => setCashRequestAmount(item.id, { requested: amountOf(requested) }));
                 }
               }}
               className="h-9 text-right"
@@ -189,8 +193,8 @@ function LineRow({
               value={released}
               onChange={(event) => setReleased(event.target.value)}
               onBlur={() => {
-                if (Number(released) !== (item.released ?? item.requested)) {
-                  run(() => setCashRequestAmount(item.id, { released: Number(released) }));
+                if (amountOf(released) !== (item.released ?? item.requested)) {
+                  run(() => setCashRequestAmount(item.id, { released: amountOf(released) }));
                 }
               }}
               className="h-9 text-right"
@@ -249,7 +253,7 @@ function PayForm({
   const [amount, setAmount] = useState(String(cap));
   const [paidOn, setPaidOn] = useState(() => todayInIndia());
   const [reference, setReference] = useState("");
-  const value = Number(amount);
+  const value = amountOf(amount);
   const problem = paymentProblem({
     amount: value,
     reference,
@@ -412,7 +416,7 @@ export function AddBills({ requestId, bills }: { requestId: string; bills: Payab
               () =>
                 addBillsToCashRequest(
                   requestId,
-                  entries.map(([billId, amount]) => ({ billId, amount: Number(amount) })),
+                  entries.map(([billId, amount]) => ({ billId, amount: amountOf(amount) })),
                 ),
               () => setPicked({}),
             )
@@ -524,7 +528,7 @@ export function AddAdvance({
         <Button
           size="sm"
           variant="secondary"
-          disabled={pending || !vendorId || !projectId || !(Number(amount) > 0)}
+          disabled={pending || !vendorId || !projectId || !(amountOf(amount) > 0)}
           onClick={() =>
             run(
               () =>
@@ -532,7 +536,7 @@ export function AddAdvance({
                   vendorId,
                   projectId,
                   labourContractId: workOrderId || null,
-                  amount: Number(amount),
+                  amount: amountOf(amount),
                   note: note || null,
                 }),
               () => {

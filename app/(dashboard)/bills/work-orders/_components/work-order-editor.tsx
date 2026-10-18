@@ -26,6 +26,7 @@ import {
   workOrderTotal,
   type WorkOrderLineInput,
 } from "@/lib/bills/work-orders";
+import { parseNumber } from "@/lib/form-data";
 import { formatMoney } from "@/lib/format";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { buildSiteOptions, decodeSite } from "@/lib/masters/site-options";
@@ -56,15 +57,14 @@ let nextKey = 0;
 const keyed = (line: Omit<LineState, "key">): LineState => ({ ...line, key: `l${nextKey++}` });
 const blankLine = (): LineState =>
   keyed({ workItemId: null, description: "", isLumpSum: false, quantity: "", uom: "", rate: "" });
-const typed = (text: string) => (text.trim() === "" ? null : Number(text.trim()));
 
 const asInput = (line: LineState): WorkOrderLineInput => ({
   workItemId: line.workItemId,
   description: line.description,
   isLumpSum: line.isLumpSum,
-  quantity: line.isLumpSum ? null : typed(line.quantity),
+  quantity: line.isLumpSum ? null : parseNumber(line.quantity),
   uom: line.isLumpSum ? null : line.uom || null,
-  rate: typed(line.rate),
+  rate: parseNumber(line.rate),
 });
 
 export function WorkOrderEditor({
