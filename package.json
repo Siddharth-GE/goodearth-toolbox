@@ -21,6 +21,7 @@
     "db:apply": "tsx scripts/apply-migrations.ts",
     "db:check": "tsx scripts/check-migrations.ts",
     "db:check-views": "tsx scripts/check-view-columns.ts",
+    "db:check-policies": "tsx scripts/check-policies.ts",
     "db:compare": "tsx scripts/compare-schema.ts",
     "chat:usage": "node --import tsx --import ./scripts/google-chat-usage-loader.mjs scripts/google-chat-usage-test.ts"
   },

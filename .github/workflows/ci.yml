@@ -83,6 +83,8 @@ jobs:
       # 2. Are the views still the shape they claim? Views bypass row-level
       #    security, so each one's columns, WHERE and grants are its whole
       #    boundary (scripts/view-manifest.ts pins them).
+      # 3. Does row-level security still hold SECURITY.md's rules
+      #    (scripts/check-policies.ts)?
       - name: Production has every migration (PRs into master)
         if: github.base_ref == 'master'
         run: npm run db:check -- --project pajfrgnkapicdgangjey
@@ -104,5 +106,17 @@ jobs:
       - name: The views are still the shape they claim (PRs into staging)
         if: github.base_ref == 'staging'
         run: npm run db:check-views -- --project ipstebqawrvhkyntctrv
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Row-level security holds its rules (PRs into master)
+        if: github.base_ref == 'master'
+        run: npm run db:check-policies -- --project pajfrgnkapicdgangjey
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Row-level security holds its rules (PRs into staging)
+        if: github.base_ref == 'staging'
+        run: npm run db:check-policies -- --project ipstebqawrvhkyntctrv
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
