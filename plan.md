@@ -22,8 +22,17 @@ Why this shape: every tool works on day one, a website fix still reaches both ap
 
 ## A. The shell, both stores
 
-- [ ] [Opus] `mobile/`: a Capacitor 8 project with its own `package.json` (the web app's dependencies untouched), pointed at `https://toolbox.kaadalgroup.com`, the offline screen, and the Kaadal K icon and splash.
-- [ ] [Opus] Android: built on this PC with the Java and SDK already here (`android/PLAN.md`, _Building a new version_, for the paths and the two shell traps), signed with the existing upload key, version code 2. Google sign-in is refused inside an Android web view too, so A4 belongs to the Android round.
+- [x] [Opus] `mobile/`: a Capacitor 8 project with its own `package.json` (the web app's dependencies untouched), pointed at `https://toolbox.kaadalgroup.com`, the offline screen, and the Kaadal K icon and splash. Android only so far; the iPhone's icon comes with A3. Two things Chrome did for the wrapper are now the app's own: prints and exports go through Android's downloader (`mobile/PLAN.md`), and the back button through `@capacitor/app`.
+- [x] [Opus] Android: built on this PC, signed with the existing upload key, version code 2: `kaadal-toolbox-2.0.0.aab` and `-test-install.apk` in `C:\Users\goodearth\Documents\kaadal-android-release`. Capacitor 8 needs **Java 21**, added beside the wrapper's 17 (`mobile/PLAN.md`, _Building a new version_). Seen on an Android 16 emulator: the K launch screen, the live sign-in page, the "No connection" screen in flight mode, Try again, the back button. Not yet seen: anything after sign-in, Print, and the keyboard.
+- [ ] [Founder] **Try version 2 on an Android phone** (install `kaadal-toolbox-2.0.0-test-install.apk`; it updates the wrapper in place if that is on the phone):
+  1. Open it: the K on cream, then the burgundy sign-in page, with no address bar.
+  2. Sign in with email and password; switch to the mail app for the code and back. Tick "trust this device", close the app, reopen: still signed in.
+  3. Open a few tools from different teams; the phone's back button steps back through pages.
+  4. **Print** an indent or a PO: "Opening …" appears, then the PDF opens in the phone's viewer.
+  5. Tap into a form field: the keyboard doesn't cover it.
+  6. Attach a picture somewhere (an expense bill or a drawing): the phone's picker opens.
+  7. Flight mode on, open a page: "No connection". Flight mode off, **Try again**.
+  8. Known and expected: **Continue with Google** leaves the app for Chrome. That's A4.
 - [ ] [Opus] iPhone: a manually-run GitHub workflow on a macOS machine that builds, signs and uploads to TestFlight with the App Store Connect key held as GitHub secrets. Never runs on pull requests, so a fork can't reach the secrets.
 - [ ] [Fable] **Google sign-in out of the web view**: the button opens the system browser; Google returns to `https://toolbox.kaadalgroup.com/auth/callback`, which the phone hands to the app (Universal Link on iPhone through a public `/.well-known/apple-app-site-association`, App Link on Android through the existing `assetlinks.json`), and the app finishes the sign-in in its own web view, where the PKCE cookie lives. New public path, so `SECURITY.md` first.
 - [ ] [Opus] Build A4; the web app learns it is inside the app only through `lib/native/` (a shared module, `@capacitor/core` its one new web dependency) so no tool talks to the phone directly.
