@@ -22,6 +22,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- Google's sign-in comes back here (lib/native/app.ts, MainActivity.onNewIntent). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.kaadalgroup.toolbox" android:host="auth" android:path="/callback" />
+            </intent-filter>
+
         </activity>
 
         <provider

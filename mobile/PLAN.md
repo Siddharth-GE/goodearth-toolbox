@@ -6,16 +6,13 @@ Kaadal Toolbox for Android (and later iPhone), `com.kaadalgroup.toolbox`: a **Ca
 
 - **`mobile/` is its own project** with its own `package.json`; the website's dependencies are untouched, and lint, typecheck and Prettier skip it. `mobile/android/` is committed; Gradle output and what `cap sync` copies in are ignored.
 - **`capacitor.config.json`** names the site. `www/index.html` is the **"No connection" screen**, shown in place of a blank page whenever the site can't be reached (`server.errorPath`).
-- **The site is never told it is in an app**, except through the user agent's `KaadalToolboxApp` suffix, kept for the Google sign-in step (A4 in `plan.md`).
+- **The site learns it is in the app only from the user agent's `KaadalToolboxApp` mark**, asked through `lib/native/app.ts`, and today only Google sign-in asks.
+- **Google sign-in** runs in a Chrome tab, because Google refuses a web view. When the site sees the mark, it asks Google to return to `com.kaadalgroup.toolbox://auth/callback` instead of its own callback; Android hands that to the app, and `MainActivity.onNewIntent` loads the site's `/auth/callback` with the same query in the web view, where the PKCE cookie lives. Another app claiming the address would catch only a code that is useless without that cookie. The address must be on each Supabase project's redirect allow-list.
 - **Spacing:** the web view sits between the status bar and the navigation bar (`SystemBars.insetsHandling: "native"`), on burgundy with light icons, so the site needs no safe-area CSS.
 - **Back button:** `@capacitor/app` steps back through the site's history, and leaves the app from the first page.
 - **Prints and exports** (`lib/pdf/`, `lib/csv.ts`): a web view can't show a PDF, so `MainActivity` hands every download to Android's DownloadManager with the session's cookies, then opens it in the phone's PDF viewer or spreadsheet app. Files live in the app's own storage (no permission asked); the same print downloaded again replaces the old copy.
-- **Links to other sites** (Zoho WorkDrive, product pages) open in the phone's browser.
+- **Links to other sites** (Google's sign-in, Zoho WorkDrive, product pages) open in a Chrome tab over the app (`ExternalLinksPlugin`), and closing it returns to the page the person was on.
 - **Pictures** go through the phone's normal picker, as on the website.
-
-## What doesn't work yet
-
-- **Sign in with Google.** Google refuses sign-in inside an app's web view: the button opens Chrome, and the sign-in finishes there, not in the app. Password and the emailed code work. Fixing it is A4 in `plan.md` (a `[Fable]` step), and Play's reviewer signs in with Google, so A4 lands before this version goes to Play's Production track.
 
 ## Building a new version
 

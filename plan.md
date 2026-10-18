@@ -1,6 +1,6 @@
 # Native apps on iPhone and Android
 
-**Approved by the founder 2026-10-18 ("everything looks good"). Build Android first:** A1, A2 and A4 on Android, then the founder's Android vet; the iPhone (A3) after. Work on `feature/native-apps`, branched from `feature/android-app` (PR #112, the website's half it needs), in its own worktree. Each `[Fable]` step still needs Fable's pass before it is built, unless the founder waives it in so many words. Every new package is a release at least two weeks old (Capacitor 8.5.3 was days old on 2026-10-18).
+**Approved by the founder 2026-10-18 ("everything looks good"). Build Android first:** A1, A2 and A4 on Android, then the founder's Android vet; the iPhone (A3) after. Work on `feature/native-apps`, branched from `feature/android-app` (PR #112, the website's half it needs), in its own worktree. **The founder waived Fable's reviews for this build** (2026-10-18: "waive all the fable reviews i trust you"), so Opus takes each `[Fable]` step and says so beside it. Every new package is a release at least two weeks old (Capacitor 8.5.3 was days old on 2026-10-18).
 
 The founder's choices (2026-10-18): **one shared app in both stores**, built with Capacitor 8, showing today's Toolbox screens and adding **push notifications, Face ID / fingerprint, and camera and scanning**. iPhone on the **public App Store**; no Mac, so iPhone builds run on GitHub's free macOS machines (the repo is public). Same ID on both: `com.kaadalgroup.toolbox`.
 
@@ -10,7 +10,7 @@ Why this shape: every tool works on day one, a website fix still reaches both ap
 
 - **Capacitor calls loading the live site "not intended for production".** Many apps ship it; the cost is review risk when the network drops. So the app carries its own "No connection — try again" screen (`server.errorPath`) and never shows a blank page.
 - **Apple may say a staff-only app belongs in Apple Business Manager** (guideline 3.2), as it has for others. The fallback is the same build sent as a private Custom App: a setting in App Store Connect, not a rebuild.
-- **Google refuses to sign in inside an app's web view.** "Sign in with Google" must open the phone's browser and come back through a verified link (step A4). Apple's demo reviewer needs that path, as Play's does.
+- **Google refuses to sign in inside an app's web view.** "Sign in with Google" must open in a browser tab and come back to the app (step A4). Apple's demo reviewer needs that path, as Play's does.
 - **Apple's login rule (4.8)** exempts apps that sign in with an existing company account, which ours is; the review notes say so.
 
 ## Founder first
@@ -32,10 +32,13 @@ Why this shape: every tool works on day one, a website fix still reaches both ap
   5. Tap into a form field: the keyboard doesn't cover it.
   6. Attach a picture somewhere (an expense bill or a drawing): the phone's picker opens.
   7. Flight mode on, open a page: "No connection". Flight mode off, **Try again**.
-  8. Known and expected: **Continue with Google** leaves the app for Chrome. That's A4.
+  8. **Continue with Google** opens Google in a burgundy tab over the app. It finishes signing in only once the two steps below A4 are done.
 - [ ] [Opus] iPhone: a manually-run GitHub workflow on a macOS machine that builds, signs and uploads to TestFlight with the App Store Connect key held as GitHub secrets. Never runs on pull requests, so a fork can't reach the secrets.
-- [ ] [Fable] **Google sign-in out of the web view**: the button opens the system browser; Google returns to `https://toolbox.kaadalgroup.com/auth/callback`, which the phone hands to the app (Universal Link on iPhone through a public `/.well-known/apple-app-site-association`, App Link on Android through the existing `assetlinks.json`), and the app finishes the sign-in in its own web view, where the PKCE cookie lives. New public path, so `SECURITY.md` first.
-- [ ] [Opus] Build A4; the web app learns it is inside the app only through `lib/native/` (a shared module, `@capacitor/core` its one new web dependency) so no tool talks to the phone directly.
+- [x] [Fable → Opus] **Google sign-in out of the web view.** The founder waived Fable's review (2026-10-18: "waive all the fable reviews i trust you"), so Opus designed it, more simply than first drafted here: Google returns to the app's own address, `com.kaadalgroup.toolbox://auth/callback`, rather than a verified web link, so **no new public path** (no `apple-app-site-association`) and the iPhone uses the same address. The code alone is worthless without the PKCE cookie in the app's web view. The rule is in `SECURITY.md`, the mechanics in `mobile/PLAN.md`.
+- [x] [Opus] Built: `lib/native/app.ts` reads the user agent's mark on the server (pure and tested, no new web dependency); `signInWithGoogle` picks the return address; on Android, other sites open in a Chrome tab over the app and the return is finished in the web view. Seen on the emulator: Google's page in a burgundy tab over the app, its close button back to the app, and a return carrying a made-up code finished on the site and refused, with the app open and from cold.
+- [ ] **Before the round trip works**, two things outside the code:
+  - [ ] [Founder] Add `com.kaadalgroup.toolbox://auth/callback` to staging's Supabase redirect list: Authentication → URL Configuration → Redirect URLs (Opus's attempt through the management API was blocked by the session's safety check). Staging's settings become production's at the switch, so this is the only time; the new practice project needs it too.
+  - [ ] [Founder] Merge the website's half to staging (PR #112, then this branch's website change), so `toolbox.kaadalgroup.com` answers the app.
 - [ ] [Founder] Vet on TestFlight and Play's internal track: sign in all three ways, open every team's tools, turn on flight mode and see the offline screen.
 
 ## B. Face ID and fingerprint

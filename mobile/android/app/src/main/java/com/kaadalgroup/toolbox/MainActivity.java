@@ -38,6 +38,7 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        registerPlugin(ExternalLinksPlugin.class);
         super.onCreate(savedInstanceState);
         downloadManager = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
         ContextCompat.registerReceiver(
@@ -49,6 +50,23 @@ public class MainActivity extends BridgeActivity {
         bridge.getWebView().setDownloadListener((url, userAgent, contentDisposition, mimeType, contentLength) ->
             startDownload(url, userAgent, contentDisposition, mimeType)
         );
+    }
+
+    // Google's sign-in returns to com.kaadalgroup.toolbox://auth/callback (lib/native/app.ts); the
+    // code is finished on the site's own callback, in this web view, where its PKCE cookie lives.
+    // Called by Capacitor at a cold start too.
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        Uri data = intent.getData();
+        boolean fromRecents = (intent.getFlags() & Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0;
+        if (data == null || fromRecents || bridge == null) return;
+        if (!getPackageName().equals(data.getScheme()) || !"auth".equals(data.getHost()) || !"/callback".equals(data.getPath())) {
+            return;
+        }
+        String query = data.getEncodedQuery();
+        String callback = bridge.getServerUrl() + "/auth/callback" + (query == null ? "" : "?" + query);
+        bridge.getWebView().loadUrl(callback);
     }
 
     @Override
