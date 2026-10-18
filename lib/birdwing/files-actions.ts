@@ -33,7 +33,8 @@ export async function uploadStayFile(stayId: string, formData: FormData): Promis
     created_by: user.id,
   });
   if (error) {
-    await supabase.storage.from(STAYS_BUCKET).remove([path]);
+    const { error: removeError } = await supabase.storage.from(STAYS_BUCKET).remove([path]);
+    if (removeError) console.error("uploadStayFile cleanup failed:", removeError);
     console.error("uploadStayFile row write failed:", error);
     return { error: dbErrorMessage(error, "Could not save the file. Try again.") };
   }

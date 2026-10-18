@@ -189,7 +189,7 @@ export async function createStay(_prev: ActionState, formData: FormData): Promis
     );
     if (roomError) {
       // Two people booked the same room in the same second: the stay is cancelled with the reason, keeping no room it did not get.
-      await supabase
+      const { error: cancelError } = await supabase
         .from("birdwing_stays")
         .update({
           status: "cancelled",
@@ -197,6 +197,7 @@ export async function createStay(_prev: ActionState, formData: FormData): Promis
           updated_by: user.id,
         })
         .eq("id", stay.id);
+      if (cancelError) console.error("createStay cancel failed:", cancelError);
       if (roomError.code === OVERLAP) return { error: overlapMessage };
       return fromDb(roomError, "Could not book the rooms. Try again.");
     }
@@ -253,7 +254,7 @@ export async function createBlock(_prev: ActionState, formData: FormData): Promi
     })),
   );
   if (roomError) {
-    await supabase
+    const { error: cancelError } = await supabase
       .from("birdwing_stays")
       .update({
         status: "cancelled",
@@ -261,6 +262,7 @@ export async function createBlock(_prev: ActionState, formData: FormData): Promi
         updated_by: user.id,
       })
       .eq("id", block.id);
+    if (cancelError) console.error("createBlock cancel failed:", cancelError);
     if (roomError.code === OVERLAP) return { error: overlapMessage };
     return fromDb(roomError, "Could not block the rooms. Try again.");
   }
