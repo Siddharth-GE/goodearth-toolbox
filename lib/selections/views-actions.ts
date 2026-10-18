@@ -70,13 +70,19 @@ export async function uploadSpaceView(
     };
   }
 
-  const { data: last } = await supabase
+  const { data: last, error: lastError } = await supabase
     .from("space_views")
     .select("sort_order")
     .eq("space_id", spaceId)
     .order("sort_order", { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (lastError) {
+    const { error: removeError } = await supabase.storage.from(BUCKET).remove([path]);
+    if (removeError) console.error("uploadSpaceView cleanup failed:", removeError);
+    console.error("uploadSpaceView order read failed:", lastError);
+    return { error: "Could not save the image. Try again." };
+  }
 
   const { error } = await supabase.from("space_views").insert({
     space_id: spaceId,
@@ -88,7 +94,8 @@ export async function uploadSpaceView(
 
   if (error) {
     // The object is already in storage; an orphan is better than a row pointing at nothing.
-    await supabase.storage.from(BUCKET).remove([path]);
+    const { error: removeError } = await supabase.storage.from(BUCKET).remove([path]);
+    if (removeError) console.error("uploadSpaceView cleanup failed:", removeError);
     console.error("uploadSpaceView insert failed:", error);
     return { error: "Could not save the image. Try again." };
   }
@@ -187,7 +194,10 @@ export async function deleteSpaceView(viewId: string): Promise<ActionState> {
   }
 
   // Row first, then the object: an orphaned file is invisible, a row pointing at a deleted file is a broken image on a client document.
-  if (view?.storage_path) await supabase.storage.from(BUCKET).remove([view.storage_path]);
+  if (view?.storage_path) {
+    const { error: removeError } = await supabase.storage.from(BUCKET).remove([view.storage_path]);
+    if (removeError) console.error("deleteSpaceView file removal failed:", removeError);
+  }
 
   revalidatePath("/selections", "layout");
   return undefined;

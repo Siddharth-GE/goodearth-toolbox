@@ -14,11 +14,15 @@ export async function GET(_request: Request, { params }: { params: Promise<{ vie
   const { viewId } = await params;
   const supabase = await createClient();
 
-  const { data: view } = await supabase
+  const { data: view, error: viewError } = await supabase
     .from("space_views")
     .select("storage_path")
     .eq("id", viewId)
     .maybeSingle();
+  if (viewError) {
+    console.error("design view lookup failed:", viewError);
+    return new Response("Could not load the image", { status: 500 });
+  }
   if (!view) return new Response("Not found", { status: 404 });
 
   const { data: file, error } = await supabase.storage

@@ -2,6 +2,7 @@ import "server-only";
 
 import { requireTool } from "@/lib/auth/access";
 import { fetchAll } from "@/lib/supabase/fetch-all";
+import { assertRead, readFailed } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
 import { cache } from "react";
 
@@ -83,6 +84,9 @@ export async function getWelcomeCounts() {
     supabase.from("selections").select("id", { count: "exact", head: true }).eq("status", "draft"),
     supabase.from("selections").select("id", { count: "exact", head: true }).eq("status", "issued"),
   ]);
+  assertRead("Selections", "the unit count", units.error);
+  assertRead("Selections", "the draft count", drafts.error);
+  assertRead("Selections", "the issued count", issued.error);
 
   return {
     units: units.count ?? 0,
@@ -108,10 +112,7 @@ export async function listUnitsForSelections({
     .order("id")
     .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
 
-  if (error) {
-    console.error("listUnitsForSelections failed:", error);
-    return { units: [], total: 0, page: currentPage, pageCount: 1, pageSize };
-  }
+  if (error) readFailed("Selections", "the units", error);
 
   const total = count ?? 0;
   return {
@@ -152,7 +153,7 @@ export const getSelection = cache(async (selectionId: string): Promise<Selection
     .select("*, units(name, projects(name))")
     .eq("id", selectionId)
     .maybeSingle();
-  if (error) console.error("listUnitsForSelections failed:", error);
+  if (error) readFailed("Selections", "this selection", error);
   if (!data) return null;
 
   const unit = data.units as { name: string; projects: { name: string } | null } | null;
@@ -197,6 +198,7 @@ export const listUnitSpaces = cache(async function listUnitSpaces(
         )
       : Promise.resolve([] as { unit_space_id: string }[]),
   ]);
+  assertRead("Selections", "this unit's spaces", spacesResult.error);
 
   const counts = new Map<string, number>();
   for (const line of linesResult) {
@@ -286,7 +288,7 @@ export async function getPreviousIssued(
     .order("revision_no", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (error) console.error("getPreviousIssued failed:", error);
+  if (error) readFailed("Selections", "the previous revision", error);
   return (data as SelectionRow) ?? null;
 }
 
@@ -359,7 +361,7 @@ export async function listActiveSpaceTypes() {
     .select("id, code, name, sort_order")
     .eq("status", "active")
     .order("sort_order");
-  if (error) console.error("listActiveSpaceTypes failed:", error);
+  if (error) readFailed("Selections", "the room types", error);
   return data ?? [];
 }
 
@@ -394,7 +396,7 @@ export async function getDownstreamImpact(lineKeys: string[]): Promise<Map<strin
   );
   if (anchored.length === 0) return impact;
 
-  const [{ data: indents }, poFacts] = await Promise.all([
+  const [{ data: indents, error: indentsError }, poFacts] = await Promise.all([
     supabase
       .from("indents")
       .select("id, reference")
@@ -412,6 +414,7 @@ export async function getDownstreamImpact(lineKeys: string[]): Promise<Map<strin
     ),
   ]);
 
+  if (indentsError) readFailed("Selections", "the affected indents", indentsError);
   const indentRefs = new Map((indents ?? []).map((row) => [row.id, row.reference]));
   const poRefsByLineId = new Map<string, Set<string>>();
   for (const fact of poFacts) {
