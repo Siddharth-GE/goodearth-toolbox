@@ -30,43 +30,7 @@ import { useRouter } from "next/navigation";
 import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { useMemo, useState } from "react";
 import { chosenUom, componentOptions } from "../../../_components/component-options";
-
-/** One row of what a unit of the work uses, as written in the list (mixes not expanded). `ref` is "mix:<id>" or "material:<id>". */
-export type RateComponentView = {
-  ref: string;
-  kind: "material" | "mix";
-  name: string;
-  uom: string;
-  qtyPerUnit: number;
-};
-
-/** One material the rate is built from, mixes expanded. */
-export type RatePriceView = {
-  itemId: string;
-  name: string;
-  uom: string;
-  qtyPerUnit: number;
-  mastersPrice: number | null;
-  villaPrice: number | null;
-  cost: number | null;
-};
-
-export type LineRateView = {
-  lineId: string;
-  workItemId: string;
-  workName: string;
-  workUom: string | null;
-  own: boolean;
-  labour: { villa: number | null; rateBook: number | null; inUse: number | null };
-  components: RateComponentView[];
-  prices: RatePriceView[];
-  rate: number | null;
-};
-
-export type RateOptions = {
-  materials: { id: string; name: string; uom: string; rate: number | null }[];
-  mixes: { id: string; name: string; uom: string }[];
-};
+import type { LineRateView, RateComponentView, RateOptions } from "@/lib/estimator/estimate-view";
 
 function RateTrigger({ rate, uom }: { rate: number | null; uom: string | null }) {
   return (

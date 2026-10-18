@@ -25,6 +25,7 @@ import type { MixRow } from "./mixes-queries";
 import type { MaterialItemRow } from "./shared";
 import type { WorkStatusRow } from "./works-queries";
 
+/** One row of what a unit of the work uses, as written (mixes not expanded). `ref` is "mix:<id>" or "material:<id>". */
 export type RateComponentView = {
   ref: string;
   kind: "material" | "mix";
@@ -41,16 +42,24 @@ export type LineRateView = {
   own: boolean;
   labour: { villa: number | null; rateBook: number | null; inUse: number | null };
   components: RateComponentView[];
-  prices: {
-    itemId: string;
-    name: string;
-    uom: string;
-    qtyPerUnit: number;
-    mastersPrice: number | null;
-    villaPrice: number | null;
-    cost: number | null;
-  }[];
+  prices: RatePriceView[];
   rate: number | null;
+};
+
+/** One material the rate is built from, mixes expanded. */
+export type RatePriceView = {
+  itemId: string;
+  name: string;
+  uom: string;
+  qtyPerUnit: number;
+  mastersPrice: number | null;
+  villaPrice: number | null;
+  cost: number | null;
+};
+
+export type RateOptions = {
+  materials: { id: string; name: string; uom: string; rate: number | null }[];
+  mixes: { id: string; name: string; uom: string }[];
 };
 
 export type TakeoffRow = {
