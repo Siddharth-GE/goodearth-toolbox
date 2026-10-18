@@ -13,6 +13,7 @@ import { listUnits } from "@/lib/masters/units";
 import { listVendors } from "@/lib/masters/vendors";
 import { listStores } from "@/lib/masters/stores";
 import { fetchAll } from "@/lib/supabase/fetch-all";
+import { assertRead } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -68,6 +69,12 @@ export async function getWelcomeCounts() {
       .select("id", { count: "exact", head: true })
       .eq("status", "deletion_requested"),
   ]);
+
+  assertRead(
+    "purchase-orders",
+    "the welcome counts",
+    drafts.error ?? issued.error ?? deletions.error,
+  );
 
   return {
     drafts: drafts.count ?? 0,
@@ -536,11 +543,12 @@ export async function getIndentPool(poId: string): Promise<IndentPool | null> {
   await requireTool("/purchase-orders");
   const supabase = await createClient();
 
-  const { data: po } = await supabase
+  const { data: po, error: poError } = await supabase
     .from("purchase_orders")
     .select("id, project_id, plot_id, unit_id, units(name), plots(name)")
     .eq("id", poId)
     .maybeSingle();
+  assertRead("purchase-orders", "this order's indent pool", poError);
   if (!po) return null;
 
   // Read to completion: a truncated pool hides approved lines, reading as "already ordered".
