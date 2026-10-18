@@ -6,6 +6,7 @@ import { requireTool } from "@/lib/auth/access";
 import type { Filterable } from "@/lib/list-params";
 import { labelsById, profileNames } from "@/lib/masters/names";
 import { fetchAll } from "@/lib/supabase/fetch-all";
+import { assertRead } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
 
 import { batchLabel, lineAmount, sumAmounts, type Amount } from "./batches";
@@ -42,6 +43,8 @@ export async function getWelcomeCounts() {
       .select("id", { count: "exact", head: true })
       .gte("issued_at", since),
   ]);
+
+  assertRead("inventory", "the welcome counts", awaiting.error ?? received.error ?? issued.error);
 
   return {
     awaitingDelivery: awaiting.count ?? 0,
@@ -244,11 +247,12 @@ export async function getReceivePool(poId: string): Promise<ReceivePool | null> 
   await requireTool("/inventory");
   const supabase = await createClient();
 
-  const { data: po } = await supabase
+  const { data: po, error: poError } = await supabase
     .from("po_facts")
     .select("id, project_id, plot_id, unit_id, vendor_id, reference, status")
     .eq("id", poId)
     .maybeSingle();
+  assertRead("inventory", "this order", poError);
   if (!po) return null;
 
   // Completeness: a truncated line list would let the rest of the delivery go unrecorded.
@@ -535,13 +539,14 @@ export const getGoodsReceipt = cache(async (receiptId: string): Promise<ReceiptD
   await requireTool("/inventory");
   const supabase = await createClient();
 
-  const { data: receipt } = await supabase
+  const { data: receipt, error: receiptError } = await supabase
     .from("goods_receipts")
     .select(
       "id, reference, po_id, project_id, store_id, to_site, plot_id, unit_id, work_item_id, challan_no, received_at, note, created_at, created_by, work_items(name, work_categories(name))",
     )
     .eq("id", receiptId)
     .maybeSingle();
+  assertRead("inventory", "this receipt", receiptError);
   if (!receipt) return null;
 
   // Same order the batch names count in (batchFactsById).

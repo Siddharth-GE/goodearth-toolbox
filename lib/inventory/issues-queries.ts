@@ -6,6 +6,7 @@ import { requireTool } from "@/lib/auth/access";
 import type { Filterable } from "@/lib/list-params";
 import { labelsById, profileNames } from "@/lib/masters/names";
 import { fetchAll } from "@/lib/supabase/fetch-all";
+import { assertRead } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
 import { issueValue, recordedDraws, type BatchDraw } from "./batches";
 import { findOverIssues, type OverIssueRow } from "./over-issue";
@@ -161,13 +162,14 @@ export const getStockIssue = cache(async (issueId: string): Promise<IssueDetail 
   await requireTool("/inventory");
   const supabase = await createClient();
 
-  const { data: issue } = await supabase
+  const { data: issue, error: issueError } = await supabase
     .from("stock_issues")
     .select(
       "id, reference, store_id, to_store_id, plot_id, work_item_id, issued_at, note, created_by, work_items(name, work_categories(name)), projects(name, companies(name))",
     )
     .eq("id", issueId)
     .maybeSingle();
+  assertRead("inventory issues", "this issue", issueError);
   if (!issue) return null;
 
   const lines = await fetchAll((from, to) =>
@@ -450,10 +452,8 @@ export async function getOverIssueRows(
     .select("id")
     .eq("plot_id", plotId)
     .maybeSingle();
-  if (unitError) {
-    console.error("inventory: over-issue unit lookup failed:", unitError);
-    return [];
-  }
+  // A failed read must not read as "nothing over-issued".
+  assertRead("inventory", "the over-issue check", unitError);
   if (!unit) return [];
 
   const takeoffRaw = await fetchAll<{
@@ -545,10 +545,7 @@ export async function getOverIssueRows(
     .from("items")
     .select("id, default_uom")
     .in("id", itemIds);
-  if (itemsError) {
-    console.error("inventory: over-issue items lookup failed:", itemsError);
-    return [];
-  }
+  assertRead("inventory", "the over-issue check", itemsError);
   const itemUomById = new Map((items ?? []).map((item) => [item.id, item.default_uom as string]));
 
   return findOverIssues(takeoff, drawnByItem, itemUomById);
