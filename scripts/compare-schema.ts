@@ -21,8 +21,8 @@ const SETTINGS_EXPECTED_TO_DIFFER = new Set([
   "uri_allow_list", // and its own redirect list
   "smtp_pass", // returned as a hash, not the value
   "external_google_secret", // same
-  "smtp_sender_name", // staging says "(PRACTICE SITE)" on purpose
-  "mailer_subjects_magic_link", // and so does its sign-in code subject
+  "smtp_sender_name", // each project names its own sender
+  "mailer_subjects_magic_link", // and its own sign-in code subject
 ]);
 
 type Aspect = { name: string; query: string };
