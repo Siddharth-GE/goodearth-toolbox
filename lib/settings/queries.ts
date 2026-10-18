@@ -3,6 +3,7 @@ import "server-only";
 import { requireAdmin } from "@/lib/auth/access";
 import { requireUser } from "@/lib/auth/dal";
 import { fetchAll } from "@/lib/supabase/fetch-all";
+import { assertRead } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
 import type { AccessAuditRow } from "./history";
 
@@ -123,7 +124,9 @@ export async function listAccessHistory(userId: string): Promise<AccessAuditRow[
       .limit(HISTORY_LIMIT),
   ]);
 
-  if (leadsRes.error) console.error("listAccessHistory team leads failed:", leadsRes.error);
+  assertRead("Settings", "the access history", appsRes.error);
+  assertRead("Settings", "the team lead history", leadsRes.error);
+  assertRead("Settings", "the role history", profileRes.error);
   const rows = [...(appsRes.data ?? []), ...(leadsRes.data ?? []), ...(profileRes.data ?? [])].sort(
     (a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0),
   );

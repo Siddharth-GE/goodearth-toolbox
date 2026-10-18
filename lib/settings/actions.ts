@@ -80,7 +80,7 @@ export async function setActive(userId: string, active: boolean): Promise<Action
   const supabase = await createClient();
 
   if (!active) {
-    const [{ data: target }, { count }] = await Promise.all([
+    const [{ data: target, error: targetError }, { count, error: countError }] = await Promise.all([
       supabase.from("profiles").select("role, is_active").eq("id", userId).maybeSingle(),
       supabase
         .from("profiles")
@@ -88,6 +88,10 @@ export async function setActive(userId: string, active: boolean): Promise<Action
         .eq("role", "admin")
         .eq("is_active", true),
     ]);
+    if (targetError || countError) {
+      console.error("setActive check failed:", targetError ?? countError);
+      return { error: "Could not check that account. Try again." };
+    }
     if (!target) return { error: "That person no longer exists." };
 
     const blocked = blockedReason({
@@ -118,7 +122,7 @@ export async function setAdmin(userId: string, isAdmin: boolean): Promise<Action
   const supabase = await createClient();
 
   if (!isAdmin) {
-    const [{ data: target }, { count }] = await Promise.all([
+    const [{ data: target, error: targetError }, { count, error: countError }] = await Promise.all([
       supabase.from("profiles").select("role, is_active").eq("id", userId).maybeSingle(),
       supabase
         .from("profiles")
@@ -126,6 +130,10 @@ export async function setAdmin(userId: string, isAdmin: boolean): Promise<Action
         .eq("role", "admin")
         .eq("is_active", true),
     ]);
+    if (targetError || countError) {
+      console.error("setAdmin check failed:", targetError ?? countError);
+      return { error: "Could not check that account. Try again." };
+    }
     if (!target) return { error: "That person no longer exists." };
 
     const blocked = blockedReason({
