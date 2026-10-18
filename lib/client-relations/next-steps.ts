@@ -3,24 +3,10 @@
  * NO DATE IS OVERDUE: an undated action sits with the overdue ones until it gets a real date.
  * "Waiting on management" outranks everything. A plot with a buyer and nothing open has "no next step", unless handed over.
  */
+import { addDays, daysBetween, weekdayOf } from "@/lib/dates";
 import { formatDayDate, formatShortDate } from "@/lib/format";
 
-function utc(iso: string): number {
-  const [y, m, d] = iso.split("-").map(Number);
-  return Date.UTC(y, m - 1, d);
-}
-
-export function addDays(iso: string, days: number): string {
-  return new Date(utc(iso) + days * 86_400_000).toISOString().slice(0, 10);
-}
-
-export function daysBetween(from: string, to: string): number {
-  return Math.round((utc(to) - utc(from)) / 86_400_000);
-}
-
-export function weekdayOf(iso: string): number {
-  return new Date(utc(iso)).getUTCDay();
-}
+export { addDays, daysBetween, weekdayOf };
 
 export type ActionBucket = "confirm" | "management" | "overdue" | "week" | "later" | "done";
 

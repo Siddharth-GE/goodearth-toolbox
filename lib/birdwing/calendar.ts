@@ -1,5 +1,6 @@
 // Rooms down the side, days across, each cell the NIGHT of that day. A booking holds nights [from, to): the morning of `to`
 // the room is free again, so a day with a departure and an arrival is a TURNOVER. Dates are YYYY-MM-DD strings, stepped in UTC.
+import { addDays, weekdayOf } from "@/lib/dates";
 import type { StayStatus } from "./shared";
 
 export type CalendarBooking = {
@@ -28,11 +29,7 @@ export type CalendarCell = {
   turnover: boolean;
 };
 
-export function addDays(date: string, days: number): string {
-  const at = new Date(`${date}T00:00:00Z`);
-  at.setUTCDate(at.getUTCDate() + days);
-  return at.toISOString().slice(0, 10);
-}
+export { addDays };
 
 export function daysFrom(start: string, count: number): string[] {
   return Array.from({ length: count }, (_, index) => addDays(start, index));
@@ -45,7 +42,7 @@ export function monthDays(month: string): string[] {
 }
 
 export function weekStart(date: string): string {
-  const weekday = new Date(`${date}T00:00:00Z`).getUTCDay(); // 0 = Sunday
+  const weekday = weekdayOf(date);
   return addDays(date, -((weekday + 6) % 7));
 }
 

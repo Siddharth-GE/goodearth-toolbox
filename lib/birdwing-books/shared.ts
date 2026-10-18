@@ -1,4 +1,10 @@
-/** Birdwing Books' vocabulary: the database's CHECK lists and the words a person reads for each. Import-free, so "use server" files and client components can import it. */
+/** Birdwing Books' vocabulary: the database's CHECK lists and the words a person reads for each. Imports only the pure lib/dates, so "use server" files and client components can import it. */
+import {
+  addDays,
+  lastDayOfMonth,
+  monthLabel as dateMonthLabel,
+  shiftMonth as dateShiftMonth,
+} from "@/lib/dates";
 
 export const GRANT = "/birdwing-books";
 
@@ -37,24 +43,17 @@ export function oneOf<T extends string>(list: readonly T[], value: unknown): T |
     : null;
 }
 
+/** 'October 2026'. */
 export function monthLabel(month: string): string {
-  return new Date(`${month.slice(0, 7)}-01T00:00:00Z`).toLocaleDateString("en-IN", {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  });
+  return dateMonthLabel(month, "long");
 }
 
+/** Always a "YYYY-MM", even when handed a full date. */
 export function shiftMonth(month: string, by: number): string {
-  const [year, mon] = month.slice(0, 7).split("-").map(Number);
-  const at = new Date(Date.UTC(year, mon - 1 + by, 1));
-  return at.toISOString().slice(0, 7);
+  return dateShiftMonth(month.slice(0, 7), by);
 }
 
 export function daysOfMonth(month: string): string[] {
-  const [year, mon] = month.slice(0, 7).split("-").map(Number);
-  const count = new Date(Date.UTC(year, mon, 0)).getUTCDate();
-  return Array.from({ length: count }, (_, index) =>
-    new Date(Date.UTC(year, mon - 1, index + 1)).toISOString().slice(0, 10),
-  );
+  const count = Number(lastDayOfMonth(month).slice(8, 10));
+  return Array.from({ length: count }, (_, index) => addDays(`${month.slice(0, 7)}-01`, index));
 }

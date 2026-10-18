@@ -11,6 +11,7 @@
  * Pure.
  */
 import type { AttendanceStatus } from "./shared";
+import { lastDayOfMonth } from "@/lib/dates";
 import { roundPaise } from "@/lib/line-money";
 
 export type PayRule = {
@@ -63,8 +64,7 @@ export function minutesOf(time: string | null): number | null {
 
 /** The rule in force for a month: the latest effective on or before its last day; null if none yet. */
 export function ruleForMonth(rules: PayRule[], month: string): PayRule | null {
-  const [year, mon] = month.slice(0, 7).split("-").map(Number);
-  const lastDay = new Date(Date.UTC(year, mon, 0)).toISOString().slice(0, 10);
+  const lastDay = lastDayOfMonth(month);
   return (
     [...rules]
       .filter((rule) => rule.effectiveFrom <= lastDay)

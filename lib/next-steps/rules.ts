@@ -3,26 +3,10 @@
  * "waiting on management" outranks everything; "finished, waiting to confirm" is the setter's to close.
  * Dates are ISO strings compared as strings; `today` is passed in, nothing here reads a clock.
  */
+import { addDays, daysBetween, weekdayOf } from "@/lib/dates";
 import { formatDayDate, formatShortDate } from "@/lib/format";
 
-function utc(iso: string): number {
-  const [y, m, d] = iso.split("-").map(Number);
-  return Date.UTC(y, m - 1, d);
-}
-
-export function addDays(iso: string, days: number): string {
-  return new Date(utc(iso) + days * 86_400_000).toISOString().slice(0, 10);
-}
-
-/** Whole days from `from` to `to` — negative when `to` is earlier. */
-export function daysBetween(from: string, to: string): number {
-  return Math.round((utc(to) - utc(from)) / 86_400_000);
-}
-
-/** 0 = Sunday … 6 = Saturday. */
-export function weekdayOf(iso: string): number {
-  return new Date(utc(iso)).getUTCDay();
-}
+export { addDays, daysBetween, weekdayOf };
 
 export const ACTION_STATUSES = [
   { value: "open", label: "Open" },

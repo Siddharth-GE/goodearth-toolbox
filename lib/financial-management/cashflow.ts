@@ -7,6 +7,7 @@
 
 import { ACCENT_TOKEN, chartToken } from "@/lib/charts/palette";
 import type { CartesianModel, ChartPoint } from "@/lib/charts/series";
+import { monthLabel, shiftMonth } from "@/lib/dates";
 
 /** Money either side of a rounding boundary counts as settled. */
 const EPSILON = 0.005;
@@ -21,33 +22,7 @@ export function monthKey(iso: string): string {
   return iso.slice(0, 7);
 }
 
-const MONTH_NAMES = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
-
-/** '2026-08' → 'Aug 2026'. */
-export function monthLabel(key: string): string {
-  const month = Number(key.slice(5, 7));
-  return `${MONTH_NAMES[month - 1] ?? key} ${key.slice(0, 4)}`;
-}
-
-function shiftMonth(key: string, by: number): string {
-  const total = Number(key.slice(0, 4)) * 12 + (Number(key.slice(5, 7)) - 1) + by;
-  const year = Math.floor(total / 12);
-  const month = (total % 12) + 1;
-  return `${year}-${String(month).padStart(2, "0")}`;
-}
+export { monthLabel };
 
 export function lastMonths(today: string, count: number): string[] {
   const current = monthKey(today);
