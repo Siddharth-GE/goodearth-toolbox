@@ -67,7 +67,7 @@ You are admin, so you see both tools without a grant. A test stay made here is a
 8. **Review**: 128 stays. Tick a few Goodearth ones → pick **Marketing** → **Set cost centre** → **Charge pending to cost centres** → they leave the list; their stay pages show "charged to Marketing".
 9. **Birdwing Books → Expenses**: October 2026 shows the old sheet's lines; attach a photo of a bill to one from your phone.
 10. **Upload the sheet**: save the workbook's _Combined Expenses_ sheet as CSV and upload it → the preview says **0 new**, every line _Already in_.
-11. **Attendance** on your phone: today at the top — mark Sajna _Present_, tap her name, in 07:30, out 18:30, Save.
+11. **Attendance** on your phone: today at the top — mark Sajna _Present_, tap the name, in 07:30, out 18:30, Save.
 12. **Settings** → give Amal, Appu and Bijeeth their pay rules (Amal ₹30,000, Appu ₹40,000, no shift = fixed).
 13. **Salaries → October 2026**: Amal's card says ₹30,000 is already in Expenses from the old sheet, and won't confirm. **November**: once the month begins, Sajna's figures are worked out from attendance.
 14. **Financial Management → Birdwing**: the tiles match the HTML page — billed ₹21.4 L, collected ₹14.0 L, pending ₹7.3 L, expenses ₹23.9 L, occupancy about 30% (estimated) — less what steps 5–8 moved.
@@ -122,7 +122,7 @@ _The Saarang tracker, inside Client Relations._
 8. **Plots**: lot cards with health pills; the **No next step** chip lists sold plots with nothing open. Open Plot 10 → **Next steps** on top; add one there; tap a Kaadal stage; step the build forward with ▶ — the card's rail fills.
 9. **Clients**: cards with faces and plot chips; open one — their plots and their actions. **Collections** reads like Actions: overdue first.
 10. **Plots → Saarang West - Villas**: 27 cards, six with a buyer, each showing its configuration (1BHK Study …). In Saarang, **Plot 33 & 34** is one card; Plots 9 and 27 have no buyer; Plots 3, 35 and 43 have their new buyers. **Clients → Stage: Lost** lists the three who cancelled, each with its reason.
-11. **Anu, signed in on her phone**: she opens on her own list with the greeting; the composer, the menus, the chips and the tick work with a thumb; nothing scrolls sideways.
+11. **Anu, signed in on a phone**: Anu opens on their own list with the greeting; the composer, the menus, the chips and the tick work with a thumb; nothing scrolls sideways.
 12. As the **probe** (it holds `/estimator` and `/inventory`): Client Relations is not in the sidebar, and `/client-relations/actions` sends it home.
 
 ## Verification — the founder, on staging (eighth piece)
@@ -130,10 +130,10 @@ _The Saarang tracker, inside Client Relations._
 _Only whoever set an action closes it._
 
 1. **Actions** → add "Trial: send the brochure" for **Anu**, Tomorrow. You set it.
-2. Ask Anu (or sign in as her) to open **Actions**: her tick on it says _Mark finished — Siddharth confirms_. She ticks it → it moves to **Waiting to confirm**, "Waiting for Siddharth to confirm".
+2. Ask Anu (or sign in as Anu) to open **Actions**: Anu's tick on it says _Mark finished — Siddharth confirms_. Anu ticks it → it moves to **Waiting to confirm**, "Waiting for Siddharth to confirm".
 3. Back as you: it tops your list under **Waiting to confirm**, "Waiting for you to confirm". Tick it → closed. Undo works.
-4. Anu cannot open it again; on Sayooj's own actions her tick is dashed and locked.
-5. One of Anu's imported actions (from the tracker): she ticks it straight to done — she counts as its setter.
+4. Anu cannot open it again; on Sayooj's own actions Anu's tick is dashed and locked.
+5. One of Anu's imported actions (from the tracker): Anu ticks it straight to done, counting as its setter.
 
 ## Verification — the founder, on staging (tenth piece)
 
@@ -142,10 +142,10 @@ _Each person sees the work assigned to them._
 With `/client-relations` given to Anu, Sayooj and Sebastina:
 
 1. **Settings → People → Sayooj**: under Client Relations, a **Team lead** tick. Leave it off for now.
-2. **As Anu** (on her phone if you can): **Plots** shows only her plots; **Actions** opens on her own list, and **All I see** adds what she set for others and others' steps on her plots; **Clients** lists only her clients; the owner menu shows names without counts.
+2. **As Anu** (on a phone if you can): **Plots** shows only Anu's plots; **Actions** opens on Anu's own list, and **All I see** adds what Anu set for others and others' steps on Anu's plots; **Clients** lists only Anu's clients; the owner menu shows names without counts.
 3. Paste the link of one of Sayooj's plots (from your own view) into Anu's browser: "This plot is not one of yours".
-4. As Anu, add a step on one of her plots for Sayooj. **As Sayooj**: that plot appears, with that one step — not Anu's other steps on it. He ticks it finished; Anu closes it; the plot leaves Sayooj's list.
-5. As Anu, give one of her plots to Sebastina (Construction owner chip): the page turns into "This plot is not one of yours… it is with your colleague now". As Sebastina, it is in her Plots.
+4. As Anu, add a step on one of Anu's plots for Sayooj. **As Sayooj**: that plot appears, with that one step — not Anu's other steps on it. Sayooj ticks it finished; Anu closes it; the plot leaves Sayooj's list.
+5. As Anu, give one of Anu's plots to Sebastina (Construction owner chip): the page turns into "This plot is not one of yours… it is with your colleague now". As Sebastina, it is in Sebastina's Plots.
 6. Tick **Sayooj as Team lead**: their Actions opens on everyone with the team strip, Plots shows all of them, the owner menu shows counts. Their access history says "Made team lead in Client Relations". Untick: back to their own.
 7. As yourself: everything as before. **Financial Management** and **Reporter** still show every plot's payments.
 8. As the **probe**: Client Relations is still refused.
@@ -195,7 +195,7 @@ Staging is becoming the real database, so use villas the team is really working 
 
 _One owner per side._
 
-1. Open **Plot 17**: its Interior owner now reads **Anu** (from her step). **W14**'s Construction owner reads **Sayooj**.
+1. Open **Plot 17**: its Interior owner now reads **Anu** (from Anu's step). **W14**'s Construction owner reads **Sayooj**.
 2. On a plot with no Interior owner: **Next steps → Interior** — the owner chip reads "No interior owner" in amber; type a step and Add — it asks you to give the plot an Interior owner first.
 3. Give that plot an Interior owner (the Interior card). Add the step — it is theirs; the owner chip on it is not a menu.
 4. Change the plot's **Interior owner** to someone else: every open interior step on it moves to them; a done one keeps who did it.
