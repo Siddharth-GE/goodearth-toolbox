@@ -3,6 +3,7 @@ import "server-only";
 import { requireTool } from "@/lib/auth/access";
 import { profileNames } from "@/lib/masters/names";
 import { fetchAll } from "@/lib/supabase/fetch-all";
+import { assertRead } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
 import { cache } from "react";
 import type { DatedAmount, ForwardMilestone } from "./cashflow";
@@ -113,10 +114,7 @@ export const getFacility = cache(async (facilityId: string): Promise<FacilityDet
     .eq("id", facilityId)
     .maybeSingle();
 
-  if (error) {
-    console.error("getFacility failed:", error);
-    return null;
-  }
+  assertRead("financial-management", "the facility", error);
   if (!facility) return null;
 
   const movements = await fetchAll((from, to) =>
@@ -199,6 +197,12 @@ export async function getWelcomeCounts() {
       .select("id", { count: "exact", head: true })
       .gte("received_on", since),
   ]);
+
+  assertRead(
+    "financial-management",
+    "the welcome counts",
+    facilities.error ?? approvedUnpaid.error ?? receipts.error,
+  );
 
   return {
     facilities: facilities.count ?? 0,
