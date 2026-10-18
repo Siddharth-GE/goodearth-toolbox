@@ -34,7 +34,8 @@ export async function uploadExpenseFile(
     created_by: user.id,
   });
   if (error) {
-    await supabase.storage.from(BILLS_BUCKET).remove([path]);
+    const { error: removeError } = await supabase.storage.from(BILLS_BUCKET).remove([path]);
+    if (removeError) console.error("uploadExpenseFile cleanup failed:", removeError);
     console.error("uploadExpenseFile row write failed:", error);
     return { error: dbErrorMessage(error, "Could not save the bill. Try again.") };
   }
