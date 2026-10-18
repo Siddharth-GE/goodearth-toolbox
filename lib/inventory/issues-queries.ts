@@ -6,24 +6,18 @@ import { requireTool } from "@/lib/auth/access";
 import type { Filterable } from "@/lib/list-params";
 import { labelsById, profileNames } from "@/lib/masters/names";
 import { fetchAll } from "@/lib/supabase/fetch-all";
+import { assertRead } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
 import { issueValue, recordedDraws, type BatchDraw } from "./batches";
 import { findOverIssues, type OverIssueRow } from "./over-issue";
 
 import { batchFactsById, INVENTORY_LIST_LIMIT, itemsById, listActiveStores } from "./queries";
 
-/**
- * Issues and adjustments reads — material leaving a store (to a site or
- * another store) and balance corrections. The boundaries that shape
- * everything here are documented in ./queries.ts.
- */
-
 export type IssueSummary = {
   id: string;
   reference: string;
   store_name: string;
   destination: string;
-  /** The work a plot issue served (0080); null for transfers and history. */
   work_name: string | null;
   issued_at: string;
   line_count: number;
@@ -41,12 +35,9 @@ export type IssuePage = {
 export type IssueListFilters = {
   page?: number;
   projectId?: string;
-  /** The store the material went out of. */
   storeId?: string;
   plotId?: string;
-  /** Issue reference — already made safe by searchParam. */
   q?: string;
-  /** Issued-on date range, YYYY-MM-DD, already checked by dateParam. */
   from?: string;
   to?: string;
 };
@@ -66,7 +57,6 @@ export async function listStockIssues({
   const pageSize = INVENTORY_LIST_LIMIT;
   const currentPage = Math.max(1, page);
 
-  // Every filter in one place. issued_at is a date, so `to` is plain lte.
   const filtered = <T extends Filterable<T>>(query: T): T => {
     let next = query;
     if (projectId) next = next.eq("project_id", projectId);
@@ -90,7 +80,6 @@ export async function listStockIssues({
     .order("id")
     .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
 
-  // A failed read is an error screen, never an empty list.
   if (error) {
     console.error("listStockIssues failed:", error);
     throw new Error("Could not read the issues.", { cause: error });
@@ -142,7 +131,6 @@ export type IssueDetail = {
   destination: string;
   is_transfer: boolean;
   plot_id: string | null;
-  /** The work a plot issue served (0080), with its category as the stage. */
   work_item_id: string | null;
   work_name: string | null;
   work_category: string | null;
@@ -162,7 +150,6 @@ export type IssueDetail = {
     uom: string;
     note: string | null;
     recorded_by_name: string | null;
-    /** The batches it drew (0108), and any stock older than batches. */
     draws: BatchDraw[];
     /** At each batch's rate, before GST; null if any part has no rate. */
     value: number | null;
@@ -175,13 +162,14 @@ export const getStockIssue = cache(async (issueId: string): Promise<IssueDetail 
   await requireTool("/inventory");
   const supabase = await createClient();
 
-  const { data: issue } = await supabase
+  const { data: issue, error: issueError } = await supabase
     .from("stock_issues")
     .select(
       "id, reference, store_id, to_store_id, plot_id, work_item_id, issued_at, note, created_by, work_items(name, work_categories(name)), projects(name, companies(name))",
     )
     .eq("id", issueId)
     .maybeSingle();
+  assertRead("inventory issues", "this issue", issueError);
   if (!issue) return null;
 
   const lines = await fetchAll((from, to) =>
@@ -194,9 +182,7 @@ export const getStockIssue = cache(async (issueId: string): Promise<IssueDetail 
       .range(from, to),
   );
 
-  // What each line took out of the source store, batch by batch. A
-  // transfer also lands the same batches in the receiving store — the
-  // positive rows, not wanted here.
+  // Only the negative rows: a transfer also lands the same batches in the receiving store.
   const movements = lines.length
     ? await fetchAll((from, to) =>
         supabase
@@ -299,7 +285,6 @@ export type IssueFormOptions = {
   projects: { id: string; name: string }[];
 };
 
-/** Everything the issue form needs, in one gated call. */
 export async function getIssueFormOptions(): Promise<IssueFormOptions> {
   await requireTool("/inventory");
   const supabase = await createClient();
@@ -363,9 +348,7 @@ export type AdjustmentPage = {
 export type AdjustmentListFilters = {
   page?: number;
   storeId?: string;
-  /** Searched in the reason text — already made safe by searchParam. */
   q?: string;
-  /** Dated-on range, YYYY-MM-DD, already checked by dateParam. */
   from?: string;
   to?: string;
 };
@@ -383,7 +366,6 @@ export async function listStockAdjustments({
   const pageSize = INVENTORY_LIST_LIMIT;
   const currentPage = Math.max(1, page);
 
-  // Every filter in one place. adjusted_at is a date, so `to` is plain lte.
   const filtered = <T extends Filterable<T>>(query: T): T => {
     let next = query;
     if (storeId) next = next.eq("store_id", storeId);
@@ -407,7 +389,6 @@ export async function listStockAdjustments({
     listActiveStores(supabase),
   ]);
 
-  // A failed read is an error screen, never an empty list.
   if (error) {
     console.error("listStockAdjustments failed:", error);
     throw new Error("Could not read the adjustments.", { cause: error });
@@ -456,18 +437,8 @@ export async function listStockAdjustments({
   };
 }
 
-/* ------------------------------------------------------------------ *
- * Over-issue check (Phase 2 Step I) — flag, never refuse
- *
- * Rendered on the issue note, so the store-keeper sees it the moment
- * the redirect lands after saving, and anyone opening the note later
- * sees the same truth. Derived fresh every time (the 0083 principle:
- * nothing stored means nothing stale) from the frozen takeoff in
- * estimate_takeoff_facts — which admits /inventory since 0078 and
- * carries no rates — plus the plot's cumulative movements for the same
- * work. The arithmetic itself is lib/inventory/over-issue.ts, pure and
- * tested.
- * ------------------------------------------------------------------ */
+// Over-issue check: flag, never refuse. Derived fresh from the frozen takeoff (estimate_takeoff_facts,
+// no rates) plus the plot's cumulative movements; the arithmetic is over-issue.ts.
 
 export async function getOverIssueRows(
   plotId: string,
@@ -481,10 +452,8 @@ export async function getOverIssueRows(
     .select("id")
     .eq("plot_id", plotId)
     .maybeSingle();
-  if (unitError) {
-    console.error("inventory: over-issue unit lookup failed:", unitError);
-    return [];
-  }
+  // A failed read must not read as "nothing over-issued".
+  assertRead("inventory", "the over-issue check", unitError);
   if (!unit) return [];
 
   const takeoffRaw = await fetchAll<{
@@ -513,9 +482,7 @@ export async function getOverIssueRows(
     }));
   if (takeoff.length === 0) return [];
 
-  // Everything this work has drawn at this plot: store issues plus
-  // direct-to-site deliveries (matched on plot OR unit — a to-site GRN
-  // carries whichever its PO named).
+  // Store issues plus direct-to-site deliveries (matched on plot OR unit: a GRN carries whichever its PO named).
   const [issues, receipts] = await Promise.all([
     fetchAll<{ id: string }>((from, to) =>
       supabase
@@ -578,10 +545,7 @@ export async function getOverIssueRows(
     .from("items")
     .select("id, default_uom")
     .in("id", itemIds);
-  if (itemsError) {
-    console.error("inventory: over-issue items lookup failed:", itemsError);
-    return [];
-  }
+  assertRead("inventory", "the over-issue check", itemsError);
   const itemUomById = new Map((items ?? []).map((item) => [item.id, item.default_uom as string]));
 
   return findOverIssues(takeoff, drawnByItem, itemUomById);

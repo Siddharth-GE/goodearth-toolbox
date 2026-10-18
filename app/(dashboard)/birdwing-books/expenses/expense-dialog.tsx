@@ -9,11 +9,7 @@ import { addExpense, updateExpense } from "@/lib/birdwing-books/actions";
 import type { ExpenseRow, HeadRow } from "@/lib/birdwing-books/queries";
 import { useState, type ReactNode } from "react";
 
-/**
- * One expense line: the month it belongs to (apart from the day it was
- * paid — October's power bill is paid in November), the head, what it
- * was, the amount, and who was paid — a Masters vendor, or just a name.
- */
+/** One expense line. The month it belongs to is apart from the day paid (October's power bill is paid in November); the payee is a Masters vendor or just a name. */
 export function ExpenseDialog({
   heads,
   vendors,

@@ -1,8 +1,4 @@
-/**
- * The shared action rules: where an action sits, what its date says, who
- * closes it, a person's load. Client Relations' team already lives by
- * these answers (the Saarang tracker), so the edges are pinned here.
- */
+/** Pins the edges of the shared action rules. */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

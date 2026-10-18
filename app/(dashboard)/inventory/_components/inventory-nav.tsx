@@ -1,10 +1,6 @@
 import { NavTabs } from "@/components/ui/tabs";
 
-/**
- * Inventory's four screens are separate routes, not panels of one page,
- * so this is NavTabs — the pill-styled next/link nav — never Radix
- * Tabs (DESIGN.md). Same shape as the Masters and Budgets navs.
- */
+// Separate routes, so NavTabs (next/link pills), never Radix Tabs (DESIGN.md).
 export function InventoryNav({
   active,
 }: {

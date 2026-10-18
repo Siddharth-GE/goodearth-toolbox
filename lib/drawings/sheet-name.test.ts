@@ -1,8 +1,3 @@
-/**
- * The downloaded sheet's name is what site files and forwards, so its
- * shape is pinned — including a draft, a project with no code, a stage
- * with no code, and a sheet from before sheet codes existed.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

@@ -1,7 +1,6 @@
 "use server";
 
-// Type-only import, never re-exported from a "use server" file — the
-// 2026-08-03 outage rule, enforced by npm run check:actions.
+// Type-only import, never re-exported from a "use server" file (npm run check:actions).
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { dbErrorMessage } from "@/lib/db-error";
@@ -11,11 +10,7 @@ import { revalidatePath } from "next/cache";
 import { GRANT } from "./shared";
 import { BILLS_BUCKET } from "./storage";
 
-/**
- * The bill behind an expense line — a photo or a PDF — in the private
- * `birdwing-books` bucket (0116). Object first, then the row; a failed
- * row removes the object. Deleting: row first, then the object.
- */
+/** The bill behind an expense line, in the private `birdwing-books` bucket (0116). Upload: object first, then the row (a failed row removes the object). Delete: row first, then the object. */
 
 export async function uploadExpenseFile(
   expenseId: string,
@@ -39,7 +34,8 @@ export async function uploadExpenseFile(
     created_by: user.id,
   });
   if (error) {
-    await supabase.storage.from(BILLS_BUCKET).remove([path]);
+    const { error: removeError } = await supabase.storage.from(BILLS_BUCKET).remove([path]);
+    if (removeError) console.error("uploadExpenseFile cleanup failed:", removeError);
     console.error("uploadExpenseFile row write failed:", error);
     return { error: dbErrorMessage(error, "Could not save the bill. Try again.") };
   }

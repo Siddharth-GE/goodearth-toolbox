@@ -136,7 +136,7 @@ begin
   -- 11. A work order is numbered, and its lines set its value.
   insert into labour_contracts (vendor_id, project_id, unit_id, description, contract_value, created_by, updated_by)
   values (v_contractor, v_project, v_unit, 'Footing works (trial)', 1, v_user, v_user) returning id, reference into v_wo, v_txt;
-  if v_txt not like 'WO/SAA/%' then raise exception 'TRIAL 11 FAILED: reference %', v_txt; end if;
+  if v_txt not like 'WO/SAA%/%' then raise exception 'TRIAL 11 FAILED: reference %', v_txt; end if;
   insert into labour_contract_lines (contract_id, work_item_id, description, uom, quantity, rate, created_by, updated_by)
   values (v_wo, v_work, 'Footing', 'cum', 2, 4000, v_user, v_user);
   select contract_value into v_n from labour_contracts where id = v_wo;

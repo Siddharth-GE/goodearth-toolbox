@@ -1,10 +1,6 @@
 import { ToolNav } from "@/components/ui/tool-nav";
 
-/**
- * NavTabs rather than Radix Tabs: these are separate routes with their own
- * data and their own loading.tsx, not panels of one page. Actions comes
- * first — the Saarang tracker's main screen (root plan.md, seventh piece).
- */
+/** NavTabs, not Radix Tabs: separate routes with their own data and loading.tsx. */
 const TABS = [
   { key: "actions", href: "/client-relations/actions", label: "Actions" },
   { key: "plots", href: "/client-relations/plots", label: "Plots" },

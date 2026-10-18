@@ -8,7 +8,12 @@ import {
   listRooms,
 } from "@/lib/birdwing/queries";
 import { CHANNEL_LABELS } from "@/lib/birdwing/shared";
-import { canEditCharges, canEditRooms, issueBlocker } from "@/lib/birdwing/workflow";
+import {
+  canEditCharges,
+  canEditDetails,
+  canEditRooms,
+  issueBlocker,
+} from "@/lib/birdwing/workflow";
 import { formatDate, formatMoney, todayInIndia } from "@/lib/format";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
@@ -203,7 +208,7 @@ export default async function StayPage({ params }: { params: Promise<{ stayId: s
               defaultMonth={stay.accountingMonth}
             />
           )}
-          {stay.status !== "cancelled" && (
+          {canEditDetails(stay.status) && (
             <>
               <CheckinForm stay={stay} />
               <StayDetailsForm stay={stay} costCentres={activeCentres} />

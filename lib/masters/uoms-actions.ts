@@ -1,5 +1,6 @@
 "use server";
 
+import { text } from "@/lib/form-data";
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
@@ -8,7 +9,7 @@ import { revalidatePath } from "next/cache";
 export async function addUom(_state: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireTool("/masters");
 
-  const name = String(formData.get("name") ?? "").trim();
+  const name = text(formData, "name");
   if (!name) return { error: "Give the unit a name." };
   if (name.length > 20) return { error: "Keep the unit under 20 characters." };
 
@@ -41,11 +42,7 @@ export async function addUom(_state: ActionState, formData: FormData): Promise<A
   return undefined;
 }
 
-/**
- * A rename follows through to every row carrying the unit — items,
- * request lines, movements, estimator setups — because all the FKs
- * cascade on update (0082). The word changes everywhere at once.
- */
+/** A rename cascades to every row carrying the unit (0082). */
 export async function renameUom(id: string, name: string): Promise<ActionState> {
   const user = await requireTool("/masters");
 

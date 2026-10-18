@@ -16,18 +16,11 @@ import { Calculator } from "lucide-react";
 import Link from "next/link";
 import { StartVillaDialog, type StartSource } from "./_components/estimate-forms";
 
-/**
- * Every villa, and what the Estimator holds for it (0098): the working
- * estimate — the one you keep editing — and the official one, the
- * numbered frozen copy the stores and site check against. Each villa is
- * estimated on its own (founder, 2026-09-26: "each villa is different");
- * a new one can start from another villa's list of works.
- */
+/** Every villa and what the Estimator holds for it (0098): the working estimate and the official, frozen one. Each villa is estimated on its own. */
 export default async function VillasPage() {
   const villas = await listVillas();
 
-  // What a villa can start from: every other villa's working and official
-  // estimate. The dialog puts the villa's own official first.
+  // What a villa can start from: every other villa's working and official estimate.
   const sourcesFor = (villa: VillaEstimates): StartSource[] => [
     ...(villa.official
       ? [

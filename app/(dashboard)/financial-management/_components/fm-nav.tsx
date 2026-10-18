@@ -1,10 +1,6 @@
 import { ToolNav } from "@/components/ui/tool-nav";
 
-/**
- * NavTabs rather than Radix Tabs: separate routes with their own
- * data and their own loading.tsx, not three panels of one page (the
- * CrmNav reasoning).
- */
+/** NavTabs, not Radix Tabs: separate routes with their own data and loading.tsx (the CrmNav reasoning). */
 const TABS = [
   { key: "cash", href: "/financial-management/cash", label: "Cash" },
   { key: "forward", href: "/financial-management/forward", label: "Forward" },

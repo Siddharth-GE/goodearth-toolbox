@@ -1,6 +1,3 @@
-/**
- * An invoice prints the same from its snapshot as it summed at issue.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

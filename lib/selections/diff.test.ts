@@ -1,9 +1,3 @@
-/**
- * The revision-diff rules. What these protect: the numbers the Issue
- * dialog shows a designer ("3 added, 1 removed…") and — via the same
- * line_key matching — the budget team's confidence that "unchanged"
- * really means their pricing carries over untouched.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -51,8 +45,7 @@ test("added, removed and changed are each detected once", () => {
 });
 
 test("moving a line to another space counts as changed, not added-plus-removed", () => {
-  // The same line_key in a different room is one decision, not two — an
-  // add+remove would tell the budget team to re-price it from scratch.
+  // The same line_key in a different room is one decision: add+remove would tell Budgets to re-price.
   const previous = [line("sofa", 1, "living")];
   const current = [line("sofa", 1, "bed1")];
 

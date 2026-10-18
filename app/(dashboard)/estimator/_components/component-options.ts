@@ -1,13 +1,7 @@
 import type { SearchOption } from "@/components/ui/search-select";
 import { formatMoney } from "@/lib/format";
 
-/**
- * What a recipe can hold — a mix or a material from the items master —
- * as SearchSelect options. The value keeps the "mix:<id>" /
- * "material:<id>" shape the recipe actions have always parsed. Mixes come
- * first: there are a handful of them and they are what a work usually
- * consumes.
- */
+/** A mix or an items-master material as SearchSelect options; values keep the "mix:<id>" / "material:<id>" shape the recipe actions parse. Mixes come first. */
 export function componentOptions(
   materials: { id: string; name: string; uom: string; rate?: number | null }[],
   mixes: { id: string; name: string; uom: string }[],
@@ -33,7 +27,6 @@ export function componentOptions(
   ];
 }
 
-/** The unit of whatever is chosen, for the "how many X per Y" hint. */
 export function chosenUom(
   choice: string,
   materials: { id: string; uom: string }[],

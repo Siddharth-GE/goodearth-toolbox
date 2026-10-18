@@ -1,12 +1,4 @@
-/**
- * The engine, checked against a model that was built without it.
- *
- * The headline tests reproduce the founder's Vihara workbook figure for
- * figure. That is the strongest test available: the workbook was arrived
- * at independently, by hand, over thirteen sheets, so agreement is
- * evidence and not a tautology. The rest cover the pieces where being
- * subtly wrong would still look plausible on screen.
- */
+/** The engine against Vihara, the founder's independent workbook, figure for figure; the rest cover pieces where being subtly wrong would still look plausible. */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -49,10 +41,6 @@ function sale(result: ScenarioResult, index = 0): SaleLineResult {
   return line;
 }
 
-// ---------------------------------------------------------------------
-// The acceptance test
-// ---------------------------------------------------------------------
-
 test("Vihara, Moderate: every Block 1 figure matches the workbook", () => {
   const result = runScenario(viharaPlan(), 1);
 
@@ -68,27 +56,17 @@ test("Vihara, Moderate: every Block 1 figure matches the workbook", () => {
   closeTo(result.overheadsFixed + result.overheadsVariable + result.overheadsOneTime, 122_429_000);
   closeTo(result.commonInfraCapex + result.commonInfraOpex, 58_000_000);
 
-  // Summary!C14 — and this one the engine agrees with for a REASON, not
-  // by coincidence: the pooled balance never goes below zero, so there
-  // is nothing to charge interest on. See the cash-trough assertion.
+  // Summary!C14: zero because the pooled balance never goes below zero (see the cash-trough assertion).
   assert.equal(result.interest, 0);
 
-  // Summary!C15:C16 — the two figures the founder actually reads.
-  //
-  // Moderate sells out inside the horizon, so matched cost and cash cost
-  // are the same number and these figures are untouched by rule 2. That
-  // is the point of asserting it here: the matched-cost change moves ONLY
-  // the scenarios that failed to finish.
+  // Summary!C15:C16. Moderate sells out, so matched and cash cost are equal and rule 2 leaves it untouched.
   closeTo(result.pbt, 266_596_000);
   assert.ok(result.marginPct !== null);
   closeTo(result.marginPct, 22.249243672932881, 0.001);
   closeTo(result.matchedTotalCost, result.totalCost, 1);
   closeTo(result.costOutsideHorizon, 0, 1);
 
-  // Summary!C17 — the workbook labels this "Peak funding" and reports
-  // −₹5.91 Cr. The minus is the tell: it is −MIN(closing cash), and the
-  // cash never goes negative. ₹5.91 Cr is the LOWEST the balance gets,
-  // not money anyone has to raise.
+  // Summary!C17: the sheet's -MIN(closing cash) is the LOWEST balance, not money to raise.
   closeTo(result.cashTrough, 59_118_147.73);
   assert.equal(result.peakFunding, 0);
 
@@ -102,54 +80,38 @@ test("Vihara, Base: slower selling leaves units and construction unfinished", ()
 
   // Summary!B6 — all 42 villas still sell inside six years at 0.8/month.
   closeTo(result.lines[0].revenue, 868_350_000);
-  // 41.999999999999993 — the workbook's own total reads the same, for
-  // the same reason: forty-odd additions of 0.8.
+  // 41.999999999999993: forty-odd additions of 0.8, the same as the workbook's own total.
   closeTo(sale(result).unitsSold, 42, 1e-9);
 
-  // Summary!B7 — the row houses do NOT. They wait for the villas to
-  // cross 70% (month 37 at this pace) and then have 36 months left,
-  // which is 28.8 units, not 35. This is the horizon doing its job.
+  // Summary!B7: the row houses wait for the villas to cross 70% (month 37), leaving 28.8 units, not 35.
   closeTo(result.lines[1].revenue, 271_440_000);
   closeTo(sale(result, 1).unitsSold, 28.8, 0.001);
   closeTo(sale(result, 1).unitsUnsold, 6.2, 0.001);
 
   closeTo(result.revenue, 1_139_790_000);
 
-  // Summary!B11 — ₹39.43 Cr of CASH, not the ₹42.34 Cr those units cost
-  // to build, because the last homes sold have build cycles running past
-  // month 72. Cash outside the horizon is genuinely outside the plan.
+  // Summary!B11: ₹39.43 Cr of cash, not the ₹42.34 Cr built; late build cycles run past month 72.
   closeTo(result.constructionCost, 394_276_363.64);
 
   // Summary!B12:B13
   closeTo(result.overheadsFixed + result.overheadsVariable + result.overheadsOneTime, 120_091_600);
   closeTo(result.commonInfraCapex + result.commonInfraOpex, 58_000_000);
 
-  // Rule 2, and the whole reason this scenario is interesting: the ₹42.34
-  // Cr IS what the homes that sold cost to build, and the revenue of
-  // every one of them was counted in full. Both numbers are true and they
-  // answer different questions — cash above, cost of what sold here.
+  // Rule 2: ₹42.34 Cr is what the homes that sold cost to build. Cash above, cost of what sold here.
   closeTo(result.constructionMatched, 423_360_000);
 
-  // Land and infra point the other way. 6.2 row houses never sold, so
-  // their share of the parcel earned nothing and is not charged against
-  // the revenue of the homes that did.
+  // Land and infra go the other way: the 6.2 unsold row houses' parcel share is not charged.
   assert.ok(result.landMatched < result.landCost);
   assert.ok(result.developmentMatched < result.developmentCost);
   closeTo(result.landMatched, 166_697_142.86);
   closeTo(result.developmentMatched, 126_480_000);
 
-  // The gap the Summary tab shows as its own row, so the cost column
-  // visibly adds up to PBT: build put back, less land and infra taken out.
+  // The gap the Summary shows as its own row: build put back, less land and infra taken out.
   closeTo(result.costOutsideHorizon, result.matchedTotalCost - result.totalCost, 1);
   closeTo(result.costOutsideHorizon, 20_460_779.22);
 
-  // Summary!B15:B17, B55 — PBT and margin DEPART from the workbook here,
-  // deliberately. The sheet reports ₹26.56 Cr at 23.3%, which is a better
-  // margin than Moderate's 22.2% off a scenario that left 6.2 homes
-  // unsold. That reads backwards because the sheet counts all of the
-  // revenue and only the build that finished. Struck against the cost of
-  // what sold, Base earns less than Moderate — which is what slower
-  // selling actually does.
+  // Summary!B15:B17, B55: PBT and margin depart from the workbook on purpose. The sheet's 23.3%
+  // beats Moderate's 22.2% because it counts all the revenue and only the finished build.
   closeTo(result.pbt, 245_161_257.14);
   assert.ok(result.marginPct !== null);
   closeTo(result.marginPct, 21.50933567963023, 0.001);
@@ -161,15 +123,8 @@ test("Vihara, Base: slower selling leaves units and construction unfinished", ()
 });
 
 test("money sold but not yet banked is reported, not lost", () => {
-  // The mirror of costOutsideHorizon, on the income side. A home sold
-  // near the end books its whole price that month but collects it over
-  // the following build, and spreadForward drops whatever lands past the
-  // horizon. That never touches PBT — struck on bookings — but it makes
-  // the CASH look worse, and `peakFunding` is read as "money to raise".
-  //
-  // At half a unit a month Vihara appears to need ₹9.7 Cr of funding
-  // while ₹11.2 Cr of collections sit just past month 72. Reporting the
-  // receivable is what lets that be read correctly.
+  // Mirror of costOutsideHorizon: late collections never touch PBT but make `peakFunding` look
+  // worse (Vihara at 0.5/month: ₹9.7 Cr apparent funding, ₹11.2 Cr collected past month 72).
   const plan = viharaPlan();
   const slow = runScenario(
     {
@@ -191,8 +146,7 @@ test("money sold but not yet banked is reported, not lost", () => {
     "the whole apparent funding gap is late collections",
   );
 
-  // A plan that sells out early collects everything, and the figure is
-  // zero rather than a small rounding ghost.
+  // A plan that sells out early collects everything: exactly zero, no rounding ghost.
   const fast = runScenario(
     {
       ...plan,
@@ -207,12 +161,8 @@ test("money sold but not yet banked is reported, not lost", () => {
 });
 
 test("an overhead that ends with sales is what makes velocity worth anything", () => {
-  // The finding behind the field. Vihara's overheads all run to a fixed
-  // calendar month, so selling out in month 16 pays exactly as much
-  // marketing retainer as selling out in month 64 — and with equity
-  // covering the whole project there is no interest to save either. PBT
-  // came out IDENTICAL at 1/mo and 4/mo, which is what made the
-  // scenarios look broken.
+  // Vihara's overheads run to a fixed calendar month, so selling out in month 16 paid as much
+  // retainer as month 64 and PBT was identical at 1/mo and 4/mo.
   const plan = viharaPlan();
   const at = (v: number, endsWithSales: boolean): PlanInputs => ({
     ...plan,
@@ -228,8 +178,7 @@ test("an overhead that ends with sales is what makes velocity worth anything", (
   closeTo(slowFixed.overheadsFixed, fastFixed.overheadsFixed, 1);
   closeTo(slowFixed.pbt, fastFixed.pbt, 1);
 
-  // Ending with sales: the fast plan stops paying for the months it no
-  // longer needs, and the profit finally responds.
+  // Ending with sales: the fast plan stops paying sooner, so profit responds.
   const slowTracking = runScenario(at(1, true), 0);
   const fastTracking = runScenario(at(4, true), 0);
   assert.ok(
@@ -241,15 +190,13 @@ test("an overhead that ends with sales is what makes velocity worth anything", (
     `selling four times faster should be worth crore, got ${fastTracking.pbt - slowTracking.pbt}`,
   );
 
-  // It never charges MORE than the calendar schedule would — the item's
-  // own end month is still a ceiling.
+  // Never charges more than the calendar schedule: the item's own end month is a ceiling.
   assert.ok(fastTracking.overheadsFixed <= fastFixed.overheadsFixed);
   assert.ok(slowTracking.overheadsFixed <= slowFixed.overheadsFixed);
 });
 
 test("an overhead that ends with sales survives a plan with no sales", () => {
-  // Nothing has sold, so there is no earlier month to end on. Falling
-  // back to zero would silently make an empty plan look profitable.
+  // Nothing has sold: falling back to zero would make an empty plan look profitable.
   const plan: PlanInputs = {
     ...defaultPlanInputs(),
     overheads: [
@@ -267,10 +214,6 @@ test("an overhead that ends with sales survives a plan with no sales", () => {
   closeTo(result.overheadsFixed, 1_200_000, 1);
   assert.ok(Number.isFinite(result.pbt));
 });
-
-// ---------------------------------------------------------------------
-// The apartment case — built on a schedule, funded by debt
-// ---------------------------------------------------------------------
 
 /** A tower: 100 flats, built months 1-30, sold from month 6. */
 function apartmentPlan(velocity: number, openingEquity = 0): PlanInputs {
@@ -302,22 +245,17 @@ function apartmentPlan(velocity: number, openingEquity = 0): PlanInputs {
 }
 
 test("an apartment tower is built whether or not it has sold", () => {
-  // The case the tool could not express at all. Built to order, nothing
-  // is spent ahead of a buyer; on a schedule, the whole tower goes up on
-  // its own calendar. Same inputs, two completely different businesses.
+  // Built to order spends nothing ahead of a buyer; on a schedule the whole tower goes up on its own calendar.
   const slow = runScenario(apartmentPlan(1), 0);
   const tower = sale(slow);
 
-  // ₹36 Cr of construction — all 100 flats — spent inside months 1-30,
-  // even though only 67 of them have sold by the horizon.
+  // ₹36 Cr of construction, all 100 flats, inside months 1-30 though only 67 have sold.
   closeTo(tower.constructionCost, 360_000_000);
   closeTo(tower.unitsSold, 67);
   // Cost of sales counts only what sold; the rest is stock, not expense.
   closeTo(tower.constructionMatched, 67 * 3_600_000);
   closeTo(tower.unsoldStock, 33 * 3_600_000);
 
-  // Built to order, the same line spends only on what sold, and spreads
-  // even that across each flat's own cycle.
   const toOrder = sale(
     runScenario(
       {
@@ -335,10 +273,7 @@ test("an apartment tower is built whether or not it has sold", () => {
 });
 
 test("with no equity the interest starts at the land and compounds", () => {
-  // The founder's shape: zero equity, everything borrowed including the
-  // acquisition. Month 1 pays ₹10 Cr for land against an empty account,
-  // so the revolver is drawn from the very first month and the interest
-  // runs the whole way.
+  // Zero equity, everything borrowed including land: the revolver is drawn from month 1.
   const funded = runScenario(apartmentPlan(1, 500_000_000), 0);
   const unfunded = runScenario(apartmentPlan(1, 0), 0);
 
@@ -346,21 +281,16 @@ test("with no equity the interest starts at the land and compounds", () => {
   assert.ok(unfunded.monthly.revolver[0] > 0, "borrowing starts in month 1");
   assert.ok(unfunded.monthly.interest[0] > 0, "and so does the interest");
   assert.ok(unfunded.interest > funded.interest, "a plan with equity behind it pays less interest");
-  // The equity row exists and says where the money came from.
   closeTo(funded.monthly.equity[0], 500_000_000);
   closeTo(sum(funded.monthly.equity), 500_000_000);
 
-  // And it is the ONLY thing separating the two: same revenue, same
-  // build, profit apart by exactly the interest.
+  // Interest is the only difference: same revenue and build, profit apart by exactly it.
   closeTo(unfunded.revenue, funded.revenue, 1);
   closeTo(unfunded.pbt, funded.pbt - (unfunded.interest - funded.interest), 1);
 });
 
 test("on a tower, selling faster is worth real money", () => {
-  // The whole reason the mode matters. The build is a sunk calendar, so
-  // every month a flat sits unsold is a month of interest on money
-  // already spent — and here, unlike the plotted case, that shows up in
-  // the profit immediately without touching a single overhead.
+  // The build is a sunk calendar, so each unsold month costs interest, visible in profit with no overhead change.
   const slow = runScenario(apartmentPlan(1), 0);
   const fast = runScenario(apartmentPlan(4), 0);
 
@@ -377,20 +307,15 @@ function sum(values: number[]): number {
 }
 
 test("selling faster never shows a worse margin", () => {
-  // The regression. Before matched cost, Vihara read Base 23.3% against
-  // Moderate 22.2%: the scenario that left 6.2 homes unsold and ₹2.9 Cr
-  // of building unfinished showed the BEST margin, because its unbuilt
-  // cost fell outside the horizon and its revenue did not. Any future
-  // change that reintroduces that asymmetry fails here.
+  // Regression: Base once read 23.3% against Moderate's 22.2% (its unbuilt cost fell outside the
+  // horizon, its revenue did not). Reintroducing that asymmetry fails here.
   const plan = viharaPlan();
   const [base, moderate, high] = [0, 1, 2].map((s) => runScenario(plan, s as 0 | 1 | 2));
 
   for (const scenario of [base, moderate, high]) {
     assert.ok(scenario.marginPct !== null);
   }
-  // Moderate and High both sell out, so they land on the same margin to
-  // within floating-point dust — hence a tolerance rather than a bare
-  // `<=`, which a difference of 1e-14 in the last place would fail.
+  // Moderate and High land on the same margin within floating-point dust, hence a tolerance.
   const DUST = 1e-9;
   assert.ok(
     base.marginPct! <= moderate.marginPct! + DUST,
@@ -400,16 +325,12 @@ test("selling faster never shows a worse margin", () => {
     moderate.marginPct! <= high.marginPct! + DUST,
     `Moderate ${moderate.marginPct}% must not beat High ${high.marginPct}%`,
   );
-  // And the gap is real, not dust: Base genuinely earns less.
   assert.ok(moderate.marginPct! - base.marginPct! > 0.5);
 });
 
 test("a line's own margin does not move with velocity", () => {
-  // Unit economics are a property of the product, not of how fast it
-  // sells: the same home costs the same and fetches the same whenever it
-  // goes. Only the PLAN's margin moves, because fixed overheads spread
-  // over less revenue. This is what tells the founder that a scenario is
-  // a sales question and not a pricing one.
+  // Unit economics belong to the product, not the sales pace; only the plan's margin moves, as
+  // fixed overheads spread over less revenue.
   const plan = viharaPlan();
   const rowHouses = [0, 1, 2].map((s) => sale(runScenario(plan, s as 0 | 1 | 2), 1));
 
@@ -417,7 +338,6 @@ test("a line's own margin does not move with velocity", () => {
   closeTo(rowHouses[0].marginPct!, rowHouses[1].marginPct!, 1e-9);
   closeTo(rowHouses[1].marginPct!, rowHouses[2].marginPct!, 1e-9);
 
-  // And the unsold ones really are absent from both sides of it.
   closeTo(rowHouses[0].unitsUnsold, 6.2, 0.001);
   assert.equal(rowHouses[2].unitsUnsold, 0);
 });
@@ -425,10 +345,8 @@ test("a line's own margin does not move with velocity", () => {
 test("Vihara, High: selling out faster leaves more cash in the trough", () => {
   const result = runScenario(viharaPlan(), 2);
 
-  // Summary!D15:D17. High and Moderate reach the same PBT — both sell
-  // every unit and build every home inside the horizon, so only the
-  // TIMING differs — but the cash position does not: faster collections
-  // mean the balance never dips as low.
+  // Summary!D15:D17: High and Moderate reach the same PBT (only timing differs), but faster
+  // collections keep the balance from dipping as low.
   closeTo(result.pbt, 266_596_000);
   closeTo(result.cashTrough, 66_788_363.64);
   assert.ok(result.cashTrough > runScenario(viharaPlan(), 1).cashTrough);
@@ -445,14 +363,8 @@ test("the active scenario is the one the summary reads", () => {
   closeTo(base.active.pbt, 245_161_257.14);
 });
 
-// ---------------------------------------------------------------------
-// Collections
-// ---------------------------------------------------------------------
-
 test("a collection schedule always adds up to the whole price", () => {
-  // A schedule summing to 0.98 is a 2% revenue error that nothing on
-  // screen would ever reveal, so this is checked across the awkward
-  // shapes rather than one convenient case.
+  // A schedule summing to 0.98 is a silent 2% revenue error, so check awkward shapes.
   for (const [booking, instalments, build] of [
     [30, 10, 22],
     [30, 10, 18],
@@ -489,10 +401,6 @@ test("construction spreads evenly across the build cycle", () => {
     1e-9,
   );
 });
-
-// ---------------------------------------------------------------------
-// Selling
-// ---------------------------------------------------------------------
 
 function planWith(lines: SaleLine[], overrides: Partial<PlanInputs> = {}): PlanInputs {
   return { ...defaultPlanInputs(), horizonMonths: 60, lines, ...overrides };
@@ -535,9 +443,7 @@ test("a launch trigger holds a line at zero until the others cross it", () => {
   });
   const result = runScenario(planWith([first, second]), 0);
 
-  // Line A sells one a month, so it crosses 7 of 10 in month 7 — and
-  // line B releases that same month, because the trigger reads the
-  // cumulative INCLUDING this month, the way the spreadsheet column does.
+  // Line B releases the month line A crosses 7 of 10: the trigger reads the cumulative including this month.
   const soldByB = result.lines[1].monthly.unitsSold;
   assert.equal(
     soldByB.slice(0, 6).reduce((a, b) => a + b, 0),
@@ -570,10 +476,6 @@ test("sales start month holds a line back without a trigger", () => {
   assert.equal(result.monthly.unitsSold[8], 0);
   assert.equal(result.monthly.unitsSold[9], 1);
 });
-
-// ---------------------------------------------------------------------
-// Land, costs and cash
-// ---------------------------------------------------------------------
 
 test("JV land is nothing until settlement, then the whole thing plus premium", () => {
   const line = saleLine({ landAreaSqft: 10_000, landCostPsf: 100, units: 0 });
@@ -614,14 +516,11 @@ test("interest is zero while equity covers the trough, and charged once it doesn
   assert.ok(unfunded.interest > 0);
   assert.ok(unfunded.peakFunding > 0);
   assert.ok(unfunded.cashTrough < 0);
-  // The plan is worse off by exactly the interest it had to pay.
   closeTo(unfunded.pbt, funded.pbt - unfunded.interest);
 });
 
 test("pooling borrows less than the lines would separately", () => {
-  // A line in surplus funds a line in deficit, so the consolidated
-  // interest is below the sum of the standalone figures. The summary
-  // shows both and names the gap; this is why they differ.
+  // A line in surplus funds one in deficit, so consolidated interest is below the standalone sum.
   const result = runScenario(viharaPlan(), 1);
   assert.ok(result.standaloneInterest > 0, "each line alone has no equity, so it borrows");
   assert.equal(result.interest, 0);
@@ -648,11 +547,8 @@ test("a plan with no revenue can't divide by it", () => {
 });
 
 test("velocities out of order are reported, not rewritten", () => {
-  // The columns are labelled Base, Moderate, High in fixed order on every
-  // screen, so a plan whose "High" is its slowest reads backwards. Worth
-  // saying out loud; not worth silently correcting what someone typed.
-  // Enough units that the horizon binds, so the mislabelling actually
-  // shows up in the answer rather than every scenario selling out anyway.
+  // Columns are labelled Base, Moderate, High in fixed order, so a slowest-"High" plan reads
+  // backwards: flag it, don't correct it. Enough units that the horizon binds.
   const backwards = planWith([
     saleLine({ units: 500, plotSqftPerUnit: 1000, landPricePsf: 1000, velocity: [2, 1.5, 1] }),
   ]);
@@ -661,17 +557,10 @@ test("velocities out of order are reported, not rewritten", () => {
     velocityOutOfOrder(planWith([saleLine({ units: 10, velocity: [1, 1.5, 2] })])),
     false,
   );
-  // Flat is fine — plenty of plans have one honest pace.
   assert.equal(velocityOutOfOrder(planWith([saleLine({ units: 10, velocity: [1, 1, 1] })])), false);
-  // And the plan still runs exactly as typed, unclamped: the column
-  // labelled "High" really does sell the slowest, which is the whole
-  // reason it is worth saying so on screen.
+  // And it still runs exactly as typed, unclamped.
   assert.ok(runScenario(backwards, 2).revenue < runScenario(backwards, 0).revenue);
 });
-
-// ---------------------------------------------------------------------
-// IRR
-// ---------------------------------------------------------------------
 
 test("IRR finds a known rate", () => {
   // −100 now, 110 in one period: 10%.
@@ -681,9 +570,7 @@ test("IRR finds a known rate", () => {
 });
 
 test("IRR refuses a flow that opens with money coming in", () => {
-  // This is the guard the workbook lacks. Its Venture IRR row reports
-  // 1150% for Moderate and −52% for High off a flow that starts
-  // positive; a dash is the honest answer.
+  // The guard the workbook lacks: its Venture IRR reports 1150% off a flow that starts positive.
   assert.equal(irr([100, 50, -20]), null);
   assert.equal(irr([0, 0, 100, -50]), null);
 });
@@ -692,10 +579,6 @@ test("IRR refuses a flow that never turns around", () => {
   assert.equal(irr([-100, -50, -20]), null);
   assert.equal(irr([0, 0, 0]), null);
 });
-
-// ---------------------------------------------------------------------
-// The engine survives what the parser lets through
-// ---------------------------------------------------------------------
 
 test("a garbage document parses to defaults and still runs", () => {
   const parsed = parsePlanInputs({
@@ -731,11 +614,8 @@ test("zero instalments and a zero build cycle don't divide by zero", () => {
 });
 
 test("the engine survives raw keystrokes the parser hasn't seen yet", () => {
-  // The editor recalculates on every keystroke, BEFORE anything is saved
-  // and therefore before parsePlanInputs clamps anything. So the engine
-  // is handed the literal 0 the instant it is typed into Efficiency or
-  // Exit cap rate. Dividing by either used to produce Infinity through
-  // every figure on the screen until the next save round trip.
+  // The editor recalculates before parsePlanInputs clamps, so the engine gets a literal 0 for
+  // Efficiency or Exit cap rate and must not emit Infinity.
   const line = { ...newHoldLine(), units: 10, carpetSqftPerUnit: 1000 };
   const plan: PlanInputs = {
     ...defaultPlanInputs(),
@@ -752,17 +632,12 @@ test("the engine survives raw keystrokes the parser hasn't seen yet", () => {
   assert.ok(Number.isFinite(result.pbtWithHeldValue));
 });
 
-// ---------------------------------------------------------------------
-// HOLD lines — the workbook's Block 2
-// ---------------------------------------------------------------------
-
 test("Vihara senior living: the capex build-up matches the workbook", () => {
   const result = runScenario(viharaSeniorLivingPlan(), 1);
   const line = result.lines[0];
   assert.ok(line.kind === "hold");
 
-  // SL_Capex!B7, B9, B11 — three areas doing three jobs. Built-up is
-  // twice carpet at 50% efficiency, and it is what construction costs.
+  // SL_Capex!B7, B9, B11: built-up is twice carpet at 50% efficiency, and is what construction costs.
   closeTo(line.carpetTotal, 27_200, 1e-6);
   closeTo(line.buaTotal, 54_400, 1e-6);
   closeTo(line.sbaTotal, 54_400, 1e-6);
@@ -792,9 +667,7 @@ test("Vihara senior living: HOLD beats SELL, and by how much", () => {
   const line = result.lines[0];
   assert.ok(line.kind === "hold");
 
-  // SL_Hold!B28:B34 — twenty years of escalating charges and entry fees,
-  // discounted at 11%, against selling the super built-up area at
-  // 8,000/sqft on day one.
+  // SL_Hold!B28:B34: twenty years discounted at 11% against selling the super built-up area at 8,000/sqft on day one.
   closeTo(line.holdValue, 543_370_321.02);
   closeTo(line.sellValue, 430_848_000);
   assert.equal(line.verdict, "hold");
@@ -809,8 +682,7 @@ test("Vihara senior living: the monthly operations inside the horizon match", ()
   const line = result.lines[0];
   assert.ok(line.kind === "hold");
 
-  // Engine_Moderate!B35, B36, B32 — ready in month 30, filling three
-  // units a month to 90% of 34, so 43 months of charges on a ramp.
+  // Engine_Moderate!B35, B36, B32: ready in month 30, filling three units a month to 90% of 34.
   closeTo(line.entryFees, 30_600_000);
   closeTo(line.recurringCharges, 158_598_000);
   closeTo(line.operatingOpex, 72_991_600);
@@ -821,27 +693,17 @@ test("a held asset is judged on yield and IRR, not on a margin", () => {
   const line = result.lines[0];
   assert.ok(line.kind === "hold");
 
-  // There is deliberately no marginPct on a HOLD line. Expensing ₹29 Cr
-  // of capex against six years of ramping rent produces a large negative
-  // percentage, and it used to sit in the same "Margin" column as a sale
-  // line's +22% — two different questions under one heading. What a held
-  // asset is actually judged on is these two.
+  // No marginPct on a HOLD line: capex against ramping rent gives a large negative. Judge it by these two.
   assert.ok(!("marginPct" in line));
   assert.ok(line.yieldOnCostPct !== null);
   assert.ok(line.holdIrrPct !== null);
 
-  // Its capex is charged in full, not just the part that fell inside the
-  // horizon, because terminalValue prices this asset as finished and
-  // filled. Part-paying for a completed building is the same rule-2 error
-  // the sale lines had.
+  // Capex is charged in full, not just inside the horizon, because terminalValue prices the asset as finished (rule 2).
   closeTo(line.matchedCost, line.landCost + line.capex + line.operatingOpex, 1);
-  // Vihara's asset is built by month 29 of 72, so here the two agree —
-  // matched cost only ever differs when something falls outside.
+  // Vihara's asset finishes by month 29 of 72, so matched and cash cost agree.
   closeTo(line.matchedCost, line.directCost, 1);
 
-  // Push the build past the horizon and they part company, by exactly the
-  // capex that no longer fits. A 12-month build starting at month 66 has
-  // five of those months falling outside a 72-month plan.
+  // Push the build past the horizon and they differ by the capex that no longer fits (12 months from month 66: five outside).
   const plan = viharaSeniorLivingPlan();
   const input = plan.lines[0];
   assert.ok(input.kind === "hold");
@@ -858,15 +720,12 @@ function inHorizonCapex(line: { directCost: number; landCost: number; operatingO
 }
 
 test("an asset that exactly breaks even reports 0%, not a dash", () => {
-  // `(irr(...) ?? NaN) * 100 || null` turned a real zero into null,
-  // because `0 || null` is null — so a break-even asset showed the same
-  // dash as one that cannot be computed at all. Rule 4 cuts both ways.
+  // Guards the old `|| null` bug that turned a real zero into a dash. Rule 4 cuts both ways.
   const plan = viharaSeniorLivingPlan();
   const line = plan.lines[0];
   assert.ok(line.kind === "hold");
 
-  // A ₹1 asset earning nothing and worth nothing: the only flow whose
-  // rate is exactly zero is one that returns precisely what went in.
+  // A ₹1 asset earning nothing: the only flow with a rate of exactly zero returns what went in.
   const zeroed = runScenario(
     {
       ...plan,
@@ -879,8 +738,7 @@ test("an asset that exactly breaks even reports 0%, not a dash", () => {
           entryFeePerUnit: 0,
           chargePerUnitMonth: 0,
           varOpexPerUnitMonth: 0,
-          // A single year of NOI equal to −capex/… is fiddly to arrange;
-          // instead make the exit alone return exactly the capex.
+          // Make the exit alone return exactly the capex.
           fixedOpexMonth: 0,
           exitCapRatePct: 100,
         },
@@ -890,9 +748,7 @@ test("an asset that exactly breaks even reports 0%, not a dash", () => {
   );
   const held = zeroed.lines[0];
   assert.ok(held.kind === "hold");
-  // NOI is zero, so the exit is zero and nothing comes back: no bracketed
-  // root, honest null. The point being asserted is that the null comes
-  // from the guard in irr(), not from `0 || null` further down.
+  // NOI is zero, so no bracketed root: the null comes from the guard in irr(), not a later `|| null`.
   assert.equal(held.holdIrrPct, null);
 
   // And the direct case: irr() itself returns a genuine zero.
@@ -905,9 +761,7 @@ test("a sell verdict flips when the sale price is high enough", () => {
   const plan = viharaSeniorLivingPlan();
   const line = plan.lines[0];
   assert.ok(line.kind === "hold");
-  // ₹54.4 Cr of saleable area: at ₹12,000/sqft the sale beats a
-  // twenty-year hold, and the tool should say so rather than always
-  // preferring the asset.
+  // At ₹12,000/sqft the sale beats a twenty-year hold, and the tool should say so.
   const selling = runScenario({ ...plan, lines: [{ ...line, sellPricePsf: 12_000 }] }, 1);
   const result = selling.lines[0];
   assert.ok(result.kind === "hold");
@@ -929,50 +783,36 @@ test("an empty hold line doesn't divide by zero on any of its rates", () => {
   assert.ok(Number.isFinite(result.pbt));
 });
 
-// ---------------------------------------------------------------------
-// A mixed plan — the workbook's Block 3
-// ---------------------------------------------------------------------
-
 test("a mixed plan collates both kinds without double-counting", () => {
   const consolidated = runScenario(viharaConsolidatedPlan(), 1);
   const saleOnly = runScenario(viharaPlan(), 1);
   const holdOnly = runScenario(viharaSeniorLivingPlan(), 1);
 
-  // Engine_Moderate!B46 — residential bookings plus senior-living entry
-  // fees and charges.
+  // Engine_Moderate!B46: residential bookings plus senior-living entry fees and charges.
   closeTo(consolidated.revenue, 1_387_423_000);
   closeTo(consolidated.revenue, saleOnly.revenue + holdOnly.revenue);
 
-  // The senior-living capex joins construction; its running costs get
-  // their own line rather than being buried in it.
+  // Senior-living capex joins construction; its running costs get their own line.
   const held = holdOnly.lines[0];
   assert.ok(held.kind === "hold");
   closeTo(consolidated.constructionCost, saleOnly.constructionCost + held.capex);
   closeTo(consolidated.operatingCost, 72_991_600);
 
-  // Terminal value is deliberately NOT in PBT: it is an asset still
-  // owned, not money that has moved.
+  // Terminal value stays out of PBT: an asset still owned, not money moved.
   closeTo(consolidated.terminalValue, 306_106_666.67);
   closeTo(consolidated.pbtWithHeldValue, consolidated.pbt + consolidated.terminalValue);
 });
 
 test("selling cost is charged on sales, never on a held asset's income", () => {
-  // A resident's monthly charge does not attract brokerage. Adding a
-  // hold line must not increase the selling cost by a rupee.
+  // A resident's charge attracts no brokerage: a hold line adds nothing to selling cost.
   const saleOnly = runScenario(viharaPlan(), 1);
   const consolidated = runScenario(viharaConsolidatedPlan(), 1);
   closeTo(consolidated.overheadsVariable, saleOnly.overheadsVariable, 1e-6);
   closeTo(consolidated.overheadsVariable, 47_929_000);
 });
 
-// ---------------------------------------------------------------------
-// Sensitivity
-// ---------------------------------------------------------------------
-
 test("the sensitivity grid's centre cell is the plan itself", () => {
-  // The grid is the same engine called again, so 0% / 0% must be the
-  // headline figure exactly. A separate sensitivity formula is how a
-  // spreadsheet's stress test drifts from its own summary.
+  // The grid is the same engine, so 0% / 0% is the headline figure exactly.
   const plan = viharaPlan();
   const grid = sensitivityGrid(plan);
   const centre = grid[2][2];

@@ -28,10 +28,7 @@ import { DrawingHistory } from "./_components/drawing-history";
 import { DeleteLabourLogButton, LabourLogDialog } from "./_components/labour-forms";
 import { RequestIssueDialog, WithdrawRequestButton } from "./_components/request-forms";
 
-// One villa, one page — the supervisor's whole day lives here: log
-// labour, request material, and see what every work has drawn against
-// the official estimate. Phone-first: stacked cards, tappable dialogs,
-// tables that scroll inside their own cards.
+// One villa, one page: labour, material requests and drawn-vs-estimate. Phone-first: stacked cards, tables scroll inside their cards.
 export default async function VillaPage({ params }: { params: Promise<{ plotId: string }> }) {
   const { plotId } = await params;
   const [villa, contractors, works, categories, brands] = await Promise.all([
@@ -107,9 +104,7 @@ export default async function VillaPage({ params }: { params: Promise<{ plotId: 
                       Released {formatDate(set.revision.releasedAt)}
                     </p>
                   </div>
-                  {/* Since 0124 the drawings are a WorkDrive folder: one
-                      button opens it, and the sheets it held when issued
-                      are listed by name so site can count them. */}
+                  {/* The drawings are a WorkDrive folder (0124); sheets held when issued are listed by name. */}
                   {set.drawingsUrl && (
                     <div className="space-y-1.5">
                       <LinkButton
@@ -191,7 +186,6 @@ export default async function VillaPage({ params }: { params: Promise<{ plotId: 
                     {`${log.workLabel} — ${describeLabour(log)}${log.note ? ` · ${log.note}` : ""}`}
                   </p>
                 </div>
-                {/* A log on a bill is frozen (0104): it shows its bill instead. */}
                 {log.billId ? (
                   <Badge variant="neutral">{`Billed · ${log.billReference ?? "on a bill"}`}</Badge>
                 ) : (
@@ -357,13 +351,7 @@ function RequestBadge({ status }: { status: IssueRequestRow["status"] }) {
   return <Badge variant="info">Waiting</Badge>;
 }
 
-// A work can carry more than one released drawing set (rare, but the
-// master allows it) — the chip names the first and counts the rest
-// rather than picking one arbitrarily and hiding the others. It always
-// points at the Drawings section above rather than a specific file:
-// with several sets in play there is no single "right" file to jump to,
-// and one target keeps the rule the same whether there's one match or
-// several.
+// A work can carry several released drawing sets: the chip names the first and counts the rest, and always points at the Drawings section.
 function drawingChip(workItemId: string, drawings: VillaDetail["drawings"]) {
   const matches = drawings.filter((set) => set.workItemIds.includes(workItemId));
   if (matches.length === 0) return null;

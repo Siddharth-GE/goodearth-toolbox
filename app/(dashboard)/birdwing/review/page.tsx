@@ -3,12 +3,6 @@ import { listCostCentres, listReviewQueue } from "@/lib/birdwing/queries";
 import { CircleCheck } from "lucide-react";
 import { ReviewBoard } from "./review-board";
 
-/**
- * The stays that need a person: what the import from the old income sheet
- * could not decide, and every Goodearth stay still showing money pending
- * that nobody will pay. Tick, then close them in bulk — a cost centre
- * set, the balance charged to it, or written off.
- */
 export default async function ReviewPage() {
   const [rows, centres] = await Promise.all([listReviewQueue(), listCostCentres()]);
 

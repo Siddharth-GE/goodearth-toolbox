@@ -21,11 +21,7 @@ import { notFound } from "next/navigation";
 import { SaveAsTemplate, WorkOrderActions } from "../_components/work-order-buttons";
 import { WorkOrderEditor } from "../_components/work-order-editor";
 
-/**
- * One work order. While it waits for approval its works and terms are
- * edited here; once approved they are permanent (the database guard),
- * and the page reads as the paper does.
- */
+// Once approved the works and terms are permanent (the database guard).
 export default async function WorkOrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const [order, actor] = await Promise.all([getWorkOrder(id), getCurrentBillActor()]);

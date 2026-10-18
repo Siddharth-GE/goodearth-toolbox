@@ -2,9 +2,6 @@ import { getWelcomeCounts } from "@/lib/dexter/queries";
 
 import { ToolWelcome } from "../_components/tool-welcome";
 
-// The welcome screen every Management tool opens on (founder,
-// 2026-08-13). Counts only, never rupees — Dexter has no money anywhere
-// in it.
 export default async function DexterPage() {
   const counts = await getWelcomeCounts();
 

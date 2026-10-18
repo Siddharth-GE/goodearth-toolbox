@@ -1,10 +1,9 @@
 "use server";
 
+import { text } from "@/lib/form-data";
 import { revalidatePath } from "next/cache";
 
-// sharp loads LAZILY inside the resize branch — a top-level import means
-// a missing native binary on the deployed runtime kills every action in
-// this file at load, name edits included (the 2026-08-22 staging lesson).
+// sharp loads LAZILY in the resize branch: a top-level import with a missing native binary would kill every action in this file at load.
 
 import { requireAdmin } from "@/lib/auth/access";
 import { requireUser } from "@/lib/auth/dal";
@@ -28,45 +27,21 @@ import {
   type PostingInput,
 } from "./people";
 
-// Type-only import, and deliberately NOT re-exported. A bare
-// `export type { X }` in a "use server" file crashes every action in its
-// compiled chunk at load time — it caused a production outage once, and
-// `npm run check:actions` is the gate that keeps it from happening twice.
+// Type-only and not re-exported: a re-export in a "use server" file crashes the chunk (check:actions).
 import type { ActionState } from "@/lib/action-state";
 
 /**
- * Writes for the Directory.
- *
- * Two boundaries, and they are different from each other:
- *   * The person's own card — requireUser() only, plus RLS's
- *     `id = auth.uid()`. No app grant: losing /directory must never lock
- *     somebody out of correcting their own phone number.
- *   * Everything company-owned — requireAdmin(). NOT has_app('/directory'),
- *     because every account in the company holds that, which makes it
- *     `true` with extra steps.
- *
- * staff_details_guard() (0060 §4) is the real boundary under both. These
- * checks are the courtesy that produces a redirect instead of a raised
- * exception.
- *
- * Actions return ActionState and never throw, so a form renders the
- * message inline.
+ * Two boundaries. A person's own card: requireUser() plus RLS `id = auth.uid()`, no app grant, so losing
+ * /directory never locks anyone out of fixing their own phone number. Company-owned data: requireAdmin(),
+ * not has_app('/directory') which every account holds. staff_details_guard() (0060 §4) is the real boundary.
  */
 
-/**
- * The layout form, not the exact path. Directory opens on a welcome
- * screen and the real screens sit one click in, so an exact-path call
- * would refresh the welcome and leave the roster stale.
- */
+/** Layout form: Directory opens on a welcome screen, so an exact path leaves the roster stale. */
 function revalidateAll(): void {
   revalidatePath("/directory", "layout");
 }
 
-/**
- * The guard's own messages were written for a person to read ("Only an
- * admin can change a department, designation, reporting line or joining
- * date"). Surface those intact; fall back for anything else.
- */
+/** Pass the guard's own readable messages through; fall back for anything else. */
 const DIRECTORY_GUARD_PHRASES = [
   "Only an admin can",
   "date of birth is in the future",
@@ -78,19 +53,7 @@ function friendly(error: { message: string }, fallback: string): ActionState {
   return state;
 }
 
-// ---------------------------------------------------------------------
-// The person's own card
-// ---------------------------------------------------------------------
-
-/**
- * The five fields a person owns.
- *
- * The update object is BUILT BY HAND from exactly those five columns. It
- * never mentions department_id, designation, reports_to_id or joined_on,
- * even if a caller passed them — the guard would refuse such a write, but
- * an action that cannot express the wrong one is better than an action the
- * database has to stop.
- */
+/** The five fields a person owns. The update is built by hand from exactly those columns, so an action cannot express a wrong write. */
 export async function updateMyDetails(input: MyDetailsInput): Promise<ActionState> {
   const user = await requireUser();
 
@@ -116,18 +79,7 @@ export async function updateMyDetails(input: MyDetailsInput): Promise<ActionStat
   return undefined;
 }
 
-/**
- * Somebody correcting the spelling of their own name.
- *
- * Writes profiles.full_name for the signed-in row only, through the
- * "users can update their own name" policy that has existed since 0001
- * and which nothing had ever used. The whole company's names arrived by
- * hand from a spreadsheet, so the alternative was routing every typo
- * through one admin.
- *
- * This is Directory writing a SHARED table, recorded in STATUS.md's
- * contract row. It is the person's own row and one column.
- */
+/** A person correcting their own name: profiles.full_name, signed-in row only, via the "users can update their own name" policy (0001). A SHARED table write, noted in STATUS.md's contract row. */
 export async function updateMyName(name: string): Promise<ActionState> {
   const user = await requireUser();
 
@@ -146,16 +98,7 @@ export async function updateMyName(name: string): Promise<ActionState> {
   return undefined;
 }
 
-/**
- * The person's own photo.
- *
- * The browser already resized to 512×512 JPEG (~40KB) before this was
- * called — that is not an optimisation, it is what makes upload work from
- * a phone at all, since a camera photo is 3-8MB and the Server Action
- * body cap is 4mb. This re-normalises anyway: an action is a public
- * endpoint and nothing a browser sends can be trusted to already be the
- * right shape.
- */
+/** The person's own photo. The browser already resized to 512x512 JPEG (a camera photo exceeds the 4mb action cap), but this re-normalises: an action is a public endpoint. */
 export async function uploadMyPhoto(formData: FormData): Promise<ActionState> {
   const user = await requireUser();
 
@@ -172,8 +115,7 @@ export async function uploadMyPhoto(formData: FormData): Promise<ActionState> {
   try {
     const { default: sharp } = await import("sharp");
     normalised = await sharp(Buffer.from(await file.arrayBuffer()))
-      // `cover`, not `contain`. A face may lose its corners and that is
-      // fine; letterboxing a portrait onto white looks wrong on a card.
+      // cover, not contain: a face may lose its corners; letterboxing looks wrong on a card.
       .resize(staffPhoto.size, staffPhoto.size, { fit: "cover" })
       .jpeg({ quality: staffPhoto.quality })
       .toBuffer();
@@ -184,24 +126,12 @@ export async function uploadMyPhoto(formData: FormData): Promise<ActionState> {
 
   const supabase = await createClient();
 
-  // The bucket and its policies come from 0061, not from here — creating
-  // one needs privileges an ordinary signed-in user does not have.
+  // The bucket and policies come from 0061; creating one needs privileges a user lacks.
   const path = staffPhotoPath(user.id, crypto.randomUUID());
 
-  // A BLOB, NOT THE RAW Buffer, AND THIS IS NOT STYLE.
-  //
-  // supabase-js only builds a multipart body when it is handed a Blob;
-  // anything else is passed to fetch as a raw body. Next patches global
-  // fetch, and a Node Buffer going through that patched path came back
-  // TEXT-DECODED: the first upload this app ever made stored a JPEG whose
-  // every non-UTF-8 byte had become EF BF BD, inflating 40KB to 124KB.
-  // Storage still reported it as image/jpeg, the row wrote fine, and the
-  // only symptom was a broken image — nothing errored anywhere.
-  //
-  // The Blob path is multipart, which every fetch implementation treats
-  // as binary. lib/selections/views-actions.ts still passes a raw Buffer
-  // and has the same latent bug — it has simply never had an
-  // upload in production to prove it.
+  // A Blob, NOT the raw Buffer: supabase-js builds multipart only for a Blob, and a Buffer through Next's
+  // patched fetch came back text-decoded (a 40KB JPEG became 124KB of EF BF BD) with no error anywhere.
+  // lib/selections/views-actions.ts still passes a raw Buffer and has the same latent bug.
   const blob = new Blob([new Uint8Array(normalised)], { type: staffPhoto.contentType });
 
   const { error: uploadError } = await supabase.storage
@@ -212,32 +142,33 @@ export async function uploadMyPhoto(formData: FormData): Promise<ActionState> {
     return { error: "Could not save the photo. Try again." };
   }
 
-  // Confirm what landed is what was sent. A silent binary corruption is
-  // permanent and invisible — it shows up as a broken image months later,
-  // with nothing in any log. Comparing sizes catches exactly that, for the
-  // cost of one small request on a rare action.
+  // Confirm the size that landed: silent binary corruption is permanent and shows up months later as a broken image.
   const folder = path.slice(0, path.lastIndexOf("/"));
   const filename = path.slice(path.lastIndexOf("/") + 1);
-  const { data: stored } = await supabase.storage
+  const { data: stored, error: listError } = await supabase.storage
     .from(STAFF_PHOTOS_BUCKET)
     .list(folder, { search: filename });
+  // The check is a safeguard; the upload itself succeeded, so carry on unverified.
+  if (listError) console.error("uploadMyPhoto size check failed:", listError);
   const storedSize = stored?.[0]?.metadata?.size as number | undefined;
 
   if (storedSize !== undefined && storedSize !== normalised.length) {
-    await supabase.storage.from(STAFF_PHOTOS_BUCKET).remove([path]);
+    const { error: removeError } = await supabase.storage.from(STAFF_PHOTOS_BUCKET).remove([path]);
+    if (removeError) console.error("uploadMyPhoto cleanup failed:", removeError);
     console.error(
       `uploadMyPhoto stored ${storedSize} bytes but sent ${normalised.length} — binary was mangled in transit`,
     );
     return { error: "The photo did not save correctly. Try again." };
   }
 
-  // Read the old path BEFORE overwriting it, so the previous object can
-  // be cleaned up rather than orphaned.
-  const { data: existing } = await supabase
+  // Read the old path BEFORE overwriting so the previous object can be cleaned up.
+  const { data: existing, error: existingError } = await supabase
     .from("staff_details")
     .select("photo_path")
     .eq("id", user.id)
     .maybeSingle();
+  // Only the old file's cleanup depends on this, so a failed read leaves an orphan, not wrong data.
+  if (existingError) console.error("uploadMyPhoto old photo read failed:", existingError);
 
   const { error } = await supabase
     .from("staff_details")
@@ -245,22 +176,25 @@ export async function uploadMyPhoto(formData: FormData): Promise<ActionState> {
     .eq("id", user.id);
 
   if (error) {
-    // Object first, then row — so a failed row write leaves an invisible
-    // orphan rather than a card pointing at nothing.
-    await supabase.storage.from(STAFF_PHOTOS_BUCKET).remove([path]);
+    // Object first, then row: a failed row write leaves an invisible orphan, not a card pointing at nothing.
+    const { error: removeError } = await supabase.storage.from(STAFF_PHOTOS_BUCKET).remove([path]);
+    if (removeError) console.error("uploadMyPhoto cleanup failed:", removeError);
     console.error("uploadMyPhoto row write failed:", error);
     return { error: "Could not save the photo. Try again." };
   }
 
   if (existing?.photo_path && existing.photo_path !== path) {
-    await supabase.storage.from(STAFF_PHOTOS_BUCKET).remove([existing.photo_path]);
+    const { error: removeError } = await supabase.storage
+      .from(STAFF_PHOTOS_BUCKET)
+      .remove([existing.photo_path]);
+    if (removeError) console.error("uploadMyPhoto old photo removal failed:", removeError);
   }
 
   revalidateAll();
   return undefined;
 }
 
-/** Row first, then the object — the reverse of upload, same reasoning. */
+/** Row first, then the object: the reverse of upload. */
 export async function removeMyPhoto(): Promise<ActionState> {
   const user = await requireUser();
   const supabase = await createClient();
@@ -279,15 +213,14 @@ export async function removeMyPhoto(): Promise<ActionState> {
     .eq("id", user.id);
   if (error) return friendly(error, "Could not remove the photo. Try again.");
 
-  await supabase.storage.from(STAFF_PHOTOS_BUCKET).remove([existing.photo_path]);
+  const { error: removeError } = await supabase.storage
+    .from(STAFF_PHOTOS_BUCKET)
+    .remove([existing.photo_path]);
+  if (removeError) console.error("removeMyPhoto file removal failed:", removeError);
 
   revalidateAll();
   return undefined;
 }
-
-// ---------------------------------------------------------------------
-// The company's four columns — admin only
-// ---------------------------------------------------------------------
 
 export async function updateStaffPosting(input: PostingInput): Promise<ActionState> {
   const user = await requireUser();
@@ -314,10 +247,6 @@ export async function updateStaffPosting(input: PostingInput): Promise<ActionSta
   return undefined;
 }
 
-// ---------------------------------------------------------------------
-// Departments — admin only
-// ---------------------------------------------------------------------
-
 export async function createDepartment(
   _state: ActionState,
   formData: FormData,
@@ -325,14 +254,13 @@ export async function createDepartment(
   const user = await requireUser();
   await requireAdmin(user);
 
-  const name = String(formData.get("name") ?? "").trim();
+  const name = text(formData, "name");
   if (!name) return { error: "Give the department a name." };
   if (name.length > 40) return { error: "Keep the name under 40 characters." };
 
   const supabase = await createClient();
 
-  // Sort order runs in tens so a later one can be slotted between two
-  // without renumbering the list.
+  // Sort order runs in tens so one can be slotted between two.
   const { data: last, error: readError } = await supabase
     .from("staff_departments")
     .select("sort_order")
@@ -348,8 +276,7 @@ export async function createDepartment(
     updated_by: user.id,
   });
 
-  // The unique index is on lower(name), so "design" collides with
-  // "Design" — which is the point, and worth saying plainly.
+  // The unique index is on lower(name), so "design" collides with "Design".
   if (error?.code === "23505") return { error: `There is already a department called ${name}.` };
   if (error) return friendly(error, "Could not add the department. Try again.");
 
@@ -378,11 +305,7 @@ export async function renameDepartment(departmentId: string, name: string): Prom
   return undefined;
 }
 
-/**
- * Switched off, never deleted — somebody who has left still sits in a
- * department on every past record, and there is no delete policy on the
- * table to make the other choice available.
- */
+/** Switched off, never deleted: leavers sit in a department on past records, and the table has no delete policy. */
 export async function setDepartmentActive(
   departmentId: string,
   isActive: boolean,

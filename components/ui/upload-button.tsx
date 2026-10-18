@@ -9,11 +9,8 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
 /**
- * One button that uploads a document — a photo of an ID or a bill, or a
- * PDF — to a server action. A photo is shrunk in the browser first
- * (lib/uploads/shrink-in-browser.ts), so a phone's 6 MB picture arrives
- * as a few hundred KB instead of failing at the 4 MB cap. `fields` ride
- * along with the file (a document's kind, say).
+ * One button that uploads a document to a server action. A photo is shrunk in the browser first
+ * (lib/uploads/shrink-in-browser.ts) so a phone picture clears the 4 MB cap.
  */
 export function UploadButton({
   action,

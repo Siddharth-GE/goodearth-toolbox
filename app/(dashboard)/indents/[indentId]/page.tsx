@@ -2,7 +2,8 @@ import { Attribution } from "@/components/ui/attribution";
 import { LinkButton } from "@/components/ui/button";
 import { PageTitle } from "@/components/ui/page-title";
 import { formatDate } from "@/lib/format";
-import { getIndent, isCurrentUserApprover } from "@/lib/indents/queries";
+import { getIndent } from "@/lib/indents/detail-queries";
+import { isCurrentUserApprover } from "@/lib/indents/queries";
 import { approvalBlocker, canEditIndent, estimatorHold, stillToBuy } from "@/lib/indents/workflow";
 import { listBrands } from "@/lib/masters/brands";
 import { listItemCategories } from "@/lib/masters/item-categories";
@@ -32,8 +33,7 @@ export default async function IndentPage({ params }: { params: Promise<{ indentI
   const linesToBuy = indent.lines.filter(
     (line) => stillToBuy(line.quantity, line.ordered_quantity) > 0,
   ).length;
-  // Lines outside the estimate wait for the estimator (0113). Read fresh
-  // on every load — the estimator answers from another screen.
+  // Lines outside the estimate wait for the estimator (0113); read fresh, as the estimator answers elsewhere.
   const hold = estimatorHold(
     indent.lines.map((line) => ({
       source: line.source,
@@ -83,8 +83,6 @@ export default async function IndentPage({ params }: { params: Promise<{ indentI
         }
       />
 
-      {/* A rejection sends the indent back to draft with the reason —
-          front and centre, so fixing it doesn't start with hunting. */}
       {editable && indent.rejection_note && (
         <div className="border-warning/40 bg-warning/5 rounded-xl border px-4 py-3">
           <p className="text-foreground text-sm">

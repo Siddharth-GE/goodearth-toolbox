@@ -6,24 +6,11 @@ import { cookies } from "next/headers";
 import { maskEmail, signPayload, verifyPayload, type SignedPayload } from "./signed-cookie";
 
 /**
- * The three cookies of the 2FA flow, and the database marking that makes
- * it enforceable.
- *
- *   ge_challenge  — "this browser proved the password minutes ago and is
- *                    owed a code screen". Set by the login action, read
- *                    by /login/verify. 10 minutes, then the whole flow
- *                    starts over.
- *   ge_verified   — "this browser completed the full sign-in". Read by
- *                    requireUser() to route half-signed-in sessions to
- *                    the code screen. UX only: the enforcing half is the
- *                    auth_verified_sessions row (0062/0063).
- *   ge_trusted    — "this device finished a code within 30 days". Lets
- *                    the login action skip the code step. It never skips
- *                    the password, so a stolen one is worthless alone.
- *
- * All HMAC-signed with AUTH_COOKIE_SECRET (lib/auth/signed-cookie.ts),
- * httpOnly, lax. The browser can hold these statements; only the server
- * can write them.
+ * The 2FA flow's three cookies, HMAC-signed (AUTH_COOKIE_SECRET) and httpOnly:
+ *   ge_challenge — the password was right minutes ago; a code is owed (10 min).
+ *   ge_verified  — the full sign-in finished. UX only: the database row enforces.
+ *   ge_trusted   — a code was done here within 30 days; skips the code, never
+ *                  the password.
  */
 
 const CHALLENGE_COOKIE = "ge_challenge";
@@ -64,8 +51,6 @@ async function clearCookie(name: string) {
   cookieStore.set(name, "", { path: "/", maxAge: 0 });
 }
 
-// The challenge ------------------------------------------------------------
-
 export async function setChallenge(email: string) {
   const now = Date.now();
   await setCookie(CHALLENGE_COOKIE, {
@@ -83,8 +68,6 @@ export async function getChallenge() {
 export async function clearChallenge() {
   await clearCookie(CHALLENGE_COOKIE);
 }
-
-// The verified marker ------------------------------------------------------
 
 export async function setVerified(userId: string) {
   await setCookie(VERIFIED_COOKIE, {
@@ -104,8 +87,6 @@ export async function clearVerified() {
   await clearCookie(VERIFIED_COOKIE);
 }
 
-// The trusted device -------------------------------------------------------
-
 export async function setTrustedDevice(userId: string) {
   await setCookie(TRUSTED_COOKIE, {
     kind: "trusted",
@@ -119,21 +100,11 @@ export async function isTrustedDevice(userId: string) {
   return payload?.subject === userId;
 }
 
-// The database half --------------------------------------------------------
-
 /**
- * Records the CURRENT session (the one in this request's cookies) as
- * having completed the full sign-in. After 0063, has_app() and
- * is_admin() answer false for any session without this row — which is
- * what stops a stolen password minting a useful session straight from
- * the auth API with the public anon key.
- *
- * Service-role on purpose, and the table is deny-all under RLS: the very
- * session being screened must not be able to write its own pass. This is
- * a sanctioned admin-client use, documented in CLAUDE.md.
- *
- * Throws on failure — "signed in but every tool shows nothing" is a
- * worse outcome than asking the person to sign in again.
+ * Records this session as fully signed in. Without the row has_app() and
+ * is_admin() refuse it (0063), so a stolen password alone mints nothing useful.
+ * Service-role on purpose: the table is deny-all, so a session cannot write its
+ * own pass. Throws: signing in again beats every tool showing nothing.
  */
 export async function markSessionVerified(method: "otp" | "trusted" | "oauth") {
   const supabase = await createClient();
@@ -154,9 +125,7 @@ export async function markSessionVerified(method: "otp" | "trusted" | "oauth") {
     throw new Error("Could not complete sign-in. Try again.");
   }
 
-  // Opportunistic sweep: rows past the trusted-device age die, which
-  // doubles as a maximum session age — has_app() stops answering for
-  // them and the person signs in afresh. Failure here is harmless.
+  // Old rows die here, which doubles as a maximum session age. Failure is harmless.
   const cutoff = new Date(Date.now() - VERIFIED_TTL_MS).toISOString();
   const { error: sweepError } = await admin
     .from("auth_verified_sessions")

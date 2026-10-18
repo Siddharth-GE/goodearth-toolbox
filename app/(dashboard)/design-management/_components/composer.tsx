@@ -18,19 +18,13 @@ const DUE_TONE: Record<DueTone, PillTone> = {
   success: "success",
 };
 
-/**
- * The one-line composer: type the step, tap villa, stage, owner and date,
- * press Enter. On a villa's page the villa is fixed. No date is allowed —
- * it lands with the overdue ones, and the line says so, because every
- * promise should carry a real date.
- */
+/** No date lands with the overdue ones, and the line says so: every promise should carry a real date. */
 export function Composer({
   fixedVilla,
   defaultOwner,
   defaultStage = null,
 }: {
   fixedVilla?: string;
-  /** Who it goes to until someone picks: you, or the person being viewed. */
   defaultOwner: string | null;
   defaultStage?: string | null;
 }) {

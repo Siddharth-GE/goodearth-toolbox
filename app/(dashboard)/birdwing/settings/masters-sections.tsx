@@ -40,15 +40,7 @@ function ActiveBox({ defaultChecked }: { defaultChecked: boolean }) {
   );
 }
 
-// ---------------------------------------------------------------------
-// The rate card
-// ---------------------------------------------------------------------
-
-/**
- * What each thing costs BEFORE GST, its GST and its SAC. The old laptop
- * app's thirteen heads arrive switched off: read each, correct it, and
- * switch on the ones that are right — only those are offered on a stay.
- */
+/** Rates are BEFORE GST. The old app's thirteen heads arrive switched off; only switched-on ones are offered on a stay. */
 export function RateCardSection({ items }: { items: RateCardRow[] }) {
   const off = items.filter((item) => !item.isActive).length;
   return (
@@ -167,10 +159,6 @@ function RateCardFields({ item }: { item?: RateCardRow }) {
   );
 }
 
-// ---------------------------------------------------------------------
-// Rooms
-// ---------------------------------------------------------------------
-
 export function RoomsSection({ rooms }: { rooms: RoomRow[] }) {
   return (
     <Section
@@ -264,11 +252,6 @@ function RoomFields({ room }: { room?: RoomRow }) {
   );
 }
 
-// ---------------------------------------------------------------------
-// Cost centres
-// ---------------------------------------------------------------------
-
-/** Who carries a Goodearth stay: Marketing for a prospect, Directors for theirs. */
 export function CostCentresSection({ centres }: { centres: CostCentreRow[] }) {
   return (
     <Section

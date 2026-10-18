@@ -1,6 +1,6 @@
 # Bugcatcher — what a green build does not prove
 
-CI runs prettier, lint, typecheck and test, then build and `check:actions`. **Every bug on this page passed all of them.** Nothing on a developer's machine could have caught these, so the only defence is knowing they exist and running the one check that does. Read this before merging anything that touches a database read, a file upload, a permission or a colour.
+CI runs prettier, lint, typecheck, test, `check:errors`, `check:boundaries`, `check:selects`, then build and `check:actions`, and against the database `db:check`, `db:check-views` and `db:check-policies`. **Every bug on this page passed what CI ran at the time**; several of those checks exist because of one. Nothing on a developer's machine could have caught these, so the only defence is knowing they exist and running the one check that does. Read this before merging anything that touches a database read, a file upload, a permission or a colour.
 
 ## Before you merge
 
@@ -29,7 +29,7 @@ A 40 KB JPEG stored as 124 KB of rubbish, every non-UTF-8 byte replaced with `EF
 
 An ambiguous embed answers HTTP 300 (`PGRST201`) at runtime; it is not a type error and the tests have no database. Client Relations shipped four dead screens this way. A table with two foreign keys to the same target needs the key named — `plots!units_plot_id_fkey` (`units` has had two paths to `plots` since `0029`); `staff_details` has four FKs to `profiles`, which is why Directory forbids embeds and merges through a `Map`.
 
-**Check.** Open the page, or run the `select` string straight at the REST API.
+**Check.** `npm run check:selects` (in CI) checks every literal `select` string against the generated types; a string built at runtime still needs the page opened, or the string run straight at the REST API.
 
 ### 3. Supabase's default privileges grant more than the migrations ask for
 
@@ -159,6 +159,13 @@ Dexter's viewer sandboxed HTML and SVG and nothing else, so an `.xml` (or `.xhtm
 
 **Rule.** Untrusted files get the sandbox on every response; browsers ignore it on non-documents, so there is nothing to choose.
 **Check.** `lib/dexter/headers.test.ts` walks every type, including an unknown one and a file with no extension.
+
+### 22. A policy written before the second factor existed never learned it
+
+`user_apps`' grant, revoke and admin-read policies came from `0003` and checked `profiles.role = 'admin'` directly. `0062` taught `is_admin()` the emailed code and `is_active`, and every later policy used it, but nobody went back: an admin's password alone could grant any tool to anyone. Each new migration's asserts covered only its own tables. Found by the 2026-10-17 audit; `0127` closes it.
+
+**Rule.** A policy asks `is_admin()` or `has_app()`, never `profiles.role`. When a helper learns a new condition, search every policy that bypasses it.
+**Check.** Live: `select tablename, policyname from pg_policies where qual ilike '%role%' or with_check ilike '%role%'`, which should list nothing (Phase 3's `db:check-policies` will run it on every pull request). Run a trial as an admin with an unverified `session_id`, as `scripts/trials/user-apps-is-admin.sql` does.
 
 ## Adding to this file
 

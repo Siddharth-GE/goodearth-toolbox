@@ -1,5 +1,6 @@
 "use server";
 
+import { optionalText, rawText, text } from "@/lib/form-data";
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
@@ -11,18 +12,13 @@ const PROJECT_STATUSES = ["planning", "active", "completed"];
 
 function readProjectForm(formData: FormData) {
   return {
-    name: String(formData.get("name") ?? "").trim(),
-    // Normalised the way indentReference() expects: uppercase, no spaces.
-    // The DB CHECK (^[A-Z0-9-]{2,10}$, migration 0019) is the backstop.
-    code:
-      String(formData.get("code") ?? "")
-        .trim()
-        .toUpperCase()
-        .replace(/\s+/g, "") || null,
-    location: String(formData.get("location") ?? "").trim() || null,
-    project_type: String(formData.get("project_type") ?? "") as ProjectType,
+    name: text(formData, "name"),
+    // Uppercase, no spaces, as indentReference() expects. The DB CHECK (migration 0019) is the backstop.
+    code: text(formData, "code").toUpperCase().replace(/\s+/g, "") || null,
+    location: optionalText(formData, "location"),
+    project_type: rawText(formData, "project_type") as ProjectType,
     status: String(formData.get("status") ?? "planning") as ProjectStatus,
-    company_id: String(formData.get("company_id") ?? "") || null,
+    company_id: rawText(formData, "company_id") || null,
   };
 }
 

@@ -2,12 +2,7 @@ import { LinkButton } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { EyeOff } from "lucide-react";
 
-/**
- * What a team member sees on a plot or a client that is not assigned to
- * them (0123) — instead of "not found", which would read like a bug. Also
- * what a plot's page turns into the moment its owner hands it to a
- * colleague, since the save refreshes the page they are on.
- */
+/** Shown instead of "not found" (which reads like a bug) for a plot or client not assigned to the member (0123), and when a save hands a plot on. */
 export function NotYours({ kind }: { kind: "plot" | "client" }) {
   return (
     <EmptyState

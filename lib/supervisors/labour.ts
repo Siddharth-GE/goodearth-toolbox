@@ -1,15 +1,5 @@
-/**
- * A labour log in the billing team's three formats (0104, founder
- * 2026-10-08) — pure, no database. Still no rupees: the supervisor logs
- * heads or quantities; the billing team prices them in Bills.
- *
- *   nmr      daily wages — heads by trade (masons / helpers / others)
- *   pw_qty   piece-work by quantity — how much of the work, in its unit
- *   pw_lump  piece-work, lump sum — what was done, in words
- *
- * The database's labour_logs_shape_matches_kind CHECK holds the same
- * shapes; this says them in words before a save is refused.
- */
+/** A labour log in the billing team's three formats (0104), pure and rupee-free: nmr (daily wages by trade),
+ * pw_qty (piece-work by quantity), pw_lump (lump sum). labour_logs_shape_matches_kind holds the same shapes in the database. */
 
 export const LABOUR_KINDS = ["nmr", "pw_qty", "pw_lump"] as const;
 export type LabourKind = (typeof LABOUR_KINDS)[number];
@@ -33,12 +23,10 @@ export type LabourShapeInput = {
   helpers: number;
   others: number;
   quantity: number | null;
-  /** The work's unit from the rate book, or null when it has none. */
   workUom: string | null;
   description: string;
 };
 
-/** What the row stores for its kind — the other kinds' fields cleared. */
 export type LabourShape = {
   kind: LabourKind;
   masons: number;
@@ -49,7 +37,6 @@ export type LabourShape = {
   description: string | null;
 };
 
-/** The log as the database will store it, or what is wrong in words. */
 export function labourShape(input: LabourShapeInput): LabourShape | { error: string } {
   if (!isLabourKind(input.kind)) return { error: "Pick how the work is paid." };
 

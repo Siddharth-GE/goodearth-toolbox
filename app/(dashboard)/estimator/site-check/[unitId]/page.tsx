@@ -27,13 +27,7 @@ import { cn } from "@/lib/utils";
 import { notFound } from "next/navigation";
 import { ApproveReconciliationButton } from "../../estimates/[estimateId]/_components/reconciliation-forms";
 
-/**
- * One villa's site check: what needs a look there — material past its
- * official estimate, and material the estimate never planned, with
- * Approve on the row — then every material, estimated against what has
- * reached the site. "Reached" is store issues to the villa plus vendor
- * deliveries straight to it (compare.ts).
- */
+/** One villa's site check: material past its estimate or never planned (Approve on the row), then every material estimated against reached (compare.ts). */
 export default async function VillaSiteCheckPage({
   params,
 }: {
@@ -46,8 +40,7 @@ export default async function VillaSiteCheckPage({
     listUnits(),
     listProjects(),
   ]);
-  // Only a villa with an official estimate has anything to check; the id
-  // reaches a query only once it has matched one.
+  // Only a villa with an official estimate has anything to check.
   const official = officials.find((candidate) => candidate.unitId === unitId);
   const villa = units.find((unit) => unit.id === unitId);
   if (!official || !villa) notFound();
@@ -65,13 +58,11 @@ export default async function VillaSiteCheckPage({
   const projectName = projects.find((project) => project.id === villa.project_id)?.name;
   const keyOf = (entry: (typeof entries)[number]) =>
     `${entry.unitId} ${entry.workItemId ?? ""} ${entry.itemId}`;
-  // Approved here, or — since 0113 — at the indent that asked for the
-  // material: either way an estimator has looked at it.
+  // Approved here or at the indent that asked for it (0113): either way an estimator has looked.
   const approvalFor = (entry: (typeof entries)[number]) =>
     approvals.get(keyOf(entry)) ?? indentApprovals.get(keyOf(entry));
 
-  // Waiting for an approval first, then over-runs, then what has been
-  // looked at.
+  // Waiting for an approval first, then over-runs, then what has been looked at.
   const rank = (entry: (typeof entries)[number]) =>
     entry.kind === "outside" ? (approvalFor(entry) ? 2 : 0) : 1;
   const sorted = [...entries].sort((a, b) => rank(a) - rank(b));

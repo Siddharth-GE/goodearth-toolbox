@@ -5,14 +5,8 @@ import { KAADAL_STAGES, optionFor } from "@/lib/client-relations/stages";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
-import { Pill, PersonName } from "./pill";
+import { Pill, PersonName } from "@/components/ui/pill";
 import { SideIcon } from "./side-mark";
-
-/**
- * A plot as the tracker drew it — a surveyed lot: its number large and
- * monospaced, the buyer, a health pill, the five-step rail and the next
- * thing to do. The whole card opens the plot.
- */
 
 const RAIL_STEPS = ["Buyer", "Sale deed", "Construction agreement", "Build", "Handed over"];
 
@@ -136,7 +130,6 @@ export function LotCard({ card, today }: { card: PlotCard; today: string }) {
           </div>
         ) : null}
 
-        {/* A plot's two sides, each with its own owner. */}
         <div className="text-muted mt-auto space-y-1.5 text-xs">
           <div className="flex min-w-0 items-center gap-2">
             <SideIcon track="sales" />

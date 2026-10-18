@@ -6,20 +6,8 @@ import type { createClient } from "@/lib/supabase/server";
 import type { SheetNameParts } from "./sheet-name";
 
 /**
- * Everything a sheet's download name needs that is not on the sheet row
- * itself: the villa and its project, the set's stage, and the number of
- * the transmittal that issued the revision. One read path, so the name on
- * a Design Management screen, on a Supervisors screen and on the
- * download itself is always the same name.
- *
- * Shared (lib/drawings/): no grant check, like the rest of this module —
- * each caller gates itself, and RLS decides what it can see. A
- * supervisor reads only issued transmittals, which is exactly where a
- * released revision's number comes from; a draft revision's number is
- * null and the name says DRAFT.
- *
- * Throws on a failed read (fetchAll), like lib/drawings/queries.ts.
- * Names merge through Maps, never embeds (BUGCATCHER #2).
+ * What a sheet's download name needs that is not on the sheet row: villa, project, stage, issuing transmittal number.
+ * No grant check (each caller gates itself); throws on a failed read (fetchAll). Names merge through Maps (BUGCATCHER #2).
  */
 export type SheetContext = Omit<SheetNameParts, "sheetCode" | "originalFileName" | "contentType">;
 
@@ -134,8 +122,7 @@ export async function sheetNamingContext(
   const stagesById = new Map(stages.map((stage) => [stage.id, stage]));
   const transmittalsById = new Map(transmittals.map((row) => [row.id, row]));
 
-  // The transmittal that ISSUED a revision: the earliest issued one
-  // carrying it. None issued yet means a draft, and the number is null.
+  // The transmittal that ISSUED a revision is the earliest issued one carrying it; none means a draft (number null).
   const issuedBy = new Map<string, { number: string; issuedAt: string; stageId: string }>();
   const onDraft = new Map<string, string>();
   for (const line of lines) {

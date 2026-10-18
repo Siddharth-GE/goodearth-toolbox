@@ -5,8 +5,9 @@ import { FormMessage } from "@/components/ui/form-message";
 import { saveBillLines } from "@/lib/bills/line-actions";
 import type { BillLineRow } from "@/lib/bills/line-queries";
 import { billLinesProblem, type PoLineForBill, type WorkOrderLineForBill } from "@/lib/bills/lines";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import {
   BillLinesEditor,
   draftsOf,
@@ -34,10 +35,6 @@ const toEditor = (row: BillLineRow): EditorLine =>
     row.id,
   );
 
-/**
- * A recorded bill's lines, edited and saved together. Saving refreshes
- * the page so the header shows the totals the database rolled up.
- */
 export function BillLinesPanel({
   billId,
   lines,
@@ -59,9 +56,8 @@ export function BillLinesPanel({
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState<EditorLine[]>(() => lines.map(toEditor));
-  const [error, setError] = useState<string>();
   const [saved, setSaved] = useState(false);
-  const [saving, startSaving] = useTransition();
+  const { pending: saving, error, run } = useActionRunner();
 
   const drafts = draftsOf(editing);
   const problem = editing.length ? billLinesProblem(drafts) : undefined;
@@ -86,18 +82,12 @@ export function BillLinesPanel({
         <FormMessage error={error} success={saved ? "Saved" : undefined} size="xs" />
         <Button
           disabled={saving || Boolean(problem) || editing.length === 0}
-          onClick={() =>
-            startSaving(async () => {
-              setError(undefined);
-              const result = await saveBillLines(billId, drafts);
-              if (result?.error) {
-                setError(result.error);
-                return;
-              }
-              setSaved(true);
-              router.refresh();
-            })
-          }
+          onClick={async () => {
+            const result = await run(() => saveBillLines(billId, drafts));
+            if (result?.error) return;
+            setSaved(true);
+            router.refresh();
+          }}
         >
           {saving ? "Saving…" : "Save the lines"}
         </Button>

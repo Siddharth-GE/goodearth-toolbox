@@ -13,21 +13,13 @@ import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { startTransmittal } from "@/lib/design-management/actions";
+import { startTransmittal } from "@/lib/design-management/transmittal-actions";
 import type { VillaDrawingSetState } from "@/lib/design-management/queries";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
-/**
- * Start a transmittal: a stage, then one drawing set of THAT stage.
- *
- * Founder, 2026-09-27: "one transmittal contains only one stage and you
- * upload a drawing set and inside that sheets". So the two questions a
- * transmittal needs are asked together, and the sets offered are only
- * the ones this villa has at the chosen stage — a Structural set can no
- * longer go out on a Concept transmittal (0099 refuses it too). Every
- * press here is `startTransmittal`, which lands on the new workspace.
- */
+/** A stage, then one drawing set of THAT stage: only this villa's sets at the chosen stage are offered (0099 refuses a mismatch too). */
 export function NewTransmittalDialog({
   unitId,
   stages,
@@ -44,8 +36,7 @@ export function NewTransmittalDialog({
   const [open, setOpen] = useState(false);
   const [stageId, setStageId] = useState(initialStage);
   const [name, setName] = useState("");
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run, clearError } = useActionRunner();
 
   if (stages.length === 0) {
     return (
@@ -58,14 +49,9 @@ export function NewTransmittalDialog({
   const stageName = stages.find((stage) => stage.id === stageId)?.name ?? "";
   const stageSets = sets.filter((set) => set.stageId === stageId);
 
-  const start = (choice: { setId: string } | { newSetName: string }) => {
-    setError(undefined);
-    startTransition(async () => {
-      // Success redirects to the new transmittal; only a refusal returns.
-      const result = await startTransmittal(unitId, stageId, choice);
-      if (result?.error) setError(result.error);
-    });
-  };
+  // Success redirects to the new transmittal; only a refusal returns.
+  const start = (choice: { setId: string } | { newSetName: string }) =>
+    run(() => startTransmittal(unitId, stageId, choice));
 
   return (
     <Dialog
@@ -73,7 +59,7 @@ export function NewTransmittalDialog({
       onOpenChange={(next) => {
         if (pending) return;
         setOpen(next);
-        if (!next) setError(undefined);
+        if (!next) clearError();
       }}
     >
       <DialogTrigger asChild>
@@ -96,7 +82,7 @@ export function NewTransmittalDialog({
               value={stageId}
               onChange={(event) => {
                 setStageId(event.target.value);
-                setError(undefined);
+                clearError();
               }}
             >
               {stages.map((stage) => (
@@ -167,7 +153,6 @@ export function NewTransmittalDialog({
   );
 }
 
-/** The one right press for a set of this stage, given where it stands. */
 function SetOffer({
   set,
   onStart,
@@ -195,7 +180,6 @@ function SetOffer({
   );
 }
 
-/** What this villa has of the set, said plainly. */
 function stateLine(set: VillaDrawingSetState): string {
   if (set.released) {
     const sheets = `${set.released.fileCount} ${set.released.fileCount === 1 ? "sheet" : "sheets"}`;

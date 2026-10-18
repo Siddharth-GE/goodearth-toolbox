@@ -1,17 +1,5 @@
-/**
- * The dataset registry — index only.
- *
- * The registry used to be a single ~1,900-line file: shared types, then
- * twelve hand-authored dataset definitions. One definition per file is
- * easier to read and to review a diff against, so each dataset now lives
- * in its own file under `datasets/`, and this file just assembles them
- * back into the same public surface — every existing import of
- * `@/lib/reporter/datasets` keeps working unchanged. See
- * `datasets/types.ts` for the rules that keep the registry honest (the
- * hand-authored `select`, the named-constraint embed rule, the
- * count_distinct identity trap, the no-typing filter rule) — they apply
- * to every file in this folder, not just the types.
- */
+// Index only: assembles the per-dataset files under datasets/. The rules every dataset obeys are in
+// datasets/types.ts.
 
 export type { FieldType, KnownSource, Aggregate, FieldDef, DatasetDef } from "./datasets/types";
 export { KNOWN_SOURCES, AGGREGATES } from "./datasets/types";
@@ -49,13 +37,9 @@ export const DATASETS: Record<string, DatasetDef> = {
   birdwing_expenses: birdwingExpenses,
 };
 
-/** Where a blank or unrecognisable spec lands. */
 export const DEFAULT_DATASET = "indent_lines";
 
-/**
- * A field key, or an alias of one, resolved to the current key.
- * Null when it matches nothing — the caller drops it, never throws.
- */
+// Null when it matches nothing; the caller drops it.
 export function resolveFieldKey(dataset: DatasetDef, key: unknown): string | null {
   if (typeof key !== "string" || !key) return null;
   if (Object.prototype.hasOwnProperty.call(dataset.fields, key)) return key;

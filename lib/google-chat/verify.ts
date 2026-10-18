@@ -1,28 +1,10 @@
-/**
- * The door's lock: proof that a request to /api/google-chat really came
- * from Google Chat, checked before anything else runs.
- *
- * Reality, learned from Google's own tokens on 2026-09-01: new Chat apps
- * are registered as Workspace add-ons, and those sign events with a
- * Google ID token — issuer https://accounts.google.com, audience = the
- * exact endpoint URL — not the classic chat@system.gserviceaccount.com /
- * project-number pair the docs still describe. Issuer + audience alone
- * would be a hole, not a lock: ANY Google service account can mint an
- * accounts.google.com ID token naming our URL as audience. What ties the
- * token to OUR Cloud project is its email claim, which must be the
- * project's own Chat service agent
- * (service-<projectNumber>@gcp-sa-gsuiteaddons.iam.gserviceaccount.com).
- * All three are checked, always.
- *
- * Verification is split so the cryptography is pure and testable:
- * verifyChatToken takes the keys, the expected audience, the expected
- * service agent and the clock as arguments; only getGoogleKeys and the
- * env accessors touch the network and the environment.
- *
- * No JWT library — node:crypto does RS256 natively, and one algorithm
- * against a pinned issuer is exactly the case where a general-purpose
- * verifier adds surface, not safety.
- */
+// The door's lock: proof the request came from Google Chat, checked first. New Chat apps are
+// Workspace add-ons signing a Google ID token (issuer accounts.google.com, audience = the endpoint
+// URL). Issuer and audience alone are a hole: ANY Google service account can mint such a token
+// for our URL. The email claim, which must be our project's own Chat service agent, ties it to
+// us. All three are checked, always. No JWT library: one algorithm against a pinned issuer is
+// where a general verifier adds surface, not safety. verifyChatToken is pure; only getGoogleKeys
+// and the env accessors touch the network or environment.
 import {
   X509Certificate,
   createPublicKey,
@@ -32,8 +14,7 @@ import {
 
 export const CHAT_ISSUER = "https://accounts.google.com";
 
-// Google's OIDC signing certs, kid → x509 PEM — same shape as the old
-// per-service-account certs URL, so keyFromPem covers both.
+// Google's OIDC signing certs, kid → x509 PEM.
 const CERTS_URL = "https://www.googleapis.com/oauth2/v1/certs";
 
 export type ChatTokenClaims = {
@@ -44,14 +25,7 @@ export type ChatTokenClaims = {
   [claim: string]: unknown;
 };
 
-/**
- * Verify a Google Chat bearer token. Returns the claims when everything
- * holds — RS256 signature by a known key, the accounts.google.com
- * issuer, our exact endpoint URL as audience, the project's own Chat
- * service agent as verified email, not expired — and null for anything
- * else. Never throws: a malformed token is a stranger at the door, not
- * an exception.
- */
+// Never throws: a malformed token is a stranger at the door.
 export function verifyChatToken(
   token: string,
   keys: Map<string, KeyObject>,
@@ -74,8 +48,7 @@ export function verifyChatToken(
   if (typeof header !== "object" || header === null) return null;
   if (typeof payload !== "object" || payload === null) return null;
 
-  // Algorithm pinned to what Google actually uses. Anything else —
-  // including "none" — is refused before the key is even looked up.
+  // Algorithm pinned; "none" and anything else is refused before the key is looked up.
   const { alg, kid } = header as { alg?: unknown; kid?: unknown };
   if (alg !== "RS256" || typeof kid !== "string") return null;
 
@@ -107,10 +80,6 @@ export function verifyChatToken(
   return claims;
 }
 
-/**
- * A PEM — either an x509 certificate (what Google publishes) or a bare
- * public key (what the tests mint) — as a verification key.
- */
 export function keyFromPem(pem: string): KeyObject {
   if (pem.includes("BEGIN CERTIFICATE")) {
     return new X509Certificate(pem).publicKey;
@@ -120,12 +89,8 @@ export function keyFromPem(pem: string): KeyObject {
 
 let cachedKeys: { keys: Map<string, KeyObject>; freshUntil: number } | null = null;
 
-/**
- * Google's current signing certificates, kid → key. Cached in module
- * scope for as long as the response's Cache-Control allows, and served
- * stale if a refresh fails — a hiccup at Google during a key rotation
- * must not take the bot down with it.
- */
+// Cached per Cache-Control, and served stale if a refresh fails, so a Google hiccup during key
+// rotation can't take the bot down.
 export async function getGoogleKeys(): Promise<Map<string, KeyObject>> {
   const now = Date.now();
   if (cachedKeys && cachedKeys.freshUntil > now) return cachedKeys.keys;
@@ -147,46 +112,28 @@ export async function getGoogleKeys(): Promise<Map<string, KeyObject>> {
   }
 }
 
-/**
- * The Cloud project number — it names the project's Chat service agent,
- * which every accepted token must carry as its email claim. Different
- * per Chat app, so staging and production each verify only their own
- * traffic. Throws by name when unset rather than quietly verifying
- * nothing (the MARATHON_SESSION_SECRET idiom).
- */
+// Names the project's Chat service agent, which every token must carry as its email. Differs per
+// Chat app, so each environment verifies only its own traffic. Throws when unset rather than
+// quietly verifying nothing.
 export function projectNumber(): string {
   const value = process.env.GOOGLE_CHAT_PROJECT_NUMBER;
   if (!value) throw new Error("GOOGLE_CHAT_PROJECT_NUMBER is not set");
   return value;
 }
 
-/** The one Google identity allowed through: this project's Chat service agent. */
 export function chatServiceAgent(): string {
   return `service-${projectNumber()}@gcp-sa-gsuiteaddons.iam.gserviceaccount.com`;
 }
 
-/**
- * The audience Google stamps into the token: the endpoint URL exactly as
- * registered in the Chat app's connection settings — so it differs per
- * environment and must match character for character.
- */
+// The endpoint URL exactly as registered in the Chat app; differs per environment.
 export function chatAudience(): string {
   const value = process.env.GOOGLE_CHAT_AUDIENCE;
   if (!value) throw new Error("GOOGLE_CHAT_AUDIENCE is not set");
   return value;
 }
 
-/**
- * The host the bot's own links point at. It is derived from the
- * registered endpoint URL rather than from a site-URL setting, because
- * that URL is already per-environment and already has to be right for a
- * single request to get through the door at all: staging's Chat app
- * names staging, production's names production, so a card built on
- * staging can only ever link to staging. The alternative — a configured
- * site URL — is the exact shape of BUGCATCHER #7, where a hardcoded URL
- * sent the OAuth return leg to production from a preview deploy. No new
- * env var, and one fewer thing that can be set wrong.
- */
+// Derived from the registered endpoint URL, not a site-URL setting, so a card built on staging
+// can only link to staging (BUGCATCHER #7).
 export function chatOrigin(): string {
   return new URL(chatAudience()).origin;
 }

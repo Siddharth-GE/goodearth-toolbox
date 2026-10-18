@@ -25,13 +25,11 @@ export default async function DirectoryPeoplePage({
 
   return (
     <div className="space-y-4">
-      {/* GET form, so a filtered roster is a linkable URL and the back
-          button does what it looks like it does. */}
+      {/* GET form, so a filtered roster is a linkable URL. */}
       <form
         action="/directory/people"
         className="flex flex-wrap items-end gap-2"
-        // Site staff reach this one-handed; the search field is first so
-        // the keyboard opens on the thing they came for.
+        // Search first so the keyboard opens on what site staff came for.
       >
         <div className="min-w-0 flex-1 space-y-1.5 sm:max-w-64 sm:flex-none">
           <Label htmlFor="q">Search</Label>
@@ -66,7 +64,6 @@ export default async function DirectoryPeoplePage({
         )}
       </form>
 
-      {/* "N of M" from the real roster, never rows.length. */}
       <p className="text-muted text-sm">
         {isFiltered ? `${people.length} of ${total} people` : `${total} people`}
       </p>
@@ -83,8 +80,7 @@ export default async function DirectoryPeoplePage({
           action={<LinkButton href="/directory/people">Show everyone</LinkButton>}
         />
       ) : (
-        // A card grid, not a table: ten columns of fifty people is
-        // unusable at 390px and there is no honest way to make it one.
+        // A card grid, not a table: ten columns are unusable at 390px.
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {people.map((person) => (
             <PersonCard key={person.id} person={person} />

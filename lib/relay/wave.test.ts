@@ -1,10 +1,4 @@
-/**
- * The wave. Most of these tests are about the two judgement calls —
- * height is a count of open trails, and queued work is a low swell — plus
- * the degenerate shapes, which are where a drawing lies most easily: a
- * villa with nothing filed must not look identical to a villa that has
- * finished everything.
- */
+/** Judgement calls (count of open trails, queued as a low swell) and degenerate shapes: nothing filed must not look like all finished. */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -20,7 +14,6 @@ const stages = [
 const START = "2026-01-01";
 const at = (day: string) => `${day}T06:30:00.000Z`;
 
-/** The planned stages, as the pages get them. */
 const planned = (now = "2026-01-01") => buildSchedule(stages, [], START, at(now)).stages;
 
 const open = (stageId: string | null): WaveTrail => ({

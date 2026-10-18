@@ -1,24 +1,25 @@
 "use server";
 
+import { checked, optionalText, text } from "@/lib/form-data";
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
 function readVendorForm(formData: FormData) {
-  const termsRaw = String(formData.get("payment_term_days") ?? "").trim();
+  const termsRaw = text(formData, "payment_term_days");
   return {
-    name: String(formData.get("name") ?? "").trim(),
-    contact_name: String(formData.get("contact_name") ?? "").trim() || null,
-    contact_designation: String(formData.get("contact_designation") ?? "").trim() || null,
-    mobile: String(formData.get("mobile") ?? "").trim() || null,
-    email: String(formData.get("email") ?? "").trim() || null,
-    gst_no: String(formData.get("gst_no") ?? "").trim() || null,
-    gst_state: String(formData.get("gst_state") ?? "").trim() || null,
-    address: String(formData.get("address") ?? "").trim() || null,
+    name: text(formData, "name"),
+    contact_name: optionalText(formData, "contact_name"),
+    contact_designation: optionalText(formData, "contact_designation"),
+    mobile: optionalText(formData, "mobile"),
+    email: optionalText(formData, "email"),
+    gst_no: optionalText(formData, "gst_no"),
+    gst_state: optionalText(formData, "gst_state"),
+    address: optionalText(formData, "address"),
     payment_term_days: termsRaw === "" ? null : Number(termsRaw),
-    is_active: formData.get("is_active") === "1",
-    is_contractor: formData.get("is_contractor") === "1",
+    is_active: checked(formData, "is_active", "1"),
+    is_contractor: checked(formData, "is_contractor", "1"),
   };
 }
 
@@ -72,9 +73,8 @@ export async function updateVendor(
 }
 
 /**
- * Bank details live in vendor_payment_details (0089), the gated 1:1
- * table — never on the open vendors row. One save replaces the whole
- * set of four fields; clearing all four removes the row.
+ * Bank details live in the gated vendor_payment_details (0089), never on vendors.
+ * One save replaces all four fields; clearing all four removes the row.
  */
 export async function saveVendorPaymentDetails(
   vendorId: string,
@@ -84,10 +84,10 @@ export async function saveVendorPaymentDetails(
   const user = await requireTool("/masters");
 
   const details = {
-    bank_name: String(formData.get("bank_name") ?? "").trim() || null,
-    account_number: String(formData.get("account_number") ?? "").trim() || null,
-    account_holder_name: String(formData.get("account_holder_name") ?? "").trim() || null,
-    ifsc: String(formData.get("ifsc") ?? "").trim() || null,
+    bank_name: optionalText(formData, "bank_name"),
+    account_number: optionalText(formData, "account_number"),
+    account_holder_name: optionalText(formData, "account_holder_name"),
+    ifsc: optionalText(formData, "ifsc"),
   };
   const empty = Object.values(details).every((value) => value === null);
 

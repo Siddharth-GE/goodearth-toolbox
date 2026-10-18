@@ -1,12 +1,7 @@
 import { formatCount, formatMoney } from "@/lib/format";
 import type { PoBilledTotals } from "@/lib/purchase-orders/queries";
 
-/**
- * What the vendor has invoiced against this order — the accounts-side
- * mirror of ReceiptsSection's "did it turn up?". One ordered total, one
- * billed total, from the po_billing_totals window (migration 0025);
- * the bills themselves live in the Bills tool.
- */
+// From the po_billing_totals window (0025); the bills themselves live in the Bills tool.
 export function BilledSection({ totals }: { totals: PoBilledTotals }) {
   if (totals.bill_count === 0) return null;
 

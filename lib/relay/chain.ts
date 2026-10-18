@@ -1,22 +1,7 @@
 /**
- * Replaying a trail's event log into the state every screen shows.
- *
- * Nothing in here is stored anywhere. Holder, stuck-ness, per-leg actuals
- * and the projected finish are all derived on every read, which is what
- * makes it impossible for them to drift from the log.
- *
- * The primitive is `stintsOf`: one stint is one continuous period during
- * which one person held the baton on one leg. Pair each event with the
- * next, and everything else is arithmetic over that list. A leg visited
- * three times (bounced back twice) has three stints, which is exactly why
- * per-leg actuals cannot be read off a single event.
- *
- * Every stint takes its assignee and expected days from the EVENT, never
- * from the leg row — see the snapshot note in 0036's header. That is what
- * stops a manager stretching a future leg and thereby rewriting whether a
- * push that already happened was on time.
- *
- * Pure: no I/O. "Now" is always passed in.
+ * Replays a trail's event log into the state every screen shows; nothing is stored.
+ * A stint is one person holding the baton on one leg. Stints take assignee and days from the
+ * EVENT, never the leg row, so editing a future leg can't rewrite a past push (0036 header). Pure.
  */
 
 import { addDays, istDayKey, istDaysBetween } from "./day";
@@ -25,15 +10,12 @@ import { type ChainEvent, type Leg, isComplete, isWithClient, lastEvent } from "
 export type Stint = {
   legNo: number;
   assigneeId: string;
-  /** When the baton landed on this leg. */
   from: string;
-  /** When it left, or null if it is still here. */
   to: string | null;
   days: number;
   expectedDays: number;
   overBy: number;
   onTime: boolean;
-  /** Still running: this is where the baton is now. */
   open: boolean;
 };
 
@@ -56,11 +38,7 @@ export type ChainState = {
   expectedDays: number;
   daysInLeg: number;
   isStuck: boolean;
-  /**
-   * The work is sitting with the client. Deliberately independent of
-   * isStuck: a trail can be both, and when it is, cold is the louder
-   * fact — the clock does not stop because the client has it.
-   */
+  /** With the client. Independent of isStuck; when both, cold is the louder fact. */
   isWithClient: boolean;
   withClientSince: string | null;
   withClientDays: number;
@@ -69,9 +47,7 @@ export type ChainState = {
   startedAt: string | null;
   finishedAt: string | null;
   totalDays: number;
-  /** Sum of expected days across every leg — the plan. */
   plannedDays: number;
-  /** Expected days still to burn, from the current leg onwards. */
   remainingDays: number;
   legActuals: LegActual[];
   stints: Stint[];
@@ -82,14 +58,7 @@ function entersLeg(e: ChainEvent): boolean {
   return e.kind === "started" || e.kind === "pushed" || e.kind === "bounced";
 }
 
-/**
- * One stint per leg-entering event, closed by the next one (or by `now`).
- *
- * A hand-off changes who is holding the baton without restarting the
- * clock, so it splits the stint in two: the first person's time still
- * counts against them, and the leg's deadline is unmoved. A hand-off can
- * therefore never launder a trail that has already gone cold.
- */
+/** One stint per leg-entering event. A hand-off splits a stint without restarting the clock, so it can't launder a cold trail. */
 export function stintsOf(events: readonly ChainEvent[], now: string): Stint[] {
   const ordered = [...events].sort((a, b) => a.seq - b.seq);
   const stints: Stint[] = [];
@@ -102,8 +71,7 @@ export function stintsOf(events: readonly ChainEvent[], now: string): Stint[] {
 
   const close = (at: string, open: boolean) => {
     if (legNo === null || holder === null || holderSince === null || enteredAt === null) return;
-    // Days are measured from when the BATON reached the leg, not from
-    // when this person took it over — the deadline belongs to the leg.
+    // Days run from when the BATON reached the leg; the deadline belongs to the leg.
     const days = Math.max(0, istDaysBetween(enteredAt, at));
     stints.push({
       legNo,
@@ -159,8 +127,7 @@ export function replayChain(
 
   const legActuals: LegActual[] = byLeg.map((leg) => {
     const mine = stints.filter((s) => s.legNo === leg.leg_no);
-    // The baton can visit a leg more than once; what a reader wants is
-    // the total time this leg has consumed, not the latest visit.
+    // Total time the leg has consumed across visits, not the latest visit.
     const daysSoFar = mine.reduce((sum, s) => sum + s.days, 0);
     const expectedDays = mine.at(-1)?.expectedDays ?? leg.expected_days;
     return {
@@ -192,9 +159,7 @@ export function replayChain(
   const daysInLeg = open?.days ?? 0;
   const expectedDays = open?.expectedDays ?? 0;
 
-  // Same answer as the view's `flow` lateral, from the same list of
-  // kinds. A hold that a later push, bounce or finish has overtaken is
-  // no longer a hold.
+  // Same as the view's flow lateral: a hold overtaken by a push, bounce or finish is no longer a hold.
   const withClient = !finished && isWithClient(ordered);
   const heldAt = withClient
     ? (ordered.filter((e) => e.kind === "client_held").at(-1)?.occurred_at ?? null)
@@ -223,14 +188,10 @@ export function replayChain(
   };
 }
 
-/**
- * The IST day a trail is expected to be finished by, assuming every
- * remaining leg takes exactly as long as planned. Null once it is done.
- */
+/** The IST day the trail is expected done if every remaining leg takes its plan. Null once done. */
 export function projectedFinishDay(state: ChainState, now: string): string | null {
   if (state.status === "finished" || state.currentLeg === null) return null;
-  // Time already spent on the current leg is sunk; what is left is the
-  // rest of its allowance plus every later leg in full.
+  // Time already spent on the current leg is sunk.
   const left = Math.max(0, state.remainingDays - state.daysInLeg);
   return addDays(istDayKey(now), left);
 }

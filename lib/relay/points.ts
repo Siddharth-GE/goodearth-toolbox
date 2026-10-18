@@ -1,30 +1,8 @@
 /**
- * Flow points, ranks and the leaderboard — all derived from the event
- * log, none of it typed in or stored.
- *
- * The economy, and why each number is what it is:
- *
- *   +10  push, on time      the ordinary good day
- *    +4  push, late         still moved it; late is not nothing
- *   +25  finish, on time    the payoff, deliberately the biggest
- *   +15  finish, late
- *    +5  honest bounce      SENDING WORK BACK IS REWARDED. Bouncing is
- *                           how a problem surfaces early; a person who
- *                           quietly sits on bad input costs far more
- *                           than the five points.
- *     0  hand-off           an admin moving a baton is not an achievement
- *
- * Bounce points are capped at one per person per trail per IST day. Two
- * colleagues can otherwise bounce one trail back and forth and farm five
- * points a click. The leaderboard also shows a bounce rate beside the
- * total, so farming is visible rather than merely capped — and because a
- * bounce storm is a real signal that an activity's legs are wrong.
- *
- * On-time is NOT computable from one event: it needs the previous event's
- * timestamp and the expected days snapshotted on it. That is why
- * `scoreEvents` takes a whole chain's log and not a flat list.
- *
- * Pure: no I/O, no clock.
+ * Flow points, ranks and the leaderboard, derived from the event log.
+ * Sending work back (a bounce) is rewarded because it surfaces problems early; hand-offs score 0.
+ * Bounce points cap at one per person per trail per IST day so colleagues can't farm them.
+ * On-time needs the previous event, so scoreEvents takes a whole chain's log. Pure.
  */
 
 import { istDayKey, istDaysBetween } from "./day";
@@ -75,7 +53,6 @@ export function rankFor(points: number): { rank: string; next: string | null; to
   };
 }
 
-/** How far through the current rank, 0–100. A topped-out rank reads 100. */
 export function rankProgress(points: number): number {
   let current = RANKS[0];
   let next: (typeof RANKS)[number] | null = null;
@@ -89,10 +66,7 @@ export function rankProgress(points: number): number {
   return Math.min(100, Math.round(((points - current.min) / (next.min - current.min)) * 100));
 }
 
-/**
- * What a push or finish would be worth right now — for the confirm sheet,
- * so the number shown before the click is the number awarded after it.
- */
+/** What a push or finish is worth now, so the confirm sheet matches the award. */
 export function previewPoints(kind: "push" | "finish", daysInLeg: number, expectedDays: number) {
   const onTime = daysInLeg <= expectedDays;
   const points =
@@ -106,16 +80,12 @@ export function previewPoints(kind: "push" | "finish", daysInLeg: number, expect
   return { onTime, points };
 }
 
-/**
- * Score one chain's log. Events must be from a single chain; pass each
- * chain separately so the predecessor lookup stays honest.
- */
+/** Score one chain's log. Pass chains separately so the predecessor lookup stays honest. */
 export function scoreChain(chainId: string, events: readonly ChainEvent[]): ScoredEvent[] {
   const ordered = [...events].sort((a, b) => a.seq - b.seq);
   const out: ScoredEvent[] = [];
 
-  // The last event that put the baton on a leg, with the expected days it
-  // was given at the time — the only honest basis for "was that on time".
+  // The last leg-entering event and its expected days then: the honest basis for "on time".
   let enteredAt: string | null = null;
   let expected = 0;
 
@@ -129,7 +99,6 @@ export function scoreChain(chainId: string, events: readonly ChainEvent[]): Scor
     }
 
     if (e.kind === "handed") {
-      // Worth nothing, and it does not restart the leg clock.
       out.push({
         chainId,
         seq: e.seq,
@@ -154,8 +123,7 @@ export function scoreChain(chainId: string, events: readonly ChainEvent[]): Scor
       points = onTime ? POINTS.finishOnTime : POINTS.finishLate;
     } else if (e.kind === "bounced") {
       points = POINTS.bounce;
-      // Bouncing is a judgement about the work, not about the clock, so
-      // it is never counted in anyone's on-time percentage.
+      // Bouncing judges the work, not the clock: never in on-time %.
       scoredOnTime = null;
     }
 
@@ -191,14 +159,7 @@ function capBounces(scored: ScoredEvent[]): ScoredEvent[] {
   });
 }
 
-/**
- * Score many chains at once. The key is the chain id.
- *
- * NOT WIRED TO A SCREEN YET, AND NOT DEAD CODE. The leaderboard and
- * podium are still to be built; the scoring they will read is written and
- * tested first, because points people can see must not change meaning
- * later. Don't let a cleanup delete it.
- */
+/** Score many chains at once, keyed by chain id. NOT WIRED TO A SCREEN YET, NOT DEAD CODE: the leaderboard will read it. */
 export function scoreAll(eventsByChain: ReadonlyMap<string, readonly ChainEvent[]>): ScoredEvent[] {
   return [...eventsByChain].flatMap(([chainId, events]) => scoreChain(chainId, events));
 }
@@ -239,8 +200,7 @@ export function totalsByActor(scored: readonly ScoredEvent[]): Map<string, FlowT
         points: r.points,
         moves: r.moves,
         bounces: r.bounces,
-        // Null, not 100: someone who has never moved a baton has no
-        // record, and showing them a perfect score would be a lie.
+        // Null, not 100: no record is not a perfect one.
         onTimePct: r.timed === 0 ? null : Math.round((r.onTime / r.timed) * 100),
         rank: rankFor(r.points).rank,
         rankProgress: rankProgress(r.points),
@@ -249,7 +209,6 @@ export function totalsByActor(scored: readonly ScoredEvent[]): Map<string, FlowT
   );
 }
 
-/** Only the events inside a window, by IST day — for "this week's flow". */
 export function since(scored: readonly ScoredEvent[], fromDayKey: string): ScoredEvent[] {
   return scored.filter((s) => s.dayKey >= fromDayKey);
 }

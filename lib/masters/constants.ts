@@ -1,22 +1,9 @@
 /**
- * The item domain's fixed value lists, declared exactly once.
- *
- * These were previously re-declared in three files each (the database
- * CHECK constraints in 0004/0006 are the real enforcement; these are the
- * app's copy for friendly validation messages), which meant a new unit of
- * measure had to be added in three places or Selections and Masters would
- * disagree about what's valid.
- *
- * This file must stay import-free: file-level "use server" action modules
- * import these as VALUES, and a module with imports would drag its chain
- * toward the client bundle (see CLAUDE.md, "Shared masters"). That
- * constraint is why these live here and not in items.ts, which is
- * "server-only".
+ * The item domain's fixed value lists; the DB CHECKs are the enforcement, these are the app's copy for friendly messages.
+ * Must stay import-free: "use server" action modules import these as values, and imports would drag a chain toward the client bundle.
  */
 
-// Units of measure left this file on 2026-08-20: they are a managed
-// Masters list now (`uoms`, 0082) — pickers read listActiveUomNames()
-// and actions validate with isActiveUom() from lib/masters/uoms.ts.
+// Units of measure live in the `uoms` master (0082): see listActiveUomNames() and isActiveUom().
 
 export const ITEM_KINDS = ["catalogue", "material"] as const;
 export type ItemKind = (typeof ITEM_KINDS)[number];
@@ -27,8 +14,7 @@ export function isItemKind(value: string): value is ItemKind {
   return (ITEM_KINDS as readonly string[]).includes(value);
 }
 
-// Terms templates (0101): which document a named text is for. The CHECK
-// on document_terms.kind is the enforcement; this is the app's copy.
+// The CHECK on document_terms.kind enforces this; this is the app's copy.
 export const TERMS_KINDS = ["po", "work_order"] as const;
 export type TermsKind = (typeof TERMS_KINDS)[number];
 

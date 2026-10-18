@@ -1,13 +1,8 @@
-/**
- * Payments, as pure rules (0107): the week a cash request is for, and a
- * contractor's position — what was billed, paid and is pending, and what
- * was advanced, recovered and is still out. The founder's examples are
- * the tests: ₹25 lakh billed with ₹20 lakh released leaves ₹5 lakh
- * pending; ₹1 lakh paid on a ₹1.5 lakh bill leaves ₹50,000.
- */
+// Pure. Examples: Rs 25 lakh billed with Rs 20 lakh released leaves Rs 5 lakh pending; Rs 1 lakh paid on a Rs 1.5 lakh bill leaves Rs 50,000.
 import { formatMoney } from "@/lib/format";
 
 import { pendingOnBill } from "./math";
+import { roundPaise } from "@/lib/line-money";
 
 /** The Monday (YYYY-MM-DD) of the week a date falls in — cash_requests.week_of. */
 export function mondayOf(isoDate: string): string {
@@ -24,15 +19,12 @@ export type LedgerAdvance = { amount: number; recovered: number };
 export type ContractorPosition = {
   billed: number;
   paid: number;
-  /** Bills settled from advances. */
   recoveredOnBills: number;
   pending: number;
   advancesGiven: number;
   advancesRecovered: number;
   advancesOutstanding: number;
 };
-
-const paisa = (value: number) => Math.round(value * 100) / 100;
 
 export function contractorPosition(
   bills: LedgerBill[],
@@ -48,13 +40,13 @@ export function contractorPosition(
   const advancesGiven = advances.reduce((sum, advance) => sum + advance.amount, 0);
   const advancesRecovered = advances.reduce((sum, advance) => sum + advance.recovered, 0);
   return {
-    billed: paisa(billed),
-    paid: paisa(paid),
-    recoveredOnBills: paisa(recoveredOnBills),
-    pending: paisa(pending),
-    advancesGiven: paisa(advancesGiven),
-    advancesRecovered: paisa(advancesRecovered),
-    advancesOutstanding: paisa(Math.max(0, advancesGiven - advancesRecovered)),
+    billed: roundPaise(billed),
+    paid: roundPaise(paid),
+    recoveredOnBills: roundPaise(recoveredOnBills),
+    pending: roundPaise(pending),
+    advancesGiven: roundPaise(advancesGiven),
+    advancesRecovered: roundPaise(advancesRecovered),
+    advancesOutstanding: roundPaise(Math.max(0, advancesGiven - advancesRecovered)),
   };
 }
 
@@ -71,11 +63,9 @@ export type CashRequestLine = {
   requested: number;
   /** Null until the approver releases (or cuts) it. */
   released: number | null;
-  /** Paid out against this line so far. */
   paid: number;
 };
 
-/** A cash request's figures: asked for, released, paid out, still to pay of what was released. */
 export function cashRequestFigures(lines: CashRequestLine[]): {
   requested: number;
   released: number;
@@ -87,23 +77,18 @@ export function cashRequestFigures(lines: CashRequestLine[]): {
   const paid = lines.reduce((sum, line) => sum + line.paid, 0);
   const toPay = lines.reduce((sum, line) => sum + lineLeftToPay(line), 0);
   return {
-    requested: paisa(requested),
-    released: paisa(released),
-    paid: paisa(paid),
-    toPay: paisa(toPay),
+    requested: roundPaise(requested),
+    released: roundPaise(released),
+    paid: roundPaise(paid),
+    toPay: roundPaise(toPay),
   };
 }
 
-/** What is still to pay on one released line — never below zero. */
 export function lineLeftToPay(line: CashRequestLine): number {
-  return Math.max(0, paisa((line.released ?? 0) - line.paid));
+  return Math.max(0, roundPaise((line.released ?? 0) - line.paid));
 }
 
-/**
- * What stops a payment, in words — the settlement guard's refusals said
- * first. `pending` is what the bill still has to settle; `cap` is what is
- * left of the released line it is paid from, when it is from one.
- */
+/** The settlement guard's refusals, said first. `pending` is what the bill still has to settle; `cap` what is left of the released line it is paid from. */
 export function paymentProblem(input: {
   amount: number;
   reference: string;

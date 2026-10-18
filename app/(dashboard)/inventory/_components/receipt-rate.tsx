@@ -12,17 +12,15 @@ import {
 import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { parseNumber } from "@/lib/form-data";
 import { formatMoney, formatPercent } from "@/lib/format";
 import { updateReceiptLineRate } from "@/lib/inventory/actions";
 import { differsFromPo } from "@/lib/inventory/batches";
 import type { ReceiptLineRate } from "@/lib/inventory/queries";
-import { useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useState } from "react";
 
-/**
- * A delivery line's rate (0108): the PO's, copied when the goods were
- * received, or what the delivery bill said instead. A changed rate shows
- * the PO's beside it in amber, so accounts see every difference.
- */
+/** A changed rate shows the PO's beside it in amber, so accounts see every difference (0108). */
 export function ReceiptRate({
   receiptLineId,
   itemName,
@@ -38,20 +36,21 @@ export function ReceiptRate({
   const [rateText, setRateText] = useState("");
   const [gstText, setGstText] = useState("");
   const [note, setNote] = useState("");
-  const [error, setError] = useState<string>();
-  const [pending, startTransition] = useTransition();
+  const { pending, error, run, clearError } = useActionRunner();
   const differs = differsFromPo(rate);
 
-  const save = () =>
-    startTransition(async () => {
-      const result = await updateReceiptLineRate(receiptLineId, {
-        rate: rateText.trim() === "" ? Number.NaN : Number(rateText),
-        gstPct: gstText.trim() === "" ? Number.NaN : Number(gstText),
+  const save = async () => {
+    const result = await run(() =>
+      updateReceiptLineRate(receiptLineId, {
+        rate: parseNumber(rateText) ?? Number.NaN,
+        gstPct: parseNumber(gstText) ?? Number.NaN,
         note: note || null,
-      });
-      if (result?.error) setError(result.error);
-      else setOpen(false);
-    });
+      }),
+    );
+    if (!result?.error) {
+      setOpen(false);
+    }
+  };
 
   return (
     <div className="space-y-0.5">
@@ -75,7 +74,7 @@ export function ReceiptRate({
           setRateText(rate.rate === null ? "" : String(rate.rate));
           setGstText(rate.gstPct === null ? "" : String(rate.gstPct));
           setNote(rate.note ?? "");
-          setError(undefined);
+          clearError();
           setOpen(true);
         }}
       >

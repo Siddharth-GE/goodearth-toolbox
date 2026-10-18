@@ -3,8 +3,6 @@ import { requireUser } from "@/lib/auth/dal";
 
 import { ToolWelcome } from "../_components/tool-welcome";
 
-// The welcome screen (every Operations and Management tool opens on
-// one). Counts only — no rupee leaves the screens one click in.
 export default async function BirdwingPage() {
   const [counts, user] = await Promise.all([getWelcomeCounts(), requireUser()]);
   const isAdmin = user.profile?.role === "admin";

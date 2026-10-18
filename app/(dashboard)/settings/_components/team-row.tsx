@@ -6,16 +6,14 @@ import { FormMessage } from "@/components/ui/form-message";
 import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type { ActionState } from "@/lib/action-state";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import type { ToolTeam } from "@/lib/nav/arrange";
 import { deleteTeam, moveTeam, renameTeam } from "@/lib/settings/teams-actions";
 import { ArrowDown, ArrowUp } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
-/**
- * One team: its place in the order (arrows), a rename, and a delete that
- * says where its tools go first. Deleting never touches anyone's access —
- * the tools only move to Other.
- */
+/** Deleting a team never touches anyone's access: its tools only move to Other. */
 export function TeamRow({
   team,
   toolCount,
@@ -27,17 +25,12 @@ export function TeamRow({
   isFirst: boolean;
   isLast: boolean;
 }) {
-  const [pending, startTransition] = useTransition();
+  const { pending, error, run: runAction } = useActionRunner();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [error, setError] = useState<string>();
 
-  const run = (work: () => Promise<{ error?: string } | undefined>) => {
-    setError(undefined);
-    startTransition(async () => {
-      const result = await work();
-      if (result?.error) setError(result.error);
-      setConfirmingDelete(false);
-    });
+  const run = async (work: () => Promise<ActionState>) => {
+    await runAction(work);
+    setConfirmingDelete(false);
   };
 
   return (
@@ -62,8 +55,7 @@ export function TeamRow({
           </IconButton>
         </div>
 
-        {/* min-w-32: on a phone, Rename and Delete wrap to their own
-            line before the name is cut short. */}
+        {/* min-w-32: Rename and Delete wrap before the name is cut short on a phone. */}
         <div className="min-w-32 flex-1">
           <p className="text-foreground truncate text-sm font-medium">{team.name}</p>
           <p className="text-muted text-xs">

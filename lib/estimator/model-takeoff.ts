@@ -2,47 +2,23 @@ import { sheetTotal } from "./calc";
 import { checkMeasurement } from "./measurement-rules";
 
 /**
- * The contract with Goodearth QS for SketchUp (0118; root plan.md, sixth
- * piece): what a takeoff file is, and what importing one into a villa's
- * working estimate would do. Pure — no database, no React — so the page
- * can read a file the moment it arrives, the server reads it again
- * before anything is written (the browser's reading is never trusted),
- * and both are tested.
- *
- * THE FILE — format "goodearth-qs-takeoff", version 1, JSON:
- *   model       {file, title, guid, villa: {unit_id, name} | null}
- *   lines       one per work measured: {work_code, work_name, uom,
- *               measured_as, qty, rows: [{description, nos, length,
- *               breadth, depth, qty, model_refs}]}
- *   not_measured {work_code, work_name, reason, elements} — reason
- *               "manual" means the rate book says measure it by hand
- *   issues      {level, title, detail} — the model's own problems,
- *               shown and never imported
- * The four boxes are the measurement sheet's own columns (0096): a
- * number above zero, or null / left out for "not used", in the work's
- * own unit. Both `qty` fields are the model's arithmetic and only
- * informational: the toolbox sums the rows itself (calc.ts).
- *
- * THE FILE IS UNTRUSTED. Nothing in it decides identity or access: the
- * villa is the person's choice, the grant is /estimator, RLS is the
- * boundary. It only says "here are rows" — and every row passes the same
- * check as a typed one (measurement-rules.ts).
+ * The contract with Goodearth QS for SketchUp (0118). Pure, so the server
+ * re-reads a file the browser already read. The file is untrusted: the
+ * villa and access never come from it, and every row passes
+ * measurement-rules.ts. A measurement box is a number above zero, or null
+ * for "not used"; the file's own `qty` totals are ignored, because the
+ * toolbox sums the rows itself (calc.ts).
  */
 
 export const TAKEOFF_FORMAT = "goodearth-qs-takeoff";
 export const TAKEOFF_VERSION = 1;
-/** Well inside the 4 MB server-action body (next.config.ts); a whole
- * villa is tens of KB, nearly all of it model references. */
+/** Well inside the 4 MB server-action body (next.config.ts). */
 export const TAKEOFF_MAX_CHARS = 3_000_000;
 const MAX_LINES = 2_000;
 const MAX_ROWS = 50_000;
 const MAX_REF = 200;
 const MAX_ISSUES = 500;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-// ---------------------------------------------------------------------
-// How a work is measured from the model (estimator_work_info.model_measure)
-// ---------------------------------------------------------------------
 
 export const MODEL_MEASURES = [
   "volume",
@@ -63,7 +39,6 @@ export const MODEL_MEASURE_LABELS: Record<ModelMeasure, string> = {
   manual: "By hand, on the estimate",
 };
 
-/** The same, short enough for a sentence: "measured it by area". */
 export const MODEL_MEASURE_SHORT: Record<ModelMeasure, string> = {
   volume: "volume",
   area: "area",
@@ -77,8 +52,7 @@ export function isModelMeasure(value: unknown): value is ModelMeasure {
   return typeof value === "string" && (MODEL_MEASURES as readonly string[]).includes(value);
 }
 
-/** What the model measures when the rate book says nothing — the
- * extension's own default (works.rb), so the two read a blank the same. */
+/** What the model measures when the rate book says nothing: the extension's own default (works.rb). */
 export function measureFromUnit(uom: string | null): ModelMeasure {
   switch ((uom ?? "").trim().toLowerCase()) {
     case "cum":
@@ -100,10 +74,6 @@ export function measureFromUnit(uom: string | null): ModelMeasure {
   }
 }
 
-// ---------------------------------------------------------------------
-// Reading a takeoff
-// ---------------------------------------------------------------------
-
 export type TakeoffRow = {
   description: string | null;
   nos: number | null;
@@ -114,26 +84,21 @@ export type TakeoffRow = {
 };
 
 export type TakeoffLine = {
-  /** Where it sits in the file, from 1 — names a line with no code. */
   position: number;
   workCode: string;
   workName: string;
-  /** As the model sent it, lower-cased. */
   uom: string;
   measuredAs: string;
-  /** The model's own total — informational. */
   modelQty: number | null;
   rows: TakeoffRow[];
-  /** Why this work can't be taken as it is (a row breaks the sheet's
-   * rules, or nothing came); null when every row is fine. */
+  /** Why this work cannot be taken as it is; null when every row is fine. */
   problem: string | null;
 };
 
 export type TakeoffNotMeasured = {
   workCode: string;
   workName: string;
-  /** "manual" = the rate book says measure by hand; anything else is a
-   * problem in the model (reported among the issues too). */
+  /** "manual" = the rate book says measure by hand; anything else is a problem in the model. */
   reason: string;
   elements: number;
 };
@@ -145,7 +110,7 @@ export type Takeoff = {
     file: string | null;
     title: string | null;
     guid: string | null;
-    /** The villa this model was last imported into — a suggestion only. */
+    /** The villa this model was last imported into: a suggestion only. */
     villa: { unitId: string; name: string } | null;
   };
   generator: string | null;
@@ -170,8 +135,7 @@ const textOrNull = (value: unknown, limit: number): string | null => {
 };
 const numberOrNull = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
-/** A box: left out or null is "not used"; a number is itself; anything
- * else is NaN, which checkMeasurement refuses by name. */
+/** A box: absent or null is "not used"; anything else non-numeric is NaN, which checkMeasurement refuses. */
 const box = (value: unknown): number | null =>
   value === null || value === undefined ? null : typeof value === "number" ? value : Number.NaN;
 const lowerFirst = (message: string) => message.charAt(0).toLowerCase() + message.slice(1);
@@ -206,11 +170,7 @@ function readRow(raw: unknown, number: number): { row?: TakeoffRow; problem?: st
   return problem ? { problem: `row ${number} — ${lowerFirst(problem)}` } : { row };
 }
 
-/**
- * The takeoff, or the one reason it can't be read at all. A problem
- * inside one work (a bad row) does not stop the file: that work is
- * refused and named, and the rest imports (founder, 2026-10-15).
- */
+/** The takeoff, or the one reason it cannot be read. A bad row refuses only its own work; the rest imports. */
 export function parseTakeoff(input: unknown): ParsedTakeoff {
   if (typeof input !== "string" || !input.trim()) {
     return { problem: "Nothing was received — send the takeoff again, or choose its file." };
@@ -325,23 +285,15 @@ export function parseTakeoff(input: unknown): ParsedTakeoff {
   };
 }
 
-// ---------------------------------------------------------------------
-// What an import would do
-// ---------------------------------------------------------------------
-
-/** A work as the import sees it: the Masters vocabulary with its
- * rate-book unit and how the model measures it. */
 export type WorkForModel = {
   workItemId: string;
   code: string;
   name: string;
   isActive: boolean;
-  /** estimator_work_info.uom — null = not set up in the rate book. */
   uom: string | null;
   modelMeasure: ModelMeasure | null;
 };
 
-/** The villa's working estimate as the import sees it. */
 export type EstimateForModel = {
   estimateId: string;
   modelFile: string | null;
@@ -359,39 +311,27 @@ export type PlanKind = "add" | "replace" | "refused" | "to_measure" | "already_o
 
 export type PlanEntry = {
   key: string;
-  /** The work's code — or "Line 3" for a line that names none. */
   code: string;
   name: string;
-  /** The rate book's unit when known, else what the model sent. */
   uom: string | null;
   kind: PlanKind;
-  /** The rows this import writes, and their total through calc.ts. */
   rows: number;
   qty: number | null;
-  /** The model's own total, when it differs from the toolbox's. */
   modelQtyDiffers: number | null;
-  /** The model's rows from the last send that these replace. */
   replacesRows: number;
-  /** Rows typed by hand on this work — kept as they are. */
   handRows: number;
-  /** A typed quantity (no sheet) the model's rows replace. */
   typedQty: number | null;
-  /** The model measured it one way, the rate book says another — send
-   * the works list to SketchUp. Imported anyway: the units agree. */
+  /** The model measured it one way, the rate book another: send the works list to SketchUp. Imported anyway. */
   measuredDifferently: { model: string; rateBook: ModelMeasure } | null;
-  /** Why it is refused, in a sentence. */
   why: string | null;
 };
 
-/** A work whose model rows come off because the model no longer
- * measures it (or measures it in a way that is refused this time). */
 export type PlanRemoval = {
   code: string;
   name: string;
   uom: string | null;
   modelRows: number;
   handRows: number;
-  /** No rows left — the work goes back to "to measure". */
   backToMeasure: boolean;
 };
 
@@ -404,26 +344,19 @@ export type ImportRowPayload = {
   model_refs: string[];
 };
 
-/** import_model_rows()'s p_lines — every work the import puts on or
- * measures; a work with no rows goes on "to measure" if it isn't there. */
+/** import_model_rows()'s p_lines. */
 export type ImportLinePayload = { work_item_id: string; rows: ImportRowPayload[] };
 
 export type ImportPlan = {
   entries: PlanEntry[];
   removals: PlanRemoval[];
-  /** The estimate was last measured from a different model. */
   differentModel: { file: string | null } | null;
   counts: { add: number; replace: number; refused: number; toMeasure: number; removed: number };
   payload: ImportLinePayload[];
-  /** False when importing would change nothing. */
   canImport: boolean;
 };
 
-/**
- * What importing this takeoff into the villa's working estimate (or a
- * new blank one, when `estimate` is null) would do, work by work — the
- * preview the person reads, and exactly what the import then writes.
- */
+/** What importing would do, work by work: the preview the person reads, and exactly what the import writes. */
 export function planImport(
   takeoff: Takeoff,
   works: WorkForModel[],
@@ -530,8 +463,7 @@ export function planImport(
     });
   }
 
-  // Works the rate book says to measure by hand: on as "to measure" if
-  // they aren't there yet, so nothing the model knows about is forgotten.
+  // Works the rate book says to measure by hand go on as "to measure" if absent, so nothing is forgotten.
   const handCodes = new Set<string>();
   for (const item of takeoff.notMeasured) {
     if (item.reason !== "manual" || codeCounts.has(item.workCode) || handCodes.has(item.workCode)) {
@@ -555,16 +487,13 @@ export function planImport(
       continue;
     }
     const there = onEstimate.get(work.workItemId);
-    // Already on: left as it is (any model rows it had are listed as
-    // coming off below).
+    // Already on: left as it is.
     entry.kind = there ? "already_on" : "to_measure";
     entry.handRows = there?.handRows ?? 0;
     payload.push({ work_item_id: work.workItemId, rows: [] });
   }
 
-  // Every earlier model row not written again comes off — the import
-  // replaces the model's rows whole, so a work the model stopped
-  // measuring must not keep a stale figure.
+  // The import replaces the model's rows whole, so a work the model stopped measuring must not keep a stale figure.
   const removals: PlanRemoval[] = (estimate?.lines ?? [])
     .filter((line) => line.modelRows > 0 && !measured.has(line.workItemId))
     .map((line) => {

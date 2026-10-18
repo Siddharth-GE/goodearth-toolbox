@@ -34,7 +34,9 @@ import {
 } from "@/lib/estimator/estimate-actions";
 import type { MeasurementFields } from "@/lib/estimator/measurement-rules";
 import type { MeasurementRow } from "@/lib/estimator/estimate-queries";
+import { parseNumber } from "@/lib/form-data";
 import { formatQuantity } from "@/lib/format";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import {
   useActionState,
   useEffect,
@@ -52,13 +54,8 @@ const BOXES: { key: Box; label: string }[] = [
   { key: "depth", label: "Depth" },
 ];
 
-/**
- * The measurement sheet under one work (0096) — the QS layer the
- * founder asked for on 2026-09-25. One row per wall, slab or footing:
- * Nos × Length × Breadth × Depth, a blank box not used. The rows add up
- * to the work's quantity on the BOQ. Read-only once the estimate is
- * submitted, where it stands as the record of how the quantity was got.
- */
+/** The measurement sheet under one work (0096): Nos × Length × Breadth × Depth per wall, slab or footing; the rows add up to the BOQ quantity.
+ * Read-only once submitted, as the record of how the quantity was got. */
 export function MeasurementSheetDialog({
   lineId,
   workName,
@@ -72,7 +69,6 @@ export function MeasurementSheetDialog({
   workUom: string | null;
   rows: MeasurementRow[];
   readOnly: boolean;
-  /** The estimate's other works, for "copy these rows to…". */
   otherLines?: { id: string; name: string; uom: string | null }[];
 }) {
   const measured = rows.length > 0;
@@ -182,19 +178,9 @@ export function MeasurementSheetDialog({
   );
 }
 
-/** Blank is "not used"; anything else is read the way people type it. */
-function readBox(value: string): number | null {
-  const cleaned = value.replace(/[,\s]/g, "");
-  return cleaned === "" ? null : Number(cleaned);
-}
-
 const show = (value: number | null) => (value === null ? "" : String(value));
 
-/**
- * One row, every box saved on blur or Enter — the ComponentQtyField
- * shape, with blank allowed because blank means "not used". A refused
- * save puts the row back as it was and says why.
- */
+/** One row, every box saved on blur or Enter. A refused save puts the row back and says why. */
 function EditableMeasurementRow({ row, workUom }: { row: MeasurementRow; workUom: string | null }) {
   const initial = {
     description: row.description ?? "",
@@ -204,16 +190,15 @@ function EditableMeasurementRow({ row, workUom }: { row: MeasurementRow; workUom
     depth: show(row.depth),
   };
   const [values, setValues] = useState(initial);
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
-  const save = () => {
+  const save = async () => {
     const fields: MeasurementFields = {
       description: values.description.trim() || null,
-      nos: readBox(values.nos),
-      length: readBox(values.length),
-      breadth: readBox(values.breadth),
-      depth: readBox(values.depth),
+      nos: parseNumber(values.nos),
+      length: parseNumber(values.length),
+      breadth: parseNumber(values.breadth),
+      depth: parseNumber(values.depth),
     };
     const unchanged =
       fields.description === row.description &&
@@ -222,13 +207,10 @@ function EditableMeasurementRow({ row, workUom }: { row: MeasurementRow; workUom
       fields.breadth === row.breadth &&
       fields.depth === row.depth;
     if (unchanged) return;
-    startTransition(async () => {
-      const result = await updateLineMeasurement(row.id, fields);
-      if (result?.error) {
-        setError(result.error);
-        setValues(initial);
-      } else setError(undefined);
-    });
+    const result = await run(() => updateLineMeasurement(row.id, fields));
+    if (result?.error) {
+      setValues(initial);
+    }
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -237,10 +219,10 @@ function EditableMeasurementRow({ row, workUom }: { row: MeasurementRow; workUom
   };
 
   const live = measurementQuantity({
-    nos: readBox(values.nos),
-    length: readBox(values.length),
-    breadth: readBox(values.breadth),
-    depth: readBox(values.depth),
+    nos: parseNumber(values.nos),
+    length: parseNumber(values.length),
+    breadth: parseNumber(values.breadth),
+    depth: parseNumber(values.depth),
   });
 
   return (
@@ -295,12 +277,7 @@ function EditableMeasurementRow({ row, workUom }: { row: MeasurementRow; workUom
   );
 }
 
-/**
- * A row the SketchUp model wrote (0118): shown, never edited here. The
- * next send replaces it, so an edit on the sheet would be lost — the
- * model is where it changes (founder, 2026-10-15). Copy to another work
- * still takes it, as a typed row.
- */
+/** A row the SketchUp model wrote (0118): never edited here, since the next send replaces it. Copy to another work still takes it, as a typed row. */
 function ModelMeasurementRow({ row, workUom }: { row: MeasurementRow; workUom: string | null }) {
   return (
     <li className="space-y-2 py-3">
@@ -332,19 +309,16 @@ function ModelMeasurementRow({ row, workUom }: { row: MeasurementRow; workUom: s
   );
 }
 
-/** A one-tap action on a row — Duplicate or Remove — that says why when
- * it is refused. */
 function RowActionButton({
   label,
   pendingLabel,
-  run,
+  run: action,
 }: {
   label: string;
   pendingLabel: string;
   run: () => Promise<{ error?: string } | undefined>;
 }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
   return (
     <span className="inline-flex items-center gap-1">
@@ -354,12 +328,7 @@ function RowActionButton({
         variant="ghost"
         size="sm"
         disabled={pending}
-        onClick={() =>
-          startTransition(async () => {
-            const result = await run();
-            setError(result?.error);
-          })
-        }
+        onClick={() => run(action)}
       >
         {pending ? pendingLabel : label}
       </Button>
@@ -367,8 +336,7 @@ function RowActionButton({
   );
 }
 
-/** Add a row — the AddComponentForm shape. Five boxes that wrap into
- * two columns on a phone, so the Add button stays reachable. */
+/** Five boxes that wrap into two columns on a phone, so the Add button stays reachable. */
 function AddMeasurementForm({ lineId }: { lineId: string }) {
   const [state, formAction, pending] = useActionState(
     addLineMeasurement.bind(null, lineId),
@@ -416,11 +384,7 @@ function AddMeasurementForm({ lineId }: { lineId: string }) {
   );
 }
 
-/**
- * Copy this sheet's rows onto another work of the estimate — measure a
- * wall once, and its plaster and paint start from the same rows. They
- * land at the bottom of the other sheet as they are, to be adjusted.
- */
+/** Copy this sheet's rows onto another work of the estimate; they land at the bottom as they are, to be adjusted. */
 function CopyRowsForm({
   fromLineId,
   otherLines,

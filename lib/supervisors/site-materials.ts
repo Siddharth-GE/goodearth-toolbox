@@ -1,41 +1,21 @@
-/**
- * What each work has drawn against what the estimate allows — the pure
- * arithmetic, no database.
- *
- * The official estimate's frozen takeoff arrives through
- * estimate_takeoff_facts in the MATERIAL's unit, with the live
- * material→item link and factor riding along (0076: one material-uom =
- * factor × item-uom). Store issues and direct-to-site deliveries move
- * in the ITEM's unit. Lining them up follows the house conversion rule,
- * restated verbatim because pure modules import nothing (the same rule
- * as lib/indents/pull-rules.ts): divide by the factor when one is entered,
- * convert 1:1 when the unit labels match ('nos' and 'each' are one
- * unit), and otherwise report the raw figure rather than guess — a
- * wrong number is worse than a labelled one.
- *
- * The Estimator owns the sibling arithmetic (compare.ts) for its
- * comparison tab; this module exists because one tool never imports
- * another tool's code.
- */
+/** What each work has drawn against the estimate, pure. The frozen takeoff is in the MATERIAL's unit, movements in the ITEM's.
+ * House conversion rule (restated because pure modules import nothing): divide by the factor when entered, 1:1 when unit labels match,
+ * otherwise report the raw figure, since a wrong number is worse than a labelled one. Mirrors the Estimator's compare.ts; tools never import each other. */
 
 export type SiteTakeoffRow = {
   workItemId: string;
   materialId: string | null;
   materialName: string;
-  /** The material's own unit — what `quantity` is measured in. */
   uom: string;
   quantity: number;
-  /** The catalogue item the material is bought as; null = unlinked. */
   itemId: string | null;
-  /** One material-uom = factor × item-uom; null = none entered. */
+  /** One material-uom = factor × item-uom; null = none entered (0076). */
   itemUomFactor: number | null;
 };
 
 export type SiteIssuedLine = {
-  /** The work the movement was tagged with; null on pre-0080 history. */
   workItemId: string | null;
   itemId: string;
-  /** In the item's unit — how stock moves. */
   quantity: number;
 };
 
@@ -44,19 +24,14 @@ export type SiteMaterialRow = {
   materialName: string;
   uom: string;
   estimated: number;
-  /** In the material's unit; null when no conversion is known. */
   issued: number | null;
-  /** The raw issued figure when it could not be converted. */
   issuedRaw: { quantity: number; uom: string } | null;
-  /** The site has drawn more for this work than the estimate allows. */
   over: boolean;
 };
 
 export type SiteMaterials = {
   rows: SiteMaterialRow[];
-  /** Arrived at the plot but not attributable to a takeoff
-   * (work, material) pair: untagged history, another work, or an item
-   * the estimate never named. Per (work, item) — nothing disappears. */
+  /** Arrived at the plot but not attributable to a takeoff (work, material) pair. Per (work, item); nothing disappears. */
   unplanned: { workItemId: string | null; itemId: string; quantity: number }[];
 };
 
@@ -68,7 +43,6 @@ const canon = (u: string) => {
 export function groupSiteMaterials(
   takeoff: SiteTakeoffRow[],
   issued: SiteIssuedLine[],
-  /** items.default_uom by item id — labels the raw figure. */
   itemUomById: Map<string, string>,
 ): SiteMaterials {
   const issuedByWorkItem = new Map<string, number>();

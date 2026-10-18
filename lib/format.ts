@@ -1,37 +1,12 @@
 /**
- * How every number and date in this app is written.
- *
- * One module, used by screens, PDFs and exports alike, because the same
- * value appearing in three places must read the same way in all three.
- * Before this existed, `items.indicative_price` rendered as `₹12,345` on
- * the margins screen, `₹12,345` in the catalogue picker (via a separate
- * `Intl.NumberFormat` declared in that file), and `12,345` with no
- * currency symbol at all in the Masters items table — three answers for
- * one column.
- *
- * Pure functions with no imports, so this is safe in Server Components,
- * Client Components, Route Handlers and react-pdf documents. Do not add
- * anything here that touches the database, the request, or the DOM.
- *
- * Indian conventions throughout: lakh/crore digit grouping (12,34,567 —
- * not 1,234,567), and dates day-first.
+ * How every number and date is written, on screens, PDFs and exports alike. Indian conventions: lakh/crore grouping, day-first dates.
+ * Pure and import-free: safe in server, client and react-pdf code.
  */
 
 /** The one place the grouping locale is named. */
 const LOCALE = "en-IN";
 
-// ---------------------------------------------------------------------
-// Money
-// ---------------------------------------------------------------------
-
-/**
- * Rupees for the screen, e.g. `₹12,34,567`.
- *
- * Whole rupees by default: paise on a construction budget are noise.
- * Missing money is a dash, never `₹0` — an unpriced line and a free line
- * are different things, and showing zero for the first is how a quote
- * goes out with something given away.
- */
+/** Rupees for the screen, whole rupees. Missing is a dash, never `₹0`: an unpriced line is not a free one. */
 export function formatMoney(
   value: number | null | undefined,
   options?: { paise?: boolean },
@@ -47,16 +22,8 @@ export function formatMoney(
 }
 
 /**
- * Rupees for print: the same digits, grouped the same way, but with NO
- * currency symbol.
- *
- * Not a stylistic preference. `@react-pdf/renderer` embeds Helvetica,
- * which has no glyph for `₹` (U+20B9) — using formatMoney in a document
- * puts a blank box on every amount on the page. Documents state the
- * currency once in a heading instead, which reads better anyway.
- *
- * Rounding happens here and nowhere earlier, so a column of rounded lines
- * still adds up to a total summed at full precision.
+ * Rupees for print, with NO ₹: react-pdf's Helvetica has no glyph for it, so state the currency in a heading.
+ * Rounding happens here only, so rounded lines still add up to a total summed at full precision.
  */
 export function formatAmount(
   value: number | null | undefined,
@@ -71,23 +38,8 @@ export function formatAmount(
 }
 
 /**
- * Rupees at the scale a business plan is discussed in: `₹26.66 Cr`,
- * `₹12.5 L`, `₹4,500`.
- *
- * Not a stylistic flourish. A development plan's figures run to ten
- * digits, and `₹1,19,82,25,000` next to `₹1,29,77,74,045` is two numbers
- * nobody can tell apart at a glance — which is the entire job of a
- * summary. The founder's own workbook ends with a block headed "KEY
- * OUTPUTS IN ₹ CRORE" for exactly this reason.
- *
- * Two decimals in crore (₹0.01 Cr is ₹1 lakh — the resolution a plan is
- * actually decided at), one in lakh, and plain rupees below that, where
- * rounding to "₹0.0 L" would lose the number entirely. Negatives keep
- * their sign: `−₹5.91 Cr`. Missing is a dash, never `₹0 Cr`.
- *
- * Use this on summaries and headline figures. Line-item tables that must
- * add up still use formatMoney — a column of rounded crore figures does
- * not tally, and looking like it should is worse than being long.
+ * Rupees at plan scale: `₹26.66 Cr`, `₹12.5 L`, plain rupees below a lakh. Missing is a dash.
+ * For summaries only: line-item tables that must add up use formatMoney.
  */
 export function formatCrore(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "—";
@@ -95,8 +47,7 @@ export function formatCrore(value: number | null | undefined): string {
   const CRORE = 10_000_000;
   const LAKH = 100_000;
   const magnitude = Math.abs(value);
-  // The minus goes before the ₹, the way a person writes it, rather than
-  // inside the number where toLocaleString would put it.
+  // The sign goes before the ₹, not inside the number.
   const sign = value < 0 ? "−" : "";
 
   if (magnitude >= CRORE) {
@@ -114,22 +65,10 @@ export function formatCrore(value: number | null | undefined): string {
   return formatMoney(value);
 }
 
-// ---------------------------------------------------------------------
-// Quantities and percentages
-// ---------------------------------------------------------------------
-
-/**
- * A quantity, grouped, with trailing zeroes dropped: `12,345`, `2.125`.
- *
- * Used on screen AND in documents. The PDF theme used to have its own
- * version that didn't group digits at all despite a comment saying it
- * should, so the same quantity read `12,345` on screen and `12345` on the
- * sheet a client was handed.
- */
+/** A grouped quantity with trailing zeroes dropped: `12,345`, `2.125`. Used on screen and in documents. */
 export function formatQuantity(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "—";
-  // Three decimals is past anything a site measurement carries; Number()
-  // then drops the trailing zeroes so 2.500 reads as 2.5.
+  // Three decimals is past site measurement; Number() drops the trailing zeroes.
   return Number(value.toFixed(3)).toLocaleString(LOCALE);
 }
 
@@ -138,10 +77,6 @@ export function formatPercent(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "—";
   return `${Number(value.toFixed(2)).toLocaleString(LOCALE)}%`;
 }
-
-// ---------------------------------------------------------------------
-// Dates and times
-// ---------------------------------------------------------------------
 
 /** `01 Aug 2026` — unambiguous, and the same on every screen and document. */
 export function formatDate(value: string | Date | null | undefined): string {
@@ -164,10 +99,7 @@ export function formatLongDate(value: string | Date | null | undefined): string 
   });
 }
 
-/**
- * `Fri, 17 Oct` — a date close enough that the weekday is the useful part
- * and the year goes without saying (Client Relations' due dates).
- */
+/** `Fri, 17 Oct` — the weekday matters, the year goes without saying. */
 export function formatDayDate(value: string | Date | null | undefined): string {
   if (!value) return "—";
   const date = value instanceof Date ? value : new Date(value);
@@ -183,7 +115,7 @@ export function formatShortDate(value: string | Date | null | undefined): string
   return date.toLocaleDateString(LOCALE, { day: "numeric", month: "short" });
 }
 
-/** `4:05 pm` — Marathon's entry lists, where only the time of day matters. */
+/** `4:05 pm`, for where only the time of day matters. */
 export function formatTime(value: string | Date | null | undefined): string {
   if (!value) return "—";
   const date = value instanceof Date ? value : new Date(value);
@@ -192,13 +124,8 @@ export function formatTime(value: string | Date | null | undefined): string {
 }
 
 /**
- * Today in India, as "YYYY-MM-DD".
- *
- * The toolbox's clock, with hourInIndia below. Asia/Kolkata is named
- * explicitly because Vercel runs in UTC and the people using this do not
- * — for five and a half hours a day the two disagree about what day it
- * is. Pure modules never call it: they take `today` as an argument so
- * tests can pin the clock, and the screen or action reads it once here.
+ * Today in India as "YYYY-MM-DD". Asia/Kolkata is named because the server runs in UTC, which disagrees about the day for 5.5 hours.
+ * Pure modules take `today` as an argument; only screens and actions call this.
  */
 export function todayInIndia(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -209,11 +136,7 @@ export function todayInIndia(): string {
   }).format(new Date());
 }
 
-/**
- * The hour in India, 0–23 — todayInIndia's sibling, for "Good morning"
- * on a server that lives in UTC. The same rule: pure modules take the
- * hour as an argument and never call this.
- */
+/** The hour in India, 0–23; pure modules take it as an argument rather than call this. */
 export function hourInIndia(): number {
   const hour = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Asia/Kolkata",
@@ -228,10 +151,6 @@ export function formatCount(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "—";
   return value.toLocaleString(LOCALE);
 }
-
-// ---------------------------------------------------------------------
-// Amounts in words
-// ---------------------------------------------------------------------
 
 const ONES = [
   "",
@@ -269,11 +188,7 @@ function hundredsInWords(value: number): string {
   return parts.join(" ");
 }
 
-/**
- * Rupees in words the way an Indian invoice prints them, in crore, lakh
- * and thousand: `Rupees Twelve Thousand Six Hundred Seventy Two and Fifty
- * Paise Only`. Paise are rounded to the nearest; missing is a dash.
- */
+/** Rupees in words as an Indian invoice prints them (crore, lakh, thousand). Paise rounded; missing is a dash. */
 export function amountInWords(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "—";
   const totalPaise = Math.round(Math.abs(value) * 100);

@@ -12,30 +12,18 @@ import {
 } from "@/components/ui/dialog";
 import { FormMessage } from "@/components/ui/form-message";
 import { deleteReceipt } from "@/lib/client-relations/actions";
-import { useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useState } from "react";
 
-/**
- * Removing a recorded payment asks first.
- *
- * A mistyped receipt has to be removable — that is why the delete policy
- * exists — but deleting money on a single click is how a real payment
- * disappears. The audit trigger keeps the before-image either way.
- */
+/** A mistyped receipt must be removable (that is why the delete policy exists), but not on one click. The audit trigger keeps the before-image. */
 export function DeleteReceiptButton({ receiptId, amount }: { receiptId: string; amount: string }) {
   const [open, setOpen] = useState(false);
-  const [error, setError] = useState<string>();
-  const [pending, startTransition] = useTransition();
+  const { pending, error, run } = useActionRunner();
 
-  const remove = () => {
-    setError(undefined);
-    startTransition(async () => {
-      const result = await deleteReceipt(receiptId);
-      if (result?.error) {
-        setError(result.error);
-        return;
-      }
-      setOpen(false);
-    });
+  const remove = async () => {
+    const result = await run(() => deleteReceipt(receiptId));
+    if (result?.error) return;
+    setOpen(false);
   };
 
   return (
@@ -59,10 +47,7 @@ export function DeleteReceiptButton({ receiptId, amount }: { receiptId: string; 
             <DialogClose asChild>
               <Button variant="secondary">Keep it</Button>
             </DialogClose>
-            {/* Secondary + text-danger is the house's destructive button —
-                there is no `danger` variant, and adding one for a single
-                call site is exactly the speculative component DESIGN.md
-                refuses. */}
+            {/* Secondary + text-danger is the house's destructive button; DESIGN.md refuses a one-off `danger` variant. */}
             <Button
               type="button"
               variant="secondary"

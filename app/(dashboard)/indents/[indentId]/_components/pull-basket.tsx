@@ -14,22 +14,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCount, formatQuantity } from "@/lib/format";
+import { parseNumber } from "@/lib/form-data";
 import { addBudgetPullLines } from "@/lib/indents/actions";
-import type { BudgetPullLineRow, PullLineRow } from "@/lib/indents/queries";
+import type { BudgetPullLineRow, PullLineRow } from "@/lib/indents/pull-queries";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useMemo, useState } from "react";
 
 type Row = PullLineRow & Partial<Pick<BudgetPullLineRow, "vendor_name">>;
 export type PullGroup = { label: string; lines: Row[] };
 
-/**
- * The interiors pull: an approved budget laid out group by group,
- * quantities prefilled with what was planned, a local basket and one
- * commit. Nothing is written until Add — ticking costs nothing, exactly
- * like the catalogue picker's basket. (The construction plan used this
- * screen too until 2026-08-20; those requests pull from the villa's
- * official estimate now.)
- */
+// Nothing is written until Add; ticking costs nothing, like the catalogue picker's basket.
 export function PullBasket({
   indentId,
   reference,
@@ -41,15 +36,13 @@ export function PullBasket({
   indentId: string;
   reference: string;
   groups: PullGroup[];
-  /** What a group heading means here — "space" for a budget. */
   groupNoun: string;
   budgetId: string;
   showVendor?: boolean;
 }) {
   const router = useRouter();
   const [picked, setPicked] = useState<Record<string, number>>({});
-  const [error, setError] = useState<string>();
-  const [saving, startSaving] = useTransition();
+  const { pending: saving, error, run } = useActionRunner();
 
   const pickedEntries = useMemo(() => Object.entries(picked), [picked]);
 
@@ -75,20 +68,17 @@ export function PullBasket({
       return next;
     });
 
-  const commit = () =>
-    startSaving(async () => {
-      const lines = pickedEntries.map(([sourceId, quantity]) => ({ sourceId, quantity }));
-      const result = await addBudgetPullLines(indentId, budgetId, lines);
-      if (result?.error) {
-        setError(result.error);
-        // A partial add still changed the indent: drop what went in so a
-        // second press can't ask for it twice.
-        router.refresh();
-        setPicked({});
-        return;
-      }
-      router.push(`/indents/${indentId}`);
-    });
+  const commit = async () => {
+    const lines = pickedEntries.map(([sourceId, quantity]) => ({ sourceId, quantity }));
+    const result = await run(() => addBudgetPullLines(indentId, budgetId, lines));
+    if (result?.error) {
+      // A partial add still changed the indent: refresh so a second press can't ask twice.
+      router.refresh();
+      setPicked({});
+      return;
+    }
+    router.push(`/indents/${indentId}`);
+  };
 
   return (
     <div className="space-y-6 pb-28">
@@ -183,7 +173,7 @@ export function PullBasket({
                             min="0"
                             value={String(picked[line.source_id])}
                             onChange={(event) =>
-                              setQuantity(line.source_id, Number(event.target.value))
+                              setQuantity(line.source_id, parseNumber(event.target.value) ?? 0)
                             }
                             className="h-9"
                             aria-label={`Quantity to request for ${line.item_name}`}
@@ -201,7 +191,6 @@ export function PullBasket({
         );
       })}
 
-      {/* Nothing has been written yet — this bar is the commit point. */}
       <div className="border-border bg-surface fixed inset-x-0 bottom-0 z-10 mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 border-t px-5 py-3 md:rounded-t-2xl md:border">
         <div className="min-w-0">
           {pickedEntries.length === 0 ? (

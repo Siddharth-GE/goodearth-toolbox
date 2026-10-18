@@ -32,9 +32,7 @@ export default async function UnitsPage({
   searchParams: Promise<{ q?: string; project?: string; page?: string }>;
 }) {
   const { q, project, page } = await searchParams;
-  // The table shows one page; the form dialog still gets the COMPLETE
-  // list — it computes which plots are already taken from `units`, and
-  // a single page would silently offer occupied plots.
+  // The dialog needs the COMPLETE units list to know which plots are taken; one page would offer occupied plots.
   const [unitPage, allUnits, projects, plots, clients] = await Promise.all([
     listUnitsPage({ search: q, projectId: project, page: Number(page) || 1 }),
     listUnits(),
@@ -48,8 +46,6 @@ export default async function UnitsPage({
   const clientName = (id: string | null) =>
     id ? (clients.find((c) => c.id === id)?.name ?? "—") : "—";
 
-  // Carries the active filters onto the pager links, so paging never
-  // silently drops the search you're in the middle of.
   const hrefForPage = (target: number) => {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
@@ -62,8 +58,6 @@ export default async function UnitsPage({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-2">
-        {/* GET form: submitting drops `page`, so changing any filter
-            naturally returns to page 1 rather than stranding you on page 40. */}
         <form action="/masters/units" className="flex flex-wrap items-end gap-2">
           <div className="space-y-1.5">
             <Label htmlFor="q">Search</Label>
@@ -152,8 +146,7 @@ export default async function UnitsPage({
           <Pagination
             page={currentPage}
             pageCount={pageCount}
-            // Precomputed strings, not the function itself — a function
-            // can't cross into a Client Component.
+            // Strings, not the function: a function can't cross into a Client Component.
             prevHref={currentPage > 1 ? hrefForPage(currentPage - 1) : null}
             nextHref={currentPage < pageCount ? hrefForPage(currentPage + 1) : null}
             total={total}

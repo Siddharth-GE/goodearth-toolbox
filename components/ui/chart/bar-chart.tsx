@@ -1,10 +1,6 @@
 "use client";
 
-/**
- * Bars — vertical (`bar`) and horizontal (`hbar`, for long names or
- * many categories). Thin marks, 4px rounded data-ends anchored to the
- * baseline, a gap between adjacent bars, tooltip per mark.
- */
+/** Vertical (`bar`) and horizontal (`hbar`, for long names) bars: thin marks, 4px rounded data-ends, tooltip per mark. */
 
 import type { CartesianModel } from "@/lib/charts/series";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";

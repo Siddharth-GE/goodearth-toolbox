@@ -9,13 +9,7 @@ import { cache } from "react";
 
 import { rollUp, type Totals } from "./math";
 
-// Budgets reads the Selections tables DIRECTLY, under its own /budgets
-// grant. It deliberately does not call lib/selections/queries.ts: every
-// function in that module opens with requireTool("/selections"), so a
-// budget-team member without the design grant would be redirected away
-// from their own screen. Cross-stage reads belong to the downstream tool —
-// the same rule that lets any tool read lib/masters/* without holding
-// /masters.
+// Reads the Selections tables DIRECTLY under the /budgets grant: lib/selections/queries.ts opens with requireTool("/selections") and would redirect a budget-team member without the design grant.
 
 export type BudgetStatus = "pricing" | "approved";
 
@@ -27,32 +21,18 @@ export type InboxRow = {
   revision_no: number;
   issued_at: string | null;
   line_count: number;
-  /** Null when nobody has pressed "Start pricing" yet. */
   budget_id: string | null;
   budget_status: BudgetStatus | null;
   priced_count: number;
 };
 
-/**
- * Everything the budget team could work on: issued revisions, whether or
- * not a budget has been started against them.
- *
- * Superseded revisions are excluded — their budgets stay in the database
- * as history, but re-opening one is not work anybody should be offered.
- */
+/** Superseded revisions are excluded: their budgets stay as history. */
 export async function listInbox(): Promise<InboxRow[]> {
   await requireTool("/budgets");
   const supabase = await createClient();
 
-  // The line counts ride along as embedded count aggregates, so the whole
-  // inbox is two requests however many revisions are issued. Counts are
-  // still computed by the database — never derived from fetched rows,
-  // which cap at 1,000 — but the previous shape did it as one exact-count
-  // request per revision plus one per budget: correct, and ~180 round
-  // trips by the hundredth issued revision.
-  // Both reads go through fetchAll: the inbox is only correct when it is
-  // complete — a silent 1,000-row cap would make an issued revision
-  // simply not exist for Budgets, with no error anywhere.
+  // Line counts ride along as embedded aggregates (two requests in all), still computed by the database, never derived from fetched rows (1,000 cap).
+  // Both reads use fetchAll: a silent cap would make an issued revision not exist for Budgets.
   const selections = await fetchAll((from, to) =>
     supabase
       .from("selections")
@@ -68,8 +48,7 @@ export async function listInbox(): Promise<InboxRow[]> {
   const selectionIds = selections.map((row) => row.id);
   if (selectionIds.length === 0) return [];
 
-  // The filter on the embedded table scopes the count to priced lines
-  // only — how much of each budget is already done.
+  // The filter on the embedded table scopes the count to priced lines.
   const budgets = await fetchAll((from, to) =>
     supabase
       .from("budgets")
@@ -104,7 +83,6 @@ export async function listInbox(): Promise<InboxRow[]> {
 }
 
 export type BudgetLineRow = {
-  /** Null until the line has a budget row of its own — see getBudget. */
   id: string | null;
   line_key: string;
   unit_space_id: string;
@@ -116,13 +94,10 @@ export type BudgetLineRow = {
   item_thumb_url: string | null;
 
   uom: string;
-  /** What the designer specified. Read-only here, kept for variance. */
   designer_quantity: number;
-  /** The item's rate at pick time — a sanity check, not a price. */
   indicative_rate: number | null;
   designer_note: string | null;
 
-  /** The budget team's own figure; starts from the designer's. */
   quantity: number;
   expected_vendor_id: string | null;
   unit_cost: number | null;
@@ -144,12 +119,7 @@ export type BudgetSpaceGroup = {
 export type BudgetDetail = {
   id: string;
   status: BudgetStatus;
-  /**
-   * Which pricing of this design revision it is. R2-v1 is the first
-   * quotation against design revision 2; re-opening it to fix a rate
-   * starts v2. The R-number says what was designed, this says what was
-   * quoted — see migration 0012.
-   */
+  /** Which pricing of the design revision: R2-v1 is the first quotation; re-opening to fix a rate starts v2 (migration 0012). */
   version: number;
   notes: string | null;
   approved_at: string | null;
@@ -161,32 +131,21 @@ export type BudgetDetail = {
   issued_at: string | null;
   spaces: BudgetSpaceGroup[];
   totals: Totals;
-  /**
-   * Lines carried forward from the previous revision whose quantity the
-   * designer has since changed. Priced, but worth a second look — the
-   * screen says so rather than leaving it to be noticed.
-   */
+  /** Carried-forward lines whose quantity the designer has since changed. */
   needsReviewCount: number;
 };
 
-/**
- * One budget, assembled space by space.
- *
- * The selection's lines are the spine, not the budget's: a budget line
- * exists only for lines someone has touched, and every line of the
- * revision must appear on the pricing screen whether or not it has been
- * priced. Matched on `line_key`, never on a row id — that is the whole
- * reason line_key exists.
- */
+/** The selection's lines are the spine: a budget line exists only once touched, yet every line must appear. Matched on `line_key`, never a row id. */
 export const getBudget = cache(async (budgetId: string): Promise<BudgetDetail | null> => {
   await requireTool("/budgets");
   const supabase = await createClient();
 
-  const { data: budget } = await supabase
+  const { data: budget, error: budgetError } = await supabase
     .from("budgets")
     .select("*, selections(revision_no, issued_at, units(name, projects(name)))")
     .eq("id", budgetId)
     .maybeSingle();
+  assertRead("budgets", "this budget", budgetError);
   if (!budget) return null;
 
   const selection = budget.selections as {
@@ -195,10 +154,7 @@ export const getBudget = cache(async (budgetId: string): Promise<BudgetDetail | 
     units: { name: string; projects: { name: string } | null } | null;
   } | null;
 
-  // Both line reads go through fetchAll: past 1,000 lines a truncated
-  // read wouldn't error — priced lines would render unpriced and the
-  // totals (and the budget-sheet PDF built from them) would under-report.
-  // The trailing .order("id") is the unique tiebreaker paging needs.
+  // Both line reads use fetchAll: a truncated read would render priced lines unpriced and under-report totals. .order("id") is the unique tiebreaker paging needs.
   const [selectionLines, budgetLines, spacesResult] = await Promise.all([
     fetchAll((from, to) =>
       supabase
@@ -230,17 +186,8 @@ export const getBudget = cache(async (budgetId: string): Promise<BudgetDetail | 
 
   const budgetByKey = new Map(budgetLines.map((line) => [line.line_key, line]));
 
-  // The product's default markup, shown on lines nobody has priced yet so
-  // the field arrives filled in rather than blank. Saving the line copies
-  // it onto the budget line, which is what makes a later change to the
-  // default unable to re-price work already done.
-  //
-  // Scoped to the items actually on this budget. Reading the whole table
-  // would have meant that once margins were set on more than 1000 of the
-  // 2,633 catalogue items, some lines would silently arrive with a blank
-  // margin instead of the configured one — and a blank margin that gets
-  // saved is a line sold at cost. A failed read stops the page for the
-  // same reason.
+  // Default markup for unpriced lines; saving copies it onto the budget line, so a later change can't re-price done work.
+  // Scoped to this budget's items: a capped read would blank some margins, and a blank margin saved is a line sold at cost.
   const itemIds = [...new Set(selectionLines.map((line) => line.item_id))];
   const { data: margins, error: marginsError } = itemIds.length
     ? await supabase.from("item_margins").select("item_id, margin_pct").in("item_id", itemIds)
@@ -274,8 +221,6 @@ export const getBudget = cache(async (budgetId: string): Promise<BudgetDetail | 
       indicative_rate:
         line.indicative_rate_snapshot === null ? null : Number(line.indicative_rate_snapshot),
       designer_note: line.designer_note,
-      // Falls back to the designer's figure so an untouched line still
-      // shows a sensible quantity and can be priced without editing it.
       quantity: priced ? Number(priced.quantity) : designerQuantity,
       expected_vendor_id: priced?.expected_vendor_id ?? null,
       unit_cost:
@@ -307,8 +252,6 @@ export const getBudget = cache(async (budgetId: string): Promise<BudgetDetail | 
         totals: rollUp(spaceLines),
       };
     })
-    // A space with nothing in it isn't work; the budget team shouldn't
-    // have to scroll past empty rooms.
     .filter((group) => group.lines.length > 0);
 
   const unit = selection?.units;
@@ -325,18 +268,13 @@ export const getBudget = cache(async (budgetId: string): Promise<BudgetDetail | 
     revision_no: selection?.revision_no ?? 0,
     issued_at: selection?.issued_at ?? null,
     spaces,
-    // Rolled from every line, not by summing the space totals — same
-    // numbers, but one source of truth rather than two.
     totals: rollUp(lines),
     needsReviewCount: lines.filter((line) => line.needs_review).length,
   };
 });
 
-/** Vendors for the expected-vendor picker on the pricing screen. */
 export async function listVendorOptions() {
   await requireTool("/budgets");
-  // The shared masters read (complete, fetchAll) rather than a second
-  // hand-rolled vendors query that had its own 1,000-row cap.
   const vendors = await listVendors();
   return vendors.map(({ id, name }) => ({ id, name }));
 }
@@ -349,15 +287,7 @@ export type MarginRow = {
   margin_pct: number | null;
 };
 
-/**
- * The per-product margins already set, keyed by item.
- *
- * A lookup map, not a list — the margins browser shows whichever items a
- * search returns and reads their margin from here. So it must be read to
- * completion: truncated at the 1,000-row cap, a configured margin shows
- * as blank, and a blank margin saved from that screen is a line sold at
- * cost. (getBudget has its own scoped read for the same reason.)
- */
+/** A lookup map read to completion: a capped read shows a configured margin as blank, and a blank margin saved is a line sold at cost. */
 export async function listMargins(): Promise<Map<string, number>> {
   await requireTool("/budgets");
   const supabase = await createClient();

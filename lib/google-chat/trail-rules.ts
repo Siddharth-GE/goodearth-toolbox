@@ -1,19 +1,8 @@
 import type { SpaceLink } from "./spaces";
 
-/**
- * The one row shape both /court and /trail read, and the pure rules that
- * turn a flat list of them into what a card should say: which scope a
- * linked space narrows to, whether a row belongs to it, which words a
- * search typed after /trail actually means, and the order the app itself
- * uses (coldest first).
- *
- * `SpaceLink` comes in by type only — this file may import nothing that
- * touches I/O, so it stays runnable by `tsx --test` the way
- * identity-rules.ts and space-match.ts do. `relay-reads.ts` is the half
- * that fetches; this half only decides.
- */
+// Pure rules over the row both /court and /trail read. Imports nothing that touches I/O
+// (`SpaceLink` is type-only), so tsx --test runs it. relay-reads.ts fetches; this decides.
 
-/** A trail, boiled down to what a chat card needs to say about it. */
 export type TrailSummary = {
   chainId: string;
   projectId: string;
@@ -33,35 +22,23 @@ export type TrailSummary = {
   withClientDays: number;
 };
 
-/**
- * What a command defaults to. A space linked to one villa scopes to that
- * villa; linked to a whole project scopes to every villa (and the
- * project's own trails) under it; a DM or an unlinked space spans
- * everything.
- */
+// A DM or an unlinked space spans everything; a project link includes its villas and its own trails.
 export type Scope =
   { kind: "all" } | { kind: "project"; projectId: string } | { kind: "unit"; unitId: string };
 
-/** A space's link, turned into the scope its commands default to. */
 export function scopeOf(link: SpaceLink | null): Scope {
   if (!link) return { kind: "all" };
   if (link.unitId) return { kind: "unit", unitId: link.unitId };
   return { kind: "project", projectId: link.projectId };
 }
 
-/** Does this row belong to the scope? "all" belongs to everything. */
 export function inScope(row: TrailSummary, scope: Scope): boolean {
   if (scope.kind === "all") return true;
   if (scope.kind === "unit") return row.unitId === scope.unitId;
   return row.projectId === scope.projectId;
 }
 
-/**
- * A linked space's court needs both halves of the answer at once: what
- * is in scope, and how many the sender holds elsewhere — so this reads
- * the unscoped list once and splits it here, rather than the door
- * needing a second read to say "and N more outside this space".
- */
+// One unscoped read split here, so the card can say "N more outside this space" without a second query.
 export function splitByScope(
   rows: TrailSummary[],
   scope: Scope,
@@ -75,13 +52,8 @@ export function splitByScope(
   return { inScope: matched, elsewhere: rest };
 }
 
-/**
- * Words typed after /trail, lower-cased and stripped of punctuation —
- * the same idea as space-match.ts's `tokens()`, but the words feed a
- * different rule below (every word must appear, not a contiguous run),
- * so it is restated here rather than imported across files that both
- * promise to import nothing.
- */
+// Restated, not imported from space-match.ts: both files import nothing. Here every word must
+// appear, not a contiguous run.
 export function searchWords(text: string): string[] {
   return text
     .toLowerCase()
@@ -89,13 +61,7 @@ export function searchWords(text: string): string[] {
     .filter(Boolean);
 }
 
-/**
- * Does this row match every one of the search words? Each word only has
- * to be a substring somewhere in the row's name fields — "villa 12"
- * finds "Villa 12 — Structural drawings"; "12" alone finds every villa
- * with a 12 in it, which is fine, because the card only ever shows the
- * first ten. No words at all matches everything.
- */
+// Each word need only be a substring of a name field. No words matches everything.
 export function matchesWords(row: TrailSummary, words: string[]): boolean {
   if (words.length === 0) return true;
   const haystack = [row.projectName, row.unitName, row.activityName, row.title]
@@ -105,12 +71,7 @@ export function matchesWords(row: TrailSummary, words: string[]): boolean {
   return words.every((word) => haystack.includes(word));
 }
 
-/**
- * The app's own order, restated once in Node: cold first, then the
- * longest-waiting, then a stable tiebreaker — because the court is split
- * by scope here, after the database has already answered, rather than
- * ordered by a second query.
- */
+// The app's own order restated in Node: the court is split by scope after the database answered.
 export function orderColdestFirst(rows: TrailSummary[]): TrailSummary[] {
   return [...rows].sort((a, b) => {
     if (a.isStuck !== b.isStuck) return a.isStuck ? -1 : 1;
@@ -119,32 +80,19 @@ export function orderColdestFirst(rows: TrailSummary[]): TrailSummary[] {
   });
 }
 
-/** A card never lists more than this many rows — the rest are "and N more". */
 export const CARD_LIMIT = 10;
 
-/** The first ten rows for a card, and how many were left off. */
 export function takeForCard(rows: TrailSummary[]): { shown: TrailSummary[]; more: number } {
   return { shown: rows.slice(0, CARD_LIMIT), more: Math.max(0, rows.length - CARD_LIMIT) };
 }
-
-// --- Phase 6/7: buttons, the bounce reasons and the three form parsers ---
 
 /** The five things a court-card button can offer for one trail. */
 export type ButtonAction = "push" | "finish" | "bounce" | "hold" | "return";
 
 const BUTTON_ACTIONS: readonly ButtonAction[] = ["push", "finish", "bounce", "hold", "return"];
 
-/**
- * Which buttons a row's card gets — the app's own MoveBatonButtons rules
- * (app/(dashboard)/relay/_components/move-baton.tsx) restated for a chat
- * card: push while there's a leg ahead, finish on the last leg, bounce
- * once the baton has moved past the first leg, and exactly one of
- * hold/return depending on whether the client currently has it. A queued
- * trail (`currentLeg` null) gets nothing — there is no baton yet for a
- * button here to move.
- *
- * Order matters: it's the order the buttons render in, push first.
- */
+// The app's MoveBatonButtons rules (relay/_components/move-baton.tsx). A queued trail has no
+// baton to move. The order is the render order.
 export function buttonsFor(row: TrailSummary): ButtonAction[] {
   if (row.currentLeg === null) return [];
   const actions: ButtonAction[] = [];
@@ -155,11 +103,7 @@ export function buttonsFor(row: TrailSummary): ButtonAction[] {
   return actions;
 }
 
-/**
- * The 0036 bounce reasons, in the order the dropdown renders them — same
- * five as the app's own BOUNCE_REASONS (lib/relay/events.ts), reworded
- * for a one-line dropdown row rather than a chip.
- */
+// The same five as lib/relay/events.ts BOUNCE_REASONS, worded for a dropdown row.
 export const BOUNCE_REASONS: { value: string; text: string }[] = [
   { value: "rework", text: "Rework needed" },
   { value: "missing_info", text: "Missing information" },
@@ -168,20 +112,13 @@ export const BOUNCE_REASONS: { value: string; text: string }[] = [
   { value: "other", text: "Other" },
 ];
 
-/** A reason's dropdown text, or the raw value when it isn't one of the five. */
 export function bounceReasonText(value: string): string {
   return BOUNCE_REASONS.find((r) => r.value === value)?.text ?? value;
 }
 
-/** What a court-card button's parameters name: which action, which trail, which leg it was pressed from. */
 export type ButtonPress = { action: ButtonAction; chainId: string; fromLeg: number };
 
-/**
- * A button press, read back from its parameters. Anything that doesn't
- * shape up as a real press — an action outside the five, a blank chain
- * id, a leg that isn't a positive whole number — is null, so a stale or
- * tampered card is refused politely rather than acted on as a guess.
- */
+// Anything that isn't a real press is null, so a stale or tampered card is refused, not guessed at.
 export function parseButton(params: Record<string, string>): ButtonPress | null {
   const action = params.action;
   if (!BUTTON_ACTIONS.includes(action as ButtonAction)) return null;
@@ -195,12 +132,7 @@ export function parseButton(params: Record<string, string>): ButtonPress | null 
   return { action: action as ButtonAction, chainId, fromLeg: Number(legRaw) };
 }
 
-/**
- * The bounce dialog's three fields, checked in the same order and the
- * same words as bounceBaton (lib/relay/actions.ts) — the database
- * refuses the same three things (migration 0036 §6), so the dialog can
- * say so without a round trip that would read like a crash.
- */
+// Same checks and words as bounceBaton (lib/relay/actions.ts); the database refuses the same three (0036 §6).
 export function parseBounceForm(
   values: { toLeg: string | null; reason: string | null; note: string | null },
   fromLeg: number,
@@ -224,60 +156,30 @@ export function parseBounceForm(
   return { ok: true, toLeg, reason, note };
 }
 
-/** One trail type, for the /newtrail dialog's "Trail type" dropdown. */
 export type TrailSetOption = { id: string; name: string };
 
-/** One leg, for the /bounce dialog's "Send it back to" dropdown. */
 export type LegOption = { legNo: number; label: string | null; assigneeName: string | null };
 
-// --- Phase 7b: page 1's new choices, and the steps page they can open --
-
-/**
- * The dropdown value page 1's "Trail type" picks when the person wants to
- * lay out the steps themselves rather than use a saved trail type — first
- * in the list (cards.ts), never a real trail_sets id, so parseNewTrailPage
- * can tell the two apart without a database round trip.
- */
+// Never a real trail_sets id, so parseNewTrailPage can tell it apart without a database trip.
 export const CUSTOM_SET = "custom";
 
-/**
- * The ceiling on a custom trail's steps. A longer trail is a trail type's
- * job, made once in the toolbox — ten rows is plenty for "pick this one
- * off the cuff" without the dialog growing unusably long.
- *
- * A Chat dialog cannot grow a row on its own once it is open, so the
- * count is chosen on page 1 (the "Steps" dropdown) and page 2 renders
- * exactly that many. This is only the ceiling that dropdown offers.
- */
+// A longer trail is a trail type's job. A Chat dialog can't grow a row once open, so the count
+// is chosen on page 1 and this is the ceiling that dropdown offers.
 export const MAX_CUSTOM_STEPS = 10;
 
-/** How many custom step rows page 1 offers before anyone changes it. */
 export const DEFAULT_CUSTOM_STEPS = 4;
 
-/**
- * Page 1's "Steps" answer, turned into a row count page 2 can render.
- * This never fails: it only matters for a custom trail, and a dialog
- * that refused to open because a dropdown came back oddly would be a
- * worse answer than four rows. Anything that isn't a whole number is
- * the default; a whole number is pinned inside 1..MAX_CUSTOM_STEPS.
- */
+// Never fails: a dialog refusing to open over an odd dropdown is worse than four rows.
 export function customStepCount(value: string | number | null): number {
   const text = typeof value === "number" ? String(value) : (value ?? "").trim();
   if (!/^\d+$/.test(text)) return DEFAULT_CUSTOM_STEPS;
   return Math.min(Math.max(Number(text), 1), MAX_CUSTOM_STEPS);
 }
 
-/** One person, for a step's "Who carries it" dropdown. */
 export type PersonOption = { id: string; name: string };
 
-/** One activity, for a custom step's "activity" dropdown. */
 export type ActivityOption = { id: string; name: string };
 
-/**
- * A standard trail type's one activity, pre-filled with its usual person
- * and days — what page 2 shows for each of a set's steps before anyone
- * changes a thing.
- */
 export type StepDefault = {
   activityId: string;
   activityName: string;
@@ -285,16 +187,7 @@ export type StepDefault = {
   expectedDays: number;
 };
 
-/**
- * Page 1 of /newtrail, read back: which house, which trail type — or
- * "custom", meaning there is no trail type and setId comes back null —
- * how many steps a custom trail should offer, whether the person wants to
- * choose who carries each step, and whether the clock starts today.
- * Neither switch nor the step count has a wrong answer, so only the two
- * dropdowns can fail: a switch sends its own value only when it's on,
- * so "on" vs missing is exactly what parseNewTrailForm read for `start`
- * before this replaced it.
- */
+// A switch sends its value only when on, so "on" vs missing is the answer. Only the two dropdowns can fail.
 export function parseNewTrailPage(values: {
   unit: string | null;
   set: string | null;
@@ -330,12 +223,10 @@ export function parseNewTrailPage(values: {
   };
 }
 
-/** True when a page-2 form value is missing or nothing but whitespace. */
 function isBlankValue(value: string | null): boolean {
   return value === null || value.trim() === "";
 }
 
-/** A whole number of days, at least 1 — or null when the text isn't one. */
 function wholeDays(value: string | null): number | null {
   if (value === null) return null;
   const trimmed = value.trim();
@@ -344,24 +235,10 @@ function wholeDays(value: string | null): number | null {
   return n >= 1 ? n : null;
 }
 
-/**
- * Page 2 of /newtrail, read back into the legs open_chain wants — the
- * app's own openTrail checks (lib/relay/actions.ts), restated in the same
- * order and the same words: at least one step, every step has an
- * activity, a person and a whole day count, and no activity repeats.
- *
- * Set mode's rows can't leave their activity blank — `opts.activityIds`
- * names it for every row, in order, because the type itself decided it —
- * so "Step N needs an activity" can never fire there; if the type shrank
- * or was deleted since the dialog opened, that row has no id to read at
- * all, and the whole page is refused at once with "That trail type no
- * longer exists." rather than one confusing per-step complaint.
- *
- * Custom mode's rows are free, and a wholly blank one (no activity, no
- * person, no days) isn't a step someone meant to fill in — it's dropped
- * before anything is numbered, so leaving the last three of six rows
- * empty reports on steps 1-3, never "Step 6".
- */
+// Same checks and words as the app's openTrail (lib/relay/actions.ts). Set-mode rows take their
+// activity from `activityIds`; a shrunk or deleted type leaves a row with no id, refused at once
+// as "no longer exists". Custom mode drops wholly blank rows before numbering, so an error never
+// names an empty "Step 6".
 export function parseTrailSteps(
   values: Record<string, string | null>,
   opts: { mode: "set" | "custom"; count: number; activityIds?: string[] },

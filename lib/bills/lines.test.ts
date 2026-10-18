@@ -1,9 +1,3 @@
-/**
- * Bill lines: each refusal in words; a material bill starts from what was
- * received and not yet billed, with the PO's discount and charges shared
- * out by quantity; a work-order bill starts from its works; a daily-wages
- * bill suggests the contractor's last day rates.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

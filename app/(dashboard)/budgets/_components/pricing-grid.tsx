@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/table";
 import { saveLine } from "@/lib/budgets/actions";
 import { clientRate, lineAmount, rollUp } from "@/lib/budgets/math";
+import { parseNumber } from "@/lib/form-data";
 import { formatMoney, formatPercent, formatQuantity } from "@/lib/format";
 import type { BudgetSpaceGroup } from "@/lib/budgets/queries";
 import { type ReactNode, useMemo, useState } from "react";
@@ -21,7 +22,6 @@ import { FormMessage } from "@/components/ui/form-message";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
 import { ApproveButton } from "./approve-button";
 
-/** What the team can change on a line, as strings — these are inputs. */
 type Draft = {
   quantity: string;
   vendorId: string;
@@ -30,25 +30,15 @@ type Draft = {
   notes: string;
 };
 
-/** Empty stays empty: a blank cost means unpriced, which is not zero. */
+/** Empty stays empty: a blank cost means unpriced, not zero. */
 function toNumber(value: string): number | null {
-  const trimmed = value.trim();
-  if (trimmed === "") return null;
-  const parsed = Number(trimmed);
-  return Number.isFinite(parsed) ? parsed : null;
+  const parsed = parseNumber(value);
+  return parsed !== null && Number.isFinite(parsed) ? parsed : null;
 }
 
 /**
- * The pricing screen's grid.
- *
- * Every space is on one page rather than behind a rail: pricing is worked
- * through top to bottom in a sitting, and making someone navigate per room
- * would put a server round trip between them and the next line.
- *
- * All lines live in this component's state, so totals recompute as figures
- * are typed — before anything is saved. The saved value is what the
- * database holds; the arithmetic on screen comes from lib/budgets/math.ts,
- * the same formula as the generated column, so the two cannot disagree.
+ * One page for every space, no rail: pricing is worked top to bottom.
+ * Lines live in state so totals recompute as typed; math.ts uses the same formula as the generated column.
  */
 export function PricingGrid({
   budgetId,
@@ -83,7 +73,6 @@ export function PricingGrid({
     setDrafts((current) => ({ ...current, [lineKey]: { ...current[lineKey], ...patch } }));
   };
 
-  // Live totals across the whole budget, from what's on screen right now.
   const totals = useMemo(() => {
     const priced = Object.values(drafts).map((draft) => ({
       quantity: toNumber(draft.quantity) ?? 0,
@@ -95,10 +84,7 @@ export function PricingGrid({
 
   return (
     <div className="space-y-6">
-      {/* Approve lives here, not in the page header, because whether it is
-          allowed depends on figures that only exist in this component's
-          state — the team should be able to price the last line and
-          approve without reloading. */}
+      {/* Approve lives here because whether it is allowed depends on this component's live figures. */}
       <SummaryBar
         totals={totals}
         action={
@@ -231,8 +217,7 @@ function PricingRow({
   const rate = clientRate(cost, margin);
   const amount = lineAmount({ quantity: quantity ?? 0, unit_cost: cost, margin_pct: margin });
 
-  // Saves on blur, not per keystroke — see the hook. saveLine
-  // deliberately doesn't revalidate the route.
+  // Saves on blur, not per keystroke; saveLine deliberately doesn't revalidate the route.
   const { flush, error, saved } = useSaveOnBlur<Draft>({
     initial: draft,
     validate: (value) => {
@@ -277,8 +262,7 @@ function PricingRow({
         <div className="text-muted text-xs">
           {line.item_brand ? `${line.item_brand} · ` : ""}
           {line.item_code ?? "—"}
-          {/* The designer's rate at pick time. A sanity check on the cost
-              being typed, never a price — it is not what anyone pays. */}
+          {/* The designer's rate at pick time: a sanity check on the cost typed, never a price. */}
           {line.indicative_rate !== null && (
             <span className="ml-2 opacity-60">indicative {formatMoney(line.indicative_rate)}</span>
           )}
@@ -304,8 +288,6 @@ function PricingRow({
         )}
         <p className="text-muted mt-0.5 text-xs">
           {line.uom}
-          {/* Shown only when the two differ, so a changed measurement is
-              always answerable against what was designed. */}
           {quantityChanged && (
             <span className="text-warning ml-1">
               (designed {formatQuantity(line.designer_quantity)})

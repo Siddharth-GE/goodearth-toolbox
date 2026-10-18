@@ -5,13 +5,7 @@ import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import type { BirdwingMonth } from "./birdwing";
 
-/**
- * Financial Management's read of Birdwing — the three 0117 views and
- * nothing of Birdwing's own tables (STATUS.md's contract row). The views
- * are gated to /financial-management or /reporter in their own WHERE, so
- * requireTool here turns an ungranted person away instead of showing an
- * empty page.
- */
+/** Financial Management's read of Birdwing: the three 0117 views only (STATUS.md contract row). They are gated to this tool or /reporter in their own WHERE, so requireTool turns an ungranted person away instead of showing an empty page. */
 
 export type BirdwingReceivable = {
   ref: string;

@@ -8,10 +8,6 @@ import { listMixes } from "./mixes-queries";
 import { isModelMeasure, type ModelMeasure } from "./model-takeoff";
 import { fail, GRANT, itemDefsByIds, OLDER_ROW_LABEL } from "./shared";
 
-// ---------------------------------------------------------------------
-// Works — the masters vocabulary joined with this tool's setup
-// ---------------------------------------------------------------------
-
 export type WorkStatusRow = {
   workItemId: string;
   code: string;
@@ -25,11 +21,7 @@ export type WorkStatusRow = {
   componentCount: number;
 };
 
-/**
- * Every work in the Masters vocabulary with its estimator setup beside
- * it. A row with no `uom` has never been set up — the screen shows those
- * as the outstanding to-do rather than hiding them.
- */
+/** Every work with its estimator setup beside it. A row with no uom has never been set up; the screen shows it as outstanding. */
 export async function listWorkStatus(): Promise<WorkStatusRow[]> {
   await requireTool(GRANT);
   const supabase = await createClient();
@@ -76,11 +68,7 @@ export async function listWorkStatus(): Promise<WorkStatusRow[]> {
   });
 }
 
-/**
- * How many estimate lines use each work — the rate book's "used on an
- * estimate but not priced" list is the setup to-do that matters: a work
- * nobody has put on an estimate can wait.
- */
+/** Estimate lines per work: the "used on an estimate but not priced" list is the setup to-do that matters. */
 export async function countLinesByWork(): Promise<Map<string, number>> {
   await requireTool(GRANT);
   const supabase = await createClient();
@@ -101,7 +89,6 @@ export type WorkComponentRow = {
   name: string;
   uom: string;
   qtyPerUnit: number;
-  /** For a mix: how many materials it holds. Zero is worth flagging. */
   mixComponentCount: number | null;
 };
 
@@ -113,10 +100,9 @@ export type WorkSetup = {
   groupName: string | null;
   uom: string | null;
   labourRate: number | null;
-  /** How the SketchUp model measures it (0118); null = from the unit. */
   modelMeasure: ModelMeasure | null;
   components: WorkComponentRow[];
-  /** How many estimate lines use this work — changing its unit rewrites their meaning. */
+  /** Changing a work's unit rewrites what these lines mean. */
   lineCount: number;
 };
 
@@ -160,6 +146,7 @@ export async function getWorkSetup(workItemId: string): Promise<WorkSetup | null
   ]);
 
   if (info.error) fail("the work setup", info.error);
+  if (lines.error) fail("the work's estimate lines", lines.error);
 
   const mixesById = new Map(mixes.map((m) => [m.id, m]));
   const itemDefs = await itemDefsByIds(supabase, [

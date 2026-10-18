@@ -1,37 +1,21 @@
 "use server";
 
+import { optionalText } from "@/lib/form-data";
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { designView } from "@/lib/pdf/theme";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-// sharp loads LAZILY inside the resize branch — a top-level import means
-// a missing native binary on the deployed runtime kills every action in
-// this file at load (the 2026-08-22 staging lesson).
+// sharp loads LAZILY in the resize branch: a top-level import with a missing native binary kills every action in this file at load.
 
-// Re-declared rather than imported from lib/design-views/queries.ts, which
-// is "server-only": importing a value from it into this file-level
-// "use server" module drags the server-only chain into the client bundle
-// (see CLAUDE.md). The one string is duplicated on purpose; both copies
-// carry this comment so neither looks like an oversight.
+// Re-declared, not imported from the "server-only" lib/design-views/queries.ts, which would drag that chain into the client bundle. Both copies carry this comment.
 const BUCKET = "design-views";
 
-// Server Actions cap the request body at 1MB by default (raised to 4mb in
-// next.config.ts for headroom), so this is not a policy choice — anything
-// larger never arrives. The browser normalises to ~300KB before sending;
-// this is the backstop for a request that didn't come from our UI.
+// Server Actions cap the body at 1MB (raised to 4mb in next.config.ts), so larger never arrives. The browser sends ~300KB; this backstops other callers.
 const MAX_UPLOAD_BYTES = 3 * 1024 * 1024;
 const ACCEPTED = ["image/jpeg", "image/png", "image/webp", "image/avif"];
 
-/**
- * Uploads a design view for a space.
- *
- * Every image is normalised to the single spec in lib/pdf/theme.ts —
- * 16:9, letterboxed on white rather than cropped, JPEG because
- * @react-pdf/renderer cannot embed WebP. Normalising on the way in rather
- * than at render time means a document is never a ragged mix of shapes,
- * and the PDF generator never has to think about it.
- */
+/** Normalised to lib/pdf/theme.ts's spec on the way in: 16:9, letterboxed on white, JPEG (@react-pdf can't embed WebP). */
 export async function uploadSpaceView(
   spaceId: string,
   selectionId: string,
@@ -50,15 +34,13 @@ export async function uploadSpaceView(
     return { error: "Upload a JPG, PNG, WebP or AVIF." };
   }
 
-  const caption = String(formData.get("caption") ?? "").trim() || null;
+  const caption = optionalText(formData, "caption");
 
   let normalised: Buffer;
   try {
     const { default: sharp } = await import("sharp");
     normalised = await sharp(Buffer.from(await file.arrayBuffer()))
-      // `contain` keeps the whole drawing and pads to 16:9. `cover` would
-      // give the same consistency while quietly cropping a corner off an
-      // elevation, which is the worse failure.
+      // `contain` keeps the whole drawing; `cover` would crop a corner off an elevation.
       .resize(designView.width, designView.height, {
         fit: "contain",
         background: { r: 255, g: 255, b: 255 },
@@ -72,26 +54,10 @@ export async function uploadSpaceView(
 
   const supabase = await createClient();
 
-  // The bucket and its storage policies are created by migration
-  // 0010_design_views_storage.sql, not here. Listing or creating a bucket
-  // needs privileges an ordinary signed-in user doesn't have, so trying it
-  // at upload time fails for everyone except the service role.
+  // The bucket and policies come from migration 0010; an ordinary user can't create buckets at upload time.
   const path = `spaces/${spaceId}/${crypto.randomUUID()}.${designView.extension}`;
 
-  // A BLOB, NOT THE RAW Buffer, AND THIS IS NOT STYLE.
-  //
-  // supabase-js only builds a multipart body when handed a Blob; anything
-  // else goes to fetch as a raw body. Next patches global fetch, and a
-  // Node Buffer through that path comes back TEXT-DECODED — every
-  // non-UTF-8 byte becomes EF BF BD, so a JPEG arrives as rubbish that
-  // storage still labels image/jpeg. Nothing errors; the only symptom is
-  // a broken image.
-  //
-  // Found on 2026-08-14 by the Directory's first-ever photo upload. This
-  // line had the same defect and had simply never run in production —
-  // there were no design-view objects in the bucket at all. Left as it
-  // was, the first render a designer uploaded would have corrupted
-  // silently and gone into a client's quote PDF.
+  // A Blob, not the raw Buffer: supabase-js only builds a multipart body from a Blob, and a Buffer through Next's patched fetch is text-decoded, corrupting a JPEG with no error.
   const blob = new Blob([new Uint8Array(normalised)], { type: designView.contentType });
 
   const { error: uploadError } = await supabase.storage
@@ -99,20 +65,25 @@ export async function uploadSpaceView(
     .upload(path, blob, { contentType: designView.contentType });
   if (uploadError) {
     console.error("uploadSpaceView upload failed:", uploadError);
-    // Storage refuses rather than explains, so name the most likely cause
-    // instead of leaving someone to guess.
+    // Storage refuses rather than explains, so name the most likely cause.
     return {
       error: "Could not save the image — you may not have permission to upload design views.",
     };
   }
 
-  const { data: last } = await supabase
+  const { data: last, error: lastError } = await supabase
     .from("space_views")
     .select("sort_order")
     .eq("space_id", spaceId)
     .order("sort_order", { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (lastError) {
+    const { error: removeError } = await supabase.storage.from(BUCKET).remove([path]);
+    if (removeError) console.error("uploadSpaceView cleanup failed:", removeError);
+    console.error("uploadSpaceView order read failed:", lastError);
+    return { error: "Could not save the image. Try again." };
+  }
 
   const { error } = await supabase.from("space_views").insert({
     space_id: spaceId,
@@ -123,9 +94,9 @@ export async function uploadSpaceView(
   });
 
   if (error) {
-    // The object is already in storage; leaving it orphaned is better
-    // than leaving a row pointing at nothing.
-    await supabase.storage.from(BUCKET).remove([path]);
+    // The object is already in storage; an orphan is better than a row pointing at nothing.
+    const { error: removeError } = await supabase.storage.from(BUCKET).remove([path]);
+    if (removeError) console.error("uploadSpaceView cleanup failed:", removeError);
     console.error("uploadSpaceView insert failed:", error);
     return { error: "Could not save the image. Try again." };
   }
@@ -150,13 +121,11 @@ export async function captionSpaceView(
     console.error("captionSpaceView failed:", error);
     return { error: "Could not save the caption." };
   }
-  // No revalidate: the caption is already on screen and nothing else
-  // derives from it.
+  // No revalidate: the caption is already on screen.
   void selectionId;
   return undefined;
 }
 
-/** Swaps a view with its neighbour — enough ordering for a handful of images. */
 export async function moveSpaceView(
   viewId: string,
   selectionId: string,
@@ -189,7 +158,6 @@ export async function moveSpaceView(
     return { error: "Could not reorder. Try again." };
   }
 
-  // Already at the end — not an error, just nothing to do.
   if (!neighbour) return undefined;
 
   const results = await Promise.all([
@@ -226,9 +194,11 @@ export async function deleteSpaceView(viewId: string): Promise<ActionState> {
     return { error: "Could not remove the image." };
   }
 
-  // Row first, then the object: an orphaned file is invisible, whereas a
-  // row pointing at a deleted file is a broken image on a client document.
-  if (view?.storage_path) await supabase.storage.from(BUCKET).remove([view.storage_path]);
+  // Row first, then the object: an orphaned file is invisible, a row pointing at a deleted file is a broken image on a client document.
+  if (view?.storage_path) {
+    const { error: removeError } = await supabase.storage.from(BUCKET).remove([view.storage_path]);
+    if (removeError) console.error("deleteSpaceView file removal failed:", removeError);
+  }
 
   revalidatePath("/selections", "layout");
   return undefined;

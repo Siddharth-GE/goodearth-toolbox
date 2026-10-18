@@ -22,14 +22,7 @@ import { deleteFacility, setFacilityActive } from "@/lib/financial-management/ac
 import { Archive, ArchiveRestore, MoreHorizontal, Trash2 } from "lucide-react";
 import { useState } from "react";
 
-/**
- * Close/reopen and Delete for one facility. Delete asks first and is
- * refused by the action (and the RESTRICT FK behind it) once the
- * facility has movements — the menu offers Close for that case.
- *
- * Plain useState booleans rather than useTransition — the Relay
- * schedule-editor bug (see PlanRowMenu).
- */
+/** Close/reopen and Delete for one facility. Delete is refused by the action (and the RESTRICT FK) once there are movements; Close is the alternative. Plain useState, not useTransition (Relay schedule-editor bug, see PlanRowMenu). */
 export function FacilityMenu({
   facilityId,
   party,

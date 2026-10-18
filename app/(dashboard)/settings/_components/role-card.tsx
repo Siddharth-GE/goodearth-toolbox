@@ -11,22 +11,14 @@ import { formatMoney } from "@/lib/format";
 import { addRoleApp, deleteRole, removeRoleApp, updateRole } from "@/lib/settings/roles-actions";
 import type { ToolSection } from "@/lib/nav/arrange";
 import type { RoleWithApps } from "@/lib/settings/roles";
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useActionState, useEffect, useRef, useState } from "react";
 
-/**
- * One role: its name and approval rights as a small save-on-submit
- * form, and its app bundle as toggles that save immediately (the
- * GrantCheckbox pattern — controlled, rolled back if the server
- * disagrees).
- *
- * Editing a bundle changes what everyone holding the role can open, on
- * their very next page load — nothing is copied, so nothing can drift.
- */
+/** Editing a bundle changes what everyone holding the role can open on their next page load: nothing is copied, so nothing drifts. */
 export function RoleCard({ role, sections }: { role: RoleWithApps; sections: ToolSection[] }) {
   const [state, formAction, pending] = useActionState(updateRole.bind(null, role.id), undefined);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [deleting, startDelete] = useTransition();
-  const [deleteError, setDeleteError] = useState<string>();
+  const { pending: deleting, error: deleteError, run: runDelete } = useActionRunner();
   const [approvesBills, setApprovesBills] = useState(role.can_approve_bills);
   const [saved, setSaved] = useState(false);
   const wasPending = useRef(false);
@@ -149,13 +141,10 @@ export function RoleCard({ role, sections }: { role: RoleWithApps; sections: Too
               size="sm"
               className="text-danger"
               disabled={deleting}
-              onClick={() =>
-                startDelete(async () => {
-                  const result = await deleteRole(role.id);
-                  if (result?.error) setDeleteError(result.error);
-                  setConfirmingDelete(false);
-                })
-              }
+              onClick={async () => {
+                await runDelete(() => deleteRole(role.id));
+                setConfirmingDelete(false);
+              }}
             >
               {deleting ? "Deleting…" : "Delete role"}
             </Button>
@@ -194,11 +183,8 @@ function RoleAppToggle({
   warning?: string;
   inBundle: boolean;
 }) {
-  const [isPending, startTransition] = useTransition();
-  // Controlled, like GrantCheckbox: the state the server confirmed,
-  // rolled back when it disagrees.
+  const { pending: isPending, error, run } = useActionRunner();
   const [checked, setChecked] = useState(inBundle);
-  const [error, setError] = useState<string>();
 
   return (
     <label className="border-border flex items-start gap-2 rounded-lg border px-3 py-2">
@@ -206,17 +192,16 @@ function RoleAppToggle({
         checked={checked}
         disabled={isPending}
         aria-label={`${checked ? "Remove" : "Add"} ${label}`}
-        onChange={(event) => {
+        onChange={async (event) => {
           const next = event.target.checked;
           setChecked(next);
-          setError(undefined);
-          startTransition(async () => {
-            const result = next ? await addRoleApp(roleId, app) : await removeRoleApp(roleId, app);
-            if (result?.error) {
-              setChecked(!next);
-              setError(result.error);
-            }
-          });
+
+          const result = await run(() =>
+            next ? addRoleApp(roleId, app) : removeRoleApp(roleId, app),
+          );
+          if (result?.error) {
+            setChecked(!next);
+          }
         }}
       />
       <span className="min-w-0">

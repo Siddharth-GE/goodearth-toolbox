@@ -1,5 +1,2 @@
-/**
- * The `birdwing-books` bucket name, standing alone — importable by a
- * "use server" file and a route handler alike.
- */
+/** The bucket name alone, so a "use server" file and a route handler can both import it. */
 export const BILLS_BUCKET = "birdwing-books";

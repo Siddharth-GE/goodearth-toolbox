@@ -29,19 +29,12 @@ const DUE_TONE: Record<DueTone, PillTone> = {
   success: "success",
 };
 
-/**
- * One action — Client Relations' card for the design team: a round tick,
- * the words edited in place, and chips that open a menu — villa, stage,
- * date, owner, and ••• for status, notes and moving it. Every change
- * saves at once; a tick says "Marked done" with Undo for five seconds.
- */
 export function ActionCard({
   action,
   showVilla = true,
   hideWhenDone = false,
 }: {
   action: DesignAction;
-  /** Off on a villa's own page, where the villa goes without saying. */
   showVilla?: boolean;
   /** On the Actions list a ticked card leaves; on a villa's page it stays, struck through. */
   hideWhenDone?: boolean;
@@ -49,8 +42,7 @@ export function ActionCard({
   const { today, meId, isManager, team } = useDesignBoard();
   const undoBar = useUndoBar();
   const [, startTransition] = useTransition();
-  // The tick shows at once, and the guess is dropped the moment the saved
-  // status moves — saved, or undone — so the card ends on the server's word.
+  // The tick shows at once; the guess is dropped when the saved status moves, so the card ends on the server's word.
   const [optimistic, setOptimistic] = useState<string | null>(null);
   const [seenStatus, setSeenStatus] = useState(action.status);
   if (seenStatus !== action.status) {
@@ -65,8 +57,7 @@ export function ActionCard({
   const finished = status === "awaiting_confirmation";
   const due = dueLabel({ ...action, status }, today);
   const urgent = !done && !finished && (due.tone === "danger" || status === "waiting_management");
-  // Only whoever set it, or a manager, closes it; its owner marks it
-  // finished for them (0126 holds the same line).
+  // Only the setter or a manager closes it; its owner marks it finished (0126).
   const right = closeRight(action, { id: meId, isManager });
   const setter = action.createdBy === meId ? "you" : action.setterName.split(" ")[0];
 
@@ -273,8 +264,7 @@ export function ActionCard({
                 {ACTION_STATUSES.map((option) => (
                   <DropdownMenuItem
                     key={option.value}
-                    // Closing, or opening a closed one, is the setter's or a
-                    // manager's; marking it finished is its owner's.
+                    // Closing is the setter's or a manager's; marking finished is its owner's.
                     disabled={
                       ((option.value === "done" || action.status === "done") &&
                         right !== "close") ||
@@ -335,7 +325,6 @@ export function ActionCard({
   );
 }
 
-/** The words, edited in place: Enter or leaving the box saves. */
 function ActionText({
   action,
   done,

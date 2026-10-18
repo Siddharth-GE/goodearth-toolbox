@@ -12,7 +12,6 @@ import {
 import { listInbox } from "@/lib/budgets/queries";
 import { PiggyBank } from "lucide-react";
 import Link from "next/link";
-import { BudgetsNav } from "../_components/budgets-nav";
 import { StartPricingButton } from "../_components/start-pricing-button";
 import { formatDate } from "@/lib/format";
 
@@ -31,8 +30,6 @@ export default async function BudgetsPage() {
           </Link>
         }
       />
-
-      <BudgetsNav />
 
       {rows.length === 0 ? (
         <EmptyState
@@ -65,8 +62,6 @@ export default async function BudgetsPage() {
                   ) : row.budget_status === "pricing" ? (
                     <div className="flex items-center gap-2">
                       <Badge variant="warning">Pricing</Badge>
-                      {/* The number that says whether this is nearly done or
-                          barely started, without having to open it. */}
                       <span className="text-muted text-xs">
                         {row.priced_count} of {row.line_count} priced
                       </span>

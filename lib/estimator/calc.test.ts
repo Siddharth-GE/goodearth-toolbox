@@ -227,10 +227,7 @@ test("totals add up what is known and refuse to call it complete", () => {
 });
 
 test("a column with nothing known in it is null, not zero", () => {
-  // The bug this exists to stop: one line, its only material unpriced.
-  // The materials column knows NOTHING, and a screen printing ₹0 there
-  // would be saying the materials are free. Caught on staging before
-  // the tool shipped.
+  // One line whose only material is unpriced: the materials column knows NOTHING, and ₹0 there would say they are free.
   const unpricedRecipe: WorkRecipe = {
     workItemId: "w3",
     uom: "cum",
@@ -259,8 +256,7 @@ test("nothing known anywhere leaves every column null", () => {
 });
 
 test("a genuinely free column is zero, not null", () => {
-  // Labour-only work: the materials really do cost nothing, and that is
-  // a different statement from "nobody has priced them".
+  // Labour-only work: the materials really cost nothing, which is not "nobody has priced them".
   const labourOnly: WorkRecipe = {
     workItemId: "w2",
     uom: "sqm",
@@ -374,9 +370,7 @@ test("computeWorkTakeoff keeps quantities per work, and sums to computeTakeoff",
   assert.equal(w1Cement?.quantity, 80);
   assert.equal(w2Cement?.quantity, 50);
 
-  // The per-work rows must sum to exactly what the aggregate takeoff
-  // says — the snapshot (0077) stores the former, the screens print the
-  // latter, and they can never disagree.
+  // Per-work rows must sum to the aggregate takeoff: the snapshot stores the former, the screens print the latter.
   const summed = new Map<string, number>();
   for (const row of perWork) {
     summed.set(row.materialId, (summed.get(row.materialId) ?? 0) + row.quantity);
@@ -483,10 +477,6 @@ test("aggregateFrozenTakeoff sums a material across works and keeps null honest"
   assert.equal(steel?.missingRate, true);
 });
 
-// ---------------------------------------------------------------------
-// Per-villa overrides (0087 recipes, 0088 labour and prices)
-// ---------------------------------------------------------------------
-
 test("a villa's component list replaces the standard whole, not as a delta", () => {
   const recipes = [
     {
@@ -560,10 +550,6 @@ test("an overridden price reaches the line's material cost", () => {
   );
   assert.equal(cost.materialCost, 8 * 2 * 500);
 });
-
-// ---------------------------------------------------------------------
-// The measurement sheet (0096)
-// ---------------------------------------------------------------------
 
 const row = (
   nos: number | null,

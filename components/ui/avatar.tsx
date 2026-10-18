@@ -2,10 +2,7 @@ import { colorForName } from "@/lib/color-hash";
 
 /**
  * A person's face where there is no photo: their colour, their initial.
- *
- * `letters={2}` shows the first two letters of the first name — for a
- * small team whose names share an initial (Sayooj and Sebastina read "Sa"
- * and "Se", not "S" and "S"; the Saarang tracker's reason for two).
+ * `letters={2}` shows two letters, for a small team whose names share an initial (Sa / Se).
  */
 export function Avatar({
   name,

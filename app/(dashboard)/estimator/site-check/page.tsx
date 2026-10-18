@@ -17,18 +17,8 @@ import { ClipboardCheck } from "lucide-react";
 import Link from "next/link";
 import { IndentLineAnswer } from "./_components/indent-answer";
 
-/**
- * Site check — first the indent lines waiting for an estimator, then
- * every villa with an official estimate as a card counting what needs a
- * look there (founder, 2026-10-16: "a villa wise list you click in and
- * see"). A card opens the villa: its over-runs and unplanned arrivals with
- * Approve on the row, and every material estimated against reached. Each
- * material across all villas is one tap away (`/materials`).
- *
- * Everything is derived fresh from the frozen estimates and the plots'
- * movements, the same arithmetic as each official estimate's own page.
- * Quantities only — no money on this screen.
- */
+/** Site check: indent lines waiting for an estimator, then a card per villa with an official estimate counting what needs a look.
+ * Derived fresh from the frozen estimates and plot movements. Quantities only, no money. */
 export default async function SiteCheckPage() {
   const [officials, units, projects, indents] = await Promise.all([
     getOfficialComparisons(),
@@ -50,8 +40,7 @@ export default async function SiteCheckPage() {
   const referenceByEstimate = new Map(
     officials.map((official) => [official.estimateId, official.reference]),
   );
-  // Approved here, or — since 0113 — at the indent that asked for the
-  // material: either way an estimator has looked at it.
+  // Approved here or at the indent that asked for it (0113): either way an estimator has looked.
   const isApproved = (entry: (typeof entries)[number]) => {
     const key = `${entry.unitId} ${entry.workItemId ?? ""} ${entry.itemId}`;
     return approvals.has(key) || indentApprovals.has(key);
@@ -66,8 +55,7 @@ export default async function SiteCheckPage() {
   const waiting = villas.reduce((sum, villa) => sum + villa.waiting, 0);
   const villasOver = villas.filter((villa) => villa.over > 0).length;
 
-  // Indents wait for the estimator whether or not any villa has an
-  // official estimate yet — a villa without one has nothing to cover it.
+  // Indents wait for the estimator even when no villa has an official estimate yet.
   if (officials.length === 0) {
     return (
       <div className="space-y-4">
@@ -85,8 +73,7 @@ export default async function SiteCheckPage() {
     0,
   );
 
-  // Grouped by project, in project-name order, as Design Management's
-  // villa cards are.
+  // Grouped by project name, as Design Management's villa cards are.
   const projectOf = (villa: VillaSummary) =>
     projectName.get(unitById.get(villa.unitId)?.project_id ?? "") ?? "No project";
   const groups = [...new Set(villas.map(projectOf))].sort();
@@ -211,13 +198,8 @@ function VillaBadges({ villa }: { villa: VillaSummary }) {
   );
 }
 
-/**
- * Indent lines outside the estimate (0113) — "the first thing reconciled
- * in the estimate". Each submitted indent with such lines, oldest first;
- * the indent cannot be approved until every one is approved here. To put a
- * material on the estimate properly, open the villa's working estimate and
- * make it official again — the next indent then pulls it from there.
- */
+/** Indent lines outside the estimate (0113), oldest first; the indent cannot be approved until each is approved here.
+ * To cover a material properly, make the villa's working estimate official again. */
 function IndentsWaiting({ indents }: { indents: IndentForEstimator[] }) {
   if (indents.length === 0) return null;
   return (

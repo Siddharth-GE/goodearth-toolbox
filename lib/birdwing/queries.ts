@@ -31,29 +31,13 @@ import {
   type StayUse,
 } from "./shared";
 
-/**
- * Reads for Birdwing Stays.
- *
- * Every function opens with `requireTool(GRANT)`: the 0115 policies gate
- * SELECT too, so an ungranted person would otherwise see "no stays yet"
- * instead of being turned away. Stays reads nothing outside itself but
- * the shared surfaces — `profiles` for names (merged through a Map:
- * birdwing_stays has three FKs to profiles, BUGCATCHER #2) and
- * `companies` for the letterhead.
- *
- * Money is worked out here, never stored (lib/birdwing/money.ts): the
- * charges, receipts and settlements of the stays in hand, summed per
- * stay. At a four-room guest house's scale every list reads them whole.
- */
+// Every read opens with requireTool(GRANT): the 0115 policies gate SELECT, so an ungranted person would see an empty list, not be turned away.
+// birdwing_stays has three FKs to profiles, so names merge through a Map (BUGCATCHER #2). Money is summed here, never stored (money.ts).
 
 const fail = (context: string, error: { message: string }): never =>
   readFailed("birdwing", context, error);
 
 type Client = Awaited<ReturnType<typeof createClient>>;
-
-// ---------------------------------------------------------------------
-// Masters and settings
-// ---------------------------------------------------------------------
 
 export type RoomRow = {
   id: string;
@@ -190,7 +174,6 @@ export async function getSettings(): Promise<BirdwingSettings> {
   };
 }
 
-/** The companies an admin may pick as the letterhead (Masters, open to read). */
 export async function listCompanyOptions(): Promise<{ id: string; name: string }[]> {
   await requireTool(GRANT);
   const supabase = await createClient();
@@ -204,10 +187,6 @@ export async function listCompanyOptions(): Promise<{ id: string; name: string }
   );
   return data.filter((company) => company.is_active).map(({ id, name }) => ({ id, name }));
 }
-
-// ---------------------------------------------------------------------
-// Guests
-// ---------------------------------------------------------------------
 
 export type GuestOption = { id: string; name: string; phone: string | null; city: string | null };
 
@@ -225,10 +204,6 @@ export async function listGuestOptions(): Promise<GuestOption[]> {
   return data;
 }
 
-// ---------------------------------------------------------------------
-// Money per stay
-// ---------------------------------------------------------------------
-
 type MoneyParts = {
   charges: Map<string, number[]>;
   receipts: Map<string, number[]>;
@@ -236,11 +211,7 @@ type MoneyParts = {
   issued: Map<string, string>;
 };
 
-/**
- * Every charge, receipt, settlement and issued invoice of the given
- * stays. A short list is filtered by id; a long one reads the tables
- * whole (a URL of a thousand ids is too long, and the tables are small).
- */
+/** A short id list is filtered by id; a long one reads the tables whole (a URL of a thousand ids is too long). */
 async function moneyParts(supabase: Client, stayIds: string[]): Promise<MoneyParts> {
   const parts: MoneyParts = {
     charges: new Map(),
@@ -301,10 +272,6 @@ function moneyOf(
   });
 }
 
-// ---------------------------------------------------------------------
-// Welcome
-// ---------------------------------------------------------------------
-
 export async function getWelcomeCounts(): Promise<{
   arrivingToday: number;
   leavingToday: number;
@@ -340,8 +307,7 @@ export async function getWelcomeCounts(): Promise<{
       .select("id", head)
       .filter("review_flags", "neq", "{}")
       .is("reviewed_at", null),
-    // Stays made in this tool (history carries its own invoices or a
-    // review flag) that have ended with no invoice issued.
+    // Stays made in this tool that have ended with no invoice issued.
     fetchAll((from, to) =>
       supabase
         .from("birdwing_stays")
@@ -385,10 +351,6 @@ export async function getWelcomeCounts(): Promise<{
   };
 }
 
-// ---------------------------------------------------------------------
-// The stays list
-// ---------------------------------------------------------------------
-
 export const STAY_TABS = ["upcoming", "in-house", "past", "cancelled"] as const;
 export type StayTab = (typeof STAY_TABS)[number];
 
@@ -415,7 +377,6 @@ export type StayFilters = {
   tab: StayTab;
   use?: StayUse;
   channel?: Channel;
-  /** "YYYY-MM": the accounting month. */
   month?: string;
   q?: string;
   page: number;
@@ -430,7 +391,6 @@ export async function listStays(
   const supabase = await createClient();
   const today = todayInIndia();
 
-  // Search reaches the guest's name through the guests table first.
   let guestIds: string[] | null = null;
   if (filters.q) {
     const guests = await fetchAll((from, to) =>
@@ -502,7 +462,6 @@ type StayCore = {
   reviewed_at: string | null;
 };
 
-/** Names, rooms and money for a page of stays. */
 async function decorateStays(supabase: Client, stays: StayCore[]): Promise<StayListRow[]> {
   if (stays.length === 0) return [];
   const ids = stays.map((stay) => stay.id);
@@ -565,10 +524,6 @@ async function decorateStays(supabase: Client, stays: StayCore[]): Promise<StayL
     flagged: stay.review_flags.length > 0 && stay.reviewed_at === null,
   }));
 }
-
-// ---------------------------------------------------------------------
-// One stay
-// ---------------------------------------------------------------------
 
 export type StayGuest = {
   id: string;
@@ -936,10 +891,6 @@ export async function getStay(stayId: string): Promise<StayDetail | null> {
   };
 }
 
-// ---------------------------------------------------------------------
-// The calendar, and which rooms are free
-// ---------------------------------------------------------------------
-
 export type CalendarBookingRow = {
   stayId: string;
   ref: string;
@@ -951,7 +902,6 @@ export type CalendarBookingRow = {
   label: string;
 };
 
-/** Every live room-booking touching [from, to). */
 export async function listBookings(from: string, to: string): Promise<CalendarBookingRow[]> {
   await requireTool(GRANT);
   const supabase = await createClient();
@@ -1001,10 +951,7 @@ export async function listBookings(from: string, to: string): Promise<CalendarBo
   });
 }
 
-/**
- * Each stay's pending balance, worked out on the server — the review
- * screen's bulk close never takes an amount from the browser.
- */
+/** Worked out on the server: the bulk close never takes an amount from the browser. */
 export async function pendingByStay(stayIds: string[]): Promise<Map<string, number>> {
   await requireTool(GRANT);
   const supabase = await createClient();
@@ -1021,12 +968,7 @@ export async function pendingByStay(stayIds: string[]): Promise<Map<string, numb
   return new Map((data ?? []).map((stay) => [stay.id, moneyOf(parts, stay).pending]));
 }
 
-/**
- * The stays touching [from, to) that hold no room — the old sheet's,
- * which counted rooms but never named them, and any booked here before a
- * room was given. Cancelled stays and room blocks are left out. The
- * calendar draws them below the rooms (lib/birdwing/calendar.ts).
- */
+/** Stays touching [from, to) with no room (the old sheet's, or booked before a room was given); drawn below the rooms. */
 export async function listUnplacedStays(from: string, to: string): Promise<UnplacedStay[]> {
   await requireTool(GRANT);
   const supabase = await createClient();
@@ -1044,7 +986,6 @@ export async function listUnplacedStays(from: string, to: string): Promise<Unpla
   );
   if (stays.length === 0) return [];
 
-  // Which of them hold a room — a hundred ids to a request keeps the URL short.
   const ids = stays.map((stay) => stay.id);
   const placed = new Set<string>();
   for (let index = 0; index < ids.length; index += 100) {
@@ -1089,15 +1030,7 @@ export async function listUnplacedStays(from: string, to: string): Promise<Unpla
   }));
 }
 
-// ---------------------------------------------------------------------
-// An invoice, as it prints
-// ---------------------------------------------------------------------
-
-/**
- * The invoice to print for a stay: the one asked for by id, else the live
- * issued one, else a DRAFT from the charges as they stand. Null when the
- * stay (or the invoice asked for) is not this person's to see.
- */
+/** The invoice asked for, else the live issued one, else a DRAFT. Null when the stay is not this person's to see. */
 export async function getInvoicePrint(
   stayId: string,
   invoiceId?: string,
@@ -1138,10 +1071,6 @@ export async function getInvoicePrint(
   });
 }
 
-// ---------------------------------------------------------------------
-// The review queue
-// ---------------------------------------------------------------------
-
 export type ReviewRow = {
   id: string;
   ref: string;
@@ -1155,11 +1084,7 @@ export type ReviewRow = {
   pending: number;
 };
 
-/**
- * What needs a person: every stay the import flagged and nobody has
- * marked reviewed, and every Goodearth stay (not a paying guest) still
- * carrying a pending balance — the ₹6.45L the old sheet left open.
- */
+/** Stays the import flagged and nobody reviewed, plus Goodearth's own stays still carrying a pending balance. */
 export async function listReviewQueue(): Promise<ReviewRow[]> {
   await requireTool(GRANT);
   const supabase = await createClient();

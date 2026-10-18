@@ -3,21 +3,11 @@ import type { ReactNode } from "react";
 import { pdf } from "./theme";
 
 /**
- * The shared shell every Goodearth document is built from.
- *
- * Selections uses it today; Purchase Orders, budget summaries and bills
- * will use the same letterhead, footer and table so the company's paper
- * looks like one system rather than one design per tool.
- *
- * On fonts: react-pdf embeds fonts rather than using the system's, and
- * Geist reaches this app as woff2 via next/font, which react-pdf can't
- * read. Helvetica is the built-in stand-in. Swap it by dropping a Geist
- * .ttf into the repo and calling Font.register here — one change, every
- * document follows.
+ * The shared shell of every Goodearth document: letterhead, footer, table.
+ * react-pdf can't read next/font's woff2, so Helvetica stands in; Font.register a Geist .ttf here to change every document.
  */
 
-// react-pdf hyphenates by default, which broke narrow table headers
-// mid-word ("RE- QUESTED"). Whole words only, in every document.
+// react-pdf hyphenates by default, breaking narrow headers mid-word; whole words only.
 Font.registerHyphenationCallback((word) => [word]);
 
 const styles = StyleSheet.create({
@@ -80,22 +70,15 @@ const styles = StyleSheet.create({
 });
 
 export type DocumentMeta = {
-  /** e.g. "SELECTIONS" — sits opposite the wordmark. */
   documentType: string;
-  /** Stable reference, repeated on every page so a stray sheet is traceable. */
   reference: string;
-  /** Appears bottom-left on every page. */
   footerLeft: string;
   /** Draft documents are watermarked and must never look signable. */
   isDraft?: boolean;
-  /**
-   * The company the document is issued by — its project's (0101). Absent
-   * or null prints the placeholder letterhead.
-   */
+  /** The issuing company, its project's (0101); absent or null prints the placeholder letterhead. */
   company?: LetterheadCompany | null;
 };
 
-/** What the letterhead prints of a company; Masters' CompanyRow fits it. */
 export type LetterheadCompany = {
   name: string;
   legal_name: string | null;
@@ -105,14 +88,7 @@ export type LetterheadCompany = {
   email: string | null;
 };
 
-/**
- * Company identity block.
- *
- * With a company (Masters → Companies, through the document's project):
- * its legal name, registered address, GSTIN and contacts — never invented
- * here. Without one, the PLACEHOLDER: the wordmark set in type and a
- * stand-in line, as every document printed before companies existed.
- */
+/** Company identity block from Masters (name, address, GSTIN, contacts), never invented; without one, the placeholder wordmark. */
 function Letterhead({
   documentType,
   reference,
@@ -122,8 +98,7 @@ function Letterhead({
   reference: string;
   company?: LetterheadCompany | null;
 }) {
-  // A typed address keeps its lines; the letterhead runs them into one,
-  // whether or not each line already ended in a comma.
+  // A typed address keeps its lines; the letterhead runs them into one.
   const address = company?.address
     ?.split("\n")
     .map((part) => part.trim().replace(/,$/, ""))
@@ -156,10 +131,7 @@ function Letterhead({
   );
 }
 
-/**
- * One A4 page. `fixed` on the letterhead and footer means they repeat on
- * every sheet a long space spills onto, without being re-declared.
- */
+/** One A4 page; `fixed` letterhead and footer repeat on every sheet. */
 export function DocumentPage({ meta, children }: { meta: DocumentMeta; children: ReactNode }) {
   return (
     <Page size="A4" style={styles.page} wrap>
@@ -185,9 +157,6 @@ export function DocumentPage({ meta, children }: { meta: DocumentMeta; children:
   );
 }
 
-// ---------------------------------------------------------------------
-// Table
-// ---------------------------------------------------------------------
 const tableStyles = StyleSheet.create({
   headRow: {
     flexDirection: "row",
@@ -215,18 +184,13 @@ const tableStyles = StyleSheet.create({
 
 export type Column<T> = {
   header: string;
-  /** Flex weight, so columns stay proportional on any page width. */
   width: number;
   align?: "left" | "right";
   render: (row: T, index: number) => string;
-  /** A smaller muted line under the cell's text — a description, a work. */
   detail?: (row: T, index: number) => string | null;
 };
 
-/**
- * A table that survives a page break: the header repeats on each sheet
- * (`fixed`), and rows are kept whole rather than split across pages.
- */
+/** A table that survives page breaks: the header repeats (`fixed`) and rows stay whole. */
 export function DocumentTable<T>({ columns, rows }: { columns: Column<T>[]; rows: T[] }) {
   return (
     <View>
@@ -273,9 +237,6 @@ export function DocumentTable<T>({ columns, rows }: { columns: Column<T>[]; rows
   );
 }
 
-// ---------------------------------------------------------------------
-// The blocks every chain document repeats — indent, PO, work order, bill
-// ---------------------------------------------------------------------
 const blockStyles = StyleSheet.create({
   h1: { fontFamily: pdf.fontBold, fontSize: pdf.size.display, letterSpacing: -0.3 },
   subtitle: { fontSize: pdf.size.body, color: pdf.color.muted, marginTop: 3 },
@@ -317,7 +278,6 @@ const blockStyles = StyleSheet.create({
   signatureLabel: { fontSize: pdf.size.tiny, color: pdf.color.muted },
 });
 
-/** The document's number, large, and what it is for, beneath. */
 export function DocumentHeading({ title, subtitle }: { title: string; subtitle: string }) {
   return (
     <View>
@@ -327,7 +287,6 @@ export function DocumentHeading({ title, subtitle }: { title: string; subtitle: 
   );
 }
 
-/** The shaded band of label-over-value facts, four to a row. */
 export function MetaBlock({ items }: { items: { label: string; value: string }[] }) {
   return (
     <View style={blockStyles.metaBlock}>
@@ -345,7 +304,6 @@ export function SectionLabel({ children }: { children: string }) {
   return <Text style={blockStyles.sectionLabel}>{children}</Text>;
 }
 
-/** Terms, notes and remarks under a hairline — each a labelled paragraph. */
 export function NotesBlock({ notes }: { notes: { label: string; text: string | null }[] }) {
   const shown = notes.filter((note) => note.text && note.text.trim() !== "");
   if (shown.length === 0) return null;

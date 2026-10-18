@@ -7,23 +7,11 @@ import { fetchAll } from "@/lib/supabase/fetch-all";
 import { readFailed } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
 
-/**
- * Reads for Dexter.
- *
- * Every function opens with `requireTool(GRANT)`. Dexter reads nothing
- * outside itself but `profiles`, for the uploader's name (STATUS.md
- * contract row) — `dexter_decks` carries two FKs to `profiles`
- * (uploaded_by, updated_by, plus created_by), so names are merged
- * through a `Map` rather than an embed (BUGCATCHER #2), the
- * lib/design-management/queries.ts pattern.
- */
+// Every function opens with requireTool(GRANT). Uploader names merge through a Map, not an embed:
+// dexter_decks has several FKs to profiles (BUGCATCHER #2).
 
 const fail = (context: string, error: { message: string }): never =>
   readFailed("dexter", context, error);
-
-// ---------------------------------------------------------------------
-// Welcome
-// ---------------------------------------------------------------------
 
 export async function getWelcomeCounts(): Promise<{
   projects: number;
@@ -52,10 +40,6 @@ export async function getWelcomeCounts(): Promise<{
   };
 }
 
-// ---------------------------------------------------------------------
-// Projects
-// ---------------------------------------------------------------------
-
 export type DexterProjectRow = {
   id: string;
   name: string;
@@ -64,7 +48,6 @@ export type DexterProjectRow = {
   updatedAt: string;
 };
 
-/** Every project, ordered by name, with how many decks each holds. */
 export async function listProjects(): Promise<DexterProjectRow[]> {
   await requireTool(GRANT);
   const supabase = await createClient();
@@ -120,7 +103,6 @@ export type DexterProjectDetail = {
   decks: DexterDeckRow[];
 };
 
-/** One project and every deck in it, newest first. `null` when the id doesn't exist. */
 export async function getProject(projectId: string): Promise<DexterProjectDetail | null> {
   await requireTool(GRANT);
   const supabase = await createClient();

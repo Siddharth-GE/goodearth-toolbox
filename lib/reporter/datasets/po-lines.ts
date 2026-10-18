@@ -1,11 +1,5 @@
-// ---------------------------------------------------------------------
-// po_lines — every purchase-order line, with its rate and value
-// ---------------------------------------------------------------------
-// MONEY, by the founder's decision (PLAN.md decisions 3 and 4; policies
-// widened by 0055). Every PO has a vendor (checked in production before
-// this shipped), so the vendors embed could be !inner — but it is not
-// needed: the vendor FILTER pushes down on purchase_orders.vendor_id,
-// and the embed only supplies the display name.
+// MONEY. The vendor FILTER pushes down on purchase_orders.vendor_id; the embed only supplies the
+// display name.
 
 import type { DatasetDef } from "./types";
 
@@ -59,16 +53,15 @@ export const poLines: DatasetDef = {
       type: "text",
       path: "purchase_orders.vendors.name",
       identityPath: "purchase_orders.vendor_id",
-      // By id, not name: a filter on the nested vendors embed would
-      // filter the EMBED, not the parent rows, and silently return
-      // every line. The id column sits on the inner-joined PO row.
+      // By id, not name: a filter on the nested vendors embed would filter the EMBED and silently
+      // return every line.
       filterColumn: "purchase_orders.vendor_id",
       sortColumn: "purchase_orders.vendors.name",
       groupable: true,
       aggregates: ["count_distinct"],
       lookup: "vendors",
     },
-    // A reference is generated, unique, never blank — its own identity.
+    // A reference is generated, unique and never blank.
     po: {
       label: "PO",
       type: "text",

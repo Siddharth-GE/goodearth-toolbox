@@ -14,8 +14,8 @@ Production is `toolbox.goodearthkannur.org` (from `master`); staging is `staging
 ## Platform
 
 - **Stack:** Next.js 16.2 (Turbopack) · React 19.2 · Tailwind 4 · Supabase Postgres. Vercel `bom1` + Supabase `ap-south-1`, both Mumbai.
-- **Migrations:** `0001`–`0093` on both databases; `0094`–`0126` on staging only. `applied_migrations` (`0067`) is the ledger, and CI checks it on every pull request.
-- **Access:** per-user grants (`user_apps`) + role bundles (`role_apps`), enforced in the database by `has_app()`. On staging, a tool the founder makes `scoped` (Client Relations) shows each person only their own rows, and admins and its team leads everything (`0122`, `is_lead()`).
+- **Migrations:** `0001`–`0093` on both databases; `0094`–`0129` on staging only. `applied_migrations` (`0067`) is the ledger, and CI checks it on every pull request.
+- **Access:** per-user grants (`user_apps`) + role bundles (`role_apps`), enforced in the database by `has_app()`. On staging, a tool the founder makes `scoped` (Client Relations) shows each person only their own rows, and admins and its team leads everything (`0122`, `is_lead()`). Every read asks for the emailed code, not just the password, and the public key can call nothing (`0129`).
 - **Navigation** (staging): tools sit under closed teams in the sidebar, arranged by the founder in Settings → Teams (`0114`, `lib/nav/`); a tool with no team sits under Other. Teams arrange, grants decide.
 - **Sign-in:** password → emailed 6-digit code (30-day trusted device), self-service reset, Google for existing team emails only; both steps rate-limited in the database. Mail rides Resend as `toolbox@goodearthkannur.org`. The rules are `SECURITY.md`.
 - **Performance:** warm TTFB ~0.2s, cold ~1.0s — cold starts are the one measured problem.
@@ -25,11 +25,10 @@ Production is `toolbox.goodearthkannur.org` (from `master`); staging is `staging
 
 Production unless marked. Each tool's rules are its `PLAN.md` (Google Chat door: `lib/google-chat/PLAN.md`).
 
-- **Marathon** — race-day kiosk: PIN login, entries, bibs, admin. Own auth and service-role client — the one kiosk, not a pattern.
 - **Masters** — the shared reference data every tool reads: projects, plots, units, clients, vendors, stores, items (catalogue and materials), categories, brands, GST rates, construction stages, units of measure, works, item requests (on staging: companies, terms templates, a material rate that rises with POs, and build progress beside construction stages). Reads ungated, writes need `/masters`.
 - **Settings** — people, grants, roles, approver lists (on staging: the sidebar's teams, and a team lead tick beside a scoped grant). Admin only.
 - **Selections** — what design specifies per room; revisions immutable once issued. Tiles and lines show the item's picture, description and product link (catalogue pictures on staging).
-- **Budgets** — prices an issued revision (interiors) and a construction stage tree; money gated.
+- **Budgets** — prices an issued interiors revision; money gated. Construction is costed in the Estimator, not here.
 - **Indents** — site requests from a villa's official estimate, an approved interiors budget, or direct. No money (on staging: the indent's work's own materials, always in the Masters unit, what is still to buy, and a print; a line no estimate or budget covers says why and waits for the estimator's yes before the indent can be approved).
 - **Purchase Orders** — from approved indents, or direct for bulk/urgent buys. The money entry point, gated (on staging: only from indents — a bulk buy is one general PO gathering several villas' indents; made from an indent with a vendor per line, discount and charges per line, CGST + SGST or IGST, terms from a template, the company on the print).
 - **Inventory** — goods in, stock issues, adjustments, stock by location, the supervisors' request queue. Quantities, open to every signed-in person (on staging: every store delivery line is a batch carrying its PO rate, issues draw the oldest batch first, and only `/inventory` holders see the rates).
@@ -57,15 +56,15 @@ The chain runs end to end: design → price → indent → PO → goods in / sto
 | Tool                 | Reads from outside itself                                                                                                                                                                       |
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Bills                | `po_facts`, `po_billing_totals`, `po_line_billing_facts`, `work_labour_rate_facts`, `labour_logs` (Send to Bill)                                                                                |
-| Budgets              | `selections`, `selection_lines`, `spaces`, `indent_lines`, `indents` (refusing to delete a construction line an indent uses)                                                                    |
+| Budgets              | `selections`, `selection_lines`, `spaces`, `space_views` (the quote, through `lib/design-views/`)                                                                                               |
 | Indents              | `approved_budgets(_lines)`, `selections`, `selection_lines`, `po_line_facts`, `estimate_takeoff_facts`                                                                                          |
 | Purchase Orders      | `indents`, `indent_lines`, `goods_receipts(_lines)`, `po_billing_totals`, `po_line_billing_facts` (invoiced per line)                                                                           |
 | Inventory            | `po_facts`, `po_line_facts`, `estimate_takeoff_facts`, `issue_requests`, `indent_lines`, `indents` (what a delivery line was bought for)                                                        |
 | Selections           | `indents`, `indent_lines`, `po_line_facts`                                                                                                                                                      |
 | Masters              | `po_facts`, `bill_facts`, `approved_budgets`, `indents`, `selections`, `selection_lines`                                                                                                        |
-| Overview (home page) | `indents`, `indent_lines`, `po_facts`, `bill_facts`, `goods_receipts`, `staff_departments` (counts only) + `lib/marathon/queries`                                                               |
+| Overview (home page) | `indents`, `indent_lines`, `po_facts`, `bill_facts`, `goods_receipts`, `staff_departments` (counts only)                                                                                        |
 | Relay                | nothing outside the shared surfaces                                                                                                                                                             |
-| Google Chat door     | Relay's own `pusher_*` tables and `pusher_chain_state`, through the admin client (`SECURITY.md`)                                                                                                |
+| Google Chat door     | Relay's `pusher_*` tables and `pusher_chain_state`, read through the admin client; Relay's writes made as the person through `act-as.ts` (`SECURITY.md`)                                        |
 | Client Relations     | `pusher_chain_state`, `selections`; who holds its grant, names only, through `client_relations_team()` (`0120`)                                                                                 |
 | Reporter             | `lib/reporter/datasets.ts` is the list: indents, POs, bills, budget report lines, CRM facts, goods receipts, stock, selections, `pusher_chain_state`, plan targets, Birdwing stays and expenses |
 | Financial Management | `crm_milestone_facts`, `crm_receipt_facts`, `bill_money_facts`, `business_plan_target_facts`, `birdwing_month_facts`, `birdwing_stay_facts`, `birdwing_expense_facts`                           |

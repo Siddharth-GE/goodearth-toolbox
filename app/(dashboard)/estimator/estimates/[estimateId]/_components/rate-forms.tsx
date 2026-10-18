@@ -24,57 +24,14 @@ import {
   type RecipeChange,
 } from "@/lib/estimator/estimate-actions";
 import { setItemPrice } from "@/lib/masters/items-actions";
+import { parseNumber } from "@/lib/form-data";
 import { formatMoney, formatQuantity } from "@/lib/format";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useMemo, useState } from "react";
 import { chosenUom, componentOptions } from "../../../_components/component-options";
+import type { LineRateView, RateComponentView, RateOptions } from "@/lib/estimator/estimate-view";
 
-/** One row of what a unit of the work uses — a mix or a material, as
- * written in the list (mixes not expanded). `ref` is "mix:<id>" or
- * "material:<id>", the address the recipe action takes. */
-export type RateComponentView = {
-  ref: string;
-  kind: "material" | "mix";
-  name: string;
-  uom: string;
-  qtyPerUnit: number;
-};
-
-/** One material the rate is built from, mixes expanded — where the
- * money is. */
-export type RatePriceView = {
-  itemId: string;
-  name: string;
-  uom: string;
-  qtyPerUnit: number;
-  /** Masters' price; null = nobody has priced it. */
-  mastersPrice: number | null;
-  /** This villa's own price, when it has one. */
-  villaPrice: number | null;
-  /** qtyPerUnit × the price in use; null when unpriced. */
-  cost: number | null;
-};
-
-export type LineRateView = {
-  lineId: string;
-  workItemId: string;
-  workName: string;
-  workUom: string | null;
-  /** The villa has its own materials list for this work. */
-  own: boolean;
-  labour: { villa: number | null; rateBook: number | null; inUse: number | null };
-  components: RateComponentView[];
-  prices: RatePriceView[];
-  /** Per one unit; null when anything is unpriced. */
-  rate: number | null;
-};
-
-export type RateOptions = {
-  materials: { id: string; name: string; uom: string; rate: number | null }[];
-  mixes: { id: string; name: string; uom: string }[];
-};
-
-/** The rate in a BOQ row, and the button that explains it. */
 function RateTrigger({ rate, uom }: { rate: number | null; uom: string | null }) {
   return (
     <DialogTrigger asChild>
@@ -89,14 +46,8 @@ function RateTrigger({ rate, uom }: { rate: number | null; uom: string | null })
   );
 }
 
-/**
- * "Why is this rate what it is?" — the rate of one work on this villa,
- * built up in front of you: labour, then what one unit uses, then what
- * each material costs. Everything here is THIS VILLA's: an edit gives the
- * villa its own figure (black, with Back to the rate book), and a figure
- * that follows the rate book says so. The rate book itself — what every
- * villa starts from — is one link away.
- */
+/** The rate of one work on this villa, built up: labour, what one unit uses, what each material costs.
+ * An edit gives the villa its own figure (black, with Back to the rate book); a figure following the rate book says so. */
 export function LineRateDialog({
   estimateId,
   view,
@@ -108,13 +59,8 @@ export function LineRateDialog({
   options: RateOptions;
   canEditMasters: boolean;
 }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
-  const change = (next: RecipeChange) =>
-    startTransition(async () => {
-      const result = await changeLineRecipe(view.lineId, next);
-      setError(result?.error);
-    });
+  const { pending, error, run } = useActionRunner();
+  const change = (next: RecipeChange) => run(() => changeLineRecipe(view.lineId, next));
 
   const materialsCost = view.prices.every((row) => row.cost !== null)
     ? view.prices.reduce((sum, row) => sum + (row.cost ?? 0), 0)
@@ -157,12 +103,7 @@ export function LineRateDialog({
                   variant="ghost"
                   size="sm"
                   disabled={pending}
-                  onClick={() =>
-                    startTransition(async () => {
-                      const result = await resetEstimateLine(view.lineId);
-                      setError(result?.error);
-                    })
-                  }
+                  onClick={() => run(() => resetEstimateLine(view.lineId))}
                 >
                   ↺ Back to the rate book
                 </Button>
@@ -253,10 +194,7 @@ export function LineRateDialog({
   );
 }
 
-/**
- * A submitted estimate's rate, read back from what it froze: the same
- * build-up, nothing editable.
- */
+/** A submitted estimate's rate read back from what it froze; nothing editable. */
 export function FrozenRateDialog({
   workName,
   workUom,
@@ -348,7 +286,7 @@ function ComponentRow({
   );
 
   const saveQty = () => {
-    const next = Number(value.replace(/[,\s]/g, ""));
+    const next = parseNumber(value) ?? 0;
     if (!Number.isFinite(next) || next <= 0 || next === row.qtyPerUnit) {
       setValue(String(row.qtyPerUnit));
       return;
@@ -452,7 +390,7 @@ function AddComponentForm({
   const uomOfChoice = chosenUom(choice, options.materials, options.mixes);
 
   const add = () => {
-    const amount = Number(qty.replace(/[,\s]/g, ""));
+    const amount = parseNumber(qty) ?? 0;
     if (!choice) return setError("Pick a material or a mix.");
     if (!Number.isFinite(amount) || amount <= 0) {
       return setError(`Enter how much of it one ${unit} needs.`);
@@ -495,10 +433,7 @@ function AddComponentForm({
   );
 }
 
-/**
- * This villa's labour rate for the work (0088) — blank follows the rate
- * book, and says what that is. Zero is a real rate, not "unpriced".
- */
+/** This villa's labour rate (0088); blank follows the rate book. Zero is a real rate, not "unpriced". */
 function LabourRateField({
   lineId,
   villaRate,
@@ -511,18 +446,14 @@ function LabourRateField({
   unit: string;
 }) {
   const [value, setValue] = useState(villaRate === null ? "" : String(villaRate));
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run, setError } = useActionRunner();
 
-  const save = (next: number | null) => {
+  const save = async (next: number | null) => {
     if (next === villaRate) return;
-    startTransition(async () => {
-      const result = await updateEstimateLineLabourRate(lineId, next);
-      if (result?.error) {
-        setError(result.error);
-        setValue(villaRate === null ? "" : String(villaRate));
-      } else setError(undefined);
-    });
+    const result = await run(() => updateEstimateLineLabourRate(lineId, next));
+    if (result?.error) {
+      setValue(villaRate === null ? "" : String(villaRate));
+    }
   };
 
   return (
@@ -534,8 +465,7 @@ function LabourRateField({
           value={value}
           onChange={(event) => setValue(event.target.value)}
           onBlur={() => {
-            const cleaned = value.replace(/[,\s₹]/g, "");
-            const next = cleaned === "" ? null : Number(cleaned);
+            const next = parseNumber(value);
             if (next !== null && (!Number.isFinite(next) || next < 0)) {
               setValue(villaRate === null ? "" : String(villaRate));
               setError("The labour rate must be a number, or blank for the rate book's.");
@@ -578,8 +508,7 @@ function LabourRateField({
   );
 }
 
-/** This villa's price for one material (0088) — per estimate, so every
- * work in the villa that uses it pays the same. Blank uses Masters'. */
+/** This villa's price for one material (0088), per estimate so every work pays the same. Blank uses Masters'. */
 export function VillaPriceField({
   estimateId,
   itemId,
@@ -594,25 +523,20 @@ export function VillaPriceField({
   label: string;
 }) {
   const [value, setValue] = useState(villaPrice === null ? "" : String(villaPrice));
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run, setError } = useActionRunner();
 
-  const save = () => {
-    const cleaned = value.replace(/[,\s₹]/g, "");
-    const next = cleaned === "" ? null : Number(cleaned);
+  const save = async () => {
+    const next = parseNumber(value);
     if (next !== null && (!Number.isFinite(next) || next < 0)) {
       setValue(villaPrice === null ? "" : String(villaPrice));
       setError("The price must be a number, or blank for the Masters price.");
       return;
     }
     if (next === villaPrice) return;
-    startTransition(async () => {
-      const result = await setEstimateItemRate(estimateId, itemId, next);
-      if (result?.error) {
-        setError(result.error);
-        setValue(villaPrice === null ? "" : String(villaPrice));
-      } else setError(undefined);
-    });
+    const result = await run(() => setEstimateItemRate(estimateId, itemId, next));
+    if (result?.error) {
+      setValue(villaPrice === null ? "" : String(villaPrice));
+    }
   };
 
   return (
@@ -636,13 +560,11 @@ export function VillaPriceField({
   );
 }
 
-/** Set a missing Masters price from here — for people who hold Masters.
- * It is the company's price, used by every villa and every tool. */
+/** Set a missing Masters price from here, for people who hold Masters. It is the company's price, used by every villa and tool. */
 function MastersPriceField({ itemId, label, uom }: { itemId: string; label: string; uom: string }) {
   const router = useRouter();
   const [value, setValue] = useState("");
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run, setError } = useActionRunner();
 
   return (
     <span className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto">
@@ -659,20 +581,16 @@ function MastersPriceField({ itemId, label, uom }: { itemId: string; label: stri
         size="sm"
         variant="secondary"
         disabled={pending || value.trim() === ""}
-        onClick={() => {
-          const price = Number(value.replace(/[,\s₹]/g, ""));
+        onClick={async () => {
+          const price = parseNumber(value) ?? 0;
           if (!Number.isFinite(price) || price < 0) {
             setError("The price must be a number.");
             return;
           }
-          startTransition(async () => {
-            const result = await setItemPrice(itemId, price);
-            if (result?.error) setError(result.error);
-            else {
-              setError(undefined);
-              router.refresh();
-            }
-          });
+          const result = await run(() => setItemPrice(itemId, price));
+          if (!result?.error) {
+            router.refresh();
+          }
         }}
       >
         Set in Masters

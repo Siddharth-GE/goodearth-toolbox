@@ -6,12 +6,7 @@ import { Wallet } from "lucide-react";
 import { MonthSwitcher, monthParam } from "../_components/month-switcher";
 import { SalaryCardView } from "./salary-card";
 
-/**
- * A month's salaries, person by person: the rule in force, the figures
- * worked out from attendance and the house's occupancy, and — once a
- * reviewer has checked them — the confirmed salary, which becomes that
- * month's salary line in Expenses and closes the month's attendance.
- */
+/** A month's salaries per person: the rule in force, figures from attendance and occupancy, and once reviewed the confirmed salary, which becomes the month's salary line in Expenses and closes its attendance. */
 export default async function SalariesPage({
   searchParams,
 }: {

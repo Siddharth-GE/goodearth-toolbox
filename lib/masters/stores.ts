@@ -12,8 +12,6 @@ export type StoreRow = {
   created_at: string;
 };
 
-// fetchAll for consistency with the other masters reads: every list
-// here promises completeness, so none of them get to silently cap.
 export async function listStores(): Promise<StoreRow[]> {
   const supabase = await createClient();
   const data = await fetchAll((from, to) =>

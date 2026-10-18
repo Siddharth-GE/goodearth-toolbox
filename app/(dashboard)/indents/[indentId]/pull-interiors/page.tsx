@@ -10,24 +10,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDate } from "@/lib/format";
-import {
-  getBudgetPull,
-  getIndentHeader,
-  listApprovedBudgetsForProject,
-} from "@/lib/indents/queries";
+import { getIndentHeader } from "@/lib/indents/detail-queries";
+import { getBudgetPull, listApprovedBudgetsForProject } from "@/lib/indents/pull-queries";
 import { canEditIndent } from "@/lib/indents/workflow";
 import { Palette } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { PullBasket } from "../_components/pull-basket";
 
-/**
- * The interiors path: request the items on an APPROVED budget.
- *
- * Everything on this screen comes through the approved_* views, so the
- * quantities and vendors are visible and the cost, margin and client
- * rate are not merely hidden — they were never selected.
- */
+// Everything comes through the approved_* views: cost, margin and client rate are never selected.
 export default async function InteriorsPullPage({
   params,
   searchParams,
@@ -38,12 +29,10 @@ export default async function InteriorsPullPage({
   const { indentId } = await params;
   const { budget: budgetId } = await searchParams;
 
-  // The light header read — this screen never shows the indent's lines.
   const indent = await getIndentHeader(indentId);
   if (!indent) notFound();
   if (!canEditIndent(indent.status)) redirect(`/indents/${indentId}`);
 
-  // Step two: a budget is chosen, so show its lines.
   if (budgetId) {
     const pull = await getBudgetPull(budgetId, indentId);
     if (!pull) notFound();
@@ -77,9 +66,7 @@ export default async function InteriorsPullPage({
     );
   }
 
-  // Step one: which approved budget? Only each unit's current (issued)
-  // revision is offered — a superseded revision's budget is history, and
-  // pulling from it is how the same line gets bought twice.
+  // Only each unit's current issued revision is offered (a superseded budget double-buys).
   const { pullable, pending } = await listApprovedBudgetsForProject(
     indent.project_id,
     indent.unit_id,

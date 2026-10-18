@@ -31,9 +31,7 @@ export default async function ProjectSchedulePage({
   const { project, schedule, trails, stages } = data;
   const unfiled = trails.filter((t) => t.projectStageId === null);
 
-  // A villa's trails, keyed by house. Every house in the project gets an
-  // entry even with nothing filed against it — a villa missing from the
-  // page would read as "no such villa" rather than "nothing started".
+  // Every house gets an entry, even with nothing filed: a missing villa would read as "no such villa".
   const byUnit = new Map<string, WaveTrail[]>();
   for (const house of houses) byUnit.set(house.unitId, []);
   const wholeProject: WaveTrail[] = [];
@@ -45,8 +43,7 @@ export default async function ProjectSchedulePage({
       isQueued: t.isQueued,
       isWithClient: t.isWithClient,
     };
-    // Trails filed against the project itself rather than a house — fire
-    // NOCs, master approvals. They get their own row instead of vanishing.
+    // Trails filed on the project itself (fire NOCs, master approvals) get their own row.
     if (t.unitId === null) {
       wholeProject.push(entry);
       continue;
@@ -56,15 +53,12 @@ export default async function ProjectSchedulePage({
     else byUnit.set(t.unitId, [entry]);
   }
 
-  // One ceiling for the whole page, so a taller wave really does mean
-  // more open work than the villa above it.
+  // One ceiling for the page so a taller wave means more open work.
   const ampUnit = waveAmpUnit([...byUnit.values(), wholeProject]);
   const waveOf = (rows: WaveTrail[]) =>
     buildWave(schedule.stages, rows, { ampUnit, planPct: schedule.planPct });
 
-  // Trouble first, then work in flight, then what has landed. A project
-  // list sorted by villa number makes someone read all forty-three to
-  // find the two that need them, which is the opposite of one glance.
+  // Trouble first, then work in flight, then landed: sorting by villa number makes someone read all forty-three.
   const RANK: Record<string, number> = {
     stuck: 0,
     withClient: 1,
@@ -81,11 +75,7 @@ export default async function ProjectSchedulePage({
         a.house.unitName.localeCompare(b.house.unitName, undefined, { numeric: true }),
     );
 
-  // Villas with nothing filed at all are real, and there are usually far
-  // more of them than villas with work — Saarang has forty-three houses
-  // and four with anything on them. Drawing thirty-nine identical flat
-  // lines would bury the four that matter, so they are named together at
-  // the bottom instead of each taking a card.
+  // Villas with nothing filed far outnumber those with work; they are named together at the bottom, not forty flat lines.
   const started = villaWaves.filter((v) => v.wave && v.wave.status !== "quiet");
   const untouched = villaWaves.filter((v) => !v.wave || v.wave.status === "quiet");
 
@@ -120,8 +110,7 @@ export default async function ProjectSchedulePage({
       />
       <RelayNav active="projects" />
 
-      {/* Counts, then the picture. No rupees anywhere in Relay — this
-          tool is about where work is standing, not what it cost. */}
+      {/* No rupees anywhere in Relay: it is about where work stands, not cost. */}
       <FigureBand className="lg:grid-cols-5">
         <FigureBandCell>
           <Figure label="Villas" value={houses.length} size="lg" />
@@ -157,9 +146,6 @@ export default async function ProjectSchedulePage({
         </FigureBandCell>
       </FigureBand>
 
-      {/* The waves: one board, the stage names written once across its
-          top, every villa a row beneath — names and curves share one
-          surface instead of the names floating in page-space. */}
       {headerWave ? (
         <div className="space-y-3">
           <VillaWaveBoard
@@ -190,12 +176,7 @@ export default async function ProjectSchedulePage({
             ]}
           />
 
-          {/* One line, not thirty-nine links.
-              These villas have no work on them, which is a fact about
-              the project and not a list anyone came here to read — the
-              first version printed every name as a blue link and turned
-              the bottom of the page into a drawer of junk. It opens if
-              someone actually wants to reach one. */}
+          {/* One line, not 39 links: villas with no work are a fact about the project, not a list to read. */}
           {untouched.length > 0 && (
             <details className="group border-border bg-surface rounded-2xl border shadow-sm">
               <summary className="text-muted hover:text-foreground flex cursor-pointer list-none items-center gap-2 p-4 text-sm marker:content-none">
@@ -206,9 +187,6 @@ export default async function ProjectSchedulePage({
                   {untouched.length === 1 ? "it" : "them"} yet
                 </span>
               </summary>
-              {/* Tiles, not a wall of blue links: each villa is a small
-                  quiet button in an even grid, so the open drawer still
-                  looks designed rather than dumped. */}
               <div className="grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-2 px-4 pb-4">
                 {untouched.map(({ house }) => (
                   <Link
@@ -233,9 +211,6 @@ export default async function ProjectSchedulePage({
         </Card>
       )}
 
-      {/* The plan, against which all of the above is running late or not.
-          Below the waves now: the wave is what someone opens this page
-          for, the schedule is what they check second. */}
       <ScheduleCard
         schedule={schedule}
         editor={
@@ -247,12 +222,7 @@ export default async function ProjectSchedulePage({
         }
       />
 
-      {/* "Trails by stage" used to be listed out here — every trail under
-          every stage, the founder's call to remove it: the waves already
-          say where the work is, a trail's own page is where it is acted
-          on, and since 0065 trails file themselves, so the workbench for
-          filing them had nothing left to do. Only the stragglers panel
-          below survives, because a straggler is a real, fixable fault. */}
+      {/* Only stragglers (trails under no stage) are listed: since 0065 trails file themselves, so a straggler is a real fault. */}
       {unfiled.length > 0 && (
         <Card className="border-warning/40 p-4">
           <h3 className="text-foreground text-sm font-semibold">
@@ -317,8 +287,7 @@ function TrailLine({
       {trail.isFinished ? (
         <Badge variant="success">Done</Badge>
       ) : trail.isQueued ? (
-        // No dial: it would read "0 of 4 days" and look like a clock that
-        // had started, which is the one thing the queue must never imply.
+        // No dial: "0 of 4 days" would look like a started clock.
         <Badge variant="neutral">Waiting</Badge>
       ) : (
         <TimerDial days={trail.daysInLeg} expectedDays={trail.expectedDays} />

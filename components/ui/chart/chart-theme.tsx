@@ -1,12 +1,8 @@
 "use client";
 
 /**
- * The house style every chart passes to Recharts — hairline grid in
- * --border, --muted axis labels, tooltip on surface-raised — so no
- * screen ever hands Recharts raw styling props. Colours are CSS
- * variable TOKENS throughout: Recharts passes them straight through to
- * SVG attributes, which resolve them in the DOM, so light/dark swap in
- * app/globals.css and DESIGN.md's no-hex rule holds.
+ * The house style every chart passes to Recharts, so no screen hands it raw styling props. Recharts is imported only inside components/ui/chart.
+ * Colours are CSS variable tokens, resolved in the DOM, keeping DESIGN.md's no-hex rule.
  */
 
 import { formatCrore, formatMoney, formatQuantity } from "@/lib/format";
@@ -43,10 +39,7 @@ type TooltipEntry = {
   color?: string;
 };
 
-/**
- * The one tooltip. Recharts hands `payload` per hovered category; the
- * label map turns series ids into the words on screen.
- */
+/** The one tooltip; the label map turns series ids into the words on screen. */
 export function HouseTooltip({
   active,
   payload,

@@ -5,16 +5,14 @@ import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { setBillTotalOverride, updateBillDetails } from "@/lib/bills/line-actions";
+import { parseNumber } from "@/lib/form-data";
 import { formatDate, formatMoney } from "@/lib/format";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
-/**
- * An itemised bill's own fields. The invoice number, date and note are
- * edited on blur while it is recorded; the taxable, GST and total are the
- * lines' sums (the database writes them), so they are shown, not typed.
- */
+// The taxable, GST and total are the lines' sums (the database writes them), so they are shown, not typed.
 export function DetailsFields({
   billId,
   invoiceNo,
@@ -118,10 +116,7 @@ export function DetailsFields({
   );
 }
 
-/**
- * A daily-wages bill whose muster roll totals differently from heads ×
- * rates: a different total, with a note saying why (0106).
- */
+/** For a muster roll that totals differently from heads × rates: a total with a reason (0106). */
 export function TotalOverride({
   billId,
   currentTotal,
@@ -135,20 +130,14 @@ export function TotalOverride({
   const [open, setOpen] = useState(false);
   const [total, setTotal] = useState(String(currentTotal));
   const [note, setNote] = useState(overrideNote ?? "");
-  const [error, setError] = useState<string>();
-  const [saving, startSaving] = useTransition();
+  const { pending: saving, error, run: runAction } = useActionRunner();
 
-  const run = (input: { total: number | null; note: string | null }) =>
-    startSaving(async () => {
-      setError(undefined);
-      const result = await setBillTotalOverride(billId, input);
-      if (result?.error) {
-        setError(result.error);
-        return;
-      }
-      setOpen(false);
-      router.refresh();
-    });
+  const run = async (input: { total: number | null; note: string | null }) => {
+    const result = await runAction(() => setBillTotalOverride(billId, input));
+    if (result?.error) return;
+    setOpen(false);
+    router.refresh();
+  };
 
   if (overrideNote && !open) {
     return (
@@ -209,7 +198,7 @@ export function TotalOverride({
       <Button
         size="sm"
         disabled={saving}
-        onClick={() => run({ total: Number(total), note: note || null })}
+        onClick={() => run({ total: parseNumber(total) ?? 0, note: note || null })}
       >
         {saving ? "Saving…" : "Set the total"}
       </Button>

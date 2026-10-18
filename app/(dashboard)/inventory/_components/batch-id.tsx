@@ -5,12 +5,7 @@ import { cn } from "@/lib/utils";
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 
-/**
- * A batch's ID (0108), large enough to read off a screen at the store and
- * copy in one press — it goes onto boxes, messages and issue slips. The ID
- * itself selects whole (a click, or press and hold on a phone), so a phone
- * that refuses the clipboard can still copy it by hand.
- */
+/** Large enough to read off a screen and copy in one press; it selects whole, so a phone that refuses the clipboard can copy by hand. */
 export function BatchId({ label, size = "lg" }: { label: string; size?: "lg" | "md" }) {
   const [copied, setCopied] = useState(false);
   const [failed, setFailed] = useState(false);

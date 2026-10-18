@@ -11,25 +11,19 @@ import { buildSiteOptions, decodeSite } from "@/lib/masters/site-options";
 import { createPurchaseOrder } from "@/lib/purchase-orders/actions";
 import type { PoFormOptions } from "@/lib/purchase-orders/queries";
 import { GENERAL_SCOPE, resolveScopeCode } from "@/lib/purchase-orders/reference";
-import { useMemo, useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useMemo, useState } from "react";
 
-/**
- * Project → scope → vendor. The scope (one place — a unit with its
- * plot, a unit-less plot, or a general purchase) is part of the PO
- * number and permanent once created — the form says so, and previews
- * the number as it's chosen.
- */
+// The scope is part of the PO number and permanent once created; the form says so and previews the number.
 export function PoForm({
   options,
   defaultTerms,
 }: {
   options: PoFormOptions;
-  /** The default PO terms from Masters → Terms, or null when none is set. */
   defaultTerms: string | null;
 }) {
   const [projectId, setProjectId] = useState("");
-  // "" = general, "unit:<id>" or "plot:<id>" otherwise — one select, so
-  // it's impossible to pick a plot AND a unit.
+  // "" = general, "unit:<id>" or "plot:<id>": one select, so a plot AND a unit can't both be picked.
   const [scope, setScope] = useState("");
   const [vendorId, setVendorId] = useState("");
   const [deliverStoreId, setDeliverStoreId] = useState("");
@@ -37,8 +31,7 @@ export function PoForm({
   const [expectedBy, setExpectedBy] = useState("");
   const [terms, setTerms] = useState(defaultTerms ?? "");
   const [note, setNote] = useState("");
-  const [error, setError] = useState<string>();
-  const [creating, startTransition] = useTransition();
+  const { pending: creating, error, run } = useActionRunner();
 
   const project = options.projects.find((candidate) => candidate.id === projectId);
   const siteOptions = useMemo(
@@ -50,8 +43,7 @@ export function PoForm({
   const scopedSite = siteOptions.find((option) => option.value === scope);
 
   const missingProjectCode = Boolean(project) && !project?.code;
-  // The picked place's code fills whichever slot its kind reads — the
-  // unit-first resolution order itself is unchanged.
+  // The picked place's code fills whichever slot its kind reads.
   const scopeCode = resolveScopeCode(
     scopedSite?.code ?? null,
     scopedSite?.code ?? null,
@@ -60,9 +52,8 @@ export function PoForm({
   const missingScopeCode = scope !== "" && scopeCode === null;
 
   const create = () =>
-    startTransition(async () => {
-      // A success redirects to the new PO, so only errors come back.
-      const result = await createPurchaseOrder({
+    run(() =>
+      createPurchaseOrder({
         projectId,
         plotId,
         unitId,
@@ -72,9 +63,8 @@ export function PoForm({
         expectedBy: expectedBy || null,
         terms: terms || null,
         note: note || null,
-      });
-      if (result?.error) setError(result.error);
-    });
+      }),
+    );
 
   return (
     <div className="border-border bg-surface max-w-xl space-y-4 rounded-2xl border p-5">

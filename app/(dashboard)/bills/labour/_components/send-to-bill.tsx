@@ -27,18 +27,12 @@ import {
   type LabourEntry,
 } from "@/lib/bills/labour-billing";
 import type { LabourBillingOptions, UnbilledEntry } from "@/lib/bills/labour-queries";
+import { parseNumber } from "@/lib/form-data";
 import { formatCount, formatDate, formatMoney, formatQuantity } from "@/lib/format";
-import { useMemo, useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useMemo, useState } from "react";
 
-/**
- * Send to Bill: tick the entries, give the rates, press once. Daily
- * wages: a day rate per trade (the contractor's last bill's suggested),
- * heads × rates, and a total that may be set by hand with a reason.
- * Piece-work: the contractor's approved work order, and a rate per entry
- * (the work order's for that work, else the rate book's; a lump sum
- * typed). The figure shown is the figure the bill will carry.
- */
-
+// The figure shown is the figure the bill will carry. Piece-work rate: the work order's for that work, else the rate book's; a lump sum is typed.
 const asEntry = (row: UnbilledEntry): LabourEntry => ({
   id: row.id,
   kind: row.kind,
@@ -51,7 +45,6 @@ const asEntry = (row: UnbilledEntry): LabourEntry => ({
   quantity: row.quantity,
 });
 
-const typed = (text: string) => (text.trim() === "" ? null : Number(text.trim()));
 const show = (value: number | null | undefined) => (value == null ? "" : String(value));
 
 export function SendToBill({
@@ -73,8 +66,7 @@ export function SendToBill({
   const [reference, setReference] = useState("");
   const [billDate, setBillDate] = useState("");
   const [note, setNote] = useState("");
-  const [error, setError] = useState<string>();
-  const [sending, startSending] = useTransition();
+  const { pending: sending, error, run, clearError } = useActionRunner();
 
   const rateBook = useMemo(() => new Map(Object.entries(options.rateBook)), [options.rateBook]);
   const chosen = entries.filter((entry) => ticked.has(entry.id));
@@ -108,7 +100,7 @@ export function SendToBill({
     if (on) next.add(entry.id);
     else next.delete(entry.id);
     setTicked(next);
-    setError(undefined);
+    clearError();
     if (on) suggestFor(entry, next);
   };
 
@@ -123,18 +115,18 @@ export function SendToBill({
     show(suggestedPieceRate(asEntry(entry), workOrder?.lines ?? [], rateBook));
 
   const rates = {
-    mason: typed(dayRates.mason),
-    helper: typed(dayRates.helper),
-    other: typed(dayRates.other),
+    mason: parseNumber(dayRates.mason),
+    helper: parseNumber(dayRates.helper),
+    other: parseNumber(dayRates.other),
   };
   const heads = headsOf(chosenEntries);
   const pieceRateValues = Object.fromEntries(
-    chosen.map((entry) => [entry.id, typed(rateFor(entry))]),
+    chosen.map((entry) => [entry.id, parseNumber(rateFor(entry))]),
   );
   const computed = isDaily
     ? dailyWagesTotal(heads, rates, gstPct)
     : pieceWorkTotal(chosenEntries, pieceRateValues, gstPct);
-  const overrideValue = typed(override);
+  const overrideValue = parseNumber(override);
 
   const problem =
     groupProblem ??
@@ -156,11 +148,10 @@ export function SendToBill({
         ? "Pick the bill date."
         : undefined);
 
+  // A success lands on the new bill; only a refusal comes back.
   const send = () =>
-    startSending(async () => {
-      setError(undefined);
-      // A success lands on the new bill; only a refusal comes back.
-      const result = await sendLabourToBill({
+    run(() =>
+      sendLabourToBill({
         logIds: chosen.map((entry) => entry.id),
         kind: isDaily ? "nmr" : "pw",
         labourContractId: isDaily ? null : workOrderId,
@@ -172,9 +163,8 @@ export function SendToBill({
         totalOverride: isDaily ? overrideValue : null,
         overrideNote: isDaily ? overrideNote || null : null,
         note: note || null,
-      });
-      if (result?.error) setError(result.error);
-    });
+      }),
+    );
 
   return (
     <div className="space-y-4 pb-6">

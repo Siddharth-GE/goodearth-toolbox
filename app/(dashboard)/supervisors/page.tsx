@@ -2,9 +2,7 @@ import { getWelcomeCounts } from "@/lib/supervisors/queries";
 
 import { ToolWelcome } from "../_components/tool-welcome";
 
-// The welcome screen (founder, 2026-08-13: every Operations tool opens
-// on one). Counts only, never rupees — labour is heads, materials are
-// quantities, and nothing in this tool prices either.
+// Counts only, never rupees: labour is heads, materials are quantities.
 export default async function SupervisorsPage() {
   const counts = await getWelcomeCounts();
 

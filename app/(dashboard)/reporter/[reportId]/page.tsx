@@ -11,15 +11,8 @@ import { ReportView } from "../_components/report-view";
 import { SaveReportDialog } from "../_components/save-report-dialog";
 import { SpecLoss } from "../_components/spec-loss";
 
-/**
- * THE report page. `[reportId]` is a `reports.id` uuid OR a `starter-*`
- * id — one screen, one code path, resolved by getReport().
- *
- * A `?spec=` on this address is a report being reshaped in place: the
- * page shows the changed report and offers to save it, so looking is
- * free and committing is deliberate. Without one, the saved spec runs.
- * Starters are read-only, so their only save is "Save a copy".
- */
+// `[reportId]` is a `reports.id` uuid OR a `starter-*` id. A `?spec=` is a report reshaped in
+// place: looking is free, saving is deliberate. Starters are read-only ("Save a copy").
 export default async function ReportPage({
   params,
   searchParams,
@@ -31,14 +24,12 @@ export default async function ReportPage({
   const { spec: specParam } = await searchParams;
 
   const report = await getReport(reportId);
-  // Null covers "no such report" AND "not visible to you" — RLS makes
-  // those indistinguishable, and notFound() is the right answer to both.
+  // Null covers "no such report" and "not visible to you": RLS makes them indistinguishable.
   if (!report) notFound();
 
   const decoded = decodeSpecParam(specParam);
   const spec = decoded === null ? report.spec : parseReportSpec(decoded);
-  // Both sides come out of parseReportSpec, which builds its keys in a
-  // fixed order, so this compares shape rather than spelling.
+  // Both sides come from parseReportSpec's fixed key order, so this compares shape, not spelling.
   const changed = JSON.stringify(spec) !== JSON.stringify(report.spec);
   const loss = decoded === null ? await getReportSpecLoss(reportId) : describeSpecLoss(decoded);
 

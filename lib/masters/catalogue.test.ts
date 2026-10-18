@@ -1,10 +1,3 @@
-/**
- * The catalogue search filter, which is a small language the user's own
- * typing gets spliced into. The route used to strip `,` `(` `)` out of the
- * term to stop a second clause being introduced; these tests lock in the
- * quoting that replaced it, because the whole point is that a term full of
- * filter syntax is now DATA rather than something to be removed.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -18,8 +11,7 @@ test("an ordinary term searches name, code and description", () => {
 });
 
 test("a comma cannot introduce another clause", () => {
-  // The dangerous shape: without quoting this would read as an extra
-  // clause, chosen by whoever typed the search box.
+  // Without quoting, this would read as an extra clause.
   const filter = catalogueSearchFilter("a,brand_id.not.is.null");
   assert.equal(filter.split('",').length - 1, 2, "only the three clauses this function wrote");
   assert.ok(
@@ -45,8 +37,7 @@ test("a double quote cannot close the quoting", () => {
 });
 
 test("a backslash is escaped, so it cannot escape the closing quote", () => {
-  // `foo\` unescaped would end the value with `\"`, swallowing the quote
-  // that was meant to close it.
+  // `foo\` unescaped would end the value with `\"` and swallow the closing quote.
   const filter = catalogueSearchFilter("foo\\");
   assert.equal(
     filter,
@@ -55,8 +46,7 @@ test("a backslash is escaped, so it cannot escape the closing quote", () => {
 });
 
 test("the percent wildcards wrap the term, inside the quotes", () => {
-  // Quoting protects the reserved characters; ilike still reads % as a
-  // wildcard, which is what makes this a search rather than an equality.
+  // ilike still reads % as a wildcard inside the quotes.
   assert.ok(catalogueSearchFilter("tap").startsWith('name.ilike."%tap%"'));
 });
 

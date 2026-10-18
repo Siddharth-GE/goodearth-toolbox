@@ -1,11 +1,5 @@
-// ---------------------------------------------------------------------
-// relay_chains — every trail and where its baton is
-// ---------------------------------------------------------------------
-// Reads pusher_chain_state — Reporter is now that view's THIRD consumer
-// (Relay, Client Relations, Reporter); a sixth redefinition must check
-// here too (CLAUDE.md's warning). The view is flat and already carries
-// its names. department_names is an array, which extractRows cannot
-// flatten — it stays out until someone actually asks for it.
+// Reads pusher_chain_state, a view shared with Relay and Client Relations: redefining it must check
+// here too. department_names is an array extractRows can't flatten, so it stays out.
 
 import type { DatasetDef } from "./types";
 

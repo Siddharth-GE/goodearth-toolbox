@@ -1,17 +1,7 @@
-// ---------------------------------------------------------------------
-// crm_milestones + crm_receipts — the money coming IN (0056)
-// ---------------------------------------------------------------------
-// TWO DATASETS, NEVER ONE JOIN. A milestone with three receipts fans
-// out to three rows in a join, and any sum(due_amount) then triples —
-// the easiest way for Reporter to produce a confidently wrong number.
-// The one sanctioned crossing is the AGGREGATE the view computes:
-// a milestone carries the SUM of its own receipts (received_amount),
-// one row per milestone, no fan-out possible. A receipt not yet
-// allocated to a milestone appears only in crm_receipts — so "total
-// received" belongs there; received_amount answers "how much of THIS
-// due is in". Both read 0056's flat views: no embeds, no ambiguity,
-// and the prose columns (details, notes, bottlenecks) never left the
-// database.
+// TWO DATASETS, NEVER ONE JOIN: a milestone with three receipts fans out to three rows and any
+// sum(due_amount) triples. The one crossing is the view's own aggregate: received_amount, the SUM
+// of the milestone's receipts. A receipt not yet allocated appears only in crm_receipts, so "total
+// received" belongs there. Both read 0056's flat views.
 
 import type { DatasetDef } from "./types";
 
@@ -56,7 +46,7 @@ export const crmMilestones: DatasetDef = {
       aggregates: ["count_distinct"],
       lookup: "units",
     },
-    // Client names can repeat like any names; the id is the identity.
+    // Client names repeat; the id is the identity.
     client: {
       label: "Client",
       type: "text",

@@ -1,30 +1,9 @@
-// The founder's final masters workbook (Masters.xlsx, 2026-10-06) as clean
-// lists — the pure half of scripts/import-masters-workbook.ts, kept here so
-// every cleaning rule is tested (the script reads the file and writes; this
-// decides). Five sheets are read: vendors and contractors, works with their
-// labour rates, material categories, materials and construction stages.
-// "Project IDs" is not: reorganising projects and plots is its own step.
-//
-// DECIDED WITH THE FOUNDER, 2026-10-07:
-//   - A name the vendor sheet repeats is one vendor (Rasheed K is listed
-//     five times); its ticks and details are pooled. Names that only look
-//     alike stay apart — Santhosh K / K Santhosh, C Saju / Saju C,
-//     Prabhakaran M / Prabhakaran, Rijesh / Rijesh K P, Madhu / Madhu M A,
-//     GeoBricks / Geo Bricks — for Masters to merge if they are one party.
-//   - A company, not a person: "Mr. Abhilash, Havells India" is Havells
-//     India with Abhilash as the contact, and "Varun Vijayan" is Legrand's
-//     territory manager. Branz Hexa loses its "2025-2026".
-//   - Work names lose their "FD - " style prefix — the category already
-//     shows it, as in the first works import — and "Moiner" is "Monier".
-//
-// Where the works sheet contradicts itself (two things under one code, a
-// heading with no code, a heading listed as a work) the fix is spelled out
-// in the tables below, each matched on the sheet's own code AND text, so a
-// later edit to the sheet fails loudly instead of being fixed wrongly.
+import { roundPaise } from "@/lib/line-money";
+// Pure half of scripts/import-masters-workbook.ts. A repeated vendor name is one vendor; look-alike names stay apart for Masters to merge.
+// Contradictory works rows are fixed in the tables below, matched on code AND text so a later sheet edit fails loudly.
 
 export type Cell = string | undefined;
 
-/** One spreadsheet row: its 1-based number and its cells by column (A = 0). */
 export type SheetRow = { row: number; cells: Cell[] };
 
 function text(cell: Cell): string {
@@ -36,7 +15,6 @@ function orNull(cell: Cell): string | null {
   return value === "" ? null : value;
 }
 
-/** An address: each line tidied, blank lines dropped, line breaks kept. */
 function lines(cell: Cell): string | null {
   const value = (cell ?? "")
     .split(/\r?\n/)
@@ -46,9 +24,6 @@ function lines(cell: Cell): string | null {
   return value === "" ? null : value;
 }
 
-const money = (value: number) => Math.round(value * 100) / 100;
-
-/** Letters and digits only, lower case — "Pvt.Ltd" and "Pvt. Ltd." agree. */
 export function looseKey(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
@@ -60,10 +35,9 @@ function number(cell: Cell, where: string): number | null {
   if (!Number.isFinite(parsed) || parsed < 0) {
     throw new Error(`${where}: "${value}" is not a price.`);
   }
-  return money(parsed);
+  return roundPaise(parsed);
 }
 
-/** The rows under the header, after checking the header is the one the rules were written for. */
 function underHeader(rows: SheetRow[], sheet: string, expected: string[]): SheetRow[] {
   const header = rows.find((r) => r.cells.some((c) => text(c) !== ""));
   const matches =
@@ -76,10 +50,6 @@ function underHeader(rows: SheetRow[], sheet: string, expected: string[]): Sheet
   }
   return rows.filter((r) => r.row > header.row);
 }
-
-// ---------------------------------------------------------------------------
-// Vendors and contractors
-// ---------------------------------------------------------------------------
 
 export const VENDOR_COLUMNS = [
   "Sl. No.",
@@ -120,7 +90,6 @@ export type BankDetails = {
 
 export type WorkbookVendor = {
   name: string;
-  /** Every spelling the sheet used, before any tidy-up — what an existing vendor is matched on. */
   sheetNames: string[];
   rows: number[];
   is_contractor: boolean;
@@ -131,8 +100,7 @@ const VENDOR_LEFT_OUT = new Set(["demo vendor"]);
 
 const VENDOR_TIDY: Record<string, Partial<Record<"name" | VendorDetail, string | null>>> = {
   "mr. abhilash, havells india": { name: "Havells India", contact_name: "Abhilash" },
-  // The sheet's address cell holds his card: "Territory Manager-Projects,
-  // Legrand, Ph-8606071533".
+  // The address cell holds a Legrand territory manager's card, not an address.
   "varun vijayan": {
     name: "Legrand",
     contact_name: "Varun Vijayan",
@@ -141,8 +109,7 @@ const VENDOR_TIDY: Record<string, Partial<Record<"name" | VendorDetail, string |
     address: null,
   },
   "branz hexa india pvt. ltd. 2025-2026": { name: "Branz Hexa India Pvt. Ltd." },
-  // A cut-off name: the row's GST number, address, contact and bank account
-  // are PeeCee Traders', and so is its account holder name.
+  // A cut-off name: the row's GST, address, contact and bank belong to PeeCee Traders.
   peec: { name: "PeeCee Traders" },
 };
 
@@ -231,10 +198,6 @@ export function vendorsFromSheet(rows: SheetRow[]): { vendors: WorkbookVendor[];
   return { vendors, notes };
 }
 
-// ---------------------------------------------------------------------------
-// Works
-// ---------------------------------------------------------------------------
-
 export type WorkbookWorkCategory = { code: string; name: string; sort_order: number };
 export type WorkbookWorkGroup = {
   code: string;
@@ -248,29 +211,23 @@ export type WorkbookWorkItem = {
   group: string | null;
   name: string;
   sort_order: number;
-  /** The rate book's unit and labour rate — null where the sheet gives none. */
   uom: string | null;
   labour_rate: number | null;
 };
 
-/** Section headings in the sheet that become groups → the group's code. */
 const WORK_HEADINGS: { code: string; name: string; group: string }[] = [
-  // No code in the sheet. FD.3 was this heading in the first works list;
-  // the sheet's own FD.3 row repeats FD.6 and is left out (below).
+  // No code in the sheet; the sheet's own FD.3 row repeats FD.6 and is left out (below).
   { code: "", name: "FD - Rubble Foundation", group: "FD.3" },
   { code: "FD.11", name: "FD - Isolated Foundation", group: "FD.11" },
   { code: "FD.18", name: "FD - Pile Foundation", group: "FD.18" },
   { code: "FD.24", name: "FD - Plinth Beam", group: "FD.24" },
-  // The sheet gives this heading the category's own code.
   { code: "PF", name: "PF - Plastering", group: "PF.0" },
-  // The sheet numbers this heading PF.2, which is already Bull Marking. It
-  // follows PF.19, so it becomes PF.20 and its works PF.20a–PF.20s.
+  // The sheet numbers this heading PF.2 (already Bull Marking); it follows PF.19, so it becomes PF.20 and its works PF.20a–PF.20s.
   { code: "PF.2", name: "PF - Roof Fabrication", group: "PF.20" },
   { code: "F.1", name: "F - Internal Finishing Works", group: "F.1" },
   { code: "F.2", name: "F - External Finishes", group: "F.2" },
 ];
 
-/** Rows that are not works of their own. */
 const WORK_LEFT_OUT: { code: string; name: string; why: string }[] = [
   { code: "FD.3", name: "FD - Dry Rubble Masonry", why: "repeats FD.6, which carries the rate" },
   {
@@ -285,18 +242,17 @@ const WORK_LEFT_OUT: { code: string; name: string; why: string }[] = [
   },
 ];
 
-/** A work the sheet leaves without a code. */
 const WORK_CODES: { code: string; name: string; becomes: string }[] = [
   { code: "", name: "MEP - Electrical Connection Checking", becomes: "MEP.11b" },
 ];
 
-/** Where a group stops before the next heading, because what follows is a different kind of work. */
+/** Where a group ends early, because what follows is a different kind of work. */
 const GROUP_ENDS_BEFORE = new Set([
   "PF.16", // Screed is not Plastering
   "PF.20k", // Stair Fabrication onward is not Roof Fabrication
 ]);
 
-/** Names the sheet repeats under different floors get the floor their parent row names. */
+/** Names repeated under different floors take the floor their parent row names. */
 const FLOOR: Record<string, string> = {
   "SS.2a": "GF",
   "SS.2b": "GF",
@@ -412,9 +368,7 @@ export function worksFromSheet(rows: SheetRow[]): {
       (FLOOR[code] ? ` - ${FLOOR[code]}` : "") +
       (scope ? ` — ${scope}` : "");
 
-    // The rate book: a unit, or a share of the stage's per-sqft rate (SS
-    // and MEP write 0.12 in the unit column; the price is already the
-    // share, 0.12 × 230 = 27.6 per sqft).
+    // SS and MEP write 0.12 in the unit column: a share of the stage's per-sqft rate, and the price is already that share.
     const unit = text(cells[3]);
     const rate = number(cells[4], `Row ${row} (${code})`);
     let uom: string | null = null;
@@ -465,13 +419,8 @@ export function worksFromSheet(rows: SheetRow[]): {
   return { categories, groups, items, notes };
 }
 
-// ---------------------------------------------------------------------------
-// Material categories, materials, construction stages
-// ---------------------------------------------------------------------------
-
 export type WorkbookMaterialCategory = { code: string; name: string };
-// The sheet's "Material Family" column is not kept: as a description it
-// is mostly the name again or a fragment of it ("X", "Box").
+// The Material Family column is dropped: mostly the name again.
 export type WorkbookMaterial = {
   code: string;
   name: string;
@@ -504,7 +453,7 @@ const MATERIAL_UOMS: Record<string, string> = {
   bottle: "bottle",
 };
 
-/** Founder-settled for the first material master (2026-08-20): a blank unit is "nos". */
+/** A blank unit is "nos". */
 const BLANK_MATERIAL_UOM = "nos";
 
 /** The Category sheet has no header: code in A, name in B. */

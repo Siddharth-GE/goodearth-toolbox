@@ -33,7 +33,7 @@ In a tool the founder makes scoped (`scoped` in `lib/tools.ts` — today Client 
 
 - **Only two roles: `admin` and `staff`.** Admins have every tool and see no checkboxes.
 - **Admin is changed in the app** (`setAdmin`). `profiles_guard()` lets only an admin change a role, refuses to remove the **last active admin** (demotion or deactivation), and `audit_profiles` records it. Studio stays the break-glass path (the guard applies only when `auth.uid()` is not null).
-- **A staff user cannot change any role, including their own** — until `0013` one request through the anon key bought every grant.
+- **A staff user cannot change any role, including their own** (`0013`): otherwise one request through the anon key buys every grant.
 
 ## Role templates
 
@@ -58,6 +58,5 @@ A role names a job (Site Engineer, Purchase, Accounts) and bundles apps plus app
 
 ## Known gaps
 
-- **Granting `/marathon` does nothing** — the kiosk has its own PIN auth.
 - **Object-level permissions in one tool only** — Client Relations shows each person their own plots and actions (`0123`). Elsewhere anyone with `/selections` opens any unit, anyone with `/budgets` any budget. A tool joins by being made `scoped` with its own migration — first it has to record who is assigned to what (Supervisors does not, yet).
 - **A tool nobody is granted is invisible to all but admins** — grant it after shipping.

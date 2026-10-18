@@ -1,8 +1,3 @@
-/**
- * The bill status machine's button rules — who may do what, at which
- * status. The trigger (migration 0025) is the real boundary; these pin
- * the mirror that decides what renders.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -16,7 +11,6 @@ import {
   canSendBack,
   exceedsAnchor,
   exceedsApprovalLimit,
-  isContractBillable,
 } from "./workflow";
 
 const adminDecider = { isAdmin: true, isApprover: false };
@@ -41,9 +35,7 @@ test("approving takes a recorded bill and a named approver or an admin", () => {
   assert.equal(canApprove("paid", approver), false);
 });
 
-// The limit matrix (0033). A ceiling that leaked would either block a
-// legitimate approval or, far worse, let one through — so every corner
-// is pinned: at the limit, either side of it, unlimited, and admin.
+// The limit matrix (0033): at the limit, either side of it, unlimited, and admin.
 const capped = { isAdmin: false, isApprover: true, approvalLimit: 50000 };
 
 test("an approver's limit passes below and at the number, and stops above it", () => {
@@ -55,7 +47,6 @@ test("an approver's limit passes below and at the number, and stops above it", (
 test("no limit means unlimited, not nothing — every approver who predates limits", () => {
   const unlimited = { isAdmin: false, isApprover: true, approvalLimit: null };
   assert.equal(canApprove("recorded", unlimited, 10_000_000), true);
-  // Absent field, the shape callers used before 0033.
   assert.equal(canApprove("recorded", { isAdmin: false, isApprover: true }, 10_000_000), true);
 });
 
@@ -115,12 +106,6 @@ test("a contract is approved by a decider, and only while pending", () => {
   assert.equal(canApproveContract("approved", approver), false);
 });
 
-test("a contract takes bills only once approved and while active", () => {
-  assert.equal(isContractBillable("approved", true), true);
-  assert.equal(isContractBillable("approved", false), false);
-  assert.equal(isContractBillable("pending_approval", true), false);
-});
-
 test("a contract's terms lock on approval", () => {
   assert.equal(canEditContract("pending_approval"), true);
   assert.equal(canEditContract("approved"), false);
@@ -130,6 +115,5 @@ test("over-billing warns past the anchor total, never at or under it", () => {
   assert.equal(exceedsAnchor(1000, 900, 100), false); // lands exactly on it
   assert.equal(exceedsAnchor(1000, 900, 100.01), true);
   assert.equal(exceedsAnchor(1000, 0, 1500), true);
-  // Nothing to compare against — no warning.
   assert.equal(exceedsAnchor(null, 900, 100000), false);
 });

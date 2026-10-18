@@ -2,32 +2,17 @@
 
 import { requireTool } from "@/lib/auth/access";
 import { dbErrorMessage } from "@/lib/db-error";
-// constants.ts is import-free, which is what makes it safe to use as
-// VALUES from this file-level "use server" module — importing them from
-// a "server-only" module instead would drag that chain into the client
-// bundle and break the production build (see CLAUDE.md, "Shared masters").
+// constants.ts is import-free, so it is safe as VALUES in this "use server" module; a "server-only" import would break the client bundle.
 import { isActiveUom } from "@/lib/masters/uoms";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-// Type-only import, and deliberately NOT re-exported — see the note in
-// lib/budgets/actions.ts: a bare `export type { X };` in a "use server"
-// file crashes every action in its compiled chunk at load time.
+// Type-only import, deliberately NOT re-exported (see lib/budgets/actions.ts).
 import type { ActionState } from "@/lib/action-state";
 
-// ---------------------------------------------------------------------
-// Revisions
-// ---------------------------------------------------------------------
-
-/**
- * Starts revision 0 for a unit that has never been designed.
- *
- * The database enforces one draft per unit (partial unique index), so a
- * double submission surfaces as a duplicate-key error rather than two
- * competing drafts — caught below and reported plainly.
- */
+/** One draft per unit is a partial unique index: a double submission surfaces as a duplicate-key error, caught below. */
 export async function startFirstRevision(unitId: string): Promise<ActionState> {
   const user = await requireTool("/selections");
   const supabase = await createClient();
@@ -44,20 +29,12 @@ export async function startFirstRevision(unitId: string): Promise<ActionState> {
     return { error: "Could not start a revision. Try again." };
   }
 
-  // "layout" everywhere a revision's status or structure changes: the
-  // list page and any open editor screen both derive from it, so the
-  // whole segment revalidates — same rule Budgets follows.
+  // "layout": the list page and open editors both derive from a revision's status, so the whole segment revalidates.
   revalidatePath("/selections", "layout");
   redirect(`/selections/${data.id}`);
 }
 
-/**
- * Locks a revision and hands it to the budget team.
- *
- * The two-row update (this revision issued, the previous superseded) runs
- * inside issue_selection() in the database so it cannot half-happen —
- * a unit must never end up with two live issued revisions.
- */
+/** issue_selection() does the two-row update (issue this, supersede the previous) in the database, so a unit never has two live issued revisions. */
 export async function issueSelection(
   selectionId: string,
   notes: string | null,
@@ -65,8 +42,7 @@ export async function issueSelection(
   await requireTool("/selections");
   const supabase = await createClient();
 
-  // Written before issuing, while the row is still a draft — the guard
-  // trigger refuses edits to anything already issued.
+  // Written while still a draft: the guard trigger refuses edits to anything issued.
   if (notes?.trim()) {
     const { error: notesError } = await supabase
       .from("selections")
@@ -81,8 +57,7 @@ export async function issueSelection(
   const { error } = await supabase.rpc("issue_selection", { p_selection_id: selectionId });
   if (error) {
     console.error("issueSelection failed:", error);
-    // These come from RAISE EXCEPTION in the function and are already
-    // written for a person to read.
+    // From RAISE EXCEPTION in the function, already written for a person.
     return { error: dbErrorMessage(error, "Could not issue this revision.") };
   }
 
@@ -90,11 +65,7 @@ export async function issueSelection(
   return undefined;
 }
 
-/**
- * Opens R+1 as a draft, copied forward from an issued revision.
- * Line keys are carried over by the database function — that is what lets
- * Budgets keep pricing on lines that didn't change.
- */
+/** Line keys are carried over by the database function, which lets Budgets keep pricing unchanged lines. */
 export async function createNextRevision(fromSelectionId: string): Promise<ActionState> {
   await requireTool("/selections");
   const supabase = await createClient();
@@ -111,21 +82,9 @@ export async function createNextRevision(fromSelectionId: string): Promise<Actio
   redirect(`/selections/${data}`);
 }
 
-// ---------------------------------------------------------------------
-// Spaces
-// ---------------------------------------------------------------------
-
 export type NewSpace = { spaceTypeId: string; label: string };
 
-/**
- * Creates a unit's spaces in one call.
- *
- * Setting up a villa means eight or nine spaces, and doing that as eight
- * separate dialogs was the slowest part of starting a design. Labels
- * arrive already resolved from the client (auto-suggested, then editable
- * before committing) rather than being generated here, so what the
- * designer approved on screen is exactly what gets written.
- */
+/** Labels arrive already resolved from the client, so what the designer approved is exactly what is written. */
 export async function addSpaces(unitId: string, spaces: NewSpace[]): Promise<ActionState> {
   await requireTool("/selections");
 
@@ -134,8 +93,7 @@ export async function addSpaces(unitId: string, spaces: NewSpace[]): Promise<Act
     .filter((space) => space.spaceTypeId && space.label);
   if (cleaned.length === 0) return { error: "Choose at least one space." };
 
-  // Catch collisions within the batch itself before the database does —
-  // the unique constraint would report only the first one.
+  // Catch collisions within the batch before the database does; the unique constraint reports only the first.
   const seen = new Set<string>();
   for (const space of cleaned) {
     const key = space.label.toLowerCase();
@@ -180,24 +138,11 @@ export async function addSpaces(unitId: string, spaces: NewSpace[]): Promise<Act
   return undefined;
 }
 
-// ---------------------------------------------------------------------
-// Lines
-// ---------------------------------------------------------------------
-
 export type BasketEntry = { itemId: string; quantity: number };
 
 /**
- * Adds a whole basket of items to one or more spaces in a single call.
- *
- * Deliberately batched. Server Actions dispatch one at a time per client
- * and a revalidating action re-renders the entire route server-side, so
- * adding twelve items as twelve calls meant twelve queued round trips,
- * each re-running every query on the page. The designer now assembles the
- * basket locally — which costs nothing — and this writes it in one go.
- *
- * `uom` and `indicative_rate_snapshot` are copied from the item master at
- * this moment on purpose: a price edited months later must never rewrite
- * what an issued revision was specified against.
+ * Batched: Server Actions dispatch one at a time and a revalidating action re-renders the route.
+ * `uom` and `indicative_rate_snapshot` are copied from the item master now on purpose: a later price edit must not rewrite an issued revision.
  */
 export async function addLines(
   selectionId: string,
@@ -213,7 +158,6 @@ export async function addLines(
 
   const supabase = await createClient();
 
-  // One query for every item's uom and price, not one per line.
   const { data: items, error: itemsError } = await supabase
     .from("items")
     .select("id, default_uom, indicative_price")
@@ -227,13 +171,7 @@ export async function addLines(
   }
   const itemById = new Map(items.map((item) => [item.id, item]));
 
-  // What's already in these spaces: needed both to append new lines after
-  // the existing ones, and to consolidate rather than duplicate. Read to
-  // completion (fetchAll) and never silently on error — a partial or
-  // missing view of the existing lines would break exactly the merge
-  // promise this function makes, duplicating lines instead of raising
-  // their quantity. fetchAll raises rather than returning half a list;
-  // caught here because an action answers with an ActionState.
+  // Read to completion (fetchAll), caught for the ActionState: a partial view of existing lines would duplicate lines instead of raising their quantity.
   let existing: {
     id: string;
     unit_space_id: string;
@@ -258,10 +196,7 @@ export async function addLines(
 
   const nextSort = new Map<string, number>();
   for (const spaceId of spaceIds) nextSort.set(spaceId, 0);
-  // The same item in the same space is one line, not two — adding a
-  // second Aluminium Profile to the Living raises the quantity on the
-  // line already there. Keyed on item id, so it only merges a genuinely
-  // identical product, never two similar ones.
+  // The same item in the same space is one line: adding it again raises the quantity. Keyed on item id, so only an identical product merges.
   const currentLine = new Map<string, { id: string; quantity: number }>();
   for (const line of existing ?? []) {
     nextSort.set(
@@ -312,9 +247,7 @@ export async function addLines(
     }
   }
 
-  // Each merge is a different quantity on a different row, so they can't
-  // be one statement. They're independent, so they go in parallel — this
-  // is server-side, with none of the client's one-at-a-time dispatch.
+  // Each merge is a different quantity on a different row, so they can't be one statement; independent, so parallel.
   if (merges.length > 0) {
     const results = await Promise.all(
       merges.map((merge) =>
@@ -330,7 +263,7 @@ export async function addLines(
     }
   }
 
-  revalidatePath(`/selections/${selectionId}`);
+  revalidatePath("/selections", "layout");
   return undefined;
 }
 
@@ -356,10 +289,7 @@ export async function updateLine(
     return { error: "Could not save the change. Try again." };
   }
 
-  // No revalidatePath on purpose. The row on screen already shows the new
-  // value, and nothing else on the page derives from a quantity — the rail
-  // counts lines, not amounts. Revalidating here would re-render the whole
-  // route (four queries) after every field a designer tabs out of.
+  // No revalidatePath on purpose: the row already shows the value and nothing else derives from a quantity.
   void selectionId;
   return undefined;
 }
@@ -374,23 +304,11 @@ export async function removeLine(selectionId: string, lineId: string): Promise<A
     return { error: "Could not remove the item. Try again." };
   }
 
-  revalidatePath(`/selections/${selectionId}`);
+  revalidatePath("/selections", "layout");
   return undefined;
 }
 
-// ---------------------------------------------------------------------
-// Item requests
-// ---------------------------------------------------------------------
-
-/**
- * Creates a provisional item and raises a request for it, without the
- * designer leaving the editor.
- *
- * The item lands in `items` immediately, flagged provisional, so the
- * selection line has a real foreign key from the start — there is no
- * parallel "custom line" concept to reconcile later. Approval is a
- * tidying step for Masters, never a gate on the designer's work.
- */
+/** The provisional item lands in `items` flagged provisional so the line has a real FK; approval is Masters' tidying, never a gate. */
 export async function requestItem(input: {
   name: string;
   categoryId: string;
@@ -407,21 +325,12 @@ export async function requestItem(input: {
 
   const supabase = await createClient();
 
-  // One database function, one transaction (migration 0017). This used
-  // to be two inserts — the provisional item, then the request — and
-  // when the second failed, the item survived alone: pickable in the
-  // catalogue, invisible to Masters' queue, with each retry minting
-  // another orphan. Designers have no delete right on items (correctly),
-  // so only a transaction could clean up after itself. No code is set:
-  // codes follow the catalogue's own convention and are assigned when
-  // Masters accepts the item.
+  // One database function, one transaction (migration 0017): two inserts left an orphan item when the second failed, and designers can't delete items.
+  // No code is set; Masters assigns it on accept.
   const { data: itemId, error } = await supabase.rpc("create_item_request", {
     p_name: name,
     p_category_id: input.categoryId,
-    // The casts paper over a typegen limitation: it types every function
-    // argument non-null, but these two columns are nullable and the
-    // function handles null fine — "no brand" and "no note" are real
-    // inputs, and PostgREST passes the JSON null straight through.
+    // The casts paper over typegen typing every argument non-null; these two columns are nullable and the function handles null.
     p_brand_id: input.brandId as unknown as string,
     p_spec_note: (input.specNote?.trim() || null) as unknown as string,
     p_uom: input.uom,
@@ -435,7 +344,4 @@ export async function requestItem(input: {
   return { itemId };
 }
 
-// Catalogue search deliberately lives in app/api/catalogue/route.ts, not
-// here. It is a read, and Server Actions are the wrong tool for reads:
-// they dispatch one at a time per client (so keystrokes queue) and a
-// revalidating action re-renders the whole route. See that file.
+// Catalogue search lives in app/api/catalogue/route.ts: Server Actions dispatch one at a time (keystrokes queue) and revalidating re-renders the route.

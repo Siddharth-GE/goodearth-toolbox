@@ -1,7 +1,3 @@
-/**
- * Pins the bot's fixed sentences — one assertion per refusal, both
- * greeting shapes, and a check that none of them leaks an email address.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -223,8 +219,6 @@ test("noticeDialog is one paragraph and nothing else", () => {
   assert.equal(dialog.sections[0].widgets[0].textParagraph.text, "A DM can't be linked.");
 });
 
-// --- Phase 5: /court and /trail cards --------------------------------
-
 type CardButton = {
   text: string;
   onClick: {
@@ -270,14 +264,12 @@ function paragraphs(built: Record<string, unknown>) {
     .map((w) => w.textParagraph.text);
 }
 
-/** Every row's buttonList, in card order — one array of buttons per trail row. */
 function buttonLists(built: Record<string, unknown>): CardButton[][] {
   return widgetsOf(built)
     .filter((w): w is Extract<Widget, { buttonList: unknown }> => "buttonList" in w)
     .map((w) => w.buttonList.buttons);
 }
 
-/** The Open in the toolbox link out of each row — always the buttonList's last button. */
 function openLinks(built: Record<string, unknown>) {
   return buttonLists(built).map((buttons) => buttons[buttons.length - 1].onClick.openLink?.url);
 }
@@ -834,8 +826,6 @@ test("row text: a title shows under the activity only when it says something new
   );
 });
 
-// --- Phase 6/7: action buttons, the two dialogs, and every write sentence --
-
 test("courtCard: a row's buttons follow buttonsFor for its state, Open in the toolbox last", () => {
   const built = courtCard({
     firstName: "S",
@@ -916,8 +906,7 @@ test("courtCard: Bounce alone opens a dialog; every other button acts straight a
   });
   const [buttons] = buttonLists(built);
   for (const button of buttons) {
-    // The marker lives INSIDE the action: one level up, Google rejects
-    // the whole card (trap (i)).
+    // One level up, Google rejects the whole card (trap (i)).
     if (button.text === "Bounce") {
       assert.equal(button.onClick.action?.interaction, "OPEN_DIALOG");
     } else {
@@ -1168,7 +1157,7 @@ test("newTrailDialog: the start switch defaults on", () => {
   const decoratedWidgets = widgetsOf(dialog).filter(
     (w): w is { decoratedText: Record<string, unknown> } => "decoratedText" in w,
   );
-  // index 0 is "Choose the people myself" (Phase 7b); "Start now" is second.
+  // Index 0 is "Choose the people myself"; "Start now" is second.
   const decorated = decoratedWidgets[1].decoratedText as {
     text: string;
     bottomLabel: string;
@@ -1280,8 +1269,6 @@ test("doneText, cannotActNow and newTrailNeedsDialog", () => {
   );
 });
 
-// --- Phase 7b: page 1's custom row and pick_people switch, page 2 ------
-
 test("newTrailDialog: the trail type dropdown starts with Custom, before every saved type", () => {
   const dialog = newTrailDialog({
     units: [{ value: "u-1", text: "Saarang · Villa 1" }],
@@ -1327,7 +1314,6 @@ test("newTrailDialog: the 'choose the people myself' switch is off by default", 
     controlType: "SWITCH",
   });
 
-  // Start now still follows it, unchanged, still on by default.
   const start = decoratedWidgets[1].decoratedText as {
     text: string;
     switchControl: { selected: boolean };
@@ -1350,7 +1336,6 @@ test("newTrailDialog: the steps dropdown offers 1..MAX_CUSTOM_STEPS, four by def
     items: { text: string; value: string; selected: boolean }[];
   }[];
 
-  // It sits right after the trail type, the choice it belongs to.
   assert.deepEqual(
     inputs.map((i) => i.name),
     ["unit", "set", "steps"],
@@ -1566,7 +1551,6 @@ test("trailStepsDialog: Open trail carries page 1's choices, the mode, and set m
     { key: "set", value: CUSTOM_SET },
     { key: "start", value: "" },
     { key: "mode", value: "custom" },
-    // The count the door reads back is the number of rows actually drawn.
     { key: "count", value: "7" },
   ]);
 });
@@ -1590,7 +1574,6 @@ test("trailStepsDialog: an error is the first widget, in its own paragraph", () 
     '<font color="#b3261e"><b>Step 2 needs someone to carry it.</b></font>',
   );
 
-  // And the form is still there below it, unchanged.
   const activityInputs = (selectionInputs(dialog) as { name: string }[]).filter((s) =>
     s.name.startsWith("activity_"),
   );
@@ -1654,7 +1637,6 @@ test("trailStepsDialog: set mode, submitted values win over the type's defaults"
     name: string;
     items: { value: string; selected: boolean }[];
   }[];
-  // Step 1's person was changed to Priya — the default (Anil) does not win.
   assert.deepEqual(
     persons[0].items.map((i) => [i.value, i.selected]),
     [
@@ -1662,8 +1644,7 @@ test("trailStepsDialog: set mode, submitted values win over the type's defaults"
       ["p2", true],
     ],
   );
-  // Step 2's dropdown came back empty: it stays empty rather than
-  // silently re-filling itself with the usual person.
+  // An emptied dropdown stays empty.
   assert.ok(persons[1].items.every((i) => i.selected === false));
 
   const days = textInputs(dialog) as { name: string; value: string }[];

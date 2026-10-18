@@ -1,14 +1,6 @@
 /**
- * How the self-hosted Saarang Tracker's export is read — shared by the two
- * scripts that bring it in: `scripts/update-saarang-register.ts` (Masters:
- * plots, villas, buyers) and `scripts/import-saarang-tracker.ts` (Client
- * Relations: each plot's record and every action). Root plan.md, seventh
- * piece. Pure, no imports, tested.
- *
- * The founder, 2026-10-16: "saarang west is the project" — the tracker's
- * Phase 3 ("P3 01" … "P3 29") is the project Saarang West - Villas; and
- * "some buyers cancel some new buyers have come add them to masters" —
- * where the tracker and Masters disagree on a buyer, the tracker is right.
+ * How the Saarang Tracker's export is read, shared by scripts/update-saarang-register.ts (Masters) and scripts/import-saarang-tracker.ts (CRM). Pure, no imports.
+ * Where the tracker and Masters disagree on a buyer, the tracker is right. Phase 3 ("P3 01") is the project Saarang West - Villas.
  */
 
 export const SAARANG = "Saarang - Villas";
@@ -18,17 +10,13 @@ export type TrackerPlot = {
   project: typeof SAARANG | typeof SAARANG_WEST;
   /** Masters' plot code: "P22-23" in Saarang, "W21-22" in Saarang West. */
   code: string;
-  /** Masters' plot name: "Plot 22 & 23". */
   name: string;
-  /** The plot numbers it covers, in order. */
   numbers: number[];
 };
 
 /**
- * "Plot 01" → Saarang P1; "Plot 22-23" → Saarang P22-23, "Plot 22 & 23";
- * "P3 05" → Saarang West W5; "P3 21-22" → Saarang West W21-22. Anything
- * else → null. Saarang West's codes start with W so its plots never read
- * as Saarang's in a list that mixes the two.
+ * "Plot 01" becomes Saarang P1, "P3 05" becomes Saarang West W5, anything else null.
+ * West's codes start with W so the two never read alike in a mixed list.
  */
 export function trackerPlot(label: string): TrackerPlot | null {
   const match = /^(Plot|P3)\s+(\d+)(?:-(\d+))?$/.exec(label.trim());

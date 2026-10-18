@@ -1,13 +1,10 @@
 "use server";
 
-// Type-only import, and deliberately NOT re-exported: a bare
-// `export type { ActionState }` in a "use server" file survives into the
-// compiled module's runtime export list, where the type doesn't exist —
-// every action in the chunk then dies at module load (the 2026-08-03
-// production outage). Import it from "@/lib/action-state" instead.
+// Not re-exported: `export type { ActionState }` in a "use server" file survives into the runtime
+// exports and every action dies at load (BUGCATCHER). Import it from "@/lib/action-state".
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
-import { parseNumber } from "@/lib/form-data";
+import { parseNumber, rawText, text } from "@/lib/form-data";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -26,14 +23,13 @@ type FacilityFields = {
   terms: string | null;
 };
 
-/** Shared by create and update — the same form posts both. */
 function readFacilityFields(formData: FormData): FacilityFields | { error: string } {
-  const party = String(formData.get("party") ?? "").trim();
+  const party = text(formData, "party");
   if (!party) return { error: "Name the bank or investor." };
   if (party.length > PARTY_LIMIT)
     return { error: `Keep the name under ${PARTY_LIMIT} characters.` };
 
-  const kind = String(formData.get("kind") ?? "");
+  const kind = rawText(formData, "kind");
   if (!(FACILITY_KINDS as readonly string[]).includes(kind)) {
     return { error: "Pick what kind of money this is." };
   }
@@ -51,11 +47,11 @@ function readFacilityFields(formData: FormData): FacilityFields | { error: strin
     return { error: "The sanctioned amount must be a number above zero, or blank for no cap." };
   }
 
-  const startDate = String(formData.get("start_date") ?? "").trim();
+  const startDate = text(formData, "start_date");
   if (startDate && !ISO_DATE.test(startDate))
     return { error: "Pick the start date from the calendar." };
 
-  const terms = String(formData.get("terms") ?? "").trim();
+  const terms = text(formData, "terms");
   if (terms.length > TEXT_LIMIT) return { error: `Keep the terms under ${TEXT_LIMIT} characters.` };
 
   return {
@@ -68,7 +64,6 @@ function readFacilityFields(formData: FormData): FacilityFields | { error: strin
   };
 }
 
-/** Set up a funding source, then open it. */
 export async function createFacility(
   _state: ActionState,
   formData: FormData,
@@ -91,8 +86,7 @@ export async function createFacility(
   }
 
   revalidatePath("/financial-management", "layout");
-  // redirect() throws its own control-flow signal, so it must be outside
-  // any try/catch and after every write has been checked.
+  // redirect() throws, so it sits outside any try/catch, after every write is checked.
   redirect(`/financial-management/funding/${data.id}`);
 }
 
@@ -122,7 +116,6 @@ export async function updateFacility(
   return undefined;
 }
 
-/** Close (or reopen) a facility. A closed loan keeps its history. */
 export async function setFacilityActive(
   facilityId: string,
   isActive: boolean,
@@ -144,11 +137,7 @@ export async function setFacilityActive(
   return undefined;
 }
 
-/**
- * Delete a facility — refused in plain English once it has history. The
- * RESTRICT FK enforces the same rule at the database, so the pre-check
- * here is for the message, not the safety.
- */
+/** Delete a facility, refused in plain English once it has history. The RESTRICT FK enforces it; the pre-check is for the message. */
 export async function deleteFacility(facilityId: string): Promise<ActionState> {
   await requireTool("/financial-management");
   const supabase = await createClient();
@@ -179,7 +168,6 @@ export async function deleteFacility(facilityId: string): Promise<ActionState> {
   redirect("/financial-management/funding");
 }
 
-/** Record a drawdown, repayment or interest payment against a facility. */
 export async function recordMovement(
   facilityId: string,
   _state: ActionState,
@@ -187,7 +175,7 @@ export async function recordMovement(
 ): Promise<ActionState> {
   const user = await requireTool("/financial-management");
 
-  const kind = String(formData.get("kind") ?? "");
+  const kind = rawText(formData, "kind");
   if (!(MOVEMENT_KINDS as readonly string[]).includes(kind)) {
     return { error: "Pick what kind of movement this is." };
   }
@@ -197,11 +185,11 @@ export async function recordMovement(
     return { error: "Enter the amount as a number above zero." };
   }
 
-  const happenedOn = String(formData.get("happened_on") ?? "").trim();
+  const happenedOn = text(formData, "happened_on");
   if (!ISO_DATE.test(happenedOn)) return { error: "Pick the date from the calendar." };
 
-  const reference = String(formData.get("reference") ?? "").trim();
-  const note = String(formData.get("note") ?? "").trim();
+  const reference = text(formData, "reference");
+  const note = text(formData, "note");
   if (reference.length > TEXT_LIMIT || note.length > TEXT_LIMIT) {
     return { error: `Keep the reference and note under ${TEXT_LIMIT} characters.` };
   }
@@ -227,10 +215,7 @@ export async function recordMovement(
   return undefined;
 }
 
-/**
- * Remove a movement. Allowed — a mistyped payment must be correctable —
- * and the audit trigger keeps the before-image.
- */
+/** Remove a movement: a mistyped payment must be correctable; the audit trigger keeps the before-image. */
 export async function deleteMovement(movementId: string, facilityId: string): Promise<ActionState> {
   await requireTool("/financial-management");
   const supabase = await createClient();

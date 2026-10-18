@@ -38,7 +38,6 @@ export function MonthSwitcher({
   );
 }
 
-/** A "YYYY-MM" from the URL, or this month. */
 export function monthParam(raw: string | undefined, today: string): string {
   return raw && /^\d{4}-(0[1-9]|1[0-2])$/.test(raw) ? raw : today.slice(0, 7);
 }

@@ -2,11 +2,7 @@ import { formatMoney, formatQuantity } from "@/lib/format";
 import type { BatchDraw } from "@/lib/inventory/batches";
 import { BatchId } from "./batch-id";
 
-/**
- * Which batches a quantity comes out of, one per line (0108). The issue
- * note's record and the issue form's preview say it the same way, so what
- * the store-keeper saw before Save is what the note shows after.
- */
+/** Shared by the issue note and the issue form's preview, so what the keeper saw before Save is what the note shows. */
 export function BatchDraws({ draws, uom }: { draws: BatchDraw[]; uom: string }) {
   if (draws.length === 0) return <span className="text-muted/50 text-sm">—</span>;
   return (

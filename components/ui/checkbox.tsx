@@ -1,11 +1,7 @@
 import { cn } from "@/lib/utils";
 import type { InputHTMLAttributes } from "react";
 
-/**
- * `indeterminate` is the native half-ticked state — a parent box whose
- * children are partly selected. The DOM only exposes it as a property,
- * never an attribute, hence the ref callback.
- */
+/** `indeterminate` is a DOM property, never an attribute, hence the ref callback. */
 export function Checkbox({
   className,
   indeterminate,

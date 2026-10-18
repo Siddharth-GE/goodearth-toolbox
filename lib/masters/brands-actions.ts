@@ -1,5 +1,6 @@
 "use server";
 
+import { checked, text } from "@/lib/form-data";
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
@@ -8,7 +9,7 @@ import { revalidatePath } from "next/cache";
 export async function createBrand(_state: ActionState, formData: FormData): Promise<ActionState> {
   await requireTool("/masters");
 
-  const name = String(formData.get("name") ?? "").trim();
+  const name = text(formData, "name");
   if (!name) return { error: "Enter a brand name." };
 
   const supabase = await createClient();
@@ -30,8 +31,8 @@ export async function updateBrand(
 ): Promise<ActionState> {
   const user = await requireTool("/masters");
 
-  const name = String(formData.get("name") ?? "").trim();
-  const is_active = formData.get("is_active") === "1";
+  const name = text(formData, "name");
+  const is_active = checked(formData, "is_active", "1");
   if (!name) return { error: "Enter a brand name." };
 
   const supabase = await createClient();

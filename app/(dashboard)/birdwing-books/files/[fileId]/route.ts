@@ -3,13 +3,9 @@ import { getCurrentUser } from "@/lib/auth/dal";
 import { BILLS_BUCKET } from "@/lib/birdwing-books/storage";
 import { idParam } from "@/lib/list-params";
 import { createClient } from "@/lib/supabase/server";
+import { storedFileResponse } from "@/lib/uploads/stored-file";
 
-/**
- * Serves one expense bill from the private `birdwing-books` bucket: the row
- * is looked up by id through the RLS-scoped client first, so a path never
- * leaves the server for anyone without /birdwing-books. nosniff: the type
- * is what the row says.
- */
+/** Serves one expense bill from the private bucket. The row is looked up by id through the RLS-scoped client first, so a path never leaves the server for anyone without /birdwing-books. nosniff: the type is what the row says. */
 export async function GET(_request: Request, { params }: { params: Promise<{ fileId: string }> }) {
   const user = await getCurrentUser();
   if (!user) return new Response("Unauthorized", { status: 401 });
@@ -30,18 +26,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ fil
   }
   if (!file) return new Response("Not found", { status: 404 });
 
-  const { data: object, error } = await supabase.storage
-    .from(BILLS_BUCKET)
-    .download(file.storage_path);
-  if (error || !object) return new Response("Not found", { status: 404 });
-
-  const asciiName = file.file_name.replace(/[^ -~]/g, "_").replace(/"/g, "");
-  return new Response(await object.arrayBuffer(), {
-    headers: {
-      "Content-Type": file.content_type,
-      "Content-Disposition": `inline; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(file.file_name)}`,
-      "Cache-Control": "private, max-age=3600",
-      "X-Content-Type-Options": "nosniff",
-    },
+  return storedFileResponse(supabase, BILLS_BUCKET, file.storage_path, {
+    contentType: file.content_type,
+    fileName: file.file_name,
+    nosniff: true,
   });
 }

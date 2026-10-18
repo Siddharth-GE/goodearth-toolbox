@@ -1,10 +1,5 @@
-/**
- * The access history on a person's Settings page is read straight from
- * audit_log, so what each row *says* is the only place a mistake would
- * show. A grant and a revoke must never read alike, an update that
- * touched two columns must report both, and a row Settings didn't write
- * must drop out rather than be narrated wrongly.
- */
+// Access history is read from audit_log, so wording is where mistakes show: grants and revokes differ,
+// multi-column updates report each change, and rows Settings didn't write drop out.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

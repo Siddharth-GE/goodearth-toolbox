@@ -20,7 +20,9 @@ import {
 import type { MixDetail, MixRow } from "@/lib/estimator/mixes-queries";
 import type { MaterialItemRow } from "@/lib/estimator/shared";
 import { removeWorkComponent, updateWorkComponentQty } from "@/lib/estimator/works-actions";
-import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { parseNumber } from "@/lib/form-data";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 
 export function MixFormDialog({
   mix,
@@ -83,8 +85,7 @@ export function MixFormDialog({
   );
 }
 
-/** Add one material — a master item since 0086 — to a mix. Lives on
- * the mix's own screen, not in a dialog. */
+/** Add one master item to a mix; lives on the mix's own screen, not in a dialog. */
 export function AddMixComponentForm({
   mixId,
   mixUom,
@@ -156,11 +157,7 @@ export function AddMixComponentForm({
   );
 }
 
-/**
- * A component's quantity, editable in place (the StageNameField shape).
- * One field serves both editors — a mix's materials and a work's recipe
- * differ only in which action saves them.
- */
+/** A component's quantity, editable in place; a mix and a work recipe differ only in which action saves it. */
 export function ComponentQtyField({
   id,
   qty,
@@ -173,26 +170,20 @@ export function ComponentQtyField({
   kind: "mix" | "work";
 }) {
   const [value, setValue] = useState(String(qty));
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
-  const save = () => {
-    const next = Number(value);
+  const save = async () => {
+    const next = parseNumber(value) ?? 0;
     if (!Number.isFinite(next) || next <= 0 || next === qty) {
       setValue(String(qty));
       return;
     }
-    startTransition(async () => {
-      const result = await (kind === "mix"
-        ? updateMixComponentQty(id, next)
-        : updateWorkComponentQty(id, next));
-      if (result?.error) {
-        setError(result.error);
-        setValue(String(qty));
-      } else {
-        setError(undefined);
-      }
-    });
+    const result = await run(() =>
+      kind === "mix" ? updateMixComponentQty(id, next) : updateWorkComponentQty(id, next),
+    );
+    if (result?.error) {
+      setValue(String(qty));
+    }
   };
 
   return (
@@ -224,8 +215,7 @@ export function RemoveComponentButton({
   kind: "mix" | "work";
   label: string;
 }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
   return (
     <div className="flex items-center justify-end gap-2">
@@ -237,12 +227,7 @@ export function RemoveComponentButton({
         aria-label={`Remove ${label}`}
         disabled={pending}
         onClick={() =>
-          startTransition(async () => {
-            const result = await (kind === "mix"
-              ? removeMixComponent(id)
-              : removeWorkComponent(id));
-            setError(result?.error);
-          })
+          run(() => (kind === "mix" ? removeMixComponent(id) : removeWorkComponent(id)))
         }
       >
         {pending ? "Removing…" : "Remove"}
@@ -252,8 +237,7 @@ export function RemoveComponentButton({
 }
 
 export function DeleteMixButton({ mixId }: { mixId: string }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
   return (
     <div className="flex items-center gap-2">
@@ -262,12 +246,7 @@ export function DeleteMixButton({ mixId }: { mixId: string }) {
         type="button"
         variant="secondary"
         disabled={pending}
-        onClick={() =>
-          startTransition(async () => {
-            const result = await deleteMix(mixId);
-            setError(result?.error);
-          })
-        }
+        onClick={() => run(() => deleteMix(mixId))}
       >
         {pending ? "Deleting…" : "Delete mix"}
       </Button>

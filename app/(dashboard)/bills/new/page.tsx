@@ -7,7 +7,6 @@ import { listActiveGstRates } from "@/lib/masters/gst-rates";
 import { listActiveUomNames } from "@/lib/masters/uoms";
 import { BillForm, type FormKind } from "./_components/bill-form";
 
-/** A muster roll starts with the masons' line; others are added as needed. */
 const NMR_START: BillLineDraft = {
   kind: "nmr",
   poLineId: null,

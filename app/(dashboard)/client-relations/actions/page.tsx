@@ -10,15 +10,8 @@ import { Composer } from "../_components/composer";
 import { SideMark } from "../_components/side-mark";
 
 /**
- * The Saarang tracker's main screen: every promise to a client, with an
- * owner and a date, sorted by how late it is (root plan.md, seventh piece).
- *
- * An admin or a team lead opens on everyone, with the team strip; everyone
- * else sees only the work assigned to them (0123) and opens on their own
- * list, under a greeting, with a switch to everything they can see — what
- * they set for others and what sits on their plots. Every filter lives in
- * the URL — the side too: each plot has a Construction and an Interior
- * side, with their own owners and their own actions.
+ * An admin or team lead opens on everyone, with the team strip; others see only their assigned work (0123), opening on their own list.
+ * Every filter lives in the URL, the side too.
  */
 export default async function ActionsPage({
   searchParams,

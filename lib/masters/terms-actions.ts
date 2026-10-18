@@ -1,5 +1,6 @@
 "use server";
 
+import { checked, rawText, text } from "@/lib/form-data";
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
@@ -8,11 +9,11 @@ import { isTermsKind } from "./constants";
 
 function readTermsForm(formData: FormData) {
   return {
-    kind: String(formData.get("kind") ?? ""),
-    name: String(formData.get("name") ?? "").trim(),
-    body: String(formData.get("body") ?? "").trim(),
-    is_active: formData.get("is_active") === "1",
-    is_default: formData.get("is_default") === "1",
+    kind: rawText(formData, "kind"),
+    name: text(formData, "name"),
+    body: text(formData, "body"),
+    is_active: checked(formData, "is_active", "1"),
+    is_default: checked(formData, "is_default", "1"),
   };
 }
 
@@ -24,12 +25,7 @@ function validate(form: ReturnType<typeof readTermsForm>): string | undefined {
   return undefined;
 }
 
-/**
- * At most one default per kind — a partial unique index (0101). The row is
- * saved first with the flag down, so a name clash fails before the old
- * default is touched; only then is the old default lowered and this one
- * raised.
- */
+/** One default per kind (partial unique index, 0101): save with the flag down first so a name clash fails before the old default is touched. */
 async function makeDefault(id: string, kind: string, userId: string): Promise<ActionState> {
   const supabase = await createClient();
   const { error: lowerError } = await supabase

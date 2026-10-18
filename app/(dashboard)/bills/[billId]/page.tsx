@@ -47,7 +47,6 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
 
   const editable = canEditBill(bill.status);
   const itemised = lines.length > 0;
-  // Money against the bill (0107): once approved, it takes payments.
   const moneyMoves = bill.status !== "recorded";
   const [settlement, events, advances] = moneyMoves
     ? await Promise.all([
@@ -58,7 +57,6 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
           : Promise.resolve([]),
       ])
     : [null, [], []];
-  // What the line editor offers, only while the bill can change.
   const [gstRates, uoms, poLines, workLines] = editable
     ? await Promise.all([
         listActiveGstRates(),

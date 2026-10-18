@@ -119,8 +119,7 @@ export default async function FundingPage() {
                   <TableCell className="text-right font-mono">
                     {formatMoney(facility.position.interestPaid)}
                   </TableCell>
-                  {/* Computed monthly from the rate — informational, the
-                      ledger of real payments is the truth. */}
+                  {/* Computed monthly from the rate: informational, the ledger of real payments is the truth. */}
                   <TableCell className="text-muted text-right font-mono">
                     {facility.position.accrued === null
                       ? "—"

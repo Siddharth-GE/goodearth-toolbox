@@ -4,15 +4,8 @@ import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 
 /**
- * A material's Master rate rises by itself when a PO is issued at a
- * higher rate, never falls (0103, founder 2026-10-08), and each rise is
- * logged in item_price_changes. This reads the newest rise per item for
- * the items list.
- *
- * item_price_changes is gated to /masters or /purchase-orders (it names
- * the PO and the old price), so anyone else simply sees no history. The
- * PO's number comes from po_facts — the money-free view every signed-in
- * person may read — never from the gated PO tables.
+ * Rates only rise: a PO at a higher rate raises the Master rate and logs it (0103).
+ * item_price_changes is gated to /masters or /purchase-orders; the PO number comes from the money-free po_facts.
  */
 export type PriceRaise = {
   item_id: string;

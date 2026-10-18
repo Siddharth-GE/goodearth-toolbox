@@ -20,9 +20,10 @@ import type { BillFormOptions } from "@/lib/bills/queries";
 import { GENERAL_SCOPE, resolveScopeCode } from "@/lib/bills/reference";
 import { exceedsAnchor } from "@/lib/bills/workflow";
 import { formatMoney } from "@/lib/format";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { buildSiteOptions, decodeSite } from "@/lib/masters/site-options";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 import {
   BillLinesEditor,
   draftsOf,
@@ -32,17 +33,7 @@ import {
 
 export type FormKind = "po" | "contract" | "nmr";
 
-/**
- * What is this bill for? A purchase order, an approved work order, or
- * NMR — daily wages. A PO bill starts from the PO's materials received
- * and not yet billed; a work-order bill from its works; each line's
- * figures can be changed to match the paper, and the totals are the
- * lines' (plan.md B7). The kind, vendor and anchor live in the address,
- * so picking an anchor loads its lines. Daily wages logged on site are
- * billed from Bills → Labour (Send to Bill); this NMR form is for a
- * muster roll that never went through the log. Over-billing warns,
- * never blocks (founder decision).
- */
+// Daily wages logged on site are billed from Bills → Labour (Send to Bill); this NMR form is for a muster roll that never went through the log. Over-billing warns, never blocks.
 export function BillForm({
   options,
   initial,
@@ -71,8 +62,7 @@ export function BillForm({
   const [lines, setLines] = useState<EditorLine[]>(() =>
     prefill.lines.map((draft) => toEditorLine(draft)),
   );
-  const [error, setError] = useState<string>();
-  const [recording, startTransition] = useTransition();
+  const { pending: recording, error, run } = useActionRunner();
 
   const go = (next: { kind: FormKind; vendorId?: string; anchorId?: string }) => {
     const params = new URLSearchParams({ kind: next.kind });
@@ -81,7 +71,6 @@ export function BillForm({
     router.replace(`/bills/new?${params}`, { scroll: false });
   };
 
-  // Only vendors with something to bill against in the chosen mode.
   const vendors = useMemo(() => {
     if (kind === "nmr") return options.vendors;
     const billable = new Set(
@@ -139,11 +128,10 @@ export function BillForm({
         ? "Pick the date."
         : linesProblem);
 
+  // A success lands on the new bill, so only refusals come back.
   const record = () =>
-    startTransition(async () => {
-      setError(undefined);
-      // A success lands on the new bill, so only refusals come back.
-      const result = await createBillWithLines({
+    run(() =>
+      createBillWithLines({
         kind,
         poId: kind === "po" ? anchorId : null,
         labourContractId: kind === "contract" ? anchorId : null,
@@ -155,9 +143,8 @@ export function BillForm({
         invoiceDate,
         note: note || null,
         lines: drafts,
-      });
-      if (result?.error) setError(result.error);
-    });
+      }),
+    );
 
   return (
     <div className="space-y-4">

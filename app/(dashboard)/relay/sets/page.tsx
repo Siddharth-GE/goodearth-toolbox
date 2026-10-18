@@ -9,15 +9,7 @@ import { RelayNav, RelaySetupNav } from "../_components/relay-nav";
 import { NewSetForm } from "./_components/new-set-form";
 import { SetEditor } from "./_components/set-editor";
 
-/**
- * The named standard sets — the answer to "every villa runs roughly the
- * same handoffs, why am I opening them one at a time".
- *
- * A set is a list of ACTIVITIES, never a frozen copy of people and days.
- * Legs are prefilled from each activity's last run at the moment the set
- * is applied, so a set built today does not carry a leaver's name onto
- * every new house forever.
- */
+/** Named standard sets. A set holds ACTIVITIES, never frozen people and days: legs prefill at apply time, so a leaver's name doesn't ride onto every new house. */
 export default async function TrailSetsPage() {
   const [sets, activities] = await Promise.all([listTrailSets(true), listActivities()]);
 

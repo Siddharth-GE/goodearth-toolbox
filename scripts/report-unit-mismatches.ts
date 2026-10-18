@@ -1,12 +1,6 @@
 /**
- * Lists every saved line whose unit is not its item's Masters unit.
- *
- * WHY. A material moves from indent to stock in its Masters unit
- * (plan.md, A2, 2026-10-08). Before that rule the indent line grid let a
- * person switch a cement line to cft, and the unit rode onto the PO, the
- * receipt and stock — which sums quantities whatever their unit. The
- * screens now refuse it; this finds what was saved before, for a person
- * to look at. It changes nothing.
+ * Lists every saved line whose unit is not its item's Masters unit, for a
+ * person to look at. Changes nothing.
  *
  * Interiors lines (an indent line with a budget, and the PO and receipt
  * lines made from one) are left out: a tile may be specified per sqft.

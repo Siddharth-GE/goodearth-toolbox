@@ -15,18 +15,7 @@ import {
   type Client,
 } from "./queries";
 
-/**
- * Stock reads — the balance at every location, and how it got there.
- * The boundaries that shape everything here are documented in
- * ./queries.ts.
- */
-
-/**
- * A store or a plot — the two kinds of place material sits. A unit and
- * its plot are the same place since 0029 (plot ↔ unit is 1:1), so the
- * stock view folds deliveries at a unit into its plot and 'unit' is no
- * longer a location kind; stale /unit/ URLs fall out here as 404s.
- */
+/** A store or a plot. A unit is its plot (0029), so 'unit' is not a kind; stale /unit/ URLs 404. */
 export type LocationKind = "store" | "plot";
 
 export function isLocationKind(value: string): value is LocationKind {
@@ -60,24 +49,11 @@ export type StockPage = {
   pageCount: number;
   pageSize: number;
   locations: LocationOption[];
-  /** More items matched the search than it can carry — the screen says so. */
   searchCapped: boolean;
 };
 
-/**
- * Where the material is, across all three kinds of location.
- *
- * A store row is a live balance that goes up and down. A plot row is a
- * running total of what has landed there — direct deliveries (at the
- * plot or its unit, same place since 0029) plus everything carried out
- * from a store — because nothing leaves a site through this system; it
- * is consumed by the build. Migration 0024 explains why those two
- * answers share one view but not one meaning.
- *
- * Zero-quantity store rows are kept: "had some, has none left" is a
- * different answer from "never held it", and the history behind it is
- * still worth reaching.
- */
+// A store row is a live balance; a plot row is a running total of what landed (nothing leaves a site, 0024).
+// Zero-quantity store rows stay: "had some, has none" differs from "never held it".
 export async function listStockByLocation({
   page = 1,
   kind,
@@ -87,7 +63,6 @@ export async function listStockByLocation({
   page?: number;
   kind?: LocationKind;
   locationId?: string;
-  /** Item name or code — already made safe by searchParam. */
   q?: string;
 } = {}): Promise<StockPage> {
   await requireTool("/inventory");
@@ -96,8 +71,6 @@ export async function listStockByLocation({
   const pageSize = INVENTORY_LIST_LIMIT;
   const currentPage = Math.max(1, page);
 
-  // The search is over items (an open Masters read): find the matching
-  // item ids first, then keep only the stock rows for those items.
   const found = q ? await matchingItemIds(supabase, q, ["name", "code"]) : null;
   if (found && found.ids.length === 0) {
     const locations = await listStockLocations(supabase);
@@ -128,13 +101,11 @@ export async function listStockByLocation({
     listStockLocations(supabase),
   ]);
 
-  // A failed read is an error screen, never "No stock recorded yet".
   if (error) {
     console.error("listStockByLocation failed:", error);
     throw new Error("Could not read the stock.", { cause: error });
   }
 
-  // View columns are all typed nullable — normalise once (see above).
   const rows = data
     .map((row) => ({
       location_kind: (row.location_kind ?? "store") as LocationKind,
@@ -166,9 +137,7 @@ export async function listStockByLocation({
 
   const total = count ?? 0;
   return {
-    // The database pages this by (kind, location, item) so pagination
-    // stays stable, but uuid order reads as random on screen — so the
-    // page in hand is sorted by name before it is rendered.
+    // Paged by (kind, location, item) for stability, then sorted by name for the screen.
     rows: rows
       .map((row) => {
         const item = items.get(row.item_id);
@@ -198,12 +167,7 @@ export async function listStockByLocation({
   };
 }
 
-/**
- * The filter list: only places that actually hold something, so the
- * dropdown doesn't offer every plot in the company when two of them
- * have material on the ground. Read to completion — a location missing
- * here cannot be filtered to.
- */
+/** Only places that hold something, read to completion so none is unfilterable. */
 async function listStockLocations(supabase: Client): Promise<LocationOption[]> {
   const data = await fetchAll((from, to) =>
     supabase
@@ -247,16 +211,13 @@ async function listStockLocations(supabase: Client): Promise<LocationOption[]> {
 export type MovementRow = {
   id: string;
   kind: "receipt" | "issue" | "transfer_in" | "adjustment";
-  /** What it did to this store's holding: signed. */
   quantity: number;
   uom: string;
   at: string;
   reference: string;
-  /** Where it came from or went, in words. */
   counterparty: string;
   note: string | null;
   actor_name: string | null;
-  /** Where the row lives, for the "open it" link. */
   href: string | null;
 };
 
@@ -272,16 +233,8 @@ export type ItemMovements = {
   movements: MovementRow[];
 };
 
-/**
- * Every movement of one item at one location, newest first — the answer
- * to "why does it say 40?". The sources are read separately and merged
- * here rather than in SQL, because each carries a different counterparty
- * (a PO, a destination, a reason).
- *
- * A store sees all four kinds. A plot only ever sees things arriving —
- * direct deliveries and material carried out from a store — because
- * nothing leaves a site through this system (migration 0024).
- */
+// Every movement of one item at one location, newest first. Sources are read separately and merged
+// here (each has a different counterparty). A plot only sees arrivals (0024).
 export async function getItemMovements(
   kind: LocationKind,
   locationId: string,
@@ -299,18 +252,13 @@ export async function getItemMovements(
   const item = items.get(itemId);
   const isStore = kind === "store";
 
-  // A delivery to a unit landed at its plot (1:1 since 0029), so a
-  // plot's history must match receipts recorded against either id.
+  // A unit's delivery landed at its plot (0029): match receipts against either id.
   const { data: plotUnit } = isStore
     ? { data: null }
     : await supabase.from("units").select("id").eq("plot_id", locationId).maybeSingle();
   const unitId = plotUnit?.id ?? null;
 
-  // Each source read to completion — a movement list that silently
-  // stops short would not add up to the balance shown above it. The
-  // location predicate is pushed into the query via the !inner join:
-  // un-filtered, a common material held at ten sites paid for ten
-  // locations' history to show one.
+  // Each source read to completion so the list adds up to the balance; the !inner join pushes the location filter into the query.
   const [receiptLines, issueLines, adjustments] = await Promise.all([
     fetchAll((from, to) => {
       let query = supabase
@@ -345,8 +293,7 @@ export async function getItemMovements(
         .order("id")
         .range(from, to),
     ),
-    // Adjustments only ever apply to a store — a site has no balance to
-    // correct, so this read is skipped entirely for a plot.
+    // Adjustments only apply to a store; skipped for a plot.
     isStore
       ? fetchAll((from, to) =>
           supabase
@@ -379,8 +326,6 @@ export async function getItemMovements(
     issued_at: string;
   };
 
-  /** Did this delivery land at the location being looked at? A receipt
-   * recorded against the plot's unit is the same place. */
   const receivedHere = (parent: ReceiptParent | null) => {
     if (!parent) return false;
     if (isStore) return parent.store_id === locationId;
@@ -396,9 +341,7 @@ export async function getItemMovements(
         (line) => (line.stock_issues as IssueParent | null)?.store_id === locationId,
       )
     : [];
-  // Arriving: a transfer into this store, or — for a plot — material
-  // carried out to it from a store (an issue goes to a store or a
-  // plot, 0023 §3).
+  // Arriving: a transfer into this store, or for a plot, material carried out to it (0023 §3).
   const transfersIn = issueLines.filter((line) => {
     const parent = line.stock_issues as IssueParent | null;
     if (!parent) return false;
@@ -503,12 +446,7 @@ export async function getItemMovements(
   };
 }
 
-/**
- * What a store holds, for the issue form's picker. Reads stock_on_hand,
- * NOT stock_by_location: only a store has a balance that can be drawn
- * down, and this list is what the negative-stock guard will be checked
- * against.
- */
+/** A store's holdings for the issue picker, from stock_on_hand (only stores can be drawn down). */
 export type StoreHolding = {
   store_id: string;
   store_name: string;
@@ -521,12 +459,7 @@ export type StoreHolding = {
   quantity: number;
 };
 
-/**
- * The batches a store still holds (0108), per item, oldest first — the
- * order an issue draws them in. Quantities from batch_on_hand (open, like
- * stock_on_hand); each batch's rate from its receipt line. Stock from
- * before batches has no row here: an issue draws it last, as "no batch".
- */
+/** A store's batches per item, oldest first (the issue's draw order), from batch_on_hand; pre-batch stock has no row. */
 export async function listStoreBatches(
   storeId: string,
   itemId?: string,
@@ -534,8 +467,7 @@ export async function listStoreBatches(
   await requireTool("/inventory");
   const supabase = await createClient();
 
-  // Completeness-critical: a batch missing here would be previewed as
-  // stock with no batch, at no rate.
+  // Completeness: a missing batch would preview as stock with no rate.
   const data = await fetchAll((from, to) => {
     let query = supabase
       .from("batch_on_hand")
@@ -578,7 +510,7 @@ export async function listStoreHoldings(storeId: string): Promise<StoreHolding[]
   await requireTool("/inventory");
   const supabase = await createClient();
 
-  // Completeness-critical: an item missing here cannot be issued.
+  // Completeness: an item missing here cannot be issued.
   const data = await fetchAll((from, to) =>
     supabase
       .from("stock_on_hand")

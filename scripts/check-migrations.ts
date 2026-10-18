@@ -1,33 +1,13 @@
 /**
- * Asks one database whether it has every migration in this branch, and
- * fails if it does not.
+ * Fails if one database lacks any migration in this branch.
  *
  *   npx tsx scripts/check-migrations.ts --project <ref>
  *
- * READ-ONLY. It writes nothing to either database, so there is no
- * --commit and no dry run. Exit 0 means that database is level with the
- * folder; exit 1 means it is behind, or an applied file has been edited.
- *
- * WHY THIS EXISTS. "Apply the migration to production, THEN merge" is a
- * rule kept by remembering it, and every other rule of that shape in this
- * repo has been broken at least once. The ledger has always known the
- * answer — nothing asked at the moment it mattered.
- *
- * So CI asks, on every pull request, against the database that pull
- * request's branch deploys to: a PR into master is checked against
- * production, a PR into staging against staging. A missing migration is
- * then a red X next to the six checks already there, and it clears the
- * moment the migration is applied. Nothing new to remember.
- *
- * `npm run db:apply -- --project <ref>` (no --commit) prints the same
- * thing in more detail and is the friendlier local tool. The difference
- * is only the exit code: a dry run reports and succeeds, because printing
- * a plan is not a failure. This one fails, because being asked and
- * answering "production is missing 0071" is.
- *
- * IT CANNOT APPLY ANYTHING, and that is deliberate. A check that fixes
- * what it finds would apply an unreviewed migration to production from
- * CI, on a database with no backups.
+ * Read-only: no --commit. Exit 1 means behind, or an applied file was edited.
+ * CI runs it on every pull request against the database that branch deploys to
+ * (master -> production, staging -> staging), so "apply, then merge" is enforced.
+ * `npm run db:apply -- --project <ref>` prints more detail but exits 0.
+ * It never applies anything: that would put an unreviewed migration on production from CI.
  */
 import { DATABASES } from "../lib/environment";
 import { compareToLedger, readLedger, readMigrations } from "./migration-ledger";

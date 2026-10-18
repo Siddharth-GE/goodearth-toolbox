@@ -8,7 +8,7 @@ Client presentations as shareable links, and the answers a client types into one
 2. **A project is a named folder**, with an optional free-text client name. It is not a Masters project and not a Masters client — a pitch is usually for somebody who has no record yet. No FK, on purpose.
 3. **The link is the only gate.** No password, no expiry, no view count. Each is its own small plan if wanted.
 4. **Every link carries the Kaadal preview (2026-10-02).** Shared on WhatsApp, any deck link shows the Kaadal mark on that deck's own background colour, whatever the colour is — including decks uploaded and links sent before this existed.
-5. **A deck keeps what the client types (2026-10-02).** One set of answers per deck — one link is one client; to ask five people, upload five decks. Saved as they type, plus an optional Send button that marks the answers finished. This is the public door's one write, and the one case where the 2026-09-25 "never a write" reading was reversed; `SECURITY.md` carries the boundary.
+5. **A deck keeps what the client types (2026-10-02).** One set of answers per deck — one link is one client; to ask five people, upload five decks. Saved as they type, plus an optional Send button that marks the answers finished. This is the public door's one write; `SECURITY.md` carries the boundary.
 
 ## How it is built
 

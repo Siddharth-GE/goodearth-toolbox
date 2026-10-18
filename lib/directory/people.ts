@@ -1,14 +1,4 @@
-/**
- * Validation and formatting for a directory card.
- *
- * Pure and dependency-free, so `npm test` can reach it and so both the
- * forms and the Server Actions run the SAME rule — the message a person
- * sees and the check the server applies cannot drift apart.
- *
- * The database CHECKs in 0060 are the backstop, not the UX. Everything a
- * person types passes through here first, which is what lets those
- * constraints be wide without the form being sloppy.
- */
+/** Validation and formatting for a card. Pure, so forms and Server Actions run the SAME rule. The 0060 CHECKs are the backstop, not the UX. */
 
 /** The eight, in the same order as staff_details_blood_group_check. */
 export const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"] as const;
@@ -24,16 +14,7 @@ export function isBloodGroup(value: string): value is BloodGroup {
   return (BLOOD_GROUPS as readonly string[]).includes(value);
 }
 
-/**
- * Strips the punctuation people type and keeps at most one leading `+`.
- *
- * Returns null for blank — a cleared field is absent, not empty string,
- * which is what the nullable column wants.
- *
- * Anything that does not reduce to a plain number comes back UNCHANGED,
- * so the caller's validate step produces a sentence rather than this
- * silently mangling "call the office" into "".
- */
+/** Strips typed punctuation, keeps one leading +. Blank gives null (the column is nullable). Anything not reducible to a number comes back UNCHANGED so validation can give a sentence. */
 export function normalisePhone(raw: string | null | undefined): string | null {
   if (!raw) return null;
   const trimmed = raw.trim();
@@ -46,17 +27,11 @@ export function normalisePhone(raw: string | null | undefined): string | null {
   return plus ? `+${digits}` : digits;
 }
 
-/** True if a normalised number is one the database will accept. */
 export function isValidPhone(normalised: string): boolean {
   return /^\+?[0-9]{7,15}$/.test(normalised);
 }
 
-/**
- * Display only. Groups a plain ten-digit Indian mobile as "98765 43210"
- * and an +91 one the same way; leaves anything else exactly as stored,
- * because a landline or a foreign number grouped by that rule reads worse
- * than not grouped at all.
- */
+/** Display only: groups a ten-digit Indian mobile as "98765 43210" (also +91); anything else stays as stored, since a landline grouped that way reads worse. */
 export function formatPhone(value: string | null | undefined): string {
   if (!value) return "";
   const digits = value.replace(/^\+91/, "").replace(/^\+/, "");
@@ -72,13 +47,7 @@ export type MyDetailsInput = {
   emergencyContactPhone: string | null;
 };
 
-/**
- * The five a person may edit themselves. Returns a sentence to show them,
- * or undefined.
- *
- * `today` is passed in rather than read, so this stays pure and the tests
- * can pin the clock. The caller supplies todayInIndia().
- */
+/** The five a person may edit. Returns a sentence to show, or undefined. `today` is passed in to stay pure. */
 export function validateMyDetails(input: MyDetailsInput, today: string): string | undefined {
   const phone = normalisePhone(input.phone);
   if (phone && !isValidPhone(phone)) {
@@ -90,9 +59,7 @@ export function validateMyDetails(input: MyDetailsInput, today: string): string 
     return "That emergency number doesn't look right — use digits only, with an optional + and country code.";
   }
 
-  // Mirrors staff_details_emergency_named_check, so the app says it
-  // before the database has to. A number with nobody's name against it
-  // is not an emergency contact.
+  // Mirrors staff_details_emergency_named_check: a number with no name is not an emergency contact.
   if (emergencyPhone && !input.emergencyContactName?.trim()) {
     return "Add the name of the person to call, not just the number.";
   }
@@ -132,7 +99,6 @@ export type PostingInput = {
   joinedOn: string | null;
 };
 
-/** The four an admin sets. `today` again passed in, for the same reason. */
 export function validatePosting(input: PostingInput, today: string): string | undefined {
   if (input.designation && input.designation.length > MAX_DESIGNATION_LENGTH) {
     return `Keep the designation under ${MAX_DESIGNATION_LENGTH} characters.`;

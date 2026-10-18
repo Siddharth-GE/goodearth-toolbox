@@ -1,13 +1,5 @@
-/**
- * The plain-English words every part of a report shares — the builder,
- * the table, the chart legend and the CSV headings. Presentation only:
- * the legal ops and aggregates come from the registry via
- * builderDataset(); these are just what they are called on screen.
- *
- * It lives in lib rather than beside the screens because the CSV routes
- * need it too, and a column called one thing on the page and another in
- * the download is the kind of small lie that costs an afternoon.
- */
+// Plain-English words shared by the builder, table, chart legend and CSV headings, so a column has
+// one name everywhere.
 import type { Aggregate, FieldType } from "./datasets";
 import type { Op } from "./spec";
 
@@ -51,7 +43,6 @@ export function aggLabel(agg: Aggregate): string {
   }
 }
 
-/** "Total quantity", "Distinct count of items" — a measure column's heading. */
 export function measureLabel(fieldLabel: string, agg: Aggregate): string {
   if (agg === "count_distinct") return `Distinct ${fieldLabel.toLowerCase()}s`;
   if (agg === "count") return `${fieldLabel} count`;

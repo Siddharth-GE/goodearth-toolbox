@@ -18,11 +18,7 @@ export type FacilityFormValues = {
   terms: string | null;
 };
 
-/**
- * Create and edit share one form. A successful create REDIRECTS into the
- * new facility (so the close-on-success is moot); a successful edit
- * closes and the action's revalidate re-renders the page underneath.
- */
+/** Create and edit share one form. A create redirects into the new facility; an edit closes and the revalidate re-renders underneath. */
 export function FacilityFormDialog({ facility }: { facility?: FacilityFormValues }) {
   return (
     <RecordFormDialog

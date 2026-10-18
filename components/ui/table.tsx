@@ -6,11 +6,7 @@ export function Table({
   containerClassName,
   ...props
 }: HTMLAttributes<HTMLTableElement> & {
-  /**
-   * Extra classes for the scroll wrapper — e.g. a max height plus
-   * `overflow-auto` so a long table scrolls under a sticky header row
-   * (the header cells then take `sticky top-0` themselves).
-   */
+  /** Extra classes for the scroll wrapper, e.g. a max height plus `overflow-auto` for a sticky header row. */
   containerClassName?: string;
 }) {
   return (
@@ -55,11 +51,7 @@ export function TableCell({ className, ...props }: TdHTMLAttributes<HTMLTableCel
   return <td className={cn("text-foreground px-4 py-3.5 text-sm", className)} {...props} />;
 }
 
-/**
- * The totals row under a list (plan.md, A4): a hairline above, the figures
- * in the column's own alignment. Totals are over EVERY matched row, worked
- * out in the query — never the sum of the page on screen.
- */
+/** The totals row under a list: over every matched row, worked out in the query, never the sum of the page on screen. */
 export function TableFoot({ className, ...props }: HTMLAttributes<HTMLTableSectionElement>) {
   return (
     <tfoot className={cn("border-border bg-foreground/[0.02] border-t", className)} {...props} />

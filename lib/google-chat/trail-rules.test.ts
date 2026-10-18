@@ -1,8 +1,3 @@
-/**
- * Pins the pure rules both /court and /trail lean on: what scope a
- * linked space narrows to, which rows are "in" it, how a typed search
- * turns into words, the ten-cap, and the app's own coldest-first order.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -207,8 +202,6 @@ test("orderColdestFirst returns a new array, leaving the input untouched", () =>
   );
 });
 
-// --- Phase 6/7: buttonsFor, BOUNCE_REASONS, parseButton, the two forms --
-
 test("buttonsFor: a queued trail (no current leg) offers nothing", () => {
   assert.deepEqual(buttonsFor(row({ currentLeg: null })), []);
 });
@@ -345,8 +338,6 @@ test("parseBounceForm: the target leg must be a real leg number, not zero, text 
   assert.deepEqual(parseBounceForm({ toLeg: "abc", reason: "rework", note: "note" }, 3).ok, false);
   assert.deepEqual(parseBounceForm({ toLeg: null, reason: "rework", note: "note" }, 3).ok, false);
 });
-
-// --- Phase 7b: parseNewTrailPage, parseTrailSteps -----------------------
 
 test("parseNewTrailPage: a standard type, people not chosen, start on", () => {
   assert.deepEqual(

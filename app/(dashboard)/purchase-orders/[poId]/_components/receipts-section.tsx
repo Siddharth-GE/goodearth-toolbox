@@ -11,11 +11,7 @@ import { formatDate, formatQuantity } from "@/lib/format";
 import type { PoReceiptRow } from "@/lib/purchase-orders/queries";
 import Link from "next/link";
 
-/**
- * What has actually arrived against this order. Read from Inventory's
- * tables, which carry no money at all — this is the PO holder's own
- * screen asking "did it turn up?".
- */
+// Inventory's tables carry no money, so this is the PO holder's own screen asking "did it turn up?".
 export function ReceiptsSection({ receipts }: { receipts: PoReceiptRow[] }) {
   if (receipts.length === 0) return null;
 

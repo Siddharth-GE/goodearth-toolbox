@@ -2,13 +2,10 @@
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { setToolLead } from "@/lib/settings/actions";
-import { useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useState } from "react";
 
-/**
- * The "Team lead" tick under a grant whose tool shows each person only
- * their own work (lib/tools.ts `scoped`, 0122) — a sibling of
- * GrantCheckbox, controlled and rolled back if the write fails.
- */
+/** The "Team lead" tick under a grant of a scoped tool (0122); controlled and rolled back like GrantCheckbox. */
 export function LeadCheckbox({
   userId,
   app,
@@ -20,9 +17,8 @@ export function LeadCheckbox({
   isLead: boolean;
   toolName: string;
 }) {
-  const [isPending, startTransition] = useTransition();
+  const { pending: isPending, error, run } = useActionRunner();
   const [checked, setChecked] = useState(isLead);
-  const [error, setError] = useState<string>();
 
   return (
     <div className="inline-flex flex-col items-center gap-1">
@@ -30,17 +26,14 @@ export function LeadCheckbox({
         checked={checked}
         disabled={isPending}
         aria-label={`${checked ? "Remove" : "Make"} team lead in ${toolName}`}
-        onChange={(event) => {
+        onChange={async (event) => {
           const next = event.target.checked;
           setChecked(next);
-          setError(undefined);
-          startTransition(async () => {
-            const result = await setToolLead(userId, app, next);
-            if (result?.error) {
-              setChecked(!next);
-              setError(result.error);
-            }
-          });
+
+          const result = await run(() => setToolLead(userId, app, next));
+          if (result?.error) {
+            setChecked(!next);
+          }
         }}
       />
       {error && (

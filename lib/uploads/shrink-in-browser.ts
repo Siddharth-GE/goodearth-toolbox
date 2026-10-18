@@ -1,20 +1,7 @@
 /**
- * Making a phone's photo of a document small enough to upload — in the
- * browser, before it leaves the phone.
- *
- * A phone camera photo is 3–8 MB and the server-action body cap is 4 MB
- * (next.config.ts), so an unshrunk photo never reaches the server and the
- * person sees an error with nothing to act on (the Directory photo's
- * lesson). A document is read, not framed: the whole page is kept
- * (`contain`, never cropped), on white, at most 1,600 px on its long
- * edge — an ID card or a bill stays legible at that size, in ~200–400 KB.
- *
- * A PDF goes up as it is. Browser-only (canvas); the server checks type
- * and size again regardless — an action is a public endpoint.
+ * Shrinks a phone photo of a document in the browser: phone photos are 3–8 MB and the server-action body cap is 4 MB (next.config.ts).
+ * Keeps the whole page (`contain`, never cropped) on white, 1,600 px long edge. A PDF goes up as it is. Browser-only (canvas).
  */
-
-export const DOCUMENT_UPLOAD_LIMIT = 4 * 1024 * 1024;
-export const DOCUMENT_TYPES = ["application/pdf", "image/jpeg", "image/png"] as const;
 
 const LONG_EDGE = 1600;
 const QUALITY = 0.82;

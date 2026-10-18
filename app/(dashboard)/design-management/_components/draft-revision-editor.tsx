@@ -12,31 +12,24 @@ import {
   setDraftRevisionNumber,
   setDrawingRevisionWorks,
   updateDraftRevisionNote,
-} from "@/lib/design-management/actions";
+} from "@/lib/design-management/revision-actions";
 import { deleteDrawingRevisionFile } from "@/lib/design-management/files-actions";
 import type { DrawingRevisionRow } from "@/lib/design-management/queries";
 import { parseWorkDriveLink } from "@/lib/design-management/workdrive-link";
 import { formatShortDate } from "@/lib/format";
+import { parseNumber } from "@/lib/form-data";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
 import type { WorksTreeCategory } from "@/lib/masters/works";
 import { ChevronDown, ChevronUp, ExternalLink, FileText, RefreshCw, Trash2 } from "lucide-react";
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 
 import { FolderSheetList } from "./folder-sheet-list";
 import { WorksCheckboxTree } from "./works-checkbox-tree";
 
 const LABEL = "text-muted text-[11px] font-medium tracking-[0.14em] uppercase";
 
-/**
- * The draft's own workspace: its number, what changed, its drawings (a
- * WorkDrive link and the folder's sheets), and the works it serves — the
- * only revision status this tool ever offers an edit surface for. Once
- * released or superseded, the guard triggers refuse every one of these
- * writes anyway; this component simply never renders for that row.
- *
- * It sits INSIDE a transmittal line, which is why it has no delete button
- * of its own: discarding a draft is the transmittal's Delete this draft.
- */
+/** The draft's workspace: number, what changed, drawings, works. Rendered only for a draft (guard triggers refuse later writes anyway). It sits inside a transmittal line, so discarding is the transmittal's Delete this draft. */
 export function DraftRevisionEditor({
   revision,
   tree,
@@ -45,8 +38,7 @@ export function DraftRevisionEditor({
   tree: WorksTreeCategory[];
 }) {
   return (
-    // No warning tint: the Draft badge says what it is, and a status
-    // colour that only decorates stops meaning anything.
+    // No warning tint: the Draft badge says what it is.
     <div className="border-border space-y-4 rounded-xl border p-3">
       <RevisionNumberField revisionId={revision.id} revisionNo={revision.revisionNo} />
       <NoteField revisionId={revision.id} revisionNo={revision.revisionNo} note={revision.note} />
@@ -61,12 +53,7 @@ export function DraftRevisionEditor({
   );
 }
 
-/**
- * The revision number, the designer's while draft (0124; founder,
- * 2026-10-17): a set the team had at R2 in Excel starts here at R3. The
- * database refuses a number at or below one the set already used, and its
- * sentence shows under the field.
- */
+/** The designer's revision number while draft (0124); the database refuses one at or below a number the set already used, and its sentence shows under the field. */
 function RevisionNumberField({
   revisionId,
   revisionNo,
@@ -79,7 +66,7 @@ function RevisionNumberField({
     initial: String(revisionNo),
     validate: (next) =>
       /^\d{1,2}$/.test(next.trim()) ? undefined : "A revision is a whole number from 0 to 99.",
-    save: (next) => setDraftRevisionNumber(revisionId, Number(next.trim())),
+    save: (next) => setDraftRevisionNumber(revisionId, parseNumber(next) ?? 0),
   });
 
   return (
@@ -135,8 +122,7 @@ function NoteField({
         onChange={(event) => setValue(event.target.value)}
         onBlur={() => noteSave.flush(value)}
         placeholder={
-          // 0093: R0 is the first issue, so there is no change to explain
-          // yet; from R1 the note is what the database asks for at Issue.
+          // 0093: R0 is the first issue, so nothing to explain yet; from R1 the note is what Issue asks for.
           revisionNo === 0
             ? "Optional — anything site should know about this first issue"
             : "What changed in this revision — needed before it can go to site"
@@ -147,13 +133,7 @@ function NoteField({
   );
 }
 
-/**
- * The drawings: the share link of this revision's WorkDrive folder (0124;
- * founder, 2026-10-17: "lets not get into file handling"). Using a link
- * reads the folder there and then, so the count and the names show before
- * anything else; Read again picks up a sheet added in WorkDrive since.
- * Issue reads it once more and keeps that list with the record.
- */
+/** The share link of this revision's WorkDrive folder (0124). Using it reads the folder there and then; Read again picks up new sheets; Issue reads it once more and keeps that list. */
 function DrawingsField({
   revisionId,
   drawingsUrl,
@@ -164,22 +144,13 @@ function DrawingsField({
   sheets: DrawingRevisionRow["folderSheets"];
 }) {
   const [value, setValue] = useState(drawingsUrl ?? "");
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
   // Compared as the server will store it, so a pasted link with a slash or
   // a query on the end still reads as the saved one.
   const parsed = parseWorkDriveLink(value);
   const changed = (parsed.ok ? parsed.url : value.trim()) !== (drawingsUrl ?? "");
   const readAt = sheets[0]?.readAt ?? null;
-
-  const run = (action: () => Promise<{ error?: string } | undefined>) => {
-    setError(undefined);
-    startTransition(async () => {
-      const result = await action();
-      if (result?.error) setError(result.error);
-    });
-  };
 
   return (
     <div className="space-y-2">
@@ -252,23 +223,15 @@ function DrawingsField({
   );
 }
 
-/**
- * Sheets uploaded before 0124, on a draft started then. They go to site
- * with it unless taken off; nothing new is uploaded any more.
- */
+/** Sheets uploaded before 0124 go to site with the draft unless taken off. */
 function UploadedSheets({ files }: { files: DrawingRevisionRow["files"] }) {
   const [removingId, setRemovingId] = useState<string>();
-  const [error, setError] = useState<string>();
-  const [removing, startRemove] = useTransition();
+  const { pending: removing, error, run } = useActionRunner();
 
-  const remove = (fileId: string) => {
-    setError(undefined);
+  const remove = async (fileId: string) => {
     setRemovingId(fileId);
-    startRemove(async () => {
-      const result = await deleteDrawingRevisionFile(fileId);
-      if (result?.error) setError(result.error);
-      setRemovingId(undefined);
-    });
+    await run(() => deleteDrawingRevisionFile(fileId));
+    setRemovingId(undefined);
   };
 
   return (
@@ -290,8 +253,7 @@ function UploadedSheets({ files }: { files: DrawingRevisionRow["files"] }) {
               <FileText className="text-muted size-3.5 shrink-0" />
               <span className="min-w-0 break-all">{file.fileName}</span>
             </a>
-            {/* No confirmation: one sheet, on a draft. Everything that loses
-                more than that asks first. */}
+            {/* No confirmation: one sheet, on a draft. */}
             <IconButton
               aria-label={`Take off ${file.fileName}`}
               tone="danger"
@@ -318,8 +280,7 @@ function WorksEditor({
   workItemIds: string[];
 }) {
   const [checked, setChecked] = useState<Set<string>>(() => new Set(workItemIds));
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
   const [justSaved, setJustSaved] = useState(false);
   const [open, setOpen] = useState(false);
 
@@ -340,8 +301,7 @@ function WorksEditor({
     });
   };
 
-  // The category ticker: set the whole list one way, never toggle each —
-  // toggling a mixed selection would invert it instead of completing it.
+  // Set the whole list one way, never toggle each: toggling a mixed selection would invert it.
   const setMany = (ids: string[], check: boolean) => {
     setJustSaved(false);
     setChecked((prev) => {
@@ -354,18 +314,12 @@ function WorksEditor({
     });
   };
 
-  const save = () => {
-    setError(undefined);
-    startTransition(async () => {
-      const result = await setDrawingRevisionWorks(revisionId, [...checked]);
-      if (result?.error) setError(result.error);
-      else setJustSaved(true);
-    });
+  const save = async () => {
+    const result = await run(() => setDrawingRevisionWorks(revisionId, [...checked]));
+    if (!result?.error) setJustSaved(true);
   };
 
-  // Folded until asked for (2026-09-27 audit: the whole works vocabulary,
-  // open under every draft line, buried the note and the sheets). Unsaved
-  // ticks keep it open, so a change is never hidden behind the fold.
+  // Folded until asked for; unsaved ticks keep it open so a change is never hidden.
   const shown = open || dirty;
 
   return (

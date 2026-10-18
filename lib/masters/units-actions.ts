@@ -1,5 +1,6 @@
 "use server";
 
+import { rawText, text } from "@/lib/form-data";
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
@@ -11,19 +12,13 @@ const UNIT_STATUSES = ["available", "reserved", "sold"];
 
 function readUnitForm(formData: FormData) {
   return {
-    project_id: String(formData.get("project_id") ?? ""),
-    // Required since 0029: every unit sits on exactly one plot.
-    plot_id: String(formData.get("plot_id") ?? ""),
-    name: String(formData.get("name") ?? "").trim(),
-    // Normalised the way poReference() expects: uppercase, no spaces.
-    // The DB CHECK (^[A-Z0-9-]{2,10}$, migration 0021) is the backstop.
-    code:
-      String(formData.get("code") ?? "")
-        .trim()
-        .toUpperCase()
-        .replace(/\s+/g, "") || null,
-    unit_type: String(formData.get("unit_type") ?? "") as UnitType,
-    client_id: String(formData.get("client_id") ?? "") || null,
+    project_id: rawText(formData, "project_id"),
+    plot_id: rawText(formData, "plot_id"),
+    name: text(formData, "name"),
+    // Uppercase, no spaces, as poReference() expects. The DB CHECK (migration 0021) is the backstop.
+    code: text(formData, "code").toUpperCase().replace(/\s+/g, "") || null,
+    unit_type: rawText(formData, "unit_type") as UnitType,
+    client_id: rawText(formData, "client_id") || null,
     status: String(formData.get("status") ?? "available") as UnitStatus,
   };
 }
@@ -37,9 +32,7 @@ function validateCode(code: string | null): string | undefined {
   return undefined;
 }
 
-// Two unique constraints can fire a 23505 here: the per-project code,
-// and the one-unit-per-plot index (0029). The constraint name in the
-// message tells them apart.
+// Two unique constraints can raise 23505: per-project code and one-unit-per-plot (0029); the constraint name tells them apart.
 function duplicateError(message: string): string {
   if (message.includes("units_plot_id_key")) {
     return "That plot already has a unit — one unit per plot.";
@@ -73,8 +66,6 @@ export async function createUnit(_state: ActionState, formData: FormData): Promi
   return undefined;
 }
 
-// Also how "assign a client" happens — the edit form just includes the
-// client picker, no separate action needed.
 export async function updateUnit(
   id: string,
   _state: ActionState,

@@ -26,20 +26,13 @@ import {
   workOrderTotal,
   type WorkOrderLineInput,
 } from "@/lib/bills/work-orders";
+import { parseNumber } from "@/lib/form-data";
 import { formatMoney } from "@/lib/format";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { buildSiteOptions, decodeSite } from "@/lib/masters/site-options";
 import { Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
-
-/**
- * The work order, being written: who, where, what it covers, its works
- * and its terms. Works come from the Masters list, each offered at the
- * rate book's unit and labour rate; a template fills the works and terms
- * in one go. Nothing is saved until Create (or Save, on a pending order)
- * — the value at the foot is always the lines' sum, which is what the
- * database stores.
- */
+import { useMemo, useState } from "react";
 
 type LineState = {
   key: string;
@@ -54,7 +47,6 @@ type LineState = {
 export type WorkOrderEditorInitial = {
   vendorId: string;
   projectId: string;
-  /** "unit:<id>", "plot:<id>" or "" — the SitePicker value. */
   site: string;
   description: string;
   terms: string;
@@ -65,15 +57,14 @@ let nextKey = 0;
 const keyed = (line: Omit<LineState, "key">): LineState => ({ ...line, key: `l${nextKey++}` });
 const blankLine = (): LineState =>
   keyed({ workItemId: null, description: "", isLumpSum: false, quantity: "", uom: "", rate: "" });
-const typed = (text: string) => (text.trim() === "" ? null : Number(text.trim()));
 
 const asInput = (line: LineState): WorkOrderLineInput => ({
   workItemId: line.workItemId,
   description: line.description,
   isLumpSum: line.isLumpSum,
-  quantity: line.isLumpSum ? null : typed(line.quantity),
+  quantity: line.isLumpSum ? null : parseNumber(line.quantity),
   uom: line.isLumpSum ? null : line.uom || null,
-  rate: typed(line.rate),
+  rate: parseNumber(line.rate),
 });
 
 export function WorkOrderEditor({
@@ -83,7 +74,6 @@ export function WorkOrderEditor({
 }: {
   options: WorkOrderFormOptions;
   initial: WorkOrderEditorInitial;
-  /** Present: saving a pending order. Absent: making a new one. */
   orderId?: string;
 }) {
   const router = useRouter();
@@ -95,9 +85,8 @@ export function WorkOrderEditor({
   const [lines, setLines] = useState<LineState[]>(() =>
     initial.lines.length ? initial.lines.map(keyed) : [blankLine()],
   );
-  const [error, setError] = useState<string>();
   const [saved, setSaved] = useState(false);
-  const [saving, startSaving] = useTransition();
+  const { pending: saving, error, run } = useActionRunner();
 
   const workOptions = useMemo(
     () =>
@@ -121,7 +110,6 @@ export function WorkOrderEditor({
   const update = (key: string, patch: Partial<LineState>) =>
     setLines((current) => current.map((line) => (line.key === key ? { ...line, ...patch } : line)));
 
-  /** A picked work brings its name, unit and labour rate from the rate book. */
   const pickWork = (line: LineState, workItemId: string) => {
     const work = workById.get(workItemId);
     const previous = line.workItemId ? workById.get(line.workItemId) : undefined;
@@ -165,31 +153,28 @@ export function WorkOrderEditor({
   const total = workOrderTotal(inputs);
   const problem = workOrderProblem({ vendorId, projectId, description, lines: inputs });
 
-  const save = () =>
-    startSaving(async () => {
-      setError(undefined);
-      setSaved(false);
-      const { plotId, unitId } = decodeSite(site);
-      const input = {
-        vendorId,
-        projectId,
-        plotId,
-        unitId,
-        description,
-        terms: terms || null,
-        lines: inputs,
-      };
-      // A new order lands on its own page; only a refusal comes back.
-      const result = orderId ? await saveWorkOrder(orderId, input) : await createWorkOrder(input);
-      if (result?.error) {
-        setError(result.error);
-        return;
-      }
-      if (orderId) {
-        setSaved(true);
-        router.refresh();
-      }
-    });
+  const save = async () => {
+    setSaved(false);
+    const { plotId, unitId } = decodeSite(site);
+    const input = {
+      vendorId,
+      projectId,
+      plotId,
+      unitId,
+      description,
+      terms: terms || null,
+      lines: inputs,
+    };
+    // A new order lands on its own page; only a refusal comes back.
+    const result = await run(() =>
+      orderId ? saveWorkOrder(orderId, input) : createWorkOrder(input),
+    );
+    if (result?.error) return;
+    if (orderId) {
+      setSaved(true);
+      router.refresh();
+    }
+  };
 
   return (
     <div className="space-y-4">

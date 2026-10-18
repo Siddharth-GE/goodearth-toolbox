@@ -58,7 +58,6 @@ export default async function WorksPage() {
         />
       ) : (
         <>
-          {/* ~230 rows on one page: fine to render, not to scroll blind. */}
           <nav aria-label="Jump to category" className="flex flex-wrap gap-2">
             {tree.map(({ category }) => (
               <a
@@ -74,9 +73,7 @@ export default async function WorksPage() {
           {tree.map(({ category, directItems, groups: categoryGroups }) => {
             const itemCount =
               directItems.length + categoryGroups.reduce((n, g) => n + g.items.length, 0);
-            // Direct items and group blocks interleave in code order, the
-            // way the site team's sheet reads — PF.30 (no group) follows
-            // the PF.19 group's items rather than jumping to the top.
+            // Direct items and groups interleave in code order, as in the site team's sheet.
             const entries = [
               ...directItems.map((item) => ({ sort: item.sort_order, code: item.code, item })),
               ...categoryGroups.map((g) => ({

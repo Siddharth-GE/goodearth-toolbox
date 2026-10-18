@@ -19,8 +19,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCount, formatDate, formatQuantity } from "@/lib/format";
+import { parseNumber } from "@/lib/form-data";
 import { addDirectLines, removeLine, updateLine } from "@/lib/indents/actions";
-import type { IndentLineRow, IndentLineSource } from "@/lib/indents/queries";
+import type { IndentLineRow, IndentLineSource } from "@/lib/indents/detail-queries";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
 import { stillToBuy, waitsForEstimator } from "@/lib/indents/workflow";
 import { Calculator, PackageOpen, Palette, Trash2 } from "lucide-react";
@@ -28,8 +29,7 @@ import { useState, useTransition } from "react";
 
 type Option = { id: string; name: string };
 
-/** Where a pulled line came from, said under the item. Direct lines say
- * nothing — that's the default, not an event. */
+/** Where a pulled line came from; direct lines say nothing. */
 const SOURCE_LABELS: Record<IndentLineSource, string | null> = {
   direct: null,
   construction: "from the construction plan",
@@ -52,14 +52,10 @@ export function LineGrid({
   reference: string;
   lines: IndentLineRow[];
   editable: boolean;
-  /** The construction plan belongs to a unit, so that pull only makes
-   * sense once the indent names one. */
   hasUnit: boolean;
-  /** Approved indents show "ordered X of Y" per line — POs consume them. */
   showOrdered: boolean;
   categories: Option[];
   brands: Option[];
-  /** Active unit names from the one master (0082). */
   uoms: string[];
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -74,10 +70,6 @@ export function LineGrid({
           </span>
           {editable && (
             <>
-              {/* The three sources a line can come from, in the order a
-                  site team reaches for them. Construction requests come
-                  from the official estimate since 2026-08-20; the old
-                  plan pull is retired. */}
               {hasUnit && (
                 <LinkButton
                   href={`/indents/${indentId}/pull-estimate`}
@@ -134,10 +126,7 @@ export function LineGrid({
           </TableHead>
           <TableBody>
             {lines.map((line) => (
-              // Keyed on quantity too: the picker can raise an existing
-              // line's quantity server-side, and a remount is the honest
-              // way to show it — the row's own edits never revalidate, so
-              // this can't steal focus mid-typing.
+              // Keyed on quantity: the picker can raise it server-side, and a remount shows that without stealing focus.
               <LineRow
                 key={`${line.id}-${line.quantity}`}
                 indentId={indentId}
@@ -171,9 +160,7 @@ export function LineGrid({
   );
 }
 
-/** The unit of a non-interiors line, as text. A line saved in another unit
- * before the Masters-unit rule says so, because its next save switches it
- * to the Masters unit and the quantity must be re-typed in that unit. */
+/** A line saved in another unit before the Masters-unit rule says so: its next save switches unit and the quantity must be re-typed. */
 function UnitText({ line }: { line: IndentLineRow }) {
   const master = line.item_default_uom;
   const differs = master != null && master.trim().toLowerCase() !== line.uom.trim().toLowerCase();
@@ -191,9 +178,7 @@ function UnitText({ line }: { line: IndentLineRow }) {
   );
 }
 
-/** The estimator's answer on a line outside the estimate (0113). A draft
- * has not reached the estimator yet, so it shows only an answer kept from
- * before a send-back — changing the line empties it. */
+/** A draft shows only an answer kept from before a send-back; changing the line empties it. */
 function EstimatorAnswer({ line, draft }: { line: IndentLineRow; draft: boolean }) {
   const answer = line.estimator;
   if (!answer) {
@@ -254,7 +239,7 @@ function LineRow({
   });
 
   const save = (nextUom = uom) => {
-    const parsed = Number(quantity.trim());
+    const parsed = parseNumber(quantity) ?? 0;
     if (!Number.isFinite(parsed) || !(parsed > 0)) {
       setQuantity(String(line.quantity));
     }
@@ -283,8 +268,6 @@ function LineRow({
           {sourceLabel && <span className="ml-2 italic">{sourceLabel}</span>}
         </div>
         {line.design_drift && (
-          // A revision issued after this line was pulled changed or
-          // removed it — the order may need revisiting.
           <div className="mt-1">
             <Badge variant="warning">
               {line.design_drift === "removed"
@@ -294,8 +277,7 @@ function LineRow({
           </div>
         )}
         {outside && (
-          // Not from the estimate or a budget (0113): it says why, and it
-          // waits for the estimator before the indent can be approved.
+          // Outside the estimate (0113): says why, waits for the estimator.
           <div className="mt-1.5 space-y-1">
             <Badge variant="warning">Outside the estimate</Badge>
             {editable ? (
@@ -343,8 +325,7 @@ function LineRow({
           </TableCell>
           <TableCell>
             {line.source === "interiors" ? (
-              // Saved immediately on change — a select has no meaningful
-              // blur, and waiting for one loses the edit on remove/submit.
+              // Saved on change: a select has no meaningful blur.
               <Select
                 value={uom}
                 onChange={(event) => {
@@ -354,8 +335,7 @@ function LineRow({
                 className="h-9"
                 aria-label={`Unit for ${line.item_name}`}
               >
-                {/* A saved unit that has since left the master stays
-                    choosable, so an old line can be reopened and saved. */}
+                {/* A saved unit that left the master stays choosable. */}
                 {uom && !uoms.includes(uom) && <option value={uom}>{uom}</option>}
                 {uoms.map((unit) => (
                   <option key={unit} value={unit}>
@@ -364,8 +344,6 @@ function LineRow({
                 ))}
               </Select>
             ) : (
-              // Every other line moves in the item's Masters unit — the
-              // server saves that whatever is sent (updateLine).
               <UnitText line={line} />
             )}
           </TableCell>

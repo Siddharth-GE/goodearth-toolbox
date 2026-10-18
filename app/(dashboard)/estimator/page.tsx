@@ -3,10 +3,7 @@ import { countIndentLinesWaiting } from "@/lib/estimator/indent-queries";
 
 import { ToolWelcome } from "../_components/tool-welcome";
 
-// The welcome screen (founder, 2026-08-13: every Operations tool opens
-// on one). No PageTitle here — the layout renders the title and nav.
-// Counts only, never rupees: everything one click in is money, so the
-// welcome is the one screen in this tool that shows none.
+// No PageTitle here: the layout renders the title and nav. Counts only, never rupees.
 export default async function EstimatorPage() {
   const [counts, overEstimate, indentLines] = await Promise.all([
     getWelcomeCounts(),

@@ -16,8 +16,7 @@ export function ProjectFormDialog({
   companies: CompanyRow[];
 }) {
   const isEdit = !!project;
-  // Active companies, plus the project's own if it has since been
-  // switched off — the form must not silently drop it on save.
+  // Include the project's own company even if switched off, so saving doesn't drop it.
   const choices = companies.filter(
     (company) => company.is_active || company.id === project?.company_id,
   );

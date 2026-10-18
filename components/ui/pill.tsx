@@ -4,15 +4,8 @@ import Link from "next/link";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 /**
- * The tracker's pills — a plot, a date, a person, a status — small,
- * rounded, and the trigger of every chip menu. Born in Client Relations
- * (root plan.md, seventh piece, "The look"); shared from its second tool,
- * Design Management's board (thirteenth piece).
- *
- * Status tones carry fixed meaning (DESIGN.md): danger is overdue or
- * waiting on management, info is due soon, warning is waiting on someone
- * else or a missing date, success is done. Words always ride with the
- * colour — "3 days overdue", never a red dot alone.
+ * The tracker's pills (a plot, a date, a person, a status) and the trigger of every chip menu. Status tones carry fixed meaning (DESIGN.md):
+ * danger is overdue or waiting on management, info is due soon, warning is waiting on someone else or a missing date, success is done. Words ride with the colour.
  */
 export type PillTone = "plain" | "danger" | "info" | "warning" | "success" | "ink" | "dashed";
 
@@ -47,7 +40,6 @@ export function Pill({
   return <span className={cn(pillClassName(tone), className)}>{children}</span>;
 }
 
-/** A pill that opens a menu or does something — the trigger of every chip menu. */
 export function PillButton({
   tone = "plain",
   className,
@@ -97,7 +89,6 @@ export function PlotChip({
   );
 }
 
-/** A face and a first name. */
 export function PersonName({ name, size = 20 }: { name: string; size?: number }) {
   return (
     <span className="inline-flex min-w-0 items-center gap-1.5">

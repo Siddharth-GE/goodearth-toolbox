@@ -15,14 +15,7 @@ import { createClient } from "@/lib/supabase/server";
 import { billedByContractTotals } from "./queries";
 import type { ContractStatus } from "./workflow";
 
-/**
- * Work orders (0105, plan.md B6) — the labour contract made richer and
- * renamed on every screen: a number, terms, and its works. The table is
- * still labour_contracts, so bills.kind = 'contract', Financial
- * Management and Reporter are untouched. All of it is /bills-gated; the
- * rate book's labour rate comes through work_labour_rate_facts, a money
- * view WHERE-gated to /bills or /estimator (0105).
- */
+// The labour contract renamed: the table is still labour_contracts, so bills.kind = 'contract' (0105). The rate book's labour rate comes through work_labour_rate_facts, a money view WHERE-gated to /bills or /estimator.
 
 const CONTRACT_COLUMNS =
   "id, reference, vendor_id, project_id, plot_id, unit_id, description, contract_value, terms, status, is_active, approved_by, approved_at, created_by, created_at, vendors(name), projects(name), plots(name), units(name)";
@@ -59,7 +52,6 @@ export type WorkOrderRow = {
   project_name: string;
   plot_id: string | null;
   unit_id: string | null;
-  /** The villa — its unit or plot — or "General". */
   place: string;
   description: string;
   contract_value: number;
@@ -94,11 +86,7 @@ export type WorkOrderFilters = {
   status?: ContractStatus;
 };
 
-/**
- * Every work order, newest first, with what has been billed against
- * each. The filters run here over the full list — a few hundred orders
- * at most — so the count under the list is always the real one.
- */
+/** Filters run here over the full list (a few hundred orders), so the count under the list is the real one. */
 export async function listWorkOrders(filters: WorkOrderFilters = {}): Promise<WorkOrderRow[]> {
   await requireTool("/bills");
   const supabase = await createClient();
@@ -132,7 +120,6 @@ export async function listWorkOrders(filters: WorkOrderFilters = {}): Promise<Wo
 export type WorkOrderLineRow = {
   id: string;
   work_item_id: string | null;
-  /** "FD.15 · Footing", from the Masters works list. */
   work_label: string | null;
   description: string;
   is_lump_sum: boolean;
@@ -147,11 +134,9 @@ export type WorkOrderDetail = WorkOrderRow & {
   approved_at: string | null;
   created_by_name: string | null;
   lines: WorkOrderLineRow[];
-  /** The project's company, for the letterhead; null → placeholder. */
   company: CompanyRow | null;
 };
 
-/** One work order with its works, or null when it does not exist. */
 export async function getWorkOrder(id: string): Promise<WorkOrderDetail | null> {
   await requireTool("/bills");
   const supabase = await createClient();
@@ -250,17 +235,10 @@ export type WorkOrderFormOptions = {
   works: WorkPick[];
   uoms: string[];
   templates: WorkOrderTemplate[];
-  /** The default work-order terms from Masters → Terms, or null. */
   defaultTerms: string | null;
 };
 
-/**
- * Everything the work-order editor needs, in one gated call: the
- * contractors (vendors marked as contractors, plus `keepVendorId` when
- * an old order names another vendor), the Masters works with the rate
- * book's unit and labour rate, the active templates with their works,
- * and the default terms.
- */
+/** `keepVendorId` keeps an old order's non-contractor vendor in the list. */
 export async function getWorkOrderFormOptions(
   keepVendorId?: string,
 ): Promise<WorkOrderFormOptions> {
@@ -363,7 +341,6 @@ export async function getWorkOrderFormOptions(
   };
 }
 
-/** The templates, active or not, for the templates screen. */
 export async function listWorkOrderTemplates(): Promise<
   (WorkOrderTemplate & { is_active: boolean })[]
 > {

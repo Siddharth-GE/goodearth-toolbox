@@ -18,10 +18,8 @@ const STATUSES: { value: SiteRequestRow["status"]; label: string }[] = [
   { value: "declined", label: "Declined" },
 ];
 
-// The store-keeper's queue (Phase 2 Step H): what the site is asking
-// for, oldest first. Fulfil walks into the issue form with the villa,
-// work, item and quantity already filled — the store stays the
-// keeper's choice. Decline needs a reason the supervisor sees.
+// Fulfil walks into the issue form prefilled; the store stays the keeper's choice.
+// Decline needs a reason the supervisor sees.
 export default async function RequestsPage({
   searchParams,
 }: {

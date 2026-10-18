@@ -20,23 +20,15 @@ export type RateBookRow = {
   code: string;
   name: string;
   groupName: string | null;
-  /** "SS — Super-structure", in the vocabulary's order. */
   category: string;
   uom: string | null;
   labourRate: number | null;
   componentCount: number;
-  /** One unit, labour + materials; null when anything is unpriced. */
   rate: number | null;
-  /** Estimate lines using the work, drafts and officials alike. */
   lineCount: number;
 };
 
-/**
- * The rate book, searchable: every work, what one unit of it costs, and
- * whether any estimate uses it. Typing narrows the list in the browser —
- * a hundred and seventy works in nine cards was a lot of scrolling to
- * find "lintel".
- */
+/** The rate book, searchable: typing narrows the list in the browser. */
 export function RateBookList({ rows }: { rows: RateBookRow[] }) {
   const [query, setQuery] = useState("");
 

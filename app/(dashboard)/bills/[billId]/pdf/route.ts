@@ -1,4 +1,5 @@
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
+import { pdfResponse, safeFileNamePart } from "@/lib/pdf/response";
 import { BillDocument } from "@/lib/bills/bill-document";
 import { getBillLines } from "@/lib/bills/line-queries";
 import { getBillSettlement } from "@/lib/bills/payment-queries";
@@ -6,12 +7,7 @@ import { getBill } from "@/lib/bills/queries";
 import { getProjectCompany } from "@/lib/masters/companies";
 import { createElement, type ReactElement } from "react";
 
-/**
- * The bill, as a PDF to print. getBill enforces the /bills grant. Opened
- * in the browser rather than downloaded, because the ask is to print it;
- * generated on demand so it never drifts from the bill, and a bill not
- * yet approved carries its DRAFT watermark.
- */
+// getBill enforces the /bills grant. On demand, so it never drifts; a bill not yet approved carries its DRAFT watermark.
 export async function GET(_request: Request, { params }: { params: Promise<{ billId: string }> }) {
   const { billId } = await params;
 
@@ -30,15 +26,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ bil
     }) as ReactElement<DocumentProps>,
   );
 
-  const safe = (value: string) => value.replace(/[^\w-]+/g, "-").replace(/^-|-$/g, "");
   const draftTag = bill.status === "recorded" ? "-DRAFT" : "";
-  const filename = `Goodearth-Bill-${safe(bill.reference)}${draftTag}.pdf`;
+  const filename = `Goodearth-Bill-${safeFileNamePart(bill.reference)}${draftTag}.pdf`;
 
-  return new Response(new Uint8Array(buffer), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${filename}"`,
-      "Cache-Control": "no-store",
-    },
-  });
+  return pdfResponse(buffer, filename, { disposition: "inline" });
 }

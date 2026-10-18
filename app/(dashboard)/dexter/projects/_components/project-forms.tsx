@@ -16,8 +16,6 @@ import { Label } from "@/components/ui/label";
 import { createProject } from "@/lib/dexter/actions";
 import { useActionState, useState } from "react";
 
-/** A name and, optionally, who it's for — everything else about a
- *  project happens one click in, once it exists. */
 export function NewProjectDialog() {
   const [open, setOpen] = useState(false);
 
@@ -30,8 +28,7 @@ export function NewProjectDialog() {
         <DialogHeader>
           <DialogTitle>New project</DialogTitle>
         </DialogHeader>
-        {/* Inside DialogContent, which Radix unmounts on close, so every
-            open starts with a clean form and no stale error. */}
+        {/* Radix unmounts DialogContent on close, so every open starts clean. */}
         <NewProjectForm />
       </DialogContent>
     </Dialog>

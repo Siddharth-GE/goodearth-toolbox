@@ -22,7 +22,6 @@ import { ItemFormDialog } from "./_components/item-form-dialog";
 import { formatDate, formatMoney } from "@/lib/format";
 import { latestPriceRaises, type PriceRaise } from "@/lib/masters/item-price-changes";
 
-// Indian digit grouping (1,23,456) — the catalogue runs to lakh-scale prices.
 export default async function ItemsPage({
   searchParams,
 }: {
@@ -41,15 +40,13 @@ export default async function ItemsPage({
     listActiveUomNames(),
   ]);
   const { items, total, page: currentPage, pageSize, pageCount } = result;
-  // The newest rise a PO made to each rate on this page (0103).
+  // Newest PO rate rise per item (0103).
   const raises = await latestPriceRaises(items.map((item) => item.id));
 
   const categoryName = (id: string) => categories.find((c) => c.id === id)?.name ?? "—";
   const brandName = (id: string | null) =>
     id ? (brands.find((b) => b.id === id)?.name ?? "—") : "—";
 
-  // Carries the active filters onto the pager links, so paging never
-  // silently drops the search you're in the middle of.
   const hrefForPage = (target: number) => {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
@@ -63,8 +60,6 @@ export default async function ItemsPage({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-2">
-        {/* GET form: submitting drops `page`, so changing any filter
-            naturally returns to page 1 rather than stranding you on page 40. */}
         <form action="/masters/items" className="flex flex-wrap items-end gap-2">
           <div className="space-y-1.5">
             <Label htmlFor="q">Search</Label>
@@ -162,8 +157,7 @@ export default async function ItemsPage({
           <Pagination
             page={currentPage}
             pageCount={pageCount}
-            // Precomputed strings, not the function itself — a function
-            // can't cross into a Client Component.
+            // Strings, not the function: a function can't cross into a Client Component.
             prevHref={currentPage > 1 ? hrefForPage(currentPage - 1) : null}
             nextHref={currentPage < pageCount ? hrefForPage(currentPage + 1) : null}
             total={total}
@@ -175,7 +169,6 @@ export default async function ItemsPage({
   );
 }
 
-/** "Raised from ₹345 by PO/SAA/P1/007 · 03 Oct 2026" — the newest PO rise. */
 function PriceRaiseHint({ raise }: { raise: PriceRaise | undefined }) {
   if (!raise) return null;
   const from = raise.old_price != null ? ` from ${formatMoney(raise.old_price)}` : "";

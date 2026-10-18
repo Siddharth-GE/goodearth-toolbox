@@ -1,7 +1,6 @@
 "use server";
 
-// Type-only import, never re-exported from a "use server" file — the
-// 2026-08-03 outage rule, enforced by npm run check:actions.
+// Type-only and never re-exported from a "use server" file (check:actions).
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { dbErrorMessage } from "@/lib/db-error";
@@ -10,14 +9,7 @@ import { GRANT } from "@/lib/design-management/shared";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
-// ---------------------------------------------------------------------
-// Drawing revision files — sheets uploaded before 0124
-// ---------------------------------------------------------------------
-//
-// Nothing uploads a sheet any more (founder, 2026-10-17: "lets not get
-// into file handling" — a revision's drawings are a WorkDrive link). The
-// sheets already uploaded stay, opened through files/[fileId]/route.ts,
-// and one on a draft can still be taken off.
+// Sheets uploaded before 0124 stay (opened through files/[fileId]/route.ts); one on a draft can still be taken off.
 
 /** Row first, then the object — a failure leaves an orphan file, never a row pointing at nothing. */
 export async function deleteDrawingRevisionFile(fileId: string): Promise<ActionState> {

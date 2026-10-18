@@ -1,29 +1,14 @@
 /**
- * Is this draft transmittal ready to issue? The screen's answer, said
- * BEFORE the press (2026-09-27 audit: Issue was trial and error, its
- * refusal a line of small print in the header).
- *
- * A mirror, not the rule. `issue_transmittal` (0093, widened by 0124)
- * decides, and its refusal still reaches the screen verbatim; this only
- * reads the same three conditions off data the page already has, in the
- * same order, so the line under the title and the database never name
- * different problems:
- *
- *   1. no drawings at all;
- *   2. the first line, in sheet order, with neither a WorkDrive link nor
- *      an uploaded sheet — a re-sent released revision included;
- *   3. the first DRAFT line past R0 with no note saying what changed.
- *
- * Pure and import-free, so `npm test` pins it without a database.
+ * Is this draft transmittal ready to issue? Said BEFORE the press. A mirror, not the rule: issue_transmittal (0093, widened by 0124) decides and its refusal still reaches the screen.
+ * It reads the same three conditions in the same order so the page and the database never name different problems: no drawings; the first line with neither a WorkDrive link nor an uploaded sheet;
+ * the first DRAFT line past R0 with no note saying what changed. Pure and import-free.
  */
 
 export type ReadinessLine = {
   setName: string;
   revisionNo: number;
   revisionStatus: "draft" | "released" | "superseded";
-  /** Sheets uploaded before 0124. */
   fileCount: number;
-  /** A WorkDrive share link (0124) — the drawings, whatever the folder holds. */
   hasLink: boolean;
   note: string | null;
 };

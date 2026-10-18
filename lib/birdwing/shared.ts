@@ -1,11 +1,4 @@
-/**
- * Birdwing Stays' vocabulary — the database's CHECK lists, and the words
- * a person reads for each. Shared by queries, actions, the PDF and the
- * screens, so a value and its label are written once.
- *
- * Import-free on purpose: file-level "use server" modules and client
- * components import this (the lib/action-state.ts rule).
- */
+// The database's CHECK lists and their labels, written once. Import-free: "use server" modules and client components import it.
 
 export const GRANT = "/birdwing";
 
@@ -111,7 +104,6 @@ export const FILE_KIND_LABELS: Record<FileKind, string> = {
 export const SETTLEMENT_KINDS = ["cross_charge", "write_off"] as const;
 export type SettlementKind = (typeof SETTLEMENT_KINDS)[number];
 
-/** Narrowing a string from the database or a form to one of a list. */
 export function oneOf<T extends string>(list: readonly T[], value: unknown): T | null {
   return typeof value === "string" && (list as readonly string[]).includes(value)
     ? (value as T)

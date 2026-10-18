@@ -14,18 +14,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCount, formatQuantity } from "@/lib/format";
+import { parseNumber } from "@/lib/form-data";
 import { addPoolLines } from "@/lib/purchase-orders/actions";
-import type { PoolIndentGroup } from "@/lib/purchase-orders/queries";
+import type { PoolIndentGroup } from "@/lib/purchase-orders/indent-queries";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useMemo, useState } from "react";
 
-/**
- * The PullBasket pattern (Indents M4), adapted for ordering: approved
- * indent lines laid out indent by indent, quantities prefilled with
- * what's still unordered, a local basket and one commit. Nothing is
- * written until Add. Lines already on this PO, and lines fully ordered
- * elsewhere, show disabled-and-labelled — never hidden.
- */
+// Nothing is written until Add. Lines already on this PO, or fully ordered elsewhere, show disabled, never hidden.
 export function PoolBasket({
   poId,
   reference,
@@ -37,8 +33,7 @@ export function PoolBasket({
 }) {
   const router = useRouter();
   const [picked, setPicked] = useState<Record<string, number>>({});
-  const [error, setError] = useState<string>();
-  const [saving, startSaving] = useTransition();
+  const { pending: saving, error, run } = useActionRunner();
 
   const pickedEntries = useMemo(() => Object.entries(picked), [picked]);
 
@@ -78,20 +73,17 @@ export function PoolBasket({
     ([id, quantity]) => quantity > (remainingById.get(id) ?? 0),
   );
 
-  const commit = () =>
-    startSaving(async () => {
-      const lines = pickedEntries.map(([indentLineId, quantity]) => ({ indentLineId, quantity }));
-      const result = await addPoolLines(poId, lines);
-      if (result?.error) {
-        setError(result.error);
-        // A partial add still changed the PO: drop what went in so a
-        // second press can't ask for it twice.
-        router.refresh();
-        setPicked({});
-        return;
-      }
-      router.push(`/purchase-orders/${poId}`);
-    });
+  const commit = async () => {
+    const lines = pickedEntries.map(([indentLineId, quantity]) => ({ indentLineId, quantity }));
+    const result = await run(() => addPoolLines(poId, lines));
+    if (result?.error) {
+      // A partial add still changed the PO: refresh so a second press can't ask twice.
+      router.refresh();
+      setPicked({});
+      return;
+    }
+    router.push(`/purchase-orders/${poId}`);
+  };
 
   return (
     <div className="space-y-6 pb-28">
@@ -191,7 +183,10 @@ export function PoolBasket({
                               max={line.remaining}
                               value={String(picked[line.indent_line_id])}
                               onChange={(event) =>
-                                setQuantity(line.indent_line_id, Number(event.target.value))
+                                setQuantity(
+                                  line.indent_line_id,
+                                  parseNumber(event.target.value) ?? 0,
+                                )
                               }
                               className="h-9"
                               aria-label={`Quantity to order for ${line.item_name}`}
@@ -215,7 +210,6 @@ export function PoolBasket({
         );
       })}
 
-      {/* Nothing has been written yet — this bar is the commit point. */}
       <div className="border-border bg-surface fixed inset-x-0 bottom-0 z-10 mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 border-t px-5 py-3 md:rounded-t-2xl md:border">
         <div className="min-w-0">
           {pickedEntries.length === 0 ? (

@@ -1,19 +1,11 @@
 import { cn } from "@/lib/utils";
 import { ExternalLink } from "lucide-react";
 
-/** Only web links become an href — see ProductLink. */
 export function isWebLink(url: string | null | undefined): url is string {
   return !!url && /^https?:\/\//i.test(url);
 }
 
-/**
- * The vendor's product page for an item, opened in a new tab — the
- * photos, sizes and finishes a catalogue tile has no room for, and what a
- * designer needs to choose between twenty items called "Bench".
- *
- * `items.source_url` arrives from vendor spreadsheets, so anything that is
- * not an http(s) address renders nothing rather than becoming an href.
- */
+/** The vendor's product page in a new tab. `items.source_url` comes from vendor spreadsheets, so anything not http(s) renders nothing. */
 export function ProductLink({
   href,
   itemName,

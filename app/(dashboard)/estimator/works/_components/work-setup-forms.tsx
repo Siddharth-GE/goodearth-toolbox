@@ -26,14 +26,7 @@ import type { MaterialItemRow } from "@/lib/estimator/shared";
 import type { WorkSetup } from "@/lib/estimator/works-queries";
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
-/**
- * The work's unit and labour rate.
- *
- * Changing the unit once estimate lines exist would silently change what
- * every one of those quantities means — 40 "cum" becoming 40 "sqm" is
- * the same number describing a different building — so the unit is
- * locked while any estimate uses the work (saveWorkInfo refuses it too).
- */
+/** The work's unit and labour rate. The unit is locked while any estimate uses the work, since changing it would change what every quantity means (saveWorkInfo refuses it too). */
 export function WorkInfoForm({ work, uoms }: { work: WorkSetup; uoms: string[] }) {
   const [state, formAction, pending] = useActionState(
     saveWorkInfo.bind(null, work.workItemId),
@@ -91,11 +84,7 @@ export function WorkInfoForm({ work, uoms }: { work: WorkSetup; uoms: string[] }
   );
 }
 
-/**
- * How the SketchUp model measures this work (0118). Saved on change; the
- * works list SketchUp loads carries it, so the model follows the rate
- * book once that list is sent again.
- */
+/** How the SketchUp model measures this work (0118). Saved on change; the model follows once the works list is sent again. */
 export function ModelMeasureForm({
   workItemId,
   uom,
@@ -150,7 +139,6 @@ export function ModelMeasureForm({
   );
 }
 
-/** Add one thing to the recipe: a material, or a whole mix. */
 export function AddWorkComponentForm({
   workItemId,
   workUom,
@@ -227,11 +215,7 @@ export function AddWorkComponentForm({
   );
 }
 
-/**
- * Copy this work's rate — unit, labour and materials — onto other works.
- * Its floor twins (the same work on another floor) come ticked; any other
- * work can be added by name.
- */
+/** Copy this work's rate onto other works. Floor twins come ticked; any other work can be added by name. */
 export function CopyRateForm({
   workItemId,
   twins,

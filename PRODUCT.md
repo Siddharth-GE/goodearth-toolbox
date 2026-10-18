@@ -13,7 +13,7 @@ web
 - ~70 staff of Goodearth, a design-led real estate company in Kerala; sized for ~200. Access is per-tool grants in Settings; admins see everything.
 - Office staff — accounts, QS/budgets, designers, admins — on desktops and laptops. **Site engineers, supervisors and store-keepers use it on phones at site**: site-facing tools (Indents, Inventory, Supervisors) must genuinely work on a phone.
 - The founder directs the product, is not a developer, and judges the running app in plain language.
-- Two outside audiences: race-day participants at the Marathon kiosk, and clients opening a Dexter presentation link.
+- One outside audience: clients opening a Dexter presentation link.
 - English-only UI is confirmed sufficient.
 
 ## Product Purpose

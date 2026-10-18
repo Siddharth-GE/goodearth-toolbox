@@ -8,12 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { BillLineKind, DayRates, PoLineForBill, WorkOrderLineForBill } from "./lines";
 import { dayRatesFromLines } from "./lines";
 
-/**
- * Reads for a bill's lines (0106, plan.md B7). The PO side comes only
- * through po_line_billing_facts — the money window WHERE-gated to
- * /purchase-orders or /bills — never the PO tables, which the billing
- * team cannot read (Bills PLAN, "Things that will bite").
- */
+// The PO side comes only through po_line_billing_facts (money window gated to /purchase-orders or /bills); the billing team cannot read the PO tables (Bills PLAN).
 
 export type BillLineRow = {
   id: string;
@@ -22,7 +17,6 @@ export type BillLineRow = {
   item_id: string | null;
   labour_log_id: string | null;
   work_item_id: string | null;
-  /** "FD.15 · Footing" — the work a labour line was for. */
   work_label: string | null;
   description: string;
   uom: string | null;
@@ -34,7 +28,6 @@ export type BillLineRow = {
   note: string | null;
 };
 
-/** A bill's lines, in order. */
 export async function getBillLines(billId: string): Promise<BillLineRow[]> {
   await requireTool("/bills");
   const supabase = await createClient();
@@ -73,11 +66,7 @@ export async function getBillLines(billId: string): Promise<BillLineRow[]> {
   }));
 }
 
-/**
- * A PO's lines for billing: ordered, received and already billed, at the
- * PO's rate, GST, discount and charges — through po_line_billing_facts
- * (0106), with each material's name from the open items table.
- */
+/** Through po_line_billing_facts (0106), with each material's name from the open items table. */
 export async function getPoLinesForBill(poId: string): Promise<PoLineForBill[]> {
   await requireTool("/bills");
   const supabase = await createClient();
@@ -121,7 +110,6 @@ export async function getPoLinesForBill(poId: string): Promise<PoLineForBill[]> 
     .sort((a, b) => a.item_name.localeCompare(b.item_name));
 }
 
-/** A work order's works, for a bill against it. */
 export async function getWorkOrderLinesForBill(
   contractId: string,
 ): Promise<WorkOrderLineForBill[]> {
@@ -140,11 +128,7 @@ export async function getWorkOrderLinesForBill(
   return lines;
 }
 
-/**
- * The day rates on a contractor's most recent daily-wages bill that has
- * lines — what Send to Bill suggests next (founder: "last bill's rates
- * suggested"). Nulls when they have none.
- */
+/** From the contractor's latest daily-wages bill that has lines; what Send to Bill suggests next. */
 export async function getLastDayRates(vendorId: string): Promise<DayRates> {
   await requireTool("/bills");
   const supabase = await createClient();
@@ -164,7 +148,6 @@ export async function getLastDayRates(vendorId: string): Promise<DayRates> {
   return dayRatesFromLines(lines);
 }
 
-/** How many labour entries this bill was made from (Send to Bill) — 0 for any other bill. */
 export async function countLabourEntriesOnBill(billId: string): Promise<number> {
   await requireTool("/bills");
   const supabase = await createClient();

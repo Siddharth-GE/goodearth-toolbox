@@ -1,22 +1,16 @@
 "use server";
 
-// Type-only import, never re-exported from a "use server" file — the
-// 2026-08-03 outage rule, enforced by npm run check:actions.
+// Type-only import, never re-exported from a "use server" file (npm run check:actions).
 import type { ActionState } from "@/lib/action-state";
 import { requireAdmin } from "@/lib/auth/access";
 import { requireUser } from "@/lib/auth/dal";
 import { dbErrorMessage } from "@/lib/db-error";
-import { optionalText, text } from "@/lib/form-data";
+import { checked, optionalText, text } from "@/lib/form-data";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { readAmount } from "./upload";
 
-/**
- * Birdwing Books → Settings: the people, their pay rules and the expense
- * heads. ADMIN ONLY — 0116 says is_admin() on every write here, and each
- * action checks first. A pay rule is effective-dated: a raise is a new
- * rule from its first day, so last year's salaries keep last year's rule.
- */
+/** Birdwing Books settings: people, pay rules, expense heads. ADMIN ONLY: 0116 requires is_admin() on every write and each action checks first. A pay rule is effective-dated: a raise is a new rule from its first day. */
 
 const refresh = () => revalidatePath("/birdwing-books", "layout");
 
@@ -51,7 +45,7 @@ export async function saveStaff(
     joined_on: joinedOn,
     profile_id: optionalText(formData, "profile_id"),
     sort_order: Number(text(formData, "sort_order") || "100") || 100,
-    is_active: formData.get("is_active") === "on",
+    is_active: checked(formData, "is_active"),
     updated_by: user.id,
   };
   const supabase = await createClient();
@@ -131,7 +125,7 @@ export async function saveHead(
   const row = {
     name,
     sort_order: Number(text(formData, "sort_order") || "100") || 100,
-    is_active: formData.get("is_active") === "on",
+    is_active: checked(formData, "is_active"),
     updated_by: user.id,
   };
   const supabase = await createClient();

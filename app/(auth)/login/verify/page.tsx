@@ -4,12 +4,7 @@ import { getChallenge, maskEmail } from "@/lib/auth/verified-session";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-/**
- * The code screen — step two of signing in. Only meaningful behind the
- * challenge cookie the login action sets after a correct password;
- * arriving without one (bookmarked, expired, or never signed in) goes
- * back to the start.
- */
+/** Step two of signing in; only meaningful behind the challenge cookie the login action sets, else back to the start. */
 export default async function VerifyLoginPage() {
   const challenge = await getChallenge();
   if (!challenge) redirect("/login");

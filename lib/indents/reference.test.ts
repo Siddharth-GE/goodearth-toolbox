@@ -1,9 +1,3 @@
-/**
- * The indent reference is what gets written on paper at a site and read
- * out over the phone, so its exact shape is pinned here — including the
- * one subtle case where the TS mirror and the SQL mint (migration 0019)
- * could drift apart: numbers past 999.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -15,8 +9,7 @@ test("builds IND/<code>/<3-digit number>", () => {
 });
 
 test("indent 1000 is IND/X/1000, never truncated to 100", () => {
-  // SQL's lpad('1234', 3, '0') TRUNCATES to '123'; the migration guards
-  // with greatest(3, length(n)) and this pins the TS mirror to match.
+  // SQL's lpad('1234', 3, '0') truncates to '123'; the migration guards with greatest(3, length(n)).
   assert.equal(indentReference("X", 1000), "IND/X/1000");
 });
 

@@ -8,11 +8,7 @@ import {
 } from "@/lib/birdwing-books/queries";
 import { HeadsSection, StaffSection } from "./settings-sections";
 
-/**
- * Admin only (0116: every write here is is_admin()): the people, their
- * pay rules, and the expense heads. Nothing is deleted — a person or a
- * head is switched off; a pay rule is followed by a newer one.
- */
+/** Admin only (0116: every write is is_admin()). Nothing is deleted: a person or head is switched off; a pay rule is followed by a newer one. */
 export default async function BooksSettingsPage() {
   const user = await requireUser();
   await requireAdmin(user);

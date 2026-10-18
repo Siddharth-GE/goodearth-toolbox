@@ -16,8 +16,6 @@ export type ClientRow = {
   updated_by: string | null;
 };
 
-// fetchAll for consistency with the other masters reads: every list
-// here promises completeness, so none of them get to silently cap.
 export async function listClients(): Promise<ClientRow[]> {
   const supabase = await createClient();
   const data = await fetchAll((from, to) =>
@@ -30,12 +28,10 @@ const CLIENTS_PAGE_SIZE = 50;
 
 export type ClientFilters = {
   search?: string;
-  /** "active" | "inactive" | undefined (all) */
   status?: string;
   page?: number;
 };
 
-/** One page for the masters table screen; listClients stays the complete read. */
 export async function listClientsPage(
   filters: ClientFilters = {},
 ): Promise<PagedResult<ClientRow>> {

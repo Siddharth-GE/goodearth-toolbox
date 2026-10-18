@@ -14,15 +14,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 /**
- * One standard set and its ordered activities.
- *
- * The order matters and is not cosmetic: it is the order the trails land
- * on a house, which is the order someone will work down the queue.
- *
- * Every change writes the WHOLE list (setTrailSetActivities), so adding,
- * removing and reordering are one code path with one failure mode. A
- * diff would have to reason about a row that both moved and changed,
- * which is exactly where an ordering bug hides.
+ * One standard set and its ordered activities; the order is the order trails land on a house.
+ * Every change writes the WHOLE list, so add, remove and reorder share one path (a diff hides ordering bugs).
  */
 export function SetEditor({
   set,
@@ -105,9 +98,6 @@ export function SetEditor({
             <li key={item.itemId} className="flex items-center gap-2 py-2">
               <span className="text-muted w-5 text-center font-mono text-xs">{i + 1}</span>
               <span className="text-foreground min-w-0 flex-1 text-sm">{item.activityName}</span>
-              {/* Days per activity, so picking a type fills in a plan
-                  and not just a list of names. Editable again on the
-                  trail itself before it starts. */}
               <Input
                 aria-label={`${item.activityName} days`}
                 type="number"

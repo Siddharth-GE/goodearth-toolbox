@@ -15,24 +15,19 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/components/ui/table";
-import { formatMoney, formatQuantity } from "@/lib/format";
+import { formatMoney, formatQuantity, todayInIndia } from "@/lib/format";
 import { recordStockIssue } from "@/lib/inventory/actions";
 import { issueValue, planBatches, type Batch } from "@/lib/inventory/batches";
 import type { IssueFormOptions } from "@/lib/inventory/issues-queries";
 import type { SiteRequestRow } from "@/lib/inventory/requests-queries";
 import type { StoreHolding } from "@/lib/inventory/stock-queries";
 import { wouldGoNegative } from "@/lib/inventory/stock";
-import { useMemo, useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useMemo, useState } from "react";
 import { BatchDraws } from "./batch-draws";
 
 type Destination = "plot" | "store";
 
-/**
- * Issuing material: tick what is going, say where. Only what the store
- * actually holds is listed, and each quantity is capped at the balance
- * on screen — the negative-stock guard is still the boundary, this just
- * means a store-keeper rarely meets it.
- */
 export type IssueWorkOption = { id: string; code: string; name: string; category: string };
 
 export function IssueForm({
@@ -45,13 +40,9 @@ export function IssueForm({
 }: {
   store: { id: string; name: string; project_id: string | null };
   holdings: StoreHolding[];
-  /** The store's batches per item, oldest first (0108). */
   batches: Record<string, Batch[]>;
   options: IssueFormOptions;
-  /** Active works from the masters — what a plot issue is FOR (0080). */
   works: IssueWorkOption[];
-  /** A supervisor's request being fulfilled (Step H) — prefills the
-   * destination, work, item and quantity; saving stamps it fulfilled. */
   request?: SiteRequestRow | null;
 }) {
   const [destination, setDestination] = useState<Destination>("plot");
@@ -59,17 +50,16 @@ export function IssueForm({
   const [workItemId, setWorkItemId] = useState(request?.workItemId ?? "");
   const [toStoreId, setToStoreId] = useState("");
   const [projectId, setProjectId] = useState(store.project_id ?? "");
-  const [issuedAt, setIssuedAt] = useState(() => new Date().toISOString().slice(0, 10));
+  const [issuedAt, setIssuedAt] = useState(() => todayInIndia());
   const [note, setNote] = useState("");
   const [picked, setPicked] = useState<Record<string, number>>(() =>
     request && holdings.some((row) => row.item_id === request.itemId)
       ? { [request.itemId]: request.quantity }
       : {},
   );
-  /** The batch to draw first, per item; absent or "" is the oldest. */
+  /** The batch to draw first, per item; absent or "" means oldest. */
   const [preferred, setPreferred] = useState<Record<string, string>>({});
-  const [error, setError] = useState<string>();
-  const [saving, startSaving] = useTransition();
+  const { pending: saving, error, run } = useActionRunner();
 
   const pickedEntries = useMemo(() => Object.entries(picked), [picked]);
   const availableById = useMemo(
@@ -77,8 +67,7 @@ export function IssueForm({
     [holdings],
   );
 
-  // The database decides the batches (allocate_batches, 0108); this is
-  // the same rule run early so the keeper sees it before Save.
+  // The database decides the batches (allocate_batches, 0108); this runs the same rule early.
   const plans = useMemo(
     () =>
       new Map(
@@ -102,8 +91,7 @@ export function IssueForm({
   }, [plans]);
 
   const otherStores = options.stores.filter((s) => s.id !== store.id);
-  /** Only a transfer out of a store with no project of its own needs
-   * one picked by hand — otherwise the number's project is derived. */
+  /** Only a transfer out of a store with no project needs one picked; otherwise it is derived. */
   const needsProject = destination === "store" && !store.project_id;
 
   const overAvailable = pickedEntries.some(([itemId, quantity]) =>
@@ -126,8 +114,8 @@ export function IssueForm({
     });
 
   const submit = () =>
-    startSaving(async () => {
-      const result = await recordStockIssue({
+    run(() =>
+      recordStockIssue({
         storeId: store.id,
         toStoreId: destination === "store" ? toStoreId : null,
         plotId: destination === "plot" ? plotId : null,
@@ -141,10 +129,8 @@ export function IssueForm({
           quantity,
           preferredReceiptLineId: preferred[itemId] || null,
         })),
-      });
-      if (result?.error) setError(result.error);
-      // On success the action redirects to the issue note.
-    });
+      }),
+    );
 
   return (
     <div className="space-y-6 pb-28">
@@ -393,7 +379,6 @@ export function IssueForm({
         </Table>
       </section>
 
-      {/* Nothing has been written yet — this bar is the commit point. */}
       <div className="border-border bg-surface fixed inset-x-0 bottom-0 z-10 mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 border-t px-5 py-3 md:rounded-t-2xl md:border">
         <div className="min-w-0">
           {pickedEntries.length === 0 ? (

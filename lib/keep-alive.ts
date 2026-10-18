@@ -1,12 +1,8 @@
 import { timingSafeEqual } from "node:crypto";
 
 /**
- * Whether a request to /api/keep-alive came from Vercel's cron.
- *
- * Vercel sends `Authorization: Bearer <CRON_SECRET>` with every cron
- * invocation once CRON_SECRET is set in the project's environment. The
- * comparison is timingSafeEqual so a guess can't be narrowed one byte
- * at a time; a missing secret is a refusal, never a pass-through.
+ * Whether the request came from Vercel's cron: Bearer CRON_SECRET, compared with timingSafeEqual.
+ * A missing secret is a refusal, never a pass-through.
  */
 export function isCronAuthorized(
   authorizationHeader: string | null,

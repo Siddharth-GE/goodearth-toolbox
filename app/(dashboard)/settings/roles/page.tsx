@@ -16,7 +16,6 @@ export default async function SettingsRolesPage() {
   await requireAdmin(user);
 
   const [roles, arrangement] = await Promise.all([listRoles(), getToolArrangement()]);
-  // The apps read under the sidebar's own teams (Settings → Teams).
   const sections = arrangeTools(GRANTABLE_TOOLS, arrangement);
 
   return (

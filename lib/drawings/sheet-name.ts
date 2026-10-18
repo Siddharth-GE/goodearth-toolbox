@@ -1,22 +1,6 @@
 /**
- * What a drawing sheet is called when it leaves the app.
- *
- * Founder, 2026-09-27: "each sheet gets renamed with the code, project
- * name, villa name, category, transmittal number and sheet name (like
- * groundfloorplan something abbreviated — when uploading a sheet user has
- * to enter it)". So:
- *
- *   SAA-Saarang-Villa12-WD-TB0003-GFP.pdf
- *   project code · project · villa · stage code · transmittal · sheet
- *
- * Built when the sheet is downloaded, never stored: the transmittal
- * number is minted on Issue, so a stored name would be wrong for every
- * draft and need rewriting at the moment of release. A draft sheet says
- * DRAFT where the number will go.
- *
- * Shared (lib/drawings/): Design Management names the sheets it lists,
- * the file route names the download for both tools. Pure and
- * import-free, so `npm test` pins the shape.
+ * A sheet's download name, built at download time and never stored (the transmittal number is minted on Issue):
+ * SAA-Saarang-Villa12-WD-TB0003-GFP.pdf = project code, project, villa, stage code, transmittal, sheet. A draft says DRAFT.
  */
 
 export type SheetNameParts = {
@@ -27,14 +11,11 @@ export type SheetNameParts = {
   stageName: string;
   /** "TB-0003", or null while the transmittal is a draft. */
   transmittalNumber: string | null;
-  /** "GFP"; null only for sheets uploaded before sheet codes existed. */
   sheetCode: string | null;
-  /** The name the file was uploaded under — the fallback for a missing code. */
   originalFileName: string;
   contentType: string;
 };
 
-/** Letters and digits only: "Villa 12" → "Villa12", "TB-0003" → "TB0003". */
 function compact(value: string): string {
   return value.replace(/[^A-Za-z0-9]+/g, "");
 }
@@ -70,11 +51,7 @@ export function sheetFileName(parts: SheetNameParts): string {
   return `${segments.join("-")}.${extensionFor(parts.contentType, parts.originalFileName)}`;
 }
 
-/**
- * The sheet code as typed, made into the shape the database accepts
- * (0099: `^[A-Z0-9][A-Z0-9-]{0,19}$`): upper case, spaces become
- * hyphens, anything else is dropped. Null when nothing usable is left.
- */
+/** The sheet code as typed, in the database's shape (0099): upper case, spaces to hyphens, else dropped; null if nothing is left. */
 export function normaliseSheetCode(input: string): string | null {
   const code = input
     .toUpperCase()

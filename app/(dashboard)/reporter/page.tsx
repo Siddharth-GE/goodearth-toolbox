@@ -5,10 +5,6 @@ import { STARTERS } from "@/lib/reporter/starters";
 
 import { ToolWelcome } from "../_components/tool-welcome";
 
-// The welcome screen (founder, 2026-08-13: every Operations and
-// Management tool opens on one). The starters and saved reports live one
-// click in at /reporter/saved. Counts only — the money Reporter can show
-// stays inside the reports themselves.
 export default async function ReporterPage() {
   const counts = await getWelcomeCounts();
 

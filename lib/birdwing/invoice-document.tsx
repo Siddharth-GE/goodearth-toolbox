@@ -14,17 +14,8 @@ import { pdf } from "@/lib/pdf/theme";
 import type { InvoiceLine, InvoicePrint } from "./invoice";
 import { nightsBetween } from "./money";
 
-/**
- * A Birdwing tax invoice on the shared paper (lib/pdf/document.tsx): the
- * invoicing company's letterhead from Masters (never typed here, never
- * invented — PRODUCT.md), the MEF/GH number, the stay, the lines with SAC
- * and GST, the tax summary split CGST + SGST, the total in words, and the
- * bank, UPI and cancellation policy from Birdwing → Settings.
- *
- * Amounts in digits to the paisa (Helvetica has no ₹ glyph; the currency
- * is said once). A draft is watermarked and unsigned; a cancelled invoice
- * says CANCELLED where the number is.
- */
+/** The letterhead comes from Masters, never typed or invented (PRODUCT.md). Amounts are digits to the paisa
+ * (Helvetica has no ₹ glyph). A draft is watermarked and unsigned; a cancelled invoice says CANCELLED. */
 
 const styles = StyleSheet.create({
   currencyNote: { fontSize: pdf.size.tiny, color: pdf.color.muted, marginBottom: 6 },

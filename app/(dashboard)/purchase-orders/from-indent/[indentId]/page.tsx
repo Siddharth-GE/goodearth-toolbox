@@ -3,15 +3,11 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageTitle } from "@/components/ui/page-title";
 import { formatCount } from "@/lib/format";
 import { listActiveGstRates } from "@/lib/masters/gst-rates";
-import { getIndentForOrdering } from "@/lib/purchase-orders/queries";
+import { getIndentForOrdering } from "@/lib/purchase-orders/indent-queries";
 import { PackageCheck } from "lucide-react";
 import { notFound } from "next/navigation";
 import { IndentOrderForm } from "./_components/indent-order-form";
 
-/**
- * Step two of a PO from an indent (plan.md, B3): the indent's remaining
- * lines, a vendor for each, and Create — one draft PO per vendor.
- */
 export default async function OrderIndentPage({
   params,
 }: {

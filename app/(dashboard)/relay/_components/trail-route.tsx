@@ -1,19 +1,9 @@
 import type { LegActual } from "@/lib/relay/chain";
 
 /**
- * The trail drawn as a route: a node per leg, filled in behind the baton,
- * ringed in accent where it is standing now.
- *
- * Inline SVG, which is unprecedented in this codebase outside the logo —
- * justified here because the shape IS the information. A row of pills
- * would say the same words and none of the same thing.
- *
- * The viewBox is wide and scaled UNIFORMLY. The first version stretched
- * it with preserveAspectRatio="none" to fill any width, which turned
- * every node into a flat ellipse — the numbers inside them smeared out
- * sideways. Uniform scaling keeps circles circular; the cost is that the
- * strip gets short on a phone, which is the right trade because the leg
- * list underneath carries the same information in words.
+ * The trail as a route: a node per leg, filled behind the baton, ringed where it stands.
+ * Inline SVG because the shape is the information. The viewBox scales UNIFORMLY (stretching smears the numbers);
+ * the strip gets short on a phone, and the leg list underneath carries the words.
  */
 export function TrailRoute({ legs }: { legs: LegActual[] }) {
   const n = legs.length;
@@ -22,8 +12,7 @@ export function TrailRoute({ legs }: { legs: LegActual[] }) {
   const W = 900;
   const H = 60;
   const x = (i: number) => (n === 1 ? W / 2 : 40 + ((W - 80) * i) / (n - 1));
-  // A gentle weave once there are enough legs to weave; a straight line
-  // reads better than a pointless curve for one or two.
+  // Weave once there are enough legs; a straight line reads better for one or two.
   const y = (i: number) => (n <= 2 ? H / 2 : i % 2 ? H * 0.68 : H * 0.32);
 
   const points = legs.map((_, i) => ({ x: x(i), y: y(i) }));

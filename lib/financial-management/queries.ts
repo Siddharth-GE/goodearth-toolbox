@@ -3,6 +3,7 @@ import "server-only";
 import { requireTool } from "@/lib/auth/access";
 import { profileNames } from "@/lib/masters/names";
 import { fetchAll } from "@/lib/supabase/fetch-all";
+import { assertRead } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
 import { cache } from "react";
 import type { DatedAmount, ForwardMilestone } from "./cashflow";
@@ -11,18 +12,9 @@ import { facilityPosition, type FacilityPosition } from "./interest";
 import type { FacilityKind, MovementKind } from "./kinds";
 
 /**
- * Reads for Financial Management.
- *
- * Every function opens with `requireTool("/financial-management")` — the
- * 0058 policies gate SELECT as well as writes, so an ungranted user
- * would get an empty list rather than an error, which reads as "no
- * facilities yet" instead of "not for you". The explicit check redirects
- * them instead of lying (the Business Planning reasoning, kept).
- *
- * The funding reads touch ONLY the tool's own tables plus shared
- * `profiles`. The cross-tool money views (`crm_receipt_facts`,
- * `bill_money_facts`, `business_plan_target_facts`) enter in the Cash
- * and Forward queries, never here.
+ * Every function opens with requireTool: the 0058 policies gate SELECT too, so an ungranted
+ * user would get an empty list instead of a redirect. The funding reads touch only the tool's
+ * own tables plus `profiles`; cross-tool money views enter in the Cash and Forward queries.
  */
 
 export type FacilityRow = {
@@ -53,14 +45,7 @@ export type FacilityDetail = FacilityRow & {
   movements: MovementRow[];
 };
 
-/**
- * Every facility with its computed position, active first.
- *
- * fetchAll on both tables: facilities are counted in tens, movements in
- * hundreds, but a silent 1,000-row cap would one day drop a movement and
- * quietly misstate a balance — the one failure a money screen must not
- * have.
- */
+/** Every facility with its computed position, active first. fetchAll on both tables: a silent 1,000-row cap would drop a movement and misstate a balance. */
 export async function listFacilities(): Promise<FacilityRow[]> {
   await requireTool("/financial-management");
   const supabase = await createClient();
@@ -118,12 +103,7 @@ export async function listFacilities(): Promise<FacilityRow[]> {
   });
 }
 
-/**
- * One facility with its full movement ledger, newest first.
- *
- * Returns null for "no such facility" AND for "not visible to you" —
- * RLS makes those indistinguishable, and both end at notFound().
- */
+/** One facility with its full movement ledger, newest first. Null for "no such facility" and "not visible to you" alike (RLS), both ending at notFound(). */
 export const getFacility = cache(async (facilityId: string): Promise<FacilityDetail | null> => {
   await requireTool("/financial-management");
   const supabase = await createClient();
@@ -134,10 +114,7 @@ export const getFacility = cache(async (facilityId: string): Promise<FacilityDet
     .eq("id", facilityId)
     .maybeSingle();
 
-  if (error) {
-    console.error("getFacility failed:", error);
-    return null;
-  }
+  assertRead("financial-management", "the facility", error);
   if (!facility) return null;
 
   const movements = await fetchAll((from, to) =>
@@ -187,31 +164,23 @@ export const getFacility = cache(async (facilityId: string): Promise<FacilityDet
 });
 
 export type CashPosition = {
-  /** Client money received — every receipt, from crm_receipt_facts. */
   collections: DatedAmount[];
-  /** Bills actually paid, dated by paid_at. */
   billsPaid: DatedAmount[];
   /** Approved and waiting to be paid — the near-term payables figure. */
   approvedUnpaidTotal: number;
   approvedUnpaidCount: number;
-  /** The tool's own ledger, split by kind. */
   drawdowns: DatedAmount[];
   repayments: DatedAmount[];
   interestPaid: DatedAmount[];
 };
 
-/** Headline counts for the tool's welcome screen. Deliberately counts,
- * never rupees — this tool's screens are all money, so the welcome is
- * the one place that shows none of it. */
+/** Headline counts for the welcome screen: counts, never rupees. */
 export async function getWelcomeCounts() {
   await requireTool("/financial-management");
   const supabase = await createClient();
 
-  const startOfMonth = new Date();
-  startOfMonth.setDate(1);
-  startOfMonth.setHours(0, 0, 0, 0);
-  // received_on is a date, not a timestamp.
-  const since = startOfMonth.toISOString().slice(0, 10);
+  // received_on is a date, not a timestamp. This month starts on India's calendar.
+  const since = `${todayInIndia().slice(0, 8)}01`;
 
   // Exact database counts, head-only — never rows.length.
   const [facilities, approvedUnpaid, receipts] = await Promise.all([
@@ -226,6 +195,12 @@ export async function getWelcomeCounts() {
       .gte("received_on", since),
   ]);
 
+  assertRead(
+    "financial-management",
+    "the welcome counts",
+    facilities.error ?? approvedUnpaid.error ?? receipts.error,
+  );
+
   return {
     facilities: facilities.count ?? 0,
     approvedUnpaid: approvedUnpaid.count ?? 0,
@@ -234,13 +209,9 @@ export async function getWelcomeCounts() {
 }
 
 /**
- * Everything the Cash screen adds up, raw — the bucketing and chart
- * shaping stay in the pure cashflow.ts where the tests are.
- *
- * The two cross-tool reads go through the 0058 views (`crm_receipt_facts`,
- * `bill_money_facts`) whose WHERE admits this tool's grant — never the
- * CRM or Bills tables. fetchAll throughout: a receipt dropped by the
- * silent 1,000-row cap would quietly misstate the company's cash.
+ * Everything the Cash screen adds up, raw; bucketing stays in the pure cashflow.ts. The two
+ * cross-tool reads go through the 0058 views, whose WHERE admits this tool's grant, never the
+ * CRM or Bills tables. fetchAll throughout: a silent 1,000-row cap would misstate cash.
  */
 export async function getCashPosition(): Promise<CashPosition> {
   await requireTool("/financial-management");
@@ -277,8 +248,7 @@ export async function getCashPosition(): Promise<CashPosition> {
 
   const billsPaid: DatedAmount[] = bills
     .filter((bill) => bill.status === "paid" && bill.total_amount !== null)
-    // The bills_guard requires paid_at before a bill can be paid, but a
-    // missing date still lands in `undated` honestly rather than today.
+    // bills_guard requires paid_at to pay a bill; a missing date still lands in `undated`, not today.
     .map((bill) => ({ amount: bill.total_amount ?? 0, on: bill.paid_at }));
 
   const approvedUnpaid = bills.filter((bill) => bill.status === "approved");
@@ -318,12 +288,7 @@ export type ForwardView = {
   undrawnSanctioned: number;
 };
 
-/**
- * Everything the Forward screen reasons over: the payment schedules
- * (crm_milestone_facts), the receipts not yet filed against a rung
- * (crm_receipt_facts), the published plan targets, and the facilities'
- * undrawn headroom. The spillover arithmetic lives in cashflow.ts.
- */
+/** Everything the Forward screen reasons over: payment schedules, unfiled receipts, published plan targets and facilities' undrawn headroom. */
 export async function getForwardView(): Promise<ForwardView> {
   await requireTool("/financial-management");
   const supabase = await createClient();

@@ -32,9 +32,7 @@ export default async function MixPage({ params }: { params: Promise<{ mixId: str
   ]);
   if (!mix) notFound();
 
-  // What one unit of the mix costs — calc.ts's rule: unknown, never low,
-  // when anything is unpriced or the mix is empty. A row from before
-  // materials were items counts for nothing, here as in every estimate.
+  // calc.ts's rule: unknown, never low, when anything is unpriced or the mix is empty. A pre-0086 row counts for nothing.
   const counted = mix.components.filter((component) => !component.legacy);
   const unpriced = counted.filter((component) => component.materialRate === null);
   const costPerUnit = mixUnitCost(

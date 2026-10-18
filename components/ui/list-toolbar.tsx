@@ -4,23 +4,12 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 
 /**
- * The one search / filter bar every list shares (plan.md, A4 — the
- * "shared filter toolbar" DESIGN.md held back for the third copy; there
- * were nine).
- *
- * A plain GET form, so it needs no JavaScript and works the same on a
- * site phone: submitting drops `page` and returns to page 1, the choices
- * live in the URL, and the page stays a Server Component. Params the list
- * wants kept (a status tab) ride as hidden fields.
- *
- *   q          the search box, when `search` is given
- *   from, to   a date range, when `dates` is given
- *   <param>    one select per filter
+ * The one search / filter bar every list shares. A plain GET form: no JavaScript, choices live in the URL, submitting returns to page 1.
+ * Params the list wants kept (a status tab) ride as hidden fields. q = search; from, to = date range; <param> = one select per filter.
  */
 export type ListFilter = {
   param: string;
   label: string;
-  /** The "everything" choice, e.g. "All vendors". */
   allLabel: string;
   options: { value: string; label: string }[];
 };
@@ -33,14 +22,10 @@ export function ListToolbar({
   dates,
   filters = [],
 }: {
-  /** The list's own path, e.g. "/bills/list". */
   action: string;
-  /** The current value of every param the bar owns. */
   values: Record<string, string | undefined>;
-  /** Params to carry through unchanged (a tab's status). */
   keep?: Record<string, string | undefined>;
   search?: { placeholder: string };
-  /** Label for the date range, e.g. "Bill date". */
   dates?: { label: string };
   filters?: ListFilter[];
 }) {

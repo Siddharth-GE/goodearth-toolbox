@@ -8,8 +8,9 @@ import { cn } from "@/lib/utils";
 import { CalendarDays, MapPin, Plus, UserRound } from "lucide-react";
 import { useRef, useState, useTransition } from "react";
 
-import { useBoard, useToast } from "./board-context";
-import { PersonName, Pill, PillButton, type PillTone } from "./pill";
+import { useBoard } from "./board-context";
+import { useUndoBar } from "@/components/ui/undo-bar";
+import { PersonName, Pill, PillButton, type PillTone } from "@/components/ui/pill";
 import { SideMark, sideLabel } from "./side-mark";
 import { DueMenu, OwnerMenu, PlotMenu } from "./step-menus";
 
@@ -21,29 +22,21 @@ const DUE_TONE: Record<DueTone, PillTone> = {
 };
 
 /**
- * The tracker's one-line composer: type the step, tap plot, owner, date,
- * Construction or Interior, press Enter. On a plot's page the plot is
- * fixed. A step on a plot is its side's owner's and nobody else's (0125),
- * so once a plot is chosen the owner is shown, not picked; only a step
- * with no plot is given to whoever you choose.
- *
- * No date is allowed — it lands with the overdue ones, and the line says
- * so, because the tracker's rule is that every promise gets a real date.
+ * A step on a plot is its side's owner's and nobody else's (0125), so once a plot is chosen the owner is shown, not picked.
+ * No date lands with the overdue ones, and the line says so: every promise gets a real date.
  */
 export function Composer({
   fixedPlot,
   defaultOwner,
   defaultTrack = "sales",
 }: {
-  /** A plot's page: every step it adds is that plot's. */
   fixedPlot?: string;
   /** Who it goes to until someone picks: you, the person being viewed, or the plot's owner. */
   defaultOwner: string | null;
-  /** The side it starts on, and goes back to after each add. */
   defaultTrack?: ActionTrack;
 }) {
   const { plots, team, today } = useBoard();
-  const toast = useToast();
+  const toast = useUndoBar();
   const input = useRef<HTMLInputElement>(null);
   const [pending, startTransition] = useTransition();
   const [plot, setPlot] = useState<string | null>(fixedPlot ?? null);

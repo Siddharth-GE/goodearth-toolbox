@@ -12,18 +12,14 @@ import {
 import { FormMessage } from "@/components/ui/form-message";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import type { ActionState } from "@/lib/action-state";
 import { approveBill, deleteBill, sendBackBill } from "@/lib/bills/actions";
 import { canApprove, canDeleteBill, canSendBack, type BillStatus } from "@/lib/bills/workflow";
 import { formatMoney } from "@/lib/format";
-import { useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useState } from "react";
 
-/**
- * Everything that changes a bill's status, in one place.
- *
- * Which buttons appear comes from lib/bills/workflow.ts; every rule is
- * enforced again by bills_guard() in the database, so a hidden button
- * is a courtesy and the trigger is the actual boundary.
- */
+// Buttons come from lib/bills/workflow.ts; bills_guard() enforces every rule, so a hidden button is a courtesy.
 export function ActionButtons({
   billId,
   status,
@@ -35,25 +31,18 @@ export function ActionButtons({
   status: BillStatus;
   actor: { isAdmin: boolean; isApprover: boolean; approvalLimit: number | null; userId: string };
   createdBy: string | null;
-  /** Checked against the approver's limit (0033). */
   totalAmount: number;
 }) {
-  const [pending, startTransition] = useTransition();
+  const { pending, error, run: runAction, clearError } = useActionRunner();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [sendingBack, setSendingBack] = useState(false);
   const [note, setNote] = useState("");
-  const [error, setError] = useState<string>();
 
-  const run = (action: () => Promise<{ error?: string } | undefined>) =>
-    startTransition(async () => {
-      const result = await action();
-      if (result?.error) setError(result.error);
-      else {
-        setSendingBack(false);
-      }
-    });
+  const run = async (action: () => Promise<ActionState>) => {
+    const result = await runAction(action);
+    if (!result?.error) setSendingBack(false);
+  };
 
-  // ---- Approved: send it back (payments are recorded on the page) --
   if (status === "approved") {
     const decider = canSendBack(status, actor);
     if (!decider) return null;
@@ -72,7 +61,7 @@ export function ActionButtons({
             setSendingBack(open);
             if (open) {
               setNote("");
-              setError(undefined);
+              clearError();
             }
           }}
         >
@@ -113,7 +102,6 @@ export function ActionButtons({
     );
   }
 
-  // ---- Recorded: approve, or throw it away --------------------------
   const approvable = canApprove(status, actor, totalAmount);
   const deletable = canDeleteBill(status, actor, createdBy);
   // A named approver who is simply over their ceiling gets told so,

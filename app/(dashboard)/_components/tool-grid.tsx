@@ -4,7 +4,6 @@ import type { ToolSection } from "@/lib/nav/arrange";
 import { TOOL_ICONS } from "@/lib/tools";
 import Link from "next/link";
 
-/** Every tool the person holds, under the same teams as the sidebar — all open here. */
 export function ToolGrid({ sections }: { sections: ToolSection[] }) {
   return (
     <div className="space-y-8">
@@ -16,10 +15,8 @@ export function ToolGrid({ sections }: { sections: ToolSection[] }) {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {groupTools.map((tool) => {
               const Icon = TOOL_ICONS[tool.icon];
-              // Every card links. `tools` is visibleTools()'s own output —
-              // the same rule the sidebar uses — so a built tool here is one
-              // the person holds (the click cannot bounce off requireTool),
-              // and an unbuilt one leads to its ungated Coming Soon stub.
+              // `tools` is visibleTools()'s output, the sidebar's rule: built ones are held (no requireTool bounce),
+              // unbuilt ones lead to the ungated Coming Soon stub.
               const card = (
                 <Card interactive className="h-full p-5">
                   <div className="flex items-start justify-between">

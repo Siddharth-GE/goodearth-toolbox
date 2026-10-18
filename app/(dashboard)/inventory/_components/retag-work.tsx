@@ -3,16 +3,13 @@
 import { Button } from "@/components/ui/button";
 import { FormMessage } from "@/components/ui/form-message";
 import { Select } from "@/components/ui/select";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { retagIssueWork } from "@/lib/inventory/actions";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
 type WorkOption = { id: string; code: string; name: string; category: string };
 
-/**
- * Fix which work a plot issue was tagged with (0080). A label fix with
- * no quantity effect — the audit trail records the change — which is
- * why this is allowed while everything else on an issue is permanent.
- */
+/** A label fix with no quantity effect (audited), so allowed while the rest of an issue is permanent (0080). */
 export function RetagWork({
   issueId,
   workItemId,
@@ -23,8 +20,7 @@ export function RetagWork({
   works: WorkOption[];
 }) {
   const [value, setValue] = useState(workItemId ?? "");
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
   const [saved, setSaved] = useState(false);
   const categories = [...new Set(works.map((work) => work.category))];
 
@@ -56,13 +52,11 @@ export function RetagWork({
         size="sm"
         variant="secondary"
         disabled={pending || !value || value === workItemId}
-        onClick={() =>
-          startTransition(async () => {
-            const result = await retagIssueWork(issueId, value);
-            setError(result?.error);
-            setSaved(!result?.error);
-          })
-        }
+        onClick={async () => {
+          setSaved(false);
+          const result = await run(() => retagIssueWork(issueId, value));
+          setSaved(!result?.error);
+        }}
       >
         {pending ? "Saving…" : "Save"}
       </Button>

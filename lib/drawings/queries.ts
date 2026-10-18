@@ -8,38 +8,9 @@ import { sheetNamingContext, type SheetContext } from "./sheet-context";
 import { sheetFileName } from "./sheet-name";
 
 /**
- * The released drawings, read.
- *
- * SHARED CODE — the lib/design-views precedent, restated for this tool
- * pair: Design Management owns every write on a drawing set, a revision,
- * its files and its work links (lib/design-management/actions.ts, gated
- * on /design-management) and stays that way. This module only reads what
- * has already been RELEASED, because Supervisors needs those exact rows
- * on the villa page and against each work — the same data, not a copy of
- * it.
- *
- * NO GRANT CHECK HERE, on purpose — the lib/masters/* and lib/design-views
- * convention: each caller gates itself under its own grant before asking
- * (lib/supervisors/queries.ts opens with requireTool("/supervisors"),
- * Design Management's own screens open with requireTool("/design-management")).
- * The underlying tables' RLS SELECT quals already admit either grant for
- * a non-draft revision (0091 drawing_revisions/drawing_revision_files/
- * drawing_revision_works), so this module widening its own reach costs
- * nothing on top of that — but it must stay narrowly about released
- * drawings, the same discipline lib/design-views keeps about photographs.
- *
- * Imports only the shared Supabase surface (createClient, fetchAll) and
- * its own siblings in lib/drawings/ — never lib/design-management/ or
- * lib/supervisors/, per CLAUDE.md's "one
- * tool never imports another tool's code; shared code never imports a
- * tool's."
- *
- * File BYTES are not served here. The private `drawings` bucket stays
- * behind app/(dashboard)/design-management/files/[fileId]/route.ts,
- * which re-checks the grant and re-reads the file row through the
- * RLS-scoped client before streaming. This module hands back file ids
- * only, for building that route's URL
- * (`/design-management/files/<fileId>`).
+ * The released drawings, read for Supervisors; Design Management owns every write. No grant check, on purpose:
+ * each caller gates itself, and RLS already admits either grant for a released revision (0091). Throws on a failed
+ * read rather than showing "nothing released yet". File bytes are served only by the design-management files route.
  */
 
 export type ReleasedDrawingFile = {
@@ -66,42 +37,17 @@ export type ReleasedDrawingSet = {
     note: string | null;
     releasedAt: string;
   };
-  /** Sheets uploaded before 0124; a revision since carries a link instead. */
   files: ReleasedDrawingFile[];
-  /** The WorkDrive share link the revision went out with (0124), if any. */
   drawingsUrl: string | null;
-  /** That folder's sheets as the toolbox kept them on Issue. */
   folderSheets: FolderSheet[];
   workItemIds: string[];
-  /**
-   * The change log: SUPERSEDED revisions, newest first — revision
-   * number, note and release date only. Deliberately NO files: site
-   * builds from the latest sheet and nothing older, so an old sheet is
-   * never one tap away (founder, 2026-08-22: the history must be seen,
-   * as an expandable change list).
-   */
+  /** The change log: superseded revisions, newest first, with number, note and date only. No files: site must not be one tap from an old sheet. */
   history: DrawingHistoryEntry[];
 };
 
 /**
- * Every drawing set with a released revision on this unit — the LATEST
- * released one. 0091's issue function supersedes the previous released
- * revision of a set the instant a new one releases, so there is at most
- * one row per (unit, set) with `status = 'released'` by design; no
- * ORDER/LIMIT trick is needed to pick "latest" out of several.
- *
- * Flat selects only, completed via `fetchAll` — a villa carries few
- * revisions in practice, but a read that has to be right is exactly what
- * `fetchAll` is for rather than trusting PostgREST's silent 1,000-row cap
- * to never bind. Ordered to match the drawing-set master's own order
- * (sort_order, then name) — the same sequence Design Management's own
- * screens and the transmittal PDF use, so a set doesn't jump around
- * depending which app is looking at it.
- *
- * Throws (with context) rather than answering with an empty list on a
- * failed read — an empty Drawings section that is actually a database
- * error would read as "nothing has been released yet," which is not what
- * happened.
+ * Every drawing set's latest released revision on this unit (at most one per set: Issue supersedes the previous).
+ * Throws on a failed read rather than returning an empty list, which would read as "nothing released yet".
  */
 export async function listReleasedDrawingsForUnit(unitId: string): Promise<ReleasedDrawingSet[]> {
   const supabase = await createClient();
@@ -142,8 +88,7 @@ export async function listReleasedDrawingsForUnit(unitId: string): Promise<Relea
 
     if (revisions.length === 0) return [];
 
-    // Files and work links are fetched for the RELEASED (current)
-    // revisions only — the history carries notes and dates, never files.
+    // Files and work links only for released revisions; the history carries notes and dates.
     const releasedIds = revisions
       .filter((revision) => revision.status === "released")
       .map((revision) => revision.id);
@@ -226,7 +171,6 @@ export async function listReleasedDrawingsForUnit(unitId: string): Promise<Relea
     });
     historyBySet.set(revision.drawing_set_id, list);
   }
-  // Newest change first — the fetch ordered revision_no ascending.
   for (const list of historyBySet.values()) list.reverse();
 
   const released = revisions.filter((revision) => revision.status === "released");
@@ -241,10 +185,7 @@ export async function listReleasedDrawingsForUnit(unitId: string): Promise<Relea
 
   return ordered.map((revision) => {
     const set = setsById.get(revision.drawing_set_id);
-    // The guard trigger stamps released_at the one time a revision moves
-    // off draft, so a row with status = 'released' always has one — a
-    // missing value here is a data integrity problem, not a display
-    // choice, and is worth failing loudly over.
+    // The guard trigger always stamps released_at; a missing one is a data problem worth failing on.
     if (!revision.released_at) {
       throw new Error(
         `Drawing revision ${revision.id} has status "released" but no released_at timestamp.`,

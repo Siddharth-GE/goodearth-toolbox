@@ -1,5 +1,6 @@
 "use server";
 
+import { text } from "@/lib/form-data";
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
@@ -11,14 +12,13 @@ export async function addConstructionStage(
 ): Promise<ActionState> {
   const user = await requireTool("/masters");
 
-  const name = String(formData.get("name") ?? "").trim();
+  const name = text(formData, "name");
   if (!name) return { error: "Give the stage a name." };
   if (name.length > 60) return { error: "Keep the name under 60 characters." };
 
   const supabase = await createClient();
 
-  // New stages land at the end of the sequence; steps of 10 leave room
-  // to slot one between two later by editing sort_order in the database.
+  // Steps of 10 leave room to slot a stage between two by editing sort_order.
   const { data: last, error: lastError } = await supabase
     .from("construction_stages")
     .select("sort_order")
@@ -46,11 +46,7 @@ export async function addConstructionStage(
   return undefined;
 }
 
-/**
- * A rename follows through to every indent and construction budget line
- * carrying the stage — the FKs cascade on update (0053), so the word
- * changes everywhere at once and history keeps making sense.
- */
+/** A rename cascades to every indent and budget line carrying the stage (0053). */
 export async function renameConstructionStage(id: string, name: string): Promise<ActionState> {
   const user = await requireTool("/masters");
 

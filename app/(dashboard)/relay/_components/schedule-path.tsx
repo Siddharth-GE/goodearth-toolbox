@@ -1,26 +1,9 @@
 import type { ScheduleSummary } from "@/lib/relay/schedule";
 
 /**
- * The project schedule as one picture: a track of stages sized by their
- * length in weeks, each stage filled by its OWN progress, and a marker
- * showing where the plan says today is.
- *
- * Each stage fills in place, and that is the whole point. The first
- * version drew the weighted total (`actualPct`) as one bar from the left
- * edge — so finishing a Construction trail, which earns Construction's
- * large share of the weeks, painted straight over Design and Approvals
- * where nothing had happened. A bar from the left edge claims
- * "everything up to here is done"; only a per-stage fill can say
- * "Construction is moving and Design has not started".
- *
- * THE RULE THIS ESTABLISHED: a weighted total is a number, not a
- * position. Never draw one as a bar growing from the left.
- *
- * The slip still reads off the figures underneath and the verdict badge,
- * which say it in words.
- *
- * Uniform scaling, like the trail route — a stretched viewBox turns
- * every marker into a smear.
+ * The schedule as a track of stages sized by weeks, each filled by its OWN progress, with today's marker.
+ * THE RULE: a weighted total is a number, not a position. Never draw one as a bar growing from the left;
+ * it paints over stages where nothing happened. Uniform scaling: a stretched viewBox smears markers.
  */
 export function SchedulePath({ schedule }: { schedule: ScheduleSummary }) {
   if (!schedule.hasSchedule || schedule.stages.length === 0) return null;
@@ -33,19 +16,13 @@ export function SchedulePath({ schedule }: { schedule: ScheduleSummary }) {
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" aria-hidden="true">
-      {/* One block per stage, width proportional to its weeks, filled by
-          how much of that stage's own work is done. */}
       {schedule.stages.map((stage, i) => {
         const x = pxOf((stage.weekFrom / schedule.totalWeeks) * 100);
         const w = pxOf((stage.weeks / schedule.totalWeeks) * 100);
         const trackW = Math.max(2, w - 2);
-        // A stage barely started still shows a sliver rather than
-        // vanishing on a narrow block.
+        // A barely started stage still shows a sliver.
         const fillW = stage.progress > 0 ? Math.max(3, stage.progress * trackW) : 0;
-        // Nothing filed under it at all is a different thing from filed
-        // and not done, and it needs a different fix: file some trails,
-        // not chase someone. A dashed outline says "nothing here yet";
-        // a solid block says "work is waiting".
+        // Nothing filed is not "filed and not done" (the fix is filing trails, not chasing someone): dashed outline vs solid block.
         const nothingFiled = stage.trailsTotal === 0;
         return (
           <g key={stage.id}>
@@ -81,12 +58,7 @@ export function SchedulePath({ schedule }: { schedule: ScheduleSummary }) {
                 fill="var(--foreground)"
               />
             )}
-            {/* The first and last names would run off the ends of the
-                viewBox and be clipped mid-word — "Handove" is what the
-                last stage read before this. They line up with the edge
-                instead of their own midpoint. Names also alternate onto
-                two rows, because stage lengths vary enough that a
-                four-week stage beside a sixteen-week one collides. */}
+            {/* End names align to the edge, not their midpoint, or they clip; names alternate onto two rows so short stages don't collide. */}
             <text
               x={x + w / 2}
               y={TRACK_Y - (i % 2 === 0 ? 22 : 8)}
@@ -110,8 +82,7 @@ export function SchedulePath({ schedule }: { schedule: ScheduleSummary }) {
         );
       })}
 
-      {/* Where the plan says today is — drawn last so it sits above the
-          fills rather than behind them. */}
+      {/* Today's marker is drawn last so it sits above the fills. */}
       <g>
         <line
           x1={pxOf(schedule.planPct)}

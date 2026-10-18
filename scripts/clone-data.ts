@@ -1,86 +1,32 @@
 /**
- * Copies the real master data from one database into another.
+ * Copies the real master data (people, places, clients, the catalogue) from one
+ * database into another, and nothing else.
  *
- *   npx tsx scripts/clone-data.ts --from <ref> --to <ref>
- *       # dry run — reports what it WOULD copy, writes nothing
- *
+ *   npx tsx scripts/clone-data.ts --from <ref> --to <ref>            # dry run, writes nothing
  *   npx tsx scripts/clone-data.ts --from <ref> --to <ref> --commit
  *
- * WHY THIS EXISTS. On 17 Aug 2026 the databases swapped roles: the one
- * the toolbox was built in keeps every practice selection, budget and PO
- * and becomes staging, and a fresh one takes the real work. This carries
- * across the part that is real — people, places, clients, the catalogue —
- * and nothing else.
- *
- * WHAT IT DOES NOT COPY, and this is the point of the script rather than
- * an omission: the whole transaction chain, Marathon, the test trails,
- * the audit log, and every *_counters row. Leaving the counters behind is
- * what makes the first real purchase order PO-0001.
- *
- * IDS ARE PRESERVED. Every row keeps its primary key, so `created_by`,
- * `updated_by` and every foreign key still point at the same thing. A
- * copy that renumbered would need a mapping table and would get one
- * column wrong somewhere.
- *
- * AUTH USERS COME TOO, WHOLE. profiles references auth.users, so the 49
- * logins must exist with the same ids or every profile breaks. They are
- * copied including `encrypted_password` — the bcrypt hash, not the
- * password — so every account keeps the password it already has and
- * nothing has to be redistributed. auth.identities comes with them, or
- * email and Google sign-in have nothing to match against.
- *
- * REPLICA MODE. profiles references roles and roles references profiles:
- * a genuine cycle, so no insert order exists that satisfies every foreign
- * key. `session_replication_role = replica` turns off FK checking and
- * triggers for the load, which is also what stops handle_new_user() and
- * profiles_seed_staff_details() firing and fighting with the rows being
- * copied. Each request re-sets it, because every call through the
- * management API is its own session.
- *
- * SAFE TO RUN TWICE. Each table is emptied and reloaded. That is only
- * safe while the target has no real work in it, so it refuses to run if
- * it finds any — see GUARD_TABLES. After go-live this script must not be
- * the thing that empties production.
- *
- * NO SEQUENCES TO RESET. The only two in `public` belong to audit_log and
- * app_errors, neither of which is copied.
+ * Not copied, on purpose: the transaction chain, test trails, the audit log
+ * and every *_counters row (so the first real PO is PO-0001).
+ * Ids are preserved, so created_by, updated_by and every foreign key still match.
+ * Auth users come whole, with the bcrypt hash and auth.identities, so logins keep passwords.
+ * Replica mode: profiles and roles reference each other, so no insert order satisfies
+ * every FK; `session_replication_role = replica` turns off FK checks and triggers
+ * (handle_new_user etc.), re-set per request since each API call is its own session.
+ * Each table is emptied and reloaded, so it refuses to run if GUARD_TABLES hold real
+ * work. After go-live this must not be what empties production.
  */
 import { isCommit, literal, requireProjectRef, sql } from "./supabase-management";
 
-/**
- * The real data, parents before children. Order is cosmetic under replica
- * mode, but a half-finished run reads better when it fails in a sensible
- * place.
- *
- * NOT HERE, deliberately:
- *   selections/budgets/indents/purchase_orders/goods_receipts/bills/
- *   stock_* / labour_contracts / construction_budgets / item_requests
- *     - the practice chain.
- *   marathon_*        - the kiosk starts empty. Also retires the agents
- *                       left on the seeded PIN 1234, which is in public
- *                       git history and could never be fixed by rotating.
- *   pusher_chains / _legs / _events / pusher_chain_departments
- *     - the test trails. pusher_chain_departments looks like Relay setup
- *       and is not: it hangs off pusher_chains, one row per trail.
- *   vendors / stores  - one test row each. Real ones get entered in
- *                       Masters before Purchase Orders and Inventory are
- *                       first used.
- *   business_plans / business_plan_targets, funding_facilities
- *                     - all three looked like master data and were
- *                       carried across on 17 Aug; the founder identified
- *                       them as practice ("Kaadal", "Phase 3", and a
- *                       ₹10,00,000 loan from a party called "fed" with
- *                       terms "d") and they were removed the same day.
- *                       The distinction that was missed: a plan or a loan
- *                       is something someone BUILDS IN the tool, not a
- *                       fact about the company that exists whether or not
- *                       the toolbox does. Those belong with the
- *                       transactions. Real facilities get entered once,
- *                       against the bank's own statement (TODO.md).
- *   audit_log / app_errors / login_attempts / auth_verified_sessions
- *     - records of the old database's own life.
- *   *_counters        - so numbering starts at 1.
- */
+// The real data, parents before children. Order is cosmetic under replica mode.
+//
+// Left out on purpose:
+//   the practice chain (selections, budgets, indents, POs, receipts, bills, stock_*, ...);
+//   pusher_chains and children (test trails; pusher_chain_departments hangs off them);
+//   vendors and stores (one test row each; real ones are entered in Masters);
+//   business_plans, business_plan_targets, funding_facilities (built in the tool,
+//     not facts about the company, so they belong with the transactions);
+//   audit_log, app_errors, login_attempts, auth_verified_sessions;
+//   *_counters, so numbering starts at 1.
 const TABLES = [
   "roles",
   "profiles",
@@ -109,25 +55,14 @@ const TABLES = [
   "pusher_project_plans",
 ];
 
-/** Copied from the auth schema, in this order. */
 const AUTH_TABLES = ["users", "identities"];
 
-/**
- * Emptied on the target, never copied.
- *
- * Replaying the migrations fires the audit triggers, so a fresh database
- * arrives with several dozen audit rows describing its own construction —
- * seeded activities, default stages. They are about rows that this script
- * then deletes and replaces, so they document nothing that exists. A
- * production audit log should start on the day production started.
- */
+// Emptied on the target, never copied. Replaying migrations leaves audit rows
+// describing rows this script then replaces; production's log should start clean.
 const EMPTY_ONLY = ["audit_log"];
 
-/**
- * If any of these has a row in the target, somebody has started doing
- * real work there and this script must not empty it. There is no --force:
- * the right move is to look at what is in them, not to override a check.
- */
+// If any of these has a row in the target, real work has started there and this
+// script must not empty it. There is no --force: look at what is in them.
 const GUARD_TABLES = [
   "selections",
   "budgets",
@@ -137,20 +72,12 @@ const GUARD_TABLES = [
   "bills",
   "stock_issues",
   "client_receipts",
-  "marathon_entries",
 ];
 
 const BATCH = 500;
 
-/**
- * The columns of a table that can actually be written.
- *
- * Generated columns are excluded, or the insert is rejected outright:
- * auth.users.confirmed_at is computed from the two confirmation
- * timestamps, and Postgres refuses a non-DEFAULT value for it. Identity
- * columns are excluded for the same reason. Neither loses anything —
- * a generated column recomputes itself from the columns that did copy.
- */
+// The writable columns of a table. Generated columns (auth.users.confirmed_at)
+// and identity columns are excluded or Postgres rejects the insert; they recompute.
 async function columnsOf(ref: string, schema: string, table: string): Promise<string[]> {
   const rows = await sql<{ column_name: string }>(
     ref,
@@ -168,7 +95,6 @@ async function countOf(ref: string, qualified: string): Promise<number> {
   return Number(rows[0]?.n ?? 0);
 }
 
-/** Reads a table as JSON objects, paged, so one huge response cannot fail the run. */
 async function readRows(
   ref: string,
   schema: string,
@@ -196,12 +122,8 @@ function quoteIdent(name: string): string {
   return `"${name.replace(/"/g, '""')}"`;
 }
 
-/**
- * Inserts rows through jsonb_populate_recordset rather than a built-up
- * VALUES list. Postgres does the type conversion, so arrays, jsonb, empty
- * strings and nulls all land as themselves — no hand-rolled quoting to
- * get subtly wrong on one column of one table.
- */
+// Inserts through jsonb_populate_recordset so Postgres does the type conversion
+// (arrays, jsonb, empty strings, nulls) with no hand-rolled quoting.
 async function writeRows(
   ref: string,
   schema: string,
@@ -209,9 +131,7 @@ async function writeRows(
   columns: string[],
   rows: Record<string, unknown>[],
 ): Promise<void> {
-  // The columns are named on BOTH sides. `select *` off the recordset
-  // would hand over every column of the row type including the generated
-  // ones, which Postgres rejects however carefully the JSON was built.
+  // Columns are named on BOTH sides: `select *` would include generated columns.
   const named = columns.map(quoteIdent).join(", ");
   for (let at = 0; at < rows.length; at += BATCH) {
     const batch = rows.slice(at, at + BATCH);
@@ -241,7 +161,6 @@ async function main() {
   console.log(`To   : ${to}`);
   console.log(`Mode : ${commit ? "COMMIT" : "dry run"}\n`);
 
-  // ---- the guard ----------------------------------------------------
   const occupied: string[] = [];
   for (const table of GUARD_TABLES) {
     const rows = await countOf(to, table);
@@ -258,7 +177,6 @@ async function main() {
     return;
   }
 
-  // ---- plan the copy --------------------------------------------------
   type Job = { schema: string; table: string; columns: string[]; rows: number };
   const jobs: Job[] = [];
   let mismatches = 0;
@@ -301,7 +219,6 @@ async function main() {
     return;
   }
 
-  // ---- empty the target, children first -------------------------------
   console.log("\nEmptying the target...");
   for (const table of EMPTY_ONLY) {
     await sql(to, `set session_replication_role = replica; delete from ${quoteIdent(table)};`);
@@ -314,7 +231,6 @@ async function main() {
     );
   }
 
-  // ---- copy -----------------------------------------------------------
   console.log("Copying...");
   for (const job of jobs) {
     if (job.rows === 0) continue;
@@ -323,7 +239,6 @@ async function main() {
     console.log(`  ${String(rows.length).padStart(5)}  ${job.schema}.${job.table}`);
   }
 
-  // ---- confirm ---------------------------------------------------------
   console.log("\nChecking every table arrived...");
   let wrong = 0;
   for (const job of jobs) {

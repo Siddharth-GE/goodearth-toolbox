@@ -1,8 +1,4 @@
-/**
- * The three labour formats: each kind keeps only its own fields, a
- * measured log takes the work's unit (never one typed on the phone), and
- * each refusal is said in words before the database's CHECK says it.
- */
+/** Each kind keeps only its own fields, a measured log takes the work's unit, and each refusal is said in words before the CHECK says it. */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

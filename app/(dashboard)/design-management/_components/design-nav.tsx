@@ -1,11 +1,6 @@
 import { ToolNav } from "@/components/ui/tool-nav";
 
-/**
- * The design board's tabs (root plan.md, thirteenth piece). The Board is the
- * Villas screen grown into it, so its href stays /villas and every link
- * into a villa keeps working. A villa's page and its transmittals belong
- * to the Board.
- */
+/** The Board keeps the old /villas href so every link into a villa works. */
 const TABS = [
   { key: "board", href: "/design-management/villas", label: "Board" },
   { key: "actions", href: "/design-management/actions", label: "Actions" },

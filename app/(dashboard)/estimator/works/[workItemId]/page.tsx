@@ -41,18 +41,15 @@ export default async function WorkSetupPage({
   ]);
   if (!work) notFound();
 
-  // What one unit of this work costs, through the same calculator the
-  // estimates use — one implementation, so the two can never disagree.
+  // What one unit costs, through the same calculator the estimates use, so the two cannot disagree.
   const recipe = book.recipes.find((row) => row.workItemId === workItemId);
   const mixesById = new Map<string, MixDef>(book.mixes.map((mix) => [mix.id, mix]));
   const materialsById = new Map<string, MaterialDef>(
     book.materials.map((material) => [material.id, material]),
   );
   const perUnit = computeLine({ workItemId, qty: 1 }, recipe, mixesById, materialsById);
-  // Where each unit's money goes — every material, mixes expanded.
   const buildUp = rateBuildUp(recipe, mixesById, materialsById);
 
-  // The same work on other floors, offered ticked for "copy this rate".
   const activeWorks = allWorks
     .filter((row) => row.isActive)
     .map((row) => ({ id: row.workItemId, code: row.code, name: row.name, group: row.groupName }));

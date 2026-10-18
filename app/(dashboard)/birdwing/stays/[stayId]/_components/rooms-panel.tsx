@@ -11,13 +11,9 @@ import { addStayRoom, removeStayRoom } from "@/lib/birdwing/actions";
 import type { StayRoomLine } from "@/lib/birdwing/queries";
 import { formatDate } from "@/lib/format";
 import { Trash2 } from "lucide-react";
-import { useActionState, useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useActionState, useState } from "react";
 
-/**
- * The rooms a stay holds, each with its own nights. Adding one the
- * database finds taken on any of those nights is refused with the stay
- * that holds it; a stay that has ended keeps its rooms as its record.
- */
 export function RoomsPanel({
   stayId,
   arrival,
@@ -84,8 +80,7 @@ export function RoomsPanel({
 }
 
 function RoomLine({ room, editable }: { room: StayRoomLine; editable: boolean }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
   return (
     <li className="flex flex-wrap items-center justify-between gap-2 py-2.5">
       <div className="min-w-0 text-sm">
@@ -108,12 +103,7 @@ function RoomLine({ room, editable }: { room: StayRoomLine; editable: boolean })
           aria-label={`Remove ${room.roomCode}`}
           tone="danger"
           disabled={pending}
-          onClick={() =>
-            startTransition(async () => {
-              const result = await removeStayRoom(room.id);
-              if (result?.error) setError(result.error);
-            })
-          }
+          onClick={() => run(() => removeStayRoom(room.id))}
         >
           <Trash2 className="size-4" />
         </IconButton>

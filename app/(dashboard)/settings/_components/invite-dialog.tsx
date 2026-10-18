@@ -6,11 +6,6 @@ import { Label } from "@/components/ui/label";
 import { inviteUser } from "@/lib/settings/actions";
 import { MIN_PASSWORD_LENGTH } from "@/lib/settings/invite";
 
-/**
- * Creating an account, in the same dialog shell every master uses — it
- * already handles the pending state, the double-submit and closing only
- * on a save that worked.
- */
 export function InviteDialog() {
   return (
     <RecordFormDialog label="Person" isEdit={false} action={inviteUser}>

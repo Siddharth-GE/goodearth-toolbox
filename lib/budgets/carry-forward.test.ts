@@ -1,10 +1,3 @@
-/**
- * Carry-forward rules.
- *
- * These are the cases that decide whether the budget team opens R3 and
- * sees two lines waiting or two hundred — which is the difference between
- * a tool people use and a tool people abandon.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -24,8 +17,7 @@ const priced = (
 });
 
 test("an unchanged line keeps the budget team's quantity, not the designer's", () => {
-  // The designer said 10; the team measured 12 and priced against that.
-  // The design hasn't moved, so 12 is still the right number.
+  // The designer said 10, the team measured 12: the design hasn't moved, so 12 stays.
   const plan = planCarryForward({
     previousBudgetLines: [priced("a", { quantity: 12 })],
     previousSelectionLines: [{ line_key: "a", quantity: 10 }],
@@ -41,9 +33,7 @@ test("an unchanged line keeps the budget team's quantity, not the designer's", (
 });
 
 test("a designer's quantity change wins over the team's old measurement", () => {
-  // The room got bigger. The team's 12 running feet is now stale, so the
-  // designer's new figure is taken and the line is flagged — but the cost
-  // per unit is still good, so it isn't sent back to zero.
+  // The designer changed the quantity: take the new figure and flag it, keeping the unit cost.
   const plan = planCarryForward({
     previousBudgetLines: [priced("a", { quantity: 12 })],
     previousSelectionLines: [{ line_key: "a", quantity: 10 }],
@@ -67,8 +57,7 @@ test("a new line carries nothing forward", () => {
     ],
   });
 
-  // No row for "b": the pricing screen shows it anyway, from the
-  // revision's own lines, with the product's default margin.
+  // No row for "b": the screen shows it anyway from the revision's lines.
   assert.deepEqual(
     plan.lines.map((line) => line.line_key),
     ["a"],
@@ -91,8 +80,7 @@ test("a removed line does not appear in the new budget", () => {
 });
 
 test("a line that was never priced still counts as work remaining", () => {
-  // Its vendor and margin come forward as a convenience, but with no cost
-  // it must not be reported as if it were settled.
+  // Vendor and margin carry over, but with no cost it is not settled.
   const plan = planCarryForward({
     previousBudgetLines: [priced("a", { unit_cost: null })],
     previousSelectionLines: [{ line_key: "a", quantity: 10 }],
@@ -106,9 +94,7 @@ test("a line that was never priced still counts as work remaining", () => {
 });
 
 test("the realistic case: 200 lines, two of them touched", () => {
-  // The whole reason line_key exists. If this ever regresses, the budget
-  // team is being asked to re-price an entire villa because a designer
-  // changed one light fitting.
+  // The reason line_key exists: one changed fitting must not force re-pricing a villa.
   const previousSelectionLines = Array.from({ length: 200 }, (_, index) => ({
     line_key: `line-${index}`,
     quantity: 5,
@@ -119,7 +105,6 @@ test("the realistic case: 200 lines, two of them touched", () => {
 
   const currentSelectionLines = [
     ...previousSelectionLines.slice(0, 199),
-    // One quantity changed, and one brand-new item.
     { line_key: "line-199", quantity: 9 },
     { line_key: "brand-new", quantity: 1 },
   ];

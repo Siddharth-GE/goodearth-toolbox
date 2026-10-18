@@ -3,9 +3,6 @@ import { getWelcomeCounts } from "@/lib/indents/queries";
 
 import { ToolWelcome } from "../_components/tool-welcome";
 
-// The welcome screen (founder, 2026-08-13: every Operations and
-// Management tool opens on one). The list lives one click in at
-// /indents/list.
 export default async function IndentsPage() {
   const counts = await getWelcomeCounts();
 

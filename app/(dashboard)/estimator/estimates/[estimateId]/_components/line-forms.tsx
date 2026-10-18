@@ -18,8 +18,10 @@ import {
   removeEstimateLine,
   updateEstimateLineQty,
 } from "@/lib/estimator/estimate-actions";
+import { parseNumber } from "@/lib/form-data";
 import { formatCount } from "@/lib/format";
-import { useMemo, useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useMemo, useState } from "react";
 
 export type PickableWork = {
   workItemId: string;
@@ -28,16 +30,10 @@ export type PickableWork = {
   groupName: string | null;
   categoryCode: string;
   categoryName: string;
-  /** Null = not in the rate book yet; it can still be listed. */
   uom: string | null;
 };
 
-/**
- * Put works on the estimate — any of them, all at once, ticked from a
- * searchable list (0097). They arrive "to measure": no throwaway number
- * to get past the form, and a work not yet in the rate book can be listed
- * and priced later. Works already on the estimate show ticked and fixed.
- */
+/** Put works on the estimate, ticked from a searchable list (0097). They arrive "to measure", and a work not yet in the rate book can be listed and priced later. */
 export function AddWorksDialog({
   estimateId,
   works,
@@ -45,14 +41,12 @@ export function AddWorksDialog({
 }: {
   estimateId: string;
   works: PickableWork[];
-  /** Work ids already on this estimate. */
   onEstimate: string[];
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [picked, setPicked] = useState<string[]>([]);
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run, clearError } = useActionRunner();
   const already = useMemo(() => new Set(onEstimate), [onEstimate]);
 
   const groups = useMemo(() => {
@@ -83,7 +77,7 @@ export function AddWorksDialog({
         if (next) {
           setPicked([]);
           setQuery("");
-          setError(undefined);
+          clearError();
         }
       }}
     >
@@ -157,13 +151,12 @@ export function AddWorksDialog({
           </DialogClose>
           <Button
             disabled={pending || picked.length === 0}
-            onClick={() =>
-              startTransition(async () => {
-                const result = await addEstimateLines(estimateId, picked);
-                if (result?.error) setError(result.error);
-                else setOpen(false);
-              })
-            }
+            onClick={async () => {
+              const result = await run(() => addEstimateLines(estimateId, picked));
+              if (!result?.error) {
+                setOpen(false);
+              }
+            }}
           >
             {pending
               ? "Adding…"
@@ -191,26 +184,19 @@ export function LineQtyField({
 }) {
   const shown = qty === null ? "" : String(qty);
   const [value, setValue] = useState(shown);
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
-  const save = () => {
-    const cleaned = value.replace(/[,\s]/g, "");
-    const next = cleaned === "" ? null : Number(cleaned);
+  const save = async () => {
+    const next = parseNumber(value);
     if (next === qty) return;
     if (next !== null && (!Number.isFinite(next) || next <= 0)) {
       setValue(shown);
       return;
     }
-    startTransition(async () => {
-      const result = await updateEstimateLineQty(id, next);
-      if (result?.error) {
-        setError(result.error);
-        setValue(shown);
-      } else {
-        setError(undefined);
-      }
-    });
+    const result = await run(() => updateEstimateLineQty(id, next));
+    if (result?.error) {
+      setValue(shown);
+    }
   };
 
   return (
@@ -235,8 +221,7 @@ export function LineQtyField({
 }
 
 export function RemoveLineButton({ id, label }: { id: string; label: string }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
   return (
     <div className="flex items-center justify-end gap-2">
@@ -247,12 +232,7 @@ export function RemoveLineButton({ id, label }: { id: string; label: string }) {
         size="sm"
         aria-label={`Remove ${label}`}
         disabled={pending}
-        onClick={() =>
-          startTransition(async () => {
-            const result = await removeEstimateLine(id);
-            setError(result?.error);
-          })
-        }
+        onClick={() => run(() => removeEstimateLine(id))}
       >
         {pending ? "Removing…" : "Remove"}
       </Button>

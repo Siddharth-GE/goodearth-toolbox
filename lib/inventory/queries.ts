@@ -10,36 +10,14 @@ import type { Database } from "@/lib/supabase/database.types";
 
 import { batchLabel, placesOnReceipts, type LineRate } from "./batches";
 
-/**
- * Shared lookups for the Inventory read modules — receipts-queries.ts,
- * stock-queries.ts, issues-queries.ts and requests-queries.ts. Everything
- * exported here is for those files and the Inventory list pages' filter
- * bars, not part of any other tool's surface.
- *
- * Two boundaries shape the whole tool's reads:
- *
- *  1. A store-keeper holds /inventory and usually NOT /purchase-orders,
- *     so purchase orders are read through the money-free po_facts /
- *     po_line_facts views (migration 0022) — never the gated tables.
- *     Item, store, plot and vendor names come from the masters tables,
- *     whose reads are open, read directly under this tool's own grant
- *     (the lib/indents/queries.ts rule) rather than through another
- *     tool's gated queries module.
- *  2. Inventory's stock tables carry no money, so their reads are open to
- *     any signed-in staff member — a site engineer must be able to see
- *     whether their material arrived. The one exception is a batch's
- *     rate (0108): it lives in its own table, goods_receipt_line_rates,
- *     readable by /inventory and the money tools only. The gate in every
- *     exported read is still called: what is open is the row-level read,
- *     not the screen.
- */
+// POs are read via money-free po_facts/po_line_facts (0022): store-keepers may lack /purchase-orders.
+// Stock reads are open to staff, but a batch's rate (0108) is gated; every read still calls the gate.
 
 export const INVENTORY_LIST_LIMIT = 50;
 
 export type Client = SupabaseClient<Database>;
 
-/** Ids one `.in()` filter carries — each is a 36-character uuid in the
- * request URL, and a store can hold hundreds of batches. */
+/** Ids per `.in()` filter: each uuid adds 36 characters to the request URL. */
 const IDS_PER_REQUEST = 100;
 
 function inGroups<T>(values: T[]): T[][] {
@@ -52,11 +30,7 @@ function inGroups<T>(values: T[]): T[][] {
 
 export type ReceiptLineRate = LineRate & { note: string | null };
 
-/**
- * The rate on each of these receipt lines (0108). Every Inventory screen
- * holds /inventory, which reads the table, so a line with no row simply
- * has no rate — but a failed read is an error, never "no rates".
- */
+/** The rate on each receipt line (0108). A failed read is an error, never "no rates". */
 export async function receiptLineRates(
   supabase: Client,
   ids: string[],
@@ -87,17 +61,12 @@ export async function receiptLineRates(
 export type BatchFacts = {
   receiptLineId: string;
   receiptId: string;
-  /** "GRN/SAA/012-1" — the receipt's reference and the line's place on it. */
   label: string;
   receivedAt: string;
   rate: number | null;
 };
 
-/**
- * A batch's name, date and rate, for a set of receipt line ids. The name
- * is derived, never stored, so every line of each receipt is read to count
- * the places — in the order the delivery note lists them.
- */
+/** A batch's name, date and rate. The name is derived, so every line of each receipt is read to count places. */
 export async function batchFactsById(
   supabase: Client,
   ids: string[],
@@ -159,12 +128,10 @@ export type ItemFacts = {
   default_uom: string;
 };
 
-/** Item display facts for a set of ids, as a lookup map. */
 export async function itemsById(supabase: Client, ids: string[]): Promise<Map<string, ItemFacts>> {
   const unique = [...new Set(ids)];
   if (unique.length === 0) return new Map();
-  // Completeness matters — an item missing from this map renders as a
-  // dash on a line the store-keeper is about to count.
+  // Completeness: a missing item would render as a dash on a line being counted.
   const data = await fetchAll((from, to) =>
     supabase
       .from("items")
@@ -188,7 +155,6 @@ export async function itemsById(supabase: Client, ids: string[]): Promise<Map<st
   );
 }
 
-/** The active stores, for destination pickers and filters. */
 export async function listActiveStores(supabase: Client): Promise<{ id: string; name: string }[]> {
   const data = await fetchAll((from, to) =>
     supabase
@@ -202,7 +168,6 @@ export async function listActiveStores(supabase: Client): Promise<{ id: string; 
   return data.map(({ id, name }) => ({ id, name }));
 }
 
-/** PO references for a set of po ids, via the money-free po_facts view. */
 export async function poReferencesById(
   supabase: Client,
   ids: string[],
@@ -215,13 +180,7 @@ export async function poReferencesById(
   return new Map(data.map((row) => [row.id ?? "", row.reference ?? "—"]));
 }
 
-/* ------------------------------------------------------------------ *
- * The list screens' search and filter bar (plan.md, A4)
- * ------------------------------------------------------------------ */
-
-/** The filter dropdowns every Inventory list shares — projects, stores
- * (inactive ones too: old movements still name them) and plots. The
- * Masters reads are open; this wrapper is the gate. */
+/** Inactive stores are included: old movements still name them. */
 export async function getInventoryFilterOptions(): Promise<{
   projects: { id: string; name: string }[];
   stores: { id: string; name: string }[];
@@ -240,17 +199,10 @@ export async function getInventoryFilterOptions(): Promise<{
   };
 }
 
-/** How many matching item ids one search carries into a `.in()` filter —
- * each is a 36-character uuid in the request URL. */
 const ITEM_SEARCH_CAP = 200;
 
-/**
- * A search over item names (and codes) becomes a list of item ids — items
- * is an open Masters read — so a movement list can filter its rows by
- * `item_id`. `capped` is true when more items matched than the list
- * carries, so the screen can say "narrow the search" instead of quietly
- * showing part of the answer. `q` is already made safe by searchParam.
- */
+/** Item search to ids, for filtering movements by item_id. `capped` means more matched than
+ * carried, so the screen says "narrow the search". */
 export async function matchingItemIds(
   supabase: Client,
   q: string,

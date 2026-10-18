@@ -1,10 +1,4 @@
-/**
- * The parser is the only validation a plan document gets.
- *
- * It is stored as one jsonb column, which Postgres cannot check
- * (0048 §1), and it is written by the browser. So everything that would
- * normally be a column constraint is a test here instead.
- */
+/** The parser is the only validation a plan document gets (a jsonb column checks nothing, 0048), so every would-be column constraint is a test here. */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -27,9 +21,7 @@ test("nothing at all still opens as a plan", () => {
 });
 
 test("a document written before a field existed gains the default", () => {
-  // The whole reason inputs live behind a parser: version 1 of this
-  // model has no idea what version 3 will add, and an old plan must
-  // still open rather than erroring or rendering NaN.
+  // An old plan must still open when a newer model adds fields: no error, no NaN.
   const old = { horizonMonths: 48, lines: [{ kind: "sale", name: "Villas", units: 12 }] };
   const parsed = parsePlanInputs(old);
   assert.equal(parsed.horizonMonths, 48);
@@ -40,8 +32,7 @@ test("a document written before a field existed gains the default", () => {
 });
 
 test("NaN and Infinity never make it into a plan", () => {
-  // One NaN poisons every total downstream and shows up as a blank cell
-  // that nobody can explain.
+  // One NaN poisons every total downstream.
   const parsed = parsePlanInputs({
     financingRatePct: Number.NaN,
     openingEquity: Number.POSITIVE_INFINITY,
@@ -85,9 +76,7 @@ test("a build cycle of zero becomes one month, not a division by zero", () => {
 });
 
 test("an unrecognised line kind is dropped, not guessed at", () => {
-  // Guessing would silently turn a line written by a newer version of
-  // the app into a SALE line worth nothing, which reads as a real
-  // number rather than as missing.
+  // Guessing could turn a newer app's line into a worthless SALE line.
   const parsed = parsePlanInputs({
     lines: [{ kind: "sale", name: "Keep" }, { kind: "lease", name: "Drop" }, { name: "No kind" }],
   });
@@ -102,8 +91,7 @@ test("a line with no id gets one", () => {
 });
 
 test("percentages are percents, and round-trip unchanged", () => {
-  // Rule 2 at the top of inputs.ts. 15 means 15%, and a save/reload must
-  // not turn it into 0.15 or 1500.
+  // 15 means 15%; a save/reload must not turn it into 0.15 or 1500.
   const plan = viharaPlan();
   const round = parsePlanInputs(JSON.parse(JSON.stringify(plan)));
   assert.equal(round.financingRatePct, 15);
@@ -116,8 +104,7 @@ test("percentages are percents, and round-trip unchanged", () => {
 });
 
 test("an explicit null override stays null rather than becoming a number", () => {
-  // A line's bookingPct of null means "use the plan's", which is not the
-  // same as 0% down.
+  // bookingPct null means "use the plan's", not 0% down.
   const parsed = parsePlanInputs({
     lines: [{ kind: "sale", bookingPct: null, instalments: null }],
   });

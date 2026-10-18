@@ -1,33 +1,8 @@
-/**
- * A run report → its chart model. The screen (ReportView) and the PDF
- * both come through here, so the two can never shape the same chart
- * differently.
- *
- * PURE, and tested next door in chart-model.test.ts — this is the half of
- * charting that carries arithmetic, which is why it is tested while the
- * rendering is not (PLAN.md: what needs testing is the data shaping;
- * Recharts' own rendering does not need our tests).
- *
- * WHY IT LIVES IN REPORTER. It used to be lib/charts/series.ts, which is
- * shared code, and it reached into lib/reporter/spec and /aggregate to do
- * its job — so the shared chart wrappers, and through them Financial
- * Management, all inherited a dependency on this tool.
- * Moved on 2026-08-17. The dependency now points the way the rulebook
- * says: a tool imports shared code (lib/charts/palette, and the model
- * types in lib/charts/series), never the other way about.
- *
- * Rules the tests lock down:
- * - Nulls stay null — a gap in the line, never a fabricated 0.
- * - Measures of wildly different magnitude are SPLIT into side-by-side
- *   charts rather than seated on one scale. Dual axes are impossible by
- *   construction; this is where the "two charts instead" decision lands.
- * - A meter is one ratio against a limit: measure one over measure two.
- *   It clamps its bar at 100% but reports the real percentage.
- * - Stacked segments from a grouping level fold past eight into
- *   "Other", and only ADDITIVE measures (sum, count) may be merged
- *   across groups — an average of averages is refused with a plain
- *   sentence, never computed wrong.
- */
+// Run report to chart model; the screen and the PDF both come through here, so they can't shape a
+// chart differently. Rules the tests lock: nulls stay null (a gap, never 0); measures of very
+// different magnitude split into side-by-side charts, never dual axes; a meter clamps its bar at
+// 100% but reports the real percentage; stacked segments fold past eight into "Other", and only
+// additive measures (sum, count) merge across groups; an average of averages is refused.
 
 import { OTHER_SERIES, assignSlots, measureColors } from "@/lib/charts/palette";
 import type {
@@ -45,11 +20,9 @@ import { measureId, type ReportSpec } from "./spec";
 
 export type { ChartModel };
 
-/** Sum and count merge across groups; the rest do not. */
 const ADDITIVE_AGGS = new Set(["sum", "count"]);
 
-/** Above this ratio between the largest and smallest series maxima, one
- * shared scale flattens the smaller series into a line on the floor. */
+/** Above this max-to-min ratio, one shared scale flattens the smaller series. */
 const MAGNITUDE_SPLIT_RATIO = 100;
 
 function categoryText(value: unknown): string {
@@ -57,7 +30,6 @@ function categoryText(value: unknown): string {
   return String(value);
 }
 
-/** The dataset's own labelling, wired into the model below. */
 export function chartModelFor(
   dataset: DatasetDef,
   spec: ReportSpec,
@@ -85,11 +57,8 @@ export function chartModelFor(
 export function buildChartModel(args: {
   spec: ReportSpec;
   result: ReportResult;
-  /** measure id → display label, from the screen's own labelling. */
   measureLabels: Record<string, string>;
-  /** field key → display label. */
   fieldLabels: Record<string, string>;
-  /** measure ids whose field carries money. */
   moneyMeasures: string[];
 }): ChartModel {
   const { spec, result, measureLabels, fieldLabels, moneyMeasures } = args;
@@ -109,14 +78,11 @@ export function buildChartModel(args: {
   const level = spec.groupBy.indexOf(chart.category);
   const categoryLabel = fieldLabels[chart.category] ?? chart.category;
 
-  // Stacked with two grouping levels and one measure: the axis is the
-  // chart's category level and the segments are the OTHER level.
+  // Stacked with two grouping levels and one measure: the segments are the other level.
   if (chart.type === "stacked" && spec.groupBy.length === 2 && chart.measures.length === 1) {
     return buildStackedByGroups(chart.measures[0], level, categoryLabel, spec, result, money);
   }
 
-  // Everything else: one point per group at the category's level, one
-  // series per measure.
   const points = pointsAtLevel(result.groups, level, chart.measures, spec);
   if (points === null) {
     return {
@@ -172,12 +138,8 @@ function buildMeter(
   };
 }
 
-/**
- * One point per group at `level`, one value per measure. Level 0 reads
- * the outer groups directly. Level 1 merges children sharing an inner
- * key across outers — legal only when every measure is additive;
- * returns null otherwise so the caller can say why in plain English.
- */
+// Level 1 merges children sharing an inner key across outers, legal only when every measure is
+// additive; null otherwise.
 function pointsAtLevel(
   groups: GroupRow[],
   level: number,
@@ -217,7 +179,6 @@ function pointsAtLevel(
   return order.map((key) => ({ category: key, values: merged.get(key)! }));
 }
 
-/** Stacked bar where the segments are a grouping level's own values. */
 function buildStackedByGroups(
   theMeasure: string,
   categoryLevel: number,
@@ -238,8 +199,6 @@ function buildStackedByGroups(
   const axisLevel = categoryLevel <= 0 ? 0 : 1;
   const segmentLevel = axisLevel === 0 ? 1 : 0;
 
-  // Collect segment identities in first-appearance order, then let the
-  // palette fold the tail into "Other".
   const segmentIds: string[] = [];
   for (const outer of groups) {
     for (const child of outer.children ?? []) {
@@ -278,12 +237,7 @@ function buildStackedByGroups(
   };
 }
 
-/**
- * One shared scale, or several charts. When the largest series' peak is
- * more than MAGNITUDE_SPLIT_RATIO times the smallest's, a shared axis
- * flattens the small one into a floor line, so the model splits into a
- * chart per measure — never a second axis.
- */
+// Splits into a chart per measure when the series peaks differ by more than MAGNITUDE_SPLIT_RATIO.
 function maybeSplit(model: CartesianModel): CartesianModel | SplitModel {
   if (model.series.length < 2) return model;
 

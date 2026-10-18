@@ -5,20 +5,8 @@ import { formatCount } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /**
- * Previous / Next with a position label.
- *
- * There were three incompatible versions of this before: one built from
- * LinkButtons and driven by the URL, one from Buttons driven by state,
- * and one from raw `<button>` elements with no focus ring at all. They
- * disagreed on the label ("Page 2 of 9" vs "2 / 9"), on whether to hide
- * when there was only one page, and on whether a disabled control looked
- * disabled. This is one answer to all of them.
- *
- * Two driving modes, one component: pass `onPageChange` when the list is
- * client state (search results), or `hrefForPage` when the page lives in
- * the URL so a position can be linked to (the Masters items list). Pass
- * `pageSize` alongside `total` to get "Showing 1–50 of 2,633" instead of
- * a bare count.
+ * Previous / Next with a position label. Pass `onPageChange` for client state or `hrefForPage` when the page lives in the URL;
+ * add `pageSize` alongside `total` for "Showing 1–50 of 2,633".
  */
 export function Pagination({
   page,
@@ -33,26 +21,16 @@ export function Pagination({
 }: {
   page: number;
   pageCount: number;
-  /** State-driven lists. Provide this or the hrefs. */
   onPageChange?: (page: number) => void;
-  /**
-   * URL-driven lists — Previous/Next render as real links. Plain strings
-   * (null at either end), NOT a callback: this is a Client Component and
-   * a Server Component page cannot pass it a function — that fails at
-   * runtime ("Functions cannot be passed to Client Components"), which
-   * `next build` does not catch.
-   */
+  /** URL-driven lists. Plain strings (null at either end), not a callback: a Server Component cannot pass a function to a Client Component, and `next build` misses it. */
   prevHref?: string | null;
   nextHref?: string | null;
-  /** Optional row count, shown alongside so the numbers mean something. */
   total?: number;
-  /** With `total`, upgrades the label to "Showing a–b of N". */
   pageSize?: number;
   unit?: string;
   className?: string;
 }) {
-  // Nothing to page through. Rendered as nothing rather than as two dead
-  // buttons, which is what one of the three versions used to do.
+  // Nothing to page through: render nothing, not two dead buttons.
   if (pageCount <= 1 && total === undefined) return null;
 
   let label: string | null = null;

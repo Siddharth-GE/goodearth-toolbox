@@ -1,7 +1,8 @@
 import { EmptyState } from "@/components/ui/empty-state";
 import { LinkButton } from "@/components/ui/button";
 import { PageTitle } from "@/components/ui/page-title";
-import { getIndentPool, getPurchaseOrder } from "@/lib/purchase-orders/queries";
+import { getIndentPool } from "@/lib/purchase-orders/indent-queries";
+import { getPurchaseOrder } from "@/lib/purchase-orders/queries";
 import { canEditPo } from "@/lib/purchase-orders/workflow";
 import { ClipboardList } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
@@ -12,8 +13,7 @@ export default async function PoPullPage({ params }: { params: Promise<{ poId: s
   const [po, pool] = await Promise.all([getPurchaseOrder(poId), getIndentPool(poId)]);
   if (!po || !pool) notFound();
 
-  // Lines only change while it's a draft — past that, the pool screen
-  // has nothing to offer (and the database would refuse anyway).
+  // Lines only change on a draft (the database would refuse anyway).
   if (!canEditPo(po.status)) redirect(`/purchase-orders/${poId}`);
 
   return (

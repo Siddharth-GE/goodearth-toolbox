@@ -17,13 +17,11 @@ export function ItemFormDialog({
 }: {
   categories: ItemCategoryRow[];
   brands: BrandRow[];
-  /** Active unit names from the one master (0082). */
   uoms: string[];
   item?: ItemRow;
 }) {
   const isEdit = !!item;
-  // Deactivated categories/brands stop being offered, but an item already
-  // filed under one keeps its value visible until someone changes it.
+  // Deactivated options stay visible on an item already using one.
   const pickableCategories = categories.filter(
     (category) => category.is_active || category.id === item?.category_id,
   );
@@ -88,8 +86,7 @@ export function ItemFormDialog({
           <option value="" disabled>
             Select a unit
           </option>
-          {/* A saved unit that has since left the master stays choosable
-              once, so an old item can be reopened and saved. */}
+          {/* A saved unit no longer in the master stays choosable, so an old item can be saved. */}
           {item?.default_uom && !uoms.includes(item.default_uom) && (
             <option value={item.default_uom}>{item.default_uom}</option>
           )}

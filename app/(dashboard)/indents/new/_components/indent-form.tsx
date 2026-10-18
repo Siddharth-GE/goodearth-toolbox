@@ -10,18 +10,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { createIndent } from "@/lib/indents/actions";
 import type { IndentFormOptions } from "@/lib/indents/queries";
 import { buildSiteOptions, decodeSite } from "@/lib/masters/site-options";
-import { useMemo, useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useMemo, useState } from "react";
 
 export function IndentForm({ options }: { options: IndentFormOptions }) {
   const [projectId, setProjectId] = useState("");
-  // "" = general, "unit:<id>" or "plot:<id>" otherwise — one place, one
-  // question, since plot ↔ unit became 1:1 (0029).
+  // "" = general, "unit:<id>" or "plot:<id>" (plot and unit are 1:1, 0029).
   const [site, setSite] = useState("");
   const [workItemId, setWorkItemId] = useState("");
   const [requiredBy, setRequiredBy] = useState("");
   const [note, setNote] = useState("");
-  const [error, setError] = useState<string>();
-  const [creating, startTransition] = useTransition();
+  const { pending: creating, error, run } = useActionRunner();
 
   const project = options.projects.find((candidate) => candidate.id === projectId);
   const siteOptions = useMemo(
@@ -29,25 +28,22 @@ export function IndentForm({ options }: { options: IndentFormOptions }) {
     [options.units, options.plots, projectId],
   );
 
-  // The indent number is IND/<code>/…, so a project without a code can't
-  // mint one — said here, before anything is created, rather than as a
-  // failure afterwards. The action and the database both re-check.
+  // IND/<code>/… needs a project code: say so before creating (the action and database re-check).
   const missingCode = Boolean(project) && !project?.code;
 
-  const create = () =>
-    startTransition(async () => {
-      // A success redirects to the new indent, so only errors come back.
-      const { plotId, unitId } = decodeSite(site);
-      const result = await createIndent({
+  const create = async () => {
+    const { plotId, unitId } = decodeSite(site);
+    await run(() =>
+      createIndent({
         projectId,
         plotId,
         unitId,
         workItemId: workItemId || null,
         requiredBy: requiredBy || null,
         note: note || null,
-      });
-      if (result?.error) setError(result.error);
-    });
+      }),
+    );
+  };
 
   return (
     <div className="border-border bg-surface max-w-xl space-y-4 rounded-2xl border p-5">

@@ -1,33 +1,17 @@
-/**
- * Issued-vs-estimated — the pure arithmetic, no database.
- *
- * The official estimate froze what each WORK needs of each ITEM (0077,
- * item-keyed since 0086) in the item's own unit; store issues and
- * direct-to-site deliveries carry the work they served (0080/0081) and
- * move in that same unit. So the two line up on (work, item) with nothing
- * to convert — one unit language is the point of materials being items.
- *
- * A row frozen before 0086 names a retired material and no item. It is
- * shown with its estimated figure but never compared: there is nothing to
- * match it to without the retired list, and a guessed match is worse than
- * an honest gap.
- */
+/** Issued-vs-estimated, pure. Frozen takeoffs (0077) and issues (0080/0081) are both in the item's own unit, so they line up on (work, item) with no conversion.
+ * A row frozen before 0086 names no item: shown with its estimate but never compared, since a guessed match is worse than a gap. */
 
 export type CompareTakeoffRow = {
   workItemId: string;
-  /** The item the frozen row names; null on a row frozen before 0086. */
   itemId: string | null;
   materialName: string;
-  /** The item's unit on the day of submit — what `estimated` is in. */
   uom: string;
   quantity: number;
 };
 
 export type IssuedLine = {
-  /** The work the issue was tagged with; null on pre-0080 issues. */
   workItemId: string | null;
   itemId: string;
-  /** In the item's unit — how stock moves. */
   quantity: number;
 };
 
@@ -39,18 +23,12 @@ export type ComparisonRow = {
   estimated: number;
   /** Null on an older row, which is not compared. */
   issued: number | null;
-  /** More has reached the villa for this work than the estimate allows. */
   over: boolean;
 };
 
 export type Comparison = {
   rows: ComparisonRow[];
-  /** Arrived at the plot but not attributable to a takeoff (work, item)
-   * pair: untagged history, retired works, or items the estimate never
-   * named. Reported per (work, item) — the work is kept because each of
-   * these is a reconciliation entry the estimator must approve (0083),
-   * and "cement outside the plan for PSC slab" is a different entry from
-   * the same cement untagged. Nothing disappears. */
+  /** Arrived at the plot but not attributable to a takeoff (work, item) pair. Kept per work because each is a reconciliation entry the estimator approves (0083). */
   unmatched: { workItemId: string | null; itemId: string; quantity: number }[];
 };
 
@@ -58,7 +36,7 @@ export function compareIssuesToEstimate(
   takeoff: CompareTakeoffRow[],
   issued: IssuedLine[],
 ): Comparison {
-  // Sum issued per (work, item); the null-work bucket keys as "".
+  // The null-work bucket keys as "".
   const issuedByWorkItem = new Map<string, number>();
   for (const line of issued) {
     const key = `${line.workItemId ?? ""} ${line.itemId}`;
@@ -92,10 +70,7 @@ export function compareIssuesToEstimate(
     };
   });
 
-  // An item the estimate names under SOME work still lands here when
-  // issued untagged or for another work — the quantity must show
-  // somewhere, or the comparison quietly under-reports. The map is
-  // already summed per (work, item), so unmatched keys pass through.
+  // An item the estimate names under SOME work still lands here when issued untagged or for another work, so the quantity always shows.
   const unmatched = [...issuedByWorkItem]
     .filter(([key]) => !matchedKeys.has(key))
     .map(([key, quantity]) => {

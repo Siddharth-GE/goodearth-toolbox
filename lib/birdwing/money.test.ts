@@ -1,7 +1,4 @@
-/**
- * A stay's money. chargeAmount must agree with the generated column in
- * 0115 (the trial checks the same figures in the database).
- */
+// chargeAmount must agree with the generated column in 0115.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

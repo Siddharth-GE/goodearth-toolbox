@@ -10,12 +10,6 @@ import { listVendors } from "@/lib/masters/vendors";
 import { HardHat } from "lucide-react";
 import { SendToBill } from "./_components/send-to-bill";
 
-/**
- * Bills → Labour (plan.md B7): the labour the supervisors logged that is
- * not on a bill yet. The billing team ticks entries and sends them to one
- * bill — daily wages by heads × day rates, piece-work against the
- * contractor's work order.
- */
 export default async function LabourToBillPage({
   searchParams,
 }: {

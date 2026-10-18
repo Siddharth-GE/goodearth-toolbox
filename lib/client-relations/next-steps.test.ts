@@ -1,8 +1,3 @@
-/**
- * The tracker's rules: where an action sits, what its date says, how a
- * plot is doing. The CRM team already lives by these answers in the
- * self-hosted tracker, so the edges are pinned here.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -45,7 +40,6 @@ test("an action's section", () => {
   assert.equal(at("done", "2026-01-01"), "done");
   // Waiting on management outranks being overdue.
   assert.equal(at("waiting_management", "2026-01-01"), "management");
-  // No date is overdue — the tracker's rule.
   assert.equal(at("open", null), "overdue");
   assert.equal(at("waiting_client", "2026-10-15"), "overdue");
   assert.equal(at("open", TODAY), "week");
@@ -79,7 +73,6 @@ test("the due menu's quick picks", () => {
   assert.equal(picks["This Friday"], "2026-10-23");
   assert.equal(picks["Next Monday"], "2026-10-19");
   assert.equal(picks["In 2 weeks"], "2026-10-30");
-  // On a Saturday, "this Friday" is six days on; on a Monday, "next Monday" is a week on.
   const saturday = Object.fromEntries(dueChoices("2026-10-17").map((c) => [c.label, c.date]));
   assert.equal(saturday["This Friday"], "2026-10-23");
   const monday = Object.fromEntries(dueChoices("2026-10-19").map((c) => [c.label, c.date]));
@@ -156,7 +149,6 @@ test("a plot's health", () => {
   ) => plotHealth({ ...plot, lastTouched: touched }, actions, TODAY);
   assert.equal(health(sold({ hasBuyer: false }), []), null);
   assert.equal(health(sold(), [{ status: "open", dueOn: "2026-10-01" }]), "overdue");
-  // Undated counts as overdue, as in the list.
   assert.equal(health(sold(), [{ status: "open", dueOn: null }]), "overdue");
   // Overdue first, even beside a management flag — and a flagged action is never "overdue".
   assert.equal(
@@ -178,7 +170,6 @@ test("a plot's rail", () => {
     steps: [false, false, false, false, false],
     build: 0,
   });
-  // On the first stage (Agreement) the build has not started.
   assert.deepEqual(plotRail(sold({ stageIndex: 0 })).steps, [true, true, false, false, false]);
   const slab = plotRail(sold({ caStatus: "signed", stageIndex: 3 }));
   assert.deepEqual(slab.steps, [true, true, true, true, false]);
@@ -186,7 +177,6 @@ test("a plot's rail", () => {
   const done = plotRail(sold({ caStatus: "signed", stageIndex: 8 }));
   assert.deepEqual(done.steps, [true, true, true, true, true]);
   assert.equal(done.build, 1);
-  // An empty Masters list hands nothing over.
   assert.equal(plotRail(sold({ stageIndex: -1, finalIndex: -1 })).steps[4], false);
 });
 
@@ -205,7 +195,6 @@ test("only the setter, or a manager, closes an action", () => {
   assert.equal(closeRight(set, { id: "siddharth", isManager: true }), "close");
   assert.equal(closeRight(set, { id: "anu", isManager: false }), "finish");
   assert.equal(closeRight(set, { id: "sayooj", isManager: false }), "none");
-  // Set by its own owner: they close it themselves.
   assert.equal(
     closeRight({ createdBy: "anu", ownerId: "anu" }, { id: "anu", isManager: false }),
     "close",
@@ -222,9 +211,7 @@ test("finished and waiting to confirm is never overdue, nor anyone's load", () =
   assert.equal(actionBucket(finished, TODAY), "confirm");
   assert.deepEqual(dueLabel(finished, TODAY), { text: "Finished · to confirm", tone: "success" });
   assert.equal(loadOf([finished, { status: "open", dueOn: null }], TODAY).open, 1);
-  // A plot with only a finished action is on track, not overdue and not stepless.
   assert.equal(plotHealth({ ...sold(), lastTouched: TODAY }, [finished], TODAY), "on_track");
-  // The next action prefers real work over what waits to be confirmed.
   assert.equal(nextAction([finished, { status: "open", dueOn: "2026-12-01" }])?.status, "open");
   assert.equal(nextAction([finished])?.status, "awaiting_confirmation");
 });
@@ -258,10 +245,8 @@ test("the Plots grid by side and person: each side has its own owner", () => {
     { track: "kaadal", ownerId: "anu", status: "waiting_management" },
   ];
 
-  // Either side, with no side picked.
   assert.equal(plotInList(plot, open, null, "anu"), true);
   assert.equal(plotInList(plot, open, null, "sayooj"), true);
-  // Construction: its owner, or whoever holds a construction action.
   assert.equal(plotInList(plot, open, "sales", "anu"), true);
   assert.equal(
     plotInList(plot, open, "sales", "sayooj"),
@@ -269,11 +254,9 @@ test("the Plots grid by side and person: each side has its own owner", () => {
     "the interior owner is not construction's",
   );
   assert.equal(plotInList(plot, open, "sales", "sebastina"), true);
-  // Interior: its owner, or whoever holds an interior action.
   assert.equal(plotInList(plot, open, "kaadal", "sayooj"), true);
   assert.equal(plotInList(plot, open, "kaadal", "anu"), true, "anu holds an interior action");
   assert.equal(plotInList(plot, open, "kaadal", "sebastina"), false);
-  // Waiting on management, on the side asked about.
   assert.equal(plotInList(plot, open, "kaadal", "mgmt"), true);
   assert.equal(plotInList(plot, open, "sales", "mgmt"), false);
   assert.equal(plotInList(plot, open, null, "all"), true);

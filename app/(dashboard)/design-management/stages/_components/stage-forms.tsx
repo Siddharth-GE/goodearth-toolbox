@@ -13,9 +13,10 @@ import {
   setDesignStageActive,
   setDesignStageCode,
   setDesignStageOnBoard,
-} from "@/lib/design-management/actions";
+} from "@/lib/design-management/stage-actions";
 import { ArrowDown, ArrowUp } from "lucide-react";
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useActionState, useEffect, useRef, useState } from "react";
 
 export function DesignStageForm() {
   const [state, formAction, pending] = useActionState(addDesignStage, undefined);
@@ -43,28 +44,21 @@ export function DesignStageForm() {
   );
 }
 
-/** The name, editable in place. A rename follows through to every
- * transmittal carrying it, so this doesn't ask for confirmation. */
+/** A rename follows through to every transmittal carrying it, so no confirmation. */
 export function DesignStageNameField({ id, name }: { id: string; name: string }) {
   const [value, setValue] = useState(name);
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
-  const save = () => {
+  const save = async () => {
     const next = value.trim();
     if (!next || next === name) {
       setValue(name);
       return;
     }
-    startTransition(async () => {
-      const result = await renameDesignStage(id, next);
-      if (result?.error) {
-        setError(result.error);
-        setValue(name);
-      } else {
-        setError(undefined);
-      }
-    });
+    const result = await run(() => renameDesignStage(id, next));
+    if (result?.error) {
+      setValue(name);
+    }
   };
 
   return (
@@ -86,31 +80,21 @@ export function DesignStageNameField({ id, name }: { id: string; name: string })
   );
 }
 
-/**
- * The stage's short code, which every sheet of the stage carries in its
- * file name (WD in SAA-Saarang-Villa12-WD-TR0003-GFP.pdf). Saved on
- * leaving the field; a change renames those sheets on their next download.
- */
+/** The stage's short code in every sheet's file name; a change renames those sheets on their next download. */
 export function DesignStageCodeField({ id, code }: { id: string; code: string | null }) {
   const [value, setValue] = useState(code ?? "");
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
-  const save = () => {
+  const save = async () => {
     const next = value.trim().toUpperCase();
     if (next === (code ?? "")) {
       setValue(code ?? "");
       return;
     }
-    startTransition(async () => {
-      const result = await setDesignStageCode(id, next);
-      if (result?.error) {
-        setError(result.error);
-        setValue(code ?? "");
-      } else {
-        setError(undefined);
-      }
-    });
+    const result = await run(() => setDesignStageCode(id, next));
+    if (result?.error) {
+      setValue(code ?? "");
+    }
   };
 
   return (
@@ -135,8 +119,7 @@ export function DesignStageCodeField({ id, code }: { id: string; code: string | 
 }
 
 export function DesignStageToggle({ id, isActive }: { id: string; isActive: boolean }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
   return (
     <div className="flex items-center justify-end gap-2">
@@ -146,12 +129,7 @@ export function DesignStageToggle({ id, isActive }: { id: string; isActive: bool
         variant="ghost"
         size="sm"
         disabled={pending}
-        onClick={() =>
-          startTransition(async () => {
-            const result = await setDesignStageActive(id, !isActive);
-            setError(result?.error);
-          })
-        }
+        onClick={() => run(() => setDesignStageActive(id, !isActive))}
       >
         {pending ? "Saving…" : isActive ? "Retire" : "Reactivate"}
       </Button>
@@ -159,7 +137,6 @@ export function DesignStageToggle({ id, isActive }: { id: string; isActive: bool
   );
 }
 
-/** Whether the stage is a column on the design board (0126). */
 export function DesignStageBoardSwitch({
   id,
   name,
@@ -171,8 +148,7 @@ export function DesignStageBoardSwitch({
   onBoard: boolean;
   disabled?: boolean;
 }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
   return (
     <div className="flex flex-col gap-1">
@@ -183,10 +159,7 @@ export function DesignStageBoardSwitch({
           aria-label={`${name} on the design board`}
           onChange={(event) => {
             const next = event.currentTarget.checked;
-            startTransition(async () => {
-              const result = await setDesignStageOnBoard(id, next);
-              setError(result?.error);
-            });
+            run(() => setDesignStageOnBoard(id, next));
           }}
         />
         {pending ? "Saving…" : onBoard ? "On the board" : "Off"}
@@ -207,14 +180,9 @@ export function DesignStageMoveButtons({
   isFirst: boolean;
   isLast: boolean;
 }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
-  const move = (direction: "up" | "down") =>
-    startTransition(async () => {
-      const result = await moveDesignStage(id, direction);
-      setError(result?.error);
-    });
+  const move = (direction: "up" | "down") => run(() => moveDesignStage(id, direction));
 
   return (
     <>

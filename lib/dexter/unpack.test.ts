@@ -3,10 +3,6 @@ import { test } from "node:test";
 
 import { contentTypeFor, planZip, safeDeckPath, type ZipEntry } from "./unpack";
 
-// ---------------------------------------------------------------------
-// contentTypeFor
-// ---------------------------------------------------------------------
-
 test("contentTypeFor knows the common web types", () => {
   assert.equal(contentTypeFor("index.html"), "text/html; charset=utf-8");
   assert.equal(contentTypeFor("assets/style.css"), "text/css; charset=utf-8");
@@ -26,10 +22,6 @@ test("contentTypeFor falls back to a plain download for anything unknown", () =>
   assert.equal(contentTypeFor("no-extension"), "application/octet-stream");
   assert.equal(contentTypeFor("trailing-dot."), "application/octet-stream");
 });
-
-// ---------------------------------------------------------------------
-// safeDeckPath
-// ---------------------------------------------------------------------
 
 test("safeDeckPath accepts a plain relative path", () => {
   assert.equal(safeDeckPath(["assets", "style.css"]), "assets/style.css");
@@ -67,10 +59,6 @@ test("safeDeckPath rejects a path over 200 characters", () => {
 test("safeDeckPath decodes a legitimately encoded segment", () => {
   assert.equal(safeDeckPath(["my%20file.png"]), "my file.png");
 });
-
-// ---------------------------------------------------------------------
-// planZip
-// ---------------------------------------------------------------------
 
 function file(name: string, size = 10): ZipEntry {
   return { name, size, isDirectory: false };

@@ -1,48 +1,20 @@
 /**
- * Clears every record people made in the tools on STAGING, so the team
- * starts again from the final masters workbook. Founder, 2026-10-07:
- * "remove all the current data in the apps as well, clear the whole
- * thing". Run it before scripts/import-masters-workbook.ts.
- *
- * Cleared (CLEARED below): indents, POs, goods in and out, stock, bills,
- * labour, estimates — and the rate book's material recipes, which point
- * at the materials the import replaces — budgets, selections and rooms,
- * Relay runs, drawings and transmittals, Dexter decks, client receipts,
- * business plans, funding, saved reports, item requests, every numbering
- * counter and the audit history; and the files in the Dexter, drawings
- * and room-photo buckets.
- *
- * Blanked, not deleted (BLANKED below): each villa's payment schedule.
- * Its nine steps are made with the villa and the app can only edit them,
- * never add them back, so the steps stay and lose their amounts, dates
- * and invoices — the state a new villa starts in.
- *
- * Kept (KEPT below): people, logins and access, approver lists, clients,
- * the plot register, projects, plots and villas, the design catalogue,
- * Relay's trails, departments, activities and schedules, Chat-space
- * links, Marathon. The masters the workbook replaces are the import's
- * business, not this script's.
- *
- * Every table in the database must be on one of the lists — a table
- * added since this was written stops the run until someone decides which.
- *
- * PRACTICE DATABASE ONLY (`lib/environment.ts`): it refuses any other ref.
- *
- * Before deleting, every row and file it deletes is written to
- * data/backups/ (gitignored), and it refuses if a kept table points at a
- * cleared one.
- *
- * WHY IT BYPASSES THE GUARDS — wipe-drawings.ts's reason. Issued and
- * frozen records refuse deletion through their guard triggers, rightly,
- * for everyday use; a wipe must get past them. The deletes run in ONE
- * transaction with `session_replication_role = replica`, which switches
- * every trigger off for that transaction only (guards, FK checks, audit
- * rows) — so whole tables go, never part of one, and the kept-points-at-
- * cleared check above stands in for the FK checks. Rows first, then
- * files, as the app does it.
+ * Clears every record people made in the tools on STAGING so the team can start again
+ * from the final masters workbook. Run it before scripts/import-masters-workbook.ts.
  *
  *   npx tsx scripts/wipe-staging-records.ts --project <ref>            # counts only
  *   npx tsx scripts/wipe-staging-records.ts --project <ref> --commit   # back up, then delete
+ *
+ * Lists below: CLEARED (deleted), BLANKED (each villa's payment schedule keeps its nine
+ * steps, which the app cannot re-add, and loses amounts, dates and invoices) and KEPT
+ * (people, logins, access, clients, plots, design catalogue, Relay setup). Every
+ * table must be on one list, so a newly added table stops the run until someone decides.
+ * PRACTICE DATABASE ONLY (`lib/environment.ts`): it refuses any other ref.
+ * Every row and file is first written to data/backups/ (gitignored), and it refuses if a
+ * kept table points at a cleared one.
+ * It bypasses the guards, as wipe-drawings.ts does: ONE transaction with
+ * `session_replication_role = replica`, whole tables only; the kept-points-at-cleared
+ * check stands in for the FK checks. Rows first, then files.
  */
 import { createClient } from "@supabase/supabase-js";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -53,7 +25,6 @@ import { backupTables } from "./backup-tables";
 import { isCommit, literal, requireProjectRef, serviceRoleKey, sql } from "./supabase-management";
 
 const CLEARED = [
-  // Indents → POs → goods in and out → stock → bills
   "indent_lines",
   "indents",
   "indent_counters",
@@ -72,11 +43,8 @@ const CLEARED = [
   "bill_counters",
   "labour_contracts",
   "labour_logs",
-  // Budgets
   "budget_lines",
   "budgets",
-  "construction_budget_lines",
-  "construction_budgets",
   // Estimator: estimates, and the rate book's material recipes
   "estimator_estimate_item_rates",
   "estimator_estimate_line_components",
@@ -91,12 +59,10 @@ const CLEARED = [
   "estimator_mix_components",
   "estimator_mixes",
   "estimator_materials",
-  // Selections and rooms
   "selection_lines",
   "selections",
   "space_views",
   "spaces",
-  // Design Management
   "design_step_events",
   "design_step_people",
   "design_steps",
@@ -110,24 +76,19 @@ const CLEARED = [
   "drawing_revisions",
   "drawing_set_works",
   "drawing_sets",
-  // Relay runs
   "pusher_chain_links",
   "pusher_chain_events",
   "pusher_chain_legs",
   "pusher_chain_departments",
   "pusher_chains",
-  // Dexter
   "dexter_answers",
   "dexter_decks",
   "dexter_projects",
-  // Client Relations money
   "client_receipts",
-  // Business Planning, Financial Management
   "business_plan_targets",
   "business_plans",
   "funding_movements",
   "funding_facilities",
-  // Reporter, Masters' item requests, history
   "reports",
   "item_requests",
   "app_errors",
@@ -135,7 +96,6 @@ const CLEARED = [
 ] as const;
 
 const KEPT = [
-  // The shell: people, sign-in, access
   "applied_migrations",
   "auth_verified_sessions",
   "login_attempts",
@@ -147,7 +107,6 @@ const KEPT = [
   "roles",
   "bill_approvers",
   "indent_approvers",
-  // Clients and places
   "clients",
   "client_engagements",
   "projects",
@@ -171,7 +130,6 @@ const KEPT = [
   "work_categories",
   "work_groups",
   "work_items",
-  // Relay's setup, and the Chat door's links
   "project_stages",
   "pusher_activities",
   "pusher_departments",
@@ -179,17 +137,8 @@ const KEPT = [
   "pusher_trail_sets",
   "pusher_trail_set_items",
   "google_chat_spaces",
-  // Marathon, the kiosk
-  "marathon_agents",
-  "marathon_categories",
-  "marathon_config",
-  "marathon_entries",
-  "marathon_groups",
-  "marathon_pin_attempts",
-  "marathon_runs",
 ] as const;
 
-/** Kept rows, emptied of what people entered — see "Blanked" above. */
 const BLANKED = [
   {
     table: "client_payment_milestones",
@@ -222,7 +171,6 @@ async function counts(ref: string): Promise<{ t: string; n: number }[]> {
   );
 }
 
-/** Every public table must be on a list — a new one is a decision, not a default. */
 async function unlisted(ref: string): Promise<string[]> {
   const rows = await sql<{ t: string }>(
     ref,
@@ -234,7 +182,7 @@ async function unlisted(ref: string): Promise<string[]> {
   return rows.map((row) => row.t);
 }
 
-/** Rows in a kept table that point at a cleared one — they would be left pointing at nothing. */
+// Rows in a kept table that point at a cleared one would be left pointing at nothing.
 async function keptPointingAtCleared(ref: string): Promise<string[]> {
   const fks = await sql<{ child: string; cols: string[]; parent: string }>(
     ref,
@@ -260,7 +208,6 @@ async function keptPointingAtCleared(ref: string): Promise<string[]> {
   return found.filter((row) => row.n > 0).map((row) => `${row.ref}: ${row.n} rows`);
 }
 
-/** Every object path in a bucket; a folder has no id in the listing. */
 async function listAll(storage: Storage, bucket: string, prefix = ""): Promise<string[]> {
   const { data, error } = await storage.from(bucket).list(prefix, { limit: 1000 });
   if (error) throw new Error(`Could not list ${bucket}/${prefix}: ${error.message}`);

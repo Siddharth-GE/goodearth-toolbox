@@ -14,18 +14,12 @@ import {
 import { FormMessage } from "@/components/ui/form-message";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useId, useState, useTransition, type ReactNode } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useId, useState, type ReactNode } from "react";
 
 /**
- * "Are you sure?" before a press that cannot be taken back — cancelling a
- * stay or an invoice, removing a receipt. It names what will happen
- * before it happens, keeps any refusal inside the dialog, and, when the
- * record needs one, asks why (`reason`): the answer is handed to
- * `onConfirm`, and the button waits until something is typed.
- *
- * The third copy of Design Management's local ConfirmDialog (DESIGN.md:
- * the third copy is built into components/ui); that one converts when
- * its screen is next touched.
+ * "Are you sure?" before a press that cannot be taken back. Names what will happen, keeps any refusal inside the dialog,
+ * and with `reason` asks why: the answer goes to `onConfirm` and the button waits until something is typed.
  */
 export function ConfirmDialog({
   trigger,
@@ -39,7 +33,6 @@ export function ConfirmDialog({
   open: controlledOpen,
   onOpenChange,
 }: {
-  /** What opens it; omit when a menu item opens it through `open`. */
   trigger?: ReactNode;
   title: string;
   description: string;
@@ -59,8 +52,7 @@ export function ConfirmDialog({
     if (onOpenChange) onOpenChange(next);
     else setOwnOpen(next);
   };
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run, clearError } = useActionRunner();
   const [why, setWhy] = useState("");
   const reasonId = useId();
 
@@ -71,7 +63,7 @@ export function ConfirmDialog({
         if (pending) return;
         setOpen(next);
         if (!next) {
-          setError(undefined);
+          clearError();
           setWhy("");
         }
       }}
@@ -108,13 +100,11 @@ export function ConfirmDialog({
               tone === "danger" ? "bg-danger text-danger-foreground hover:bg-danger/90" : undefined
             }
             disabled={pending || (reason !== undefined && why.trim() === "")}
-            onClick={() => {
-              setError(undefined);
-              startTransition(async () => {
-                const result = await onConfirm(why.trim());
-                if (result?.error) setError(result.error);
-                else setOpen(false);
-              });
+            onClick={async () => {
+              const result = await run(() => onConfirm(why.trim()));
+              if (!result?.error) {
+                setOpen(false);
+              }
             }}
           >
             {pending ? pendingLabel : confirmLabel}

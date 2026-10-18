@@ -1,25 +1,7 @@
 /**
- * Is this read failure worth trying again?
- *
- * Reads in this codebase throw rather than hand back half an answer
- * (fetch-all.ts says why). That is the right call for a genuine failure
- * — but it also means one dropped connection blanks a whole page with
- * "Something went wrong", which is what the Operations tools did on the
- * evening of 16 Aug 2026: intermittent, every tool, gone by morning.
- *
- * So the throw stays and a bounded retry goes in front of it. The whole
- * question is which failures deserve one. A dropped connection will
- * probably succeed on the next attempt; an RLS refusal, a constraint
- * violation or a malformed filter will fail identically three times and
- * only make the user wait longer for the same message. Retrying those
- * would also turn a fast, clear refusal into a slow, vague one.
- *
- * So: retry the connection, never the answer. Anything not named here is
- * treated as permanent, which is the safe default — the worst case is
- * the behaviour we already have today.
- *
- * Pure and dependency-free so it can be unit-tested without a database
- * (CLAUDE.md: pure logic only).
+ * Is this read failure worth trying again? Retry the connection, never the
+ * answer: a refusal, a constraint or a bad filter fails the same way every time.
+ * Anything not named here is permanent, the safe default. Pure, so it is tested.
  */
 
 /** Postgres SQLSTATEs that mean "the connection, not the query". */
@@ -41,11 +23,7 @@ const TRANSIENT_SQLSTATES = new Set([
 /** HTTP statuses worth another attempt: gateway trouble and back-pressure. */
 const TRANSIENT_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
 
-/**
- * Node puts the real network failure in `code` as a syscall name, not a
- * SQLSTATE — usually one level down in `cause`, under undici's flat
- * "fetch failed".
- */
+/** Node's network failure, as a syscall name in `code`, often one level down in `cause`. */
 const TRANSIENT_SYSCALLS = new Set([
   "ECONNRESET",
   "ECONNREFUSED",
@@ -62,11 +40,7 @@ const TRANSIENT_SYSCALLS = new Set([
   "UND_ERR_BODY_TIMEOUT",
 ]);
 
-/**
- * Network-level failures surface with no SQLSTATE at all — undici gives
- * "fetch failed" and hides the real reason in `cause`, so match on the
- * shapes actually seen rather than on a code that isn't there.
- */
+/** Network failures carry no SQLSTATE: undici says "fetch failed" and hides why in `cause`. */
 const TRANSIENT_MESSAGES = [
   "fetch failed",
   "network",
@@ -88,14 +62,8 @@ type MaybeError = {
   cause?: unknown;
 } | null;
 
-/**
- * PostgREST's PGRST303 ("JWT claims validation failed") is almost always
- * a definite no — an expired token, a wrong audience. One message is
- * not: "JWT issued at future" means the session was renewed a moment ago
- * on a clock a hair ahead of the database's, and the same token is valid
- * a moment later. It blanked the sidebar's teams on 2026-10-13
- * (BUGCATCHER #20).
- */
+/** PGRST303 is a definite no, except "JWT issued at future": a token renewed a moment
+ * ago on a clock slightly ahead of the database's (BUGCATCHER #20). */
 function isTokenFromTheFuture(candidate: NonNullable<MaybeError>): boolean {
   return (
     candidate.code === "PGRST303" &&
@@ -111,8 +79,7 @@ export function isTransient(error: unknown): boolean {
 
   if (isTokenFromTheFuture(candidate)) return true;
 
-  // PostgREST puts the SQLSTATE in `code`; a numeric code is an HTTP
-  // status from the fetch layer instead.
+  // A numeric code is an HTTP status from the fetch layer, not a SQLSTATE.
   const code = candidate.code;
   if (typeof code === "string" && TRANSIENT_SQLSTATES.has(code.toUpperCase())) return true;
   if (typeof code === "string" && TRANSIENT_SYSCALLS.has(code.toUpperCase())) return true;
@@ -123,9 +90,7 @@ export function isTransient(error: unknown): boolean {
 
   if (typeof candidate.status === "number" && TRANSIENT_STATUSES.has(candidate.status)) return true;
 
-  // A real SQLSTATE that isn't in the list above is a definite answer
-  // from the database — a refusal or a constraint. Never retry it, even
-  // if the message happens to contain a word like "timeout".
+  // Any other real SQLSTATE is the database's answer: never retried, whatever the message says.
   if (typeof code === "string" && /^[0-9A-Z]{5}$/.test(code.toUpperCase())) return false;
 
   const message = typeof candidate.message === "string" ? candidate.message.toLowerCase() : "";
@@ -138,17 +103,8 @@ export function isTransient(error: unknown): boolean {
 }
 
 /**
- * Runs `attempt` up to `tries` times, pausing between retries, and gives
- * up the moment a failure looks permanent.
- *
- * `attempt` returns Supabase's `{ data, error }` rather than throwing, so
- * this inspects the error object instead of catching. Thrown errors (a
- * dropped socket can reach us that way too) are handled as well: a
- * transient one is retried, anything else is rethrown untouched.
- *
- * Delays are short and fixed — this sits in front of a page render, so
- * the ceiling on added latency for a genuinely dead database is about
- * half a second, not the many seconds a full exponential backoff costs.
+ * Up to `tries` attempts, stopping at the first permanent failure; thrown errors
+ * are judged the same way. Short fixed delays: this sits in front of a page render.
  */
 export async function withRetry<T extends { error: unknown }>(
   attempt: () => PromiseLike<T>,
@@ -174,8 +130,7 @@ export async function withRetry<T extends { error: unknown }>(
     await sleep(delaysMs[index] ?? delaysMs[delaysMs.length - 1] ?? 150);
   }
 
-  // Only reachable when every attempt failed transiently; hand back the
-  // last error so the caller reports the real reason.
+  // Every attempt failed transiently: hand back the last real reason.
   return lastResult as T;
 }
 

@@ -28,19 +28,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { deleteReport, renameReport, updateReportSpec } from "@/lib/reporter/actions";
 import { encodeSpec, type ReportSpec } from "@/lib/reporter/spec";
 
-/**
- * Save-changes, rename and delete for one saved report.
- *
- * "Save changes" only appears when the spec on screen actually differs
- * from the stored one, so the button is never a no-op — reshaping a
- * report and keeping the change are two separate decisions, and a
- * person can look without committing.
- *
- * Plain useState booleans rather than useTransition: router.refresh()
- * inside an async transition leaves isPending true for as long as the
- * refresh is in flight, which greys the control out and never comes
- * back (the Relay schedule-editor bug).
- */
+// "Save changes" shows only when the spec on screen differs from the stored one. Plain useState,
+// not useTransition: router.refresh() inside an async transition leaves isPending true and greys
+// the control out for good.
 export function ReportActions({
   reportId,
   name,
@@ -52,9 +42,7 @@ export function ReportActions({
   reportId: string;
   name: string;
   description: string | null;
-  /** The spec currently on screen — what "Save changes" would store. */
   spec: ReportSpec;
-  /** True when that differs from what is saved. */
   changed: boolean;
   canDelete: boolean;
 }) {
@@ -73,8 +61,7 @@ export function ReportActions({
       setError(result.error);
       return;
     }
-    // Back to the report's own address: the changes are now what the
-    // report IS, so carrying them in the URL would be misleading.
+    // The changes are now the report itself, so keeping them in the URL would mislead.
     router.push(`/reporter/${reportId}`);
   }
 

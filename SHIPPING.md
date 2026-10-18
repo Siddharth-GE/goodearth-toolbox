@@ -29,15 +29,13 @@ Both are reached from this machine through the management API (`/database/query`
 - `NEXT_PUBLIC_SUPABASE_*` are public — the anon key is safe because RLS is on everywhere.
 - `SUPABASE_SERVICE_ROLE_KEY` bypasses RLS entirely — server-only, for the sanctioned uses in `SECURITY.md` and scripts.
 - `SUPABASE_ACCESS_TOKEN` is the management API key — local only, and CI's one secret (for `db:check`); rotating it means rotating it in GitHub too.
-- `MARATHON_SESSION_SECRET` signs the kiosk cookie; `AUTH_COOKIE_SECRET` signs the sign-in flow's cookies (separate on purpose); rotating either signs people out. `SITE_URL` is the app's absolute URL.
+- `AUTH_COOKIE_SECRET` signs the sign-in flow's cookies; rotating it signs people out. `SITE_URL` is the app's absolute URL.
 - **Vercel holds the Supabase variables twice** — a Production entry (production database) and a Preview entry (staging). If a preview ever shows real data, check that first.
 - **Vercel Authentication is off** (Google must reach the Chat endpoint), so every preview URL is public — and reads staging, so trying a feature there can never touch real work.
 - **Secrets go into Vercel through its API** (`scripts/vercel-env.ts`), never pasted and never marked "sensitive" (BUGCATCHER #18).
 - Anything the platform holds outside the database — auth settings, email templates, redirect lists — is configuration too (BUGCATCHER #10). **Supabase's redirect allow-list** must cover previews: `https://goodearth-toolbox-*.vercel.app/**`.
 
 Data scripts in `scripts/` are dry-run by default, `--commit` to write, and match on a natural key so a re-run writes nothing; never delete to re-insert, because live rows carry selections, budgets and indents.
-
-**A new database gets its Marathon PINs rotated** the day its migrations land: `0002` seeds published agent and admin PINs, so run `scripts/rotate-marathon-pins.ts --project <ref> --commit` and keep the PINs it prints once.
 
 ## The staging protocol
 

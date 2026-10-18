@@ -1,9 +1,4 @@
-/**
- * The arithmetic behind every leadership report. The rule these tests
- * exist to hold: NULLS ARE SKIPPED, NOT ZEROED — an unpriced line and a
- * free line are different things — and a grand total always equals the
- * sum of its subtotals.
- */
+// Holds the rule: nulls are skipped, not zeroed, and a grand total equals the sum of its subtotals.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -46,7 +41,6 @@ test("all six aggregates", () => {
   assert.equal(result.totals["quantity:avg"], 65 / 4);
   assert.equal(result.totals["quantity:min"], 5);
   assert.equal(result.totals["quantity:max"], 30);
-  // count counts values present, so the null steel quantity is not one.
   assert.equal(result.totals["quantity:count"], 4);
   assert.equal(result.totals["item:count_distinct"], 3);
 });
@@ -62,7 +56,7 @@ test("nulls are skipped, not zeroed", () => {
     allNull,
     2,
   );
-  // A sum over nothing is null — never 0, which would read as "free".
+  // A sum over nothing is null, never 0 ("free").
   assert.equal(result.totals["quantity:sum"], null);
   assert.equal(result.groups?.[0].measures["quantity:sum"], null);
 
@@ -72,7 +66,6 @@ test("nulls are skipped, not zeroed", () => {
     [...allNull, { project: "P", quantity: 6 }],
     3,
   );
-  // The average of {null, null, 6} is 6, not 2.
   assert.equal(mixed.totals["quantity:avg"], 6);
 });
 
@@ -146,9 +139,8 @@ test("sorting groups by a measure orders by the number, nulls last", () => {
 });
 
 test("a distinct count counts things, not labels", () => {
-  // Five armchairs share the name "Armchair" and are told apart by item
-  // code — and one has no code at all, which is why codes are not the
-  // identity either. Counting names says 2; counting items says 4.
+  // Five armchairs share a name; one has no code, so codes aren't the identity either. Names say 2,
+  // items say 4.
   const armchair = (id: string, code: string | null): ReportRow => ({
     project: "Malhar",
     item: id === "i4" ? "Cement" : "Armchair",
@@ -175,7 +167,6 @@ test("a distinct count counts things, not labels", () => {
     armchairs.length,
   );
   assert.equal(result.totals["item:count_distinct"], 4);
-  // The blank code is still one item — counting codes would say 3.
   assert.equal(result.totals["item_code:count_distinct"], 4);
   assert.equal(result.groups?.[0].measures["item:count_distinct"], 4);
 });
@@ -213,12 +204,10 @@ test("extractRows carries identity ids beside the names it displays", () => {
     extracted,
     2,
   );
-  // Two rows, one name, two items.
   assert.equal(result.totals["item:count_distinct"], 2);
 });
 
 test("a field with no identityPath still counts its own values", () => {
-  // The indent reference IS the identity, so nothing changes for it.
   const result = runReport(
     dataset,
     spec({ measures: [{ field: "indent", agg: "count_distinct" }] }),
@@ -249,7 +238,6 @@ test("extractRows computes derived fields from the flattened row", () => {
         vendors: { name: "Sharma Traders" },
       },
     },
-    // An unpriced line: the derived value must be null, not 0.
     {
       item_id: "i2",
       quantity: 5,
@@ -284,7 +272,6 @@ test("extractRows computes derived fields from the flattened row", () => {
     [priced, unpriced],
     2,
   );
-  // The null line is skipped, not zeroed — the sum is the priced line.
   assert.equal(result.totals["line_value:sum"], 236);
 });
 

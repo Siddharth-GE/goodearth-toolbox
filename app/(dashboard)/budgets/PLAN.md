@@ -1,6 +1,6 @@
 # Budgets — the rules
 
-What an issued design revision costs, and what the client is charged — plus the construction stage tree. Grant `/budgets`. Migrations `0011`, `0012`, `0019`.
+What an issued design revision costs, and what the client is charged. Interiors only: construction runs Estimate → Indent → PO (founder, 2026-10-18). Grant `/budgets`. Migrations `0011`, `0012`, `0019`.
 
 ## The idea
 
@@ -34,10 +34,6 @@ A budget for R+1 copies the previous pricing, matched on `line_key` — `lib/bud
 | Removed line                | Absent; its old pricing stays with the old revision            |
 
 An unpriced line never reads as free; a 0% margin charges exactly cost.
-
-## The Construction tree
-
-`/budgets/construction` — the QS team's stage-wise quantity plan per unit. **It no longer feeds Indents** (construction requests pull from the villa's official estimate); whether it retires is an open founder question (`TODO.md`). The opposite of Interiors: **no money** (reads open, writes `/budgets`), no status or revisions (one living plan per unit), free-text stages grouped in construction order (renaming onto another stage merges them — the typo fix). Its files (`construction.ts`, `construction-actions.ts`) must never touch `budget_lines` or `item_margins`. A construction line an indent anchored cannot be deleted — hence its read of `indent_lines`.
 
 ## Margin secrecy — verified, and re-run it if the views widen
 

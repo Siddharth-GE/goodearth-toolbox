@@ -1,30 +1,17 @@
 "use server";
 
-// Type-only import, and deliberately NOT re-exported: a bare
-// `export type { ActionState }` in a "use server" file survives into the
-// compiled module's runtime export list, where the type doesn't exist —
-// every action in the chunk then dies at module load (the 2026-08-03
-// production outage). Import it from "@/lib/action-state" instead.
+// Type-only import, deliberately not re-exported: a re-exported type in a "use server" file kills every action
+// in the chunk at module load. Import it from "@/lib/action-state".
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { parseNumber, text } from "@/lib/form-data";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { isModelMeasure } from "./model-takeoff";
 import { GRANT, UOM_LIMIT } from "./shared";
 
-// ---------------------------------------------------------------------
-// Work setup and recipes
-// ---------------------------------------------------------------------
-
-/**
- * The work's unit and labour rate. One row per work; saving again
- * updates it, so the form is the same either way.
- *
- * Changing the unit after estimate lines exist would silently change
- * what every one of those quantities MEANS, so it is refused while any
- * line uses the work (2026-09-26 — it used to be a warning).
- */
+/** The work's unit and labour rate; one row per work. The unit is refused while any estimate line uses the work. */
 export async function saveWorkInfo(
   workItemId: string,
   _state: ActionState,
@@ -42,9 +29,7 @@ export async function saveWorkInfo(
 
   const supabase = await createClient();
 
-  // A work's unit is what every quantity on it means: 40 cum becoming
-  // 40 sqm is the same number describing a different building. While any
-  // estimate line uses the work, the unit stays as it is.
+  // A work's unit is what every quantity on it means (40 cum becoming 40 sqm is another building), so it stays while any line uses the work.
   const [current, used] = await Promise.all([
     supabase.from("estimator_work_info").select("uom").eq("work_item_id", workItemId).maybeSingle(),
     supabase
@@ -81,12 +66,7 @@ export async function saveWorkInfo(
   return undefined;
 }
 
-/**
- * How the SketchUp model measures this work (0118) — the rate book is the
- * one place it is decided, and the works list SketchUp loads is
- * downloaded from here. Null (blank) follows the unit. Only a work with a
- * unit has a row to hold it.
- */
+/** How the SketchUp model measures this work (0118); the works list SketchUp loads is downloaded from here. Null follows the unit. */
 export async function setWorkModelMeasure(
   workItemId: string,
   measure: string | null,
@@ -114,7 +94,7 @@ export async function setWorkModelMeasure(
   return undefined;
 }
 
-/** One recipe line: a material OR a mix, never both — the database agrees. */
+/** One recipe line: a material OR a mix, never both (the database agrees). */
 export async function addWorkComponent(
   workItemId: string,
   _state: ActionState,
@@ -133,7 +113,7 @@ export async function addWorkComponent(
   }
 
   const supabase = await createClient();
-  // "material" in the form means a master ITEM since 0086.
+  // "material" in the form means a master ITEM (0086).
   const { error } = await supabase.from("estimator_work_components").insert({
     work_item_id: workItemId,
     item_id: kind === "material" ? refId : null,
@@ -185,18 +165,9 @@ export async function removeWorkComponent(id: string): Promise<ActionState> {
   return undefined;
 }
 
-/**
- * Copy one work's rate — its unit, labour rate and materials — onto
- * other works: the same plastering priced for the ground floor is priced
- * the same way on the first and the attic. Each target's own materials
- * are REPLACED by the source's (a copy, not a merge), and its unit set to
- * the source's.
- *
- * A target already on an estimate in a DIFFERENT unit is refused by name:
- * changing its unit would silently change what those quantities mean.
- * Several writes per target and no transaction — a failure part-way says
- * which works were done, and running it again finishes the rest.
- */
+/** Copy one work's unit, labour rate and materials onto other works; the targets' materials are REPLACED (a copy, not a merge).
+ * A target on an estimate in a DIFFERENT unit is refused by name. Several writes per target, no transaction:
+ * a failure says which works were done, and running it again finishes the rest. */
 export async function copyWorkSetup(
   fromWorkItemId: string,
   toWorkItemIds: string[],
@@ -208,7 +179,7 @@ export async function copyWorkSetup(
   if (!fromWorkItemId || targets.length === 0) return { error: "Tick the works to copy it to." };
 
   const supabase = await createClient();
-  const [info, components, targetInfo, targetLines] = await Promise.all([
+  const [info, components, targetInfo] = await Promise.all([
     supabase
       .from("estimator_work_info")
       .select("uom, labour_rate")
@@ -219,17 +190,30 @@ export async function copyWorkSetup(
       .select("item_id, mix_id, qty_per_unit")
       .eq("work_item_id", fromWorkItemId),
     supabase.from("estimator_work_info").select("work_item_id, uom").in("work_item_id", targets),
-    supabase.from("estimator_estimate_lines").select("work_item_id").in("work_item_id", targets),
   ]);
-  const readError = info.error ?? components.error ?? targetInfo.error ?? targetLines.error;
+  const readError = info.error ?? components.error ?? targetInfo.error;
   if (readError) {
     console.error("copyWorkSetup (read) failed:", readError);
+    return { error: "Could not read the rate book. Try again." };
+  }
+  // Every line, not the first 1,000: a missed one would let a unit change slip past the check below.
+  let targetLines: { work_item_id: string }[];
+  try {
+    targetLines = await fetchAll((from, to) =>
+      supabase
+        .from("estimator_estimate_lines")
+        .select("work_item_id")
+        .in("work_item_id", targets)
+        .order("id")
+        .range(from, to),
+    );
+  } catch {
     return { error: "Could not read the rate book. Try again." };
   }
   if (!info.data) return { error: "Set this work up first — there is nothing to copy yet." };
   const source = info.data;
 
-  const used = new Set((targetLines.data ?? []).map((line) => line.work_item_id));
+  const used = new Set(targetLines.map((line) => line.work_item_id));
   const unitClash = (targetInfo.data ?? []).filter(
     (row) => row.uom !== source.uom && used.has(row.work_item_id),
   );
@@ -239,7 +223,7 @@ export async function copyWorkSetup(
     };
   }
 
-  // Rows from before 0086 name neither an item nor a mix; not copied.
+  // Pre-0086 rows name neither an item nor a mix; not copied.
   const recipe = (components.data ?? []).filter((row) => row.item_id || row.mix_id);
   let done = 0;
   for (const target of targets) {

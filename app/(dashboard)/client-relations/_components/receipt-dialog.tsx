@@ -17,16 +17,11 @@ import { Select } from "@/components/ui/select";
 import { addReceipt } from "@/lib/client-relations/actions";
 import type { MilestoneRow } from "@/lib/client-relations/queries";
 import { RECEIPT_MODES, milestoneLabel } from "@/lib/client-relations/stages";
-import { formatMoney } from "@/lib/format";
-import { useState, useTransition } from "react";
+import { formatMoney, todayInIndia } from "@/lib/format";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useState } from "react";
 
-/**
- * Record money arriving. The first place in this whole app where a rupee
- * comes IN — everything monetary before Client Relations was payables.
- *
- * No approval step: Bills has one because approving a wrong bill pays
- * money out, whereas this records money that has already landed.
- */
+/** Records money arriving. No approval step, unlike Bills: this records money that has already landed. */
 export function ReceiptDialog({
   engagementId,
   milestones,
@@ -45,8 +40,7 @@ export function ReceiptDialog({
         <DialogHeader>
           <DialogTitle>Record a payment</DialogTitle>
         </DialogHeader>
-        {/* Inside DialogContent, which Radix unmounts on close, so every
-            open starts from a clean form rather than last time's error. */}
+        {/* Radix unmounts DialogContent on close, so every open starts from a clean form. */}
         <ReceiptForm
           engagementId={engagementId}
           milestones={milestones}
@@ -67,21 +61,19 @@ function ReceiptForm({
   onSaved: () => void;
 }) {
   const [amount, setAmount] = useState("");
-  const [receivedOn, setReceivedOn] = useState(new Date().toISOString().slice(0, 10));
+  const [receivedOn, setReceivedOn] = useState(todayInIndia());
   const [milestoneId, setMilestoneId] = useState("");
   const [mode, setMode] = useState("bank");
   const [reference, setReference] = useState("");
   const [note, setNote] = useState("");
-  const [error, setError] = useState<string>();
-  const [pending, startTransition] = useTransition();
+  const { pending, error, run } = useActionRunner();
 
   const amountNumber = Number(amount);
   const valid = amount !== "" && Number.isFinite(amountNumber) && amountNumber > 0 && !!receivedOn;
 
-  const submit = () => {
-    setError(undefined);
-    startTransition(async () => {
-      const result = await addReceipt({
+  const submit = async () => {
+    const result = await run(() =>
+      addReceipt({
         engagementId,
         milestoneId: milestoneId || null,
         amount: amountNumber,
@@ -89,13 +81,10 @@ function ReceiptForm({
         mode,
         reference: reference || null,
         note: note || null,
-      });
-      if (result?.error) {
-        setError(result.error);
-        return;
-      }
-      onSaved();
-    });
+      }),
+    );
+    if (result?.error) return;
+    onSaved();
   };
 
   return (
@@ -133,9 +122,7 @@ function ReceiptForm({
           value={milestoneId}
           onChange={(event) => setMilestoneId(event.target.value)}
         >
-          {/* Leaving this blank is legal and normal: money often arrives
-              before anyone decides which instalment it settles, and it
-              still counts towards what is owed. */}
+          {/* Blank is legal: money often arrives before anyone decides which instalment it settles, and it still counts. */}
           <option value="">Not decided yet</option>
           {milestones.map((milestone) => (
             <option key={milestone.id} value={milestone.id}>

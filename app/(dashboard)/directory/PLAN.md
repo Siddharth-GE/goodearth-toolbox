@@ -1,6 +1,6 @@
 # Directory — the rules
 
-Everyone who works here, with a card. Grant `/directory` (held by everyone). Migrations `0060`, `0061` (photos). The staff sheet was loaded once by `scripts/import-staff.ts`.
+Everyone who works here, with a card. Grant `/directory` (held by everyone). Migrations `0060`, `0061` (photos). The staff sheet was loaded once, by a script now in git history.
 
 ## The model
 

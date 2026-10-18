@@ -3,9 +3,7 @@ import { getWelcomeCounts } from "@/lib/bills/queries";
 
 import { ToolWelcome } from "../_components/tool-welcome";
 
-// The welcome screen (founder, 2026-08-13: every Operations and
-// Management tool opens on one). The list lives one click in at
-// /bills/list. Counts only — bill amounts stay behind the doors.
+// Counts only: bill amounts stay behind the doors.
 export default async function BillsPage() {
   const counts = await getWelcomeCounts();
 

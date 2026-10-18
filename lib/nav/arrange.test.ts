@@ -1,9 +1,4 @@
-/**
- * The arranging rule behind every team heading: teams in the founder's
- * order, tools in registry order inside them, and anything without a
- * team under Other — never dropped. A tool that vanished from the
- * sidebar because its team was deleted would look like lost access.
- */
+/** Teams in order, tools in registry order, no-team tools under Other and never dropped. */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

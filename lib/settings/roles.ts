@@ -5,8 +5,7 @@ import { requireUser } from "@/lib/auth/dal";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 
-// Settings is admin-only, so every read guards itself — the page checks
-// too, but a query must not rely on its caller remembering to.
+// Settings is admin-only: every read guards itself rather than relying on the page's check.
 async function requireAdminCaller() {
   const user = await requireUser();
   await requireAdmin(user);
@@ -23,7 +22,6 @@ export type RoleRow = {
 
 export type RoleWithApps = RoleRow & {
   apps: string[];
-  /** How many people hold this role — what a delete would strand. */
   memberCount: number;
 };
 
@@ -64,7 +62,6 @@ export async function listRoles(): Promise<RoleWithApps[]> {
   }));
 }
 
-/** The apps one role bundles — the person page's own lookup. */
 export async function listRoleApps(roleId: string): Promise<Set<string>> {
   await requireAdminCaller();
   const supabase = await createClient();

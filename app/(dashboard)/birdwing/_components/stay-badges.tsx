@@ -20,10 +20,7 @@ export function StayStatusBadge({ status }: { status: StayStatus }) {
   return <Badge variant={STATUS_LOOK[status]}>{STATUS_LABELS[status]}</Badge>;
 }
 
-/**
- * Paying guest, or Goodearth's own use — the distinction the whole tool
- * turns on, so it is never a colour alone: the words say it.
- */
+/** Paying guest or Goodearth's own use: the tool turns on this, so the words say it, never a colour alone. */
 export function UseBadge({ use }: { use: StayUse | null }) {
   if (!use) return null;
   return <Badge variant={isInternalUse(use) ? "warning" : "success"}>{USE_LABELS[use]}</Badge>;

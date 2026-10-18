@@ -8,17 +8,14 @@ import { Select } from "@/components/ui/select";
 import { paymentProblem } from "@/lib/bills/ledger";
 import { recordBillPayment, recoverAdvance } from "@/lib/bills/payment-actions";
 import type { OpenAdvance } from "@/lib/bills/payment-queries";
-import { formatDate, formatMoney } from "@/lib/format";
+import { parseNumber } from "@/lib/form-data";
+import { formatDate, formatMoney, todayInIndia } from "@/lib/format";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => todayInIndia();
 
-/**
- * Paying an approved bill (0107): a payment of all or part of what is
- * pending, or part of an open advance recovered against it. When the two
- * reach the total, the database marks the bill paid by itself.
- */
 export function SettlementPanel({
   billId,
   pending,
@@ -26,7 +23,6 @@ export function SettlementPanel({
 }: {
   billId: string;
   pending: number;
-  /** The contractor's advances with something left to recover. */
   advances: OpenAdvance[];
 }) {
   const router = useRouter();
@@ -36,11 +32,10 @@ export function SettlementPanel({
   const [reference, setReference] = useState("");
   const [note, setNote] = useState("");
   const [advanceId, setAdvanceId] = useState(advances[0]?.id ?? "");
-  const [error, setError] = useState<string>();
-  const [saving, startSaving] = useTransition();
+  const { pending: saving, error, run, clearError } = useActionRunner();
 
   const advance = advances.find((candidate) => candidate.id === advanceId);
-  const value = Number(amount);
+  const value = parseNumber(amount) ?? 0;
   const problem =
     mode === "pay"
       ? paymentProblem({ amount: value, reference, pending })
@@ -58,38 +53,34 @@ export function SettlementPanel({
 
   const open = (next: "pay" | "recover") => {
     setMode(next);
-    setError(undefined);
+    clearError();
     setAmount(
       String(next === "recover" && advance ? Math.min(pending, advance.outstanding) : pending),
     );
   };
 
-  const save = () =>
-    startSaving(async () => {
-      setError(undefined);
-      const result =
-        mode === "pay"
-          ? await recordBillPayment(billId, {
-              amount: value,
-              paidOn,
-              reference,
-              note: note || null,
-            })
-          : await recoverAdvance(billId, {
-              advanceId,
-              amount: value,
-              recoveredOn: paidOn,
-              note: note || null,
-            });
-      if (result?.error) {
-        setError(result.error);
-        return;
-      }
-      setMode(null);
-      setReference("");
-      setNote("");
-      router.refresh();
-    });
+  const save = async () => {
+    const result = await run(() =>
+      mode === "pay"
+        ? recordBillPayment(billId, {
+            amount: value,
+            paidOn,
+            reference,
+            note: note || null,
+          })
+        : recoverAdvance(billId, {
+            advanceId,
+            amount: value,
+            recoveredOn: paidOn,
+            note: note || null,
+          }),
+    );
+    if (result?.error) return;
+    setMode(null);
+    setReference("");
+    setNote("");
+    router.refresh();
+  };
 
   if (!mode) {
     return (

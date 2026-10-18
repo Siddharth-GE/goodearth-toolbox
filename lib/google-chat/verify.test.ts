@@ -1,15 +1,4 @@
-/**
- * The door's lock, tested with keys minted in-process — no network, no
- * Google. These pin what the verifier must refuse: the wrong audience,
- * the wrong issuer, the wrong sender identity, a dead expiry, an unknown
- * key, a bent signature, a smuggled algorithm, and things that aren't
- * tokens at all.
- *
- * The identity checks matter most: an accounts.google.com ID token with
- * the right audience can be minted by ANY Google service account, so the
- * email claim — the project's own Chat service agent — is what makes
- * this our lock and not just "a Google lock".
- */
+// Keys are minted in-process, no network. The email claim is what makes this our lock, not just a Google lock.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createSign, generateKeyPairSync } from "node:crypto";
@@ -69,8 +58,7 @@ test("the wrong issuer is refused even with a valid signature", () => {
 });
 
 test("another service account's token is refused — Google-signed is not enough", () => {
-  // A perfectly genuine ID token, right audience, but minted by someone
-  // else's service account. This is the attack the email check exists for.
+  // A genuine token with the right audience from someone else's service account: the attack the email check is for.
   const impostor = mintToken({
     claims: { email: "attacker-sa@some-other-project.iam.gserviceaccount.com" },
   });

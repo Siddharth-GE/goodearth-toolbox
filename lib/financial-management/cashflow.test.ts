@@ -1,9 +1,4 @@
-/**
- * The monthly bucketing behind the Cash and Forward screens. The rules
- * that matter: an empty month is a real zero bar, an undated amount is
- * never invented into a month, and the buckets always reconcile with
- * the plain sum.
- */
+/** Monthly bucketing: an empty month is a real zero bar, an undated amount is never invented into a month, and buckets reconcile with the plain sum. */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -146,8 +141,7 @@ test("an unallocated receipt settles the oldest unpaid rung of its own engagemen
     new Map([["e1", 1200]]),
     TODAY,
   );
-  // e1's pool clears its overdue rung and takes 200 off September;
-  // e2's identical overdue rung is untouched — its own ledger.
+  // e1's pool clears its overdue rung and takes 200 off September; e2's identical rung is untouched.
   assert.equal(result.overdue, 1000);
   assert.equal(result.byMonth.get("2026-09"), 800);
 });

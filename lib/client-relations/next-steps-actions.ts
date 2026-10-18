@@ -24,16 +24,8 @@ import type { ActionState } from "@/lib/action-state";
 import type { TablesUpdate } from "@/lib/supabase/database.types";
 
 /**
- * Writes for the Saarang tracker's screens inside Client Relations — an
- * action's every field, and a plot's, one at a time (root plan.md,
- * seventh piece).
- *
- * One field per call, the tracker's PATCH: a chip saves the moment it is
- * tapped, so there is no form to half-fill. Every export opens with
- * requireTool("/client-relations"); RLS (0120) refuses anything past it;
- * nothing throws. An action's owner is checked against
- * client_relations_team() on every write, so a step is never given to
- * someone who cannot see it.
+ * One field per call (a chip saves when tapped). Every export opens with requireTool; RLS (0120) refuses anything past it; nothing throws.
+ * An owner is checked against client_relations_team() on every write, so a step is never given to someone who cannot see it.
  */
 
 const GRANT = "/client-relations";
@@ -79,10 +71,6 @@ async function isOnTeam(
   if (error) return friendly(error, "Could not check who is on the team. Try again.");
   return (data ?? []).some((row) => row.id === personId);
 }
-
-// ---------------------------------------------------------------------
-// Actions — the next steps
-// ---------------------------------------------------------------------
 
 export type NewStep = {
   engagementId: string | null;
@@ -132,11 +120,7 @@ export type StepPatch = {
   engagementId?: string | null;
 };
 
-/**
- * One change to one action. Done stamps today (in India) and un-done
- * clears it, so the two can never disagree (0120's CHECK holds the same
- * line). Any date a person picks clears "date assumed".
- */
+/** Done stamps today (India) and un-done clears it, so they never disagree (0120's CHECK). Any picked date clears "date assumed". */
 export async function updateNextStep(stepId: string, patch: StepPatch): Promise<ActionState> {
   const user = await requireTool(GRANT);
   const supabase = await createClient();
@@ -163,9 +147,7 @@ export async function updateNextStep(stepId: string, patch: StepPatch): Promise<
   }
   if (patch.status !== undefined) {
     if (!known(ACTION_STATUSES, patch.status)) return { error: "Pick a status from the list." };
-    // Only whoever set it, or a manager, closes it or opens it again; its
-    // owner marks it finished for them (0121 — the database holds the same
-    // line, this says it in a sentence first).
+    // Only whoever set it, or a manager, closes or reopens it; its owner marks it finished (0121 holds the same line).
     const { data: current, error: readError } = await supabase
       .from("client_actions")
       .select("status, owner_id, created_by")
@@ -213,10 +195,6 @@ export async function updateNextStep(stepId: string, patch: StepPatch): Promise<
   return undefined;
 }
 
-// ---------------------------------------------------------------------
-// A plot, one field at a time
-// ---------------------------------------------------------------------
-
 export type PlotPatch = {
   ownerId?: string | null;
   saleDeedStatus?: string;
@@ -232,7 +210,6 @@ export type PlotPatch = {
   registrationNote?: string | null;
   registrationOn?: string | null;
   progressStageId?: string | null;
-  /** The three design checks: true stamps today, false clears. */
   designConfirmed?: boolean;
   permit?: boolean;
   workingDrawing?: boolean;
@@ -252,11 +229,8 @@ function optionalDate(value: string | null | undefined): string | null | false {
 }
 
 /**
- * The tracker's PATCH /deals/:id, checked field by field against the same
- * lists the database CHECKs (0050, 0120). A deed or CA moved off "signed"
- * drops who holds its original in the same write — 0050 refuses a
- * custodian on an unsigned document, and a chip should never meet a
- * constraint name.
+ * Each field is checked against the lists the database CHECKs (0050, 0120). A deed or CA moved off "signed" drops its original's
+ * holder in the same write: 0050 refuses a custodian on an unsigned document.
  */
 export async function updatePlot(engagementId: string, patch: PlotPatch): Promise<ActionState> {
   const user = await requireTool(GRANT);
@@ -385,7 +359,6 @@ export async function updatePlot(engagementId: string, patch: PlotPatch): Promis
   return undefined;
 }
 
-/** The client's name, typed in place on a plot's header. */
 export async function renameClient(clientId: string, name: string): Promise<ActionState> {
   const user = await requireTool(GRANT);
   const trimmed = name.trim();

@@ -6,19 +6,7 @@ import Link from "next/link";
 
 import { TimerDial } from "./timer-dial";
 
-/**
- * One trail, as a card.
- *
- * The same block had been hand-written three times — the all-trails list,
- * the house's running list, the house's done list — each with a slightly
- * different arrangement of the same five facts. DESIGN.md's rule is to
- * build the third copy into a shared component.
- *
- * A card rather than a table row because these lists are read on a phone
- * at site, where a row of columns becomes a wrap of orphaned words. The
- * baton card next door made the same call for the same reason; this is
- * its quieter sibling, for trails you are looking at rather than holding.
- */
+/** One trail as a card, shared by the three lists (DESIGN.md's third-copy rule). A card, not a row: read on a phone at site. */
 export function TrailCard({
   row,
   showProject = false,
@@ -36,8 +24,7 @@ export function TrailCard({
     <Card
       className={cn(
         "transition-colors",
-        // No breathing here. The court breathes because there is a button
-        // to press; a list that pulses is just an alarm to scroll past.
+        // No breathing: the court breathes because there is a button to press; a pulsing list is an alarm to scroll past.
         row.isStuck && !row.isFinished && "border-danger/40",
       )}
     >
@@ -86,8 +73,7 @@ export function TrailCard({
         {row.isFinished ? (
           <Badge variant="success">Done</Badge>
         ) : row.isQueued ? (
-          // Never a dial on a queued trail: it would read "0 of 4 days"
-          // and look like a clock that had already started.
+          // No dial on a queued trail: "0 of 4 days" would look like a running clock.
           <Badge variant="neutral">Waiting</Badge>
         ) : (
           <TimerDial days={row.daysInLeg} expectedDays={row.expectedDays} />

@@ -34,13 +34,6 @@ const KIND_VARIANT: Record<LocationKind, "success" | "info"> = {
   plot: "info",
 };
 
-/**
- * Where the material is. A store row is a live balance; a plot row is
- * a running total of everything that has landed there (a delivery to a
- * unit lands at its plot — same place since 0029), because nothing
- * leaves a site through this system — it gets built into the house.
- * Both are computed from movements, never stored.
- */
 export default async function StockPage({
   searchParams,
 }: {
@@ -49,8 +42,7 @@ export default async function StockPage({
   const { page, at, q: rawQ } = await searchParams;
   const q = searchParam(rawQ);
 
-  // The filter travels as "kind:id" in one param so a single select can
-  // offer stores and plots together.
+  // The filter travels as "kind:id" in one param so one select can offer stores and plots.
   const [rawKind, rawId] = (at ?? "").split(":");
   const kind = rawKind && isLocationKind(rawKind) ? rawKind : undefined;
   const locationId = kind && rawId ? rawId : undefined;

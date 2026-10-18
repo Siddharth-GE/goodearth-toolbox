@@ -10,20 +10,7 @@ import Link from "next/link";
 import { BoardColumns } from "../_components/board-columns";
 import { FilterChips } from "../_components/board-parts";
 
-/**
- * The Board — every villa in design, one column per board stage (root
- * plan.md, thirteenth piece: "a setup with a similar ui like crm, where each
- * plot can be passed from one stage to another"). A villa sits in the
- * column of the furthest stage it has started; a stage sent back for
- * revision shows on its card and never moves it back.
- *
- * Columns side by side on a desktop; on a phone they stack, a stage at a
- * time. Villas with nothing started are a closed list underneath, each
- * one click from "Set where it is". Every filter lives in the URL.
- *
- * Grown from the Villas screen, and still at its address, so every link
- * into a villa — and its transmittals — keeps working.
- */
+/** One column per board stage; a villa sits in the furthest stage it has started and a stage sent back shows on its card, never moving it back. Columns stack on a phone. The address is the old Villas screen's, so links keep working. */
 export default async function DesignBoardPage({
   searchParams,
 }: {

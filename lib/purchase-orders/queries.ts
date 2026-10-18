@@ -13,24 +13,14 @@ import { listUnits } from "@/lib/masters/units";
 import { listVendors } from "@/lib/masters/vendors";
 import { listStores } from "@/lib/masters/stores";
 import { fetchAll } from "@/lib/supabase/fetch-all";
+import { assertRead } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import {
-  leftToBuy,
-  orderedByIndentLine,
-  purchaseHistory,
-  type PriceSuggestion,
-  type VendorSuggestion,
-} from "./from-indent";
 import type { PoStatus } from "./workflow";
 
-// Purchase Orders reads the indents/masters tables DIRECTLY, under its
-// own /purchase-orders grant — never another tool's gated queries module
-// (the lib/indents/queries.ts rule). Money lives on the PO tables and
-// their RLS requires this tool's grant to SELECT, so nothing here can be
-// read by a user who only holds /indents.
+// Reads indents/masters tables directly under the /purchase-orders grant, never another tool's queries module. Money lives on the PO tables, whose RLS needs this grant.
 
 const PO_LIST_LIMIT = 50;
 
@@ -54,13 +44,10 @@ export type PoListPage = {
   pageSize: number;
 };
 
-/** Headline counts for the tool's welcome screen. Status counts only —
- * no money leaves the PO tables through this. */
 export async function getWelcomeCounts() {
   await requireTool("/purchase-orders");
   const supabase = await createClient();
 
-  // Exact database counts, head-only — never rows.length.
   const [drafts, issued, deletions] = await Promise.all([
     supabase
       .from("purchase_orders")
@@ -76,6 +63,12 @@ export async function getWelcomeCounts() {
       .eq("status", "deletion_requested"),
   ]);
 
+  assertRead(
+    "purchase-orders",
+    "the welcome counts",
+    drafts.error ?? issued.error ?? deletions.error,
+  );
+
   return {
     drafts: drafts.count ?? 0,
     issuedOpen: issued.count ?? 0,
@@ -88,9 +81,7 @@ export type PoListFilters = {
   status?: PoStatus;
   vendorId?: string;
   projectId?: string;
-  /** PO reference or vendor name — already made safe by searchParam. */
   q?: string;
-  /** Created-on date range, YYYY-MM-DD, already checked by dateParam. */
   from?: string;
   to?: string;
 };
@@ -110,8 +101,7 @@ export async function listPurchaseOrders({
   const pageSize = PO_LIST_LIMIT;
   const currentPage = Math.max(1, page);
 
-  // A vendor-name search becomes a list of vendor ids (vendors is an open
-  // Masters read), so one or() can cover reference and vendor.
+  // A vendor-name search becomes vendor ids, so one or() covers reference and vendor.
   let vendorIdsForSearch: string[] = [];
   if (q) {
     const { data: matched, error: vendorError } = await supabase
@@ -126,8 +116,7 @@ export async function listPurchaseOrders({
     vendorIdsForSearch = (matched ?? []).map((row) => row.id);
   }
 
-  // Every filter in one place. created_at is a timestamp, so the "to" day
-  // runs up to — not including — the day after it.
+  // created_at is a timestamp, so the "to" day runs up to the day after it.
   const filtered = <T extends Filterable<T>>(query: T): T => {
     let next = query;
     if (status) next = next.eq("status", status);
@@ -143,8 +132,6 @@ export async function listPurchaseOrders({
     return next;
   };
 
-  // A stated limit with an exact database count — the total is never
-  // derived from the rows that happened to arrive.
   const { data, count, error } = await filtered(
     supabase
       .from("purchase_orders")
@@ -156,8 +143,7 @@ export async function listPurchaseOrders({
     .order("created_at", { ascending: false })
     .order("id")
     .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
-  // A failed read is an error screen, never an empty list — "no orders"
-  // and "could not read the orders" mean opposite things.
+  // A failed read is an error screen, never an empty list.
   if (error) {
     console.error("listPurchaseOrders failed:", error);
     throw new Error("Could not read the purchase orders.", { cause: error });
@@ -183,8 +169,6 @@ export async function listPurchaseOrders({
   };
 }
 
-/** The list page's filter dropdowns — every vendor and project by name.
- * The Masters reads are open; this wrapper is the gate. */
 export async function getPoFilterOptions(): Promise<{
   vendors: { id: string; name: string }[];
   projects: { id: string; name: string }[];
@@ -196,10 +180,6 @@ export async function getPoFilterOptions(): Promise<{
     projects: projects.map(({ id, name }) => ({ id, name })),
   };
 }
-
-/* ------------------------------------------------------------------ *
- * The new-PO form
- * ------------------------------------------------------------------ */
 
 export type PoProjectOption = { id: string; name: string; code: string | null };
 export type PoScopedOption = { id: string; project_id: string; name: string; code: string | null };
@@ -214,8 +194,6 @@ export type PoFormOptions = {
   stores: PoStoreOption[];
 };
 
-/** Everything the new-PO form needs, in one gated call. The masters
- * reads themselves are ungated by design — this wrapper is the gate. */
 export async function getPoFormOptions(): Promise<PoFormOptions> {
   await requireTool("/purchase-orders");
   const [projects, plots, units, vendors, stores] = await Promise.all([
@@ -240,10 +218,6 @@ export async function getPoFormOptions(): Promise<PoFormOptions> {
   };
 }
 
-/* ------------------------------------------------------------------ *
- * One purchase order, in full
- * ------------------------------------------------------------------ */
-
 export type PoLineRow = {
   id: string;
   item_id: string;
@@ -266,11 +240,9 @@ export type PoLineRow = {
   /** Null = a direct line (0079) — a bulk or urgent buy with no indent. */
   indent_line_id: string | null;
   indent_reference: string | null;
-  /** The indent's work, "Footing — FD.15" — derived, never picked here. */
   work_label: string | null;
   /** Invoiced so far: the bill lines against this line (0106). */
   billed_quantity: number;
-  /** Who last touched the line — the attribution rule. */
   updated_by_name: string | null;
 };
 
@@ -333,8 +305,7 @@ export const getPurchaseOrder = cache(async (poId: string): Promise<PoDetail | n
         .order("id")
         .range(from, to),
     ),
-    // Invoiced so far per line — po_line_billing_facts (0106), the PO ↔
-    // Bills window, WHERE-gated to /purchase-orders or /bills.
+    // po_line_billing_facts (0106): the PO-Bills window, gated to /purchase-orders or /bills.
     fetchAll((from, to) =>
       supabase
         .from("po_line_billing_facts")
@@ -345,7 +316,6 @@ export const getPurchaseOrder = cache(async (poId: string): Promise<PoDetail | n
     ),
   ]);
 
-  // A failed read is an error screen, never "not found".
   if (poError) {
     console.error("getPurchaseOrder failed:", poError);
     throw new Error("Could not read the purchase order.", { cause: poError });
@@ -356,9 +326,7 @@ export const getPurchaseOrder = cache(async (poId: string): Promise<PoDetail | n
     billed.map((row) => [row.po_line_id ?? "", row.billed_quantity ?? 0]),
   );
 
-  // One profiles read resolves every actor on the document — simpler
-  // and safer than four embedded joins on a table with several FKs to
-  // profiles (Supabase would need each constraint named explicitly).
+  // One profiles read, not embeds (several FKs to profiles).
   const actorIds = [
     ...new Set(
       [
@@ -458,14 +426,7 @@ export type PoBilledTotals = {
   bill_count: number;
 };
 
-/**
- * The ordered-vs-billed picture for one PO, from the po_billing_totals
- * window (migration 0025) — the one sanctioned money view between
- * Purchase Orders and Bills. Its WHERE qual admits /purchase-orders and
- * /bills holders; this caller is already behind requireTool, and a row
- * filtered away by the qual comes back as null, rendered as "nothing
- * billed yet".
- */
+/** From po_billing_totals (0025), the one money view between POs and Bills; its qual admits /purchase-orders and /bills, and a filtered row reads as "nothing billed yet". */
 export async function getPoBilledTotals(poId: string): Promise<PoBilledTotals> {
   await requireTool("/purchase-orders");
   const supabase = await createClient();
@@ -477,8 +438,7 @@ export async function getPoBilledTotals(poId: string): Promise<PoBilledTotals> {
     .maybeSingle();
   if (error) console.error("getPoBilledTotals failed:", error);
 
-  // Every view column is typed nullable by the generator — normalise
-  // once at the boundary.
+  // View columns are typed nullable: normalise once here.
   return {
     ordered_total: data?.ordered_total ?? 0,
     billed_total: data?.billed_total ?? 0,
@@ -495,12 +455,9 @@ export type PoPdfData = {
     gst_no: string | null;
     address: string | null;
   };
-  /** The project's company, printed on the letterhead; null → placeholder. */
   company: CompanyRow | null;
 };
 
-/** Everything the PO document needs — the detail plus the vendor's
- * full counterparty block from Masters. Gated by getPurchaseOrder. */
 export async function getPoPdfData(poId: string): Promise<PoPdfData | null> {
   const po = await getPurchaseOrder(poId);
   if (!po) return null;
@@ -532,202 +489,20 @@ export async function getPoPdfData(poId: string): Promise<PoPdfData | null> {
   };
 }
 
-/**
- * The terms templates a PO can use (Masters → Terms, 0101) — the default
- * first, which a new PO starts from. The Masters read is open; this
- * wrapper is the gate.
- */
+/** Default first, which a new PO starts from. */
 export async function getPoTermsTemplates(): Promise<TermsTemplate[]> {
   await requireTool("/purchase-orders");
   return listActiveTerms("po");
 }
 
-/** Who the signed-in user is to this tool — drives the creator-or-admin
- * delete rule and (from M3) the admin-only deletion approval. The
- * database enforces both again. */
+/** Drives the creator-or-admin delete and the admin-only approval; the database enforces both again. */
 export async function getCurrentPoActor(): Promise<{ isAdmin: boolean; userId: string }> {
   const user = await requireTool("/purchase-orders");
   return { isAdmin: user.profile?.role === "admin", userId: user.id };
 }
 
-/* ------------------------------------------------------------------ *
- * The pool — approved indent lines this PO can still order
- * ------------------------------------------------------------------ */
-
-export type PoolLineRow = {
-  /** indent_lines.id — the provenance anchor a PO line carries. */
-  indent_line_id: string;
-  item_id: string;
-  item_name: string;
-  item_code: string | null;
-  item_brand: string | null;
-  item_thumb_url: string | null;
-  uom: string;
-  /** What the approved indent asks for. */
-  approved_quantity: number;
-  /** Ordered across ALL non-cancelled POs, this one included. */
-  already_ordered: number;
-  /** approved − ordered; what this PO could still take. */
-  remaining: number;
-  /** Already a line on this PO — shown disabled, never hidden. */
-  on_this_po: boolean;
-  note: string | null;
-};
-
-export type PoolIndentGroup = {
-  indent_id: string;
-  reference: string;
-  stage: string | null;
-  /** The indent's villa — said on a bulk PO, which gathers many. */
-  place: string | null;
-  lines: PoolLineRow[];
-};
-
-export type IndentPool = {
-  /** How the pool was filtered, said on screen. */
-  scope_label: string;
-  groups: PoolIndentGroup[];
-};
-
-/**
- * The approved indent lines a PO may order from, in its project: a unit
- * PO pulls from that unit's indents, a plot PO from that plot's (the
- * founder's one-PO-one-plot/unit rule), and a GENERAL PO from every
- * approved indent — the bulk buy, one order gathering several villas'
- * indents (founder, 2026-10-11; before, it took only indents tagged to no
- * villa). Every line is annotated with what's already ordered across all
- * live POs, and fully-ordered lines render disabled-and-labelled rather
- * than vanishing.
- */
-export async function getIndentPool(poId: string): Promise<IndentPool | null> {
-  await requireTool("/purchase-orders");
-  const supabase = await createClient();
-
-  const { data: po } = await supabase
-    .from("purchase_orders")
-    .select("id, project_id, plot_id, unit_id, units(name), plots(name)")
-    .eq("id", poId)
-    .maybeSingle();
-  if (!po) return null;
-
-  // Read to completion — a truncated pool would silently hide approved
-  // lines, which reads as "already ordered" and leaves material unbought.
-  // The query is built fresh per callback: fetchAll pages by calling it
-  // again, and a reused builder would stack duplicate clauses.
-  const indents = await fetchAll((from, to) => {
-    let query = supabase
-      .from("indents")
-      .select("id, reference, stage, plots(name), units(name)")
-      .eq("project_id", po.project_id)
-      .eq("status", "approved");
-    if (po.unit_id) {
-      query = query.eq("unit_id", po.unit_id);
-    } else if (po.plot_id) {
-      query = query.eq("plot_id", po.plot_id);
-    }
-    return query.order("created_at").order("id").range(from, to);
-  });
-
-  const scope_label = po.unit_id
-    ? `unit ${(po.units as { name: string } | null)?.name ?? ""}`.trim()
-    : po.plot_id
-      ? `plot ${(po.plots as { name: string } | null)?.name ?? ""}`.trim()
-      : "every villa (a bulk buy)";
-
-  if (indents.length === 0) return { scope_label, groups: [] };
-
-  const indentIds = indents.map((indent) => indent.id);
-  const lines = await fetchAll((from, to) =>
-    supabase
-      .from("indent_lines")
-      .select(
-        "id, indent_id, item_id, quantity, uom, note, items(name, code, thumb_url, brands(name))",
-      )
-      .in("indent_id", indentIds)
-      .order("created_at")
-      .order("id")
-      .range(from, to),
-  );
-
-  const lineIds = lines.map((line) => line.id);
-  const ordered = lineIds.length
-    ? await fetchAll((from, to) =>
-        supabase
-          .from("purchase_order_lines")
-          .select("indent_line_id, quantity, po_id, purchase_orders(status)")
-          .in("indent_line_id", lineIds)
-          .order("id")
-          .range(from, to),
-      )
-    : [];
-
-  const orderedByLine = new Map<string, number>();
-  const onThisPo = new Set<string>();
-  for (const row of ordered) {
-    const status = (row.purchase_orders as { status: string } | null)?.status;
-    if (status === "cancelled") continue;
-    // Direct lines (0079) carry no indent anchor and don't count against
-    // any indent's remaining quantity.
-    if (row.indent_line_id == null) continue;
-    orderedByLine.set(
-      row.indent_line_id,
-      (orderedByLine.get(row.indent_line_id) ?? 0) + row.quantity,
-    );
-    if (row.po_id === poId) onThisPo.add(row.indent_line_id);
-  }
-
-  const byIndent = new Map<string, PoolLineRow[]>();
-  for (const line of lines) {
-    const item = line.items as {
-      name: string;
-      code: string | null;
-      thumb_url: string | null;
-      brands: { name: string } | null;
-    } | null;
-    const already = orderedByLine.get(line.id) ?? 0;
-    const group = byIndent.get(line.indent_id) ?? [];
-    group.push({
-      indent_line_id: line.id,
-      item_id: line.item_id,
-      item_name: item?.name ?? "—",
-      item_code: item?.code ?? null,
-      item_brand: item?.brands?.name ?? null,
-      item_thumb_url: item?.thumb_url ?? null,
-      uom: line.uom,
-      approved_quantity: line.quantity,
-      already_ordered: already,
-      remaining: Math.max(0, line.quantity - already),
-      on_this_po: onThisPo.has(line.id),
-      note: line.note,
-    });
-    byIndent.set(line.indent_id, group);
-  }
-
-  return {
-    scope_label,
-    groups: indents
-      .filter((indent) => byIndent.has(indent.id))
-      .map((indent) => ({
-        indent_id: indent.id,
-        reference: indent.reference ?? "—",
-        stage: indent.stage,
-        place:
-          (indent.units as { name: string } | null)?.name ??
-          (indent.plots as { name: string } | null)?.name ??
-          null,
-        lines: byIndent.get(indent.id) ?? [],
-      })),
-  };
-}
-
-/* ------------------------------------------------------------------ *
- * Receipts against this PO — the detail page's "did it arrive?"
- * ------------------------------------------------------------------ */
-
 type Client = SupabaseClient<Database>;
 
-/** Item names for a set of ids — only the name; the receipt rows on the
- * PO page show no thumbnails or codes. */
 async function itemNamesById(supabase: Client, ids: string[]): Promise<Map<string, string>> {
   const unique = [...new Set(ids)];
   if (unique.length === 0) return new Map();
@@ -764,13 +539,7 @@ export type PoReceiptRow = {
   lines: { item_name: string; quantity: number; uom: string }[];
 };
 
-/**
- * The receipts against one PO, for the purchase-order detail page —
- * gated on this tool's own /purchase-orders grant. Nothing here is
- * money; it is the PO holder's own screen asking "did it arrive?".
- * The goods tables' reads are open by design (Inventory carries no
- * money), read directly rather than through Inventory's queries module.
- */
+// Gated on the PO tool's own grant; the goods tables are read directly (open by design, no money), not through Inventory's queries.
 export async function getPoReceipts(poId: string): Promise<PoReceiptRow[]> {
   await requireTool("/purchase-orders");
   const supabase = await createClient();
@@ -846,282 +615,6 @@ export async function getPoReceipts(poId: string): Promise<PoReceiptRow[]> {
   }));
 }
 
-/* ------------------------------------------------------------------ *
- * A PO from an indent (plan.md, B3) — pick an approved indent and go
- * ------------------------------------------------------------------ */
-
-type IndentHeadRow = {
-  id: string;
-  reference: string;
-  status: string;
-  project_id: string;
-  plot_id: string | null;
-  unit_id: string | null;
-  approved_at: string | null;
-  projects: { name: string; code: string | null } | null;
-  plots: { name: string; code: string | null } | null;
-  units: { name: string; code: string | null } | null;
-  work_items: { code: string; name: string } | null;
-};
-
-const INDENT_HEAD_COLUMNS =
-  "id, reference, status, project_id, plot_id, unit_id, approved_at, projects(name, code), plots(name, code), units(name, code), work_items(code, name)";
-
-const workLabelOf = (work: { code: string; name: string } | null) =>
-  work ? `${work.name} — ${work.code}` : null;
-
-/** Every PO line that points at an indent line, with its PO's status. */
-async function orderedRows(supabase: Client, indentLineIds?: string[]) {
-  if (indentLineIds && indentLineIds.length === 0) return [];
-  const rows = await fetchAll((from, to) => {
-    let query = supabase
-      .from("purchase_order_lines")
-      .select("indent_line_id, quantity, purchase_orders(status)")
-      .not("indent_line_id", "is", null);
-    if (indentLineIds) query = query.in("indent_line_id", indentLineIds);
-    return query.order("id").range(from, to);
-  });
-  return rows.map((row) => ({
-    indent_line_id: row.indent_line_id,
-    quantity: row.quantity,
-    status: (row.purchase_orders as { status: string } | null)?.status ?? "cancelled",
-  }));
-}
-
-export type IndentToOrderRow = {
-  id: string;
-  reference: string;
-  project_name: string;
-  /** The villa — its unit or plot — or "General". */
-  place: string;
-  work_label: string | null;
-  approved_at: string | null;
-  line_count: number;
-  /** Lines with something still to buy across every live PO. */
-  lines_left: number;
-};
-
-/**
- * The approved indents with anything left to buy, newest approval first,
- * for the from-indent list. `q` matches the indent number, project,
- * villa or work. Read to completion: a truncated list would hide an
- * indent nobody then orders.
- */
-export async function listIndentsToOrder(q?: string): Promise<IndentToOrderRow[]> {
-  await requireTool("/purchase-orders");
-  const supabase = await createClient();
-
-  const [indents, lines, ordered] = await Promise.all([
-    fetchAll((from, to) =>
-      supabase
-        .from("indents")
-        .select(INDENT_HEAD_COLUMNS)
-        .eq("status", "approved")
-        .order("approved_at", { ascending: false })
-        .order("id")
-        .range(from, to),
-    ),
-    fetchAll((from, to) =>
-      supabase
-        .from("indent_lines")
-        .select("id, indent_id, quantity, indents!inner(status)")
-        .eq("indents.status", "approved")
-        .order("id")
-        .range(from, to),
-    ),
-    orderedRows(supabase),
-  ]);
-
-  const orderedByLine = orderedByIndentLine(ordered);
-  const counts = new Map<string, { total: number; left: number }>();
-  for (const line of lines) {
-    const count = counts.get(line.indent_id) ?? { total: 0, left: 0 };
-    count.total++;
-    if (leftToBuy(line.quantity, orderedByLine.get(line.id) ?? 0) > 0) count.left++;
-    counts.set(line.indent_id, count);
-  }
-
-  const needle = q?.toLowerCase();
-  return (indents as unknown as IndentHeadRow[])
-    .map((indent) => ({
-      id: indent.id,
-      reference: indent.reference,
-      project_name: indent.projects?.name ?? "—",
-      place: indent.units?.name ?? indent.plots?.name ?? "General",
-      work_label: workLabelOf(indent.work_items),
-      approved_at: indent.approved_at,
-      line_count: counts.get(indent.id)?.total ?? 0,
-      lines_left: counts.get(indent.id)?.left ?? 0,
-    }))
-    .filter((row) => row.lines_left > 0)
-    .filter(
-      (row) =>
-        !needle ||
-        [row.reference, row.project_name, row.place, row.work_label ?? ""].some((text) =>
-          text.toLowerCase().includes(needle),
-        ),
-    );
-}
-
-export type IndentOrderLine = {
-  indent_line_id: string;
-  item_id: string;
-  item_name: string;
-  item_code: string | null;
-  item_brand: string | null;
-  item_thumb_url: string | null;
-  uom: string;
-  approved_quantity: number;
-  already_ordered: number;
-  left: number;
-  note: string | null;
-  /** The last vendor this item was bought from, at that PO's rate. */
-  suggestion: VendorSuggestion | null;
-};
-
-export type IndentForOrdering = {
-  id: string;
-  reference: string;
-  status: string;
-  project_name: string;
-  place: string;
-  work_label: string | null;
-  /**
-   * Why a PO cannot be numbered for this indent's scope yet — a project,
-   * plot or unit without its short code — or null when it can.
-   */
-  scope_problem: string | null;
-  /** Lines with something left to buy; the rest are counted, not listed. */
-  lines: IndentOrderLine[];
-  fully_ordered: number;
-  vendors: { id: string; name: string }[];
-  /** Each vendor's last price per item, keyed by priceKey(item, vendor). */
-  prices: Record<string, PriceSuggestion>;
-};
-
-/**
- * One indent, ready to order: its lines with what is left to buy, the
- * vendor and rate to suggest for each, and every active vendor to choose
- * from. Null when the indent does not exist.
- */
-export async function getIndentForOrdering(indentId: string): Promise<IndentForOrdering | null> {
-  await requireTool("/purchase-orders");
-  const supabase = await createClient();
-
-  const { data, error } = await supabase
-    .from("indents")
-    .select(INDENT_HEAD_COLUMNS)
-    .eq("id", indentId)
-    .maybeSingle();
-  if (error) {
-    console.error("getIndentForOrdering failed:", error);
-    throw new Error("Could not read the indent.", { cause: error });
-  }
-  if (!data) return null;
-  const indent = data as unknown as IndentHeadRow;
-
-  const lines = await fetchAll((from, to) =>
-    supabase
-      .from("indent_lines")
-      .select("id, item_id, quantity, uom, note, items(name, code, thumb_url, brands(name))")
-      .eq("indent_id", indentId)
-      .order("created_at")
-      .order("id")
-      .range(from, to),
-  );
-  const itemIds = [...new Set(lines.map((line) => line.item_id))];
-
-  const [ordered, purchases, vendors] = await Promise.all([
-    orderedRows(
-      supabase,
-      lines.map((line) => line.id),
-    ),
-    itemIds.length
-      ? fetchAll((from, to) =>
-          supabase
-            .from("purchase_order_lines")
-            .select(
-              "item_id, rate, gst_pct, purchase_orders(vendor_id, status, issued_at, created_at)",
-            )
-            .in("item_id", itemIds)
-            .order("id")
-            .range(from, to),
-        )
-      : Promise.resolve([]),
-    listVendors(true),
-  ]);
-
-  const orderedByLine = orderedByIndentLine(ordered);
-  const history = purchaseHistory(
-    purchases.map((row) => {
-      const po = row.purchase_orders as {
-        vendor_id: string;
-        status: string;
-        issued_at: string | null;
-        created_at: string;
-      } | null;
-      return {
-        item_id: row.item_id,
-        vendor_id: po?.vendor_id ?? "",
-        rate: row.rate,
-        gst_pct: row.gst_pct,
-        at: po?.issued_at ?? po?.created_at ?? "",
-        status: po?.status ?? "cancelled",
-      };
-    }),
-  );
-
-  const scopeProblem = !indent.projects?.code
-    ? "This project has no short code yet — set one in Masters → Projects before ordering."
-    : indent.unit_id
-      ? indent.units?.code
-        ? null
-        : "This unit has no short code yet — set one in Masters before ordering."
-      : indent.plot_id && !indent.plots?.code
-        ? "This plot has no short code yet — set one in Masters before ordering."
-        : null;
-
-  const mapped: IndentOrderLine[] = lines.map((line) => {
-    const item = line.items as {
-      name: string;
-      code: string | null;
-      thumb_url: string | null;
-      brands: { name: string } | null;
-    } | null;
-    const already = orderedByLine.get(line.id) ?? 0;
-    return {
-      indent_line_id: line.id,
-      item_id: line.item_id,
-      item_name: item?.name ?? "—",
-      item_code: item?.code ?? null,
-      item_brand: item?.brands?.name ?? null,
-      item_thumb_url: item?.thumb_url ?? null,
-      uom: line.uom,
-      approved_quantity: line.quantity,
-      already_ordered: already,
-      left: leftToBuy(line.quantity, already),
-      note: line.note,
-      suggestion: history.lastVendor.get(line.item_id) ?? null,
-    };
-  });
-  const open = mapped.filter((line) => line.left > 0);
-
-  return {
-    id: indent.id,
-    reference: indent.reference,
-    status: indent.status,
-    project_name: indent.projects?.name ?? "—",
-    place: indent.units?.name ?? indent.plots?.name ?? "General",
-    work_label: workLabelOf(indent.work_items),
-    scope_problem: scopeProblem,
-    lines: open,
-    fully_ordered: mapped.length - open.length,
-    vendors: vendors.map(({ id, name }) => ({ id, name })),
-    prices: Object.fromEntries(history.lastPrice),
-  };
-}
-
-/** References and vendors of a few POs — the "made together" notice. */
 export async function getPoSummaries(
   ids: string[],
 ): Promise<{ id: string; reference: string; vendor_name: string }[]> {

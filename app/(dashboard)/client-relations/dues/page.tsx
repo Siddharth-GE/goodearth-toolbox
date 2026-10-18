@@ -1,3 +1,4 @@
+import { unpricedNote } from "@/lib/client-relations/dues";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Figure, FigureBand, FigureBandCell } from "@/components/ui/figure";
 import { ListToolbar } from "@/components/ui/list-toolbar";
@@ -17,14 +18,9 @@ import { PiggyBank } from "lucide-react";
 import Link from "next/link";
 
 import { SectionHead } from "../_components/board-parts";
-import { Pill, PlotChip } from "../_components/pill";
+import { Pill, PlotChip } from "@/components/ui/pill";
 
-/**
- * Who owes what — read the way Actions reads: overdue first, then the
- * next seven days, then later (root plan.md, seventh piece, "edit the
- * current tool to match the vibe"). Amounts stay in a table, monospaced,
- * because a column of money reads as one (DESIGN.md).
- */
+/** Amounts stay in a monospaced table: a column of money reads as one (DESIGN.md). */
 
 type Group = "overdue" | "week" | "later" | "undated";
 
@@ -74,7 +70,12 @@ export default async function DuesPage({
     <div className="space-y-4">
       <FigureBand>
         <FigureBandCell>
-          <Figure label="Scheduled" value={formatMoney(board.totals.scheduled)} size="sm" />
+          <Figure
+            label="Scheduled"
+            value={formatMoney(board.totals.scheduled)}
+            hint={unpricedNote(board.totals.unpricedCount)}
+            size="sm"
+          />
         </FigureBandCell>
         <FigureBandCell>
           <Figure label="Invoiced" value={formatMoney(board.totals.invoiced)} size="sm" />

@@ -17,6 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCount, formatMoney, formatQuantity } from "@/lib/format";
+import { parseNumber } from "@/lib/form-data";
 import { createPosFromIndent } from "@/lib/purchase-orders/actions";
 import {
   picksProblem,
@@ -25,15 +26,10 @@ import {
   type IndentPick,
   type PriceSuggestion,
 } from "@/lib/purchase-orders/from-indent";
-import type { IndentOrderLine } from "@/lib/purchase-orders/queries";
-import { useMemo, useState, useTransition } from "react";
+import type { IndentOrderLine } from "@/lib/purchase-orders/indent-queries";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useMemo, useState } from "react";
 
-/**
- * Every line left to buy, ticked, with its vendor, rate and GST already
- * suggested from the last purchase of that item. Nothing is written until
- * Create, which makes one draft PO per vendor — the bar at the foot says
- * how many before it is pressed.
- */
 type Row = {
   picked: boolean;
   quantity: string;
@@ -43,7 +39,6 @@ type Row = {
 };
 
 const asText = (value: number | null | undefined) => (value == null ? "" : String(value));
-const typed = (text: string) => (text.trim() === "" ? null : Number(text.trim()));
 
 export function IndentOrderForm({
   indentId,
@@ -56,10 +51,8 @@ export function IndentOrderForm({
   indentId: string;
   lines: IndentOrderLine[];
   vendors: { id: string; name: string }[];
-  /** Each vendor's last price per item, keyed by priceKey(item, vendor). */
   prices: Record<string, PriceSuggestion>;
   gstRates: number[];
-  /** Why no PO can be numbered for this indent yet, or null. */
   blocked: string | null;
 }) {
   const [rows, setRows] = useState<Record<string, Row>>(() =>
@@ -77,8 +70,7 @@ export function IndentOrderForm({
     ),
   );
   const [everyVendor, setEveryVendor] = useState("");
-  const [error, setError] = useState<string>();
-  const [creating, startCreating] = useTransition();
+  const { pending: creating, error, run } = useActionRunner();
 
   const vendorOptions = useMemo(
     () => vendors.map((vendor) => ({ value: vendor.id, label: vendor.name })),
@@ -122,23 +114,17 @@ export function IndentOrderForm({
       const row = rows[line.indent_line_id];
       return {
         indentLineId: line.indent_line_id,
-        quantity: Number(row.quantity),
+        quantity: parseNumber(row.quantity) ?? 0,
         vendorId: row.vendorId,
-        rate: typed(row.rate),
-        gstPct: typed(row.gst),
+        rate: parseNumber(row.rate),
+        gstPct: parseNumber(row.gst),
       };
     });
   const left = new Map(lines.map((line) => [line.indent_line_id, line.left]));
   const problem = blocked ?? picksProblem(picks, left);
   const groups = splitByVendor(picks.filter((pick) => pick.vendorId));
 
-  const create = () =>
-    startCreating(async () => {
-      setError(undefined);
-      // A success lands on the first PO; only a refusal comes back.
-      const result = await createPosFromIndent(indentId, picks);
-      if (result?.error) setError(result.error);
-    });
+  const create = () => run(() => createPosFromIndent(indentId, picks));
 
   return (
     <div className="space-y-4 pb-28">
@@ -175,7 +161,7 @@ export function IndentOrderForm({
         <TableBody>
           {lines.map((line) => {
             const row = rows[line.indent_line_id];
-            const quantity = Number(row.quantity);
+            const quantity = parseNumber(row.quantity) ?? 0;
             const tooMuch = row.picked && quantity > line.left + 1e-9;
             const lastPrice = row.vendorId
               ? prices[priceKey(line.item_id, row.vendorId)]
@@ -298,7 +284,6 @@ export function IndentOrderForm({
         the expected date are set there too.
       </p>
 
-      {/* Nothing has been written yet — this bar is the commit point. */}
       <div className="border-border bg-surface fixed inset-x-0 bottom-0 z-10 mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 border-t px-5 py-3 md:rounded-t-2xl md:border">
         <div className="min-w-0">
           {picks.length === 0 ? (

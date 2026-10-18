@@ -1,37 +1,9 @@
 /**
- * A house's work, drawn as a wave.
- *
- * One villa is never one line of work: drawings, procurement and site run
- * in parallel, and a list of trails cannot show that. The wave can. It
- * runs left to right along the project's own stages, and its height at
- * any point is how much open work sits in that stage. Humps are effort in
- * flight. A flat line at the end means everything has landed.
- *
- * Two judgements are baked in:
- *
- *   1. HEIGHT IS A COUNT OF OPEN TRAILS, not a sum of expected days. One
- *      forty-day construction activity would otherwise tower over five
- *      one-day approvals, and the picture would say "Construction is
- *      busy" when what it means is "Construction is slow". The question a
- *      wave answers is "how many things are in flight here".
- *
- *   2. QUEUED WORK COUNTS AT A THIRD of a running trail. A laid-down set
- *      is real, planned work — it must not read as flat, because flat
- *      means finished. It must not read as full height either, because
- *      nobody has picked it up. A low swell is the honest shape.
- *
- * WHY THIS DOES NOT BREAK THE WEIGHTED-TOTAL RULE (see schedule.ts and
- * SchedulePath): each stage's height is drawn INSIDE that stage's own
- * span on the x-axis. Nothing cumulative is ever drawn growing from the
- * left edge. A hump over Construction says "Construction is busy" and
- * says nothing at all about Design, which is exactly the property the
- * per-stage fill was introduced to protect.
- *
- * Heights are normalised across every villa on one project page, so a
- * taller wave really does mean more open work than the villa above it.
- *
- * Pure: no I/O, no dates of its own — the stage windows and "today"
- * arrive already calculated from schedule.ts.
+ * A house's work drawn as a wave along the project's stages; height is open work per stage.
+ * Height is a COUNT of open trails, not expected days, so one 40-day activity can't tower over five approvals.
+ * Queued work counts a third of a running trail: flat means finished, full means picked up.
+ * Each stage is drawn inside its own span, so nothing cumulative grows from the left (see schedule.ts).
+ * Heights are normalised across every villa on a project page. Pure.
  */
 
 import type { PlannedStage } from "./schedule";
@@ -41,27 +13,21 @@ export type WaveTrail = {
   isFinished: boolean;
   isStuck: boolean;
   isQueued: boolean;
-  /** The baton is sitting with the client, not with us. */
   isWithClient?: boolean;
 };
 
-/** One stage's slice of the wave: where it sits, and what is in it. */
 export type WaveStageBand = {
   stageId: string;
   name: string;
-  /** 0–1 across the whole project, proportional to the stage's weeks. */
   x0: number;
   x1: number;
-  /** Started and not finished. Includes trails sitting with the client. */
   open: number;
   queued: number;
-  /** Open and cold. */
   stuck: number;
   /** Open, with the client, and not also cold — cold is the louder fact. */
   withClient: number;
   finished: number;
   total: number;
-  /** Height at this stage's midpoint, 0–1. */
   amp: number;
 };
 
@@ -80,7 +46,6 @@ export type WaveModel = {
   points: { x: number; y: number }[];
   markers: WaveMarker[];
   status: WaveStatus;
-  /** The words on the right of the card: "2 stuck", "moving", "complete". */
   label: string;
   /** Where the plan says today is, 0–1. Null when the project has no start date. */
   planX: number | null;
@@ -106,20 +71,11 @@ function loadOf(trails: readonly WaveTrail[]): number {
   return open + QUEUED_WEIGHT * queued;
 }
 
-/**
- * The height that counts as "full", shared by every wave on one page.
- *
- * Normalising each villa against itself would draw a house with one open
- * trail exactly as tall as a house with fifteen, which is the opposite of
- * one glance. The busiest villa sets the ceiling and everyone else is
- * drawn against it.
- */
+/** The height that counts as "full", shared by every wave on a page: the busiest villa sets the ceiling. */
 export function waveAmpUnit(groups: readonly (readonly WaveTrail[])[]): number {
   let max = 0;
   for (const g of groups) {
-    // Per stage, not per villa: the ceiling is the busiest single stage,
-    // so a villa with work spread across five stages does not flatten
-    // everyone else on the page.
+    // Per stage, not per villa, so work spread over five stages doesn't flatten the page.
     const perStage = new Map<string, WaveTrail[]>();
     for (const t of g) {
       if (t.projectStageId === null) continue;
@@ -137,9 +93,7 @@ export function buildWave(
   trails: readonly WaveTrail[],
   opts: { ampUnit: number; planPct: number | null },
 ): WaveModel | null {
-  // No stages means no x-axis. There is no honest wave to draw, and the
-  // caller shows "set the stages first" instead of a flat line that would
-  // read as "nothing to do".
+  // No stages, no x-axis: the caller says "set the stages first" instead of a flat line.
   if (stages.length === 0) return null;
 
   const totalWeeks = stages.reduce((sum, s) => sum + s.weeks, 0);
@@ -198,8 +152,7 @@ export function buildWave(
       markers.push({ x: mid, y: band.amp, kind: "stuck", count: band.stuck });
     }
     if (band.withClient > 0) {
-      // Offset when the same stage is also cold, so two dots on one crest
-      // stay two dots.
+      // Offset when the stage is also cold so two dots stay two.
       markers.push({
         x: band.stuck > 0 ? Math.max(0, mid - 0.025) : mid,
         y: band.amp,
@@ -209,11 +162,8 @@ export function buildWave(
     }
   }
 
-  // Trails filed under no stage, or under a stage that has since been
-  // deleted, cannot sit anywhere honest on this axis. They are counted
-  // out loud instead of quietly dropped — a wave that looks calm because
-  // work is missing from it is the exact flattering number this tool
-  // exists to remove.
+  // Trails under no stage (or a deleted one) are counted out loud, not dropped: a calm wave from
+  // missing work is the flattering number this tool exists to remove.
   const unfiled = trails.filter(
     (t) => !t.isFinished && (t.projectStageId === null || !known.has(t.projectStageId)),
   );
@@ -248,10 +198,7 @@ export function buildWave(
   };
 }
 
-/**
- * The words beside the wave, in the order a reader needs them: what is
- * wrong first, what is happening second, what has ended last.
- */
+/** The words beside the wave: what is wrong first, then what is happening, then what has ended. */
 function verdictOf(
   totals: { open: number; queued: number; stuck: number; withClient: number; finished: number },
   trailCount: number,
@@ -268,17 +215,7 @@ function verdictOf(
   return { status: "complete", label: "complete" };
 }
 
-/**
- * The wave itself: a smooth curve through the control points.
- *
- * Catmull-Rom converted to cubic béziers, which is the standard way to
- * get a curve that actually passes through its points rather than near
- * them — a hump must sit over its own stage, not drift into the next one.
- *
- * The control points are clamped to the baseline. Without that, a tall
- * hump beside an empty stage makes the curve dip below zero on the way
- * down, drawing negative work.
- */
+/** A smooth curve through the control points (Catmull-Rom as béziers, so a hump sits over its stage), clamped to the baseline so it never dips negative. */
 export function wavePath(
   points: readonly { x: number; y: number }[],
   w: number,
@@ -302,7 +239,6 @@ export function wavePath(
 
     const c1x = sx(p1.x) + (sx(p2.x) - sx(p0.x)) / 6;
     const c2x = sx(p2.x) - (sx(p3.x) - sx(p1.x)) / 6;
-    // Clamped at the baseline: the curve may flatten, never go negative.
     const c1y = Math.min(floor, sy(p1.y) + (sy(p2.y) - sy(p0.y)) / 6);
     const c2y = Math.min(floor, sy(p2.y) - (sy(p3.y) - sy(p1.y)) / 6);
 

@@ -1,10 +1,3 @@
-/**
- * The PO reference is what a vendor sees on paper and quotes back on
- * their invoice, so its exact shape is pinned here — including the
- * lpad-truncation case where the TS mirror and the SQL mint (migration
- * 0021) could drift apart, and the scope-resolution order (unit before
- * plot before GEN) that decides which code enters the number.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

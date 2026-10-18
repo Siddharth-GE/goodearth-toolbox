@@ -5,13 +5,7 @@ import { formatDate } from "@/lib/format";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
 
-/**
- * The change description folded behind a click (founder, 2026-08-22:
- * "a small button saying view change description or revision log …
- * since sometimes its a long text"). Shows every revision of the set
- * that has gone to site, newest first — the same shape the Supervisors
- * side unfolds, worded for the design team.
- */
+/** Every revision of the set that has gone to site, newest first, folded behind a click because change text can be long. */
 export function RevisionLog({
   entries,
 }: {

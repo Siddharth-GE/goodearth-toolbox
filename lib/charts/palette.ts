@@ -1,39 +1,17 @@
 /**
- * Slot assignment for the categorical chart palette — the pure half of
- * the fourth colour system (see app/globals.css for the tokens and the
- * measured ordering, and DESIGN.md for the rules).
- *
- * Colours are TOKENS, not hexes: Recharts passes colour props straight
- * through to SVG attributes, which resolve CSS variables normally in
- * the DOM, so light/dark swap in one file and DESIGN.md's "never
- * hardcode a hex in a component" holds with the library in place. The
- * print palette for PDFs is separate (lib/pdf/theme.ts, Stage 9) —
- * a detached SVG string cannot resolve CSS variables.
- *
- * The rules the tests lock down:
- * - Slots follow ENTITY ORDER, never rank: a filter that drops a series
- *   must not repaint the survivors, so assignment runs against the full
- *   known universe of series, not whoever is present today.
- * - Eight is the ceiling. The ninth and later entities fold into
- *   "Other" on the last slot; a ninth hue is never generated.
- * - Status colours (success/warning/danger/info) are never issued as
- *   series colours — they keep their fixed meanings.
- * - Single-series and emphasis charts use the brand accent, not slot 1,
- *   so most of Reporter's charts read as Goodearth green.
+ * Colours are CSS tokens, never hexes (DESIGN.md). Slots follow entity order, not rank, so a filter never repaints survivors.
+ * Eight is the ceiling; status colours are never series colours; single-series charts use the accent.
  */
 
 export const CHART_SLOT_COUNT = 8;
 
-/** The label the folded tail renders under. */
 export const OTHER_SERIES = "Other";
 
-/** 1-based slot → the CSS token Recharts is handed. */
 export function chartToken(slot: number): string {
   const clamped = Math.min(CHART_SLOT_COUNT, Math.max(1, Math.round(slot)));
   return `var(--chart-${clamped})`;
 }
 
-/** The accent for single-series and emphasised marks. */
 export const ACCENT_TOKEN = "var(--accent)";
 
 /** What a de-emphasised series wears when one series is the point. */
@@ -46,20 +24,12 @@ export type SlotAssignment = {
 };
 
 export type SlotPlan = {
-  /** Present series in universe order, each with its stable slot. */
   series: SlotAssignment[];
-  /** Entity ids folded into OTHER_SERIES (universe position > ceiling). */
   folded: string[];
 };
 
 /**
- * Assign palette slots to the present series.
- *
- * `universe` is every series id that COULD appear, in first-appearance
- * order; it defaults to `present`. Slots belong to universe positions,
- * so filtering away one series leaves every survivor wearing the colour
- * it had. When the universe outgrows the palette, entities past slot
- * 7 fold into one "Other" bucket on slot 8.
+ * Slots belong to universe positions (default: `present`); past slot 7, entities fold into "Other" on slot 8.
  */
 export function assignSlots(present: string[], universe: string[] = present): SlotPlan {
   const order = [...new Set(universe)];
@@ -93,12 +63,7 @@ export function assignSlots(present: string[], universe: string[] = present): Sl
   return { series, folded };
 }
 
-/**
- * Colours for measure-series charts (one colour per measure): a single
- * measure wears the accent; an emphasised measure wears the accent and
- * greys the rest; otherwise slots in measure order — which the spec
- * fixed, so the mapping is stable by construction.
- */
+/** Single measure: the accent; emphasised: accent, rest grey; otherwise slots in measure order. */
 export function measureColors(measureIds: string[], emphasis?: string): Record<string, string> {
   const colors: Record<string, string> = {};
   if (measureIds.length === 1) {

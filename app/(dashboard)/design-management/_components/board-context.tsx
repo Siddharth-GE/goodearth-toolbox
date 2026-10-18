@@ -5,21 +5,13 @@ import type { BoardStage } from "@/lib/design-management/board";
 import type { Person, VillaRef } from "@/lib/design-management/board-queries";
 import { createContext, useContext, type ReactNode } from "react";
 
-/**
- * What every card, menu and composer on a design board screen shares —
- * today, the team, the villas, the board's stages — handed down once
- * rather than repeated on every card (Client Relations' BoardProvider,
- * its own copy), with the shared Undo bar under it.
- */
 export type DesignBoard = {
   today: string;
   team: Person[];
   villas: VillaRef[];
   stages: BoardStage[];
-  /** Open actions per person, for the owner menu. */
   openByOwner: Record<string, number>;
   meId: string;
-  /** An admin: closes any action. */
   isManager: boolean;
 };
 

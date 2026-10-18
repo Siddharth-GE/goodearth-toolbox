@@ -1,19 +1,8 @@
-/**
- * Roles are additive: a bundle can only ever add to what someone holds
- * personally, and the approval ceiling that applies is the more
- * generous of the two. These rules are mirrored by has_app() and
- * bill_approval_cap() in migration 0034 — a disagreement here is a
- * screen that lies about what the database will allow.
- */
+// Roles are additive and the higher approval ceiling wins; mirrors has_app() and bill_approval_cap() (0034).
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import {
-  canApproveEffective,
-  effectiveApprovalLimit,
-  effectiveApps,
-  effectiveGrant,
-} from "./access-model";
+import { effectiveApprovalLimit, effectiveApps, effectiveGrant } from "./access-model";
 
 const personal = new Set(["/masters", "/indents"]);
 const role = new Set(["/bills", "/indents"]);
@@ -41,12 +30,6 @@ test("no role means personal grants stand exactly as they are", () => {
     granted: true,
     source: "personal",
   });
-});
-
-test("either source alone confers the right to approve", () => {
-  assert.equal(canApproveEffective({ personal: true, fromRole: false }), true);
-  assert.equal(canApproveEffective({ personal: false, fromRole: true }), true);
-  assert.equal(canApproveEffective({ personal: false, fromRole: false }), false);
 });
 
 test("unlimited from either side wins — combining rights never shrinks them", () => {
@@ -77,7 +60,6 @@ test("a source that grants no right contributes no ceiling", () => {
     effectiveApprovalLimit({ isApprover: true, limit: 50000 }, { canApprove: false, limit: null }),
     50000,
   );
-  // Not named personally; the role's limit is the one that applies.
   assert.equal(
     effectiveApprovalLimit({ isApprover: false, limit: null }, { canApprove: true, limit: 75000 }),
     75000,

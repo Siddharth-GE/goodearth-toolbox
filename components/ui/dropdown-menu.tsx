@@ -14,8 +14,7 @@ export function DropdownMenuContent({
 }: ComponentProps<typeof DropdownMenuPrimitive.Content>) {
   return (
     <DropdownMenuPrimitive.Portal>
-      {/* The menu-in keyframe grows the menu from the corner nearest its
-          trigger: it reads Radix's own transform-origin variable. */}
+      {/* The menu-in keyframe grows from the corner nearest the trigger, via Radix's transform-origin variable. */}
       <DropdownMenuPrimitive.Content
         sideOffset={sideOffset}
         className={cn(

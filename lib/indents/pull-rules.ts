@@ -1,19 +1,5 @@
-/**
- * Which budgets may be pulled from, and which pulled lines have drifted
- * from the design — the pure decisions, no database.
- *
- * A unit's selection is revised over time and every issued revision gets
- * its own budget; an approved budget stays approved forever as the
- * historical record. Only the budget of the CURRENT (issued) revision is
- * safe to request material against — offering older ones is how the same
- * line gets bought twice. This module exists apart from queries.ts so
- * the rules can be tested directly — it may import nothing.
- *
- * Drift comparison deliberately includes item_id (diffLines in
- * Selections does not need to — an item swap there is remove + add): an
- * indent line anchored to a superseded revision must flag "the design no
- * longer says this" whatever form the change took.
- */
+// Pure rules, no database (imports nothing, so tests run directly).
+// Only the CURRENT issued revision's budget is safe to request against: older approved budgets are how a line gets bought twice. Drift compares item_id too, so any change flags.
 
 export type BudgetCandidate = {
   budget_id: string;
@@ -32,17 +18,7 @@ export type ChooserRow =
   | { kind: "pullable"; budget: BudgetCandidate; revision_no: number }
   | { kind: "pending"; unit_id: string; revision_no: number };
 
-/**
- * Sort approved budgets into "pull from this" and "this unit is paused
- * while its new revision's budget gets approved".
- *
- * A candidate is pullable iff its selection IS the unit's issued
- * revision. A unit whose candidates are all superseded gets exactly one
- * pending row carrying the issued revision's number — the screen's
- * "R2 issued — budget pending approval". A unit with no issued revision
- * at all contributes nothing (a budget implies an issued selection, so
- * this only covers bad data).
- */
+/** Pullable iff the selection is the unit's issued revision; an all-superseded unit gets one pending row with the issued R-number. */
 export function classifyBudgetChooser(
   candidates: BudgetCandidate[],
   issuedByUnit: Map<string, IssuedRevision>,
@@ -82,14 +58,7 @@ export type DriftLine = {
 
 export type DriftStatus = "changed" | "removed";
 
-/**
- * For indent lines anchored to a superseded revision: which of them does
- * the latest issued revision no longer agree with?
- *
- * Returns a map keyed by line_key; keys absent from the map are
- * unchanged. "removed" — the line is gone from the latest revision;
- * "changed" — its item, quantity or space differs.
- */
+/** Indent lines anchored to a superseded revision, keyed by line_key: "removed" or "changed" (item, quantity or space); absent keys are unchanged. */
 export function classifyDesignDrift(
   anchoredKeys: string[],
   anchoredLines: DriftLine[],
@@ -118,15 +87,9 @@ export function classifyDesignDrift(
   return drift;
 }
 
-// ---------------------------------------------------------------------
-// Pull path 3 — the villa's official estimate (0078)
-// ---------------------------------------------------------------------
-
 export type EstimatePullCandidate = {
-  /** The estimate's quantity for this material, in the MATERIAL's uom. */
   quantity: number;
   material_uom: string;
-  /** The catalogue item the material is bought as; null = not linked. */
   item_id: string | null;
   item_default_uom: string | null;
   /** One material_uom = factor × item_default_uom; null = none entered. */
@@ -136,16 +99,8 @@ export type EstimatePullCandidate = {
 export type EstimatePullState =
   { state: "unlinked" } | { state: "needs_qty" } | { state: "ready"; prefillQty: number };
 
-/**
- * What the pull screen may do with one material of the takeoff.
- *
- * Since 0086 a takeoff row is already in the item's own unit, so it is
- * ready as it stands. The rest serves estimates submitted before that: a
- * person-entered factor converts; matching unit labels (case-insensitive,
- * with procurement's 'each' and the estimator's 'nos' being one unit)
- * convert 1:1; anything else asks a person for the quantity rather than
- * guessing — a guessed conversion is a wrong number on an indent.
- */
+// Since 0086 a takeoff row is in the item's unit and ready. Older rows: a person-entered factor converts; matching unit labels (each = nos) convert 1:1;
+// anything else asks a person, because a guessed conversion is a wrong number.
 export function classifyEstimatePull(row: EstimatePullCandidate): EstimatePullState {
   if (!row.item_id || !row.item_default_uom) return { state: "unlinked" };
   if (row.item_uom_factor !== null && row.item_uom_factor > 0) {
@@ -161,15 +116,12 @@ export function classifyEstimatePull(row: EstimatePullCandidate): EstimatePullSt
   return { state: "needs_qty" };
 }
 
-/** One row of estimate_takeoff_facts — one (work, material) of the official estimate. */
 export type EstimateFact = {
   work_item_id: string | null;
-  /** The frozen name and unit the estimate was submitted with. */
   material_name: string;
   uom: string;
   quantity: number;
-  /** The catalogue item. Always set since 0086; null only on an older
-   * estimate whose material was never linked to one. */
+  /** Always set since 0086; null only on an older estimate. */
   item_id: string | null;
   item_uom_factor: number | null;
 };
@@ -178,26 +130,14 @@ export type EstimatePullGroup = {
   /** The item, or "unlinked:<name>" for an older row that names none. */
   key: string;
   item_id: string | null;
-  /** The frozen estimate name(s), for when the item has been renamed since. */
   estimate_name: string;
-  /** What the estimate says, in its own unit(s) — one part per unit, so
-   * "8 cft + 2 bag" when two older works disagreed. */
+  /** In the estimate's own unit(s), e.g. "8 cft + 2 bag" when older works disagreed. */
   estimate_parts: { quantity: number; uom: string }[];
   work_count: number;
   verdict: EstimatePullState;
 };
 
-/**
- * The official estimate, one row per catalogue item — what a person
- * requests, whatever work it was estimated under.
- *
- * Keyed on the ITEM (BUGCATCHER #16): since 0086 every takeoff row names
- * its item and has no material id, so a pull keyed on the material saw
- * nothing. An older row still converts through its own factor, fact by
- * fact, before anything is added up — two works that estimated the same
- * item in different units are only ready when every one of them converts.
- * `itemUom` is the item's unit today, read from the catalogue.
- */
+// Keyed on the ITEM (BUGCATCHER #16). Older rows convert fact by fact before summing; an item is ready only when every one converts.
 export function groupEstimatePull(
   facts: EstimateFact[],
   itemUom: Map<string, string>,
@@ -255,17 +195,11 @@ export function groupEstimatePull(
   }));
 }
 
-/**
- * Everything already requested against ANY of the villa's estimates, per
- * item. Counting only the current official estimate reopened the
- * double-buy every time the villa was re-estimated: lines pulled against
- * EST/…/001 counted for nothing once EST/…/002 superseded it.
- */
+/** Requested against ANY of the villa's estimates: counting only the current one reopens the double-buy. */
 export function requestedByItem(
   lines: { item_id: string; quantity: number; indent_id: string; work_item_id?: string | null }[],
   indentId: string,
-  /** When the pull is for one work, `forWork` counts only lines on indents
-   * raised for that work; `requested` stays villa-wide either way. */
+  /** With a work, only that work's indents count; `requested` stays villa-wide. */
   workItemId: string | null = null,
 ): { requested: Map<string, number>; forWork: Map<string, number>; onThisIndent: Set<string> } {
   const requested = new Map<string, number>();
@@ -281,13 +215,7 @@ export function requestedByItem(
   return { requested, forWork, onThisIndent };
 }
 
-/**
- * The takeoff rows a pull offers. An indent raised for one work offers
- * that work's materials only — listing the whole villa under "Footing" is
- * how "only cement appears" read as missing sand, jelly and steel
- * (2026-10-08). No work on the indent, or "every work" asked for, offers
- * everything.
- */
+/** An indent for one work offers that work's materials only; no work, or "every work", offers all. */
 export function factsForWork<T extends { work_item_id: string | null }>(
   facts: T[],
   workItemId: string | null,
@@ -295,12 +223,7 @@ export function factsForWork<T extends { work_item_id: string | null }>(
   return workItemId ? facts.filter((fact) => fact.work_item_id === workItemId) : facts;
 }
 
-/**
- * When the villa's working estimate changed after the official copy a pull
- * reads was made (0109) — the date to warn with, or null when it has not.
- * Equal is not "after": making an estimate official writes everything in
- * one transaction, sharing one clock reading.
- */
+/** The date to warn with, or null. Equal is not "after": an estimate goes official in one transaction, one clock reading. */
 export function workingChangedSince(
   submittedAt: string | null,
   workingUpdatedAt: string | null,

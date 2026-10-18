@@ -22,17 +22,11 @@ import {
   type WorkOrderLineForBill,
 } from "@/lib/bills/lines";
 import { billLineMoney, rollUpBill } from "@/lib/bills/math";
+import { parseNumber } from "@/lib/form-data";
 import { formatCount, formatMoney } from "@/lib/format";
 import { Plus, Trash2 } from "lucide-react";
 
-/**
- * A bill's lines being written: quantity × rate, less a rupee discount,
- * GST on that, other charges after it — each line's amount and the
- * bill's totals worked out as figures are typed, the way the database
- * will store them. Controlled: the bill page saves, the new-bill form
- * records.
- */
-
+// Controlled: the bill page saves, the new-bill form records. Totals are worked out as figures are typed, the way the database stores them.
 /** A line in the editor: the draft, its saved id, and its typed text. */
 export type EditorLine = {
   key: string;
@@ -57,17 +51,14 @@ export function toEditorLine(draft: BillLineDraft, id?: string): EditorLine {
   };
 }
 
-const typed = (text: string) => (text.trim() === "" ? null : Number(text.trim()));
-
-/** The editor's lines as drafts, typed text read as numbers. */
 export function draftsOf(lines: EditorLine[]): (BillLineDraft & { id?: string })[] {
   return lines.map((line) => ({
     ...line.draft,
     id: line.id,
-    quantity: line.draft.kind === "pw_lump" ? null : typed(line.text.quantity),
-    rate: typed(line.text.rate),
-    discountAmount: typed(line.text.discount),
-    otherCharges: typed(line.text.charges),
+    quantity: line.draft.kind === "pw_lump" ? null : parseNumber(line.text.quantity),
+    rate: parseNumber(line.text.rate),
+    discountAmount: parseNumber(line.text.discount),
+    otherCharges: parseNumber(line.text.charges),
   }));
 }
 
@@ -109,9 +100,7 @@ export function BillLinesEditor({
   onChange: (lines: EditorLine[]) => void;
   gstRates: number[];
   uoms: string[];
-  /** A PO bill: the PO's lines, to add what is still to bill. */
   poLines?: PoLineForBill[];
-  /** A work-order bill: its works, to add as lines. */
   workLines?: WorkOrderLineForBill[];
   /** Lines that are neither the PO's materials nor labour (not on a PO bill). */
   allowOther: boolean;
@@ -128,7 +117,6 @@ export function BillLinesEditor({
   const updateText = (line: EditorLine, patch: Partial<EditorLine["text"]>) =>
     update(line.key, { text: { ...line.text, ...patch } });
 
-  // PO lines not on this bill yet, with something received and unbilled.
   const onBill = new Set(
     lines.flatMap((line) => (line.draft.poLineId ? [line.draft.poLineId] : [])),
   );

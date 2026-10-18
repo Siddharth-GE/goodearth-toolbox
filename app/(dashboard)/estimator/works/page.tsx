@@ -8,16 +8,8 @@ import { formatCount } from "@/lib/format";
 import { Hammer } from "lucide-react";
 import { RateBookList, type RateBookRow } from "./_components/rate-book-list";
 
-/**
- * The rate book: what one unit of every work costs — its unit, labour
- * rate and the materials it uses, priced at Masters' prices. Every villa
- * estimate starts from these; a villa can have its own figures for any
- * of them (tap a rate on the estimate).
- *
- * The first list worth working through is "used but not priced": the
- * works some estimate already uses whose rate is still unknown. The other
- * hundred-odd works can wait until an estimate needs them.
- */
+/** The rate book: what one unit of every work costs at Masters' prices. Every villa estimate starts from it.
+ * The list worth working through first is "used but not priced". */
 export default async function RateBookPage({
   searchParams,
 }: {

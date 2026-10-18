@@ -2,21 +2,15 @@ import { LinkButton } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageTitle } from "@/components/ui/page-title";
 import { formatDate } from "@/lib/format";
-import { getEstimatePull, getIndentHeader } from "@/lib/indents/queries";
+import { getIndentHeader } from "@/lib/indents/detail-queries";
+import { getEstimatePull } from "@/lib/indents/pull-queries";
 import { canEditIndent } from "@/lib/indents/workflow";
 import { Calculator } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { EstimatePullBasket } from "../_components/estimate-pull-basket";
 
-/**
- * Pull path 3: request materials off the villa's OFFICIAL estimate —
- * the 0077 submit snapshot, read through the money-free
- * estimate_takeoff_facts window, one row per catalogue item. An indent
- * raised for a work sees that work's materials; `?all=1` shows every
- * work. Quantities come from the estimate and stay editable; nothing is
- * added until Add is pressed.
- */
+// Reads the official estimate (0077 snapshot) through the money-free estimate_takeoff_facts; `?all=1` shows every work.
 export default async function EstimatePullPage({
   params,
   searchParams,
@@ -65,8 +59,7 @@ export default async function EstimatePullPage({
         />
       ) : (
         <>
-          {/* Which estimate this is, always — a QS's later changes to the
-              working estimate reach here only once made official again. */}
+          {/* Later working-estimate changes reach here only once made official. */}
           <p className="text-muted text-sm">
             From <span className="text-foreground font-medium">{pull.reference}</span>
             {pull.submitted_at && <>, made official {formatDate(pull.submitted_at)}</>}. Changes the

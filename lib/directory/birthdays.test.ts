@@ -1,9 +1,4 @@
-/**
- * Birthday arithmetic. The edges are the whole point here: a window that
- * wraps the new year, a date that only exists in three years out of four,
- * and the day itself — all three read wrong under the obvious
- * implementation.
- */
+/** Edges: a window wrapping the new year, 29 February, and the day itself. */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -32,8 +27,7 @@ test("a birthday already past this year rolls to next year", () => {
 });
 
 test("the window wraps the new year", () => {
-  // A naive month/day comparison puts January behind December and shows
-  // an empty list to everyone for the last week of the year.
+  // A naive month/day comparison puts January behind December.
   assert.equal(daysUntilBirthday("1990-01-03", "2026-12-28"), 6);
 
   const people = [{ name: "Anu", dateOfBirth: "1990-01-03" }];
@@ -44,8 +38,7 @@ test("the window wraps the new year", () => {
 });
 
 test("29 February resolves to 1 March in a non-leap year", () => {
-  // 2027 is not a leap year. Dropping the date entirely would hide the
-  // birthday for three years in four.
+  // 2027 is not a leap year; dropping the date would hide it three years in four.
   assert.equal(nextBirthday("1992-02-29", "2027-02-25"), "2027-03-01");
   // 2028 is, so it lands on the real date.
   assert.equal(nextBirthday("1992-02-29", "2028-02-25"), "2028-02-29");

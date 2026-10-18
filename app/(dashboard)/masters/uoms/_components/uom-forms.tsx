@@ -5,7 +5,8 @@ import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { addUom, renameUom, setUomActive } from "@/lib/masters/uoms-actions";
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useActionState, useEffect, useRef, useState } from "react";
 
 export function UomForm() {
   const [state, formAction, pending] = useActionState(addUom, undefined);
@@ -33,29 +34,21 @@ export function UomForm() {
   );
 }
 
-/** The name, editable in place. A rename follows through to every row
- * carrying the unit — the FKs cascade (0082) — so the word changes
- * everywhere at once. */
+/** A rename cascades to every row carrying the unit (0082). */
 export function UomNameField({ id, name }: { id: string; name: string }) {
   const [value, setValue] = useState(name);
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
-  const save = () => {
+  const save = async () => {
     const next = value.trim();
     if (!next || next === name) {
       setValue(name);
       return;
     }
-    startTransition(async () => {
-      const result = await renameUom(id, next);
-      if (result?.error) {
-        setError(result.error);
-        setValue(name);
-      } else {
-        setError(undefined);
-      }
-    });
+    const result = await run(() => renameUom(id, next));
+    if (result?.error) {
+      setValue(name);
+    }
   };
 
   return (
@@ -78,8 +71,7 @@ export function UomNameField({ id, name }: { id: string; name: string }) {
 }
 
 export function UomToggle({ id, isActive }: { id: string; isActive: boolean }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
   return (
     <div className="flex items-center justify-end gap-2">
@@ -89,12 +81,7 @@ export function UomToggle({ id, isActive }: { id: string; isActive: boolean }) {
         variant="ghost"
         size="sm"
         disabled={pending}
-        onClick={() =>
-          startTransition(async () => {
-            const result = await setUomActive(id, !isActive);
-            setError(result?.error);
-          })
-        }
+        onClick={() => run(() => setUomActive(id, !isActive))}
       >
         {pending ? "Saving…" : isActive ? "Deactivate" : "Activate"}
       </Button>

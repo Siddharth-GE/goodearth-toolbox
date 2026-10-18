@@ -15,14 +15,7 @@ import type { PlanResult, ScenarioResult } from "@/lib/business-planning/model";
 import { formatCrore, formatPercent, formatQuantity } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-/**
- * The collation: what each line contributes, what the project costs on
- * top, and what falls out — with Base, Moderate and High side by side
- * and the ACTIVE one marked.
- *
- * In crore throughout. Ten-digit rupee figures in three columns are
- * indistinguishable, and telling them apart is the entire job here.
- */
+/** What each line contributes, what the project costs on top, and what falls out, Base/Moderate/High side by side with the ACTIVE one marked. In crore throughout. */
 export function SummaryTab({
   result,
   activeScenario,
@@ -51,19 +44,13 @@ export function SummaryTab({
               <TableHeaderCell className="text-right">Built</TableHeaderCell>
               <TableHeaderCell className="text-right">Running</TableHeaderCell>
               <TableHeaderCell className="text-right">Gross profit</TableHeaderCell>
-              {/* Not "Margin". A sale line reports a margin and a held
-                  asset reports a yield, and putting the two under one
-                  heading was how a −180% and a +22% came to sit in the
-                  same column looking comparable. */}
+              {/* Not "Margin": a sale line reports a margin and a held asset a yield, and one heading made a -180% and a +22% look comparable. */}
               <TableHeaderCell className="text-right">Margin / yield</TableHeaderCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {active.lines.map((line) => {
-              // The two kinds spend on different things — a SALE line
-              // builds and infras, a HOLD line has capex and running
-              // costs — so the columns are the shape they share and
-              // the detail sits in the sub-line.
+              // The two kinds spend on different things, so the columns are the shape they share and the detail sits in the sub-line.
               const built =
                 line.kind === "sale"
                   ? line.developmentMatched + line.constructionMatched
@@ -163,12 +150,7 @@ export function SummaryTab({
               active={activeScenario}
               pick={(s) => formatCrore(s.revenue)}
             />
-            {/* Costs here are what the plan spent on WHAT IT SOLD, not
-                  what left the account before the horizon — those two
-                  differ whenever a scenario fails to finish, and using
-                  cash for both is what let a slower plan show a better
-                  margin. The cash view lives on the Cashflow tab; the
-                  "falls outside" row below names the gap. */}
+            {/* Costs here are what the plan spent on WHAT IT SOLD, not cash before the horizon; they differ when a scenario fails to finish. The "falls outside" row below names the gap. */}
             <ScenarioRow
               label="Land"
               scenarios={result.scenarios}
@@ -214,9 +196,7 @@ export function SummaryTab({
               active={activeScenario}
               pick={(s) => formatCrore(-s.interest)}
             />
-            {/* The reconciling row. Without it the cost lines above are
-                  a different total from the cash on the Cashflow tab and
-                  nothing on screen says why. */}
+            {/* The reconciling row: without it the cost lines differ from the Cashflow tab's cash with no explanation. */}
             <ScenarioRow
               label="of which falls outside the horizon"
               scenarios={result.scenarios}
@@ -238,8 +218,7 @@ export function SummaryTab({
               active={activeScenario}
               pick={(s) => formatPercent(s.marginPct)}
             />
-            {/* An asset you still own is not profit you can spend, so
-                  it sits below PBT and is added in a row of its own. */}
+            {/* An asset still owned is not spendable profit, so it sits below PBT in a row of its own. */}
             <ScenarioRow
               label="Value of what's held"
               scenarios={result.scenarios}
@@ -260,9 +239,7 @@ export function SummaryTab({
               active={activeScenario}
               pick={(s) => formatCrore(s.peakFunding)}
             />
-            {/* Sold, owed, and not banked before the horizon ends. It is
-                in the profit but not in the cash, so it makes the funding
-                gap above look bigger than it is. */}
+            {/* Sold, owed and not banked before the horizon: in the profit but not the cash, so it makes the funding gap look bigger than it is. */}
             <ScenarioRow
               label="of which still to collect"
               scenarios={result.scenarios}
@@ -298,13 +275,7 @@ export function SummaryTab({
   );
 }
 
-/**
- * Why two interest figures exist and why they differ.
- *
- * This is stated on screen rather than left as a footnote, because the
- * two numbers WILL be compared and the gap is not an error — it is the
- * benefit of running the lines out of one account.
- */
+/** Why two interest figures exist: the gap is not an error, it is the benefit of running the lines out of one account. */
 function InterestNote({ result }: { result: ScenarioResult }) {
   if (result.standaloneInterest <= 0 && result.interest <= 0) return null;
 
@@ -347,7 +318,7 @@ function Money({
 }: {
   value: number;
   strong?: boolean;
-  /** A count, not money — units sold. */
+  /** Units sold, not money. */
   raw?: boolean;
 }) {
   return (
@@ -376,10 +347,8 @@ function ScenarioRow({
   active: ScenarioIndex;
   pick: (scenario: ScenarioResult) => string;
   strong?: boolean;
-  /** An aside rather than a figure in its own right — a "of which" row. */
   muted?: boolean;
-  /** Drop the row entirely when this is zero everywhere — a plan with no
-      held lines shouldn't carry three empty rows about held value. */
+  /** Drop the row when this is zero everywhere, so a plan with no held lines has no empty held-value rows. */
   hideWhenAllZero?: (scenario: ScenarioResult) => number;
 }) {
   if (hideWhenAllZero && scenarios.every((s) => Math.abs(hideWhenAllZero(s)) < 0.5)) return null;

@@ -11,14 +11,6 @@ import { dueLabel } from "@/lib/next-steps/rules";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
-/**
- * A villa on the board, Client Relations' lot card in design's terms: its
- * plot number large and monospaced, the client, a health pill, a rail with
- * a segment per board stage, where it sits and for how long, any earlier
- * stage being revised, the next action, and the faces on its stage. The
- * whole card opens the villa.
- */
-
 const SEGMENT: Record<StepStatus, string | null> = {
   not_started: null,
   working: "bg-info",
@@ -34,7 +26,6 @@ export function StageRail({
   className,
 }: {
   rail: RailSegment[];
-  /** Each stage's name under its segment — the villa's own header. */
   labels?: boolean;
   className?: string;
 }) {

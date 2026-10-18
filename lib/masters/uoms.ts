@@ -3,16 +3,7 @@ import "server-only";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 
-/**
- * The managed list of units of measure (migration 0082) — ONE list for
- * every unit picker in the toolbox. Founder decision, 2026-08-20:
- * procurement's hard-coded eight and the Estimator's own picker master
- * were two vocabularies for the same idea, and "keep it in the
- * masters" ended that. Same rules as construction stages (0053):
- * picked, never typed; renames cascade to every row carrying the unit;
- * deactivating stops new picks without touching history; a unit in use
- * cannot be deleted.
- */
+/** One list for every unit picker. Picked, never typed; renames cascade; deactivating keeps history; a unit in use can't be deleted. */
 export type UomMasterRow = {
   id: string;
   name: string;
@@ -35,14 +26,12 @@ export async function listUomsMaster(): Promise<UomMasterRow[]> {
   return data as UomMasterRow[];
 }
 
-/** Only the units a new row may pick today, in picker order. */
 export async function listActiveUomNames(): Promise<string[]> {
   const uoms = await listUomsMaster();
   return uoms.filter((uom) => uom.is_active).map((uom) => uom.name);
 }
 
-/** Server-side guard for actions saving a typed/picked unit: the master
- * list is the truth, the way isUom's hard-coded eight used to be. */
+/** Server-side guard for actions saving a unit: the master list is the truth. */
 export async function isActiveUom(name: string): Promise<boolean> {
   const supabase = await createClient();
   const { data, error } = await supabase

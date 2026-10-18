@@ -4,22 +4,13 @@ import { fetchAll } from "@/lib/supabase/fetch-all";
 import type { createClient } from "@/lib/supabase/server";
 
 /**
- * A revision's WorkDrive folder, as the toolbox last read it (0124): the
- * list kept in `drawing_revision_folder_sheets` — read on the draft,
- * read once more on Issue, fixed from then on. It is what the cover sheet
- * prints and what site sees, whatever later happens in the folder.
- *
- * Shared (lib/drawings/): Design Management and Supervisors both show
- * it. No grant check, like the rest of this module — each caller gates
- * itself, and RLS admits site only to a released revision's list.
- * Throws on a failed read (fetchAll), like lib/drawings/queries.ts.
+ * A revision's WorkDrive folder as last read (0124): read on the draft and once more on Issue, then fixed.
+ * No grant check: each caller gates itself. Throws on a failed read (fetchAll), like queries.ts.
  */
 export type FolderSheet = {
   id: string;
   name: string;
-  /** When the sheet last changed in WorkDrive, as Zoho said. */
   modifiedAt: string | null;
-  /** When the toolbox read the folder. */
   readAt: string;
 };
 

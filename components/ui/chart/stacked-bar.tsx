@@ -1,10 +1,6 @@
 "use client";
 
-/**
- * Part-to-whole. A stacked bar, never a pie — the deliberate exclusion
- * is written into the registry comments. A hairline of surface between
- * segments keeps adjacent colours from touching.
- */
+/** Part-to-whole as a stacked bar, never a pie; a hairline of surface keeps adjacent colours apart. */
 
 import type { CartesianModel } from "@/lib/charts/series";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";

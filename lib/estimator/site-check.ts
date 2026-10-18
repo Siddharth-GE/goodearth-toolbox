@@ -1,12 +1,4 @@
-/**
- * The Site check list — pure, import-free, tested.
- *
- * Every villa's official estimate has already been lined up against what
- * reached the villa (compare.ts). This turns those comparisons into
- * what needs a look, counted villa by villa for the front list, and into
- * "where does all the cement go": each material, estimated against
- * reached, for one villa or across the whole project.
- */
+/** The Site check list: pure, import-free, tested. Turns the compare.ts comparisons into what needs a look, per villa and per material. */
 
 type ComparedRow = {
   workItemId: string;
@@ -32,18 +24,14 @@ export type SiteCheckEntry = {
   unitId: string;
   workItemId: string | null;
   itemId: string;
-  /** Frozen on the estimate for an over-run; null for an outside entry
-   * (the screen names it from the item). */
+  /** Frozen on the estimate for an over-run; null for an outside entry (the screen names it from the item). */
   materialName: string | null;
   uom: string | null;
-  /** What the estimate allowed; null when it never planned it. */
   estimated: number | null;
   reached: number;
   kind: "over" | "outside";
 };
 
-/** Everything that needs a look: over-runs past the estimate, and
- * arrivals the estimate never planned. */
 export function siteCheckEntries(officials: Official[]): SiteCheckEntry[] {
   const entries: SiteCheckEntry[] = [];
   for (const official of officials) {
@@ -80,22 +68,14 @@ export function siteCheckEntries(officials: Official[]): SiteCheckEntry[] {
 
 export type MaterialTotal = {
   itemId: string;
-  /** From the estimates' frozen rows; null when only arrivals name it. */
   name: string | null;
   uom: string | null;
   estimated: number;
-  /** Everything that reached the villas — planned or not. */
   reached: number;
-  /** How many villas' official estimates plan it. */
   villas: number;
 };
 
-/**
- * "Where does all the cement go": per material, what the official
- * estimates allow in total and what has reached the villas in total —
- * planned arrivals and unplanned ones alike, because both are cement on
- * site. `unitId` narrows it to one villa's figures.
- */
+/** Per material: what the official estimates allow vs what reached the villas, planned and unplanned alike. `unitId` narrows to one villa. */
 export function materialTotals(officials: Official[], unitId?: string): MaterialTotal[] {
   const totals = new Map<string, MaterialTotal & { villaSet: Set<string> }>();
   const entry = (itemId: string) => {
@@ -139,20 +119,13 @@ export function materialTotals(officials: Official[], unitId?: string): Material
 export type VillaSummary = {
   estimateId: string;
   unitId: string;
-  /** Materials past the estimate. */
   over: number;
-  /** Arrived outside the estimate, no estimator has looked yet. */
   waiting: number;
   /** Arrived outside the estimate and approved — flagged forever (0083). */
   approved: number;
 };
 
-/**
- * Site check's front list (founder, 2026-10-16: "a villa wise list you
- * click in and see"): one row per official estimate, counting what needs
- * a look there. Villas waiting for an approval first, then those past
- * their estimate, then the rest — each group in villa-name order.
- */
+/** The front list: one row per official estimate. Villas waiting for an approval first, then those past their estimate, then the rest, each by villa name. */
 export function villaSummaries(
   officials: Official[],
   entries: SiteCheckEntry[],
@@ -179,7 +152,6 @@ export function villaSummaries(
   );
 }
 
-/** Reached as a share of estimated; null when nothing was estimated. */
 export function drawnPercent(estimated: number, reached: number): number | null {
   return estimated > 0 ? (reached / estimated) * 100 : null;
 }

@@ -46,17 +46,11 @@ import { daysBetween } from "@/lib/next-steps/rules";
 import { formatShortDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { ArrowRight, MoreHorizontal, Play, Plus, Undo2, X } from "lucide-react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { useId, useState, useTransition } from "react";
 
 import { useDesignBoard } from "../../../_components/board-context";
 import { MenuLabel, NobodyOnTheTeam } from "../../../_components/menus";
-
-/**
- * A villa's stages, one card per board stage (root plan.md, thirteenth
- * piece): its status as one-tap chips, who is on it, a one-line note, and
- * the moves — Pass on, Send back for revision, Start. Every change saves
- * at once; the database writes the history.
- */
 
 /** The chips a person taps. Revising goes through Send back, which asks why. */
 const TAPPABLE: StepStatus[] = ["working", "with_client", "waiting", "done"];
@@ -233,7 +227,6 @@ function StageCard({
   );
 }
 
-/** Who is on a stage: faces with a cross, and + to put someone on. */
 function StagePeople({ step }: { step: StepView }) {
   const { team } = useDesignBoard();
   const undoBar = useUndoBar();
@@ -319,7 +312,6 @@ function StagePeople({ step }: { step: StepView }) {
   );
 }
 
-/** The one-line note — saves when you leave the box. */
 function StageNote({ step }: { step: StepView }) {
   const undoBar = useUndoBar();
   const [, startTransition] = useTransition();
@@ -352,7 +344,6 @@ function StageNote({ step }: { step: StepView }) {
   );
 }
 
-/** Pick people from the team with one tap each. */
 function PeopleChips({
   value,
   onChange,
@@ -389,7 +380,6 @@ function PeopleChips({
   );
 }
 
-/** Pass on: this stage done, the next Working with whoever takes it. */
 function PassDialog({
   unitId,
   step,
@@ -404,8 +394,7 @@ function PassDialog({
   const [to, setTo] = useState(targets[0].id);
   const [people, setPeople] = useState<string[]>([]);
   const [note, setNote] = useState("");
-  const [error, setError] = useState<string>();
-  const [pending, startTransition] = useTransition();
+  const { pending, error, run, clearError } = useActionRunner();
   const noteId = useId();
   const toName = targets.find((target) => target.id === to)?.name ?? targets[0].name;
 
@@ -416,7 +405,7 @@ function PassDialog({
         if (pending) return;
         setOpen(next);
         if (!next) {
-          setError(undefined);
+          clearError();
           setPeople([]);
           setNote("");
           setTo(targets[0].id);
@@ -473,23 +462,19 @@ function PassDialog({
           </DialogClose>
           <Button
             disabled={pending || people.length === 0}
-            onClick={() => {
-              setError(undefined);
-              startTransition(async () => {
-                const result = await passStep({
+            onClick={async () => {
+              const result = await run(() =>
+                passStep({
                   unitId,
                   fromStageId: step.stageId,
                   toStageId: to,
                   peopleIds: people,
                   note,
-                });
-                if (result?.error) {
-                  setError(result.error);
-                  return;
-                }
-                setOpen(false);
-                undoBar(`Passed to ${toName}`);
-              });
+                }),
+              );
+              if (result?.error) return;
+              setOpen(false);
+              undoBar(`Passed to ${toName}`);
             }}
           >
             {pending ? "Passing…" : `Pass to ${toName}`}
@@ -500,13 +485,11 @@ function PassDialog({
   );
 }
 
-/** Start a stage — any stage, any time — with the people who take it. */
 function StartDialog({ unitId, step }: { unitId: string; step: StepView }) {
   const undoBar = useUndoBar();
   const [open, setOpen] = useState(false);
   const [people, setPeople] = useState<string[]>([]);
-  const [error, setError] = useState<string>();
-  const [pending, startTransition] = useTransition();
+  const { pending, error, run, clearError } = useActionRunner();
 
   return (
     <Dialog
@@ -515,7 +498,7 @@ function StartDialog({ unitId, step }: { unitId: string; step: StepView }) {
         if (pending) return;
         setOpen(next);
         if (!next) {
-          setError(undefined);
+          clearError();
           setPeople([]);
         }
       }}
@@ -543,17 +526,11 @@ function StartDialog({ unitId, step }: { unitId: string; step: StepView }) {
           </DialogClose>
           <Button
             disabled={pending || people.length === 0}
-            onClick={() => {
-              setError(undefined);
-              startTransition(async () => {
-                const result = await startStep(unitId, step.stageId, people);
-                if (result?.error) {
-                  setError(result.error);
-                  return;
-                }
-                setOpen(false);
-                undoBar(`${step.stageName} started`);
-              });
+            onClick={async () => {
+              const result = await run(() => startStep(unitId, step.stageId, people));
+              if (result?.error) return;
+              setOpen(false);
+              undoBar(`${step.stageName} started`);
             }}
           >
             {pending ? "Starting…" : `Start ${step.stageName}`}
@@ -564,18 +541,13 @@ function StartDialog({ unitId, step }: { unitId: string; step: StepView }) {
   );
 }
 
-/**
- * Bringing a villa in at the stage it has reached: every stage before it
- * Done, this one Working with its people.
- */
 function SetWhereItIs({ unitId }: { unitId: string }) {
   const { stages } = useDesignBoard();
   const undoBar = useUndoBar();
   const [open, setOpen] = useState(false);
   const [stage, setStage] = useState<string | null>(null);
   const [people, setPeople] = useState<string[]>([]);
-  const [error, setError] = useState<string>();
-  const [pending, startTransition] = useTransition();
+  const { pending, error, run, clearError } = useActionRunner();
   const stageName = stages.find((s) => s.id === stage)?.name ?? null;
   const before = stage
     ? stages.slice(
@@ -602,7 +574,7 @@ function SetWhereItIs({ unitId }: { unitId: string }) {
           if (pending) return;
           setOpen(next);
           if (!next) {
-            setError(undefined);
+            clearError();
             setStage(null);
             setPeople([]);
           }
@@ -643,18 +615,12 @@ function SetWhereItIs({ unitId }: { unitId: string }) {
             </DialogClose>
             <Button
               disabled={pending || !stage || people.length === 0}
-              onClick={() => {
+              onClick={async () => {
                 if (!stage) return;
-                setError(undefined);
-                startTransition(async () => {
-                  const result = await setWhereItIs(unitId, stage, people);
-                  if (result?.error) {
-                    setError(result.error);
-                    return;
-                  }
-                  setOpen(false);
-                  undoBar(`Set at ${stageName}`);
-                });
+                const result = await run(() => setWhereItIs(unitId, stage, people));
+                if (result?.error) return;
+                setOpen(false);
+                undoBar(`Set at ${stageName}`);
               }}
             >
               {pending ? "Saving…" : stageName ? `Set at ${stageName}` : "Set where it is"}

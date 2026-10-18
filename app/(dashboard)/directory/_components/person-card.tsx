@@ -7,17 +7,7 @@ import Link from "next/link";
 
 import { PersonPhoto } from "./person-photo";
 
-/**
- * One person on the roster.
- *
- * THIS IS A PHONE SCREEN. A site engineer opens the directory standing on
- * site to get a colleague's number, so the number and the address are
- * FULL-WIDTH TAP TARGETS, not 12px icons beside text — `tel:` dials,
- * `mailto:` composes. Everything else on the card is secondary to that.
- *
- * The name links to the full card; the contact rows deliberately do not,
- * so a mis-tap costs a wrong dialler, never a lost number.
- */
+/** One roster person. THIS IS A PHONE SCREEN: number and address are FULL-WIDTH TAP TARGETS (tel:, mailto:). The name links to the card; contact rows don't, so a mis-tap never loses a number. */
 export function PersonCard({ person }: { person: DirectoryPerson }) {
   return (
     <Card className="flex flex-col p-4">
@@ -49,8 +39,7 @@ export function PersonCard({ person }: { person: DirectoryPerson }) {
         {person.phone ? (
           <a
             href={`tel:${person.phone}`}
-            // min-h-11 is the 44px tap target — this row exists to be hit
-            // with a thumb, one-handed, outdoors.
+            // min-h-11 is the 44px tap target.
             className="text-foreground hover:bg-accent/5 -mx-2 flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm"
           >
             <Phone className="text-muted size-4 shrink-0" />

@@ -11,10 +11,7 @@ import { ReportView } from "../_components/report-view";
 import { SaveReportDialog } from "../_components/save-report-dialog";
 import { SpecLoss } from "../_components/spec-loss";
 
-// THE report page for an unsaved spec: ?spec= in, a composed page out.
-// The URL is the report — shareable, bookmarkable, and untrusted;
-// everything below starts from parseReportSpec. A saved report renders
-// the same ReportView from a stored spec instead of the URL.
+// The URL is the report: shareable and untrusted, so everything starts from parseReportSpec.
 export default async function RunReportPage({
   searchParams,
 }: {
@@ -26,8 +23,6 @@ export default async function RunReportPage({
   const loss = decoded === null ? [] : describeSpecLoss(decoded);
   const dataset = DATASETS[spec.dataset];
 
-  // Keyed on the raw param so navigating to a new spec remounts the
-  // builder in sync with the report under it.
   return (
     <div className="space-y-6" key={params.spec ?? "blank"}>
       <PageTitle

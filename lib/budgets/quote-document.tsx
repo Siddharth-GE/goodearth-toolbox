@@ -4,18 +4,7 @@ import { designView, pdf } from "@/lib/pdf/theme";
 import { formatAmount, formatDate, formatQuantity } from "@/lib/format";
 import type { QuoteData, QuoteLine, QuoteView } from "./quote";
 
-/**
- * Document C — the client quote.
- *
- * The same data as the internal budget sheet, filtered: item, quantity,
- * rate and amount, with the design views above each space's list.
- *
- * It shows no cost and no margin, and it *cannot* — QuoteData (quote.ts)
- * has no field for either. That is a stronger guarantee than a template
- * that merely omits two columns, and it is the one worth having: showing
- * a client our cost is the single most expensive mistake this system
- * could make.
- */
+/** The client quote (Document C) shows no cost or margin and cannot: QuoteData (quote.ts) has no field for either. */
 
 const styles = StyleSheet.create({
   h1: { fontFamily: pdf.fontBold, fontSize: pdf.size.display, letterSpacing: -0.3 },
@@ -104,7 +93,6 @@ const styles = StyleSheet.create({
   signatureLabel: { fontSize: pdf.size.tiny, color: pdf.color.muted },
 });
 
-/** Rate and amount only. There is no cost column because there is no cost. */
 const columns: Column<QuoteLine>[] = [
   { header: "#", width: 0.4, render: (_row, index) => String(index + 1) },
   { header: "Item", width: 3.4, render: (row) => row.item_name },
@@ -136,8 +124,7 @@ export function QuoteDocument({ quote }: { quote: QuoteData }) {
         <View style={styles.metaBlock}>
           <Meta label="Reference" value={quote.reference} />
           <Meta label="Date" value={formatDate(quote.approved_at)} />
-          {/* Stated on the client's copy too: if a revised quotation
-              follows, both sides can say which one they mean. */}
+          {/* Version stated on the client's copy too, so both sides name the same quotation. */}
           <Meta label="Version" value={String(quote.version)} />
           <Meta label="Spaces" value={String(quote.spaces.length)} />
           <Meta
@@ -167,8 +154,7 @@ export function QuoteDocument({ quote }: { quote: QuoteData }) {
         </View>
 
         <View style={styles.terms}>
-          {/* PLACEHOLDER: the real commercial terms, GST treatment and
-              validity period replace this when they arrive. One place. */}
+          {/* PLACEHOLDER: the real commercial terms, GST treatment and validity replace this. */}
           <Text style={styles.termsText}>
             Quantities are indicative and subject to final site measurement. Prices are exclusive of
             applicable taxes unless stated otherwise. This quotation is valid for 30 days from the
@@ -192,8 +178,6 @@ export function QuoteDocument({ quote }: { quote: QuoteData }) {
         )}
       </DocumentPage>
 
-      {/* One sheet per space: the renders the client approved, then what
-          those renders are made of, then what that space costs. */}
       {quote.spaces.map((space) => (
         <DocumentPage key={space.space_id} meta={meta}>
           <View style={styles.spaceHeading}>
@@ -219,9 +203,6 @@ export function QuoteDocument({ quote }: { quote: QuoteData }) {
   );
 }
 
-/** Identical layout rule to the design document — one view runs full
- *  width, several go two to a row — so the client sees the same pages
- *  they signed off, now with prices under them. */
 function SpaceViewGrid({ views }: { views: QuoteView[] }) {
   if (views.length === 0) return null;
   const twoUp = views.length >= designView.twoUpFrom;

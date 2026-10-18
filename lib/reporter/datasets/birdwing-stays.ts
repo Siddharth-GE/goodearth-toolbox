@@ -1,12 +1,6 @@
-// ---------------------------------------------------------------------
-// birdwing_stays — the guest house, stay by stay (0117)
-// ---------------------------------------------------------------------
-// One row per stay at Birdwing Farmstay, from 0117's flat owner view:
-// no embeds, a guest's NAME and never a phone, email or ID. Money is
-// worked out as Stays works it — billed is the charges less the OTA's
-// commission and the discount; pending is billed less what was collected,
-// charged to a Goodearth cost centre, or written off. A stay is one row,
-// so a sum never fans out.
+// From 0117's flat owner view: no embeds, a guest's NAME and never a phone, email or ID. Billed is
+// charges less the OTA commission and discount; pending is billed less collected, charged to a cost
+// centre, or written off. One row per stay, so a sum never fans out.
 
 import type { DatasetDef } from "./types";
 
@@ -120,8 +114,8 @@ export const birdwingStays: DatasetDef = {
       groupable: false,
       aggregates: ["sum", "avg"],
     },
-    // The old sheet counted rooms and never named them: its room-nights
-    // are room count × nights, and this says which rows those are.
+    // The old sheet counted rooms without naming them: this marks the rows whose room-nights are
+    // room count x nights.
     room_nights_estimated: {
       label: "Room-nights estimated",
       type: "bool",

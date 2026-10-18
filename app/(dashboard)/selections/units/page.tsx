@@ -60,9 +60,7 @@ export default async function SelectionsPage({
             </TableHead>
             <TableBody>
               {units.map((unit) => {
-                // A unit's live revision is its draft if one is open, else the
-                // last issued one. Both can exist at once: R0 issued while R1
-                // is being drafted.
+                // A unit's live revision is its draft if one is open, else the last issued. Both can exist at once (R0 issued while R1 is drafted).
                 const current = unit.draft ?? unit.latestIssued;
                 return (
                   <TableRow key={unit.unit_id}>
@@ -75,9 +73,6 @@ export default async function SelectionsPage({
                       ) : current.status === "draft" ? (
                         <div className="flex flex-wrap items-center gap-2">
                           <Badge variant="warning">Draft</Badge>
-                          {/* Both can be live at once: R0 sitting with the
-                            budget team while R1 is being drafted. Hiding
-                            the issued one would misrepresent the unit. */}
                           {unit.latestIssued && (
                             <span className="text-muted text-xs">
                               R{unit.latestIssued.revision_no} with budgeting
@@ -119,8 +114,7 @@ export default async function SelectionsPage({
           <Pagination
             page={currentPage}
             pageCount={pageCount}
-            // Precomputed strings, not the function itself — a function
-            // can't cross into a Client Component.
+            // Strings, not the function: a function can't cross into a Client Component.
             prevHref={currentPage > 1 ? hrefForPage(currentPage - 1) : null}
             nextHref={currentPage < pageCount ? hrefForPage(currentPage + 1) : null}
             total={total}

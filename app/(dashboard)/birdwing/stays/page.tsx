@@ -193,7 +193,6 @@ function StayRow({ row }: { row: StayListRow }) {
   );
 }
 
-/** The last eighteen months and the next six, newest first. */
 function recentMonths(): { value: string; label: string }[] {
   const now = new Date();
   const months: { value: string; label: string }[] = [];

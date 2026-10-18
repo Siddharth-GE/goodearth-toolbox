@@ -32,7 +32,6 @@ export default async function PurchaseOrderPage({
   searchParams,
 }: {
   params: Promise<{ poId: string }>;
-  /** `made`: the POs a from-indent Create just made, this one first. */
   searchParams: Promise<{ made?: string }>;
 }) {
   const { poId } = await params;
@@ -52,10 +51,7 @@ export default async function PurchaseOrderPage({
   if (!po) notFound();
 
   const editable = canEditPo(po.status);
-  // The vendor/store pickers and the terms templates only render on an
-  // editable draft — most views of a PO are of issued ones, and paid for
-  // the whole options bag (all projects, plots, units, vendors, stores)
-  // without using it.
+  // Pickers and terms templates render only on an editable draft; skip their reads on issued POs.
   const [company, options, termsTemplates] = await Promise.all([
     getProjectCompany(po.project_id),
     editable ? getPoFormOptions() : { vendors: [], stores: [] },

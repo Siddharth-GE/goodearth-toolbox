@@ -1,10 +1,3 @@
-/**
- * What the door is allowed to conclude from Google's envelope. Google's
- * docs are silent on where the sender's email actually lands for
- * add-on-style events, so every place it might sit is pinned here — as
- * is the answer when it sits nowhere, which must be a null, never a
- * throw.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -286,9 +279,7 @@ test("a form value is the first string under its input name, or null", () => {
 });
 
 test("a dialog's on/off switch reads through formValue like any other input", () => {
-  // The dialog builder gives the switch the value "on" (cards.ts's
-  // newTrailDialog); Google only sends an input at all when it's set, so
-  // an untouched (off) switch simply isn't in formInputs.
+  // Google sends a switch input only when it is on.
   const on = {
     commonEventObject: { formInputs: { start: { stringInputs: { value: ["on"] } } } },
   };
@@ -365,8 +356,7 @@ test("messageName rejects a malformed name", () => {
 });
 
 test("a press on the bot's own card still names the person in chat.user", () => {
-  // Google sends the card as the message behind a button press, and the
-  // card's sender is the bot — that must not hide the human who pressed.
+  // The bot's own card is the message behind a press; its bot sender must not hide the human.
   assert.equal(
     senderEmail({
       chat: {

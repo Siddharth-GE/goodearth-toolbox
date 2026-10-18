@@ -1,8 +1,3 @@
-/**
- * The six answers the door is allowed to give about who typed, pinned
- * one by one. This is the only honest way to prove the refusal paths:
- * nobody deactivates a real colleague to watch the bot say so.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -80,9 +75,7 @@ test("an admin holds Relay without an explicit grant", () => {
 });
 
 test("a grant through a role bundle counts, same as a personal one", () => {
-  // resolveIdentity merges the two sources before deciding, so a role
-  // bundle arrives here indistinguishable from a personal grant — this
-  // pins that the merged list is what the decision reads.
+  // The merged list (personal plus role grants) is what the decision reads.
   const identity = decideIdentity(
     "sid@goodearth.test",
     AUTH_USER,

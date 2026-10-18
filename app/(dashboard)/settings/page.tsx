@@ -48,8 +48,7 @@ export default async function SettingsPeoplePage({
   ]);
   const roleById = new Map(roles.map((role) => [role.id, role]));
 
-  // ~70 people: filtering in memory is honest here — listUsersForAdmin
-  // already returns everyone, so there's no second read to save.
+  // ~70 people: filtering in memory is fine; listUsersForAdmin already returns everyone.
   const needle = (q ?? "").trim().toLowerCase();
   const people = needle
     ? users.filter(

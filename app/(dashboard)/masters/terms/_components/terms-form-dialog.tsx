@@ -15,7 +15,7 @@ export function TermsFormDialog({
   kind,
 }: {
   terms?: DocumentTermsRow;
-  /** Which list the New button sits on — the form starts on that kind. */
+  /** Which list the New button sits on. */
   kind?: TermsKind;
 }) {
   const isEdit = !!terms;

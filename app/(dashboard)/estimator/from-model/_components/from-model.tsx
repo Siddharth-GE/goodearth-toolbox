@@ -31,23 +31,13 @@ import {
 import { formatCount, formatQuantity } from "@/lib/format";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
 
-/**
- * The bridge with Goodearth QS for SketchUp. SketchUp opens this page in
- * its own window (UI::HtmlDialog) and injects `window.sketchup`, whose
- * methods are the extension's callbacks (goodearth-qs/src/goodearth_qs/
- * send.rb); it answers by calling the window functions below. Outside
- * SketchUp none of it exists and the page takes the takeoff file instead.
- * Whatever arrives is only "here is a takeoff" — the server reads and
- * checks it again before anything is written.
- */
+/** Bridge with Goodearth QS for SketchUp: it opens this page in an HtmlDialog and injects window.sketchup; it answers through the window functions below.
+ * Outside SketchUp the page takes the takeoff file instead. Whatever arrives is re-read and checked on the server. */
 declare global {
   interface Window {
     sketchup?: {
-      /** "Send me the takeoff" — answered through geqsReceive. */
       geqsTakeoff?: () => void;
-      /** {unit_id, villa, estimate_url}: the model remembers the villa. */
       geqsImported?: (json: string) => void;
-      /** The live works list, saved as SketchUp's own. */
       geqsWorksList?: (csv: string) => void;
     };
     geqsReceive?: (json: string) => void;
@@ -61,8 +51,7 @@ export type VillaOption = { unitId: string; name: string; projectName: string };
 type Received = { text: string; from: "sketchup" | "file"; fileName?: string };
 
 const noSubscription = () => () => {};
-/** Inside SketchUp's window the bridge is there from the first paint;
- * on the server and in any browser it never is. */
+/** Inside SketchUp's window the bridge exists from the first paint; on the server and in any browser it never does. */
 const bridgePresent = () => typeof window.sketchup?.geqsTakeoff === "function";
 
 export function FromModel({ villas }: { villas: VillaOption[] }) {
@@ -81,16 +70,13 @@ export function FromModel({ villas }: { villas: VillaOption[] }) {
   const [sendingList, startSendingList] = useTransition();
   const request = useRef(0);
 
-  // What arrived, read in the browser for the summary only — the server
-  // reads it again for real.
+  // Read in the browser for the summary only; the server reads it again for real.
   const parsed = useMemo(() => (received ? parseTakeoff(received.text) : null), [received]);
   const takeoff = parsed && "takeoff" in parsed ? parsed.takeoff : null;
   const villaNames = useMemo(() => new Map(villas.map((v) => [v.unitId, v.name])), [villas]);
-  // SketchUp's first answer is awaited from the moment the page opens.
   const waiting = inSketchUp && (asking || (!received && !bridgeError));
 
-  /** A fresh preview for this takeoff and villa; only the newest answer
-   * is shown. */
+  /** A fresh preview for this takeoff and villa; only the newest answer is shown. */
   const runPreview = (text: string, unit: string) => {
     setPreview(null);
     setPreviewError(undefined);
@@ -105,8 +91,7 @@ export function FromModel({ villas }: { villas: VillaOption[] }) {
     });
   };
 
-  /** A takeoff arrived, from SketchUp or a file. A villa the model
-   * remembers is picked for it, if it is one of ours and none is picked. */
+  /** A takeoff arrived; a villa the model remembers is picked if it is one of ours and none is picked. */
   const receive = (next: Received) => {
     setAsking(false);
     setImported(null);
@@ -128,8 +113,7 @@ export function FromModel({ villas }: { villas: VillaOption[] }) {
     window.sketchup?.geqsTakeoff?.();
   };
 
-  // SketchUp calls these on the window whenever it answers; they always
-  // reach this render's handlers.
+  // SketchUp calls these whenever it answers; they always reach this render's handlers.
   const bridge = useRef<{
     receive: (next: Received) => void;
     failed: (message: string) => void;
@@ -151,7 +135,6 @@ export function FromModel({ villas }: { villas: VillaOption[] }) {
     };
   });
 
-  // Inside SketchUp: listen first, then ask for the takeoff.
   useEffect(() => {
     if (!inSketchUp) return;
     window.geqsReceive = (text) =>
@@ -185,7 +168,6 @@ export function FromModel({ villas }: { villas: VillaOption[] }) {
       request.current += 1;
       setPreview(null);
       setImported(done);
-      // SketchUp remembers the villa, so the next send lands here too.
       window.sketchup?.geqsImported?.(
         JSON.stringify({
           unit_id: done.villa.unitId,

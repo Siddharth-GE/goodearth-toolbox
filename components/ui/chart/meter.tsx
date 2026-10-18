@@ -1,11 +1,6 @@
 "use client";
 
-/**
- * One ratio against a limit — spend vs budget. A CSS bar, deliberately
- * not Recharts (PLAN.md: this was never chart-library work). The bar
- * clamps at 100%; the caption always tells the real percentage, and
- * turns warning past the limit — over budget has fixed meaning.
- */
+/** One ratio against a limit, as a CSS bar (not Recharts). The bar clamps at 100%; the caption tells the real percentage and warns past the limit. */
 
 import { Card } from "@/components/ui/card";
 import { formatMoney, formatPercent, formatQuantity } from "@/lib/format";

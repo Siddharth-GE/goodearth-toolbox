@@ -1,10 +1,6 @@
 "use client";
 
-/**
- * Trend over time (or any ordered category): 2px lines, gaps where the
- * data is null (never a fabricated zero), crosshair + tooltip, markers
- * with hit targets larger than the marks.
- */
+/** Trend lines: gaps where data is null (never a fabricated zero), a crosshair tooltip, hit targets larger than the markers. */
 
 import type { CartesianModel } from "@/lib/charts/series";
 import {

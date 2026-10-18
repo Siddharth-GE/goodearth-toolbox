@@ -18,6 +18,7 @@ import {
   TableTotalCell,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import type { ActionState } from "@/lib/action-state";
 import { lineLeftToPay, paymentProblem } from "@/lib/bills/ledger";
 import {
   addAdvanceToCashRequest,
@@ -33,38 +34,31 @@ import {
   submitCashRequest,
 } from "@/lib/bills/payment-actions";
 import type { CashRequestDetail, CashRequestItem, PayableBill } from "@/lib/bills/payment-queries";
-import { formatDate, formatMoney } from "@/lib/format";
+import { parseNumber } from "@/lib/form-data";
+import { formatDate, formatMoney, todayInIndia } from "@/lib/format";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
-type Result = { error?: string } | undefined;
+// A blank box is 0 here, as before: the server refuses it with its own message.
+const amountOf = (text: string) => parseNumber(text) ?? 0;
+
 type Option = { id: string; name: string };
 
-/** Runs an action, shows its refusal, refreshes the page on success. */
 function useRun() {
   const router = useRouter();
-  const [error, setError] = useState<string>();
-  const [pending, startTransition] = useTransition();
-  const run = (action: () => Promise<Result>, after?: () => void) =>
-    startTransition(async () => {
-      setError(undefined);
-      const result = await action();
-      if (result?.error) {
-        setError(result.error);
-        return;
-      }
-      after?.();
-      router.refresh();
-    });
+  const { pending, error, run: runAction } = useActionRunner();
+  // Refreshes once the transition has ended: a refresh inside it leaves `pending` stuck on.
+  const run = async (action: () => Promise<ActionState>, after?: () => void) => {
+    const result = await runAction(action);
+    if (result?.error) return;
+    after?.();
+    router.refresh();
+  };
   return { run, error, pending };
 }
 
-/**
- * The lines of one week's request, and what can be done with them at
- * its stage: asked amounts while drafting, released amounts while with
- * the approver, payments once released.
- */
 export function RequestLines({
   request,
   isApprover,
@@ -179,8 +173,8 @@ function LineRow({
               value={requested}
               onChange={(event) => setRequested(event.target.value)}
               onBlur={() => {
-                if (Number(requested) !== item.requested) {
-                  run(() => setCashRequestAmount(item.id, { requested: Number(requested) }));
+                if (amountOf(requested) !== item.requested) {
+                  run(() => setCashRequestAmount(item.id, { requested: amountOf(requested) }));
                 }
               }}
               className="h-9 text-right"
@@ -199,8 +193,8 @@ function LineRow({
               value={released}
               onChange={(event) => setReleased(event.target.value)}
               onBlur={() => {
-                if (Number(released) !== (item.released ?? item.requested)) {
-                  run(() => setCashRequestAmount(item.id, { released: Number(released) }));
+                if (amountOf(released) !== (item.released ?? item.requested)) {
+                  run(() => setCashRequestAmount(item.id, { released: amountOf(released) }));
                 }
               }}
               className="h-9 text-right"
@@ -246,7 +240,6 @@ function LineRow({
   );
 }
 
-/** Paying a released line: a bill payment, or the advance itself. */
 function PayForm({
   item,
   cap,
@@ -258,9 +251,9 @@ function PayForm({
 }) {
   const { run, error, pending } = useRun();
   const [amount, setAmount] = useState(String(cap));
-  const [paidOn, setPaidOn] = useState(() => new Date().toISOString().slice(0, 10));
+  const [paidOn, setPaidOn] = useState(() => todayInIndia());
   const [reference, setReference] = useState("");
-  const value = Number(amount);
+  const value = amountOf(amount);
   const problem = paymentProblem({
     amount: value,
     reference,
@@ -341,7 +334,6 @@ function PayForm({
   );
 }
 
-/** Approved bills with something pending, ticked onto a draft request. */
 export function AddBills({ requestId, bills }: { requestId: string; bills: PayableBill[] }) {
   const { run, error, pending } = useRun();
   const [picked, setPicked] = useState<Record<string, string>>({});
@@ -424,7 +416,7 @@ export function AddBills({ requestId, bills }: { requestId: string; bills: Payab
               () =>
                 addBillsToCashRequest(
                   requestId,
-                  entries.map(([billId, amount]) => ({ billId, amount: Number(amount) })),
+                  entries.map(([billId, amount]) => ({ billId, amount: amountOf(amount) })),
                 ),
               () => setPicked({}),
             )
@@ -437,7 +429,6 @@ export function AddBills({ requestId, bills }: { requestId: string; bills: Payab
   );
 }
 
-/** An advance onto a draft request: contractor, project, optionally a work order. */
 export function AddAdvance({
   requestId,
   contractors,
@@ -537,7 +528,7 @@ export function AddAdvance({
         <Button
           size="sm"
           variant="secondary"
-          disabled={pending || !vendorId || !projectId || !(Number(amount) > 0)}
+          disabled={pending || !vendorId || !projectId || !(amountOf(amount) > 0)}
           onClick={() =>
             run(
               () =>
@@ -545,7 +536,7 @@ export function AddAdvance({
                   vendorId,
                   projectId,
                   labourContractId: workOrderId || null,
-                  amount: Number(amount),
+                  amount: amountOf(amount),
                   note: note || null,
                 }),
               () => {
@@ -562,7 +553,6 @@ export function AddAdvance({
   );
 }
 
-/** The request's next step: submit, release or send back, close. */
 export function RequestActions({
   request,
   isApprover,

@@ -1,8 +1,3 @@
-/**
- * Work orders: a line is a quantity at a rate or a lump sum, the value
- * is the lines' sum to paise (as the database writes it), and every
- * refusal is said in words first.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

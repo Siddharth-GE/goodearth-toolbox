@@ -1,10 +1,5 @@
-// ---------------------------------------------------------------------
-// stock — what is where, right now
-// ---------------------------------------------------------------------
-// stock_by_location has NO project_id and NO declared FKs, so it
-// registers unscoped (an honest note lives in the description) and its
-// names arrive by enrichment, not embed. It also has no id column —
-// pageOrder replaces the default. Quantities only, never cost.
+// stock_by_location has no project_id, no declared FKs and no id column: names arrive by
+// enrichment, and pageOrder replaces the default. Quantities only, never cost.
 
 import type { DatasetDef } from "./types";
 
@@ -23,8 +18,7 @@ export const stock: DatasetDef = {
   defaultColumns: ["item", "item_code", "location", "location_kind", "quantity"],
   defaultSort: [],
   fields: {
-    // Enriched from bounded lookups — display and grouping only. The
-    // founder's dropdown rule is satisfied by not being filterable.
+    // Enriched from lookups: display and grouping only, not filterable.
     item: {
       label: "Item",
       type: "text",

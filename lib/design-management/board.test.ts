@@ -1,7 +1,3 @@
-/**
- * The design board's rules. The founder's: a villa sits at the furthest
- * stage that has started, even while an earlier one is being revised.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -41,7 +37,6 @@ test("a villa sits at the furthest stage that has started", () => {
     ]).index,
     2,
   );
-  // Interiors started early, beside Design: it sits at Interiors.
   assert.equal(
     placeOf(STAGES, [
       { stageId: "design", status: "working" },
@@ -49,7 +44,6 @@ test("a villa sits at the furthest stage that has started", () => {
     ]).index,
     4,
   );
-  // A step taken back to not started does not count.
   assert.equal(
     placeOf(STAGES, [
       { stageId: "design", status: "done" },
@@ -64,7 +58,6 @@ test("a villa sits at the furthest stage that has started", () => {
     ).complete,
     true,
   );
-  // A stage that is not on the board is ignored.
   assert.equal(placeOf(STAGES, [{ stageId: "mep", status: "working" }]).index, -1);
 });
 
@@ -91,7 +84,6 @@ test("pass on moves a villa forward from where it sits, the next stage first", (
   );
   // Design is being revised behind it: it finishes with Done, not a pass.
   assert.deepEqual(passTargets(STAGES, steps, "design"), []);
-  // A finished stage waiting to be handed on still offers it.
   assert.deepEqual(
     passTargets(
       STAGES,
@@ -121,7 +113,6 @@ test("how a villa is doing", () => {
   const health = (input: HealthInput, actions: { status: string; dueOn: string | null }[] = []) =>
     villaHealth(input, actions, TODAY);
   assert.equal(health(villa({ place: { index: -1, complete: false } })), null);
-  // An overdue action outranks a revision.
   assert.equal(
     health(villa({ revising: true }), [{ status: "open", dueOn: "2026-10-01" }]),
     "overdue",
@@ -137,7 +128,6 @@ test("how a villa is doing", () => {
   assert.equal(health(villa({ peopleOnCurrent: 0 })), "nobody");
   assert.equal(health(villa({ lastTouched: "2026-10-02T09:00:00Z" })), "stale");
   assert.equal(health(villa({ lastTouched: "2026-10-03T09:00:00Z" })), "on_track");
-  // A done action and one due later leave it on track.
   assert.equal(
     health(villa(), [
       { status: "done", dueOn: "2026-10-01" },

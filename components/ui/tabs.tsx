@@ -5,9 +5,7 @@ import * as TabsPrimitive from "@radix-ui/react-tabs";
 import Link from "next/link";
 import type { ComponentProps } from "react";
 
-// Radix Tabs: for switching between content panels on the SAME page
-// (no navigation, no URL change) — e.g. sections of a form. Not what
-// Marathon's admin nav needs; see NavTabs below for that.
+// Radix Tabs: switches panels on the SAME page (no URL change). See NavTabs below for routes.
 export const Tabs = TabsPrimitive.Root;
 export const TabsContent = TabsPrimitive.Content;
 
@@ -34,10 +32,7 @@ export function TabsTrigger({ className, ...props }: ComponentProps<typeof TabsP
   );
 }
 
-// NavTabs: the same pill visual, but for switching between actual
-// ROUTES (different pages) — plain next/link, not Radix. Use this for
-// admin-style section nav (Entries / Members / Groups), where each tab
-// is a real URL, not client-only panel state.
+// NavTabs: the same pill visual for real ROUTES, plain next/link, not Radix.
 export function NavTabs({
   tabs,
   active,
@@ -46,8 +41,7 @@ export function NavTabs({
   active: string;
 }) {
   return (
-    // flex-wrap: Masters has eight of these, and on a phone an unwrapped
-    // pill row was wider than the screen.
+    // flex-wrap: an unwrapped pill row was wider than a phone screen.
     <div className="flex flex-wrap gap-2">
       {tabs.map((tab) => (
         <Link

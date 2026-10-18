@@ -1,11 +1,5 @@
-/**
- * What the parser left out, said in plain English.
- *
- * A report saved before a field was renamed still opens — unknown keys
- * are dropped rather than thrown — but dropping something quietly would
- * mean showing a person a different report from the one they saved and
- * never mentioning it. This is the mention.
- */
+// The parser drops unknown keys so an old report still opens; this says so rather than silently
+// showing a different report.
 export function SpecLoss({ lines }: { lines: string[] }) {
   if (lines.length === 0) return null;
 

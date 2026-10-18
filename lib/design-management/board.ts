@@ -1,16 +1,6 @@
 /**
- * The design board's rules, pure (root plan.md, thirteenth piece) — where a
- * villa sits, its rail, how it is doing, what Pass on offers, and the
- * history read as sentences.
- *
- * The founder, 2026-10-17: "the stage that a house is in is marked by the
- * latest stage even tho revisions may happen backwards". So a villa sits
- * at the FURTHEST board stage whose step has started; an earlier stage
- * sent back for revision shows on its card, and never moves it back.
- * Nothing here is stored — it is worked out from the steps each render,
- * so it can never disagree with them.
- *
- * Dates are ISO strings, `today` passed in; nothing here reads a clock.
+ * The design board's rules, pure. A villa sits at the FURTHEST board stage whose step has started; an earlier stage sent back for revision shows on its card and never moves it back.
+ * Nothing is stored: it is worked out from the steps each render, so it cannot disagree with them. Dates are ISO strings, `today` passed in.
  */
 import { actionBucket, daysBetween, type BucketInput } from "@/lib/next-steps/rules";
 
@@ -37,14 +27,12 @@ export function isStepStatus(value: string): value is StepStatus {
   return STEP_STATUSES.some((status) => status.value === value);
 }
 
-/** A column of the board: a design stage switched onto it, in the list's order. */
 export type BoardStage = { id: string; name: string };
 
 export type StepLite = { stageId: string; status: string };
 
 export type RailSegment = { stageId: string; name: string; status: StepStatus };
 
-/** One segment per board stage, in order; a stage with no step is not started. */
 export function railOf(stages: readonly BoardStage[], steps: readonly StepLite[]): RailSegment[] {
   const byStage = new Map(steps.map((step) => [step.stageId, step.status]));
   return stages.map((stage) => ({
@@ -55,9 +43,7 @@ export function railOf(stages: readonly BoardStage[], steps: readonly StepLite[]
 }
 
 export type Place = {
-  /** Position of the furthest started board stage; -1 when nothing has started. */
   index: number;
-  /** Every board stage done. */
   complete: boolean;
 };
 
@@ -74,12 +60,8 @@ export function placeOf(stages: readonly BoardStage[], steps: readonly StepLite[
 }
 
 /**
- * The stages Pass on offers from `fromStageId`. Passing on moves a villa
- * forward from where it sits, so only the stage it sits at offers it —
- * done or not, since a finished stage waiting to be handed on is the
- * point. Every later board stage can take it (the board is not a straight
- * line), the next one first. An earlier stage under revision finishes with
- * Done, and going back is Send back, never a pass.
+ * Pass on moves a villa forward from where it sits, so only the stage it sits at offers it, done or not. Every later board stage can take it, the next first.
+ * An earlier stage under revision finishes with Done; going back is Send back, never a pass.
  */
 export function passTargets(
   stages: readonly BoardStage[],
@@ -90,10 +72,6 @@ export function passTargets(
   if (from === -1 || from !== placeOf(stages, steps).index) return [];
   return stages.slice(from + 1);
 }
-
-// ---------------------------------------------------------------------
-// How a villa is doing
-// ---------------------------------------------------------------------
 
 export type VillaHealth =
   "overdue" | "revising" | "pass_on" | "nobody" | "stale" | "on_track" | "complete";
@@ -108,7 +86,6 @@ export const VILLA_HEALTH: Record<VillaHealth, { label: string; tone: Tone }> = 
   complete: { label: "Design complete", tone: "success" },
 };
 
-/** The health chips on the board, in the order they filter. */
 export const HEALTH_FILTERS: readonly VillaHealth[] = [
   "overdue",
   "revising",
@@ -119,21 +96,13 @@ export const HEALTH_FILTERS: readonly VillaHealth[] = [
 
 export type HealthInput = {
   place: Place;
-  /** The status of the stage it sits at. */
   currentStatus: StepStatus | null;
-  /** Any earlier stage sent back and not yet done again. */
   revising: boolean;
-  /** People on the stage it sits at. */
   peopleOnCurrent: number;
-  /** The latest change to any of its steps or actions. */
   lastTouched: string | null;
 };
 
-/**
- * Null for a villa with nothing started — it has nothing to be late on.
- * An overdue action outranks everything, as on every action list; then a
- * revision under way; then a finished stage nobody has passed on.
- */
+/** Null for a villa with nothing started. An overdue action outranks everything, then a revision under way, then a finished stage nobody has passed on. */
 export function villaHealth(
   villa: HealthInput,
   actions: readonly BucketInput[],
@@ -150,21 +119,18 @@ export function villaHealth(
   return "on_track";
 }
 
-/** "1st", "2nd", "3rd", "4th" … for "Revising Design · 2nd time". */
 export function ordinal(n: number): string {
   const tens = n % 100;
   if (tens >= 11 && tens <= 13) return `${n}th`;
   return `${n}${["th", "st", "nd", "rd"][n % 10] ?? "th"}`;
 }
 
-/** What a revising stage's chip says: the stage, and the time round when it is not the first. */
 export function revisingLabel(stageName: string, revisions: number): string {
   return revisions > 1
     ? `Revising ${stageName} · ${ordinal(revisions)} time`
     : `Revising ${stageName}`;
 }
 
-/** Send-backs per step, counted from the history. */
 export function revisionCounts(
   events: readonly { stepId: string; kind: string; toStatus: string | null }[],
 ): Map<string, number> {
@@ -176,10 +142,6 @@ export function revisionCounts(
   }
   return counts;
 }
-
-// ---------------------------------------------------------------------
-// The history, as sentences
-// ---------------------------------------------------------------------
 
 export type HistoryEvent = {
   seq: number;
@@ -194,7 +156,6 @@ export type HistoryEvent = {
   reason: string | null;
 };
 
-/** One move in a few words: "started Permit", "put Anu on WD". */
 export function eventPhrase(event: HistoryEvent): string {
   const stage = event.stageName;
   if (event.kind === "person_added") return `put ${event.personName ?? "someone"} on ${stage}`;
@@ -229,11 +190,7 @@ export type HistoryLine = {
   reasons: string[];
 };
 
-/**
- * Events made in one move — a pass is a stage done, the next started and
- * its people put on, all in one transaction and so at one `at` — read as
- * one line. Newest first.
- */
+/** Events at one `at` (a pass is one transaction: stage done, next started, people put on) read as one line. Newest first. */
 export function historyLines(events: readonly HistoryEvent[]): HistoryLine[] {
   const ordered = [...events].sort((a, b) => a.seq - b.seq);
   const lines: HistoryLine[] = [];

@@ -20,11 +20,8 @@ export const metadata: Metadata = {
   description: "Kaadal's internal tools",
 };
 
-// Paints the phone browser's own address bar to match the page, so a dark
-// screen isn't topped by a white strip. Values quoted from app/globals.css.
-// These stay on prefers-color-scheme rather than following the switch:
-// they are static <meta> tags the browser resolves before any of our code
-// runs. Worst case is one strip of chrome not matching.
+// Paints the phone's address bar to match the page. Static <meta> tags resolve before our code,
+// so they follow prefers-color-scheme, not the switch.
 export const viewport: Viewport = {
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#f4f2ee" },
@@ -33,23 +30,8 @@ export const viewport: Viewport = {
 };
 
 /**
- * Applies a saved theme before the page paints.
- *
- * Blocking and inline on purpose. The parser stops here, sets the
- * attribute app/globals.css keys off, and only then reads the rest of the
- * body — so a person who chose dark never sees a white frame first. The
- * usual alternative, restoring the theme from an effect after hydration,
- * flashes on every single load.
- *
- * Reading the cookie in the layout instead would be tidier, but calling
- * cookies() here opts the whole app out of static rendering — measured:
- * it turned /login, /_not-found and /_global-error from prerendered into
- * server-rendered-on-demand, and cold starts are already this app's known
- * performance problem — warm TTFB ~0.2s, cold ~1.0s. Nine lines of script is the
- * cheaper trade.
- *
- * No cookie leaves the attribute off entirely, which is what makes
- * globals.css fall through to the device's own setting.
+ * Applies a saved theme before paint. Blocking and inline on purpose: restoring from an effect flashes on every load.
+ * Not read via cookies() in the layout: that opts the whole app out of static rendering (BUGCATCHER #6).
  */
 const APPLY_SAVED_THEME = `try{var m=document.cookie.match(/(?:^|; )${THEME_COOKIE}=(light|dark)/);if(m)document.documentElement.dataset.theme=m[1]}catch(e){}`;
 
@@ -62,21 +44,15 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-      // The script above changes <html> before React hydrates, which is
-      // exactly the mismatch this suppresses.
+      // The script changes <html> before hydration: the mismatch this suppresses.
       suppressHydrationWarning
     >
       <body className="flex min-h-full flex-col" suppressHydrationWarning>
         <script dangerouslySetInnerHTML={{ __html: APPLY_SAVED_THEME }} />
-        {/* In the root layout so it covers the sign-in pages and the
-            marathon kiosk too, not just the dashboard — you should know
-            which site you are on before you type a password into it.
-            Renders nothing on production. */}
+        {/* In the root layout so sign-in and the kiosk show it too: know which site you are on before typing a password. */}
         <PracticeBanner />
         {children}
-        {/* Real-user page-load timings, reported to Vercel. Sits in the root
-            layout so it covers the kiosk routes (app/marathon) too, not just
-            the dashboard shell. No-op outside a Vercel deployment. */}
+        {/* Page-load timings to Vercel; here so the kiosk routes are covered. No-op outside Vercel. */}
         <SpeedInsights />
       </body>
     </html>

@@ -1,36 +1,15 @@
-/**
- * Pure logic for the WhatsApp preview card of a shared deck link: working
- * out the deck page's background colour, picking a brand mark colour that
- * reads well on it, reading the page's title, and splicing our Open Graph
- * meta tags into the HTML as it is served.
- *
- * The generated preview image is stored in the deck's own folder under
- * `DEXTER_PREVIEW_PATH`. The leading dot means it can never collide with a
- * real deck file, because `planZip` drops dot-prefixed paths.
- *
- * Deliberately import-free — this is read by the public deck route (no
- * session), so it must not drag anything along with it. Every exported
- * name here is part of that shared contract — do not rename one without
- * updating the route.
- */
+// Preview card logic for a shared deck link. Import-free: the public deck route (no session) reads
+// it, so renaming an export breaks the route. The image lives at DEXTER_PREVIEW_PATH; the leading
+// dot can't collide with a deck file (planZip drops dot paths).
 
-/** Where the generated preview image lives inside a deck's folder. */
 export const DEXTER_PREVIEW_PATH = ".preview.png";
 export const PREVIEW_SITE_NAME = "Kaadal";
 export const PREVIEW_TAGLINE = "Designs that grow from the inside out";
-/** The size WhatsApp and friends show best. */
 export const PREVIEW_SIZE = { width: 1200, height: 630 } as const;
-/** Kaadal burgundy — used when a deck gives us no colour at all. */
 export const DEFAULT_PREVIEW_BACKGROUND = "#521323";
 
-// ---------------------------------------------------------------------
-// Reading one CSS colour
-// ---------------------------------------------------------------------
-
-// Scanned left to right so the first colour in the string wins. A hex run
-// must not run on into a word character, so `#12345g` is not a colour.
-// The bare words must stand alone (not part of `off-white` style names or
-// custom-property names).
+// First colour wins. A hex run mustn't run into a word character, and bare words must stand alone
+// (not part of off-white or custom-property names).
 const COLOR_PATTERN =
   /#([0-9a-f]+)(?!\w)|(?<![\w-])rgba?\(([^)]*)\)|(?<![\w-])(white|black)(?![\w-])/gi;
 
@@ -41,12 +20,8 @@ function hex2(n: number): string {
   return n.toString(16).padStart(2, "0");
 }
 
-/**
- * The FIRST colour in a CSS value, as lowercase `#rrggbb`, or `null`.
- * Understands hex (3, 4, 6 or 8 digits — alpha dropped), `rgb()`/`rgba()`
- * with integer channels, and the bare words `white` and `black`. Anything
- * else (`transparent`, `url(…)`, percent channels) is skipped.
- */
+// Hex (alpha dropped), rgb()/rgba() with integer channels, and bare white/black; anything else
+// (transparent, url(), percent channels) is skipped.
 export function parseCssColor(value: string): string | null {
   for (const match of value.matchAll(COLOR_PATTERN)) {
     if (match[1] !== undefined) {
@@ -72,10 +47,6 @@ export function parseCssColor(value: string): string | null {
   return null;
 }
 
-// ---------------------------------------------------------------------
-// The deck's background colour
-// ---------------------------------------------------------------------
-
 const KAADAL_TOKENS: Record<string, string> = {
   "--k-ink": "#180b0f",
   "--k-teal": "#102228",
@@ -94,7 +65,6 @@ const KAADAL_TOKENS: Record<string, string> = {
 const MAX_VAR_DEPTH = 4;
 const VAR_CALL = /var\(\s*(--[\w-]+)\s*(?:,\s*([^()]*?))?\s*\)/g;
 
-/** The value of an attribute inside one tag's text, either quote style. */
 function attributeOf(tag: string, name: string): string | null {
   const pattern = new RegExp(`(?:^|[\\s"'/])${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`, "i");
   const match = pattern.exec(tag);
@@ -102,7 +72,6 @@ function attributeOf(tag: string, name: string): string | null {
   return match[1] ?? match[2] ?? "";
 }
 
-/** Every `--name: value` in the page's own style blocks; the last one wins. */
 function customProperties(css: string): Map<string, string> {
   const found = new Map<string, string>();
   for (const match of css.matchAll(/(--[\w-]+)\s*:\s*([^;{}]+)/g)) {
@@ -111,7 +80,6 @@ function customProperties(css: string): Map<string, string> {
   return found;
 }
 
-/** Replaces every `var(--x)` / `var(--x, fallback)`, or null if one cannot be. */
 function resolveVars(value: string, custom: Map<string, string>): string | null {
   let current = value;
   for (let depth = 0; depth < MAX_VAR_DEPTH && current.includes("var("); depth += 1) {
@@ -136,7 +104,6 @@ function colorOf(value: string | null, custom: Map<string, string>): string | nu
   return resolved === null ? null : parseCssColor(resolved);
 }
 
-/** The last `background-color` / `background` value in a declaration list. */
 function lastBackground(declarations: string): string | null {
   let last: string | null = null;
   for (const match of declarations.matchAll(/(?:^|[;\s])background(?:-color)?\s*:\s*([^;]+)/gi)) {
@@ -145,7 +112,6 @@ function lastBackground(declarations: string): string | null {
   return last;
 }
 
-/** The background value the last matching rule gives, or null. */
 function ruleBackground(css: string, matches: (selector: string) => boolean): string | null {
   let last: string | null = null;
   for (const rule of css.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
@@ -156,14 +122,8 @@ function ruleBackground(css: string, matches: (selector: string) => boolean): st
   return last;
 }
 
-/**
- * The deck page's background as `#rrggbb`, or `null` when nothing in the
- * HTML says. Looks, in order, at the `theme-color` meta tag, the inline
- * style on `<body>`, the page's own `<style>` rules for body then
- * html/`:root`, and the `bgcolor` attribute. `var(--x)` is resolved from
- * the page's own declarations, then the built-in Kaadal tokens, then the
- * var's fallback.
- */
+// Looks at the theme-color meta, body's inline style, the page's body then html/:root rules, then
+// bgcolor. var(--x) resolves from the page, then Kaadal tokens, then the fallback.
 export function deckBackgroundColor(html: string): string | null {
   const source = html.replace(/\/\*[\s\S]*?\*\//g, "");
 
@@ -173,7 +133,6 @@ export function deckBackgroundColor(html: string): string | null {
   }
   const custom = customProperties(css);
 
-  // 1. <meta name="theme-color" content="…"> — the first such tag.
   for (const tag of source.matchAll(/<meta\b[^>]*>/gi)) {
     if (attributeOf(tag[0], "name")?.trim().toLowerCase() !== "theme-color") continue;
     const fromMeta = colorOf(attributeOf(tag[0], "content"), custom);
@@ -181,13 +140,11 @@ export function deckBackgroundColor(html: string): string | null {
     break;
   }
 
-  // 2. The inline style on <body>.
   const bodyTag = /<body\b[^>]*>/i.exec(source)?.[0] ?? "";
   const bodyStyle = attributeOf(bodyTag, "style");
   const fromInline = colorOf(bodyStyle === null ? null : lastBackground(bodyStyle), custom);
   if (fromInline) return fromInline;
 
-  // 3. Rules in the page's own style blocks: body first, then html / :root.
   const fromBodyRule = colorOf(
     ruleBackground(css, (selector) => selector === "body"),
     custom,
@@ -199,18 +156,13 @@ export function deckBackgroundColor(html: string): string | null {
   );
   if (fromHtmlRule) return fromHtmlRule;
 
-  // 4. The old-fashioned bgcolor attribute on <body>.
   return colorOf(attributeOf(bodyTag, "bgcolor"), custom);
 }
-
-// ---------------------------------------------------------------------
-// The brand mark colour
-// ---------------------------------------------------------------------
 
 const BURGUNDY = "#521323";
 const BLUSH = "#dec8b7";
 
-// Pairings the brand has signed off, tried before any calculation.
+// Brand-approved pairings, tried first.
 const APPROVED_MARKS: Record<string, string> = {
   "#be904c": "#ffffff",
   "#521323": "#dec8b7",
@@ -239,12 +191,8 @@ function contrast(a: string, b: string): number {
   return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 }
 
-/**
- * The colour to draw the Kaadal mark in on a `#rrggbb` background: the
- * brand-approved pairing when there is one, else whichever of burgundy and
- * blush reads better, else plain white or ink when neither reaches a
- * contrast ratio of 3.
- */
+// The approved pairing if any, else burgundy or blush, whichever reads better, else white or ink
+// when neither reaches contrast 3.
 export function previewMarkColor(background: string): string {
   const bg = background.toLowerCase();
   const approved = APPROVED_MARKS[bg];
@@ -258,10 +206,6 @@ export function previewMarkColor(background: string): string {
   return contrast("#ffffff", bg) >= contrast("#180b0f", bg) ? "#ffffff" : "#180b0f";
 }
 
-// ---------------------------------------------------------------------
-// The page title
-// ---------------------------------------------------------------------
-
 const MAX_TITLE_LENGTH = 120;
 
 const NAMED_ENTITIES: Record<string, string> = {
@@ -273,11 +217,8 @@ const NAMED_ENTITIES: Record<string, string> = {
   nbsp: " ",
 };
 
-/**
- * Turns a string with one char per byte (how the route reads a deck file,
- * so the bytes survive a round trip) back into real text by decoding
- * those bytes as UTF-8.
- */
+// The route reads deck files one char per byte so bytes survive a round trip; this decodes them as
+// UTF-8.
 export function latin1ToUtf8(text: string): string {
   const bytes = new Uint8Array(text.length);
   for (let i = 0; i < text.length; i += 1) bytes[i] = text.charCodeAt(i) & 0xff;
@@ -296,10 +237,6 @@ function decodeEntities(text: string): string {
   });
 }
 
-/**
- * The text of the page's first `<title>`, entities decoded, whitespace
- * collapsed and capped at 120 characters — or `null` when there is none.
- */
 export function pageTitle(html: string): string | null {
   const match = /<title\b[^>]*>([\s\S]*?)<\/title\s*>/i.exec(html);
   if (!match) return null;
@@ -308,16 +245,7 @@ export function pageTitle(html: string): string | null {
   return capped === "" ? null : capped;
 }
 
-// ---------------------------------------------------------------------
-// The preview tags, and getting them into the page
-// ---------------------------------------------------------------------
-
-/**
- * Escapes text for a double-quoted attribute, and turns everything outside
- * printable ASCII into a numeric reference. The result is pure ASCII — this
- * matters, because the route splices it into a byte-preserved file whose
- * charset we do not know.
- */
+// Pure ASCII: the route splices it into a byte-preserved file of unknown charset.
 function escapeAttribute(text: string): string {
   let out = "";
   for (const char of text) {
@@ -332,7 +260,6 @@ function escapeAttribute(text: string): string {
   return out;
 }
 
-/** The Open Graph block WhatsApp builds its card from. Pure ASCII, no trailing newline. */
 export function previewTags(input: { title: string; imageUrl: string }): string {
   return [
     `<meta property="og:type" content="website">`,
@@ -357,12 +284,8 @@ export function canInjectPreviewTags(bytes: Uint8Array): boolean {
   return true;
 }
 
-/**
- * Inserts the tags right after `<head>`, else after `<html>`, else after
- * the doctype, else at the very start — and never changes any other
- * character. Ours go first so they win over Open Graph tags the deck
- * already carries.
- */
+// Tags go first (after <head>, else <html>, else doctype, else the start) so they win over the
+// deck's own Open Graph tags; no other character changes.
 export function injectPreviewTags(html: string, tags: string): string {
   const block = `\n${tags}\n`;
   const anchors = [/<head(?:\s[^>]*)?>/i, /<html(?:\s[^>]*)?>/i, /<!doctype[^>]*>/i];

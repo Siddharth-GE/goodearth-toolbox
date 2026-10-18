@@ -10,9 +10,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { deleteLabourLog, recordLabourLog, updateLabourLog } from "@/lib/supervisors/actions";
 import { LABOUR_KIND_LABEL, LABOUR_KINDS, type LabourKind } from "@/lib/supervisors/labour";
 import type { ContractorOption, LabourLogRow, WorkOption } from "@/lib/supervisors/queries";
-import { useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useState } from "react";
+import { todayInIndia } from "@/lib/format";
 
-/** Works flattened server-side; the select groups them by category. */
 function WorkSelect({
   works,
   name,
@@ -88,13 +89,12 @@ export function LabourLogDialog({
   plotId: string;
   works: WorkOption[];
   contractors: ContractorOption[];
-  /** Present = edit that entry; absent = log a new day. */
   log?: LabourLogRow;
   workItemId?: string;
   trigger?: React.ReactNode;
 }) {
   const isEdit = !!log;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInIndia();
   const [kind, setKind] = useState<LabourKind>(log?.kind ?? "nmr");
   const [work, setWork] = useState(log?.workItemId ?? workItemId ?? "");
   const workUom = works.find((option) => option.id === work)?.uom ?? null;
@@ -215,8 +215,7 @@ export function LabourLogDialog({
 }
 
 export function DeleteLabourLogButton({ logId }: { logId: string }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
   return (
     <span className="inline-flex items-center gap-2">
@@ -226,12 +225,7 @@ export function DeleteLabourLogButton({ logId }: { logId: string }) {
         variant="ghost"
         size="sm"
         disabled={pending}
-        onClick={() =>
-          startTransition(async () => {
-            const result = await deleteLabourLog(logId);
-            setError(result?.error);
-          })
-        }
+        onClick={() => run(() => deleteLabourLog(logId))}
       >
         Delete
       </Button>

@@ -1,8 +1,4 @@
-/**
- * The ready-to-issue line mirrors issue_transmittal's three refusals
- * (0093, widened by 0124), in the same order. If the migration's order
- * ever changes, these tests are the place that should break first.
- */
+// Mirrors issue_transmittal's three refusals (0093, 0124) in order; if the migration's order changes, these break first.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

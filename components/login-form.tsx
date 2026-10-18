@@ -8,9 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useSearchParams } from "next/navigation";
 import { useActionState } from "react";
 
-// Messages for the flows that end in a redirect back here (the Google
-// callback and the reset flow), where there is no form state to carry
-// them. The URL says only a keyword; the words live here.
+// Messages for redirects back here (Google callback, reset flow); the URL carries only a keyword.
 const PARAM_ERRORS: Record<string, string> = {
   google: "That Google account isn't part of the team. Use your work login, or ask an admin.",
   deactivated: "This account has been deactivated. Ask an admin to switch it back on.",
@@ -66,8 +64,7 @@ export function LoginForm() {
   );
 }
 
-/** Google's own "G", inline so no external request is needed. Brand
- * colours, not palette tokens — it is a logo, not UI. */
+/** Google's "G": brand colours, not palette tokens, since it is a logo. */
 function GoogleMark() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4">

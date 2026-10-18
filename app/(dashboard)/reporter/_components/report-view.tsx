@@ -19,16 +19,8 @@ import { ReportChart } from "./report-chart";
 import { ReportSummary } from "./report-summary";
 import { ReportTable } from "./report-table";
 
-/**
- * A report, composed: the builder, then headline figures, the chart and
- * the table. One component so an unsaved report (`/reporter/run`) and a
- * saved one (`/reporter/[reportId]`) cannot drift into two different
- * pages — the only difference between them is where the builder pushes
- * its changes and what the toolbar above offers.
- *
- * A Server Component: every query runs here, and the chart model is
- * shaped by the pure, tested code before any of it reaches the browser.
- */
+// One component for unsaved and saved reports so they can't drift. A Server Component: queries run
+// here, and the chart model is shaped by pure, tested code.
 export async function ReportView({
   spec,
   basePath,
@@ -46,8 +38,6 @@ export async function ReportView({
   ]);
   const dataset = DATASETS[spec.dataset];
 
-  // The same helper the PDF route uses, so paper and screen can never
-  // shape the same chart differently.
   const chartModel = outcome.ok ? chartModelFor(dataset, spec, outcome.result) : null;
 
   return (
@@ -75,11 +65,8 @@ export async function ReportView({
           {chartModel && <ReportChart model={chartModel} />}
           {outcome.result.matched > 0 && (
             <div className="flex justify-end gap-2">
-              {/* The spec is re-encoded from what actually ran, so the
-                  file matches the page even if the URL was hand-edited.
-                  `plain` because next/link would prefetch the download
-                  on hover and build the whole file for a passing
-                  cursor. */}
+              {/* Re-encoded from what ran so the file matches the page; `plain` stops next/link
+                  prefetching (and building) the download. */}
               <LinkButton
                 href={`${basePath}/pdf?spec=${encodeSpec(spec)}`}
                 variant="secondary"

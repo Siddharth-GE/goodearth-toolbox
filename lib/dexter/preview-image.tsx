@@ -2,21 +2,10 @@ import { ImageResponse } from "next/og";
 
 import { PREVIEW_SIZE, previewMarkColor } from "@/lib/dexter/preview";
 
-/**
- * The picture a deck link shows when it is shared on WhatsApp: the
- * Kaadal 'K' mark, centred on the deck's own background colour.
- *
- * Kept apart from `lib/dexter/preview.ts` on purpose — that module is
- * import-free and read by the public viewer on every request, while this
- * one pulls in the image generator. The viewer loads this file LAZILY,
- * inside the one branch that draws a preview, so a deploy that cannot
- * load the generator costs the preview picture and nothing else: the
- * deck itself still opens (BUGCATCHER #15).
- *
- * No text is drawn, so no font is needed — the mark is four vector
- * paths, quoted from the brand's own artwork (`kaadal-k-*.svg`: one
- * drawing, twelve fills). Change the paths only from that artwork.
- */
+// Lazy-loaded by the viewer inside the one branch that draws a preview, so a deploy that can't load
+// the image generator costs the picture, not the deck (BUGCATCHER #15). preview.ts stays
+// import-free. No text, so no font. Change the vector paths only from the brand artwork
+// (kaadal-k-*.svg).
 
 const MARK_WIDTH = 67.13;
 const MARK_HEIGHT = 65.74;
@@ -26,8 +15,7 @@ const MARK_PATHS = [
   "M53.82 65.74L67.13 65.74C61.11 62.73 54.40 40.28 52.78 35.53C52.78 35.53 44.10 41.90 30.44 29.74L39.35 56.25C41.78 64.00 49.54 65.74 53.82 65.74",
 ];
 
-// The mark stands 240px tall on the 630px card: large enough to read in
-// WhatsApp's thumbnail, with the colour left to do the rest.
+// 240px on the 630px card reads in WhatsApp's thumbnail.
 const DRAWN_HEIGHT = 240;
 const DRAWN_WIDTH = Math.round((DRAWN_HEIGHT * MARK_WIDTH) / MARK_HEIGHT);
 

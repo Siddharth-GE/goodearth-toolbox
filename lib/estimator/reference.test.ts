@@ -1,8 +1,4 @@
-/**
- * The estimate reference appears on the official document indents pull
- * from, so its exact shape is pinned — including the case where the TS
- * mirror and the SQL mint (migration 0077) could drift: numbers past 999.
- */
+/** The reference's exact shape is pinned, including numbers past 999, where the TS mirror and the SQL mint (0077) could drift. */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

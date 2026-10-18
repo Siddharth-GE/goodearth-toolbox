@@ -6,22 +6,12 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-// Type-only import, and deliberately NOT re-exported — see the note in
-// lib/purchase-orders/actions.ts: a bare `export type { X };` in a
-// "use server" file crashes every action in its compiled chunk at load.
+// Type-only import, not re-exported: a re-export in a "use server" file crashes every action at load.
 import type { ActionState } from "@/lib/action-state";
 
-/**
- * Writes for Inventory. The real rules live in the database (migration
- * 0023: grn_lines_qty_guard, stock_issue_lines_qty_guard,
- * stock_adjustments_qty_guard, the two permanence guards and the PO
- * completion trigger) — these actions validate first so refusals arrive
- * as friendly messages, but a write that slips past the UI is still
- * stopped DB-side.
- */
+/** Rules live in the database (0023 guards); actions validate first so refusals read as friendly messages. */
 
-/** The guards raise human-readable messages (written for exactly this).
- * Surface the known ones instead of a generic "try again". */
+/** Surface the guards' own readable messages instead of a generic "try again". */
 const INVENTORY_GUARD_PHRASES = [
   "still to come",
   "is in that store",
@@ -42,12 +32,7 @@ const INVENTORY_GUARD_PHRASES = [
   "names it later",
 ] as const;
 
-/* ------------------------------------------------------------------ *
- * Receiving goods against a purchase order
- * ------------------------------------------------------------------ */
-
 export type ReceiveLineInput = {
-  /** purchase_order_lines.id — the provenance anchor. */
   poLineId: string;
   quantity: number;
 };
@@ -65,15 +50,8 @@ export type RecordReceiptInput = {
   lines: ReceiveLineInput[];
 };
 
-/**
- * Records one delivery: mints the GRN, then writes its lines.
- *
- * The item and uom are re-read server-side from po_line_facts — the
- * client says only which line and how many. The over-receipt guard caps
- * each line at what was ordered across every receipt, so a race between
- * two store-keepers cannot book the same delivery twice, and the PO
- * completes itself once nothing is outstanding.
- */
+/** Item and uom come from po_line_facts, not the client. The over-receipt guard caps each line
+ * across every receipt, so a race cannot book one delivery twice. */
 export async function recordGoodsReceipt(input: RecordReceiptInput): Promise<ActionState> {
   const user = await requireTool("/inventory");
 
@@ -91,9 +69,7 @@ export async function recordGoodsReceipt(input: RecordReceiptInput): Promise<Act
 
   const supabase = await createClient();
 
-  // po_line_facts, not purchase_order_lines: a store-keeper holds
-  // /inventory and usually not /purchase-orders, and this view is the
-  // sanctioned money-free window (migration 0022).
+  // po_line_facts, not the gated table: a store-keeper may lack /purchase-orders (0022).
   const { data: sources, error: sourcesError } = await supabase
     .from("po_line_facts")
     .select("id, po_id, item_id, uom")
@@ -107,10 +83,7 @@ export async function recordGoodsReceipt(input: RecordReceiptInput): Promise<Act
     return { error: "Could not record this delivery. Try again." };
   }
 
-  // Every column of a view is typed nullable by the generator (a view
-  // carries no NOT NULL metadata), so the rows are narrowed once here —
-  // a line missing its anchor or item is dropped rather than inserted
-  // with a hole in it.
+  // Views type every column nullable; narrow once, dropping lines missing an anchor or item.
   const byId = new Map(
     (sources ?? [])
       .filter(
@@ -128,8 +101,7 @@ export async function recordGoodsReceipt(input: RecordReceiptInput): Promise<Act
     p_po_id: input.poId,
     p_store_id: (input.storeId || null) as unknown as string,
     p_to_site: input.toSite,
-    // Named args pick the 7-arg signature; the 0081 wrapper keeps the
-    // old one alive for code deployed before the migration.
+    // Named args pick the 7-arg signature (0081).
     p_work_item_id: (input.toSite ? input.workItemId : null) as unknown as string,
     p_challan_no: (input.challanNo?.trim() || null) as unknown as string,
     p_received_at: (input.receivedAt || null) as unknown as string,
@@ -141,15 +113,8 @@ export async function recordGoodsReceipt(input: RecordReceiptInput): Promise<Act
   }
   if (!receiptId) return { error: "Could not record this delivery. Try again." };
 
-  // One line at a time, deliberately: the over-receipt guard raises per
-  // line with the figure still to come, and a batch insert would fail
-  // wholesale on the first refusal — losing the lines that were fine.
-  //
-  // The cost of that choice: a refusal part-way leaves a delivery note
-  // holding fewer lines than arrived, and there is no way to add lines
-  // to a receipt afterwards. Recording a SECOND receipt against the same
-  // PO for the rest is the recovery, and the over-receipt guard makes it
-  // safe — so that is what the message below must say.
+  // One line at a time: the over-receipt guard raises per line, and a batch insert would fail wholesale.
+  // A refusal part-way leaves a short note; recording a second receipt for the rest is the recovery.
   let added = 0;
   for (const line of usable) {
     const source = byId.get(line.poLineId)!;
@@ -181,22 +146,14 @@ export async function recordGoodsReceipt(input: RecordReceiptInput): Promise<Act
   redirect(`/inventory/receipts/${receiptId}`);
 }
 
-/* ------------------------------------------------------------------ *
- * The rate a delivery carries (0108)
- * ------------------------------------------------------------------ */
-
 export type ReceiptRateInput = {
   rate: number;
   gstPct: number;
   note: string | null;
 };
 
-/**
- * Changes the rate on one receipt line when the delivery bill says
- * something other than the PO. The PO's own figures stay beside it — the
- * database refuses to move them — so the difference is always visible to
- * accounts. The table's policy admits /inventory only.
- */
+/** Changes a receipt line's rate when the bill differs from the PO. The PO's own figures
+ * stay beside it, so accounts always see the difference. */
 export async function updateReceiptLineRate(
   receiptLineId: string,
   input: ReceiptRateInput,
@@ -231,17 +188,11 @@ export async function updateReceiptLineRate(
   return undefined;
 }
 
-/* ------------------------------------------------------------------ *
- * Issuing material out of a store
- * ------------------------------------------------------------------ */
-
-/** The unit is not sent: every line is issued in the item's Masters unit,
- * read on the server (the same rule as indents and adjustments). */
+/** No unit is sent: lines are issued in the item's Masters unit, read on the server. */
 export type IssueLineInput = {
   itemId: string;
   quantity: number;
-  /** The batch the store-keeper chose to draw first (0108); null means
-   * the oldest. The rest always comes oldest first. */
+  /** Batch to draw first (0108); null means oldest. The rest always comes oldest first. */
   preferredReceiptLineId?: string | null;
 };
 
@@ -250,25 +201,19 @@ export type RecordIssueInput = {
   /** Exactly one: another store (a transfer) or a plot (used at site). */
   toStoreId: string | null;
   plotId: string | null;
-  /** The work the material serves (0080) — required for a plot issue,
-   * never sent for a transfer. */
+  /** The work the material serves (0080); required for a plot issue, never for a transfer. */
   workItemId: string | null;
   /** Only consulted for a transfer out of a store with no project. */
   projectId: string | null;
   issuedAt: string | null;
   note: string | null;
   lines: IssueLineInput[];
-  /** When this issue answers a supervisor's request (Step H), the
-   * request to stamp fulfilled once the issue is recorded. */
+  /** The supervisor's request to stamp fulfilled once the issue is recorded. */
   requestId?: string | null;
 };
 
-/**
- * Records material leaving a store. The negative-stock guard refuses
- * any line that would take the store below zero, checked under an
- * advisory lock so two people issuing the same material at once cannot
- * both succeed against the same balance.
- */
+/** The negative-stock guard refuses any line taking a store below zero, under an advisory
+ * lock so concurrent issues cannot both succeed. */
 export async function recordStockIssue(input: RecordIssueInput): Promise<ActionState> {
   const user = await requireTool("/inventory");
 
@@ -306,8 +251,7 @@ export async function recordStockIssue(input: RecordIssueInput): Promise<ActionS
   if (unitless) return { error: `${unitless.name} has no unit in Masters. Set one there first.` };
   if (uomByItem.size !== itemIds.size) return { error: "An item on this issue no longer exists." };
 
-  // A chosen batch must still be in this store, of this item. The
-  // allocation would skip a stale one anyway — refusing says so instead.
+  // A chosen batch must still be in this store; refuse a stale one rather than skip it silently.
   const chosen = input.lines.filter((line) => line.preferredReceiptLineId);
   if (chosen.length > 0) {
     const { data: held, error: heldError } = await supabase
@@ -333,8 +277,7 @@ export async function recordStockIssue(input: RecordIssueInput): Promise<ActionS
     p_store_id: input.storeId,
     p_to_store_id: (input.toStoreId || null) as unknown as string,
     p_plot_id: (input.plotId || null) as unknown as string,
-    // Named args pick the 7-arg signature; the 0080 wrapper keeps the
-    // old 6-arg one alive for code deployed before the migration.
+    // Named args pick the 7-arg signature (0080).
     p_work_item_id: (input.plotId ? input.workItemId : null) as unknown as string,
     p_project_id: (input.projectId || null) as unknown as string,
     p_issued_at: (input.issuedAt || null) as unknown as string,
@@ -346,11 +289,7 @@ export async function recordStockIssue(input: RecordIssueInput): Promise<ActionS
   }
   if (!issueId) return { error: "Could not record this issue. Try again." };
 
-  // One at a time, same reason as a goods receipt: the negative-stock
-  // guard raises per line with the quantity actually in the store. Same
-  // cost too — a refusal part-way leaves an issue note short, lines
-  // can't be added to it afterwards, and recording a second issue from
-  // the same store is the recovery.
+  // One at a time, as for receipts. A refusal part-way leaves a short note; a second issue is the recovery.
   let added = 0;
   for (const line of input.lines) {
     const { error: lineError } = await supabase.from("stock_issue_lines").insert({
@@ -376,13 +315,8 @@ export async function recordStockIssue(input: RecordIssueInput): Promise<ActionS
     added++;
   }
 
-  // The issue is recorded either way; stamping the supervisor's request
-  // fulfilled is best-effort on top. If it fails the request simply
-  // stays in the queue — decline it there with "issued as …" rather
-  // than lying to the store-keeper that the issue itself failed.
-  // Writing issue_requests from here is the fifth documented cross-tool
-  // write exception (STATUS.md); 0084's guard trigger only lets this
-  // side move requested → fulfilled/declined.
+  // Stamping the supervisor's request is best-effort: if it fails the request stays queued.
+  // Cross-tool write exception (STATUS.md); the 0084 trigger only lets it move requested to fulfilled/declined.
   if (input.requestId) {
     const { error: stampError } = await supabase
       .from("issue_requests")
@@ -397,10 +331,6 @@ export async function recordStockIssue(input: RecordIssueInput): Promise<ActionS
   revalidatePath("/inventory", "layout");
   redirect(`/inventory/issues/${issueId}`);
 }
-
-/* ------------------------------------------------------------------ *
- * Answering a supervisor's request without stock
- * ------------------------------------------------------------------ */
 
 export async function declineSiteRequest(id: string, reason: string): Promise<ActionState> {
   const user = await requireTool("/inventory");
@@ -430,26 +360,17 @@ export async function declineSiteRequest(id: string, reason: string): Promise<Ac
   return undefined;
 }
 
-/* ------------------------------------------------------------------ *
- * Adjusting a count by hand
- * ------------------------------------------------------------------ */
-
 export type RecordAdjustmentInput = {
   storeId: string;
   itemId: string;
-  /** Signed: positive adds (opening stock, a found box), negative removes. */
+  /** Signed: positive adds, negative removes. */
   quantity: number;
   reason: string;
   adjustedAt: string | null;
 };
 
-/**
- * The only way a balance changes without a movement behind it, which is
- * why the reason is mandatory both here and at the database. Opening
- * stock is simply a positive adjustment. The unit is the item's Masters
- * unit, read here — stock sums quantities whatever their unit, so a
- * correction in another one would quietly mix bags with cft.
- */
+/** The only way a balance changes without a movement, so the reason is mandatory here and in
+ * the database. The unit is the item's Masters unit, so bags never mix with cft. */
 export async function recordStockAdjustment(input: RecordAdjustmentInput): Promise<ActionState> {
   const user = await requireTool("/inventory");
 
@@ -494,11 +415,7 @@ export async function recordStockAdjustment(input: RecordAdjustmentInput): Promi
   return undefined;
 }
 
-/**
- * Retag which work a plot issue served (0080). A label fix, not a
- * movement: quantities, store, destination and number are untouched,
- * and audit_row() records the change. Transfers carry no work.
- */
+/** Retags the work a plot issue served (0080). A label fix: quantities and numbers are untouched. */
 export async function retagIssueWork(issueId: string, workItemId: string): Promise<ActionState> {
   const user = await requireTool("/inventory");
   if (!workItemId) return { error: "Pick the work." };

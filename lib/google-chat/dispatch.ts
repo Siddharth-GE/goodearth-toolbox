@@ -93,44 +93,11 @@ import {
 import { getSpaceLink, linkSpace, listLinkTargets, unlinkSpace } from "@/lib/google-chat/spaces";
 import { chatAudience, chatOrigin } from "@/lib/google-chat/verify";
 
-/**
- * Everything the door does once Google has been proven.
- *
- * The split is not tidiness: `app/api/google-chat/route.ts` is a
- * Next.js route file and may export nothing but its handlers, so
- * nothing else can ever reach the dispatch while it lives there. It
- * lives here instead — the lock (token verification) stays in the route,
- * and this file picks up at the line the route's own comment used to
- * call "only now, with Google proven, is the body read at all". One
- * exported function, `handleChatRequest`, takes the same Request the
- * route took and answers Google exactly as before.
- *
- * The one thing that buys: `scripts/google-chat-usage-test.ts` can hand
- * this function Google-shaped events from a laptop and read the answers,
- * so identity, the reads, the cards, an act-as write and the card
- * refresh can all be exercised against staging without a human pressing
- * buttons in a Chat space. Google is still the only judge of the card
- * JSON itself (BUGCATCHER #17) — the harness proves our side of it.
- */
-/**
- * An add-on-style synchronous reply: the message rides inside an action
- * envelope, not as bare `{ text }` — Google shows "Relay not responding"
- * if the envelope is missing, even on a 200.
- *
- * Given a sender's `users/<id>` name, the reply is private to them.
- * Everything that is about one person — a refusal, a greeting, a
- * lookup — goes back privately; only what the whole space should see
- * (the hello on joining, later the action confirmations) goes public.
- *
- * A plain string is a plain text reply, exactly as it has always been.
- * Phase 5 lets the same envelope carry a card instead — or both — by
- * passing `{ text, cardsV2 }`: Google's message resource takes the
- * cards beside the text, and `privateMessageViewer` still applies to
- * the whole message. That last part is a belief until it is seen: the
- * first /court typed on staging is what proves a cardsV2 card renders
- * inside createMessageAction AND stays private (plan.md's step 1 — the
- * answer, whichever way it goes, becomes trap (h) in plan.md).
- */
+// Everything the door does once Google is proven. Lives here, not in the route
+// file, because a route may export nothing but handlers.
+
+// Google shows "Relay not responding" if the message isn't inside this action
+// envelope. With `privateTo` the reply is visible to that person only.
 type CardMessage = {
   text?: string;
   cardsV2?: Record<string, unknown>[];
@@ -150,48 +117,19 @@ function card(
   });
 }
 
-/**
- * A dialog, as an add-on-style app answers one: a navigation that
- * pushes a card, and no message envelope at all. The two shapes are not
- * interchangeable — a dialog wrapped in the hostAppDataAction envelope
- * the text replies use simply never appears.
- */
+// A dialog is a navigation, not a message envelope; wrapped in the envelope it never appears.
 function pushCard(cardBody: Record<string, unknown>) {
   return Response.json({ action: { navigations: [{ pushCard: cardBody }] } });
 }
 
-/**
- * The next page of a dialog that is already open — the answer to a Save
- * that isn't finished yet. `pushCard` opens a dialog; `updateCard`
- * replaces what is in the one the person is looking at, which is how
- * /newtrail's second page (the steps, the people, the days) appears
- * without the door having to remember anything between the two: page 1's
- * answers ride back on the Open button's own parameters.
- *
- * This is plan.md's trap (j), and it is a belief until the founder's
- * vet: whether Google accepts `updateCard` in reply to a SUBMIT_DIALOG
- * at all, and whether the Open button's parameters come back beside page
- * 2's form values. If it doesn't, this is the one line that changes.
- */
+// Replaces the open dialog (the next page), so no state is kept between pages (trap (j)).
 function updateCard(cardBody: Record<string, unknown>) {
   return Response.json({ action: { navigations: [{ updateCard: cardBody }] } });
 }
 
-/**
- * Shut the dialog, optionally saying something as it goes. Google gives
- * the app one answer and one only, and — learned on the second vet,
- * 2026-09-02 — it accepts exactly three shapes here, never a mix:
- *
- *   - a message to the space closes the dialog by itself: the
- *     hostAppDataAction envelope ALONE, with no navigation beside it
- *     (the two together are "invalid" and show "Could not load dialog");
- *   - a private word to the person is a `notification` toast on the
- *     close navigation — visible to them only, nothing posted;
- *   - a plain close is the navigation alone.
- *
- * So the public confirmation is the first shape, and a refusal or an
- * apology (nobody else's business) is the second.
- */
+// Google accepts exactly three shapes, never a mix: the message envelope alone
+// (closes the dialog and posts), a `notification` toast on the close navigation
+// (private), or the close navigation alone. Mixing shows "Could not load dialog".
 function closeDialog(text?: string, privateTo?: string | null) {
   if (text && !privateTo) return card(text);
   const body: Record<string, unknown> = {
@@ -201,15 +139,9 @@ function closeDialog(text?: string, privateTo?: string | null) {
   return Response.json(body);
 }
 
-// The one sentence the door falls back on when something on our side
-// broke. It is said in two places — the outer catch, and the dialog
-// that can't be built without its list — so it is written once.
 const SOMETHING_WENT_WRONG = "Something went wrong on our side. Please try again in a moment.";
 
-// The commands this file dispatches on, as declared in the Chat app's
-// configuration (events.ts holds the whole id list, and Google sends
-// only the number). Named here so the dispatch reads as commands rather
-// than as arithmetic.
+// Command ids as declared in the Chat app's configuration (events.ts holds the list).
 const COURT_COMMAND_ID = 1;
 const PUSH_COMMAND_ID = 2;
 const BOUNCE_COMMAND_ID = 3;
@@ -218,24 +150,13 @@ const TRAIL_COMMAND_ID = 5;
 const NEWTRAIL_COMMAND_ID = 6;
 const LINK_COMMAND_ID = 7;
 
-// The hello a DM gets on joining. There is nothing to link in a DM, so
-// instead of a space's scope it names the two commands that answer a
-// question outright — the moving of batons starts from the court card's
-// own buttons.
 const DM_HELLO =
   "Hello! I'm the Relay bot. Try /court to see what's in your hand, " +
   "or /trail followed by a villa name.";
 
-/**
- * The bot has just been added somewhere. In a DM there is nothing to
- * work out; in a space, the space's name is matched against every villa
- * and then every project, and a confident single match is linked there
- * and then — no identity check, because whoever can add the bot to a
- * space can let it read that space's name.
- *
- * Anything less than confident (nothing matched, or several did) is
- * left unlinked and said out loud, so /link is the obvious next move.
- */
+// Bot added somewhere. A confident single match of the space name is linked with no
+// identity check (whoever can add the bot can let it read the name); anything less
+// is left unlinked and said out loud, so /link is the next move.
 async function handleJoin(event: ChatEvent, spaceId: string) {
   if (isDirectMessage(event)) return card(DM_HELLO);
 
@@ -273,18 +194,11 @@ async function handleJoin(event: ChatEvent, spaceId: string) {
     unitId,
     linkedBy: null,
   });
-  // A failed write must not announce a link that isn't stored: the
-  // space would then think it was scoped and the database wouldn't.
+  // Never announce a link that isn't stored.
   return card(saved ? joinHello(label) : joinHello(null));
 }
 
-/**
- * The /link dialog came back. The dropdown's value is the whole answer:
- * "none" forgets the link, "project:<id>" or "unit:<id>" stores it
- * against the person who chose it. The confirmation is public — a
- * space's scope is the space's business — while an apology stays
- * private to whoever pressed Save.
- */
+// The confirmation is public (a space's scope is its business); an apology stays private.
 async function handleLinkSubmit(
   event: ChatEvent,
   spaceId: string,
@@ -299,8 +213,7 @@ async function handleLinkSubmit(
     return cleared ? closeDialog(linkConfirmation(null)) : closeDialog(linkSaveFailed(), privateTo);
   }
 
-  // A villa's project comes from the list, not from the dialog: a row
-  // names one id, and the stored row must name both.
+  // A villa's project comes from the list; the stored row must name both.
   const targets = await listLinkTargets();
   if (!targets) return closeDialog(linkSaveFailed(), privateTo);
 
@@ -326,8 +239,7 @@ async function handleLinkSubmit(
     }
   }
 
-  // A row naming something that is no longer there — a dialog left open
-  // while a villa was renamed away — is an apology, not a guess.
+  // A target that no longer exists is an apology, not a guess.
   if (!projectId || !label) return closeDialog(linkSaveFailed(), privateTo);
 
   const saved = await linkSpace({
@@ -340,17 +252,8 @@ async function handleLinkSubmit(
   return saved ? closeDialog(linkConfirmation(label)) : closeDialog(linkSaveFailed(), privateTo);
 }
 
-/**
- * /link itself: the picker. A DM can't be linked; a space gets Google's
- * dialog, with the current choice pre-selected. If the command didn't
- * arrive as a dialog request at all, the console's "Opens a dialog"
- * tick is missing — the door says exactly that rather than answering
- * with a card Google will drop on the floor.
- */
 async function handleLinkCommand(event: ChatEvent, spaceId: string, privateTo: string | null) {
-  // Google asked for a dialog, so from here on every answer IS a dialog:
-  // a message envelope in reply to a dialog request is "invalid" and
-  // shows as "Could not load dialog" (the first vet, /link in a DM).
+  // Once Google asks for a dialog every answer must be a dialog, else "Could not load dialog".
   if (dialogEventType(event) !== "REQUEST_DIALOG") return card(dialogNotEnabled(), privateTo);
   if (isDirectMessage(event)) return pushCard(noticeDialog(dmCannotLink()));
 
@@ -364,31 +267,16 @@ async function handleLinkCommand(event: ChatEvent, spaceId: string, privateTo: s
       : `project:${current.projectId}`
     : NO_LINK_VALUE;
 
-  // The Save button posts back to the door itself: for an HTTP app the
-  // button's function is a URL, and the registered endpoint URL is
-  // exactly what chatAudience() holds.
+  // For an HTTP app a button's function is a URL: the registered endpoint, chatAudience().
   return pushCard(
     linkDialog(linkTargetRows(targets.projects, targets.units), selected, chatAudience()),
   );
 }
 
-/**
- * The court as cards — the ONE renderer, so /court and a card that
- * rewrites itself after a press can never drift apart. Round two added
- * the second caller (refreshPressedCard below); `notice` is the line it
- * puts on top saying what just happened, and /court passes none.
- *
- * The read is deliberately unscoped: one pass over the person's whole
- * court, split in Node by the space's scope, so a linked space can say
- * both "here is this villa's batons" and "you also hold N elsewhere"
- * without a second query. In a DM or an unlinked space the scope is
- * "all", nothing is split off, and the card is simply the whole court.
- *
- * Null is a failed read, never an empty court: "nothing is waiting on
- * you" would be a lie told to someone holding six batons. What each
- * caller does about it differs — /court apologises, a refresh leaves the
- * card as it is — which is exactly why the decision isn't made here.
- */
+// The one court renderer, so /court and a self-rewriting card can't drift apart.
+// Reads unscoped and splits by scope in Node, so a linked space can also say "you hold N
+// elsewhere". Null is a failed read, never an empty court: "nothing waiting" would be a
+// lie to someone holding six batons.
 async function buildCourtCards(
   spaceId: string,
   identity: { userId: string; firstName: string },
@@ -403,9 +291,7 @@ async function buildCourtCards(
   const { inScope, elsewhere } = splitByScope(rows, scope);
   const { shown, more } = takeForCard(orderColdestFirst(inScope));
 
-  // Counted over every in-scope row, not just what's shown: a cold trail
-  // cut off by the ten-cap must still show up in the header (the
-  // founder's ask, 2026-09-09).
+  // Counted over every in-scope row, so a cold trail cut by the ten-cap still shows.
   const coldCount = inScope.filter((row) => row.isStuck).length;
   const withClientCount = inScope.filter((row) => row.isWithClient).length;
 
@@ -417,9 +303,7 @@ async function buildCourtCards(
       more,
       moreElsewhere: elsewhere.length,
       origin: chatOrigin(),
-      // Where Google posts a button press back to. For an HTTP app a
-      // button's function is a URL, never a name (trap (e)), and the
-      // registered endpoint URL is exactly what chatAudience() holds.
+      // Where Google posts a button press back (a URL, never a name: trap (e)).
       submitUrl: chatAudience(),
       notice,
       coldCount,
@@ -428,13 +312,7 @@ async function buildCourtCards(
   ];
 }
 
-/**
- * /court — what is in this person's hand, coldest first, privately.
- *
- * /push, /bounce and /finish answer with this same card: the buttons
- * that move a baton live on its rows, so "which of these do you mean?"
- * is the honest first question for all four commands.
- */
+// /push, /bounce and /finish answer with this same card: the buttons live on its rows.
 async function handleCourt(
   spaceId: string,
   identity: { userId: string; firstName: string },
@@ -445,26 +323,10 @@ async function handleCourt(
   return card({ cardsV2: cards }, privateTo);
 }
 
-/**
- * Rewrite the card that was just pressed, so it shows the person's court
- * as it now stands with a line on top saying what they just did.
- *
- * This runs BEFORE the answer to Google and can never change it: Google
- * takes one answer per press and that answer is still the public
- * confirmation, so the card is rewritten through the Chat REST API as
- * the app instead (outbound.ts). Every way this can go wrong ends in a
- * word for the log and a card left exactly as it was — no message name
- * (a dialog Save may carry none), a failed court read, a refused PATCH,
- * no key at all, or something nobody thought of, which is what the
- * catch is for.
- *
- * One line per refresh, and the message resource name is in it on
- * purpose. `spaces/…/messages/…` is an opaque handle — not text, not an
- * email, not a token — and having it in the log is the difference
- * between "a refresh failed" and being able to put the card right by
- * hand with scripts/google-chat-patch-card.ts. (plan.md asked for a
- * boolean; Fable decided the id is logged.)
- */
+// Rewrites the pressed card through the Chat REST API (Google takes one answer per press
+// and that stays the public confirmation). Every failure ends in a log line and an
+// untouched card. The message name is logged on purpose: it is an opaque handle, and it
+// lets scripts/google-chat-patch-card.ts fix a card by hand.
 async function refreshPressedCard(
   event: ChatEvent,
   spaceId: string,
@@ -489,17 +351,9 @@ async function refreshPressedCard(
   }
 }
 
-/**
- * /trail <words> — where is that trail, privately.
- *
- * The words come from the message the person typed; the space's link
- * narrows the running trails to its villa or project. With no words at
- * all and nothing to narrow by, there is no question to answer, so the
- * bot asks for a word rather than dumping every running trail in the
- * company. Matching happens in Node, on rows the view already returned:
- * a PostgREST filter string built from typed words is exactly the thing
- * no CI gate can see through.
- */
+// Matching happens in Node on rows the view returned: a PostgREST filter built from
+// typed words is something no CI gate can see through. No words and no scope asks for
+// a word rather than dumping every running trail.
 async function handleTrail(event: ChatEvent, spaceId: string, privateTo: string | null) {
   const words = searchWords(commandText(event));
   const link = await getSpaceLink(spaceId);
@@ -513,8 +367,6 @@ async function handleTrail(event: ChatEvent, spaceId: string, privateTo: string 
   const matched = orderColdestFirst(rows.filter((row) => matchesWords(row, words)));
   const { shown, more } = takeForCard(matched);
 
-  // Counted over every matched row, not just what's shown, the same rule
-  // as the court card (the founder's ask, 2026-09-09).
   const coldCount = matched.filter((row) => row.isStuck).length;
   const withClientCount = matched.filter((row) => row.isWithClient).length;
 
@@ -536,15 +388,10 @@ async function handleTrail(event: ChatEvent, spaceId: string, privateTo: string 
   );
 }
 
-/**
- * Everything a write needs to know about who is doing it. The email is
- * carried alongside the id on purpose: act-as.ts mints the session from
- * the email Google vouched for and then refuses to hand back a client
- * unless the account that came back is this exact id.
- */
+// The email rides with the id: act-as.ts mints the session from it, then refuses a client
+// unless the account that came back is this exact id.
 type Actor = { userId: string; email: string; firstName: string };
 
-/** The public sentence each write earns, once the fresh row is in hand. */
 function confirmation(action: string, firstName: string, trail: TrailSummary): string {
   if (action === "push") return pushedText(firstName, trail);
   if (action === "finish") return finishedText(firstName, trail);
@@ -552,23 +399,12 @@ function confirmation(action: string, firstName: string, trail: TrailSummary): s
   return returnedText(firstName, trail);
 }
 
-/**
- * A button on a court card: Push, Finish, With client, Back from client.
- *
- * Four things happen in order, and each has its own answer. The session
- * can't be minted — private apology. The database refuses (not the
- * holder, the baton has moved, the trail is finished) — the guard's own
- * sentence, privately, because a refusal is between the person and the
- * rule. It worked — the whole space is told, because that is the point
- * of doing this in chat.
- *
- * Bounce never arrives here: its button is declared OPEN_DIALOG, so
- * Google asks for a dialog instead of pressing straight through.
- */
+// Push, Finish, With client, Back from client. A refusal is private (it is between the
+// person and the rule); success is told to the whole space. Bounce never arrives here:
+// its button is OPEN_DIALOG.
 async function handleButtonPress(event: ChatEvent, actor: Actor, privateTo: string | null) {
   const press = parseButton(buttonParams(event));
-  // A button this door doesn't know is not an error to announce: Google
-  // gets a well-formed empty answer and the space stays quiet.
+  // An unknown button gets a well-formed empty answer and the space stays quiet.
   if (!press) return Response.json({});
   if (press.action === "bounce") return Response.json({});
 
@@ -584,30 +420,19 @@ async function handleButtonPress(event: ChatEvent, actor: Actor, privateTo: stri
   const result: WriteResult = acted.value;
   if (!result.ok) return card(result.error, privateTo);
 
-  // The confirmation is built from the trail as it now stands, so it
-  // names the leg it has moved to rather than the one it left. If that
-  // read fails the write still happened, and saying nothing would be
-  // worse than saying it plainly.
+  // Read after the write so the sentence names the leg moved to. If the read fails the
+  // write still happened, so say so plainly.
   const trail = await getTrailSummary(press.chainId);
   const sentence = trail ? confirmation(press.action, actor.firstName, trail) : doneText();
 
-  // The pressed card catches up with what just happened, and the space
-  // still hears the same sentence it always did. The refresh is awaited
-  // so it lands before the answer, and its outcome never touches the
-  // answer — a card left stale is yesterday's behaviour, not a failure.
+  // Awaited so it lands before the answer; its outcome never changes the answer.
   await refreshPressedCard(event, spaceName(event), actor, sentence);
 
   return card(sentence);
 }
 
-/**
- * The Bounce button, which opens a dialog rather than acting. From the
- * moment Google asks for one, every answer must BE a dialog (trap (f)),
- * so even a failed read is a one-paragraph notice card.
- *
- * Only legs the trail has already passed can be bounced to — a bounce
- * goes backwards — so the list is cut to those before the current one.
- */
+// Every answer to a dialog request must be a dialog (trap (f)), so even a failed read
+// is a notice card. A bounce goes backwards: only legs before the current one.
 async function handleBounceDialog(event: ChatEvent) {
   const press = parseButton(buttonParams(event));
   if (!press) return pushCard(noticeDialog(SOMETHING_WENT_WRONG));
@@ -627,12 +452,7 @@ async function handleBounceDialog(event: ChatEvent) {
   );
 }
 
-/**
- * The bounce dialog came back. The three checks the app makes before its
- * own round trip are made here too — a reason picked, a note that isn't
- * blank, a target the trail has passed — and the database refuses all
- * three again anyway (0036 §6).
- */
+// The same three checks as the app's form; the database refuses all three again (0036 §6).
 async function handleBounceSubmit(event: ChatEvent, actor: Actor, privateTo: string | null) {
   const press = parseButton(buttonParams(event));
   if (!press) return closeDialog(SOMETHING_WENT_WRONG, privateTo);
@@ -658,23 +478,14 @@ async function handleBounceSubmit(event: ChatEvent, actor: Actor, privateTo: str
     ? bouncedText(actor.firstName, trail, bounceReasonText(form.reason), form.note)
     : doneText();
 
-  // The same refresh as a direct button press, with one known gap: a
-  // dialog Save may not carry the court card's name at all, in which
-  // case the helper logs `message: null` and the card stays as it is.
+  // A dialog Save may carry no card name; then the refresh logs `message: null` and skips.
   await refreshPressedCard(event, spaceName(event), actor, sentence);
 
   return closeDialog(sentence);
 }
 
-/**
- * /newtrail — the picker. Like /link it needs "Opens a dialog" ticked on
- * the command in Google's console; without the tick the command arrives
- * as an ordinary one and a dialog answer goes nowhere, so the door says
- * exactly that instead of guessing.
- *
- * A linked space pre-selects its villa. A project-linked space
- * pre-selects nothing — a project is not a house to put a trail on.
- */
+// Needs "Opens a dialog" ticked in Google's console. A project-linked space pre-selects
+// nothing: a project is not a house to put a trail on.
 async function handleNewTrailCommand(event: ChatEvent, spaceId: string, privateTo: string | null) {
   if (dialogEventType(event) !== "REQUEST_DIALOG") return card(newTrailNeedsDialog(), privateTo);
 
@@ -695,13 +506,8 @@ async function handleNewTrailCommand(event: ChatEvent, spaceId: string, privateT
   );
 }
 
-/**
- * The one-tap open: a trail type laid down with its usual people, as the
- * person, and the public sentence that follows. Its own function because
- * two roads out of page 1 end here — the founder's one tap, and a trail
- * type that turns out to have no steps to put anybody on, whose refusal
- * is the one this path already says in the app's own words.
- */
+// The one-tap open: a trail type with its usual people, as the person. Also the road for
+// a type with no steps, whose refusal is this path's own.
 async function openFromSetNow(
   actor: Actor,
   input: { unitId: string; setId: string; start: boolean },
@@ -719,20 +525,10 @@ async function openFromSetNow(
   return closeDialog(openedText(actor.firstName, trail));
 }
 
-/**
- * Page 2, built from scratch — the lists it needs are read every time,
- * because the door remembers nothing between pages. Two roads reach here:
- * page 1's Save, and a page-2 refusal that has to be shown ON page 2
- * rather than whispered as a toast while the dialog closes (the founder's
- * vet, 2026-09-03: a toast is not a warning). `error` and `values` are
- * what the second road adds — the sentence, and every box as the person
- * left it.
- *
- * Failure has two shapes worth telling apart. A read that didn't answer
- * is ours to apologise for; a trail type with no steps in it is the
- * one-tap path's own refusal, in the app's own words, so this says which
- * happened and lets the caller decide.
- */
+// Page 2 is rebuilt from scratch each time because the door remembers nothing between
+// pages. `error` and `values` re-show a page-2 refusal on the page itself (a toast is
+// not a warning). A read that failed is ours to apologise for; an empty type is the
+// one-tap path's refusal, so the caller is told which.
 type StepsPage =
   { ok: true; card: Record<string, unknown> } | { ok: false; reason: "read-failed" | "empty-set" };
 
@@ -758,11 +554,8 @@ async function buildStepsPage(input: {
     if (!list) return { ok: false, reason: "read-failed" };
     activities = list;
   } else {
-    // The type's steps, pre-filled the way the one-tap path would have
-    // filled them: the activity's usual person, and the days the type
-    // itself asks for. A blank person is a step nobody has ever carried
-    // — page 2 simply leaves that dropdown unchosen, which is the whole
-    // answer to the refusal the one-tap path would have given.
+    // Pre-filled as the one-tap path would: the activity's usual person and the type's
+    // days. A step nobody has carried leaves the person unchosen.
     const set = await readSetSteps(setId as string);
     if (!set) return { ok: false, reason: "read-failed" };
     steps = set.steps;
@@ -777,8 +570,7 @@ async function buildStepsPage(input: {
       people,
       activities,
       customSteps,
-      // What page 1 decided, carried on the Open button rather than kept
-      // anywhere: the door remembers nothing between the two pages.
+      // Page 1's answers ride on the Open button's own parameters.
       params: { unit: unitId, set: setId ?? CUSTOM_SET, start },
       submitUrl: chatAudience(),
       error,
@@ -787,35 +579,16 @@ async function buildStepsPage(input: {
   };
 }
 
-/**
- * The /newtrail dialog's FIRST page came back: one house, one trail type
- * (or "custom"), how many steps a custom trail should get, whether to
- * choose the people by hand, and whether to start the clock today.
- *
- * Two roads out. A standard type with its usual people is the one-tap
- * path the founder already has, and it opens the trail here and now —
- * nothing about it changed. Anything else needs to know more than page 1
- * asked, so the answer to this Save is page 2 rather than a trail: the
- * type's steps to put people on, or as many blank steps as page 1's
- * "Steps" dropdown asked for, to build one from scratch.
- *
- * Page 2's lists are read through relay-reads.ts, which holds the admin
- * client as every other read here does — the door itself stays
- * dispatch-only. They are cards being drawn, not writes: the same people
- * and activities the app's own form shows any signed-in person, and the
- * identity step has already proved this person holds /relay. The write
- * that follows is still made as them, through a minted session, like
- * every other write here.
- */
-
+// Page 1 of /newtrail. A standard type with its usual people opens here and now; anything
+// else answers with page 2. Page 2's lists come through relay-reads.ts (admin client): they
+// are cards being drawn, not writes, and identity already proved this person holds /relay.
+// The write that follows is made as them through a minted session.
 async function handleNewTrailSubmit(event: ChatEvent, actor: Actor, privateTo: string | null) {
   const page = parseNewTrailPage({
     unit: formValue(event, "unit"),
     set: formValue(event, "set"),
-    // Only a custom trail uses this; a trail type's own steps decide.
     steps: formValue(event, "steps"),
-    // Both switches send their value when on and nothing when off, so
-    // "absent" is a real answer here, not a missing one.
+    // A switch sends its value when on and nothing when off: "absent" is a real answer.
     pickPeople: formValue(event, "pick_people"),
     start: formValue(event, "start"),
   });
@@ -823,8 +596,6 @@ async function handleNewTrailSubmit(event: ChatEvent, actor: Actor, privateTo: s
 
   const setId = page.custom ? null : page.setId;
 
-  // The one-tap path, untouched: a standard type, its usual people, open
-  // it now.
   if (setId && !page.pickPeople) {
     return await openFromSetNow(
       actor,
@@ -833,9 +604,7 @@ async function handleNewTrailSubmit(event: ChatEvent, actor: Actor, privateTo: s
     );
   }
 
-  // From here on the answer is page 2. Everything it needs is a read, and
-  // any of them failing is a notice card in the dialog that is already
-  // open — never a message envelope, which a dialog would drop.
+  // Any failed read here is a notice card in the open dialog, never a message envelope.
   const built = await buildStepsPage({
     mode: page.custom ? "custom" : "set",
     unitId: page.unitId,
@@ -844,9 +613,7 @@ async function handleNewTrailSubmit(event: ChatEvent, actor: Actor, privateTo: s
     customSteps: page.steps,
   });
 
-  // A trail type with nothing in it has no steps to put people on, so
-  // page 2 would be an empty form with one button. The one-tap path says
-  // why in the app's own words — let it.
+  // A type with no steps would give an empty page 2; the one-tap path says why instead.
   if (!built.ok && built.reason === "empty-set") {
     return await openFromSetNow(
       actor,
@@ -859,22 +626,9 @@ async function handleNewTrailSubmit(event: ChatEvent, actor: Actor, privateTo: s
   return updateCard(built.card);
 }
 
-/**
- * Page 2 came back: the steps, who carries each and for how many days.
- *
- * Nothing about this trail was remembered by the door — the house, the
- * type (or "custom") and the start toggle all ride back on the Open
- * button's own parameters, and the steps are read out of the form by
- * number. The five refusals are the app's own, checked in trail-rules
- * and again by the database.
- *
- * Every one of those refusals keeps the dialog OPEN, with the sentence at
- * the top of the page and every box as it was left. The founder's vet
- * (2026-09-03) had one arrive as a `notification` toast on the closing
- * dialog: the dialog shut, nothing was said loudly enough to see, and no
- * trail appeared. A page-2 failure is now never a toast — only the
- * confirmation closes this dialog.
- */
+// Page 2. The door remembers nothing: house, type and start ride on the Open button's
+// parameters. Every refusal keeps the dialog OPEN with the sentence on the page, never a
+// toast; only the confirmation closes it.
 async function handleTrailStepsSubmit(event: ChatEvent, actor: Actor, privateTo: string | null) {
   const params = buttonParams(event);
   const mode = params.mode === "custom" ? "custom" : "set";
@@ -882,13 +636,10 @@ async function handleTrailStepsSubmit(event: ChatEvent, actor: Actor, privateTo:
   const set = params.set ?? "";
   const count = Number(params.count);
   const start = params.start === "on";
-  // Set mode carries the type's activities on the button, because page 2
-  // shows them as labels rather than dropdowns — there is nothing in the
-  // form to read them back from.
+  // Set mode shows activities as labels, so the button carries them.
   const activityIds = params.activities ? params.activities.split(",") : undefined;
 
-  // A button whose parameters didn't survive is not something to guess
-  // at: nothing is written, and the person is told privately.
+  // Parameters that didn't survive are not guessed at: nothing is written.
   if (!unitId || !set || !Number.isInteger(count) || count < 1) {
     return closeDialog(SOMETHING_WENT_WRONG, privateTo);
   }
@@ -900,8 +651,7 @@ async function handleTrailStepsSubmit(event: ChatEvent, actor: Actor, privateTo:
     values[`days_${step}`] = formValue(event, `days_${step}`);
   }
 
-  // Any refusal from here on is shown on this same page, rebuilt around
-  // it: the sentence first, then every box as the person left it.
+  // Rebuilds this page around the refusal, every box as the person left it.
   const again = async (error: string) => {
     const built = await buildStepsPage({
       mode,
@@ -923,8 +673,7 @@ async function handleTrailStepsSubmit(event: ChatEvent, actor: Actor, privateTo:
     openTrail(db, {
       unitId,
       setId: set === CUSTOM_SET ? null : set,
-      // A trail from a type is titled with the type's name, which
-      // openTrail fills in; only a custom trail has a title to carry.
+      // A type's trail takes the type's name; only a custom trail carries a title.
       title: mode === "custom" ? parsed.title : null,
       legs: parsed.legs,
       start,
@@ -937,26 +686,18 @@ async function handleTrailStepsSubmit(event: ChatEvent, actor: Actor, privateTo:
   const trail = chainId ? await getTrailSummary(chainId) : null;
   if (!trail) return closeDialog(doneText());
 
-  // A custom trail has no earlier trail of its kind to copy department
-  // tags from, so the confirmation says where to add them.
+  // A custom trail has no earlier one to copy department tags from.
   const opened = openedText(actor.firstName, trail);
   return closeDialog(mode === "custom" ? `${opened} ${customDepartmentsNote()}` : opened);
 }
 
-/**
- * The door itself, from the moment Google is proven. The route calls
- * this with the request it verified; the usage-test script calls it
- * with an event it built by hand.
- */
+// The door from the moment Google is proven; the usage-test script calls it with a hand-built event.
 export async function handleChatRequest(request: Request): Promise<Response> {
   try {
-    // Only now, with Google proven, is the body read at all.
     const event = (await request.json().catch(() => null)) as ChatEvent | null;
     if (!event) return card("I couldn't read that message. Please try again.");
 
-    // Optional belt-and-braces: when set, only listed spaces get answers.
-    // Unset means any space in the Workspace — the Chat app itself is
-    // already private to the Goodearth Workspace.
+    // Optional: when set, only listed spaces get answers.
     const chat = event.chat ?? {};
     const allowedSpaces = (process.env.GOOGLE_CHAT_ALLOWED_SPACES ?? "")
       .split(",")
@@ -964,12 +705,7 @@ export async function handleChatRequest(request: Request): Promise<Response> {
       .filter(Boolean);
     const spaceId = spaceName(event);
 
-    // One line per event for the Vercel log: which kind arrived, from
-    // which space, which command id if any, and which of the six
-    // identity decisions was reached — never the message text, and
-    // never the email. This is how "did Google dispatch the slash
-    // command, and did it know who sent it?" gets answered without
-    // guessing from what appears in chat.
+    // One log line per event; never the message text, never the email.
     const logEvent = (sender: string | null) =>
       console.log(
         "google-chat event",
@@ -989,13 +725,9 @@ export async function handleChatRequest(request: Request): Promise<Response> {
           commandId: chat.appCommandPayload?.appCommandMetadata?.appCommandId ?? null,
           commandType: chat.appCommandPayload?.appCommandMetadata?.appCommandType ?? null,
           slashCommandInMessage: chat.messagePayload?.message?.slashCommand?.commandId ?? null,
-          // Which step of a dialog this is, if any: the one fact that
-          // says whether "Opens a dialog" is ticked in Google's console.
+          // Says whether "Opens a dialog" is ticked in Google's console.
           dialog: dialogEventType(event),
-          // Whether the press carried the pressed card's own name — the
-          // handle a refresh needs. False on anything that isn't a
-          // button, and the one fact that says whether a dialog Save
-          // can refresh a card at all.
+          // Whether a refresh has the card's handle; false on anything but a button.
           messageName: messageName(event) !== null,
           sender,
         }),
@@ -1006,9 +738,7 @@ export async function handleChatRequest(request: Request): Promise<Response> {
       return card("This space isn't set up for Relay yet.");
     }
 
-    // Only a person's message, command or button press needs a person
-    // behind it. Joining and leaving a space are the space's business,
-    // not anybody's, so they never cost a lookup.
+    // Joining and leaving are the space's business, so they cost no lookup.
     const identity =
       chat.messagePayload || chat.appCommandPayload || chat.buttonClickedPayload
         ? await resolveIdentity(event)
@@ -1018,36 +748,26 @@ export async function handleChatRequest(request: Request): Promise<Response> {
     if (chat.addedToSpacePayload) return await handleJoin(event, spaceId);
 
     if (identity) {
-      // Anyone the toolbox can't act for is told so privately, in one
-      // of the five fixed sentences — never anything that says more
-      // about who does or doesn't have an account. Inside a dialog the
-      // refusal has to shut the dialog too, or it sits there open with
-      // nothing happening.
+      // Anyone the toolbox can't act for gets one of five fixed private sentences, never
+      // anything revealing who has an account. Inside a dialog the refusal shuts it too.
       const privateTo = senderName(event);
       if (identity.kind !== "ok") {
         const refusal = identityRefusal(identity.kind);
-        // A dialog request must be answered with a dialog, so the
-        // refusal becomes one; a dialog already open is shut instead.
+        // A dialog request must be answered with a dialog.
         if (dialogEventType(event) === "REQUEST_DIALOG") return pushCard(noticeDialog(refusal));
         return chat.buttonClickedPayload
           ? closeDialog(refusal, privateTo)
           : card(refusal, privateTo);
       }
 
-      // Who the door acts as, from here on. The email is the one Google
-      // vouched for and identity.ts matched an account to; act-as.ts
-      // checks the account it mints for is this same id before letting
-      // anything be written.
+      // The email is the one Google vouched for; act-as.ts checks the minted account has this id.
       const actor: Actor = {
         userId: identity.userId,
         email: identity.email,
         firstName: identity.firstName,
       };
 
-      // A card button — a row's Push/Finish/Bounce/client button, or a
-      // dialog's Save. Which of the four it is comes from the dialog
-      // step Google put on the event, and every one of them names its
-      // own action in the button's parameters.
+      // A card button or a dialog's Save; the button's parameters name its action.
       if (chat.buttonClickedPayload) {
         const step = dialogEventType(event);
         if (step === "SUBMIT_DIALOG") {
@@ -1060,26 +780,22 @@ export async function handleChatRequest(request: Request): Promise<Response> {
           if (action === "newtrail-open") {
             return await handleTrailStepsSubmit(event, actor, privateTo);
           }
-          // A Save this door doesn't recognise still has to shut the
-          // dialog, or it sits open with nothing happening.
+          // An unknown Save must still shut the dialog.
           return closeDialog();
         }
         if (step === "CANCEL_DIALOG") return closeDialog();
-        // Bounce is the only button declared OPEN_DIALOG, so this is it.
+        // Bounce is the only button declared OPEN_DIALOG.
         if (step === "REQUEST_DIALOG") return await handleBounceDialog(event);
         return await handleButtonPress(event, actor, privateTo);
       }
 
-      // A typed slash command arrives as an appCommandPayload; Google's
-      // older shape tags the message itself instead. Answer both the same.
+      // A slash command arrives as appCommandPayload; the older shape tags the message.
       const id = commandId(event);
       if (chat.appCommandPayload || id !== null) {
         const command = (id !== null && COMMANDS[id]) || "that command";
         if (id === LINK_COMMAND_ID) return await handleLinkCommand(event, spaceId, privateTo);
 
-        // /push, /bounce and /finish are the court card too: the same
-        // question ("which of these do you mean?"), answered by the
-        // buttons on its rows.
+        // /push, /bounce and /finish are the court card: its row buttons answer them.
         if (
           id === COURT_COMMAND_ID ||
           id === PUSH_COMMAND_ID ||
@@ -1093,15 +809,12 @@ export async function handleChatRequest(request: Request): Promise<Response> {
           return await handleNewTrailCommand(event, spaceId, privateTo);
         }
 
-        // Anything unrecognised keeps the Phase 3 greeting.
         return card(greeting(identity.firstName, command), privateTo);
       }
       return card(greeting(identity.firstName, null), privateTo);
     }
 
-    // Removal, and any interaction kind this phase doesn't know:
-    // acknowledge with an empty envelope so Google has a well-formed
-    // answer.
+    // Removal and unknown kinds: an empty envelope is a well-formed answer.
     return Response.json({});
   } catch (error) {
     console.error("google-chat handler failed", error);

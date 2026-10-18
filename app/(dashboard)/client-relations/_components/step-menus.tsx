@@ -17,14 +17,7 @@ import { useMemo, useState, type ReactNode } from "react";
 
 import { useBoard } from "./board-context";
 
-/**
- * The tracker's popovers, on the toolbox's DropdownMenu (Radix: focus,
- * Escape, arrow keys). Each takes its trigger — a pill — and says what was
- * picked; saving is the caller's.
- *
- * Inputs inside a menu stop their key presses reaching it, or Radix's
- * type-to-find would swallow the letters being typed.
- */
+/** The tracker's popovers on DropdownMenu. Inputs inside a menu stop their key presses reaching it, or Radix type-to-find swallows the letters. */
 
 export function MenuLabel({ children }: { children: ReactNode }) {
   return (
@@ -45,7 +38,6 @@ export function DueMenu({
 }: {
   value: string | null;
   onPick: (date: string | null) => void;
-  /** The trigger, a pill. */
   children: ReactNode;
 }) {
   const { today } = useBoard();
@@ -130,10 +122,7 @@ export function OwnerMenu({
   );
 }
 
-/**
- * A searchable list of plots, inside an open menu — the composer's plot
- * pill and an action's "Move to another plot". `general` offers "no plot".
- */
+/** `general` offers "no plot". */
 export function PlotList({
   onPick,
   general = true,

@@ -7,16 +7,9 @@ import { createClient } from "@/lib/supabase/server";
 import { isModelMeasure, type EstimateForModel, type WorkForModel } from "./model-takeoff";
 import { fail, GRANT } from "./shared";
 
-/**
- * Reads for importing a SketchUp takeoff (0118) and for the works list
- * SketchUp tags by. Both open with the grant check; every read checks its
- * error and lists read to completion (fetchAll). No embeds — names merge
- * through Maps, as everywhere in this tool.
- */
+/** Reads for importing a SketchUp takeoff (0118) and for the works list SketchUp tags by. */
 
-/** A work as the import and the works list see it: the Masters
- * vocabulary, its category and group, its rate-book unit and how the
- * model measures it. In the works list's order: category, then work. */
+/** A work as the import and works list see it, in the works list's order: category, then work. */
 export type WorkForModelRow = WorkForModel & {
   categoryCode: string;
   categoryName: string;
@@ -73,7 +66,6 @@ export async function listWorksForModel(): Promise<WorkForModelRow[]> {
     });
 }
 
-/** The villa — its name, for the preview and for SketchUp to remember. */
 export async function getVillaForModel(
   unitId: string,
 ): Promise<{ unitId: string; name: string } | null> {
@@ -88,11 +80,7 @@ export async function getVillaForModel(
   return data ? { unitId: data.id, name: data.name } : null;
 }
 
-/**
- * The villa's working estimate (0098) as the import sees it — which model
- * it was last measured from, and each line with its rows counted by
- * source. Null when the villa has none yet (Import starts a blank one).
- */
+/** The villa's working estimate (0098) as the import sees it: the model it was last measured from, and each line's rows counted by source. */
 export async function getWorkingEstimateForModel(unitId: string): Promise<EstimateForModel | null> {
   await requireTool(GRANT);
   const supabase = await createClient();

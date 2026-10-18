@@ -1,3 +1,4 @@
+import { unpricedNote } from "@/lib/client-relations/dues";
 import { Avatar } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { Figure, FigureBand, FigureBandCell } from "@/components/ui/figure";
@@ -21,15 +22,9 @@ import { ClientStageBadge } from "../_components/crm-badges";
 import { Composer } from "../_components/composer";
 import { LotCard } from "../_components/lot-card";
 import { NotYours } from "../_components/not-yours";
-import { Pill } from "../_components/pill";
+import { Pill } from "@/components/ui/pill";
 import { StepCard } from "../_components/step-card";
 
-/**
- * One person: who they are, their plots as lot cards, and every next step
- * on those plots (root plan.md, seventh piece). A plot's whole record —
- * deed, agreement, build, interiors, collections — is its own page, one tap
- * on its card away.
- */
 export default async function ClientDetailPage({
   params,
 }: {
@@ -48,8 +43,7 @@ export default async function ClientDetailPage({
   }
 
   const { client, engagements, totals } = detail;
-  // Only fetched when it can actually be used — the dialog is the whole
-  // reason this list exists.
+  // Fetched only when the dialog can use it.
   const assignable = engagements.length === 0 ? await listAssignableUnits() : [];
 
   const steps = engagements.flatMap((engagement) => engagement.steps);
@@ -94,8 +88,7 @@ export default async function ClientDetailPage({
               <ClientFormDialog client={client} owners={options.owners} />
             </div>
           </div>
-          {/* Saarang's imported clients carry a name and nothing else, so
-              blanks here are normal rather than a failed read. */}
+          {/* Imported clients carry a name and nothing else, so blanks are normal. */}
           <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-3 lg:grid-cols-6">
             {facts.map(([label, value]) => (
               <div key={label} className="min-w-0">
@@ -153,12 +146,15 @@ export default async function ClientDetailPage({
               </div>
             </Section>
 
-            {/* Every plot's dues in one line. Each plot's schedule is worked
-                out on its own ledger and only the answers are added — see
-                combineSummaries. */}
+            {/* Each plot's dues are worked out on its own ledger; only the answers are added (combineSummaries). */}
             <FigureBand>
               <FigureBandCell>
-                <Figure label="Scheduled" value={formatMoney(totals.scheduled)} size="sm" />
+                <Figure
+                  label="Scheduled"
+                  value={formatMoney(totals.scheduled)}
+                  hint={unpricedNote(totals.unpricedCount)}
+                  size="sm"
+                />
               </FigureBandCell>
               <FigureBandCell>
                 <Figure

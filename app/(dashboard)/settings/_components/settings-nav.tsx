@@ -1,6 +1,5 @@
 import { NavTabs } from "@/components/ui/tabs";
 
-/** The section nav Settings screens share — real routes, not panel state. */
 export function SettingsNav({ active }: { active: "people" | "roles" | "overview" | "teams" }) {
   return (
     <NavTabs

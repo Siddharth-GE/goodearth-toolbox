@@ -18,11 +18,7 @@ import { MoveBatonButtons } from "../_components/move-baton";
 import { RelayNav } from "../_components/relay-nav";
 import { StrandedPanel } from "../_components/stranded-panel";
 
-/**
- * Your court. Lives at /relay/court rather than at /relay because the
- * tool opens on Projects — a leader wants the project picture first, and
- * this page is the one you come to when a baton is in your hand.
- */
+/** Your court lives at /relay/court; the tool opens on Projects, since a leader wants the project picture first. */
 export default async function RelayCourtPage() {
   const user = await requireUser();
   const isAdmin = user.profile?.role === "admin";
@@ -31,8 +27,7 @@ export default async function RelayCourtPage() {
     listMyCourt(user.id),
     getRelayPulse(user.id),
     listPeople(),
-    // Only an admin can do anything about a stranded baton, so only an
-    // admin is shown one.
+    // Only an admin can act on a stranded baton, so only an admin sees one.
     isAdmin ? listStrandedTrails() : Promise.resolve([]),
   ]);
 
@@ -48,8 +43,6 @@ export default async function RelayCourtPage() {
         />
         <RelayNav active="court" />
 
-        {/* One band, not three stretched cards: these are three small
-            numbers that belong together, and read as a single glance. */}
         <FigureBand className="lg:grid-cols-3">
           <FigureBandCell>
             <Figure label="Live" value={pulse.live} size="lg" />

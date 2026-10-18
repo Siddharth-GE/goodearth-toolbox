@@ -2,11 +2,8 @@ import { getWelcomeCounts } from "@/lib/financial-management/queries";
 
 import { ToolWelcome } from "../_components/tool-welcome";
 
-// The welcome screen (founder, 2026-08-13: every Operations and
-// Management tool opens on one). No PageTitle here — the layout renders
-// the title and nav. The Cash dashboard lives one click in at
-// /financial-management/cash. Counts only, never rupees: this tool's
-// screens are all money, so the welcome is the one place showing none.
+// The welcome screen: counts only, never rupees. The Cash dashboard is one click in at
+// /financial-management/cash. The layout renders the title and nav.
 export default async function FinancialManagementPage() {
   const counts = await getWelcomeCounts();
 

@@ -3,17 +3,8 @@ import "server-only";
 import type { createClient } from "@/lib/supabase/server";
 import { sheetTotal } from "./calc";
 
-/**
- * Re-sum a line's measurement sheet (0096) and write the total onto the
- * line — the one place a sheet becomes a quantity, for a row typed on the
- * sheet (estimate-actions.ts) and for rows the model sent
- * (model-import-actions.ts) alike. The arithmetic is calc.ts's; SQL never
- * sums. With no rows left the line keeps its last quantity, typed from
- * then on (an import that empties a model-only line nulls it itself).
- *
- * Returns a message when the quantity could not be written, else
- * undefined. The caller has already checked the grant.
- */
+/** Re-sum a line's measurement sheet (0096) onto the line: the one place a sheet becomes a quantity (SQL never sums).
+ * With no rows left the line keeps its last quantity. Returns a message on failure; the caller has checked the grant. */
 export async function syncLineQty(
   supabase: Awaited<ReturnType<typeof createClient>>,
   lineId: string,

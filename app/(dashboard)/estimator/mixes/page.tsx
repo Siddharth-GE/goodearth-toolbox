@@ -82,8 +82,7 @@ export default async function MixesPage() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {/* The visible door in. The name link alone was missed by
-                        the first real user — "cant edit a mix" meant this. */}
+                    {/* A visible Edit button: the name link alone was missed. */}
                     <div className="flex justify-end">
                       <LinkButton href={`/estimator/mixes/${mix.id}`} variant="ghost" size="sm">
                         Edit

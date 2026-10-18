@@ -7,19 +7,15 @@ import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { formatQuantity } from "@/lib/format";
+import { parseNumber } from "@/lib/form-data";
+import { formatQuantity, todayInIndia } from "@/lib/format";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { recordStockAdjustment } from "@/lib/inventory/actions";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
 type ChosenItem = { id: string; name: string; code: string | null; thumb_url: string | null };
 
-/**
- * The only way a balance changes without a movement behind it, so the
- * reason is mandatory here and at the database. Opening stock is simply
- * a positive adjustment — that is the intended way to start a store off
- * with what is already sitting in it.
- */
 export function AdjustmentForm({
   stores,
   categories,
@@ -36,13 +32,12 @@ export function AdjustmentForm({
   const [direction, setDirection] = useState<"add" | "remove">("add");
   const [quantity, setQuantity] = useState("");
   const [reason, setReason] = useState("");
-  const [adjustedAt, setAdjustedAt] = useState(() => new Date().toISOString().slice(0, 10));
+  const [adjustedAt, setAdjustedAt] = useState(() => todayInIndia());
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [error, setError] = useState<string>();
   const [saved, setSaved] = useState<string>();
-  const [saving, startSaving] = useTransition();
+  const { pending: saving, error, run } = useActionRunner();
 
-  const amount = Number(quantity);
+  const amount = parseNumber(quantity) ?? 0;
   const ready =
     storeId !== "" && item != null && Number.isFinite(amount) && amount > 0 && reason.trim() !== "";
 
@@ -62,37 +57,33 @@ export function AdjustmentForm({
     return Promise.resolve(undefined);
   };
 
-  const submit = () =>
-    startSaving(async () => {
-      if (!item) return;
-      setError(undefined);
-      setSaved(undefined);
-      const result = await recordStockAdjustment({
+  const submit = async () => {
+    if (!item) return;
+    setSaved(undefined);
+    const result = await run(() =>
+      recordStockAdjustment({
         storeId,
         itemId: item.id,
         quantity: direction === "add" ? amount : -amount,
         reason,
         adjustedAt: adjustedAt || null,
-      });
-      if (result?.error) {
-        setError(result.error);
-        return;
-      }
-      setSaved(
-        `${direction === "add" ? "Added" : "Removed"} ${formatQuantity(amount)} ${uom} of ${item.name}.`,
-      );
-      setItem(null);
-      setQuantity("");
-      setReason("");
-      router.refresh();
-    });
+      }),
+    );
+    if (result?.error) return;
+    setSaved(
+      `${direction === "add" ? "Added" : "Removed"} ${formatQuantity(amount)} ${uom} of ${item.name}.`,
+    );
+    setItem(null);
+    setQuantity("");
+    setReason("");
+    router.refresh();
+  };
 
   return (
     <section className="border-border bg-surface space-y-4 rounded-2xl border p-4">
       <h2 className="text-muted text-[11px] font-medium tracking-[0.14em] uppercase">
         Correct a count
       </h2>
-      {/* The founder's team asked what this section is for (2026-10-08). */}
       <p className="text-muted text-sm">
         For a store&apos;s count only, with the reason written down: opening stock, a box found
         (add), breakage or a recount (remove). A wrong delivery or issue is not fixed here — record

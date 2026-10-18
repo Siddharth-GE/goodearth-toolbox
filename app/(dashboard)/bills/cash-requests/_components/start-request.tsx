@@ -5,13 +5,13 @@ import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createCashRequest } from "@/lib/bills/payment-actions";
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { todayInIndia } from "@/lib/format";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 
-/** Start a cash request for the week a day falls in — this week by default. */
 export function StartRequest() {
-  const [day, setDay] = useState(() => new Date().toISOString().slice(0, 10));
-  const [error, setError] = useState<string>();
-  const [starting, startTransition] = useTransition();
+  const [day, setDay] = useState(() => todayInIndia());
+  const { pending: starting, error, run } = useActionRunner();
 
   return (
     <div className="flex flex-wrap items-end gap-2">
@@ -27,13 +27,8 @@ export function StartRequest() {
       </div>
       <Button
         disabled={starting || !day}
-        onClick={() =>
-          startTransition(async () => {
-            // A success lands on the new request; only a refusal comes back.
-            const result = await createCashRequest(day);
-            if (result?.error) setError(result.error);
-          })
-        }
+        // A success lands on the new request; only a refusal comes back.
+        onClick={() => run(() => createCashRequest(day))}
       >
         {starting ? "Starting…" : "Start a cash request"}
       </Button>

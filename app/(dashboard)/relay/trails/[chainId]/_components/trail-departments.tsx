@@ -5,19 +5,12 @@ import { Button } from "@/components/ui/button";
 import { FormMessage } from "@/components/ui/form-message";
 import { setTrailDepartments } from "@/lib/relay/actions";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useState } from "react";
 
 import { DepartmentPicker } from "../../../_components/department-picker";
 
-/**
- * Departments on an open trail: read-only chips until someone chooses to
- * change them, because most visits to this page are to move a baton, not
- * to re-tag it.
- *
- * Editable only while the trail is running. Once it is finished the
- * database refuses (0038 §3) — changing them then would silently rewrite
- * what every past report said.
- */
+/** Departments on an open trail: read-only chips until changed. Editable only while running; once finished the database refuses (0038 §3) so past reports don't change. */
 export function TrailDepartments({
   chainId,
   departments,
@@ -31,8 +24,7 @@ export function TrailDepartments({
 }) {
   const [editing, setEditing] = useState(false);
   const [ids, setIds] = useState(selected.map((d) => d.id));
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const { pending, error, run, clearError } = useActionRunner();
   const router = useRouter();
 
   if (!editing) {
@@ -76,17 +68,12 @@ export function TrailDepartments({
         <Button
           size="sm"
           disabled={pending}
-          onClick={() =>
-            startTransition(async () => {
-              const result = await setTrailDepartments(chainId, ids);
-              if (result?.error) {
-                setError(result.error);
-                return;
-              }
-              router.refresh();
-              setEditing(false);
-            })
-          }
+          onClick={async () => {
+            const result = await run(() => setTrailDepartments(chainId, ids));
+            if (result?.error) return;
+            router.refresh();
+            setEditing(false);
+          }}
         >
           {pending ? "Saving…" : "Save"}
         </Button>
@@ -95,7 +82,7 @@ export function TrailDepartments({
           size="sm"
           disabled={pending}
           onClick={() => {
-            setError(null);
+            clearError();
             setEditing(false);
           }}
         >

@@ -1,41 +1,23 @@
 /**
- * Brings Masters' Saarang register in line with the Saarang Tracker, once
- * — the founder, 2026-10-16: "saarang west is the project, add that … some
- * buyers cancel some new buyers have come add them to masters". Root
- * plan.md, seventh piece. Run it BEFORE scripts/import-saarang-tracker.ts,
- * which then finds every plot it names.
+ * Brings Masters' Saarang register in line with the Saarang Tracker, once. Run it BEFORE
+ * scripts/import-saarang-tracker.ts so every plot it names exists.
  *
  *   npx tsx scripts/update-saarang-register.ts --project <ref> --json data/saarang-tracker-<date>.json            # dry run
- *   npx tsx scripts/update-saarang-register.ts --project <ref> --json data/saarang-tracker-<date>.json --commit   # write
+ *   npx tsx scripts/update-saarang-register.ts --project <ref> --json data/saarang-tracker-<date>.json --commit
  *
- * WHAT IT DOES, in one transaction:
- *
- *   1. A pair the tracker sells as one deal ("Plot 33-34") while Masters
- *      holds two plots becomes ONE plot, the import-saarang precedent
- *      ("Plot 22 & 23", one villa): the first plot is renamed, the second
- *      plot, its villa and its empty Client Relations record are removed.
- *      Refused if the second has a buyer of its own or anything recorded
- *      against it — the foreign keys refuse, and the batch rolls back.
- *   2. A buyer Masters holds and the tracker does not is RELEASED — the
- *      villa goes back to available — and, holding no other villa, is
- *      marked lost with the reason (Client Relations keeps the history;
- *      its decision 1: one list with a lifecycle). Refused for a plot whose
- *      record holds money or signed papers from that buyer: settle those in
- *      Client Relations first.
- *   3. Saarang West's plots are added (the tracker's Phase 3): plot codes
- *      W1 … W29, combined pairs W21-22 and W23-24, names "Plot 1" …; one
- *      villa each, V1 …, its configuration in its name ("Villa 3 (1BHK
- *      Study)") because a unit's type is only villa/apartment/duplex.
- *      Adding a villa gives it its Client Relations record (0050's trigger).
- *   4. A buyer the tracker names and Masters does not is ASSIGNED — the
- *      client found by name (case, titles and "&" aside) or created —
- *      and the villa and plot marked sold, as every named buyer was by
- *      scripts/import-saarang.ts.
- *
- * Masters' own placeholder in Saarang West ("Unit 1", no villa) is left as
- * it is. Re-runnable: a second run finds nothing to change.
- *
- * Service-level access through the management API (scripts only).
+ * In one transaction:
+ *   1. A pair sold as one deal ("Plot 33-34") that Masters holds as two plots becomes ONE:
+ *      the first is renamed; the second, its villa and its empty Client Relations record go.
+ *      Refused (FKs roll back) if the second has a buyer or anything recorded.
+ *   2. A buyer Masters holds and the tracker does not is RELEASED: villa back to available,
+ *      buyer marked lost with the reason. Refused where the record holds money or signed
+ *      papers: settle those in Client Relations first.
+ *   3. Saarang West's plots are added (codes W1..W29, pairs W21-22 and W23-24), one villa
+ *      each with its configuration in the name, because a unit's type is only
+ *      villa/apartment/duplex. A new villa gets its record (0050's trigger).
+ *   4. A buyer the tracker names and Masters does not is ASSIGNED (client found by name or
+ *      created), and the villa and plot marked sold.
+ * Masters' placeholder in Saarang West ("Unit 1", no villa) is left alone. Re-runnable.
  */
 import { readFileSync } from "node:fs";
 
@@ -148,7 +130,6 @@ void (async () => {
       .map((deal) => ({ deal, plot: trackerPlot(deal.label) }))
       .filter((row): row is { deal: Deal; plot: TrackerPlot } => row.plot !== null);
 
-    // 1. Pairs sold as one.
     for (const { plot } of deals) {
       if (plot.project !== SAARANG || plot.numbers.length !== 2) continue;
       if (masters.has(key(SAARANG, plot.code))) continue;

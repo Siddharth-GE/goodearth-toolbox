@@ -3,15 +3,11 @@
 import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
 import { approveBudget, reopenBudget } from "@/lib/budgets/actions";
-import { useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 
 /**
- * Approve is disabled until every line has a cost, using the live count
- * from the grid rather than what was on screen at page load — someone who
- * has just finished the last line shouldn't have to reload to approve it.
- *
- * The check is enforced again in the action against the database, because
- * a disabled button is a courtesy, not a rule.
+ * Disabled until every line has a cost, from the grid's live count.
+ * The action re-checks against the database: a disabled button is a courtesy, not a rule.
  */
 export function ApproveButton({
   budgetId,
@@ -22,8 +18,7 @@ export function ApproveButton({
   pendingCount: number;
   lineCount: number;
 }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
   const blocked = lineCount === 0 || pendingCount > 0;
 
@@ -32,12 +27,7 @@ export function ApproveButton({
       <Button
         disabled={pending || blocked}
         title={blocked ? "Every line needs a cost first" : undefined}
-        onClick={() =>
-          startTransition(async () => {
-            const result = await approveBudget(budgetId);
-            if (result?.error) setError(result.error);
-          })
-        }
+        onClick={() => run(() => approveBudget(budgetId))}
       >
         {pending ? "Approving…" : "Approve budget"}
       </Button>
@@ -52,20 +42,14 @@ export function ApproveButton({
 }
 
 export function ReopenButton({ budgetId }: { budgetId: string }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
   return (
     <div className="space-y-1 text-right">
       <Button
         variant="secondary"
         disabled={pending}
-        onClick={() =>
-          startTransition(async () => {
-            const result = await reopenBudget(budgetId);
-            if (result?.error) setError(result.error);
-          })
-        }
+        onClick={() => run(() => reopenBudget(budgetId))}
       >
         {pending ? "Re-opening…" : "Re-open for edits"}
       </Button>

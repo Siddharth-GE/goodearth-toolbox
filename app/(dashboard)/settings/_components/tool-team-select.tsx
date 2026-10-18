@@ -3,15 +3,11 @@
 import { Select } from "@/components/ui/select";
 import type { ToolTeam } from "@/lib/nav/arrange";
 import { setToolTeam } from "@/lib/settings/teams-actions";
-import { useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useState } from "react";
 
 const OTHER = "";
 
-/**
- * The team one tool sits under, saved on change. Controlled, like
- * GrantCheckbox: it shows what the server confirmed, and moves back if
- * the save fails.
- */
 export function ToolTeamSelect({
   app,
   toolName,
@@ -23,9 +19,8 @@ export function ToolTeamSelect({
   teamId: string | null;
   teams: ToolTeam[];
 }) {
-  const [isPending, startTransition] = useTransition();
+  const { pending: isPending, error, run } = useActionRunner();
   const [value, setValue] = useState(teamId ?? OTHER);
-  const [error, setError] = useState<string>();
 
   return (
     <div className="flex w-full flex-col gap-1 sm:w-56">
@@ -34,18 +29,15 @@ export function ToolTeamSelect({
         value={value}
         disabled={isPending}
         className="h-10"
-        onChange={(event) => {
+        onChange={async (event) => {
           const next = event.target.value;
           const previous = value;
           setValue(next);
-          setError(undefined);
-          startTransition(async () => {
-            const result = await setToolTeam(app, next === OTHER ? null : next);
-            if (result?.error) {
-              setValue(previous);
-              setError(result.error);
-            }
-          });
+
+          const result = await run(() => setToolTeam(app, next === OTHER ? null : next));
+          if (result?.error) {
+            setValue(previous);
+          }
         }}
       >
         {teams.map((team) => (

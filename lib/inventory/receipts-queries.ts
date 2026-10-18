@@ -6,6 +6,7 @@ import { requireTool } from "@/lib/auth/access";
 import type { Filterable } from "@/lib/list-params";
 import { labelsById, profileNames } from "@/lib/masters/names";
 import { fetchAll } from "@/lib/supabase/fetch-all";
+import { assertRead } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
 
 import { batchLabel, lineAmount, sumAmounts, type Amount } from "./batches";
@@ -19,26 +20,16 @@ import {
   type ReceiptLineRate,
 } from "./queries";
 import { remainingToReceive } from "./stock";
+import { todayInIndia } from "@/lib/format";
 
-/**
- * Receiving reads — the POs goods can still arrive against, the receive
- * screen's pool, and the goods-receipt record. The boundaries that
- * shape everything here are documented in ./queries.ts.
- */
-
-/** Headline counts for the tool's welcome screen. A welcome screen never
- * shows rupees, so these are counts of movements, nothing else. */
+/** Counts of movements only: a welcome screen never shows rupees. */
 export async function getWelcomeCounts() {
   await requireTool("/inventory");
   const supabase = await createClient();
 
-  const startOfMonth = new Date();
-  startOfMonth.setDate(1);
-  startOfMonth.setHours(0, 0, 0, 0);
-  // received_at and issued_at are dates, not timestamps.
-  const since = startOfMonth.toISOString().slice(0, 10);
+  // received_at and issued_at are dates, not timestamps. This month starts on India's calendar.
+  const since = `${todayInIndia().slice(0, 8)}01`;
 
-  // Exact database counts, head-only — never rows.length.
   const [awaiting, received, issued] = await Promise.all([
     supabase.from("po_facts").select("id", { count: "exact", head: true }).eq("status", "issued"),
     supabase
@@ -51,16 +42,14 @@ export async function getWelcomeCounts() {
       .gte("issued_at", since),
   ]);
 
+  assertRead("inventory", "the welcome counts", awaiting.error ?? received.error ?? issued.error);
+
   return {
     awaitingDelivery: awaiting.count ?? 0,
     receivedThisMonth: received.count ?? 0,
     issuedThisMonth: issued.count ?? 0,
   };
 }
-
-/* ------------------------------------------------------------------ *
- * Receive — the purchase orders with goods still to come
- * ------------------------------------------------------------------ */
 
 export type ReceivablePoRow = {
   id: string;
@@ -71,7 +60,6 @@ export type ReceivablePoRow = {
   expected_by: string | null;
   issued_at: string | null;
   line_count: number;
-  /** Lines with nothing left to come, of line_count. */
   lines_complete: number;
 };
 
@@ -83,12 +71,7 @@ export type ReceivablePoPage = {
   pageSize: number;
 };
 
-/**
- * Issued purchase orders — the ones goods can still arrive against. A
- * PO leaves this list by completing itself (every line fully received,
- * migration 0023 §9), so an empty list genuinely means nothing is
- * outstanding.
- */
+/** Issued POs goods can still arrive against. A PO leaves by completing itself (0023), so empty means nothing outstanding. */
 export async function listReceivablePos({
   page = 1,
 }: { page?: number } = {}): Promise<ReceivablePoPage> {
@@ -108,15 +91,12 @@ export async function listReceivablePos({
     .order("id")
     .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
 
-  // A failed read is an error screen, never "Nothing is on its way".
   if (error) {
     console.error("listReceivablePos failed:", error);
     throw new Error("Could not read the purchase orders awaiting delivery.", { cause: error });
   }
 
-  // Every column of a view is typed nullable by the generator (a view
-  // carries no NOT NULL metadata), so the row shape is normalised once
-  // here rather than defended against at every use below.
+  // Views type every column nullable; normalise once here.
   const rows = data.map((row) => ({
     id: row.id ?? "",
     project_id: row.project_id ?? "",
@@ -179,7 +159,6 @@ export async function listReceivablePos({
   };
 }
 
-/** ordered/received per line, for a set of POs — the list's progress column. */
 async function receivedProgressForPos(
   supabase: Client,
   poIds: string[],
@@ -187,7 +166,7 @@ async function receivedProgressForPos(
   const byPo = new Map<string, { ordered: number; received: number }[]>();
   if (poIds.length === 0) return byPo;
 
-  // Completeness-critical: a missing line reads as "fully received".
+  // Completeness: a missing line reads as "fully received".
   const data = await fetchAll((from, to) =>
     supabase
       .from("po_line_facts")
@@ -196,7 +175,6 @@ async function receivedProgressForPos(
       .order("id")
       .range(from, to),
   );
-  // View columns are all typed nullable — normalise once (see above).
   const lines = data.map((line) => ({
     id: line.id ?? "",
     po_id: line.po_id ?? "",
@@ -216,7 +194,6 @@ async function receivedProgressForPos(
   return byPo;
 }
 
-/** How much has been received against each of these PO lines, ever. */
 async function receivedByPoLine(
   supabase: Client,
   poLineIds: string[],
@@ -239,7 +216,6 @@ async function receivedByPoLine(
 }
 
 export type ReceiveLine = {
-  /** purchase_order_lines.id — the anchor a receipt line carries. */
   po_line_id: string;
   item_id: string;
   item_name: string;
@@ -258,33 +234,26 @@ export type ReceivePool = {
   status: string;
   project_name: string;
   vendor_name: string;
-  /** The plot/unit the PO is scoped to — the "directly at site" option.
-   * Null for a general-scope PO, which the receive screen reads as
-   * "there is no site; this must go into a store." */
+  /** The plot/unit the PO is scoped to ("directly at site"); null for a general PO, which must go to a store. */
   site_label: string | null;
   lines: ReceiveLine[];
   stores: { id: string; name: string }[];
 };
 
-/**
- * Everything the receive screen needs for one PO: what was ordered,
- * what has already arrived, what is still to come, and where it can
- * be put. The pool-screen pattern from the PO tool's pull screen —
- * fully-received lines stay visible, disabled and labelled.
- */
+/** Everything the receive screen needs for one PO; fully-received lines stay visible, disabled and labelled. */
 export async function getReceivePool(poId: string): Promise<ReceivePool | null> {
   await requireTool("/inventory");
   const supabase = await createClient();
 
-  const { data: po } = await supabase
+  const { data: po, error: poError } = await supabase
     .from("po_facts")
     .select("id, project_id, plot_id, unit_id, vendor_id, reference, status")
     .eq("id", poId)
     .maybeSingle();
+  assertRead("inventory", "this order", poError);
   if (!po) return null;
 
-  // Completeness-critical: a truncated line list would read as a
-  // shorter order and let the rest of the delivery go unrecorded.
+  // Completeness: a truncated line list would let the rest of the delivery go unrecorded.
   const data = await fetchAll((from, to) =>
     supabase
       .from("po_line_facts")
@@ -293,7 +262,6 @@ export async function getReceivePool(poId: string): Promise<ReceivePool | null> 
       .order("id")
       .range(from, to),
   );
-  // View columns are all typed nullable — normalise once (see above).
   const lines = data.map((line) => ({
     id: line.id ?? "",
     item_id: line.item_id ?? "",
@@ -346,10 +314,6 @@ export async function getReceivePool(poId: string): Promise<ReceivePool | null> 
   };
 }
 
-/* ------------------------------------------------------------------ *
- * Goods receipts — the record of what arrived
- * ------------------------------------------------------------------ */
-
 export type ReceiptSummary = {
   id: string;
   reference: string;
@@ -373,9 +337,7 @@ export type ReceiptListFilters = {
   page?: number;
   projectId?: string;
   storeId?: string;
-  /** Delivery-note reference or challan number — already made safe by searchParam. */
   q?: string;
-  /** Received-on date range, YYYY-MM-DD, already checked by dateParam. */
   from?: string;
   to?: string;
 };
@@ -394,7 +356,6 @@ export async function listGoodsReceipts({
   const pageSize = INVENTORY_LIST_LIMIT;
   const currentPage = Math.max(1, page);
 
-  // Every filter in one place. received_at is a date, so `to` is plain lte.
   const filtered = <T extends Filterable<T>>(query: T): T => {
     let next = query;
     if (projectId) next = next.eq("project_id", projectId);
@@ -417,7 +378,6 @@ export async function listGoodsReceipts({
     .order("id")
     .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
 
-  // A failed read is an error screen, never an empty list.
   if (error) {
     console.error("listGoodsReceipts failed:", error);
     throw new Error("Could not read the deliveries.", { cause: error });
@@ -499,7 +459,6 @@ export type ReceiptLineRow = {
   recorded_by_name: string | null;
   /** "GRN/SAA/012-1" for a delivery into a store; a site delivery is no batch. */
   batch_label: string | null;
-  /** The indent and work the line was bought for, when it came from one. */
   bought_for: string | null;
   /** The rate this delivery carries (0108): the PO's, or the delivery bill's. */
   rate: ReceiptLineRate;
@@ -514,7 +473,6 @@ export type ReceiptDetail = {
   project_name: string;
   destination: string;
   to_site: boolean;
-  /** The work a to-site delivery serves (0081); null for stores and history. */
   work_name: string | null;
   work_category: string | null;
   challan_no: string | null;
@@ -526,11 +484,7 @@ export type ReceiptDetail = {
   totals: Amount;
 };
 
-/**
- * What each PO line was bought for: its indent's number and work, through
- * the money-free po_line_facts and the indent tables (open reads). A PO
- * line made without an indent has no entry.
- */
+/** What each PO line was bought for (its indent number and work), via money-free views. */
 async function boughtForByPoLine(
   supabase: Client,
   poLineIds: string[],
@@ -583,16 +537,17 @@ export const getGoodsReceipt = cache(async (receiptId: string): Promise<ReceiptD
   await requireTool("/inventory");
   const supabase = await createClient();
 
-  const { data: receipt } = await supabase
+  const { data: receipt, error: receiptError } = await supabase
     .from("goods_receipts")
     .select(
       "id, reference, po_id, project_id, store_id, to_site, plot_id, unit_id, work_item_id, challan_no, received_at, note, created_at, created_by, work_items(name, work_categories(name))",
     )
     .eq("id", receiptId)
     .maybeSingle();
+  assertRead("inventory", "this receipt", receiptError);
   if (!receipt) return null;
 
-  // The order the batch names count in (batchFactsById) — keep the two alike.
+  // Same order the batch names count in (batchFactsById).
   const lines = await fetchAll((from, to) =>
     supabase
       .from("goods_receipt_lines")

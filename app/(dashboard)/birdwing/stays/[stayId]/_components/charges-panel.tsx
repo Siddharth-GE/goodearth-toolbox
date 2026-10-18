@@ -22,19 +22,16 @@ import { addCharge, deleteCharge } from "@/lib/birdwing/actions";
 import { chargeAmount } from "@/lib/birdwing/money";
 import type { RateCardRow, StayCharge } from "@/lib/birdwing/queries";
 import { CHARGE_KINDS, KIND_LABELS } from "@/lib/birdwing/shared";
+import { parseNumber } from "@/lib/form-data";
 import { formatMoney, formatQuantity } from "@/lib/format";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { Trash2 } from "lucide-react";
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useState } from "react";
 
 const OTHER = "__other";
 
-/**
- * What the stay is charged — the lines the invoice prints. A head from
- * the rate card brings its rate, GST and SAC (copied onto the line, so a
- * rate changed next year leaves this one alone); "Something else" is
- * typed in full. Rates are before GST unless the box says otherwise — an
- * OTA's payout is usually GST-inclusive. An issued invoice freezes them.
- */
+/** A rate-card head brings its rate, GST and SAC, copied onto the line. Rates are before GST unless the box says
+ * otherwise (an OTA's payout is usually GST-inclusive). An issued invoice freezes them. */
 export function ChargesPanel({
   stayId,
   charges,
@@ -47,9 +44,7 @@ export function ChargesPanel({
   charges: StayCharge[];
   rateCard: RateCardRow[];
   editable: boolean;
-  /** The issued invoice's number, when that is what freezes them. */
   frozenBy: string | null;
-  /** Σ nights across the stay's rooms — the room line's natural quantity. */
   roomNights: number;
 }) {
   const [adding, setAdding] = useState(false);
@@ -113,8 +108,7 @@ export function ChargesPanel({
 }
 
 function ChargeRow({ charge, editable }: { charge: StayCharge; editable: boolean }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
   return (
     <TableRow>
       <TableCell>
@@ -139,12 +133,7 @@ function ChargeRow({ charge, editable }: { charge: StayCharge; editable: boolean
             tone="danger"
             size="sm"
             disabled={pending}
-            onClick={() =>
-              startTransition(async () => {
-                const result = await deleteCharge(charge.id);
-                if (result?.error) setError(result.error);
-              })
-            }
+            onClick={() => run(() => deleteCharge(charge.id))}
           >
             <Trash2 className="size-4" />
           </IconButton>
@@ -185,9 +174,9 @@ function AddChargeForm({
   );
 
   const preview = chargeAmount({
-    qty: Number(qty) || 0,
-    rate: Number(rate.replace(/[,₹\s]/g, "")) || 0,
-    gstPct: Number(picked ? picked.gstPct : gst) || 0,
+    qty: parseNumber(qty) || 0,
+    rate: parseNumber(rate) || 0,
+    gstPct: (picked ? picked.gstPct : parseNumber(gst)) || 0,
     rateIncludesGst: inclusive,
   });
 

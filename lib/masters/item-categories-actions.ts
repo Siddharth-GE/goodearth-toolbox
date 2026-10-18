@@ -1,5 +1,6 @@
 "use server";
 
+import { checked, rawText, text } from "@/lib/form-data";
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
@@ -12,8 +13,8 @@ export async function createItemCategory(
 ): Promise<ActionState> {
   await requireTool("/masters");
 
-  const name = String(formData.get("name") ?? "").trim();
-  const kind = String(formData.get("kind") ?? "");
+  const name = text(formData, "name");
+  const kind = rawText(formData, "kind");
   if (!name) return { error: "Enter a category name." };
   if (!isItemKind(kind)) return { error: "Choose catalogue or material." };
 
@@ -29,9 +30,7 @@ export async function createItemCategory(
   return undefined;
 }
 
-// Kind stays fixed on purpose: items already filed under this category
-// were picked with its kind in mind, and flipping it would relabel them
-// all at once. Rename or deactivate instead.
+// Kind stays fixed: items under this category were picked with its kind in mind. Rename or deactivate instead.
 export async function updateItemCategory(
   id: string,
   _state: ActionState,
@@ -39,8 +38,8 @@ export async function updateItemCategory(
 ): Promise<ActionState> {
   const user = await requireTool("/masters");
 
-  const name = String(formData.get("name") ?? "").trim();
-  const is_active = formData.get("is_active") === "1";
+  const name = text(formData, "name");
+  const is_active = checked(formData, "is_active", "1");
   if (!name) return { error: "Enter a category name." };
 
   const supabase = await createClient();

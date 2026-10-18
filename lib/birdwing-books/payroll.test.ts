@@ -1,8 +1,4 @@
-/**
- * The salary arithmetic — the laptop app's rule, pinned before anyone
- * leans on it (Sajna's rule: ₹15,000, ₹80/hr OT, ₹80 a room-day,
- * shift 08:30–17:30).
- */
+/** The salary arithmetic, pinned (Sajna's rule: ₹15,000, ₹80/hr OT, ₹80 a room-day, shift 08:30–17:30). */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

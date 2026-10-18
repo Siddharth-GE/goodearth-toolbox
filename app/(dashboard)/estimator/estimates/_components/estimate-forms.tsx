@@ -22,10 +22,10 @@ import {
   updateEstimate,
 } from "@/lib/estimator/estimate-actions";
 import type { EstimateDetail } from "@/lib/estimator/estimate-queries";
-import { useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useState } from "react";
 
-/** An estimate's name and note — a villa or project change would be a
- * different estimate, not an edited one. */
+/** An estimate's name and note; a villa or project change would be a different estimate. */
 export function EstimateFormDialog({
   estimate,
   trigger,
@@ -52,15 +52,9 @@ export function EstimateFormDialog({
   );
 }
 
-/** Something a villa's estimate can start from. */
 export type StartSource = { id: string; label: string };
 
-/**
- * Start a villa's working estimate (0098): blank, or from another
- * estimate. Every villa is different, so starting from another villa
- * brings its works as a head start and nothing else unless asked;
- * starting from this villa's own official estimate brings everything.
- */
+/** Start a villa's working estimate (0098), blank or from another. Another villa's brings its works only; this villa's own official brings everything. */
 export function StartVillaDialog({
   unitId,
   villaName,
@@ -70,9 +64,7 @@ export function StartVillaDialog({
 }: {
   unitId: string;
   villaName: string;
-  /** Other estimates to start from — this villa's official first. */
   sources: StartSource[];
-  /** Selected when the dialog opens: this villa's own official. */
   preferredSourceId?: string;
   trigger?: React.ReactNode;
 }) {
@@ -138,8 +130,7 @@ export function StartVillaDialog({
   );
 }
 
-/** Delete a draft — behind a confirm, since it takes its measurement
- * sheets and this villa's own rates with it. */
+/** Delete a draft, behind a confirm: it takes its measurement sheets and this villa's rates with it. */
 export function DeleteEstimateButton({
   estimateId,
   label = "Delete",
@@ -150,8 +141,7 @@ export function DeleteEstimateButton({
   description: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -170,15 +160,7 @@ export function DeleteEstimateButton({
           <DialogClose asChild>
             <Button variant="secondary">Keep it</Button>
           </DialogClose>
-          <Button
-            disabled={pending}
-            onClick={() =>
-              startTransition(async () => {
-                const result = await deleteEstimate(estimateId);
-                setError(result?.error);
-              })
-            }
-          >
+          <Button disabled={pending} onClick={() => run(() => deleteEstimate(estimateId))}>
             {pending ? "Deleting…" : label}
           </Button>
         </DialogFooter>

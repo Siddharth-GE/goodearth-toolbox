@@ -1,14 +1,7 @@
-/**
- * Form reading rules.
- *
- * Worth pinning because these helpers replace three identical private
- * copies and two near-identical parsers — the point of one home is that
- * every screen reads a blank, a space and a rupee sign the same way.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { optionalText, parseNumber, text } from "./form-data";
+import { checked, optionalText, parseNumber, rawText, text } from "./form-data";
 
 function form(fields: Record<string, string>): FormData {
   const data = new FormData();
@@ -40,4 +33,16 @@ test("parseNumber separates blank from zero and flags junk", () => {
   assert.equal(parseNumber("   "), null);
   assert.equal(parseNumber(null), null);
   assert.ok(Number.isNaN(parseNumber("twelve")));
+});
+
+test("rawText keeps the field exactly as sent", () => {
+  assert.equal(rawText(form({ id: " a b " }), "id"), " a b ");
+  assert.equal(rawText(form({}), "id"), "");
+});
+
+test("checked is true only for the value the checkbox sends", () => {
+  assert.equal(checked(form({ ok: "on" }), "ok"), true);
+  assert.equal(checked(form({ ok: "1" }), "ok"), false);
+  assert.equal(checked(form({ ok: "1" }), "ok", "1"), true);
+  assert.equal(checked(form({}), "ok"), false);
 });

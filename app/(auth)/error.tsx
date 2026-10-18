@@ -5,12 +5,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { TriangleAlert } from "lucide-react";
 import { useEffect } from "react";
 
-/**
- * The login shell's error boundary. The (dashboard) one can't serve this
- * route group, and a person who can't even reach the login form has no
- * sidebar to fall back on — so this offers the only action that makes
- * sense here: try again.
- */
+/** The login shell's error boundary: the (dashboard) one can't serve this group, and the only action is try again. */
 export default function AuthError({
   error,
   reset,

@@ -32,8 +32,8 @@ Every conversation starts the same way: the founder says **"read CLAUDE.md"**, a
 
 - A tool = `app/(dashboard)/<tool>/` (screens) + `lib/<tool>/` (`queries.ts` reads, `actions.ts` writes). `lib/masters/` uses `<entity>.ts` / `<entity>-actions.ts` pairs instead — sanctioned drift across its entities.
 - Every Operations and Management tool **opens on a welcome screen** (`_components/tool-welcome.tsx`): plain English, live counts, never rupees. The real first screen sits one click in, so actions must `revalidatePath("/<tool>", "layout")` — an exact-path call refreshes only the welcome and leaves the moved list stale.
-- Kiosk tools with their own auth live top-level. `app/marathon/` is the only one and **not the pattern to copy**.
 - New tool → register in `lib/tools.ts`, add its row to STATUS.md's contract table, and extend **both** `user_apps_app_known` and `role_apps_app_known` CHECKs in the same migration, or granting fails at the database. A stub ships by flipping `built: true` and replacing its `page.tsx`. A new tool sits under "Other" in the sidebar until the founder gives it a team in Settings → Teams.
+- **A comment says why in a line or two, never the story, the date or the incident**: history is git, incidents are BUGCATCHER. Delete what the code already says.
 
 ## Red lines — one-line form; `SECURITY.md` and `SHIPPING.md` carry the why
 
@@ -57,7 +57,7 @@ Every screen from `components/ui/*` (+ `components/masters/*`) — no one-off st
 
 ## Tests, CI and git
 
-Pure logic only (`npm test`) — no database, no browser. CI runs **prettier, lint, typecheck and test — all four report even when one fails — then build → check:actions only once they pass**; confirm with `gh run list` — a successful push is not a green build, and a green build is not a working feature (`BUGCATCHER.md`). Uploads to Supabase Storage take a `Blob`, never a raw `Buffer`. Smoke-test as the probe (single-grant) account before merging — an admin passes every check and never sees grant bugs; after any deploy changing server actions or policies, press one real write button on production. **Commit each working piece and push it; never leave work uncommitted.** Branch flow (`feature/<tool>` → `staging` → `master`), migration gates and deploy verification live in `SHIPPING.md`.
+Pure logic only (`npm test`) — no database, no browser. CI runs **prettier, lint, typecheck, test, `check:errors` (no unread `error`), `check:boundaries` (no tool imports another) and `check:selects` (select strings match the types) — each reports even when one fails — then build → check:actions only once they pass**, and against the database `db:check`, `db:check-views` and `db:check-policies`; confirm with `gh run list` — a successful push is not a green build, and a green build is not a working feature (`BUGCATCHER.md`). Uploads to Supabase Storage take a `Blob`, never a raw `Buffer`. Smoke-test as the probe (single-grant) account before merging — an admin passes every check and never sees grant bugs; after any deploy changing server actions or policies, press one real write button on production. **Commit each working piece and push it; never leave work uncommitted.** Branch flow (`feature/<tool>` → `staging` → `master`), migration gates and deploy verification live in `SHIPPING.md`.
 
 ## Working with the founder
 

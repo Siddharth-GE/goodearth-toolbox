@@ -1,13 +1,10 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import { assertRead, readFailed } from "@/lib/supabase/read-failed";
 import type { VendorRow } from "./vendors";
 
-// Money confinement: this module reads ONLY the money-free fact views
-// (po_facts, bill_facts) — never purchase_orders/bills base tables,
-// never po_billing_totals, never an amount column. A /masters-only
-// viewer sees this whole page; what a PO or bill is worth stays behind
-// the /purchase-orders and /bills grants.
+// Money confinement: reads only the money-free po_facts and bill_facts, never base tables or an amount column.
 
 export type VendorPoFact = {
   id: string;
@@ -40,20 +37,13 @@ export type VendorPaymentDetails = {
 
 export type VendorDetail = {
   vendor: VendorRow;
-  /** Who last edited the vendor, when updated_by is stamped. */
   updatedByName: string | null;
-  /**
-   * Bank details from the gated vendor_payment_details table (0089).
-   * RLS answers rows only to /masters, /purchase-orders and /bills —
-   * for anyone else this is null exactly like "no details entered", so
-   * the page must decide visibility from the grant, not from this.
-   */
+  /** RLS returns rows only to /masters, /purchase-orders and /bills; null otherwise looks like "no details entered", so decide visibility from the grant. */
   paymentDetails: VendorPaymentDetails | null;
   pos: VendorPoFact[];
   poTotal: number;
   bills: VendorBillFact[];
   billTotal: number;
-  /** project id → name, covering every row above. */
   projectNames: Map<string, string>;
 };
 
@@ -62,7 +52,12 @@ const RELATED_LIMIT = 50;
 export async function getVendorDetail(id: string): Promise<VendorDetail | null> {
   const supabase = await createClient();
 
-  const { data: vendor } = await supabase.from("vendors").select("*").eq("id", id).maybeSingle();
+  const { data: vendor, error: vendorError } = await supabase
+    .from("vendors")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (vendorError) readFailed("Masters", "this vendor", vendorError);
   if (!vendor) return null;
 
   const [poRes, billRes, projectRes, paymentRes] = await Promise.all([
@@ -89,16 +84,19 @@ export async function getVendorDetail(id: string): Promise<VendorDetail | null> 
       .eq("vendor_id", id)
       .maybeSingle(),
   ]);
-  if (paymentRes.error)
-    throw new Error(`vendor payment details read failed: ${paymentRes.error.message}`);
+  assertRead("Masters", "this vendor's purchase orders", poRes.error);
+  assertRead("Masters", "this vendor's bills", billRes.error);
+  assertRead("Masters", "the projects", projectRes.error);
+  assertRead("Masters", "this vendor's payment details", paymentRes.error);
 
   let updatedByName: string | null = null;
   if (vendor.updated_by) {
-    const { data: editor } = await supabase
+    const { data: editor, error: editorError } = await supabase
       .from("profiles")
       .select("full_name")
       .eq("id", vendor.updated_by)
       .maybeSingle();
+    if (editorError) readFailed("Masters", "who last edited this vendor", editorError);
     updatedByName = editor?.full_name ?? null;
   }
 

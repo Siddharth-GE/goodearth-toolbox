@@ -2,19 +2,11 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
+import { withRetry } from "@/lib/supabase/transient";
 
 /**
- * Putting one uploaded document into a private bucket, and proving it
- * landed whole — the steps every tool's upload repeats
- * (lib/design-management/files-actions.ts, lib/directory/actions.ts),
- * here for the tools that store a document as it came.
- *
- * Type and size are checked first. Storage is handed a BLOB, never a raw
- * Buffer (BUGCATCHER #1: under Next's patched fetch a Buffer is text-
- * decoded and stored as rubbish with the right content type). What landed
- * is read back and its size compared; a mismatch removes the object.
- *
- * Returns null on success, or the sentence to show.
+ * Puts one uploaded document into a private bucket and proves it landed whole.
+ * Storage gets a Blob, never a raw Buffer (BUGCATCHER #1). Returns null on success, or the sentence to show.
  */
 
 export const STORED_TYPES = ["application/pdf", "image/jpeg", "image/png"];
@@ -50,11 +42,20 @@ export async function storeUpload(
 
   const folder = path.slice(0, path.lastIndexOf("/"));
   const name = path.slice(path.lastIndexOf("/") + 1);
-  const { data: stored } = await supabase.storage.from(bucket).list(folder, { search: name });
+  const { data: stored, error: listError } = await withRetry(() =>
+    supabase.storage.from(bucket).list(folder, { search: name }),
+  );
   const storedSize = stored?.[0]?.metadata?.size as number | undefined;
-  if (storedSize !== undefined && storedSize !== bytes.length) {
-    await supabase.storage.from(bucket).remove([path]);
-    console.error(`storeUpload: stored ${storedSize} bytes of ${bytes.length} in ${bucket}`);
+  if (listError || (storedSize !== undefined && storedSize !== bytes.length)) {
+    // Unconfirmed is treated as broken: a truncated file must not stand.
+    const { error: removeError } = await supabase.storage.from(bucket).remove([path]);
+    if (removeError) console.error(`storeUpload: could not remove ${path}:`, removeError);
+    console.error(
+      listError
+        ? `storeUpload: could not confirm ${path} in ${bucket}:`
+        : `storeUpload: stored ${storedSize} bytes of ${bytes.length} in ${bucket}`,
+      listError ?? "",
+    );
     return "The file did not save correctly. Try again.";
   }
   return null;

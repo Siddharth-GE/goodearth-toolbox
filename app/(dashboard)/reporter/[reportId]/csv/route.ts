@@ -3,18 +3,9 @@ import { DATASETS } from "@/lib/reporter/datasets";
 import { getReport, runSpecForCsv } from "@/lib/reporter/queries";
 import { decodeSpecParam, parseReportSpec } from "@/lib/reporter/spec";
 
-/**
- * A saved report — or a starting point — as a spreadsheet.
- *
- * A `?spec=` overrides the stored spec, because the page allows the
- * same thing: you may reshape a saved report, look at it, and download
- * what you are looking at without having saved it. Without one, the
- * stored spec runs. Both paths end at the same parser.
- *
- * getReport() calls requireTool("/reporter") and returns null for
- * "no such report" and "not yours to see" alike, so an ungranted
- * request gets a 404, never a file.
- */
+// A `?spec=` overrides the stored spec (the page allows the same reshaping); both paths end at the
+// same parser. getReport() returns null for "no such report" and "not yours" alike, so an ungranted
+// request gets a 404, never a file.
 export async function GET(request: Request, { params }: { params: Promise<{ reportId: string }> }) {
   const { reportId } = await params;
   const report = await getReport(reportId);

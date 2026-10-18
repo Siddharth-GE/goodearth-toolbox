@@ -6,24 +6,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
+import type { ActionState } from "@/lib/action-state";
 import {
   approveItemRequest,
   mergeItemRequest,
   rejectItemRequest,
 } from "@/lib/masters/item-requests-actions";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { useDebouncedSearch } from "@/lib/hooks/use-debounced-search";
 import type { CatalogueSearchResult } from "@/lib/masters/catalogue";
 import { Search } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
-/**
- * Resolving a request.
- *
- * The catalogue search runs immediately, seeded with the requested name,
- * because with 2,600 items already loaded most "new" items are existing
- * items under a different name. Making the duplicate check the first
- * thing on screen is the difference between a catalogue and a junk drawer.
- */
+/** Catalogue search runs at once, seeded with the requested name: most "new" items are existing ones under another name. */
 export function ResolveRequest({
   requestId,
   provisionalItemId,
@@ -36,13 +31,9 @@ export function ResolveRequest({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState(requestedName);
   const [code, setCode] = useState("");
-  const [error, setError] = useState<string>();
-  const [saving, startSaving] = useTransition();
+  const { pending: saving, error, run: runAction, clearError } = useActionRunner();
 
-  // The shared hook, not this file's own copy — the hand-rolled version
-  // here had already drifted (it flashed "Nothing similar found" for
-  // 200ms before the first search returned, the exact symptom the hook's
-  // docstring warns about).
+  // Shared hook, not a local copy: it avoids a "Nothing similar found" flash before the first search returns.
   const { result, loading } = useDebouncedSearch<CatalogueSearchResult>({
     url: "/api/catalogue",
     params: { q: search },
@@ -50,18 +41,12 @@ export function ResolveRequest({
     initial: { items: [], total: 0, pageCount: 1 },
   });
 
-  const run = (work: () => Promise<{ error?: string } | undefined>) =>
-    startSaving(async () => {
-      const outcome = await work();
-      if (outcome?.error) {
-        setError(outcome.error);
-        return;
-      }
-      setOpen(false);
-    });
+  const run = async (work: () => Promise<ActionState>) => {
+    const outcome = await runAction(work);
+    if (!outcome?.error) setOpen(false);
+  };
 
-  // The provisional item is in the catalogue too, so it would otherwise
-  // appear as a candidate to merge itself into.
+  // Leave out the provisional item itself, or it appears as a candidate to merge into.
   const candidates = result.items.filter((item) => item.id !== provisionalItemId);
 
   return (
@@ -70,7 +55,7 @@ export function ResolveRequest({
       onOpenChange={(next) => {
         setOpen(next);
         if (next) setSearch(requestedName);
-        if (!next) setError(undefined);
+        if (!next) clearError();
       }}
     >
       <Button variant="secondary" onClick={() => setOpen(true)}>

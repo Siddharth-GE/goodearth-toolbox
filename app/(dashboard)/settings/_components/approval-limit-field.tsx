@@ -2,16 +2,12 @@
 
 import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
+import { parseNumber } from "@/lib/form-data";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
 import { setBillApprovalLimit } from "@/lib/settings/actions";
 import { useState } from "react";
 
-/**
- * The ceiling on a bill approver's authority, saved on blur like the
- * name field. Blank is unlimited — the state every approver was in
- * before limits existed, so clearing it restores the old behaviour
- * rather than reducing someone to nothing.
- */
+/** Saved on blur. Blank is unlimited, so clearing restores the old behaviour rather than reducing someone to nothing. */
 export function ApprovalLimitField({ userId, limit }: { userId: string; limit: number | null }) {
   const initial = limit === null ? "" : String(limit);
   const [value, setValue] = useState(initial);
@@ -19,9 +15,8 @@ export function ApprovalLimitField({ userId, limit }: { userId: string; limit: n
   const { flush, error, saved } = useSaveOnBlur<string>({
     initial,
     validate: (raw) => {
-      const text = raw.trim();
-      if (text === "") return undefined;
-      const parsed = Number(text.replace(/,/g, ""));
+      const parsed = parseNumber(raw);
+      if (parsed === null) return undefined;
       if (!Number.isFinite(parsed)) return "Enter an amount, or leave it blank for no limit.";
       if (parsed <= 0) return "Leave it blank for no limit — zero would approve nothing.";
       return undefined;

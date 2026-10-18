@@ -4,13 +4,8 @@ import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 
 /**
- * The works vocabulary the coming Estimator tool will price and schedule
- * (migration 0073): categories (FD — Foundation) hold optional groups
- * (FD.3 — Dry rubble footing) which hold work items (FD.4 — Excavation
- * for rubble foundation). Items without a group hang off the category
- * directly. This is a different vocabulary from construction_stages
- * (0053), which is what indents and construction budgets pick from —
- * the two coexist deliberately.
+ * Categories hold optional groups, which hold items; items without a group hang off the category.
+ * Not construction_stages (0053), which indents and budgets pick from.
  */
 export type WorkCategoryRow = {
   id: string;
@@ -39,8 +34,6 @@ export type WorkItemRow = {
   is_active: boolean;
 };
 
-// fetchAll for consistency with the other masters reads: every list
-// here promises completeness, so none of them get to silently cap.
 export async function listWorkCategories(): Promise<WorkCategoryRow[]> {
   const supabase = await createClient();
   const data = await fetchAll((from, to) =>
@@ -95,7 +88,6 @@ export type WorksTreeCategory = {
   groups: WorksTreeGroup[];
 };
 
-/** The whole vocabulary, shaped for the one Masters screen. */
 export async function getWorksTree(): Promise<WorksTreeCategory[]> {
   const [categories, groups, items] = await Promise.all([
     listWorkCategories(),

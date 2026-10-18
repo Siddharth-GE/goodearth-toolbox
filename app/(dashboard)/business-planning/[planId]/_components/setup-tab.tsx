@@ -18,19 +18,9 @@ import { useId, type ReactNode } from "react";
 import { MoneyField, MonthField, NumberField, PercentField, TextField } from "./fields";
 
 /**
- * Everything that belongs to the whole project rather than to one line:
- * the horizon, the money, the land deal, and the costs no single product
- * owns.
- *
- * Grouped by the question each answers, not by data type. The founder
- * does not think "these are the percentages" — they think "how is the
- * land being paid for".
- *
- * Most of it starts folded. Twenty-two fields set once a month should not
- * be the first thing the tab shows, and the ones that matter on a normal
- * visit — the horizon, the rate, the land deal — are the two sections
- * left open. Every folded section still reports its own total in its
- * header, so the money is visible without opening anything.
+ * Everything that belongs to the whole project, grouped by the question each answers. Most
+ * sections start folded (horizon, rate and land deal stay open) and each folded section shows
+ * its own total in its header.
  */
 export function SetupTab({
   inputs,
@@ -403,17 +393,11 @@ export function SetupTab({
   );
 }
 
-/** Replace one row of a list, leaving the rest alone. */
 function patch<T>(rows: T[], index: number, changes: Partial<T>): T[] {
   return rows.map((row, i) => (i === index ? { ...row, ...changes } : row));
 }
 
-/**
- * Whether an overhead is a cost of the PROJECT or of the COMPANY.
- *
- * Built as a field with a blank label so it sits on the same baseline as
- * the inputs beside it, the same trick the delete button uses.
- */
+/** Whether an overhead is a cost of the PROJECT or of the COMPANY. */
 function EndsWithSalesToggle({
   checked,
   label,
@@ -442,14 +426,7 @@ function EndsWithSalesToggle({
   );
 }
 
-/**
- * The rows of a repeatable cost list, with its Add button underneath.
- *
- * The button sits in the body rather than in the section header so that
- * adding a row is never possible while the section is folded — a new
- * empty row appearing somewhere you cannot see it is a small mystery
- * nobody needs.
- */
+/** The rows of a repeatable cost list. The Add button sits in the body so a row can't be added while the section is folded. */
 function List({
   empty,
   addLabel,
@@ -473,17 +450,9 @@ function List({
 }
 
 /**
- * One row of a repeatable list, on a track that matches how many fields
- * it actually has.
- *
- * `cols` is not decoration: a two-field selling-cost row used to lay out
- * on the same six-column grid as a six-field infrastructure row, leaving
- * two thirds of it empty.
- *
- * The delete button is built as a field with a blank label rather than
- * nudged down by a fixed margin. It lines up with the inputs because it
- * has the same structure they do, and it stays lined up if the label ever
- * changes size.
+ * One row of a repeatable list. `cols` matches the row's field count (a two-field row on a
+ * six-column grid sat two thirds empty). The delete button is a blank-label field so it stays
+ * aligned with the inputs.
  */
 function Row({
   children,

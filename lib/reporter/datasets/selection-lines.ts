@@ -1,10 +1,5 @@
-// ---------------------------------------------------------------------
-// selection_lines — what design has specified
-// ---------------------------------------------------------------------
-// Money-free: indicative_rate_snapshot exists on the table and is
-// DELIBERATELY not a field here — this dataset is about what was
-// specified, not what it costs; budget_report_lines carries the money.
-// The selections embed names the COMPOSITE FK (selection_id, unit_id).
+// Money-free: indicative_rate_snapshot is deliberately not a field. The selections embed names the
+// COMPOSITE FK (selection_id, unit_id).
 
 import type { DatasetDef } from "./types";
 

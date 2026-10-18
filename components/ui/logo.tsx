@@ -1,13 +1,7 @@
 import { cn } from "@/lib/utils";
 
-// The Kaadal 'K' mark, quoted from the brand's own artwork
-// (`kaadal-k-*.svg`: one drawing, many fills — the same paths Dexter's
-// link preview draws). Change the paths only from that artwork. Inline
-// SVG so it stays crisp at any size and needs no asset fetch. Brand
-// colours, not theme tokens: burgundy on the light theme and blush on the
-// dark — the brand's own pair — so the mark is always Kaadal's and never
-// just the text colour. The tab icon (`app/favicon.ico`) is the same pair
-// as a tile: blush K on burgundy.
+// The Kaadal 'K' mark from the brand artwork (`kaadal-k-*.svg`); change the paths only from that artwork.
+// Brand colours, not theme tokens: burgundy on light, blush on dark, so the mark is never just the text colour.
 const MARK_PATHS = [
   "M36.57 0.00L63.77 0.00C61.11 9.14 46.99 20.49 30.44 26.74C46.30 9.72 36.57 0.00 36.57 0.00",
   "M24.77 65.74L0.00 65.74C1.73 63.89 2.31 61.57 2.31 58.91L2.31 6.25C2.31 3.82 1.73 1.85 0.00 0.00L21.76 0.00L21.76 58.91C21.76 61.57 22.92 63.89 24.77 65.74",

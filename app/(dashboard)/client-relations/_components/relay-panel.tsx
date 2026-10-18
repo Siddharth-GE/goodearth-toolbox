@@ -8,20 +8,8 @@ import { formatCount, formatDate } from "@/lib/format";
 import { Route } from "lucide-react";
 
 /**
- * Design and site status, read-only, straight from Relay.
- *
- * The founder's instruction was that these come from Relay ONLY and are
- * never typed here. That decision has a visible cost and this component
- * is where it lands: on the day this shipped, 4 of Saarang's 43 villas
- * had any trail filed at all. So the empty state is not an afterthought —
- * it is what most plots will show, and it has to explain itself rather
- * than look like a page that failed to load.
- *
- * WHAT THIS DELIBERATELY DOES NOT SAY: "Foundation complete", or anything
- * else about a particular activity. `pusher_chain_state` exposes
- * is_finished for a WHOLE trail only; there is no per-activity completion
- * anywhere in Relay, and project_stages is per-project rather than
- * per-villa. Counting trails is the honest thing this data supports.
+ * Design and site status, read-only, from Relay only; never typed here. Most plots have no trail filed, so the empty state must explain itself.
+ * It never says "Foundation complete": pusher_chain_state exposes is_finished for a whole trail only, so counting trails is all it supports.
  */
 export function RelayPanel({ engagement }: { engagement: EngagementDetail }) {
   const { trails } = engagement;

@@ -8,14 +8,8 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { GRANT, TEXT_LIMIT } from "./shared";
 
-/**
- * The estimator's answer on an indent line outside the estimate (0113):
- * approve it, or refuse it with a reason the indent's approver reads.
- * Written through decide_indent_line() — Indents' table, the cross-tool
- * write SECURITY.md lists — which checks /estimator, that the indent is
- * waiting for approval, and that the line really is outside the estimate.
- * An answer can be changed while the indent waits.
- */
+/** The estimator's answer on an indent line outside the estimate (0113): approve, or refuse with a reason.
+ * Written through decide_indent_line() (Indents' table, a cross-tool write listed in SECURITY.md), which checks the grant and the line. */
 export async function decideIndentLine(input: {
   lineId: string;
   decision: "approved" | "refused";
@@ -33,8 +27,7 @@ export async function decideIndentLine(input: {
   }
 
   const supabase = await createClient();
-  // The cast papers over the typegen limitation every optional RPC
-  // argument meets (the create_indent precedent).
+  // The cast papers over the typegen limit on optional RPC arguments (the create_indent precedent).
   const { error } = await supabase.rpc("decide_indent_line", {
     p_line_id: input.lineId,
     p_decision: input.decision,

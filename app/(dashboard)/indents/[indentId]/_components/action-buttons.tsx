@@ -12,17 +12,13 @@ import {
 import { FormMessage } from "@/components/ui/form-message";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import type { ActionState } from "@/lib/action-state";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { approveIndent, deleteIndent, rejectIndent, submitIndent } from "@/lib/indents/actions";
 import { canDecide, canEditIndent, canSubmit, type IndentStatus } from "@/lib/indents/workflow";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
-/**
- * Everything that changes an indent's status, in one place.
- *
- * Which buttons appear comes from lib/indents/workflow.ts; every rule is
- * enforced again by indents_guard() in the database, so a hidden button
- * is a courtesy and the trigger is the actual boundary.
- */
+// Buttons come from lib/indents/workflow.ts; indents_guard() enforces every rule, so a hidden button is a courtesy.
 export function ActionButtons({
   indentId,
   status,
@@ -34,24 +30,19 @@ export function ActionButtons({
   status: IndentStatus;
   lineCount: number;
   decider: { isAdmin: boolean; isApprover: boolean };
-  /** Why Approve is locked (0113 — lines outside the estimate wait for
-   * the estimator), or null. Sending back stays open either way. */
+  /** Why Approve is locked (0113: lines outside the estimate wait for the estimator); Send back stays open. */
   approvalBlocker: string | null;
 }) {
-  const [pending, startTransition] = useTransition();
+  const { pending, error, run: runAction, clearError } = useActionRunner();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [note, setNote] = useState("");
-  const [error, setError] = useState<string>();
 
-  const run = (action: () => Promise<{ error?: string } | undefined>) =>
-    startTransition(async () => {
-      const result = await action();
-      if (result?.error) setError(result.error);
-      else setRejecting(false);
-    });
+  const run = async (action: () => Promise<ActionState>) => {
+    const result = await runAction(action);
+    if (!result?.error) setRejecting(false);
+  };
 
-  // ---- Submitted: the approver's decision ---------------------------
   if (canDecide(status, decider)) {
     return (
       <div className="space-y-1 text-right">
@@ -76,7 +67,7 @@ export function ActionButtons({
             setRejecting(open);
             if (open) {
               setNote("");
-              setError(undefined);
+              clearError();
             }
           }}
         >
@@ -117,7 +108,6 @@ export function ActionButtons({
     );
   }
 
-  // ---- Draft: the site team's own actions ---------------------------
   if (!canEditIndent(status)) return null;
 
   return (

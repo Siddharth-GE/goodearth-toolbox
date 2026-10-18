@@ -21,22 +21,16 @@ import {
   holdForClient,
   pushBaton,
 } from "@/lib/relay/actions";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { BOUNCE_REASONS } from "@/lib/relay/events";
 import { POINTS, previewPoints } from "@/lib/relay/points";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
 import { useCelebrate } from "./celebrate";
 
-/**
- * The three things a baton-holder can do, plus the admin rescue.
- *
- * Every one of these is refused at the database if the rules are not met
- * (migration 0036 §8) — this component only decides what to offer and
- * how to phrase it. When the guard does refuse, its message is shown
- * verbatim: it was written to be read.
- */
+/** Baton actions plus the admin rescue. The database refuses rule breaks (0036 §8); this only decides what to offer and shows the guard's message verbatim. */
 
 export type MoveTarget = {
   chainId: string;
@@ -45,9 +39,7 @@ export type MoveTarget = {
   legCount: number;
   daysInLeg: number;
   expectedDays: number;
-  /** Legs behind the baton, bounce-able. */
   bounceTargets: { legNo: number; label: string; assigneeName: string }[];
-  /** Who leg N+1 belongs to, for "the baton passes to …". */
   nextLegLabel: string | null;
   nextLegAssignee: string | null;
   nextLegDays: number | null;
@@ -130,17 +122,16 @@ function MoveDialog({
   target: MoveTarget;
   people: { id: string; name: string }[];
 }) {
-  const [error, setError] = useState<string | null>(null);
+  const { pending, error, run: runAction, clearError } = useActionRunner();
   const [note, setNote] = useState("");
   const [reason, setReason] = useState<string>("");
   const [toLeg, setToLeg] = useState<string>("");
   const [toUser, setToUser] = useState<string>("");
-  const [pending, startTransition] = useTransition();
   const celebrate = useCelebrate();
   const router = useRouter();
 
   const close = () => {
-    setError(null);
+    clearError();
     setNote("");
     setReason("");
     setToLeg("");
@@ -156,64 +147,46 @@ function MoveDialog({
     target.expectedDays,
   );
 
-  const run = () => {
-    setError(null);
-    startTransition(async () => {
-      let result;
-      if (mode === "push") {
-        result = await pushBaton(target.chainId, target.fromLeg, note);
-      } else if (mode === "finish") {
-        result = await finishTrail(target.chainId, target.fromLeg, note);
-      } else if (mode === "bounce") {
+  const run = async () => {
+    const result = await runAction(() => {
+      if (mode === "push") return pushBaton(target.chainId, target.fromLeg, note);
+      if (mode === "finish") return finishTrail(target.chainId, target.fromLeg, note);
+      if (mode === "bounce") {
         const back = Number(toLeg || target.bounceTargets.at(-1)?.legNo);
-        result = await bounceBaton(target.chainId, target.fromLeg, back, reason, note);
-      } else if (mode === "client") {
-        result = await holdForClient(target.chainId, target.fromLeg, note);
-      } else if (mode === "clientBack") {
-        result = await clientReturned(target.chainId, target.fromLeg, note);
-      } else {
-        result = await handBaton(target.chainId, toUser, note);
+        return bounceBaton(target.chainId, target.fromLeg, back, reason, note);
       }
-
-      if (result?.error) {
-        setError(result.error);
-        return;
-      }
-
-      // revalidatePath in the action marks the data stale, but the page
-      // the mover is standing on is rendered dynamically and its RSC
-      // payload is already in the router cache — without this the baton
-      // moves in the database and the screen keeps showing the old leg,
-      // which is the one thing this tool cannot afford to get wrong.
-      router.refresh();
-
-      if (mode === "finish") {
-        celebrate.banner("TRAIL COMPLETE");
-        celebrate.toast(`${target.trailName} is done.`);
-      } else if (mode === "push") {
-        celebrate.flow(
-          preview.onTime ? `+${POINTS.pushOnTime} FLOW · ON TIME` : `+${POINTS.pushLate} FLOW`,
-        );
-        celebrate.toast(
-          target.nextLegAssignee
-            ? `Baton passed to ${target.nextLegAssignee}.`
-            : "Baton pushed forward.",
-        );
-      } else if (mode === "bounce") {
-        celebrate.flow(`+${POINTS.bounce} FLOW · HONEST BOUNCE`);
-        celebrate.toast("Sent back, with your reason.");
-      } else if (mode === "client") {
-        // No flow points either way: neither sending work to a client nor
-        // getting it back is an achievement, and scoring it would invite
-        // people to score it.
-        celebrate.toast("Marked as with the client.");
-      } else if (mode === "clientBack") {
-        celebrate.toast("Back with us.");
-      } else {
-        celebrate.toast("Baton handed over.");
-      }
-      close();
+      if (mode === "client") return holdForClient(target.chainId, target.fromLeg, note);
+      if (mode === "clientBack") return clientReturned(target.chainId, target.fromLeg, note);
+      return handBaton(target.chainId, toUser, note);
     });
+    if (result?.error) return;
+    // revalidatePath marks data stale, but the page being stood on has its RSC payload in the router cache; without this the screen keeps the old leg.
+    router.refresh();
+
+    if (mode === "finish") {
+      celebrate.banner("TRAIL COMPLETE");
+      celebrate.toast(`${target.trailName} is done.`);
+    } else if (mode === "push") {
+      celebrate.flow(
+        preview.onTime ? `+${POINTS.pushOnTime} FLOW · ON TIME` : `+${POINTS.pushLate} FLOW`,
+      );
+      celebrate.toast(
+        target.nextLegAssignee
+          ? `Baton passed to ${target.nextLegAssignee}.`
+          : "Baton pushed forward.",
+      );
+    } else if (mode === "bounce") {
+      celebrate.flow(`+${POINTS.bounce} FLOW · HONEST BOUNCE`);
+      celebrate.toast("Sent back, with your reason.");
+    } else if (mode === "client") {
+      // No flow points either way: sending work to a client or getting it back is no achievement.
+      celebrate.toast("Marked as with the client.");
+    } else if (mode === "clientBack") {
+      celebrate.toast("Back with us.");
+    } else {
+      celebrate.toast("Baton handed over.");
+    }
+    close();
   };
 
   const titles: Record<Mode, string> = {

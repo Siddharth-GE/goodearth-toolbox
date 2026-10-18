@@ -9,16 +9,8 @@ const GROUP_LABEL = {
   plot: "Plots",
 } as const;
 
-/**
- * "Show me one place" — a plain select that navigates, so the choice
- * lives in the URL and the page stays a Server Component. A Server
- * Component cannot hand a function to a Client Component (the hotfix
- * lesson from 2026-08-01), so the base path comes in as a string and
- * the href is built here.
- *
- * `search` is the list's search text, carried through so changing the
- * place never throws the search away.
- */
+// A plain select that navigates, so the choice lives in the URL. The base path comes in as a string:
+// a Server Component cannot hand a function to a Client Component.
 export function LocationFilter({
   locations,
   selected,
@@ -26,7 +18,6 @@ export function LocationFilter({
   search,
 }: {
   locations: LocationOption[];
-  /** "kind:id", matching the option values below. */
   selected: string;
   basePath: string;
   search?: string;

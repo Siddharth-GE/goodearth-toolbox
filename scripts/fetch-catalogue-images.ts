@@ -1,38 +1,18 @@
 /**
- * Fetches catalogue pictures into Supabase Storage.
+ * Fetches catalogue pictures into Supabase Storage. Two re-runnable passes.
  *
- *   npx tsx scripts/fetch-catalogue-images.ts --project <ref>                      # dry run — writes NOTHING
- *   npx tsx scripts/fetch-catalogue-images.ts --project <ref> --commit             # actually writes
+ *   npx tsx scripts/fetch-catalogue-images.ts --project <ref>                      # dry run, writes NOTHING
+ *   npx tsx scripts/fetch-catalogue-images.ts --project <ref> --commit
  *   npx tsx scripts/fetch-catalogue-images.ts --project <ref> --commit --limit 10  # try a few first
  *
- * Two passes, each re-runnable:
+ * 1. FIND: an item with a `source_url` and no picture gets the vendor's main product photo
+ *    as `image_url` (Shopify `/products/<handle>.js`, else the page's `og:image`).
+ *    Collection pages are skipped: their picture is a banner.
+ * 2. THUMB: items with `image_url` but no `thumb_url` get a small WebP in the `catalogue`
+ *    bucket, URL written to `items.thumb_url`. The grid loads one per tile, so it must be ours.
  *
- * 1. FIND. An item with a product link (`source_url`) and no picture at
- *    all gets the vendor's main product photo as its `image_url`. Most
- *    vendors are Shopify stores, whose `/products/<handle>.js` answers
- *    with ~6 KB of JSON naming the photo — the page itself is ~3 MB.
- *    Anything else is read from the page's `og:image`. A collection page
- *    is skipped: its picture is a banner, not the product. Added
- *    2026-09-26, when 1,251 Whispering Homes items had a link and nothing
- *    to look at (import-catalogue-sheet.ts brought the links).
- *
- * 2. THUMB. For every item that has an `image_url` but no `thumb_url`
- *    yet: download the picture, resize it to a small WebP, upload it to
- *    the `catalogue` bucket, and write the public URL back to
- *    `items.thumb_url`.
- *
- * Why thumbnails are stored but full images are not: the source URLs point at
- * other companies' Shopify CDNs. The grid loads a thumbnail for every tile —
- * 30 full images per page would be ~15 MB against ~150 KB of thumbs — so the
- * hot path must be small and must be ours (a vendor deleting a product can't
- * blank our catalogue). The full image stays a link, because it's opened
- * rarely and isn't worth ~360 MB of storage.
- *
- * Re-runnable on purpose: rows already done are skipped, so a run interrupted
- * by network failures is fixed by simply running it again. This is exactly
- * why it is a separate script from the importers — ~2,000 fetches against
- * other people's servers will produce timeouts and 404s, and that must never
- * be able to damage a clean data import.
+ * Separate from the importers so ~2,000 fetches against other people's servers (timeouts,
+ * 404s) can never damage a clean import. Done rows are skipped, so just run it again.
  */
 import { createClient } from "@supabase/supabase-js";
 import sharp from "sharp";
@@ -42,8 +22,7 @@ import { isCommit, requireProjectRef, serviceRoleKey } from "./supabase-manageme
 const BUCKET = "catalogue";
 const THUMB_PX = 300;
 const WEBP_QUALITY = 78;
-/** Fetches run in parallel; kept low deliberately — these are other
- *  companies' servers, not ours, and there is no hurry. */
+// Kept low on purpose: these are other companies' servers.
 const CONCURRENCY = 6;
 const FETCH_TIMEOUT_MS = 20_000;
 const BATCH_SIZE = 200;
@@ -53,11 +32,7 @@ const HEADERS = {
 
 type Client = ReturnType<typeof createClient<Database>>;
 
-/**
- * A polite GET: when a store answers 429 ("slow down") — Whispering Homes
- * did for ~60 of 1,339 lookups on 2026-09-26 — wait as long as it asks
- * (or a few seconds) and try again, twice at most.
- */
+// A polite GET: on 429, wait as long as the store asks (or a few seconds), retry twice at most.
 async function get(url: string): Promise<Response> {
   for (let attempt = 0; ; attempt++) {
     const response = await fetch(url, {
@@ -71,7 +46,6 @@ async function get(url: string): Promise<Response> {
   }
 }
 
-/** A collection or category page shows a banner, not the product. */
 function isProductPage(pageUrl: string): boolean {
   try {
     const path = new URL(pageUrl).pathname;
@@ -81,7 +55,6 @@ function isProductPage(pageUrl: string): boolean {
   }
 }
 
-/** The vendor's main photo for a product page. */
 async function findPicture(pageUrl: string): Promise<string> {
   const page = new URL(pageUrl);
   const handle = /\/products?\/([^/?#]+)/i.exec(page.pathname)?.[1];
@@ -113,8 +86,7 @@ async function findPicture(pageUrl: string): Promise<string> {
 }
 
 async function buildThumb(imageUrl: string): Promise<Buffer> {
-  // Shopify's CDN resizes on request: ask for 600px rather than pulling a
-  // 2 MB original to throw most of it away.
+  // Shopify's CDN resizes on request: ask for 600px, not the 2 MB original.
   const source = new URL(imageUrl);
   if (source.hostname === "cdn.shopify.com" || source.pathname.includes("/cdn/shop/")) {
     source.searchParams.set("width", "600");
@@ -139,13 +111,9 @@ async function count(
 
 type Failure = { code: string | null; reason: string };
 
-/**
- * Runs `work` over pending rows in batches until none are left, the limit
- * is reached, or a whole batch fails (the source is probably down — stop
- * rather than hammer it). Batches walk forward by id, so a failed row —
- * still pending — is passed once and not met again this run; a fresh run
- * retries it, which is what you want for a timeout.
- */
+// Runs `work` over pending rows in batches until none are left, the limit is
+// reached, or a whole batch fails (source probably down: stop, don't hammer).
+// Batches walk forward by id, so a failed row is not met again this run.
 async function drain<T extends { id: string; code: string | null }>(
   label: string,
   limit: number,
@@ -224,7 +192,6 @@ async function main() {
       : `\n=== DRY RUN against ${ref} — nothing will be written ===\n`,
   );
 
-  // --- What's outstanding -------------------------------------------------
   const toFind = await count(
     items()
       .select("id", { count: "exact", head: true })
@@ -270,7 +237,6 @@ async function main() {
     return;
   }
 
-  // --- 1. Find a picture for items that only have a link ------------------
   type LinkOnly = { id: string; code: string | null; source_url: string };
   const found = await drain<LinkOnly>(
     "finding photos",
@@ -300,7 +266,6 @@ async function main() {
   );
   report("Photos found from product links", found.succeeded, found.failures);
 
-  // --- 2. Thumbnails ---------------------------------------------------------
   type WithPicture = { id: string; code: string | null; image_url: string };
   const thumbs = await drain<WithPicture>(
     "thumbnails",

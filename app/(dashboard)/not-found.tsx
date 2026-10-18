@@ -2,15 +2,7 @@ import { LinkButton } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FileQuestion } from "lucide-react";
 
-/**
- * The dashboard's 404 — a selection, a budget, a revision diff. It CANNOT
- * serve /marathon (a route group boundary only covers its own group);
- * the kiosk has its own app/marathon/not-found.tsx.
- *
- * Deliberately says "or you don't have access to it": the most likely
- * reason a real staff member lands here is a link shared by a colleague
- * who holds a grant they don't.
- */
+/** The dashboard's 404. Says "or you don't have access": a shared link to a tool you lack is the likeliest cause. */
 export default function DashboardNotFound() {
   return (
     <EmptyState

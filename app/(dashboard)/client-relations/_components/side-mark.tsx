@@ -2,10 +2,6 @@ import { ACTION_TRACKS, optionFor, type ActionTrack } from "@/lib/client-relatio
 import { cn } from "@/lib/utils";
 import { HardHat, Sofa } from "lucide-react";
 
-/**
- * A plot's two sides, drawn the same way everywhere: a hard hat for
- * Construction, a sofa for Interior, and always the word beside it.
- */
 export function SideIcon({ track, className }: { track: ActionTrack; className?: string }) {
   const Icon = track === "kaadal" ? Sofa : HardHat;
   return <Icon aria-hidden="true" className={cn("size-3.5 shrink-0", className)} />;

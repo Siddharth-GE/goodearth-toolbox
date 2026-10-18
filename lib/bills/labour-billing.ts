@@ -1,21 +1,8 @@
-/**
- * "Send to Bill" (0106, plan.md B7) — the pure rules, no database.
- *
- * The billing team ticks labour entries the supervisors logged and sends
- * them to one bill. send_labour_logs_to_bill() holds the same rules and
- * makes the bill; this module says them first and shows the figure the
- * bill will carry:
- *
- *   * one kind: daily wages and piece-work go on separate bills;
- *   * one contractor, one project;
- *   * daily wages: heads × the day rate per trade, plus GST, to the paisa;
- *   * piece-work: each entry's quantity (a lump sum: 1) × its rate, plus
- *     GST, each to the paisa — against the contractor's approved work
- *     order, whose rate for that work is offered first, then the rate
- *     book's labour rate.
- */
+// Pure rules; send_labour_logs_to_bill() holds the same ones and makes the bill.
+// One kind, contractor and project per bill. Daily wages: heads × day rate per trade. Piece-work: quantity (lump sum: 1) × rate, from the approved work order first, then the rate book. GST on each, to the paisa.
 
 import type { DayRates } from "./lines";
+import { roundPaise } from "@/lib/line-money";
 
 export type LabourEntry = {
   id: string;
@@ -29,9 +16,6 @@ export type LabourEntry = {
   quantity: number | null;
 };
 
-const paisa = (value: number) => Math.round(value * 100) / 100;
-
-/** What stops these entries going on one bill, in words — or undefined. */
 export function entriesProblem(entries: LabourEntry[]): string | undefined {
   if (entries.length === 0) return "Tick the labour entries to bill.";
   const daily = entries.some((entry) => entry.kind === "nmr");
@@ -48,7 +32,6 @@ export function entriesProblem(entries: LabourEntry[]): string | undefined {
 
 export type Heads = { masons: number; helpers: number; others: number };
 
-/** The man-days by trade across the ticked daily-wage entries. */
 export function headsOf(entries: LabourEntry[]): Heads {
   return entries.reduce(
     (sum, entry) => ({
@@ -60,7 +43,6 @@ export function headsOf(entries: LabourEntry[]): Heads {
   );
 }
 
-/** Which trade lacks a day rate, in words — the function's own refusal, said first. */
 export function dayRatesProblem(heads: Heads, rates: DayRates): string | undefined {
   if (
     (heads.masons > 0 && rates.mason === null) ||
@@ -72,9 +54,8 @@ export function dayRatesProblem(heads: Heads, rates: DayRates): string | undefin
   return undefined;
 }
 
-/** A daily-wages bill's total, as the database works it out. */
 export function dailyWagesTotal(heads: Heads, rates: DayRates, gstPct: number): number {
-  return paisa(
+  return roundPaise(
     (heads.masons * (rates.mason ?? 0) +
       heads.helpers * (rates.helper ?? 0) +
       heads.others * (rates.other ?? 0)) *
@@ -82,16 +63,15 @@ export function dailyWagesTotal(heads: Heads, rates: DayRates, gstPct: number): 
   );
 }
 
-/** A piece-work bill's total, as the database works it out: each entry to the paisa. */
 export function pieceWorkTotal(
   entries: LabourEntry[],
   rates: Record<string, number | null>,
   gstPct: number,
 ): number {
-  return paisa(
+  return roundPaise(
     entries.reduce(
       (sum, entry) =>
-        sum + paisa((entry.quantity ?? 1) * (rates[entry.id] ?? 0) * (1 + gstPct / 100)),
+        sum + roundPaise((entry.quantity ?? 1) * (rates[entry.id] ?? 0) * (1 + gstPct / 100)),
       0,
     ),
   );
@@ -99,11 +79,7 @@ export function pieceWorkTotal(
 
 export type WorkOrderRate = { work_item_id: string | null; is_lump_sum: boolean; rate: number };
 
-/**
- * The rate offered for a piece-work entry: the work order's rate for that
- * work when it measures it, else the rate book's labour rate. A lump sum
- * is typed — its amount is the bill's, not a rate.
- */
+/** The work order's rate when it measures that work, else the rate book's; a lump sum is typed. */
 export function suggestedPieceRate(
   entry: LabourEntry,
   workOrderLines: WorkOrderRate[],
@@ -116,7 +92,6 @@ export function suggestedPieceRate(
   return onOrder?.rate ?? rateBook.get(entry.workItemId) ?? null;
 }
 
-/** The rates the function takes for a piece-work bill: per entry, with its GST. */
 export function pieceRatesPayload(
   rates: Record<string, number | null>,
   gstPct: number,
@@ -126,11 +101,7 @@ export function pieceRatesPayload(
   );
 }
 
-/**
- * One line for an entry on the billing screen: "2 masons, 3 helpers",
- * "2 cum", "Lump sum: porch plaster". Restated here rather than imported
- * from Supervisors — one tool never imports another's code (CLAUDE.md).
- */
+/** Restated here, not imported from Supervisors: one tool never imports another's code. */
 export function describeEntry(entry: {
   kind: LabourEntry["kind"];
   masons: number;

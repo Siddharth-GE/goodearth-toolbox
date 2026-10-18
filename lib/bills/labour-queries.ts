@@ -8,12 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { WorkOrderRate } from "./labour-billing";
 import { dayRatesFromLines, type DayRates } from "./lines";
 
-/**
- * Reads for Send to Bill (0106, plan.md B7). Bills reads the labour logs
- * it bills — 0104 widened their one SELECT policy to /supervisors or
- * /bills — and the rate book's labour rate through the gated
- * work_labour_rate_facts. Contract table: Bills → labour_logs.
- */
+// Bills reads labour_logs (0104 widened their one SELECT policy to /supervisors or /bills) and the rate book's rate through work_labour_rate_facts. Contract table: Bills → labour_logs.
 
 export type UnbilledEntry = {
   id: string;
@@ -44,7 +39,6 @@ export type UnbilledFilters = {
   to?: string;
 };
 
-/** Every labour entry not yet on a bill, oldest day first, filtered. */
 export async function listUnbilledLabour(filters: UnbilledFilters = {}): Promise<UnbilledEntry[]> {
   await requireTool("/bills");
   const supabase = await createClient();
@@ -111,15 +105,11 @@ export type BillableWorkOrder = {
 };
 
 export type LabourBillingOptions = {
-  /** Approved, switched-on work orders, with their works' rates. */
   workOrders: BillableWorkOrder[];
-  /** The rate book's labour rate per work. */
   rateBook: Record<string, number>;
-  /** Each contractor's day rates on their last daily-wages bill. */
   dayRates: Record<string, DayRates>;
 };
 
-/** What Send to Bill offers for the contractors on screen. */
 export async function getLabourBillingOptions(
   contractorIds: string[],
 ): Promise<LabourBillingOptions> {

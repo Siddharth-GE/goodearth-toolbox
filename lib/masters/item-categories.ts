@@ -12,8 +12,6 @@ export type ItemCategoryRow = {
   created_at: string;
 };
 
-// fetchAll for consistency with the other masters reads: every list
-// here promises completeness, so none of them get to silently cap.
 export async function listItemCategories(kind?: ItemKind): Promise<ItemCategoryRow[]> {
   const supabase = await createClient();
   const data = await fetchAll((from, to) => {

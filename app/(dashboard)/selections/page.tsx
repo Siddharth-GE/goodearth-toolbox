@@ -3,9 +3,6 @@ import { getWelcomeCounts } from "@/lib/selections/queries";
 
 import { ToolWelcome } from "../_components/tool-welcome";
 
-// The welcome screen (founder, 2026-08-13: every Operations and
-// Management tool opens on one). The units list lives one click in at
-// /selections/units.
 export default async function SelectionsPage() {
   const counts = await getWelcomeCounts();
 

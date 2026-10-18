@@ -2,20 +2,15 @@
 
 import { Button } from "@/components/ui/button";
 import { FormMessage } from "@/components/ui/form-message";
+import type { ActionState } from "@/lib/action-state";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { setActive, setAdmin } from "@/lib/settings/actions";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
 type Confirming = "admin" | "active" | null;
 
-/**
- * The two switches that change what a person IS rather than what they
- * can open. Both ask first, in the app's own inline style (the bills
- * delete pattern) rather than a browser dialog — consequential, and
- * neither should be a stray click.
- *
- * The database refuses the dangerous cases regardless (profiles_guard,
- * 0032); these just make the refusal arrive as a sentence.
- */
+/** Both ask first, inline, being consequential. The database refuses the dangerous cases regardless (profiles_guard, 0032);
+ * these make the refusal a sentence. */
 export function AccountSwitches({
   userId,
   isAdmin,
@@ -27,17 +22,12 @@ export function AccountSwitches({
   isActive: boolean;
   isSelf: boolean;
 }) {
-  const [pending, startTransition] = useTransition();
+  const { pending, error, run: runAction } = useActionRunner();
   const [confirming, setConfirming] = useState<Confirming>(null);
-  const [error, setError] = useState<string>();
 
-  const run = (fn: () => Promise<{ error?: string } | undefined>) => {
-    setError(undefined);
-    startTransition(async () => {
-      const result = await fn();
-      if (result?.error) setError(result.error);
-      setConfirming(null);
-    });
+  const run = async (fn: () => Promise<ActionState>) => {
+    await runAction(fn);
+    setConfirming(null);
   };
 
   if (isSelf) {

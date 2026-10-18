@@ -19,19 +19,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { saveReport } from "@/lib/reporter/actions";
 import { encodeSpec, type ReportSpec } from "@/lib/reporter/spec";
 
-/**
- * Save the report on screen under a name. Also the "Save a copy" path
- * for a starter or for someone else's report — both are one insert, so
- * they are one dialog with different words on the button.
- *
- * The spec travels as the same base64url the URL carries, and is
- * re-parsed server-side by the action. Nothing typed here reaches the
- * database as anything but a name and a description.
- *
- * Not RecordFormDialog: that one closes itself on success, and a
- * successful save here REDIRECTS into the new report instead, so the
- * dialog unmounts with the page and has nothing to close.
- */
+// Also the "Save a copy" path. Not RecordFormDialog: that closes itself on success, but a save here
+// REDIRECTS, so the dialog unmounts with the page. Nothing typed here reaches the database but a
+// name and a description; the spec is re-parsed server-side.
 export function SaveReportDialog({
   spec,
   trigger,
@@ -41,9 +31,7 @@ export function SaveReportDialog({
   variant = "primary",
 }: {
   spec: ReportSpec;
-  /** The button that opens it. */
   trigger: string;
-  /** The dialog's own heading. Defaults to the trigger's words. */
   title?: string;
   defaultName?: string;
   defaultDescription?: string;
@@ -60,8 +48,7 @@ export function SaveReportDialog({
         <DialogHeader>
           <DialogTitle>{title ?? trigger}</DialogTitle>
         </DialogHeader>
-        {/* Inside DialogContent, which Radix unmounts on close, so every
-            open starts with a clean form and no stale error. */}
+        {/* Inside DialogContent, which Radix unmounts on close: every open starts clean. */}
         <SaveReportForm
           spec={spec}
           defaultName={defaultName}

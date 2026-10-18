@@ -5,16 +5,8 @@ import type { SiteOption } from "@/lib/masters/site-options";
 import type { SelectHTMLAttributes } from "react";
 
 /**
- * The one "For" dropdown every form uses instead of separate plot and
- * unit selects (plot ↔ unit is 1:1 since migration 0029). Options come
- * from buildSiteOptions; the submitted value is "unit:<id>",
- * "plot:<id>" or "" — decodeSite turns it back into ids.
- *
- * Works controlled (value/onChange) or uncontrolled (name/defaultValue
- * inside a form dialog) — the extra props pass straight through to the
- * shared Select. showCodes appends each place's short code for the
- * screens where the choice enters a reference number (POs, Bills);
- * indents number without a scope, so they leave it off.
+ * The one "For" dropdown every form uses. Value is "unit:<id>", "plot:<id>" or ""; decodeSite turns it back into ids.
+ * showCodes appends each place's short code where the choice enters a reference number (POs, Bills); indents leave it off.
  */
 export function SitePicker({
   options,

@@ -1,9 +1,4 @@
-// ---------------------------------------------------------------------
-// units — what stands where
-// ---------------------------------------------------------------------
-// The one dataset that touches plots, and it does so by the book:
-// plots!units_plot_id_fkey, never a bare embed — units has had two FK
-// paths to plots since 0029.
+// The one dataset that touches plots, by `plots!units_plot_id_fkey` (two FK paths since 0029).
 
 import type { DatasetDef } from "./types";
 

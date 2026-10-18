@@ -12,14 +12,8 @@ import Link from "next/link";
 
 import { ClientFormDialog } from "../_components/client-form-dialog";
 import { ClientStageBadge } from "../_components/crm-badges";
-import { PersonName, Pill } from "../_components/pill";
+import { PersonName, Pill } from "@/components/ui/pill";
 
-/**
- * The people, as cards — a face, a name, their plots by number, who looks
- * after them and how many promises are open (root plan.md, seventh piece:
- * "edit the current tool to match the vibe"). Prospects and clients share
- * one list (Client Relations' decision 1).
- */
 export default async function ClientsPage({
   searchParams,
 }: {

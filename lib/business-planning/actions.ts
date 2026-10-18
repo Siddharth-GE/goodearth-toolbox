@@ -1,10 +1,8 @@
 "use server";
 
-// Type-only import, and deliberately NOT re-exported: a bare
-// `export type { ActionState }` in a "use server" file survives into the
-// compiled module's runtime export list, where the type doesn't exist —
-// every action in the chunk then dies at module load (the 2026-08-03
-// production outage). Import it from "@/lib/action-state" instead.
+// Not re-exported: `export type { ActionState }` in a "use server" file survives into the runtime
+// exports and every action dies at load (BUGCATCHER). Import it from "@/lib/action-state".
+import { text } from "@/lib/form-data";
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
@@ -23,17 +21,10 @@ import { runScenario } from "./model";
 const NAME_LIMIT = 120;
 
 /**
- * Publish (or withdraw) a plan's headline numbers as targets (0057).
- *
- * Called after every write that could change them — save, rename, a
- * project link set or cleared. The engine runs HERE, in Business
- * Planning's own action: Reporter reads the resulting plain numbers
- * from business_plan_target_facts and never imports the model. A plan
- * without a project has no targets row; clearing the link withdraws.
- *
- * Failures are logged, not surfaced: the plan itself saved fine, and
- * "your plan is saved but the reporting copy lagged" is not worth
- * blocking the editor over — the next save republishes.
+ * Publish (or withdraw) a plan's headline numbers as targets (0057). The engine runs here so
+ * Reporter reads plain numbers from business_plan_target_facts and never imports the model.
+ * No project link means no targets row. Failures are logged, not surfaced: the plan saved fine
+ * and the next save republishes.
  */
 async function syncPlanTargets(planId: string, userId: string): Promise<void> {
   const supabase = await createClient();
@@ -77,16 +68,12 @@ async function syncPlanTargets(planId: string, userId: string): Promise<void> {
   if (upsertError) console.error("syncPlanTargets publish failed:", upsertError);
 }
 
-/**
- * Create a plan, then open it. A new plan starts from
- * `defaultPlanInputs()` — assumptions only, no lines and no invented
- * figures; the fast path to a populated plan is Duplicate.
- */
+/** Create a plan from `defaultPlanInputs()`, then open it. */
 export async function createPlan(_state: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireTool("/business-planning");
 
-  const name = String(formData.get("name") ?? "").trim();
-  const location = String(formData.get("location") ?? "").trim();
+  const name = text(formData, "name");
+  const location = text(formData, "location");
   if (!name) return { error: "Give the plan a name." };
   if (name.length > NAME_LIMIT) return { error: `Keep the name under ${NAME_LIMIT} characters.` };
 
@@ -110,16 +97,11 @@ export async function createPlan(_state: ActionState, formData: FormData): Promi
   }
 
   revalidatePath("/business-planning", "layout");
-  // redirect() throws its own control-flow signal, so it must be outside
-  // any try/catch and after every write has been checked.
+  // redirect() throws, so it sits outside any try/catch, after every write is checked.
   redirect(`/business-planning/${data.id}`);
 }
 
-/**
- * Rename a plan, or move it. Separate from `savePlan` because the name
- * lives in its own column, not in the document, and because renaming is
- * a deliberate act rather than something a debounce should fire.
- */
+/** Rename a plan or move it to a project. The name lives in its own column, not the document. */
 export async function renamePlan(
   planId: string,
   _state: ActionState,
@@ -127,11 +109,10 @@ export async function renamePlan(
 ): Promise<ActionState> {
   const user = await requireTool("/business-planning");
 
-  const name = String(formData.get("name") ?? "").trim();
-  const location = String(formData.get("location") ?? "").trim();
-  // "" = no project = targets withdrawn. The value is a projects.id from
-  // a bounded picker; the FK refuses anything else.
-  const projectId = String(formData.get("project_id") ?? "").trim();
+  const name = text(formData, "name");
+  const location = text(formData, "location");
+  // "" = no project = targets withdrawn; the FK refuses anything but a projects.id.
+  const projectId = text(formData, "project_id");
   if (!name) return { error: "Give the plan a name." };
   if (name.length > NAME_LIMIT) return { error: `Keep the name under ${NAME_LIMIT} characters.` };
 
@@ -151,7 +132,6 @@ export async function renamePlan(
     return { error: "Could not rename the plan. Try again." };
   }
 
-  // The name and the link both live on the published targets row.
   await syncPlanTargets(planId, user.id);
 
   revalidatePath("/business-planning", "layout");
@@ -160,17 +140,9 @@ export async function renamePlan(
 }
 
 /**
- * Write the whole document.
- *
- * The whole document, every time, because that is what the editor holds
- * and what the engine reads — a partial write would let the saved plan
- * and the plan on screen disagree, which for a model is the one failure
- * that matters. It is a few kilobytes.
- *
- * `parsePlanInputs` runs on the way in as well as on the way out. The
- * client is the one sending this object and the database cannot check a
- * jsonb column, so this is the only place a malformed document can be
- * stopped.
+ * Write the whole document every time: a partial write could leave the saved plan and the one
+ * on screen disagreeing. `parsePlanInputs` runs on the way in too; it is the only place a
+ * malformed jsonb document can be stopped.
  */
 export async function savePlan(planId: string, inputs: PlanInputs): Promise<ActionState> {
   const user = await requireTool("/business-planning");
@@ -190,21 +162,15 @@ export async function savePlan(planId: string, inputs: PlanInputs): Promise<Acti
     return { error: "Could not save. Your changes are still on screen — try again." };
   }
 
-  // A linked plan's save republishes its targets, so Reporter's
-  // plan-vs-actual is never staler than the plan's last save.
+  // A linked plan's save republishes its targets.
   await syncPlanTargets(planId, user.id);
 
-  // Only the list page: revalidating this plan's own route mid-edit
-  // would re-render the editor underneath the person typing into it.
+  // Only the list page: revalidating this plan's route mid-edit would re-render the editor under the typist.
   revalidatePath("/business-planning", "layout");
   return undefined;
 }
 
-/**
- * Copy a plan. This is the real "quick plan" path — the founder's
- * workbook was reused by cloning the file, and this is that, without
- * the drift.
- */
+/** Copy a plan: the quick-plan path. */
 export async function duplicatePlan(planId: string): Promise<ActionState> {
   const user = await requireTool("/business-planning");
   const supabase = await createClient();
@@ -227,9 +193,7 @@ export async function duplicatePlan(planId: string): Promise<ActionState> {
       name: copyName,
       location: source.location,
       schema_version: PLAN_SCHEMA_VERSION,
-      // Fresh ids on every line and cost row — two plans sharing a line
-      // id only misbehaves once both are open, which is exactly when
-      // someone is comparing them.
+      // Fresh ids on every line and cost row so the two copies never share keys.
       inputs: cloneInputs(parsePlanInputs(source.inputs)),
       created_by: user.id,
       updated_by: user.id,
@@ -246,11 +210,7 @@ export async function duplicatePlan(planId: string): Promise<ActionState> {
   redirect(`/business-planning/${data.id}`);
 }
 
-/**
- * Throw a plan away. Deletable, unlike a budget: a plan is a sketch, and
- * a sketch you cannot throw away stops being a sketch. The audit trigger
- * keeps the before-image if anyone ever needs it back.
- */
+/** Throw a plan away. Deletable, unlike a budget; the audit trigger keeps the before-image. */
 export async function deletePlan(planId: string): Promise<ActionState> {
   await requireTool("/business-planning");
   const supabase = await createClient();

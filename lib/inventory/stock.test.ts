@@ -1,10 +1,5 @@
-/**
- * Stock is only ever computed, so this arithmetic is the tool's whole
- * claim to being right. The cases pinned here are the ones a
- * spreadsheet gets wrong: a transfer moving stock without creating or
- * destroying any, a negative adjustment, and the boundary where an
- * issue exactly empties a store.
- */
+// Stock is computed, never stored. Pinned: transfers neither create nor destroy stock, negative
+// adjustments, and an issue that exactly empties a store.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

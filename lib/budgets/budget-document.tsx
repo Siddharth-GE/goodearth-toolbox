@@ -6,16 +6,8 @@ import type { BudgetDetail, BudgetLineRow } from "./queries";
 import { lineAmount, lineCost } from "./math";
 
 /**
- * Document B — the internal budget sheet.
- *
- * INTERNAL ONLY. This is the one document in the system that shows cost
- * and margin side by side. It is marked as such on every page, because the
- * difference between this and the client quote is one careless email.
- *
- * The client quote (document C) is deliberately built from a different
- * data type in quote.ts — one with no cost or margin fields at all —
- * rather than from this same shape with columns hidden. Hidden columns can
- * be un-hidden by a mistake; absent fields cannot.
+ * INTERNAL ONLY: the one document showing cost and margin together, marked on every page.
+ * The client quote is built from a different type (quote.ts) with no cost or margin fields: absent fields can't be un-hidden.
  */
 
 const styles = StyleSheet.create({
@@ -104,7 +96,6 @@ const styles = StyleSheet.create({
   currencyNote: { fontSize: pdf.size.tiny, color: pdf.color.muted, marginBottom: 6 },
 });
 
-/** Cost and margin appear here and nowhere else in the system's output. */
 const columns: Column<BudgetLineRow>[] = [
   { header: "#", width: 0.4, render: (_row, index) => String(index + 1) },
   { header: "Code", width: 1.1, render: (row) => row.item_code ?? "—" },
@@ -135,9 +126,7 @@ const columns: Column<BudgetLineRow>[] = [
 
 export function BudgetDocument({ budget }: { budget: BudgetDetail }) {
   const isDraft = budget.status === "pricing";
-  // R-number = what was designed. Version = which pricing of it. Both are
-  // needed: re-opening an approved budget to fix a rate produces a second
-  // document against the same design.
+  // R-number = what was designed; Version = which pricing of it.
   const reference = `BUD/${budget.unit_name}/R${budget.revision_no}-V${budget.version}`
     .toUpperCase()
     .replace(/\s+/g, "");
@@ -146,8 +135,7 @@ export function BudgetDocument({ budget }: { budget: BudgetDetail }) {
     documentType: "BUDGET · INTERNAL",
     reference,
     footerLeft: `INTERNAL — not for client circulation · ${budget.unit_name} R${budget.revision_no}-v${budget.version}`,
-    // A budget still being priced is watermarked DRAFT: its totals are
-    // incomplete, and nobody should mistake it for a settled figure.
+    // A budget still being priced is watermarked DRAFT: its totals are incomplete.
     isDraft,
   };
 
@@ -234,8 +222,6 @@ export function BudgetDocument({ budget }: { budget: BudgetDetail }) {
         </View>
       </DocumentPage>
 
-      {/* One sheet per space, same as the design document, so the two can
-          be read side by side. */}
       {budget.spaces.map((space) => (
         <DocumentPage key={space.space_id} meta={meta}>
           <View style={styles.spaceHeading}>

@@ -38,8 +38,6 @@ const KIND_VARIANT: Record<MovementRow["kind"], "success" | "warning" | "info"> 
   adjustment: "info",
 };
 
-/** Why the number is what it is: every movement of one item at one
- * location, newest first, adding up to the figure shown above them. */
 export default async function ItemHistoryPage({
   params,
 }: {

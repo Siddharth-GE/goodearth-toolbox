@@ -14,14 +14,7 @@ import { formatAmount, formatDate, formatQuantity } from "@/lib/format";
 import type { WorkOrderDetail, WorkOrderLineRow } from "./work-order-queries";
 import { workOrderLineAmount } from "./work-orders";
 
-/**
- * The work order on paper (plan.md B6): the company's letterhead, the
- * number, the contractor and the villa, its works with quantities and
- * rates, the value, the terms, and signatures once it is approved. A
- * pending order prints with the DRAFT watermark — it is not yet an
- * order anyone may work against. Amounts in digits only (Helvetica has
- * no ₹ glyph), the currency said once.
- */
+// A pending order prints with the DRAFT watermark. Digits only: Helvetica has no ₹ glyph.
 
 const styles = StyleSheet.create({
   currencyNote: { fontSize: pdf.size.tiny, color: pdf.color.muted, marginBottom: 6 },

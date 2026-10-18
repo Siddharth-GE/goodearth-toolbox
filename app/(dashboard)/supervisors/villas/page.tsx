@@ -4,9 +4,7 @@ import { listVillas } from "@/lib/supervisors/queries";
 import { ChevronRight, HardHat } from "lucide-react";
 import Link from "next/link";
 
-// One tappable row per villa, grouped by project — the phone-first
-// picker every supervisor starts from (founder, 2026-08-20: no plot
-// assignment, everyone sees every villa).
+// One tappable row per villa, grouped by project: the phone-first picker. Everyone sees every villa.
 export default async function VillasPage() {
   const villas = await listVillas();
 

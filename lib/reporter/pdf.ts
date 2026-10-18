@@ -4,7 +4,7 @@ import { createElement, type ReactElement } from "react";
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 
 import { safeFilename } from "@/lib/csv";
-import { formatDate } from "@/lib/format";
+import { formatDate, todayInIndia } from "@/lib/format";
 
 import { DATASETS } from "./datasets";
 import { runSpec } from "./queries";
@@ -12,17 +12,9 @@ import { chartModelFor } from "./chart-model";
 import { ReportDocument } from "./report-document";
 import type { ReportSpec } from "./spec";
 
-/**
- * A run report as a PDF download — what both PDF routes return, so a
- * saved report and an unsaved one produce the same paper. Generated on
- * demand from the database, never stored, so a file cannot drift from
- * the record it represents; runSpec enforces the /reporter grant before
- * a single row is read.
- *
- * The PDF mirrors the SCREEN — detail cut to the spec's row limit with
- * an honest "first N of M" note; the CSV is the export that carries
- * every line. A grouped report prints all its groups.
- */
+// Generated on demand, never stored; runSpec enforces the /reporter grant before any row is read.
+// Mirrors the screen (detail cut to the row limit with a "first N of M" note); the CSV carries
+// every line.
 export async function reportPdfResponse(
   spec: ReportSpec,
   name: string,
@@ -39,10 +31,8 @@ export async function reportPdfResponse(
   const dataset = DATASETS[spec.dataset];
   const generatedOn = formatDate(new Date());
 
-  // createElement rather than JSX: callers are route.ts files, which do
-  // not compile JSX. The cast is the same documented bridge the
-  // Selections PDF route uses — renderToBuffer is typed for <Document>
-  // and cannot see through the wrapper component.
+  // createElement because route.ts files don't compile JSX; the cast bridges renderToBuffer's
+  // <Document> typing.
   const buffer = await renderToBuffer(
     createElement(ReportDocument, {
       name,
@@ -55,14 +45,13 @@ export async function reportPdfResponse(
     }) as ReactElement<DocumentProps>,
   );
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInIndia();
   const filename = `Goodearth-Report-${safeFilename(name)}-${today}.pdf`;
 
   return new Response(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="${filename}"`,
-      // A report is live data; never let a browser or CDN hold one.
       "Cache-Control": "no-store",
     },
   });

@@ -1,11 +1,3 @@
-/**
- * Formatting rules.
- *
- * Worth testing because these are the numbers people act on — a quantity
- * that reads differently on a screen and on the PDF generated from it is
- * how a client ends up querying an invoice, and a missing price that
- * renders as zero is how something gets given away.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -23,15 +15,13 @@ import {
 } from "./format";
 
 test("money groups in lakhs, not thousands", () => {
-  // Indian grouping: 12,34,567 — not 1,234,567. Getting this wrong makes
-  // every figure in the app read as a foreign document.
+  // Indian grouping: 12,34,567, not 1,234,567.
   assert.match(formatMoney(1234567), /12,34,567/);
   assert.match(formatMoney(1234567), /₹/);
 });
 
 test("missing money is a dash, never zero", () => {
-  // The failure this exists to prevent: an unpriced line reading as free
-  // on something a client sees.
+  // An unpriced line must not read as free.
   assert.equal(formatMoney(null), "—");
   assert.equal(formatMoney(undefined), "—");
   assert.equal(formatMoney(Number.NaN), "—");
@@ -40,8 +30,7 @@ test("missing money is a dash, never zero", () => {
 });
 
 test("print amounts carry no rupee symbol", () => {
-  // Helvetica, which react-pdf embeds, has no ₹ glyph — including one
-  // puts a blank box on every amount of every document we send.
+  // Helvetica in react-pdf has no ₹ glyph.
   assert.equal(formatAmount(1234567), "12,34,567");
   assert.ok(!formatAmount(1234567).includes("₹"));
   assert.equal(formatAmount(null), "—");
@@ -54,9 +43,6 @@ test("screen and print agree on the digits", () => {
 });
 
 test("quantities are grouped and drop trailing zeroes", () => {
-  // The bug this replaces: the PDF's own formatter returned "12345"
-  // ungrouped while the screen showed "12,345", and turned 2.125 into
-  // 2.13.
   assert.equal(formatQuantity(12345), "12,345");
   assert.equal(formatQuantity(2.125), "2.125");
   assert.equal(formatQuantity(2.5), "2.5");
@@ -70,8 +56,7 @@ test("percentages keep meaningful decimals and drop empty ones", () => {
 });
 
 test("dates are day-first and unambiguous", () => {
-  // "01 Aug 2026" rather than 1/8/2026, which reads as January 8th to
-  // half the world.
+  // Day-first with the month named: 1/8/2026 is ambiguous.
   const formatted = formatDate("2026-08-01T10:30:00Z");
   assert.match(formatted, /01/);
   assert.match(formatted, /Aug/);
@@ -81,8 +66,6 @@ test("dates are day-first and unambiguous", () => {
 });
 
 test("long dates spell out the weekday and month", () => {
-  // The Overview greeting — previously the one formatter with no caller
-  // and no test, while the page hand-rolled the identical thing.
   const formatted = formatLongDate("2026-08-01T10:30:00Z");
   assert.match(formatted, /Saturday/);
   assert.match(formatted, /August/);
@@ -102,15 +85,13 @@ test("counts group without a currency symbol", () => {
 });
 
 test("crore formatting picks the scale a plan is discussed at", () => {
-  // The three figures the founder reads off a business plan summary.
   assert.equal(formatCrore(266_596_000), "₹26.66 Cr");
   assert.equal(formatCrore(1_198_225_000), "₹119.82 Cr");
   assert.equal(formatCrore(59_118_147.73), "₹5.91 Cr");
 
   // Below a crore it steps down rather than rounding to ₹0.06 Cr.
   assert.equal(formatCrore(1_250_000), "₹12.5 L");
-  // And below a lakh it stops abbreviating, where one decimal of a lakh
-  // would swallow the number whole.
+  // Below a lakh it stops abbreviating.
   assert.equal(formatCrore(4_500), "₹4,500");
 
   // The sign goes before the symbol, the way a person writes it.

@@ -9,8 +9,7 @@ import type { ItemCategoryRow } from "@/lib/masters/item-categories";
 import { updateBrand } from "@/lib/masters/brands-actions";
 import { updateItemCategory } from "@/lib/masters/item-categories-actions";
 
-// Kind is shown but not editable — items already filed under a category
-// were picked with its kind in mind (see updateItemCategory).
+// Kind is not editable: items filed under a category were picked with its kind in mind.
 export function CategoryEditDialog({ category }: { category: ItemCategoryRow }) {
   return (
     <RecordFormDialog label="Category" isEdit action={updateItemCategory.bind(null, category.id)}>

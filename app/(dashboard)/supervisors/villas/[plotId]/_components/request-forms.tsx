@@ -10,17 +10,12 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { createIssueRequest, withdrawIssueRequest } from "@/lib/supervisors/actions";
 import type { EstimateQuickPick, WorkOption } from "@/lib/supervisors/queries";
-import { useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useState } from "react";
 
 type ChosenItem = { id: string; name: string; uom: string };
 
-/**
- * "Request an issue": pick the work, then the material — from the
- * official estimate's list for that work (the common case, one tap) or
- * from the whole catalogue when the site needs something the estimate
- * never named. The chosen item lives OUTSIDE the dialog content (Radix
- * unmounts it on close), so onOpen resets it.
- */
+/** "Request an issue": the work, then the material, from the estimate's list for it or the whole catalogue. The chosen item lives OUTSIDE the dialog content (Radix unmounts it on close), so onOpen resets it. */
 export function RequestIssueDialog({
   plotId,
   works,
@@ -32,7 +27,6 @@ export function RequestIssueDialog({
   plotId: string;
   works: WorkOption[];
   quickPicks: EstimateQuickPick[];
-  /** The villa has an official estimate, so anything outside it needs a reason. */
   hasEstimate: boolean;
   categories: { id: string; name: string }[];
   brands: { id: string; name: string }[];
@@ -179,8 +173,7 @@ export function RequestIssueDialog({
 }
 
 export function WithdrawRequestButton({ requestId }: { requestId: string }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
   return (
     <span className="inline-flex items-center gap-2">
@@ -190,12 +183,7 @@ export function WithdrawRequestButton({ requestId }: { requestId: string }) {
         variant="ghost"
         size="sm"
         disabled={pending}
-        onClick={() =>
-          startTransition(async () => {
-            const result = await withdrawIssueRequest(requestId);
-            setError(result?.error);
-          })
-        }
+        onClick={() => run(() => withdrawIssueRequest(requestId))}
       >
         Withdraw
       </Button>

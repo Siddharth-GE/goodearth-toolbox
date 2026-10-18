@@ -1,10 +1,6 @@
 import { ToolNav } from "@/components/ui/tool-nav";
 
-/**
- * Real routes with their own loading.tsx (the FmNav reasoning). Settings
- * is shown to admins only: every write there is admin-only (0115), and a
- * tab that only ever turns a person away is noise.
- */
+// Settings shows to admins only: every write there is admin-only (0115), so the tab would only turn others away.
 const TABS = [
   { key: "calendar", href: "/birdwing/calendar", label: "Calendar" },
   { key: "stays", href: "/birdwing/stays", label: "Stays" },

@@ -1,5 +1,6 @@
 "use server";
 
+import { parseNumber, rawText, text } from "@/lib/form-data";
 import { requireAdmin } from "@/lib/auth/access";
 import { requireUser } from "@/lib/auth/dal";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -8,31 +9,14 @@ import { GRANTABLE_TOOLS, SCOPED_TOOLS } from "@/lib/tools";
 import { revalidatePath } from "next/cache";
 import { blockedReason, validateInvite } from "./invite";
 
-/**
- * Same shape every other tool's actions return.
- *
- * These used to throw instead. A thrown Server Action escapes to the
- * error boundary rather than coming back to the caller, and the caller
- * here is a checkbox — so a failed permission change left the box
- * visually ticked while nothing had been granted. An admin would have
- * had no way to know, and the person they thought they'd given access to
- * would simply not have it.
- */
-// Type-only import, and deliberately NOT re-exported — see the note in
-// lib/budgets/actions.ts: a type re-export from a "use server" file can
-// survive into the compiled module's runtime export list and crash it.
+// Type-only import, not re-exported from a "use server" file (npm run check:actions).
 import type { ActionState } from "@/lib/action-state";
 
 function isGrantable(app: string) {
   return GRANTABLE_TOOLS.some((tool) => tool.href === app);
 }
 
-/**
- * The name attribution shows everywhere — avatars, hover tooltips, the
- * "approved by" lines. Set here by an admin because accounts are
- * created in the Supabase dashboard, which never asks for one; without
- * this every action a person takes renders as a quiet dash.
- */
+/** The attribution name shown everywhere; set here because accounts are made in the Supabase dashboard, which never asks for one. */
 export async function setFullName(userId: string, fullName: string): Promise<ActionState> {
   const user = await requireUser();
   await requireAdmin(user);
@@ -52,35 +36,15 @@ export async function setFullName(userId: string, fullName: string): Promise<Act
   return undefined;
 }
 
-/**
- * Creates a real account and hands back nothing — the admin already has
- * the starting password, because they chose it.
- *
- * THE ONE SANCTIONED SERVICE-ROLE CALL IN THE DASHBOARD. Creating an
- * auth user is not expressible through RLS: auth.users has no policy
- * path for the authenticated role at all, by Supabase's design. So this
- * action alone reaches for the admin client, and only for the auth-admin
- * API — never a table write, which would silently bypass every policy
- * this app relies on. It is admin-gated above and does nothing else.
- * (Everywhere else in the dashboard: the RLS-scoped client, always.)
- *
- * The profile row, with the name already on it, is created by the
- * handle_new_user trigger (0001) from user_metadata — so nobody starts
- * life as an unnamed dash on the documents they touch.
- *
- * A temp password rather than an emailed invite link: invite mail needs
- * SMTP configured on the project, and a mail failure would leave a
- * half-made account nobody can get into.
- */
+/** THE ONE SANCTIONED SERVICE-ROLE CALL IN THE DASHBOARD: auth.users has no RLS path, so only the auth-admin API is used
+ * (never a table write, which would bypass policy), behind the admin gate. A temp password, not an invite: no SMTP needed. */
 export async function inviteUser(_state: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireUser();
   await requireAdmin(user);
 
-  const fullName = String(formData.get("full_name") ?? "").trim();
-  const email = String(formData.get("email") ?? "")
-    .trim()
-    .toLowerCase();
-  const password = String(formData.get("password") ?? "");
+  const fullName = text(formData, "full_name");
+  const email = text(formData, "email").toLowerCase();
+  const password = rawText(formData, "password");
 
   const invalid = validateInvite({ fullName, email, password });
   if (invalid) return { error: invalid };
@@ -94,8 +58,7 @@ export async function inviteUser(_state: ActionState, formData: FormData): Promi
   });
 
   if (error) {
-    // Supabase says "already been registered" for a duplicate; say it
-    // in the founder's words rather than passing the raw message on.
+    // Supabase's duplicate message is replaced with a plain sentence.
     if (/already/i.test(error.message)) {
       return { error: "Someone already has an account with that email." };
     }
@@ -107,12 +70,8 @@ export async function inviteUser(_state: ActionState, formData: FormData): Promi
   return undefined;
 }
 
-/**
- * Switches an account off or back on. Never deletes: the auth user and
- * every "recorded by" line stay exactly as they were, and reactivating
- * is one click. profiles_guard() (0032) is the real boundary — the
- * checks here exist so the refusal reads like a sentence.
- */
+/** Switches an account off or on; never deletes, so every "recorded by" line stays. profiles_guard() (0032) is the real
+ * boundary; these checks make the refusal a sentence. */
 export async function setActive(userId: string, active: boolean): Promise<ActionState> {
   const user = await requireUser();
   await requireAdmin(user);
@@ -120,7 +79,7 @@ export async function setActive(userId: string, active: boolean): Promise<Action
   const supabase = await createClient();
 
   if (!active) {
-    const [{ data: target }, { count }] = await Promise.all([
+    const [{ data: target, error: targetError }, { count, error: countError }] = await Promise.all([
       supabase.from("profiles").select("role, is_active").eq("id", userId).maybeSingle(),
       supabase
         .from("profiles")
@@ -128,6 +87,10 @@ export async function setActive(userId: string, active: boolean): Promise<Action
         .eq("role", "admin")
         .eq("is_active", true),
     ]);
+    if (targetError || countError) {
+      console.error("setActive check failed:", targetError ?? countError);
+      return { error: "Could not check that account. Try again." };
+    }
     if (!target) return { error: "That person no longer exists." };
 
     const blocked = blockedReason({
@@ -150,15 +113,7 @@ export async function setActive(userId: string, active: boolean): Promise<Action
   return undefined;
 }
 
-/**
- * Makes someone an admin, or takes it away.
- *
- * This reverses the old "roles change in Studio only" stance, on the
- * founder's call. It is safe to hand over now because three things hold
- * it: profiles_guard() lets only an admin change a role, refuses to
- * remove the last active admin, and audit_profiles records every change
- * with who made it.
- */
+/** profiles_guard() lets only an admin change a role and refuses to remove the last active admin; audit_profiles records who. */
 export async function setAdmin(userId: string, isAdmin: boolean): Promise<ActionState> {
   const user = await requireUser();
   await requireAdmin(user);
@@ -166,7 +121,7 @@ export async function setAdmin(userId: string, isAdmin: boolean): Promise<Action
   const supabase = await createClient();
 
   if (!isAdmin) {
-    const [{ data: target }, { count }] = await Promise.all([
+    const [{ data: target, error: targetError }, { count, error: countError }] = await Promise.all([
       supabase.from("profiles").select("role, is_active").eq("id", userId).maybeSingle(),
       supabase
         .from("profiles")
@@ -174,6 +129,10 @@ export async function setAdmin(userId: string, isAdmin: boolean): Promise<Action
         .eq("role", "admin")
         .eq("is_active", true),
     ]);
+    if (targetError || countError) {
+      console.error("setAdmin check failed:", targetError ?? countError);
+      return { error: "Could not check that account. Try again." };
+    }
     if (!target) return { error: "That person no longer exists." };
 
     const blocked = blockedReason({
@@ -206,8 +165,7 @@ export async function grantApp(userId: string, app: string): Promise<ActionState
 
   const supabase = await createClient();
   const { error } = await supabase.from("user_apps").insert({ user_id: userId, app });
-  // Re-granting an app the user already has hits the primary key and is
-  // a harmless no-op from the admin's point of view.
+  // Re-granting hits the primary key: a harmless no-op.
   if (error && error.code !== "23505") {
     console.error("grantApp failed:", error);
     return { error: "Could not grant access. Try again." };
@@ -228,8 +186,7 @@ export async function revokeApp(userId: string, app: string): Promise<ActionStat
     return { error: "Could not revoke access. Try again." };
   }
 
-  // The lead tick goes with the tick it sits under, so it never comes back
-  // unseen with a later grant. (Without the grant it does nothing — 0122.)
+  // The lead tick goes with its grant, so it never returns unseen with a later grant (0122).
   const { error: leadError } = await supabase
     .from("tool_leads")
     .delete()
@@ -244,12 +201,8 @@ export async function revokeApp(userId: string, app: string): Promise<ActionStat
   return undefined;
 }
 
-/**
- * Team lead: sees everyone's work in a tool whose work is assigned
- * (lib/tools.ts `scoped`, 0122) — everyone else sees only their own.
- * The tick does nothing without the grant, so the person page offers it
- * only beside a grant they hold.
- */
+/** Team lead sees everyone's work in a scoped tool (0122), others only their own. Does nothing without the grant,
+ * so the person page offers it only beside one. */
 export async function setToolLead(
   userId: string,
   app: string,
@@ -264,7 +217,6 @@ export async function setToolLead(
   const supabase = await createClient();
   if (isLead) {
     const { error } = await supabase.from("tool_leads").insert({ user_id: userId, app });
-    // Ticking someone already a lead hits the primary key — a no-op.
     if (error && error.code !== "23505") {
       console.error("setToolLead failed:", error);
       return { error: "Could not make them team lead. Try again." };
@@ -285,10 +237,7 @@ export async function setToolLead(
   return undefined;
 }
 
-// The named indent-approver switch — same shape as a grant, backed by
-// indent_approvers (migration 0019) instead of user_apps. The DB-side
-// indents_guard trigger reads the same table, so ticking here is what
-// actually lets someone approve, not just what shows them the button.
+// The named indent-approver switch, backed by indent_approvers (0019), which indents_guard also reads: ticking is what lets someone approve.
 export async function setIndentApprover(userId: string, canApprove: boolean): Promise<ActionState> {
   const user = await requireUser();
   await requireAdmin(user);
@@ -298,8 +247,6 @@ export async function setIndentApprover(userId: string, canApprove: boolean): Pr
     const { error } = await supabase
       .from("indent_approvers")
       .insert({ user_id: userId, granted_by: user.id });
-    // Re-ticking someone already on the list hits the primary key and is
-    // a harmless no-op from the admin's point of view.
     if (error && error.code !== "23505") {
       console.error("setIndentApprover failed:", error);
       return { error: "Could not make this person an approver. Try again." };
@@ -316,27 +263,16 @@ export async function setIndentApprover(userId: string, canApprove: boolean): Pr
   return undefined;
 }
 
-/**
- * The ceiling on what a bill approver may approve (0033).
- *
- * Blank means unlimited, which is also what every approver had before
- * limits existed — so clearing the box restores exactly the old
- * behaviour rather than reducing someone to nothing. Zero is refused
- * for that reason: "0" reads as "no limit" to a human and would mean
- * "can approve nothing" to the database.
- */
+/** Ceiling on what a bill approver may approve (0033). Blank is unlimited; zero is refused: a human reads it as "no limit", the database as "nothing". */
 export async function setBillApprovalLimit(userId: string, rawLimit: string): Promise<ActionState> {
   const user = await requireUser();
   await requireAdmin(user);
 
-  const text = rawLimit.trim();
-  let limit: number | null = null;
-  if (text !== "") {
-    const parsed = Number(text.replace(/,/g, ""));
-    if (!Number.isFinite(parsed))
+  const limit = parseNumber(rawLimit);
+  if (limit !== null) {
+    if (!Number.isFinite(limit))
       return { error: "Enter an amount, or leave it blank for no limit." };
-    if (parsed <= 0) return { error: "Leave it blank for no limit — zero would approve nothing." };
-    limit = parsed;
+    if (limit <= 0) return { error: "Leave it blank for no limit — zero would approve nothing." };
   }
 
   const supabase = await createClient();
@@ -354,9 +290,7 @@ export async function setBillApprovalLimit(userId: string, rawLimit: string): Pr
   return undefined;
 }
 
-// The bill twin — backed by bill_approvers (migration 0025), read by
-// the bills_guard trigger, so ticking here is what actually lets
-// someone approve a bill, not just what shows them the button.
+// The bill twin, backed by bill_approvers (0025) and read by bills_guard.
 export async function setBillApprover(userId: string, canApprove: boolean): Promise<ActionState> {
   const user = await requireUser();
   await requireAdmin(user);
@@ -366,8 +300,6 @@ export async function setBillApprover(userId: string, canApprove: boolean): Prom
     const { error } = await supabase
       .from("bill_approvers")
       .insert({ user_id: userId, granted_by: user.id });
-    // Re-ticking someone already on the list hits the primary key and is
-    // a harmless no-op from the admin's point of view.
     if (error && error.code !== "23505") {
       console.error("setBillApprover failed:", error);
       return { error: "Could not make this person an approver. Try again." };

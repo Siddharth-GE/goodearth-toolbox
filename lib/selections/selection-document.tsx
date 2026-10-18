@@ -5,18 +5,7 @@ import { designView, pdf } from "@/lib/pdf/theme";
 import { formatDate, formatQuantity } from "@/lib/format";
 import type { BudgetHandoff, SelectionLineRow } from "./queries";
 
-/**
- * The Selections sheet set.
- *
- * One space per sheet, on purpose: a sheet is what somebody carries into
- * a room. A space with more lines than fit simply continues onto the next
- * sheet, with its heading and column headers repeated.
- *
- * No rates, no totals, no value of any kind. Selections records what was
- * specified; what it costs is Budgets' document, and letting a rate reach
- * a client from this tool is exactly the mistake the separation exists to
- * prevent.
- */
+/** One space per sheet: a sheet is what someone carries into a room. No rates, totals or value of any kind: costs belong to Budgets' document. */
 
 const styles = StyleSheet.create({
   h1: { fontFamily: pdf.fontBold, fontSize: pdf.size.display, letterSpacing: -0.3 },
@@ -81,8 +70,6 @@ const styles = StyleSheet.create({
   spaceType: { fontSize: pdf.size.small, color: pdf.color.muted, marginTop: 2 },
   spaceCount: { fontSize: pdf.size.small, color: pdf.color.muted },
 
-  // Views are already normalised to 16:9 on upload, so the document never
-  // has to reason about shape — it only decides how many sit in a row.
   viewGrid: { flexDirection: "row", flexWrap: "wrap", marginBottom: 14 },
   viewImage: { width: "100%", borderRadius: 2, objectFit: "cover" },
   viewCaption: { fontSize: pdf.size.tiny, color: pdf.color.muted, marginTop: 3 },
@@ -93,7 +80,6 @@ const styles = StyleSheet.create({
   signatureLabel: { fontSize: pdf.size.tiny, color: pdf.color.muted },
 });
 
-/** Columns are the same on every space sheet, so a reader learns them once. */
 const columns: Column<SelectionLineRow>[] = [
   { header: "#", width: 0.45, render: (_row, index) => String(index + 1) },
   { header: "Code", width: 1.15, render: (row) => row.item_code ?? "—" },
@@ -104,8 +90,7 @@ const columns: Column<SelectionLineRow>[] = [
   { header: "Notes", width: 2.4, render: (row) => row.designer_note ?? "" },
 ];
 
-/** A space's views, already fetched as bytes — the bucket is private, so
- *  there is no URL react-pdf could fetch on its own. */
+/** The bucket is private, so views arrive as bytes. */
 export type ViewImage = { data: Buffer; caption: string | null };
 
 export function SelectionDocument({
@@ -135,7 +120,6 @@ export function SelectionDocument({
       author="Goodearth"
       creator="Toolbox by Kaadal"
     >
-      {/* Sheet 1 — what this document is, and what's in it. */}
       <DocumentPage meta={meta}>
         <Text style={styles.h1}>{selection.unit_name}</Text>
         <Text style={styles.subtitle}>
@@ -180,8 +164,7 @@ export function SelectionDocument({
           </View>
         ))}
 
-        {/* Only an issued revision is signable — a draft must never look
-            like something anyone can put their name to. */}
+        {/* Only an issued revision is signable. */}
         {!isDraft && (
           <View style={styles.signatureRow}>
             <View style={styles.signatureBox}>
@@ -198,7 +181,6 @@ export function SelectionDocument({
         )}
       </DocumentPage>
 
-      {/* One sheet per space. */}
       {spaces.map((group) => (
         <DocumentPage key={group.space.id} meta={meta}>
           <View style={styles.spaceHeading}>
@@ -223,13 +205,7 @@ export function SelectionDocument({
   );
 }
 
-/**
- * The space's renders above its item list.
- *
- * A single view runs full width — it's the hero of the page. Two or more
- * go side by side, because a page of stacked full-width images pushes the
- * actual specification onto another sheet.
- */
+/** One view runs full width; two or more go side by side, so stacked images don't push the specification to another sheet. */
 function SpaceViewGrid({ views }: { views: ViewImage[] }) {
   if (views.length === 0) return null;
   const twoUp = views.length >= designView.twoUpFrom;
@@ -239,8 +215,7 @@ function SpaceViewGrid({ views }: { views: ViewImage[] }) {
       {views.map((view, index) => (
         <View
           key={index}
-          // wrap={false} keeps an image and its caption together rather
-          // than letting a page break land between them.
+          // wrap={false} keeps an image with its caption.
           wrap={false}
           style={{
             width: twoUp ? "50%" : "100%",
@@ -249,10 +224,7 @@ function SpaceViewGrid({ views }: { views: ViewImage[] }) {
             marginBottom: 8,
           }}
         >
-          {/* react-pdf's Image is a PDF primitive, not an <img> — it has
-              no alt concept, so the a11y rule doesn't apply. The explicit
-              {data, format} form avoids relying on its magic-byte
-              sniffing. */}
+          {/* react-pdf's Image is a PDF primitive, not an <img>: no alt, so the a11y rule doesn't apply. The {data, format} form avoids magic-byte sniffing. */}
           {/* eslint-disable-next-line jsx-a11y/alt-text */}
           <Image src={{ data: view.data, format: "jpg" }} style={styles.viewImage} />
           {view.caption && <Text style={styles.viewCaption}>{view.caption}</Text>}

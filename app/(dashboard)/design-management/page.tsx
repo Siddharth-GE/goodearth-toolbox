@@ -2,13 +2,7 @@ import { getBoardWelcomeCounts } from "@/lib/design-management/board-queries";
 
 import { ToolWelcome } from "../_components/tool-welcome";
 
-// The welcome screen (founder, 2026-08-13: every Management/Operations
-// tool opens on one). Counts only, never rupees — this tool has no money
-// anywhere in it.
-//
-// The Board is the main door since the thirteenth piece (root plan.md): each
-// villa passed from stage to stage, "like crm". Drawings are reached
-// through a villa, as before.
+// Welcome screen: counts only (this tool has no money). The Board is the main door; drawings are reached through a villa.
 export default async function DesignManagementPage() {
   const counts = await getBoardWelcomeCounts();
 

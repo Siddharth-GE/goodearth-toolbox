@@ -1,14 +1,11 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import { assertRead, readFailed } from "@/lib/supabase/read-failed";
 import type { ClientRow } from "./clients";
 import type { UnitStatus, UnitType } from "./units";
 
-// Reads only open surfaces: units/projects/selections are readable by
-// every authenticated user. approved_budgets is grant-gated to
-// /budgets|/indents — the caller says whether the viewer holds one, and
-// without it the budget column is omitted entirely rather than shown
-// as a misleading blank.
+// approved_budgets is gated to /budgets|/indents; without one the budget column is omitted, not shown blank.
 
 export type ClientUnit = {
   id: string;
@@ -18,16 +15,13 @@ export type ClientUnit = {
   status: UnitStatus;
   project_id: string;
   projectName: string;
-  /** Latest issued selection revision, null when nothing issued yet. */
   issuedRevision: number | null;
   issuedAt: string | null;
-  /** Only meaningful when includeBudgets was true; null otherwise. */
   budgetApproved: boolean | null;
 };
 
 export type ClientDetail = {
   client: ClientRow;
-  /** Who last edited the client, when updated_by is stamped. */
   updatedByName: string | null;
   units: ClientUnit[];
 };
@@ -38,15 +32,21 @@ export async function getClientDetail(
 ): Promise<ClientDetail | null> {
   const supabase = await createClient();
 
-  const { data: client } = await supabase.from("clients").select("*").eq("id", id).maybeSingle();
+  const { data: client, error: clientError } = await supabase
+    .from("clients")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (clientError) readFailed("Masters", "this client", clientError);
   if (!client) return null;
 
-  const { data: unitRows } = await supabase
+  const { data: unitRows, error: unitError } = await supabase
     .from("units")
     .select("id, name, code, unit_type, status, project_id")
     .eq("client_id", id)
     .order("name")
     .order("id");
+  if (unitError) readFailed("Masters", "this client's units", unitError);
   const units = unitRows ?? [];
   const unitIds = units.map((u) => u.id);
 
@@ -60,11 +60,15 @@ export async function getClientDetail(
           .eq("status", "issued")
       : Promise.resolve({
           data: [] as { unit_id: string; revision_no: number; issued_at: string | null }[],
+          error: null,
         }),
     includeBudgets && unitIds.length
       ? supabase.from("approved_budgets").select("unit_id").in("unit_id", unitIds)
-      : Promise.resolve({ data: null }),
+      : Promise.resolve({ data: null, error: null }),
   ]);
+  assertRead("Masters", "the projects", projectRes.error);
+  assertRead("Masters", "this client's selections", selectionRes.error);
+  assertRead("Masters", "this client's budgets", budgetRes.error);
 
   const projectNames = new Map((projectRes.data ?? []).map((p) => [p.id, p.name]));
   const issuedByUnit = new Map(
@@ -76,11 +80,12 @@ export async function getClientDetail(
 
   let updatedByName: string | null = null;
   if (client.updated_by) {
-    const { data: editor } = await supabase
+    const { data: editor, error: editorError } = await supabase
       .from("profiles")
       .select("full_name")
       .eq("id", client.updated_by)
       .maybeSingle();
+    if (editorError) readFailed("Masters", "who last edited this client", editorError);
     updatedByName = editor?.full_name ?? null;
   }
 

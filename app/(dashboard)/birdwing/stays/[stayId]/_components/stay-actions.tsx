@@ -6,13 +6,8 @@ import { FormMessage } from "@/components/ui/form-message";
 import { markReviewed, moveStay } from "@/lib/birdwing/actions";
 import type { StayStatus } from "@/lib/birdwing/shared";
 import { isUndo, moveLabel, nextStatuses } from "@/lib/birdwing/workflow";
-import { useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 
-/**
- * The moves a stay can make from where it is — the guard's list
- * (lib/birdwing/workflow.ts). Cancelling asks why and says the rooms are
- * let go; the undo moves are quiet buttons.
- */
 export function StayActions({
   stayId,
   stayRef,
@@ -22,8 +17,7 @@ export function StayActions({
   stayRef: string;
   status: StayStatus;
 }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
   const moves = nextStatuses(status);
   if (moves.length === 0) return null;
@@ -57,13 +51,7 @@ export function StayActions({
               size="sm"
               variant={isUndo(status, to) ? "ghost" : "primary"}
               disabled={pending}
-              onClick={() => {
-                setError(undefined);
-                startTransition(async () => {
-                  const result = await moveStay(stayId, to, null);
-                  if (result?.error) setError(result.error);
-                });
-              }}
+              onClick={() => run(() => moveStay(stayId, to, null))}
             >
               {moveLabel(status, to)}
             </Button>
@@ -75,22 +63,15 @@ export function StayActions({
   );
 }
 
-/** The import's doubts about this stay, and the press that clears them. */
 export function ReviewedButton({ stayId }: { stayId: string }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
   return (
     <div className="space-y-1">
       <Button
         size="sm"
         variant="secondary"
         disabled={pending}
-        onClick={() =>
-          startTransition(async () => {
-            const result = await markReviewed([stayId]);
-            if (result?.error) setError(result.error);
-          })
-        }
+        onClick={() => run(() => markReviewed([stayId]))}
       >
         {pending ? "Saving…" : "Mark reviewed"}
       </Button>

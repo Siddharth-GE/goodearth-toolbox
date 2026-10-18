@@ -3,8 +3,7 @@ import { ForgotPasswordForm } from "@/components/forgot-password-form";
 import Link from "next/link";
 import { Suspense } from "react";
 
-// No `searchParams` prop, same reasoning as /login: the ?error=expired
-// notice is read client-side in the form so this page prerenders static.
+// No `searchParams` prop (as /login): the ?error=expired notice is read client-side so the page prerenders static.
 export default function ForgotPasswordPage() {
   return (
     <div className="w-full max-w-sm">

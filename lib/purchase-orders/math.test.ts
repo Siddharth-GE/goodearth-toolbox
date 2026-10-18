@@ -1,9 +1,3 @@
-/**
- * PO money math. The cases that matter: null-is-not-zero (an unpriced
- * line must stay OUT of every total, not enter one as free), the
- * both-or-neither rule for half-priced lines, GST grouped by slab for
- * the PDF's totals box, and full precision until display.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

@@ -16,8 +16,6 @@ export default async function BudgetPricingPage({
 }) {
   const { budgetId } = await params;
 
-  // Independent reads, one round trip — getBudget is the heaviest query
-  // in the app, so a serial vendor fetch behind it was a full extra hop.
   const [budget, vendors] = await Promise.all([getBudget(budgetId), listVendorOptions()]);
   if (!budget) notFound();
 
@@ -29,8 +27,6 @@ export default async function BudgetPricingPage({
         title={
           <>
             {budget.unit_name} · R{budget.revision_no}
-            {/* Only shown once there's been more than one pricing — on a
-                first budget the version is noise, not information. */}
             {budget.version > 1 && (
               <span className="text-muted ml-1.5 font-medium">v{budget.version}</span>
             )}
@@ -54,8 +50,7 @@ export default async function BudgetPricingPage({
             )}
             {budget.spaces.length > 0 && (
               <>
-                {/* plain: next/link prefetches on hover, which would render a
-                    whole PDF just because the cursor passed over the button. */}
+                {/* Plain link: next/link would prefetch on hover and render a whole PDF. */}
                 <LinkButton href={`/budgets/${budgetId}/pdf`} variant="secondary" plain>
                   <Lock className="size-4" />
                   Budget sheet
@@ -72,9 +67,6 @@ export default async function BudgetPricingPage({
       />
 
       {budget.needsReviewCount > 0 && (
-        // Carried-forward lines the designer has since resized. They have
-        // a price, so nothing is blocked — but saying it here means the
-        // team doesn't have to scroll hunting for amber rows.
         <div className="border-warning/40 bg-warning/5 rounded-xl border px-4 py-3">
           <p className="text-foreground text-sm">
             <span className="font-medium">
@@ -88,8 +80,7 @@ export default async function BudgetPricingPage({
       )}
 
       {budget.spaces.length > 0 && (
-        // Said plainly on screen, because the difference between these two
-        // files is the difference between a quote and a leaked margin.
+        // Said plainly on screen: one file is a quote, the other would leak the margin.
         <p className="text-muted text-xs">
           <span className="text-foreground font-medium">Budget sheet</span> is internal — it shows
           cost and margin. <span className="text-foreground font-medium">Client quote</span> shows

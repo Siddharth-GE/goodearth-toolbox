@@ -5,31 +5,23 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FormMessage } from "@/components/ui/form-message";
 import { Input } from "@/components/ui/input";
+import type { ActionState } from "@/lib/action-state";
 import { createDepartment, renameDepartment, setDepartmentActive } from "@/lib/directory/actions";
 import type { DepartmentRow } from "@/lib/directory/queries";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState } from "react";
 
-/**
- * Relay's SimpleMaster, plus an inline rename — a department typed wrong
- * on the import has to be fixable without adding a second row beside it,
- * because the first one already has people in it.
- *
- * Nothing is ever deleted: somebody who has left still sits in a
- * department on every past record, and 0060 gives the table no delete
- * policy to make the other choice available.
- */
+/** Relay's SimpleMaster plus inline rename (an import typo must be fixable without a second row). Never deleted: leavers sit in departments on past records; 0060 has no delete policy. */
 export function DepartmentManager({ departments }: { departments: DepartmentRow[] }) {
   const [state, formAction, pending] = useActionState(createDepartment, undefined);
-  const [busy, setBusy] = useState(false);
+  const { pending: busy, error: rowError, run: runAction } = useActionRunner();
   const [editing, setEditing] = useState<string>();
-  const [rowError, setRowError] = useState<string>();
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const wasPending = useRef(false);
 
-  // Clear the box only after a save that worked, so a rejected name is
-  // still there to fix.
+  // Clear the box only after a save that worked.
   useEffect(() => {
     if (wasPending.current && !pending && !state?.error) {
       formRef.current?.reset();
@@ -38,20 +30,9 @@ export function DepartmentManager({ departments }: { departments: DepartmentRow[
     wasPending.current = pending;
   }, [pending, state, router]);
 
-  const run = async (work: () => Promise<{ error?: string } | undefined>) => {
-    setBusy(true);
-    setRowError(undefined);
-    try {
-      const result = await work();
-      if (result?.error) {
-        setRowError(result.error);
-        return false;
-      }
-      router.refresh();
-      return true;
-    } finally {
-      setBusy(false);
-    }
+  const run = async (work: () => Promise<ActionState>) => {
+    const result = await runAction(work);
+    if (!result?.error) router.refresh();
   };
 
   return (

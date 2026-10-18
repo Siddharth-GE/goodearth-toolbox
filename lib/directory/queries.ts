@@ -10,37 +10,15 @@ import { todayInIndia } from "@/lib/format";
 import { upcomingBirthdays } from "./birthdays";
 
 /**
- * Reads for the Directory.
- *
- * ┌──────────────────────────────────────────────────────────────────┐
- * │ THERE IS NOT ONE PostgREST EMBED IN THIS FILE, AND THERE MUST    │
- * │ NEVER BE ONE.                                                    │
- * │                                                                  │
- * │ staff_details has FOUR foreign keys to profiles — id,            │
- * │ reports_to_id, created_by, updated_by — and staff_departments    │
- * │ has two. Any `profiles(...)` embed from either is ambiguous and  │
- * │ answers HTTP 300 (PGRST201) at runtime. Nothing local catches    │
- * │ it: not a type error, `next build` compiles it, the tests have   │
- * │ no database. Client Relations shipped four dead screens through  │
- * │ a fully green CI exactly this way.                               │
- * │                                                                  │
- * │ So everything here reads FLAT and merges through a Map. At fifty │
- * │ rows that is also faster than the join. Naming the key would     │
- * │ work too; not embedding at all cannot be got wrong.              │
- * └──────────────────────────────────────────────────────────────────┘
- *
- * Every export opens with requireTool("/directory") — with one deliberate
- * exception, getMyDetails, which needs only a session. See its comment.
- *
- * Queries may throw; a failed read has no partial answer worth showing.
- * `error` is checked explicitly everywhere, never just `data`: an empty
- * result and a failed read mean opposite things, and here the difference
- * is "nobody has an emergency contact" versus "we could not ask".
+ * THERE IS NOT ONE PostgREST EMBED IN THIS FILE, AND THERE MUST NEVER BE ONE. staff_details has four FKs to profiles
+ * (id, reports_to_id, created_by, updated_by) and staff_departments two, so a `profiles(...)` embed answers HTTP 300
+ * (PGRST201) at runtime and nothing local catches it (BUGCATCHER). Read FLAT and merge through a Map.
+ * Every export opens with requireTool("/directory") except getMyDetails, which needs only a session.
+ * Queries throw and always check `error`: "nobody has a contact" and "we could not ask" mean opposite things.
  */
 
 const GRANT = "/directory";
 
-/** How far ahead the birthday list looks, unless a caller says otherwise. */
 export const BIRTHDAY_WINDOW_DAYS = 30;
 
 function fail(context: string, error: { message: string } | null): asserts error is null {
@@ -74,11 +52,7 @@ export type DepartmentRow = {
   people: number;
 };
 
-/**
- * Everyone's email, from the one function that can read auth.users
- * without being an admin (0060 §6). Its `where has_app('/directory')` is
- * the entire permission boundary — this is the only call site.
- */
+/** Everyone's email, from the one function that can read auth.users without admin (0060 §6); its `where has_app('/directory')` is the whole boundary. */
 async function emailMap(
   supabase: Awaited<ReturnType<typeof createClient>>,
 ): Promise<Map<string, string>> {
@@ -87,15 +61,7 @@ async function emailMap(
   return new Map((data ?? []).map((row) => [row.id, row.email]));
 }
 
-/**
- * Everyone, merged. The one read the screens share, because at fifty
- * people three complete reads and two Maps beat any amount of filtering
- * in the database — and search has to span all three sources anyway.
- *
- * fetchAll on both tables: this must be COMPLETE. A truncated roster
- * renders a real colleague as "not here", which is the one answer a
- * directory must never give.
- */
+/** Everyone, merged: three complete reads and Maps beat DB filtering at fifty people. fetchAll on both tables, since a truncated roster shows a colleague as "not here". */
 async function readEveryone(): Promise<DirectoryPerson[]> {
   const supabase = await createClient();
 
@@ -119,9 +85,7 @@ async function readEveryone(): Promise<DirectoryPerson[]> {
 
   return people
     .map((person): DirectoryPerson => {
-      // A card always exists — profiles_seed_staff_details (0060 §3)
-      // creates one with the account. The fallback is for the seconds
-      // between a hand-made profile row and the next backfill.
+      // A card always exists (0060 §3 seeds it); the fallback covers the gap before the next backfill.
       const card = cardById.get(person.id);
       return {
         id: person.id,
@@ -147,11 +111,6 @@ async function readEveryone(): Promise<DirectoryPerson[]> {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/**
- * Headline counts for the welcome screen. Counts only — there is no money
- * anywhere in this tool, so that rule is free here, but the birthday count
- * still reads dates rather than guessing.
- */
 export async function getWelcomeCounts(): Promise<{
   people: number;
   departments: number;
@@ -192,18 +151,7 @@ export type PeopleFilters = {
   includeInactive?: boolean;
 };
 
-/**
- * The roster.
- *
- * SEARCH IS A NODE FILTER, not a database one, and deliberately: it spans
- * profiles.full_name, staff_details.designation and an email that only
- * exists behind an RPC, so no single `or` filter can see all three. Honest
- * at fifty people and fine at 200 — the size this app is built for. Past
- * ~1,000 it needs rethinking; PLAN.md says so rather than pretending.
- *
- * Returns { people, total } so a screen can say "N of M" from the real
- * roster rather than rows.length.
- */
+/** The roster. SEARCH IS A NODE FILTER: it spans full_name, designation and an RPC-only email, which no single `or` can see. Fine at 200 people; rethink past ~1,000 (PLAN.md). Returns { people, total } for "N of M". */
 export async function listPeople(
   filters: PeopleFilters = {},
 ): Promise<{ people: DirectoryPerson[]; total: number }> {
@@ -224,11 +172,7 @@ export async function listPeople(
   return { people, total: roster.length };
 }
 
-/**
- * One person's card, plus the two things that only make sense in context:
- * who they report to (marked when that person has been deactivated, so a
- * reporting line never silently vanishes) and who reports to them.
- */
+/** One person's card plus who they report to (marked if deactivated, so the line never vanishes) and who reports to them. */
 export async function getPerson(personId: string): Promise<{
   person: DirectoryPerson;
   reportsTo: { id: string; name: string; isActive: boolean } | null;
@@ -253,14 +197,7 @@ export async function getPerson(personId: string): Promise<{
   };
 }
 
-/**
- * The signed-in person's own card.
- *
- * requireUser() ONLY, not requireTool. The `or id = auth.uid()` half of
- * staff_details' single SELECT policy (0060 §5) is what makes this work,
- * and it is deliberate: losing the /directory grant must never lock
- * somebody out of correcting their own phone number.
- */
+/** The signed-in person's own card. requireUser() ONLY: the `or id = auth.uid()` half of the SELECT policy (0060 §5) makes it work, so losing the grant never locks anyone out of their own card. */
 export async function getMyDetails(): Promise<{
   id: string;
   name: string;
@@ -286,9 +223,7 @@ export async function getMyDetails(): Promise<{
     .maybeSingle();
   fail("your details", error);
 
-  // The company-owned half is read-only here, but it is SHOWN — someone
-  // who cannot see their own department just asks why it is missing.
-  // Both lookups are separate flat reads; see the no-embeds rule above.
+  // The company-owned half is shown read-only so nobody wonders where their department is; flat reads, no embeds.
   const [department, manager] = await Promise.all([
     card?.department_id
       ? supabase.from("staff_departments").select("name").eq("id", card.department_id).maybeSingle()
@@ -305,8 +240,7 @@ export async function getMyDetails(): Promise<{
   return {
     id: user.id,
     name: user.profile?.full_name?.trim() || "",
-    // Their own address is already on the session — no need to call
-    // directory_emails(), which they may not even be granted.
+    // Their own address is on the session; no need for directory_emails().
     email: user.email ?? null,
     phone: card?.phone ?? null,
     dateOfBirth: card?.date_of_birth ?? null,
@@ -321,7 +255,6 @@ export async function getMyDetails(): Promise<{
   };
 }
 
-/** The department list, with how many people sit in each. */
 export async function listDepartments(includeInactive = false): Promise<DepartmentRow[]> {
   await requireTool(GRANT);
   const supabase = await createClient();
@@ -363,13 +296,7 @@ export async function listDepartments(includeInactive = false): Promise<Departme
     }));
 }
 
-/**
- * The admin's reports-to dropdown.
- *
- * Active people PLUS whoever is currently selected, even if they have
- * been deactivated. Without that second half, saving any OTHER field on
- * that person clears their reporting line without anyone touching it.
- */
+/** The admin's reports-to dropdown: active people PLUS the current pick even if deactivated, or saving any other field would clear their reporting line. */
 export async function listPeopleOptions(
   currentId?: string | null,
 ): Promise<{ id: string; name: string; isActive: boolean }[]> {
@@ -380,7 +307,6 @@ export async function listPeopleOptions(
     .map((person) => ({ id: person.id, name: person.name, isActive: person.isActive }));
 }
 
-/** Whose birthday is coming up, soonest first. Active people only. */
 export async function listBirthdays(
   windowDays = BIRTHDAY_WINDOW_DAYS,
 ): Promise<(DirectoryPerson & { daysAway: number })[]> {

@@ -1,5 +1,6 @@
 "use server";
 
+import { checked, optionalText, text } from "@/lib/form-data";
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
@@ -7,13 +8,7 @@ import { revalidatePath } from "next/cache";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
-/**
- * Groups and items share one numbering space per category on the site
- * team's sheet (FD.3 is a group, FD.4 an item) but live in two tables,
- * so the per-table UNIQUEs cannot see a cross-table clash. This check
- * is that boundary (0073's header says so); the import script enforces
- * the same rule on the first load.
- */
+/** Groups and items share one numbering space per category but live in two tables, so per-table UNIQUEs miss cross-table clashes; this check covers it. */
 async function codeInUse(
   supabase: Supabase,
   code: string,
@@ -32,12 +27,7 @@ async function codeInUse(
   return false;
 }
 
-/**
- * Sheet codes end in a number (FD.4 → 4), and the screen shows each
- * level in code order — so sort_order follows the code, ×10 to leave
- * room to slot something between two later. A code with no number
- * lands at the end.
- */
+/** sort_order follows the code's number ×10, leaving room between; no number sorts last. */
 function sortOrderFromCode(code: string, fallback: number): number {
   const match = code.match(/(\d+)\s*$/);
   return match ? Number(match[1]) * 10 : fallback;
@@ -45,22 +35,14 @@ function sortOrderFromCode(code: string, fallback: number): number {
 
 function readWorksForm(formData: FormData) {
   return {
-    code: String(formData.get("code") ?? "")
-      .trim()
-      .toUpperCase(),
-    name: String(formData.get("name") ?? "").trim(),
-    category_id: String(formData.get("category_id") ?? "").trim(),
-    group_id: String(formData.get("group_id") ?? "").trim() || null,
-    // Checkbox convention (vendors): checked posts "1", unchecked posts
-    // nothing — only the edit dialogs carry the checkbox, and only the
-    // update actions read this field.
-    is_active: formData.get("is_active") === "1",
+    code: text(formData, "code").toUpperCase(),
+    name: text(formData, "name"),
+    category_id: text(formData, "category_id"),
+    group_id: optionalText(formData, "group_id"),
+    // Checkbox: checked posts "1", unchecked posts nothing; only update actions read it.
+    is_active: checked(formData, "is_active", "1"),
   };
 }
-
-// ---------------------------------------------------------------------
-// Categories
-// ---------------------------------------------------------------------
 
 export async function addWorkCategory(
   _state: ActionState,
@@ -146,10 +128,6 @@ export async function setWorkCategoryActive(id: string, isActive: boolean): Prom
   revalidatePath("/masters/works");
   return undefined;
 }
-
-// ---------------------------------------------------------------------
-// Groups
-// ---------------------------------------------------------------------
 
 export async function addWorkGroup(_state: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireTool("/masters");
@@ -240,10 +218,6 @@ export async function setWorkGroupActive(id: string, isActive: boolean): Promise
   return undefined;
 }
 
-// ---------------------------------------------------------------------
-// Items
-// ---------------------------------------------------------------------
-
 export async function addWorkItem(_state: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireTool("/masters");
 
@@ -271,7 +245,7 @@ export async function addWorkItem(_state: ActionState, formData: FormData): Prom
   });
   if (error) {
     if (error.code === "23505") return { error: `${code} is already used.` };
-    // The composite FK: the picked group belongs to a different category.
+    // The picked group belongs to a different category (composite FK).
     if (error.code === "23503") return { error: "That group belongs to a different category." };
     console.error("addWorkItem failed:", error);
     return { error: "Could not add the work item. Try again." };

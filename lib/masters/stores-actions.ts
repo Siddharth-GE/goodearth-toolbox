@@ -1,5 +1,6 @@
 "use server";
 
+import { checked, optionalText, rawText, text } from "@/lib/form-data";
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
@@ -7,10 +8,10 @@ import { revalidatePath } from "next/cache";
 
 function readStoreForm(formData: FormData) {
   return {
-    name: String(formData.get("name") ?? "").trim(),
-    project_id: String(formData.get("project_id") ?? "") || null,
-    location: String(formData.get("location") ?? "").trim() || null,
-    is_active: formData.get("is_active") === "1",
+    name: text(formData, "name"),
+    project_id: rawText(formData, "project_id") || null,
+    location: optionalText(formData, "location"),
+    is_active: checked(formData, "is_active", "1"),
   };
 }
 

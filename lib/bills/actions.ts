@@ -6,20 +6,12 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-// Type-only import, and deliberately NOT re-exported — see the note in
-// lib/budgets/actions.ts: a bare `export type { X };` in a "use server"
-// file crashes every action in its compiled chunk at load time.
+// Type-only and not re-exported: `export type { X }` in a "use server" file crashes the chunk at load.
 import type { ActionState } from "@/lib/action-state";
 
-/**
- * Writes for Bills. The real rules live in the database (bills_guard,
- * create_bill, migration 0025) — these actions validate first so
- * refusals arrive as friendly messages, but a write that slips past the
- * UI is still stopped DB-side.
- */
+// Rules live in the database (bills_guard, create_bill, 0025); actions pre-check so refusals read as sentences.
 
-/** The guards raise human-readable messages (written for exactly this).
- * Surface the known ones instead of a generic "try again". */
+/** The guards raise human-readable messages; surface the known ones. */
 const BILL_GUARD_PHRASES = [
   "permanent",
   "no longer be edited",
@@ -44,15 +36,6 @@ const BILL_GUARD_PHRASES = [
   "muster roll",
 ] as const;
 
-// Recording a bill — with its lines — is createBillWithLines in
-// lib/bills/line-actions.ts (0106: bills have lines).
-
-/* ------------------------------------------------------------------ *
- * Work orders (the labour contracts, 0105) — approval and the off-switch.
- * Making and editing them is lib/bills/work-order-actions.ts.
- * ------------------------------------------------------------------ */
-
-/** pending → approved. The DB guard re-checks the approver list. */
 export async function approveLabourContract(contractId: string): Promise<ActionState> {
   const user = await requireTool("/bills");
 
@@ -65,7 +48,7 @@ export async function approveLabourContract(contractId: string): Promise<ActionS
       approved_at: new Date().toISOString(),
       updated_by: user.id,
     })
-    // No status filter — the guard's message beats silent zero rows.
+    // No status filter: the guard's message beats silent zero rows.
     .eq("id", contractId);
   if (error) {
     console.error("approveLabourContract failed:", error);
@@ -76,8 +59,7 @@ export async function approveLabourContract(contractId: string): Promise<ActionS
   return undefined;
 }
 
-/** The off-switch: an inactive contract takes no new bills. Allowed at
- * any status; existing bills are untouched. */
+/** An inactive contract takes no new bills; existing bills are untouched. */
 export async function setLabourContractActive(
   contractId: string,
   isActive: boolean,
@@ -107,9 +89,7 @@ export type UpdateBillInput = {
   note: string | null;
 };
 
-/** Invoice fields and amounts only — the anchor, vendor, scope and
- * number are permanent (bills_guard), and status moves through the
- * transition actions, never here. */
+/** Invoice fields and amounts only; anchor, vendor, scope and number are permanent (bills_guard). */
 export async function updateBill(billId: string, input: UpdateBillInput): Promise<ActionState> {
   const user = await requireTool("/bills");
 
@@ -139,9 +119,7 @@ export async function updateBill(billId: string, input: UpdateBillInput): Promis
       note: input.note?.trim() || null,
       updated_by: user.id,
     })
-    // No status filter — filtering to recorded would make an edit on a
-    // locked bill match zero rows and "succeed" silently. bills_guard
-    // raises instead, and the message reaches the user.
+    // No status filter: filtering to recorded would make an edit on a locked bill match zero rows and "succeed".
     .eq("id", billId);
   if (error) {
     console.error("updateBill failed:", error);
@@ -152,8 +130,7 @@ export async function updateBill(billId: string, input: UpdateBillInput): Promis
   return undefined;
 }
 
-/** recorded → approved. The DB guard re-checks the approver list; the
- * button is a courtesy. Self-approval is allowed (founder decision). */
+/** The DB guard re-checks the approver list; self-approval is allowed. */
 export async function approveBill(billId: string): Promise<ActionState> {
   const user = await requireTool("/bills");
 
@@ -164,13 +141,11 @@ export async function approveBill(billId: string): Promise<ActionState> {
       status: "approved",
       approved_by: user.id,
       approved_at: new Date().toISOString(),
-      // The guard requires a cleared note — an approval answers the
-      // send-back that set it.
+      // The guard requires a cleared note.
       rejection_note: null,
       updated_by: user.id,
     })
-    // No status filter — a stale button on a moved-on bill should get
-    // the guard's message, not a silent zero-row "success".
+    // No status filter: a stale button gets the guard's message, not a silent zero-row "success".
     .eq("id", billId);
   if (error) {
     console.error("approveBill failed:", error);
@@ -181,8 +156,7 @@ export async function approveBill(billId: string): Promise<ActionState> {
   return undefined;
 }
 
-/** approved → recorded, with the mandatory note. The approval record
- * clears so the next approval stamps fresh (the rejectIndent shape). */
+/** Clears the approval record so the next approval stamps fresh. */
 export async function sendBackBill(billId: string, note: string): Promise<ActionState> {
   const user = await requireTool("/bills");
 
@@ -208,17 +182,12 @@ export async function sendBackBill(billId: string, note: string): Promise<Action
   return undefined;
 }
 
-/** A wrongly recorded bill is thrown away and recorded again — the
- * number is burnt, gaps accepted. Only while recorded, and only by
- * whoever recorded it or an admin (delete_recorded_bill checks both). */
+/** Only while recorded, and only by the recorder or an admin (delete_recorded_bill checks both); the number is burnt. */
 export async function deleteBill(billId: string): Promise<ActionState> {
   await requireTool("/bills");
 
   const supabase = await createClient();
-  // delete_recorded_bill (0106): the bill, its lines, and the labour
-  // entries it billed set free to be sent again — one transaction. Its
-  // body repeats the recorded-bill delete rule (recorder or admin, only
-  // while recorded) and says so in words when it refuses.
+  // delete_recorded_bill (0106) deletes the bill and its lines and frees the labour entries it billed, in one transaction.
   const { error } = await supabase.rpc("delete_recorded_bill", { p_bill_id: billId });
   if (error) {
     console.error("deleteBill failed:", error);

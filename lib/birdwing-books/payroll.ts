@@ -1,29 +1,18 @@
 /**
- * A month's salary, worked out — the laptop app's formula, kept as it was
- * until the founder changes it (plan.md, Birdwing):
- *
- *   total = base salary
- *         + overtime hours × OT rate
- *         + room-days × room-day rate
- *         + guest-days × guest-day rate
- *         + incentives − deductions             (the reviewer's, on confirm)
- *
- *   * Overtime is worked time OUTSIDE the person's normal shift: before it
- *     starts in the morning, after it ends in the evening. Breaks are taken
- *     to fall inside the shift, so they never reduce overtime. A day
- *     without in/out times earns no overtime and is named, so the reviewer
- *     can add the times before confirming. No shift in the rule means a
- *     fixed salary: no overtime at all.
- *   * A room-day is one occupied room on a day the person worked; a
- *     guest-day one guest in the house on such a day. Occupancy comes from
- *     the stays (birdwing_occupancy_facts). Leave, holiday leave and
- *     absence earn no incentive.
- *   * The base is the month's, whole: proration and deductions are the
- *     reviewer's to enter.
- *
- * Pure: the server reads attendance, the rule and occupancy, this sums.
+ * A month's salary, kept as the laptop app computed it (plan.md, Birdwing):
+ *   total = base + overtime hours × OT rate + room-days × room-day rate
+ *         + guest-days × guest-day rate + incentives − deductions (the reviewer's, on confirm)
+ * - Overtime is worked time outside the normal shift; breaks fall inside it. A day without
+ *   in/out times earns no overtime and is named so the reviewer can add them. No shift in the
+ *   rule means a fixed salary.
+ * - A room-day is one occupied room on a day the person worked; a guest-day is one guest in the
+ *   house (birdwing_occupancy_facts). Leave, holiday leave and absence earn no incentive.
+ * - The base is the month's, whole: proration and deductions are the reviewer's to enter.
+ * Pure.
  */
 import type { AttendanceStatus } from "./shared";
+import { lastDayOfMonth } from "@/lib/dates";
+import { roundPaise } from "@/lib/line-money";
 
 export type PayRule = {
   effectiveFrom: string;
@@ -52,7 +41,6 @@ export type SalaryPreview = {
   roomAmount: number;
   guestDays: number;
   guestAmount: number;
-  /** base + overtime + room + guest, before the reviewer's incentives and deductions. */
   gross: number;
   workedDays: number;
   halfDays: number;
@@ -62,11 +50,8 @@ export type SalaryPreview = {
   missingTimes: string[];
 };
 
-const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
-
 const WORKED: readonly AttendanceStatus[] = ["present", "half_day"];
 
-/** "08:30" or "08:30:00" → minutes after midnight; null when not a time. */
 export function minutesOf(time: string | null): number | null {
   if (!time) return null;
   const match = /^(\d{1,2}):(\d{2})/.exec(time);
@@ -77,13 +62,9 @@ export function minutesOf(time: string | null): number | null {
   return hours * 60 + minutes;
 }
 
-/**
- * The rule in force for a month: the latest one effective on or before
- * its last day. Null when the person had none yet.
- */
+/** The rule in force for a month: the latest effective on or before its last day; null if none yet. */
 export function ruleForMonth(rules: PayRule[], month: string): PayRule | null {
-  const [year, mon] = month.slice(0, 7).split("-").map(Number);
-  const lastDay = new Date(Date.UTC(year, mon, 0)).toISOString().slice(0, 10);
+  const lastDay = lastDayOfMonth(month);
   return (
     [...rules]
       .filter((rule) => rule.effectiveFrom <= lastDay)
@@ -91,11 +72,7 @@ export function ruleForMonth(rules: PayRule[], month: string): PayRule | null {
   );
 }
 
-/**
- * Minutes worked outside the shift on one day, or null when a time is
- * missing. A shift or a working day that runs past midnight is read as
- * ending the next morning.
- */
+/** Minutes worked outside the shift on one day, null when a time is missing. A shift or day running past midnight ends the next morning. */
 export function overtimeMinutes(
   day: Pick<AttendanceDay, "inAt" | "outAt">,
   shiftStart: string,
@@ -137,11 +114,11 @@ export function computeSalary(input: {
     else otMinutes += minutes;
   }
 
-  const otHours = round2(otMinutes / 60);
-  const otAmount = round2(otHours * rule.otRatePerHr);
-  const roomAmount = round2(roomDays * rule.roomDayRate);
-  const guestAmount = round2(guestDays * rule.guestDayRate);
-  const base = round2(rule.baseSalary);
+  const otHours = roundPaise(otMinutes / 60);
+  const otAmount = roundPaise(otHours * rule.otRatePerHr);
+  const roomAmount = roundPaise(roomDays * rule.roomDayRate);
+  const guestAmount = roundPaise(guestDays * rule.guestDayRate);
+  const base = roundPaise(rule.baseSalary);
   return {
     base,
     otHours,
@@ -150,7 +127,7 @@ export function computeSalary(input: {
     roomAmount,
     guestDays,
     guestAmount,
-    gross: round2(base + otAmount + roomAmount + guestAmount),
+    gross: roundPaise(base + otAmount + roomAmount + guestAmount),
     workedDays: count("present"),
     halfDays: count("half_day"),
     leaveDays: count("leave") + count("holiday_leave"),

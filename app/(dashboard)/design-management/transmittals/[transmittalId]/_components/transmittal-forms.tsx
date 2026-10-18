@@ -8,20 +8,14 @@ import {
   deleteDraftTransmittal,
   issueTransmittal,
   setDraftTransmittalNote,
-} from "@/lib/design-management/actions";
+} from "@/lib/design-management/transmittal-actions";
 import { useSaveOnBlur } from "@/lib/hooks/use-save-on-blur";
-import { useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useState } from "react";
 
-import { ConfirmDialog } from "../../../_components/confirm-dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
-/**
- * The note for site on a DRAFT transmittal, saved when the person leaves
- * the field. The stage and the set are not here: they were chosen when
- * the transmittal started and never move (0099). Once issued, nothing in
- * this file renders — the guard trigger in 0091 refuses these writes
- * anyway, and an issued transmittal that looks editable is worse than
- * one that plainly isn't.
- */
+/** The note for site on a DRAFT, saved when the field is left. Stage and set never move (0099). Once issued nothing here renders: an issued transmittal that looks editable is worse than one that plainly isn't. */
 export function TransmittalNote({
   transmittalId,
   note,
@@ -52,16 +46,7 @@ export function TransmittalNote({
   );
 }
 
-/**
- * The row under the title: whether this draft is ready to go, and Issue.
- *
- * The readiness line is worked out from the page's own data
- * (lib/design-management/readiness.ts) so the problem is named before
- * the press. Issue stays pressable either way: `issue_transmittal` is
- * the rule, and if it refuses, its own sentence replaces the readiness
- * line at full size, right where the eye already is — not in small
- * print beside the button.
- */
+/** Readiness is worked out from the page's own data (readiness.ts) so the problem is named before the press. Issue stays pressable: issue_transmittal is the rule, and its refusal replaces the readiness line at full size. */
 export function IssueBar({
   transmittalId,
   problem,
@@ -71,8 +56,7 @@ export function IssueBar({
   problem: string | null;
   sheetCount: number;
 }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
   return (
     <div className="border-border bg-surface flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3">
@@ -95,13 +79,7 @@ export function IssueBar({
         type="button"
         disabled={pending}
         className="w-full sm:w-auto"
-        onClick={() => {
-          setError(undefined);
-          startTransition(async () => {
-            const result = await issueTransmittal(transmittalId);
-            if (result?.error) setError(result.error);
-          });
-        }}
+        onClick={() => run(() => issueTransmittal(transmittalId))}
       >
         {pending ? "Issuing…" : "Issue to site"}
       </Button>
@@ -109,13 +87,11 @@ export function IssueBar({
   );
 }
 
-/** The whole draft, gone — said out loud first, with what goes with it. */
 export function DeleteDraftTransmittalButton({
   transmittalId,
   draft,
 }: {
   transmittalId: string;
-  /** The draft revision on it, which is deleted too; null when there is none. */
   draft: { label: string; revisionNo: number; sheetCount: number } | null;
 }) {
   const goesWithIt = !draft

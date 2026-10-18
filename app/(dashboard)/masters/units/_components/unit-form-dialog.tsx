@@ -26,12 +26,7 @@ export function UnitFormDialog({
   unit?: UnitRow;
 }) {
   const isEdit = !!unit;
-  // Units are the one master with a dependent field: the plot list is
-  // filtered by the chosen project, so this dialog keeps a little state
-  // of its own on top of the shared shell. Since 0029 the plot is
-  // required and one-per-unit, so only plots without a unit are offered
-  // (plus the unit's own when editing) — the DB's unique index is the
-  // backstop.
+  // Only plots without a unit are offered, plus the unit's own when editing (0029); the DB's unique index is the backstop.
   const [projectId, setProjectId] = useState(unit?.project_id ?? "");
   const takenPlotIds = new Set(
     units.filter((candidate) => candidate.id !== unit?.id).map((candidate) => candidate.plot_id),
@@ -39,8 +34,7 @@ export function UnitFormDialog({
   const filteredPlots = plots.filter(
     (plot) => plot.project_id === projectId && !takenPlotIds.has(plot.id),
   );
-  // Deactivated clients stop being offered, but a unit already assigned
-  // to one keeps that assignment visible until someone changes it.
+  // Deactivated clients stay visible on a unit already assigned to one.
   const pickableClients = clients.filter(
     (client) => client.is_active || client.id === unit?.client_id,
   );
@@ -50,8 +44,6 @@ export function UnitFormDialog({
       label="Unit"
       isEdit={isEdit}
       action={isEdit ? updateUnit.bind(null, unit.id) : createUnit}
-      // Reset the project selection each time the dialog opens, so a
-      // cancelled edit doesn't leave a stale choice behind.
       onOpen={() => setProjectId(unit?.project_id ?? "")}
     >
       <div className="space-y-1.5">

@@ -7,12 +7,7 @@ import Link from "next/link";
 
 import { PersonPhoto } from "../_components/person-photo";
 
-// Three buckets rather than a flat list: "who's got one coming up" is the
-// question people actually ask, and a run of thirty undifferentiated rows
-// answers a different one. Ranges are half-open and stated in full rather
-// than derived from each other — the cumulative version worked but relied
-// on the list being sorted, which is not something the next person should
-// have to notice.
+// Three buckets: "who's got one coming up" is the question. Ranges are half-open and stated in full, not derived from each other (that relied on sorting).
 const GROUPS = [
   { title: "Today", from: 0, to: 0 },
   { title: "This week", from: 1, to: 7 },
@@ -60,8 +55,7 @@ export default async function BirthdaysPage() {
                   >
                     {person.name}
                   </Link>
-                  {/* Day and month only — the year is stored, never shown.
-                      Nobody's age goes on a screen. */}
+                  {/* Day and month only; nobody's age goes on a screen. */}
                   <p className="text-muted text-xs">
                     {formatBirthday(person.dateOfBirth!)} · {birthdayLabel(person.daysAway)}
                   </p>

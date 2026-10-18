@@ -1,9 +1,3 @@
-/**
- * The pull-safety rules. What these protect: material never being
- * requested against a superseded design revision (the double-buy bug),
- * and the "design revised since this was requested" badge telling the
- * truth on lines that were pulled before a revision landed.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -46,8 +40,7 @@ test("the issued revision's budget is pullable, the superseded one is not", () =
 });
 
 test("a unit whose new revision has no approved budget yet shows one pending row", () => {
-  // R2 is issued but only R1's budget is approved — the unit is paused,
-  // not silently offered the old design.
+  // R2 is issued but only R1's budget is approved: paused, not offered the old design.
   const rows = classifyBudgetChooser(
     [budget("b-r1-v1", "villa", "sel-r1"), budget("b-r1-v2", "villa", "sel-r1")],
     new Map([["villa", issued("sel-r2", 2)]]),
@@ -110,8 +103,7 @@ test("drift: a line gone from the latest revision is removed", () => {
 });
 
 test("drift: only the asked-about keys are classified", () => {
-  // The latest revision may have added lines the indent never touched —
-  // they are not drift on this indent.
+  // Lines the latest revision added are not drift.
   const drift = classifyDesignDrift(
     ["mine"],
     [line("mine", "sofa", 1, "living")],
@@ -186,8 +178,7 @@ const fact = (
 });
 
 test("estimate pull groups by ITEM, so rows with no material id are seen (BUGCATCHER #16)", () => {
-  // Since 0086 every takeoff row names its item and carries no material
-  // id — the old pull keyed on material_id and saw an empty estimate.
+  // Since 0086 takeoff rows carry the item and no material id.
   const groups = groupEstimatePull(
     [fact("slab", "cement", 40, "bag"), fact("footing", "cement", 10.5, "bag")],
     new Map([["cement", "bag"]]),
@@ -233,8 +224,7 @@ test("estimate pull: an older row with no item stays its own unpickable row", ()
 });
 
 test("already requested counts every estimate the villa has had, and marks this indent", () => {
-  // 5 bags pulled against the superseded EST/…/001 are still cement on its
-  // way to the same villa — the staging case that exposed the gap.
+  // Pulls against a superseded estimate still count toward the same villa.
   const { requested, onThisIndent } = requestedByItem(
     [
       { item_id: "cement", quantity: 5, indent_id: "ind-25" },
@@ -261,8 +251,7 @@ test("estimate pull: differing units with no factor ask a person instead of gues
 });
 
 test("an indent for one work offers that work's materials only — the Footing case", () => {
-  // 2026-10-08: "only cement appears" under Footing — the pull listed the
-  // whole villa, so Footing's sand, jelly and steel read as missing.
+  // Footing must not list the whole villa's materials.
   const facts = [
     { work_item_id: "footing", item_id: "cement" },
     { work_item_id: "footing", item_id: "sand" },

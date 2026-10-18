@@ -1,14 +1,6 @@
-/**
- * The only browser code in Dexter. The viewer route serves this text at
- * `/deck/<token>/.dexter.js`, and a deck pulls it in with one script tag.
- * It saves the deck's named form fields to `/deck/<token>/.state` as the
- * client types, and fills them back in when the link is opened again.
- *
- * `app/(dashboard)/dexter/DECK-AUTHORING.md` is the author's contract —
- * change the two together. Plain ES2017 with no dependencies, and no
- * template literals inside: this is one TypeScript template literal, so a
- * `${` in the script would be interpolated here instead of in the browser.
- */
+// The only browser code in Dexter, served at /deck/<token>/.dexter.js. DECK-AUTHORING.md is the
+// author's contract; change together. Plain ES2017, no template literals inside (they'd be
+// interpolated here, not in the browser).
 export const DEXTER_CLIENT_SCRIPT = `(function () {
   'use strict';
 

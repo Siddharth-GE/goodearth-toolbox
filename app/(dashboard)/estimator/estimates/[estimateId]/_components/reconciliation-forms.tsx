@@ -14,13 +14,10 @@ import { FormMessage } from "@/components/ui/form-message";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { approveReconciliation } from "@/lib/estimator/estimate-actions";
-import { useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useState } from "react";
 
-/**
- * Approve one "outside the estimate" arrival. Approval never clears
- * the flag — the entry sits in the estimate forever with its badge;
- * this records that an estimator has seen it, and why it was needed.
- */
+/** Approve one "outside the estimate" arrival. Approval never clears the flag; it records that an estimator has seen it, and why it was needed. */
 export function ApproveReconciliationButton({
   estimateId,
   itemId,
@@ -36,8 +33,7 @@ export function ApproveReconciliationButton({
 }) {
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState("");
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run, clearError } = useActionRunner();
 
   return (
     <Dialog
@@ -46,7 +42,7 @@ export function ApproveReconciliationButton({
         setOpen(next);
         if (next) {
           setNote("");
-          setError(undefined);
+          clearError();
         }
       }}
     >
@@ -82,18 +78,19 @@ export function ApproveReconciliationButton({
           </DialogClose>
           <Button
             disabled={pending}
-            onClick={() =>
-              startTransition(async () => {
-                const result = await approveReconciliation({
+            onClick={async () => {
+              const result = await run(() =>
+                approveReconciliation({
                   estimateId,
                   itemId,
                   workItemId,
                   note,
-                });
-                if (result?.error) setError(result.error);
-                else setOpen(false);
-              })
-            }
+                }),
+              );
+              if (!result?.error) {
+                setOpen(false);
+              }
+            }}
           >
             {pending ? "Approving…" : "Approve"}
           </Button>

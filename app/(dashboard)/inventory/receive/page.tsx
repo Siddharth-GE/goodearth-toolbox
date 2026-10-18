@@ -18,13 +18,6 @@ import { PackageCheck } from "lucide-react";
 import Link from "next/link";
 import { InventoryNav } from "../_components/inventory-nav";
 
-/**
- * The Receive screen: purchase orders with goods still to come, and the
- * deliveries recorded, searchable (the second list pages on `rpage`, so
- * the two lists keep their own places). A PO leaves the top list by
- * completing itself once every line has arrived, so an empty list means
- * nothing is outstanding.
- */
 export default async function InventoryPage({
   searchParams,
 }: {
@@ -64,8 +57,7 @@ export default async function InventoryPage({
 
   const filtered = Boolean(project || store || q || from || to);
 
-  // The two lists keep their own places; the delivery filters ride along
-  // on both lists' links so paging one never drops the other's search.
+  // Delivery filters ride on both lists' links so paging one never drops the other's search.
   const hrefWith = (position: { page: number; rpage: number }) => {
     const params = new URLSearchParams();
     if (position.page > 1) params.set("page", String(position.page));

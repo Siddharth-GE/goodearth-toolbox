@@ -4,14 +4,7 @@ import { cache } from "react";
 import { AUTH_COOKIE_OPTIONS } from "./cookie-options";
 import type { Database } from "./database.types";
 
-/**
- * One client per request. Every gated query and action calls this, and a
- * page rendering six of them used to build six clients — each re-reading
- * the cookie jar and re-creating the fetch wrapper. `cache()` memoises
- * the promise for the life of the request the same way getCurrentUser
- * in lib/auth/dal.ts is memoised, and is a no-op outside a request
- * (scripts never import this file).
- */
+/** One client per request, memoised (a no-op outside a request). */
 export const createClient = cache(async () => {
   const cookieStore = await cookies();
 
@@ -30,8 +23,7 @@ export const createClient = cache(async () => {
               cookieStore.set(name, value, options),
             );
           } catch {
-            // Called from a Server Component; ignored because proxy.ts
-            // refreshes the session on every request.
+            // A Server Component cannot set cookies; proxy.ts refreshes the session.
           }
         },
       },

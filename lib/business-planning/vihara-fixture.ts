@@ -1,30 +1,12 @@
 /**
- * The founder's own workbook, as inputs to this engine.
+ * The founder's Vihara workbook as engine inputs: 42 plotted villas and 35 row houses on JV land
+ * settled at a 30% premium in year four, company overheads and a biodiversity park.
+ * model.test.ts asserts every Block 1 Summary figure for Base and Moderate against it.
  *
- * `Vihara_BusinessPlan_JV.xlsx`, handed over 2026-08-10: an eco-village
- * with 42 plotted villas and 35 row houses on JV land settled at a 30%
- * premium in year four, company overheads, and a biodiversity park.
- *
- * This exists so the engine can be checked against numbers that were
- * arrived at independently of it. Every figure the workbook's Summary
- * sheet reports for Block 1 — revenue, each cost line, PBT, margin, the
- * cash trough, the money multiple — is asserted in model.test.ts, for
- * both Base and Moderate. If the engine matches a thirteen-sheet model
- * built by hand, it is right; if it drifts, a test fails rather than a
- * plan quietly reporting the wrong profit.
- *
- * TWO PLACES THIS IS NOT A LITERAL TRANSCRIPTION, both deliberate:
- *
- *   1. LAND IS PER LINE HERE. The workbook holds one site-level land
- *      cost of ₹13.2 Cr; this tool puts land area and rate on each line,
- *      because the founder asked for lines that stand alone. So the
- *      ₹13.2 Cr is split across the two lines in proportion to their
- *      plot area, at ₹405.5299... per sqft over 3,25,500 sqft. The total
- *      is identical to the rupee, which is what the assertions check.
- *
- *   2. NO SENIOR LIVING. The workbook's Block 1 is explicitly "excl.
- *      Senior Living", which is exactly the scope of a SALE-only plan.
- *      The biodiversity park IS included, as Block 1 includes it.
+ * Two deliberate departures from a literal transcription:
+ * 1. Land is per line. The workbook's one ₹13.2 Cr site cost is split across the two lines by
+ *    plot area (₹405.5299... per sqft over 3,25,500 sqft); the total is identical to the rupee.
+ * 2. No senior living: Block 1 is "excl. Senior Living". The biodiversity park is included.
  */
 
 import type { HoldLine, PlanInputs, SaleLine } from "./inputs";
@@ -47,8 +29,7 @@ const plottedVillas: SaleLine = {
   landPricePsf: 1150,
   housePricePsf: 5500,
   constructionPsf: 3000,
-  // Plotted villas and row houses are built to order — the workbook
-  // spends nothing ahead of a buyer, and neither does this.
+  // Built to order: nothing is spent ahead of a buyer.
   buildMode: "on-sale" as const,
   buildStartMonth: 1,
   buildMonths: 22,
@@ -72,32 +53,23 @@ const rowHouses: SaleLine = {
   landPricePsf: 1150,
   housePricePsf: 5500,
   constructionPsf: 3000,
-  // Plotted villas and row houses are built to order — the workbook
-  // spends nothing ahead of a buyer, and neither does this.
+  // Built to order: nothing is spent ahead of a buyer.
   buildMode: "on-sale" as const,
   buildStartMonth: 1,
   buildMonths: 18,
   salesStartMonth: 1,
   velocity: [0.8, 1.3, 2],
-  // The staggered launch: row houses stay at zero until 70% of the
-  // plotted villas have gone.
+  // Staggered launch: row houses wait until 70% of the plotted villas have gone.
   launchTriggerPct: 70,
   bookingPct: null,
   instalments: null,
 };
 
 /**
- * The workbook's Block 2, as a HOLD line: 34 serviced two-bed units,
- * built months 19–30, filling at three a month, held twenty years.
- *
- * The workbook works this per PAX (two beds a unit, so half the per-unit
- * charge and twice the count). Beds cancel out of every figure — the
- * charge is halved and the count doubled — so this line is per UNIT and
- * reaches the same answers with one fewer input to get wrong.
- *
- * Land here is development only, at ₹200/sqft over 15,000 sqft: the
- * site's acquisition cost already sits on the residential lines, and
- * charging it twice would double-count ₹13.2 Cr.
+ * The workbook's Block 2 as a HOLD line: 34 serviced two-bed units, built months 19–30, filling
+ * three a month, held twenty years. Per unit, not per pax (the beds cancel out of every figure).
+ * Land is development only (₹200/sqft over 15,000 sqft): acquisition already sits on the
+ * residential lines and would double-count ₹13.2 Cr.
  */
 const seniorLiving: HoldLine = {
   id: "fixture-senior-living",
@@ -143,12 +115,10 @@ const seniorLiving: HoldLine = {
   sellingCostPct: 1,
 };
 
-/** Block 2 on its own — the senior-living line and nothing else. */
 export function viharaSeniorLivingPlan(): PlanInputs {
   return { ...viharaPlan(), lines: [seniorLiving] };
 }
 
-/** Blocks 1 and 2 together — the whole village, which is Block 3. */
 export function viharaConsolidatedPlan(): PlanInputs {
   const plan = viharaPlan();
   return { ...plan, lines: [...plan.lines, seniorLiving] };
@@ -158,9 +128,7 @@ export function viharaPlan(): PlanInputs {
   return {
     horizonMonths: 72,
     financingRatePct: 15,
-    // Capital tab: 50% of the ₹13.02 Cr land-development cost, raised as
-    // project equity. Land is JV-deferred, so equity is that and nothing
-    // more.
+    // Capital tab: 50% of the ₹13.02 Cr land-development cost as project equity; land is JV-deferred, so that is all the equity.
     openingEquity: 65_100_000,
     landTerms: "jv",
     landPremiumPct: 30,

@@ -24,8 +24,7 @@ export default async function ReceivePage({ params }: { params: Promise<{ poId: 
       category: categoryNameById.get(work.category_id) ?? "Other",
     }));
 
-  // Goods only arrive against an issued order — the database refuses
-  // anything else, so don't offer a form that cannot be submitted.
+  // Goods only arrive against an issued order; the database refuses anything else.
   if (pool.status !== "issued") redirect("/inventory/receive");
 
   return (

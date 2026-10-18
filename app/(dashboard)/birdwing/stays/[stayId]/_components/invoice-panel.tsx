@@ -13,12 +13,8 @@ import { formatDate, formatMoney } from "@/lib/format";
 import { FileText } from "lucide-react";
 import { useActionState } from "react";
 
-/**
- * The invoice. Until it is issued it is only a preview of the charges,
- * watermarked DRAFT; issuing mints the next MEF/GH number in the database
- * and freezes the charges. A mistake is a cancel with a reason and a new
- * issue — the cancelled one stays on the record, never deleted.
- */
+/** Until issued it is a DRAFT preview; issuing mints the MEF/GH number in the database and freezes the charges.
+ * A mistake is a cancel with a reason and a new issue; the cancelled one stays on record. */
 export function InvoicePanel({
   stayId,
   guestName,
@@ -30,7 +26,6 @@ export function InvoicePanel({
   guestName: string;
   issued: StayInvoice | null;
   history: StayInvoice[];
-  /** Why it cannot be issued yet, or null. */
   blocker: string | null;
 }) {
   const pdf = `/birdwing/stays/${stayId}/invoice`;

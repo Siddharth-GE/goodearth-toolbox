@@ -5,14 +5,8 @@ export default async function proxy(request: NextRequest) {
   return updateSession(request);
 }
 
-// Everything except genuine build output. The matcher used to also skip
-// any path ending .svg/.png/.jpg/.jpeg/.gif/.webp, which was meant for
-// files in /public — but a dynamic route segment can end in those
-// characters too (/selections/views/anything.png), and on a skipped path
-// nothing strips the x-user-id header that lib/auth/dal.ts trusts. There
-// is no /public folder, so the wider matcher costs nothing today; if one
-// ever appears, its files cost one cookie check each, a fair price for
-// the boundary holding everywhere.
+// Everything but build output. Static-file extensions are NOT skipped: a dynamic
+// segment can end in .png, and a skipped path keeps a forged x-user-id header.
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };

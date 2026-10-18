@@ -1,7 +1,6 @@
 "use server";
 
-// Type-only import, never re-exported from a "use server" file — the
-// 2026-08-03 outage rule, enforced by npm run check:actions.
+// Type-only, never re-exported from a "use server" file (npm run check:actions).
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { dbErrorMessage } from "@/lib/db-error";
@@ -12,23 +11,15 @@ import { redirect } from "next/navigation";
 import type { DayRates } from "./lines";
 import { pieceRatesPayload } from "./labour-billing";
 
-/**
- * Send to Bill (0106, plan.md B7): the ticked labour entries become one
- * bill — its lines, its total, and every entry stamped with it — inside
- * send_labour_logs_to_bill(), all or nothing. The function is SECURITY
- * DEFINER because it stamps labour_logs, which the billing team cannot
- * write; it checks /bills first, takes the quantities from the entries,
- * and from here takes only rates, the reference, date and note.
- */
+// All or nothing in send_labour_logs_to_bill(), SECURITY DEFINER because it stamps labour_logs, which the billing team cannot write.
+// It checks /bills first and takes quantities from the entries: only rates, reference, date and note come from here.
 
 export type SendToBillInput = {
   logIds: string[];
   kind: "nmr" | "pw";
-  /** Piece-work: the contractor's approved work order. */
   labourContractId: string | null;
   billReference: string;
   billDate: string;
-  /** Daily wages: the day rate per trade. */
   dayRates: DayRates | null;
   /** Piece-work: the rate per entry (a lump sum: its amount). */
   pieceRates: Record<string, number | null> | null;
@@ -59,8 +50,7 @@ export async function sendLabourToBill(input: SendToBillInput): Promise<ActionSt
       : pieceRatesPayload(input.pieceRates ?? {}, input.gstPct);
 
   const supabase = await createClient();
-  // The casts paper over the typegen limitation createBill notes: these
-  // arguments are genuinely optional and PostgREST passes JSON null on.
+  // The casts paper over typegen; PostgREST passes JSON null on.
   const { data: billId, error } = await supabase.rpc("send_labour_logs_to_bill", {
     p_log_ids: input.logIds,
     p_labour_contract_id: (input.kind === "pw"

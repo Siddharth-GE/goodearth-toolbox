@@ -16,36 +16,9 @@ import type {
   TrailSummary,
 } from "./trail-rules";
 
-/**
- * The bot's fixed sentences — words only, no I/O. Every refusal the door
- * can send back is pinned here verbatim from the Phase 3 decision table,
- * so the door never improvises a sentence and never says more about who
- * exists in the system than these five lines allow. The greeting is the
- * one line an `ok` identity gets instead.
- *
- * Em-dashes are fine in these replies — the em-dash trap from Phase 2 was
- * Google's command *description* field in the console, not chat text.
- *
- * Phase 4 grows this file with the space-linking sentences and the /link
- * dialog card — the dialog is built here too, as a plain object that the
- * door wraps in Google's `pushCard`/navigation envelope.
- *
- * Phase 5 grows it again with the two read cards, `/court` and `/trail`.
- * Both are built from the same one-row widget (a `decoratedText` plus an
- * `openLink` button), so that widget — and the day-and-status sentence
- * every row carries — is written once below and shared by both builders.
- *
- * Phase 6/7 grows it a third time: the court card's rows gain the action
- * buttons trail-rules.ts's `buttonsFor` decides on (still ending in the
- * same "Open in the toolbox" link, trap (e) means every button here is a
- * URL, never a name), plus the two dialogs — `/bounce` and `/newtrail`
- * — and the sentences a write posts to the space or says back privately.
- * Those sentences are `text`, not a card, so they use *asterisks* for
- * bold the way Chat's plain messages do, and — being the bot's own
- * words, not a villa name or a note somebody typed — are not run through
- * escapeHtml; the trail's own name and note ARE somebody's words and do
- * go through it wherever they land inside a card widget.
- */
+// The bot's fixed sentences and card builders: words only, no I/O. Refusals are pinned so the
+// door never says more about who exists than these five lines. Text sentences use *bold*
+// asterisks and skip escapeHtml; anything somebody typed goes through it inside cards.
 
 export type RefusalKind = "no-email" | "unknown" | "inactive" | "no-relay" | "failed";
 
@@ -60,17 +33,10 @@ const REFUSALS: Record<RefusalKind, string> = {
   failed: "I couldn't check who you are just now. Please try again in a moment.",
 };
 
-/** The one sentence a given refusal kind is allowed to say, verbatim. */
 export function identityRefusal(kind: RefusalKind): string {
   return REFUSALS[kind];
 }
 
-/**
- * A recognised person, with no command dispatch for what they typed:
- * names them, and either names the command they typed (still true for
- * /newtrail, which has no card of its own yet) or — a plain DM message
- * with nothing to run — points at the two Phase 5 commands that do.
- */
 export function greeting(firstName: string, command: string | null): string {
   if (command) {
     return `Hi ${firstName}! I heard ${command} — it isn't wired up yet, but now I know who's asking.`;
@@ -78,12 +44,6 @@ export function greeting(firstName: string, command: string | null): string {
   return `Hi ${firstName}! Try /court to see what's in your hand, or /trail followed by a villa name.`;
 }
 
-/**
- * The join announcement, once a space has been matched (or not) against
- * units and projects. With a label, the space is now linked; without one,
- * nothing matched (or the space had several candidates) and the bot says
- * how to fix that with /link.
- */
 export function joinHello(label: string | null): string {
   if (label) {
     return `Hello! I'm the Relay bot. I've linked this space to ${label}. Commands here default to it; /link changes that.`;
@@ -91,25 +51,18 @@ export function joinHello(label: string | null): string {
   return "Hello! I'm the Relay bot. Use /link to tell me which villa or project this space is for — until then, commands here span everything.";
 }
 
-/** /link in a DM: DMs already span everything, so there is nothing to link. */
 export function dmCannotLink(): string {
   return "A DM can't be linked — commands here already span everything.";
 }
 
-/** /link answered outside a dialog event: the console's dialog tick is missing. */
 export function dialogNotEnabled(): string {
   return "The /link command needs 'Opens a dialog' ticked in the Chat app's configuration — an admin can do that in the Google Cloud console.";
 }
 
-/** The dialog's write failed; the person should just try again. */
 export function linkSaveFailed(): string {
   return "I couldn't save that just now. Please try again in a moment.";
 }
 
-/**
- * The public confirmation once a /link dialog is submitted successfully.
- * With a label, the space is now linked to it; without one, it was unlinked.
- */
 export function linkConfirmation(label: string | null): string {
   if (label) {
     return `This space is now linked to ${label}.`;
@@ -117,22 +70,10 @@ export function linkConfirmation(label: string | null): string {
   return "This space is no longer linked — commands here span everything.";
 }
 
-/** One row of the /link dialog's dropdown: a value the door understands, and its label. */
 export type LinkTarget = { value: string; text: string };
 
-/**
- * The /link dialog itself, as a plain object shaped like a Google Chat
- * card. The door wraps this in the `pushCard` navigation envelope — this
- * function knows nothing about that envelope, only the card. The caller
- * supplies every row, including the "none" one; this builder invents none.
- *
- * `submitUrl` is where Google posts the Save press. For an HTTP app the
- * button's `action.function` is a URL, not a name — the first vet
- * (2026-09-02) had "link" there, Google tried to reach a URL called
- * "link", and showed "the app is not responding" without ever calling
- * the door. The `action` parameter names the button so the door can tell
- * this Save from the trail buttons that arrive in Phase 6.
- */
+// `submitUrl`: for an HTTP app a button's `action.function` is a URL, not a name (trap (e)).
+// The `action` parameter tells the door which Save this is.
 export function linkDialog(
   targets: LinkTarget[],
   current: string,
@@ -175,34 +116,17 @@ export function linkDialog(
   };
 }
 
-/**
- * A dialog that only says something. When Google has asked the app for
- * a dialog, the answer MUST be a dialog — a plain message envelope in
- * reply to a dialog request is "invalid" and shows as "Could not load
- * dialog" (the first vet, /link in a DM). So a refusal or an apology at
- * that moment is this: one paragraph, and the dialog's own close button.
- */
+// When Google asks for a dialog the answer must be a dialog, even a refusal (trap (f)).
 export function noticeDialog(text: string): Record<string, unknown> {
   return { sections: [{ widgets: [{ textParagraph: { text } }] }] };
 }
 
-/**
- * Every string that ends up inside a card's rich-text fields (a
- * `decoratedText`'s `text` in particular, which the bot itself puts
- * `<b>` and `<br>` into) has to be escaped first, or a villa named with
- * a stray "<" in it would break the tag rather than just look odd. Only
- * the three characters HTML actually parses as markup need it.
- */
+// Escapes the three characters HTML parses as markup, so a stray "<" in a villa name can't break a tag.
 function escapeHtml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-/**
- * "Cold — day 30 of 5" — the app's own danger red (`--danger: #dc2626`,
- * app/globals.css). The client half is appended inside the same red font
- * when both are true, because cold is the worse state and the sentence
- * should say both without splitting the colour.
- */
+// The app's danger red (--danger); the client part rides in the same red font.
 function coldStatusLine(row: TrailSummary): string {
   const clientPart = row.isWithClient
     ? `, with the client ${row.withClientDays} day${row.withClientDays === 1 ? "" : "s"}`
@@ -210,69 +134,35 @@ function coldStatusLine(row: TrailSummary): string {
   return `<font color="#dc2626">Cold — day ${row.daysInLeg} of ${row.expectedDays}${clientPart}</font>`;
 }
 
-/** "With the client 4 days — day 6 of 10" — the app's own warning amber (`--warning: #d97706`). */
+// The app's warning amber (--warning).
 function withClientStatusLine(row: TrailSummary): string {
   const days = `${row.withClientDays} day${row.withClientDays === 1 ? "" : "s"}`;
   return `<font color="#d97706">With the client ${days} — day ${row.daysInLeg} of ${row.expectedDays}</font>`;
 }
 
-/**
- * The clock-and-status sentence every row carries — the founder's ask,
- * 2026-09-09: "can there be something in trails and court that shows
- * clearly what's red?" It used to be buried at the end of the bottom
- * label ("Leg 2 of 8 · Client sign-off — day 30 of 5, cold"); it is now
- * the third line of the row's own text, coloured the same danger red or
- * warning amber the app's Relay screens badge cold and with-the-client
- * trails with. On time carries no colour at all.
- *
- * Google is documented to accept `<font color="#hex">` inside a
- * decoratedText's `text` field, but this is the first `<font>` tag the
- * door has ever sent and nobody has watched Google render it yet — a
- * belief until the founder's vet on staging, same as every other shape
- * in this file (BUGCATCHER #17). If Google drops or refuses the tag,
- * the plain-text 🔴/🟠 mark `rowWidgets` puts on the top label still
- * carries the meaning on its own — that mark is plain text, so Google
- * cannot object to it.
- */
+// Third line of every row, coloured like the app's badges. The <font> tag is unproven in
+// Google's render (BUGCATCHER #17); the 🔴/🟠 mark on the top label carries the meaning if dropped.
 function statusLine(row: TrailSummary): string {
   if (row.isStuck) return coldStatusLine(row);
   if (row.isWithClient) return withClientStatusLine(row);
   return `Day ${row.daysInLeg} of ${row.expectedDays}, on time`;
 }
 
-/** "Leg 2 of 5 · Structural drawings" — the leg label is omitted when the view has none. */
 function legAndLabel(row: TrailSummary): string {
   const legNumber = row.currentLeg ?? row.legCount;
   const base = `Leg ${legNumber} of ${row.legCount}`;
   return row.legLabel ? `${base} · ${escapeHtml(row.legLabel)}` : base;
 }
 
-/**
- * The court's own bottom label: which leg. The clock and status used to
- * end this line; they now live at the top of the row instead, in colour
- * (`statusLine`), so this is just the leg.
- */
 function courtBottomLabel(row: TrailSummary): string {
   return legAndLabel(row);
 }
 
-/**
- * /trail's bottom label: the same leg-and-label courtCard's rows carry
- * — someone asking "where is villa 12's drawings" wants to know which
- * leg it's on as much as who has it — plus who holds it. The clock and
- * status moved up into `statusLine`, level with every other row's.
- */
 function trailBottomLabel(row: TrailSummary): string {
   const holder = row.holderName ? escapeHtml(row.holderName) : "Unnamed";
   return `${legAndLabel(row)} · with ${holder}`;
 }
 
-/**
- * "everything · 2 cold, 1 with the client" — the court and trail headers
- * counting the red the founder asked to see, so a scanning eye knows how
- * many rows need attention before reading a single one. A zero part is
- * omitted; both zero leaves `base` untouched.
- */
 function subtitleWithCounts(base: string, coldCount?: number, withClientCount?: number): string {
   const parts: string[] = [];
   if (coldCount && coldCount > 0) parts.push(`${coldCount} cold`);
@@ -280,7 +170,6 @@ function subtitleWithCounts(base: string, coldCount?: number, withClientCount?: 
   return parts.length > 0 ? `${base} · ${parts.join(", ")}` : base;
 }
 
-/** Every action button's own label, in the order buttonsFor hands the actions back. */
 const ACTION_BUTTON_TEXT: Record<ButtonAction, string> = {
   push: "Push",
   finish: "Finish",
@@ -289,16 +178,8 @@ const ACTION_BUTTON_TEXT: Record<ButtonAction, string> = {
   return: "Back from client",
 };
 
-/**
- * One row's action buttons — Push/Finish/Bounce/With client/Back from
- * client, whichever `buttonsFor` says this trail's state offers. Every
- * one posts to the same `submitUrl` (the door's own registered address —
- * trap (e), a callback button's `onClick.action.function` must be a URL,
- * never a name) carrying which action, which trail and which leg it was
- * pressed from, so `parseButton` in trail-rules.ts can read the press
- * back with nothing guessed. Bounce alone opens a dialog instead of
- * acting straight away, because it needs a reason and a note first.
- */
+// Every button posts to submitUrl (a URL, never a name: trap (e)) carrying action, trail and
+// leg. Bounce alone opens a dialog, since it needs a reason first.
 function actionButtons(row: TrailSummary, submitUrl: string): Record<string, unknown>[] {
   if (row.currentLeg === null) return [];
   const fromLeg = row.currentLeg;
@@ -312,25 +193,15 @@ function actionButtons(row: TrailSummary, submitUrl: string): Record<string, unk
         { key: "leg", value: String(fromLeg) },
       ],
     };
-    // `interaction` is a field of the ACTION, not of the click around it.
-    // Placed one level up, Google rejects the whole card silently and
-    // shows "Relay not responding" — the founder's first /court with a
-    // baton in hand, 2026-09-03 (trap (i) in plan.md).
+    // `interaction` belongs to the action, not the click around it; one level up Google silently
+    // rejects the whole card (trap (i)).
     if (action === "bounce") clickAction.interaction = "OPEN_DIALOG";
     return { text: ACTION_BUTTON_TEXT[action], onClick: { action: clickAction } };
   });
 }
 
-/**
- * One trail as the widgets every row is made of: a plain-text 🔴/🟠 mark
- * ahead of the project/unit line — cold wins over with-the-client when
- * both are true, the worse state, the same order the app's own badges
- * use — the activity and title, a third line carrying `statusLine`'s
- * clock-and-status sentence in colour, then a single buttonList —
- * whatever action buttons the caller supplies (none for /trail's
- * read-only rows) followed by Open in the toolbox, which always comes
- * last so a row never ends on a button that moves something.
- */
+// Cold wins over with-the-client when both are true. Open in the toolbox always comes last,
+// so a row never ends on a button that moves something.
 function rowWidgets(
   row: TrailSummary,
   origin: string,
@@ -343,10 +214,7 @@ function rowWidgets(
     : escapeHtml(row.projectName);
   const topLabel = `${mark}${place}`;
   const activity = `<b>${escapeHtml(row.activityName)}</b>`;
-  // A trail laid down from a trail type carries the type's name as both
-  // its activity and its title, so "Standard villa" would print twice
-  // (seen on the first staging card, 2026-09-03). The title earns its
-  // line only when it says something the bold line doesn't.
+  // A trail from a type has the type's name as activity and title; print it once.
   const title = row.title?.trim() ?? "";
   const repeats = title.toLowerCase() === row.activityName.trim().toLowerCase();
   const lines = [activity];
@@ -365,29 +233,13 @@ function rowWidgets(
   ];
 }
 
-/** No words in a DM or an unlinked space: /trail alone has nothing to scope or search by. */
 export function askForWords(): string {
   return "Tell me what to look for — a villa, a project or an activity, e.g. /trail villa 12.";
 }
 
-/**
- * The /court card: everything unfinished the sender holds, coldest
- * first. A linked space has already split this by scope before it gets
- * here (`trail-rules.ts`'s `splitByScope`), so `rows` is only what's in
- * scope, `more` is how many of those were cut at the ten-cap, and
- * `moreElsewhere` is how many more the sender holds outside this space
- * — all from the one unscoped read `listCourt` did.
- *
- * `notice` is round two's line: after a press the same card is rebuilt
- * with what just happened on top, so the card the person is looking at
- * says both what moved and what is still with them. Omitted (the plain
- * `/court` read) the card is byte-for-byte what it always was.
- *
- * `coldCount` and `withClientCount` — the founder's ask, 2026-09-09 —
- * count the whole in-scope court, not just the rows shown: a cold trail
- * cut off by the ten-cap must still be counted, so the caller passes
- * these over `inScope` before `takeForCard` runs, not over `rows` here.
- */
+// `rows` is already scoped, `more` were cut at the ten-cap. `notice` is the line a rebuilt card
+// puts on top after a press. The counts cover the whole in-scope court, so callers pass them
+// before takeForCard runs.
 export function courtCard(input: {
   firstName: string;
   scopeLabel: string | null;
@@ -448,21 +300,13 @@ export function courtCard(input: {
   };
 }
 
-/** No words: "Nothing is running here right now." With words: names what didn't match. */
 function trailEmptyText(words: string[], origin: string): string {
   if (words.length === 0) return "Nothing is running here right now.";
   const phrase = escapeHtml(words.join(" "));
   return `Nothing running matches '${phrase}'. Finished and waiting trails are <a href="${origin}/relay/trails">in the toolbox</a>.`;
 }
 
-/**
- * The /trail card: every running match, by holder. `words` is what
- * `searchWords` made of what was typed — already used to filter `rows`
- * before this is called, and repeated here only to say what was searched
- * for. `coldCount`/`withClientCount` are the same red-counting the court
- * card gained (the founder's ask, 2026-09-09), over every matched row
- * before the ten-cap, appended after the existing subtitle text.
- */
+// `words` only says what was searched; `rows` are already filtered. Counts as in courtCard.
 export function trailCard(input: {
   words: string[];
   scopeLabel: string | null;
@@ -497,22 +341,13 @@ export function trailCard(input: {
   };
 }
 
-// --- Phase 6/7: the two dialogs, and the sentences a write produces ----
-
-/** "Leg 1 · Client sign-off · Anil" — a bounce target row, label omitted when the leg carries none. */
 function legOptionText(leg: LegOption): string {
   const labelPart = leg.label ? ` · ${escapeHtml(leg.label)}` : "";
   const assignee = leg.assigneeName ? escapeHtml(leg.assigneeName) : "Unnamed";
   return `Leg ${leg.legNo}${labelPart} · ${assignee}`;
 }
 
-/**
- * The /bounce dialog: which leg to send the trail back to, why, and what
- * needs to change — built even for a trail with no legs behind it to
- * bounce to (an empty "Send it back to" dropdown), because the button
- * that opens this is only offered when `buttonsFor` already found a leg
- * to go back to, and this builder shouldn't have to re-decide that.
- */
+// Built even with no legs behind it: the opening button is only offered when buttonsFor found one.
 export function bounceDialog(input: {
   trail: TrailSummary;
   legs: LegOption[];
@@ -580,26 +415,9 @@ export function bounceDialog(input: {
   };
 }
 
-/**
- * The /newtrail dialog: which house, which trail type — or "Custom", first
- * in the list, for when there is no trail type at all and the person lays
- * out the steps themselves — how many steps that custom trail gets,
- * whether they want to choose who carries each step, and whether the clock
- * starts today. The step count is asked here, before page 2 exists,
- * because a Chat dialog cannot grow a row once it is open: page 2 renders
- * exactly the number chosen, and a trail type ignores it entirely (its own
- * steps decide). `units` is space-match.ts's
- * `unitRows` output — a flat list, unlike /link's dropdown, because a new
- * trail always starts on one villa, never a whole project. `selectedUnit`
- * pre-fills a linked space's own villa; a project-linked or unlinked space
- * passes null and nothing is pre-selected. Neither switch is pre-selected
- * the way "Custom" isn't: "Choose the people myself" starts off, because
- * most trails just want the usual person; "Start now" starts on — unlike
- * the app's house queue, which queues by default, chat's founder-approved
- * default is to start immediately. Saving here either opens the trail at
- * once (a standard type, people not chosen) or hands the door what it
- * needs to build page 2 — this builder knows nothing about that branch.
- */
+// `units` is a flat list: a trail starts on one villa, never a whole project. A chat trail
+// starts now by default, unlike the app's queue. The step count is asked here because a Chat
+// dialog can't grow a row once open; a trail type ignores it.
 export function newTrailDialog(input: {
   units: { value: string; text: string }[];
   sets: TrailSetOption[];
@@ -690,33 +508,8 @@ export function newTrailDialog(input: {
   };
 }
 
-/**
- * Page 2 of /newtrail — the steps themselves, one section, shown only when
- * page 1's Save wasn't the one-tap case (a standard type, people left to
- * their usual person). Set mode's rows are fixed to the trail type's own
- * activities, in order, each pre-filled with its usual person and days —
- * choosing the people myself mostly means changing one or two dropdowns,
- * not filling in every row from scratch. Custom mode has no defaults to
- * pre-fill from, so every row starts blank; it renders exactly the number
- * of rows page 1 asked for (`customSteps`, a blank one is dropped by
- * `parseTrailSteps`, not by this builder, which doesn't know which will
- * end up used).
- *
- * `error` and `values` are what makes a refusal survivable. A page-2
- * failure used to be a `notification` toast on the closing dialog — the
- * founder's vet (2026-09-03) saw the dialog shut with nothing said and no
- * trail opened, because a toast is not a warning. So every page-2 failure
- * now re-draws this same page with the sentence at the top and every box
- * exactly as the person left it: `values` wins over the defaults for any
- * input it has an entry for, so a corrected form is one dropdown away
- * rather than the whole page typed again.
- *
- * The Open trail button carries what page 1 already decided — `unit`,
- * `set`, `start`, and `mode` — plus how many rows to read back (`count`)
- * and, in set mode, which activity each row is (`activities`, so the door
- * needs no memory between the two dialog pages: `parseTrailSteps` reads
- * everything else straight off this page's own form values.
- */
+// Page 2. `values` wins over defaults, so a refused form is redrawn as the person left it. The
+// Open button carries page 1's answers, so the door keeps no memory between pages.
 export function trailStepsDialog(input: {
   mode: "set" | "custom";
   steps: StepDefault[];
@@ -733,9 +526,7 @@ export function trailStepsDialog(input: {
 
   const customRows = customStepCount(input.customSteps ?? null);
 
-  // "The person left this box like that" and "nobody has touched this box
-  // yet" are different answers: a re-drawn page keeps a dropdown someone
-  // cleared cleared, while a first draw falls back to the type's default.
+  // A box the person cleared stays cleared on redraw; an untouched one takes the default.
   const wasSubmitted = (name: string): boolean => values !== undefined && name in values;
   const submitted = (name: string): string => values?.[name] ?? "";
 
@@ -845,33 +636,20 @@ export function trailStepsDialog(input: {
   return { sections: [{ widgets }] };
 }
 
-/** The public confirmation's extra line for a custom trail — it has no departments yet. */
 export function customDepartmentsNote(): string {
   return "Add its departments on the trail page if it needs them.";
 }
 
-/**
- * "on Villa 12" — every write sentence below says where a trail lives
- * the same way: the villa when it has one, the project alone when it
- * doesn't (a project-level trail, or a unit read that came back bare).
- */
 function trailWhere(trail: TrailSummary): string {
   return `on ${trail.unitName ?? trail.projectName}`;
 }
 
-/** " · Client sign-off" — omitted when the leg the sentence is about carries no label. */
 function trailLegPart(trail: TrailSummary): string {
   return trail.legLabel ? ` · ${trail.legLabel}` : "";
 }
 
-/**
- * Public confirmations, posted to the space as an ordinary message —
- * `text`, not a card, so *asterisks* are Chat's own way of saying bold
- * and nothing here goes through escapeHtml (see the file header). Built
- * from the fresh TrailSummary a write's own confirmation read returns,
- * so the leg, the label and the holder are all where the write actually
- * left them, never the state the button was pressed from.
- */
+// Public confirmations are `text`, not cards. Built from the fresh summary, so they show where
+// the write left the trail.
 export function pushedText(firstName: string, trail: TrailSummary): string {
   const holder = trail.holderName ?? "nobody named";
   return `*${firstName}* pushed *${trail.activityName}* ${trailWhere(trail)} to leg ${trail.currentLeg} of ${trail.legCount}${trailLegPart(trail)} — now with ${holder}.`;
@@ -899,7 +677,6 @@ export function returnedText(firstName: string, trail: TrailSummary): string {
   return `*${firstName}* took *${trail.activityName}* ${trailWhere(trail)} back from the client.`;
 }
 
-/** currentLeg null means the trail was opened queued, not started; otherwise it says where it landed. */
 export function openedText(firstName: string, trail: TrailSummary): string {
   if (trail.currentLeg === null) {
     return `*${firstName}* queued *${trail.activityName}* ${trailWhere(trail)} — not started yet.`;
@@ -908,17 +685,14 @@ export function openedText(firstName: string, trail: TrailSummary): string {
   return `*${firstName}* opened *${trail.activityName}* ${trailWhere(trail)} — leg ${trail.currentLeg} of ${trail.legCount}${trailLegPart(trail)}, with ${holder}.`;
 }
 
-/** The close navigation's private toast when a dialog write actually succeeded. */
 export function doneText(): string {
   return "Done.";
 }
 
-/** actAs() failed at any step — the session couldn't be minted, or was lost mid-write. */
 export function cannotActNow(): string {
   return "I couldn't act as you just now. Please try again in a moment.";
 }
 
-/** /newtrail answered outside a dialog event: the console's dialog tick is missing, same as /link's. */
 export function newTrailNeedsDialog(): string {
   return "The /newtrail command needs 'Opens a dialog' ticked in the Chat app's configuration — an admin can do that in the Google Cloud console.";
 }

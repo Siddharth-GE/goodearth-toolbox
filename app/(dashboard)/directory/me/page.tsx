@@ -31,10 +31,7 @@ export default async function MyDetailsPage() {
         </div>
       </Section>
 
-      {/* Shown read-only rather than hidden. Somebody who cannot see their
-          own department just asks why it is missing — and the greyed
-          fields are where the "an admin sets this" rule becomes obvious
-          instead of surprising. */}
+      {/* Read-only rather than hidden, so the "an admin sets this" rule is visible. */}
       <Section title="Set by an admin" note="Ask an admin if any of this is wrong.">
         <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Fact label="Email" value={me.email} />

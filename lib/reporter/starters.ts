@@ -1,75 +1,33 @@
-/**
- * The starting points — code constants, not seeded rows.
- *
- * Because a seeded row cannot be corrected under additive-only
- * migrations (0005_remove_catalogue_seed_demo.sql exists because that
- * mistake was already made once); because a starter must change in
- * lockstep with the dataset registry, in the same deploy; and because
- * as constants they are TESTABLE — starters.test.ts asserts every one
- * round-trips through parseReportSpec with ZERO loss, which is the one
- * automated gate that catches a registry change silently gutting a
- * starting point.
- *
- * Starters are READ-ONLY. "Save a copy" inserts a `reports` row, and
- * from then on it is an ordinary saved report.
- *
- * Seven were planned with the founder. **A starter ships with its data
- * set, not before it** — one over a dataset that does not exist yet
- * would fail its own test, and would be a broken tile on the landing
- * page. So this list grows a row per stage:
- *
- *   Site & procurement activity   indent_lines        Stage 5  ✅
- *   Spend vs budget               budget_report_lines Stage 6  ✅
- *   Sales & collections           crm_milestones      Stage 7  ✅
- *   Stock & inventory position    stock               Stage 8  ✅
- *   Project scorecard             units               Stage 8  ✅
- *   Design & delivery progress    selection_lines     Stage 10 ✅
- *   Plan vs actual                plan_targets        Stage 10 ✅
- *
- * PURE data. Nothing here touches Supabase.
- */
+// Starters are code constants, not seeded rows: a seeded row can't be corrected under additive-only
+// migrations, and starters.test.ts proves each parses with zero loss. Read-only; "Save a copy"
+// makes an ordinary saved report. A starter ships with its dataset, never before it. Pure data.
 
 import { parseReportSpec, type ReportSpec } from "./spec";
 
 export type Starter = {
   /**
-   * "starter-site-procurement" — stable, and never a `reports.id`.
-   *
-   * A HYPHEN, not the colon this plan first specified. A starter id is
-   * a URL path segment (`/reporter/<id>`), and a colon there survived
-   * Next's own routing perfectly in local testing but 404'd on the
-   * deployed preview — the platform layer in front of the app treats
-   * it as something other than an ordinary character. It is also what
-   * stops some chat apps making a shared report link clickable. The id
-   * must now survive a URL untouched, and starters.test.ts asserts it.
+   * "starter-*": a hyphen, not a colon, which 404s on the deployed platform. Never a `reports.id`.
    */
   id: string;
   name: string;
-  /** One line saying what the report answers. Shown on the tile. */
   description: string;
   spec: ReportSpec;
 };
 
-/** What marks an id as a starting point rather than a saved report. */
 export const STARTER_PREFIX = "starter-";
 
 export function isStarterId(id: string): boolean {
   return id.startsWith(STARTER_PREFIX);
 }
 
-/**
- * Raw specs, parsed at module load through the same door untrusted JSON
- * uses. If a registry change ever breaks one, it breaks in the test
- * rather than on the landing page.
- */
+// Parsed at module load through the same door untrusted JSON uses, so a registry break fails the
+// test, not the landing page.
 const SITE_PROCUREMENT = {
   dataset: "indent_lines",
   columns: ["project", "indent", "item", "quantity", "uom", "status", "requested_on"],
   filters: [],
   groupBy: ["project", "status"],
-  // Counts, not a sum of quantity: quantity mixes bags, kilos and
-  // loads, so a "total quantity" across items is a number that means
-  // nothing. Both counts read the same whatever the unit.
+  // Counts, not a sum of quantity: quantity mixes bags, kilos and loads.
   measures: [
     { field: "indent", agg: "count_distinct" },
     { field: "item", agg: "count_distinct" },
@@ -83,12 +41,8 @@ const SITE_PROCUREMENT = {
   },
 };
 
-// "Spend vs budget" reads the budget side: what approved budgets commit
-// us to spend, beside the client value quoted on the same lines, and
-// the margin between them in rupees. It is NOT budget-versus-PO-actuals
-// — that comparison needs two datasets on one page, which is the
-// dashboard-composer product this plan defers. The filter pins it to
-// approved budgets so a draft nobody has signed cannot inflate it.
+// Reads the budget side only; the filter pins approved budgets so an unsigned draft can't inflate
+// it.
 const SPEND_VS_BUDGET = {
   dataset: "budget_report_lines",
   columns: ["project", "unit", "item", "quantity", "uom", "unit_cost", "client_rate", "margin_pct"],
@@ -108,9 +62,8 @@ const SPEND_VS_BUDGET = {
   },
 };
 
-// One dataset — milestones — never a join to receipts (the registry
-// explains the fan-out). received_amount is the view's own per-rung
-// aggregate, so due, received and balance all live on one row.
+// One dataset, never a join to receipts (it would fan out); received_amount is the view's own
+// per-rung aggregate.
 const SALES_COLLECTIONS = {
   dataset: "crm_milestones",
   columns: ["project", "unit", "client", "stage", "due_amount", "received_amount", "balance_due", "due_on"], // prettier-ignore
@@ -130,8 +83,7 @@ const SALES_COLLECTIONS = {
   },
 };
 
-// Grouped by item and summed across locations — the same item at two
-// stores is one holding. hbar because item names are long and many.
+// Summed across locations: the same item at two stores is one holding.
 const STOCK_POSITION = {
   dataset: "stock",
   columns: ["item", "item_code", "location", "location_kind", "quantity"],
@@ -147,9 +99,7 @@ const STOCK_POSITION = {
   },
 };
 
-// What stands where: units stacked by status, project by project. The
-// full multi-dataset scorecard the founder sketched is the dashboard
-// composer, deferred — this is the single-dataset version that exists.
+// Single-dataset version: units stacked by status, project by project.
 const PROJECT_SCORECARD = {
   dataset: "units",
   columns: ["project", "plot", "unit", "unit_type", "status"],
@@ -165,10 +115,8 @@ const PROJECT_SCORECARD = {
   },
 };
 
-// Grouped by revision status, not project×status: a stacked chart over
-// count_distinct would refuse (distinct counts do not merge across
-// segments — a unit under two revisions would double), so the chart is
-// a plain bar over one level and project is the filter.
+// Grouped by status alone: distinct counts don't merge across stacked segments (a unit under two
+// revisions would double).
 const DESIGN_DELIVERY = {
   dataset: "selection_lines",
   columns: ["project", "unit", "revision", "status", "item", "quantity", "uom"],
@@ -187,9 +135,7 @@ const DESIGN_DELIVERY = {
   },
 };
 
-// One row per published plan; the actuals are the view's own aggregates
-// so nothing here can fan out. Planned revenue beside what has actually
-// come in; planned cost beside what has actually been billed.
+// One row per published plan; the actuals are the view's own aggregates, so nothing fans out.
 const PLAN_VS_ACTUAL = {
   dataset: "plan_targets",
   columns: ["project", "plan", "scenario", "revenue", "actual_collections", "total_cost", "actual_spend", "pbt"], // prettier-ignore
@@ -262,7 +208,6 @@ export const STARTERS: Starter[] = [
   },
 ];
 
-/** The raw specs, for the test that proves they parse without loss. */
 export const STARTER_SOURCES: Record<string, unknown> = {
   "starter-site-procurement": SITE_PROCUREMENT,
   "starter-spend-vs-budget": SPEND_VS_BUDGET,
@@ -273,7 +218,6 @@ export const STARTER_SOURCES: Record<string, unknown> = {
   "starter-plan-vs-actual": PLAN_VS_ACTUAL,
 };
 
-/** A starter by id, or null. Never throws on an unknown id. */
 export function getStarter(id: string): Starter | null {
   return STARTERS.find((starter) => starter.id === id) ?? null;
 }

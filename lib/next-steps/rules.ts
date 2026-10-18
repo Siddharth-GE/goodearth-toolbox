@@ -1,52 +1,13 @@
 /**
- * The rules every action list in the toolbox shares — which section an
- * action sits in, what its date says, who may close it, how loaded a
- * person is. Born in Client Relations (the Saarang tracker, root plan.md
- * seventh and eighth pieces) and moved here when Design Management's
- * board took the same list (thirteenth piece): two tools wanting the same
- * rules get a shared module, never an import of each other's code.
- *
- *   * NO DATE IS OVERDUE. An action without a due date sits with the
- *     overdue ones until someone gives it a real date.
- *   * "Waiting on management" outranks everything: the flag a person
- *     raises when only a manager can clear it.
- *   * "Finished, waiting to confirm" is the setter's to close, never
- *     overdue and never its owner's load.
- *
- * Dates are ISO strings compared as strings, `today` passed in: nothing
- * here reads a clock (todayInIndia() in lib/format.ts is the one read).
+ * The rules every action list shares, so two tools never import each other. No date counts as overdue;
+ * "waiting on management" outranks everything; "finished, waiting to confirm" is the setter's to close.
+ * Dates are ISO strings compared as strings; `today` is passed in, nothing here reads a clock.
  */
+import { addDays, daysBetween, weekdayOf } from "@/lib/dates";
 import { formatDayDate, formatShortDate } from "@/lib/format";
 
-// ---------------------------------------------------------------------
-// Calendar arithmetic on "YYYY-MM-DD"
-// ---------------------------------------------------------------------
+export { addDays, daysBetween, weekdayOf };
 
-function utc(iso: string): number {
-  const [y, m, d] = iso.split("-").map(Number);
-  return Date.UTC(y, m - 1, d);
-}
-
-/** `iso` moved by `days`, still "YYYY-MM-DD". */
-export function addDays(iso: string, days: number): string {
-  return new Date(utc(iso) + days * 86_400_000).toISOString().slice(0, 10);
-}
-
-/** Whole days from `from` to `to` — negative when `to` is earlier. */
-export function daysBetween(from: string, to: string): number {
-  return Math.round((utc(to) - utc(from)) / 86_400_000);
-}
-
-/** 0 = Sunday … 6 = Saturday. */
-export function weekdayOf(iso: string): number {
-  return new Date(utc(iso)).getUTCDay();
-}
-
-// ---------------------------------------------------------------------
-// An action's section and its date
-// ---------------------------------------------------------------------
-
-/** An action's statuses, in the order its ••• menu lists them. */
 export const ACTION_STATUSES = [
   { value: "open", label: "Open" },
   { value: "waiting_client", label: "Waiting on client" },
@@ -64,7 +25,6 @@ export function isActionStatus(value: string): value is ActionStatus {
 
 export type ActionBucket = "confirm" | "management" | "overdue" | "week" | "later" | "done";
 
-/** The sections of a list, top to bottom. */
 export const BUCKET_ORDER: readonly ActionBucket[] = [
   "confirm",
   "management",
@@ -91,10 +51,7 @@ export type DueLabel = { text: string; tone: DueTone };
 
 export type DueInput = BucketInput & { dueAssumed?: boolean; doneOn?: string | null };
 
-/**
- * What an action's date chip says. Words carry the urgency, never colour
- * alone: "3 days overdue", "Tomorrow", "Fri, 17 Oct".
- */
+/** Words carry the urgency, never colour alone. */
 export function dueLabel(action: DueInput, today: string): DueLabel {
   if (action.status === "done") {
     return {
@@ -116,10 +73,7 @@ export function dueLabel(action: DueInput, today: string): DueLabel {
   return { text: formatDayDate(action.dueOn), tone: days <= 7 ? "info" : "neutral" };
 }
 
-/**
- * The due menu's quick picks. "This Friday" on a Friday is next week's —
- * today already has its own line.
- */
+/** "This Friday" on a Friday means next week's; today has its own line. */
 export function dueChoices(today: string): { label: string; date: string }[] {
   const weekday = weekdayOf(today);
   const toMonday = (8 - weekday) % 7 || 7;
@@ -144,7 +98,6 @@ export function compareOpen(
   return (a.sortKey ?? "").localeCompare(b.sortKey ?? "", "en", { numeric: true });
 }
 
-/** Done, most recent first. */
 export function compareDone(a: { doneOn: string | null }, b: { doneOn: string | null }): number {
   return (b.doneOn ?? "").localeCompare(a.doneOn ?? "");
 }
@@ -160,20 +113,9 @@ export function nextAction<T extends BucketInput>(actions: readonly T[]): T | nu
   return [...open].sort((a, b) => waiting(a) - waiting(b) || compareOpen(a, b))[0];
 }
 
-// ---------------------------------------------------------------------
-// Who may close an action
-// ---------------------------------------------------------------------
-
 /**
- * The founder, 2026-10-16: "you can only complete an action that you set,
- * not everyone can". Whoever set it closes it, and so does a manager (an
- * admin); its owner, having done the work, marks it finished for the
- * setter to confirm; anyone else only looks. An action with no setter on
- * record counts its owner as one.
- *
- *   close  — tick it done, or open it again
- *   finish — tick it finished (waiting for the setter), or take that back
- *   none   — the tick is locked
+ * Whoever set an action closes it, and so does an admin; its owner marks it finished for the setter to confirm; anyone else only looks.
+ * No setter on record: the owner counts as one. close = tick done or reopen; finish = tick finished or take it back; none = locked.
  */
 export type CloseRight = "close" | "finish" | "none";
 
@@ -189,10 +131,6 @@ export function closeRight(
   if (me.id === action.ownerId) return "finish";
   return "none";
 }
-
-// ---------------------------------------------------------------------
-// A person's load — the team strip and the greeting
-// ---------------------------------------------------------------------
 
 export type Load = {
   open: number;

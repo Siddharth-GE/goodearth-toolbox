@@ -1,7 +1,3 @@
-/**
- * Birdwing's tiles in Financial Management — the consolidated page's
- * arithmetic, pinned.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

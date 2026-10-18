@@ -1,19 +1,10 @@
 /**
- * The migration folder and the ledger that says what a database has had.
+ * Reads the migration folder and the ledger of what a database has had.
+ * Shared by apply-migrations.ts and check-migrations.ts; writes nothing.
+ * It is separate because apply-migrations.ts runs main() on import.
  *
- * Shared by the two scripts that need the same answer from opposite ends:
- * scripts/apply-migrations.ts, which applies what is missing, and
- * scripts/check-migrations.ts, which only asks and fails if anything is.
- *
- * It exists because scripts/apply-migrations.ts calls main() at module
- * load — importing it to reuse two functions would run the applier. The
- * reading half lives here instead, and writes nothing anywhere.
- *
- * `applied_migrations` (0067) is the source of truth for what a database
- * has had. A filename alone only answers "did something with this name
- * run?"; the checksum answers "did THIS file run?", so an applied
- * migration edited afterwards — which the rulebook forbids — shows up
- * instead of passing unnoticed.
+ * `applied_migrations` (0067) is the source of truth. The checksum shows an
+ * applied migration that was edited afterwards.
  */
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
@@ -38,10 +29,7 @@ export function readMigrations(): Migration[] {
     });
 }
 
-/**
- * The ledger, or an empty map when the table does not exist yet — which
- * is the normal state of a database that has never been migrated.
- */
+// The ledger, or an empty map when the table does not exist yet (a never-migrated database).
 export async function readLedger(ref: string): Promise<Map<string, string>> {
   const exists = await sql<{ present: boolean }>(
     ref,
@@ -57,13 +45,10 @@ export async function readLedger(ref: string): Promise<Map<string, string>> {
 }
 
 export type LedgerComparison = {
-  /** In the folder, not in the ledger: this database is behind the code. */
   pending: Migration[];
-  /** In both, with different contents: an applied file was edited. */
   mismatched: string[];
 };
 
-/** What one database is missing, and what it has under a changed name. */
 export function compareToLedger(
   migrations: Migration[],
   ledger: Map<string, string>,

@@ -1,8 +1,3 @@
-/**
- * Replaying a trail's log. The scenarios here are the ones that actually
- * happen on site: a clean run, a bounce, a leg visited twice, a hand-off
- * mid-leg, and a trail that has gone cold.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -14,8 +9,7 @@ const ANNA = "anna";
 const RAVI = "ravi";
 const SITA = "sita";
 
-// A leg IS an activity (0043); label is the activity's name snapshotted
-// when the leg was written.
+// label is the activity name snapshotted when the leg was written (0043).
 const legs: Leg[] = [
   { leg_no: 1, activity_id: "act-1", label: "Design draft", assignee_id: ANNA, expected_days: 3 },
   {

@@ -3,63 +3,19 @@
  *
  *   npx tsx scripts/compare-schema.ts --project <ref-a> --against <ref-b>
  *
- * Read-only. It writes nothing to either database, so there is no
- * --commit and no dry run.
- *
- * WHY THIS EXISTS. From 17 Aug 2026 there are two databases that are
- * supposed to be identical in shape and different only in content. A
- * staging database that is quietly a migration behind does not fail
- * loudly — it passes. It produces green tests and working screens for a
- * schema production does not have, which is the exact failure mode
- * BUGCATCHER.md was started to catalogue. "The migrations were applied in
- * the same order" is an argument; this is evidence.
- *
- * WHAT IT COMPARES, and why each one earned its place:
- *
- *   columns      - the obvious one.
- *   rls          - "RLS on for every table, always" is a rulebook rule
- *                  and it is one boolean away from being false.
- *   policies     - compares the qual and with_check text, not just the
- *                  name. 0055's whole point was widening a qual; a policy
- *                  with the right name and the wrong qual is a hole.
- *   privileges   - three fact views were writable by any signed-in
- *                  person for months, caused by grants
- *                  nobody looked at. Grants are compared for anon,
- *                  authenticated, public and service_role by name,
- *                  because `revoke ... from public` does not touch the
- *                  other two.
- *   functions    - by full definition hash. A security definer function
- *                  whose body lost its has_app() check is the entire
- *                  permission boundary gone.
- *   views        - by definition hash AND reloptions, so the one
- *                  security_invoker view (budget_report_lines) cannot
- *                  quietly become an owner view carrying rupees.
- *   triggers     - the cross-tool ones in CLAUDE.md are load-bearing.
- *   indexes, constraints, buckets, storage policies.
- *
- * WHAT IT DOES NOT COMPARE. Data, sequence positions, and anything in
- * auth.* — those are supposed to differ.
- *
- * LINE ENDINGS. The original database was migrated by hand over several
- * months and some of that went through a path that left CRLF inside
- * function bodies; the working tree is LF (.gitattributes) and anything
- * applied by scripts/apply-migrations.ts is LF. So 31 functions differ by
- * carriage returns alone, which is whitespace to plpgsql and means
- * nothing. Rather than ignore it — hiding differences is how this kind of
- * tool stops being trusted — a difference that survives only until line
- * endings are normalised is COUNTED AND REPORTED SEPARATELY, and does not
- * fail the run.
+ * Read-only: no --commit. A staging database quietly a migration behind passes tests
+ * and screens, so this gives evidence rather than an argument.
+ * Compares columns, rls, policies (qual and with_check text), privileges (anon,
+ * authenticated, public, service_role by name), functions and views (definition hash;
+ * views also reloptions), triggers, indexes, constraints, buckets and storage policies.
+ * It does not compare data, sequence positions or auth.* rows.
+ * Some old functions carry CRLF, meaningless to plpgsql: a difference that vanishes once
+ * line endings are normalised is counted separately and does not fail the run.
  */
 import { managementToken, requireProjectRef, sql } from "./supabase-management";
 
-/**
- * Auth settings that are SUPPOSED to differ between two projects, and are
- * therefore not compared. Everything else is.
- *
- * Keep this list short and justified. Every name added here is a setting
- * that can drift between production and staging without anyone noticing —
- * which is the exact failure this section exists to prevent.
- */
+// Auth settings that are supposed to differ between projects. Keep it short:
+// every name here can drift unnoticed.
 const SETTINGS_EXPECTED_TO_DIFFER = new Set([
   "site_url", // each environment has its own address
   "uri_allow_list", // and its own redirect list
@@ -71,7 +27,7 @@ const SETTINGS_EXPECTED_TO_DIFFER = new Set([
 
 type Aspect = { name: string; query: string };
 
-/** Each query returns exactly two columns: a stable identity, and everything else about it. */
+// Each query returns two columns: a stable identity, and everything else about it.
 const ASPECTS: Aspect[] = [
   {
     name: "columns",
@@ -170,7 +126,7 @@ const ASPECTS: Aspect[] = [
   },
 ];
 
-/** The project's auth settings, which live on the platform rather than in the database. */
+// Auth settings live on the platform, not in the database.
 async function authConfig(ref: string): Promise<Record<string, unknown>> {
   const response = await fetch(`https://api.supabase.com/v1/projects/${ref}/config/auth`, {
     headers: { Authorization: `Bearer ${managementToken()}` },
@@ -184,7 +140,7 @@ async function readAspect(ref: string, aspect: Aspect): Promise<Map<string, stri
   return new Map(rows.map((row) => [row.key, row.value]));
 }
 
-/** Long policy quals and index definitions are unreadable in full; show enough to identify. */
+// Long quals and index definitions are unreadable in full; show enough to identify.
 function short(value: string): string {
   const collapsed = value.replace(/\s+/g, " ").trim();
   return collapsed.length > 160 ? `${collapsed.slice(0, 160)}…` : collapsed;
@@ -220,11 +176,8 @@ async function main() {
       }
       const other = inB.get(key)!;
       if (other === value) continue;
-      // Aspects that hash a definition carry two hashes: one of the text
-      // with carriage returns stripped, then ` raw=` and one of it
-      // untouched. Everything else is compared with CR stripped here.
-      // Either way, a difference that disappears under normalised line
-      // endings is noise, and is counted rather than shown.
+      // Hashed aspects carry two hashes: CR-stripped, then ` raw=` untouched.
+      // A difference that vanishes once CR is stripped is counted, not shown.
       const sameNormalised =
         value.split(" raw=")[0] === other.split(" raw=")[0] ||
         value.replace(/\r/g, "") === other.replace(/\r/g, "");
@@ -256,10 +209,7 @@ async function main() {
     console.log("");
   }
 
-  // ---- the settings the platform holds, not the database ----------------
-  // BUGCATCHER #10: everything above can be an empty diff while two-factor
-  // authentication has quietly become a magic link, because the setting
-  // that decides it is an email template living in project config.
+  // Platform-held settings: BUGCATCHER #10 (a magic-link email template can swap two-factor).
   const [settingsA, settingsB] = await Promise.all([authConfig(a), authConfig(b)]);
   const settingKeys = [...new Set([...Object.keys(settingsA), ...Object.keys(settingsB)])]
     .filter((key) => !SETTINGS_EXPECTED_TO_DIFFER.has(key))

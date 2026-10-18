@@ -13,16 +13,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { issueSelection } from "@/lib/selections/actions";
 import { Minus, Plus, RefreshCw } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
+import { useState } from "react";
 
-/**
- * The confirmation before a revision becomes permanent.
- *
- * Its job is to make the handoff explicit *before* the click, not after:
- * how much work this is, what changed since the last issued revision, and
- * that there is no undo. The note goes straight to the budget team and is
- * the first thing they read.
- */
+/** Makes the handoff explicit before the click: how much work, what changed, no undo. The note goes straight to the budget team. */
 export function IssueDialog({
   selectionId,
   revisionNo,
@@ -46,25 +40,20 @@ export function IssueDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [notes, setNotes] = useState("");
-  const [error, setError] = useState<string>();
-  const [saving, startSaving] = useTransition();
+  const { pending: saving, error, run, clearError } = useActionRunner();
 
-  const commit = () =>
-    startSaving(async () => {
-      const outcome = await issueSelection(selectionId, notes || null);
-      if (outcome?.error) {
-        setError(outcome.error);
-        return;
-      }
-      setOpen(false);
-    });
+  const commit = async () => {
+    const outcome = await run(() => issueSelection(selectionId, notes || null));
+    if (outcome?.error) return;
+    setOpen(false);
+  };
 
   return (
     <Dialog
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (!next) setError(undefined);
+        if (!next) clearError();
       }}
     >
       <DialogTrigger asChild>
@@ -98,8 +87,6 @@ export function IssueDialog({
                   <ChangeLine icon="removed" count={removed} label="removed" />
                   <ChangeLine icon="changed" count={changed} label="changed" />
                 </ul>
-                {/* The reassuring half of the message: the budget team is
-                    not being asked to start over. */}
                 <p className="text-muted mt-2 text-xs">
                   {unchanged} unchanged {unchanged === 1 ? "line keeps" : "lines keep"} the pricing
                   already given.

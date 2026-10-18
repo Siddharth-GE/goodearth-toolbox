@@ -1,18 +1,8 @@
-/**
- * What an invoice prints, in one shape, whichever way it was made:
- *
- *   * ISSUED (or cancelled) — read from the snapshot the database took at
- *     issue (0115's birdwing_issue_invoice): lines, letterhead, bank and
- *     terms as they were, so a reprint next year reads exactly as the one
- *     handed over.
- *   * DRAFT — the stay's charges and the settings as they are now, marked
- *     DRAFT and never numbered.
- *
- * Pure: the route reads, this shapes, lib/birdwing/invoice-document.tsx
- * draws.
- */
+// An issued or cancelled invoice reads from the snapshot the database took at issue (0115), so a reprint matches the original;
+// a DRAFT uses the current charges and settings. Pure: the route reads, this shapes, invoice-document.tsx draws.
 import type { LetterheadCompany } from "@/lib/pdf/document";
 import { gstBreakdown, taxableOf, type GstRow } from "./money";
+import { roundPaise } from "@/lib/line-money";
 
 export type InvoiceLine = {
   head: string;
@@ -64,7 +54,7 @@ function totalsOf(lines: InvoiceLine[], discount: number) {
     lines.map((line) => ({ amount: line.amount, gstPct: line.gstPct })),
   );
   const sum = (pick: (row: GstRow) => number) =>
-    Math.round(taxSummary.reduce((total, row) => total + pick(row), 0) * 100) / 100;
+    roundPaise(taxSummary.reduce((total, row) => total + pick(row), 0));
   const total = sum((row) => row.amount);
   return {
     taxSummary,
@@ -73,11 +63,10 @@ function totalsOf(lines: InvoiceLine[], discount: number) {
     sgst: sum((row) => row.sgst),
     total,
     discount,
-    payable: Math.round((total - discount) * 100) / 100,
+    payable: roundPaise(total - discount),
   };
 }
 
-/** An issued (or cancelled) invoice, from its row and snapshot. */
 export function printFromSnapshot(row: {
   number: string;
   status: string;
@@ -143,7 +132,6 @@ export function printFromSnapshot(row: {
   };
 }
 
-/** A draft: the stay's charges and today's settings, unnumbered. */
 export function printDraft(input: {
   company: LetterheadCompany | null;
   placeOfSupply: string | null;

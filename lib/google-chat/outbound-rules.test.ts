@@ -1,9 +1,3 @@
-/**
- * Pins every decision outbound-rules.ts makes: what counts as a usable
- * service account key, the claims a token request signs, the patch
- * address, and the 60-second edge that decides whether a cached token
- * is still fresh.
- */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

@@ -13,11 +13,7 @@ import { formatDate } from "@/lib/format";
 import { FileText, Trash2 } from "lucide-react";
 import { useState } from "react";
 
-/**
- * A photo of the guest's ID, a booking confirmation. Kept in a private
- * bucket and opened only through /birdwing/files/<id>, after the grant is
- * checked — never at a public address.
- */
+/** Kept in a private bucket and opened only through /birdwing/files/<id>, after the grant is checked. */
 export function DocumentsPanel({ stayId, files }: { stayId: string; files: StayFile[] }) {
   const [kind, setKind] = useState<FileKind>("id");
 

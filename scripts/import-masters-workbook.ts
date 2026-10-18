@@ -1,34 +1,20 @@
 /**
- * Loads the founder's final masters workbook into one database: vendors
- * and contractors (bank details into the gated vendor_payment_details),
- * works and their labour rates (the Estimator's rate book), material
- * categories, materials and construction stages. What the workbook no
- * longer lists is removed — founder, 2026-10-07: "this is the final
- * data". The cleaning rules and the decisions behind them are
- * lib/masters/masters-workbook.ts; this file reads and writes.
+ * Loads the final masters workbook into one database: vendors and contractors (bank
+ * details into the gated vendor_payment_details), works and labour rates, material
+ * categories, materials and construction stages. What the workbook no longer lists is
+ * removed. Cleaning rules live in lib/masters/masters-workbook.ts.
  *
  *   npx tsx scripts/import-masters-workbook.ts --project <ref> --xlsx <path>            # dry run
- *   npx tsx scripts/import-masters-workbook.ts --project <ref> --xlsx <path> --commit   # write
+ *   npx tsx scripts/import-masters-workbook.ts --project <ref> --xlsx <path> --commit
  *
- * The workbook is read where it lies and never copied into the repo: 76
- * of its vendors carry bank account numbers.
- *
- * MATCHING. Vendors on their name — exactly (any spelling the sheet used),
- * then ignoring case and punctuation where that picks out one vendor on
- * each side ("ELOR LIGHTING PVT LTD" is "Elor Lighting Pvt. Ltd.") — so a
- * vendor keeps its id and takes the sheet's spelling. A blank in the sheet
- * keeps what the database has, payment terms above all: the sheet has no
- * column for them and the founder kept the 10-day terms. Works and
- * materials match on their code, categories and stages on their name.
- *
- * REMOVING. Run scripts/wipe-staging-records.ts first; after it nothing
- * points at the old masters. If something still does, this stops and says
- * what before writing anything — the line chain refuses deletion, it never
- * cascades (CLAUDE.md).
- *
- * Everything lands in one transaction that ends by checking the counts. A
- * re-run finds everything in place and writes nothing. --commit first
- * writes the tables it changes to data/backups/ (gitignored).
+ * The workbook is read where it lies, never copied into the repo (76 vendors carry bank accounts).
+ * Matching: vendors on name (exact, then ignoring case and punctuation) so they keep their
+ * id; a blank in the sheet keeps the database value (payment terms above all). Works and
+ * materials match on code; categories and stages on name.
+ * Run scripts/wipe-staging-records.ts first. If anything still points at the old masters
+ * this stops before writing: the line chain refuses deletion and never cascades.
+ * One transaction ending in a count check; a re-run writes nothing. --commit first backs
+ * up the changed tables to data/backups/ (gitignored).
  */
 import { strFromU8, unzipSync } from "fflate";
 import { randomUUID } from "node:crypto";
@@ -61,11 +47,6 @@ const TOUCHED = [
   "work_items",
   "estimator_work_info",
 ] as const;
-
-// ---------------------------------------------------------------------------
-// Reading the workbook — an .xlsx is a zip of XML parts (fflate is already
-// a dependency, for Dexter).
-// ---------------------------------------------------------------------------
 
 function unescapeXml(value: string): string {
   return value
@@ -127,24 +108,16 @@ function readWorkbook(path: string): Map<string, SheetRow[]> {
   return sheets;
 }
 
-// ---------------------------------------------------------------------------
-// SQL helpers
-// ---------------------------------------------------------------------------
-
 const lit = (value: string | number | boolean | null): string =>
   value === null ? "null" : typeof value === "string" ? literal(value) : String(value);
 
 const textArray = (values: readonly string[]) => `array[${values.map(literal).join(", ")}]::text[]`;
 
-/** Rows as JSON for jsonb_populate_recordset — Postgres does every type conversion (clone-data.ts's rule). */
 const recordset = (rows: object[], columns: string) =>
   `jsonb_populate_recordset(null::record, ${literal(JSON.stringify(rows))}::jsonb) as r(${columns})`;
 
-/**
- * What still points at rows about to be deleted, from tables this script
- * does not itself clean up. Self-references from rows also being deleted
- * don't count.
- */
+// What still points at rows about to be deleted, from tables this script does
+// not clean up itself. Self-references from rows also being deleted don't count.
 async function blockers(
   ref: string,
   table: string,
@@ -174,8 +147,6 @@ async function blockers(
   return found.filter((row) => row.n > 0).map((row) => `${table} ← ${row.ref}: ${row.n} rows`);
 }
 
-// ---------------------------------------------------------------------------
-
 type DbVendor = {
   id: string;
   name: string;
@@ -185,7 +156,6 @@ type DbVendor = {
   bank: BankDetails | null;
 } & Record<(typeof VENDOR_DETAILS)[number], string | null>;
 
-/** Each sheet vendor's database row, if it has one — see MATCHING above. */
 function matchVendors(sheet: WorkbookVendor[], db: DbVendor[]): Map<WorkbookVendor, DbVendor> {
   const matched = new Map<WorkbookVendor, DbVendor>();
   const taken = new Set<string>();
@@ -260,7 +230,6 @@ async function main() {
   const repeats = vendorNotes.filter((n) => n.includes(" times (rows")).length;
   console.log(`  · ${repeats} vendor names the sheet repeats are one vendor each.\n`);
 
-  // --- What the database has ------------------------------------------------
   const [
     uoms,
     categoriesDb,
@@ -339,7 +308,6 @@ async function main() {
   const report: string[] = [];
   const say = (line: string) => report.push(line);
 
-  // --- Units ------------------------------------------------------------------
   const haveUoms = new Set(uoms.map((u) => u.name));
   const wantUoms = [
     ...new Set([
@@ -358,7 +326,6 @@ async function main() {
     );
   }
 
-  // --- Construction stages ------------------------------------------------------
   const stageByKey = new Map(stagesDb.map((s) => [s.name.toLowerCase(), s]));
   const stageWant = stages.map((name, i) => ({ name, sort_order: (i + 1) * 10 }));
   const stageNew = stageWant.filter((s) => !stageByKey.has(s.name.toLowerCase()));
@@ -387,7 +354,6 @@ async function main() {
     );
   }
 
-  // --- Material categories ------------------------------------------------------
   const catByKey = new Map(categoriesDb.map((c) => [c.name.toLowerCase(), c]));
   for (const c of materialCategories) {
     if (catByKey.get(c.name.toLowerCase())?.kind === "catalogue") {
@@ -423,7 +389,6 @@ async function main() {
     );
   }
 
-  // --- Materials ----------------------------------------------------------------
   const itemByCode = new Map(itemsDb.filter((i) => i.code).map((i) => [i.code as string, i]));
   for (const m of materials) {
     if (itemByCode.get(m.code)?.kind === "catalogue") {
@@ -484,7 +449,6 @@ async function main() {
   if (stageGone.length > 0)
     statements.push(`delete from construction_stages where ${stageGoneWhere};`);
 
-  // --- Vendors ------------------------------------------------------------------
   const matched = matchVendors(vendors, vendorsDb);
   const vendorNew = vendors.filter((v) => !matched.has(v));
   const vendorGone = vendorsDb.filter((v) => ![...matched.values()].includes(v));
@@ -555,7 +519,6 @@ async function main() {
     }
   }
 
-  // --- Works and the rate book --------------------------------------------------
   const wantCodes = {
     categories: works.categories.map((c) => c.code),
     groups: works.groups.map((g) => g.code),
@@ -695,11 +658,8 @@ async function main() {
        join work_items w on w.code = r.code
        on conflict (work_item_id) do update set uom = excluded.uom, labour_rate = excluded.labour_rate;`,
     );
-    // How a SketchUp model measures the works whose unit alone would
-    // mislead it — 0118's backfill, for a rate book loaded after it (on
-    // production, the workbook may arrive after the migration). Only
-    // where nobody has set it, so a person's choice in the rate book
-    // stands.
+    // How a SketchUp model measures works whose unit alone would mislead: 0118's
+    // backfill for a rate book loaded after it. Only where unset, so a person's choice stands.
     statements.push(
       `update estimator_work_info i set model_measure = 'base_and_sides'
        from work_items w
@@ -739,7 +699,6 @@ async function main() {
     );
   }
 
-  // --- Nothing may still point at what goes -------------------------------------
   const stopped = [
     ...(matGone.length > 0 ? await blockers(ref, "items", matGoneWhere) : []),
     ...(catGone.length > 0 ? await blockers(ref, "item_categories", catGoneWhere, ["items"]) : []),

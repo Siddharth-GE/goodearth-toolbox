@@ -20,8 +20,7 @@ import { notFound } from "next/navigation";
 import { VendorFormDialog } from "../_components/vendor-form-dialog";
 import { VendorPaymentDialog } from "../_components/vendor-payment-dialog";
 
-// Everything here is money-free (po_facts / bill_facts): what exists
-// and where it stands, never what it costs — see lib/masters/vendor-detail.ts.
+// Money-free: po_facts / bill_facts only, never amounts (lib/masters/vendor-detail.ts).
 export default async function VendorDetailPage({
   params,
 }: {
@@ -38,9 +37,7 @@ export default async function VendorDetailPage({
     hasApp(user, "/bills"),
     hasApp(user, "/masters"),
   ]);
-  // RLS gates the vendor_payment_details read to exactly these grants —
-  // the card is rendered from the same test so "not allowed" never
-  // dresses up as "no details entered".
+  // RLS gates vendor_payment_details to these grants; the card uses the same test so "not allowed" never looks like "no details entered".
   const canSeeBank = canEditMasters || canSeePos || canSeeBills;
   const projectName = (id: string) => projectNames.get(id) ?? "—";
 

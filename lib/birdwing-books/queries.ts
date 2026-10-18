@@ -22,13 +22,12 @@ import {
   type AttendanceStatus,
   type ExpenseStatus,
 } from "./shared";
+import { roundPaise } from "@/lib/line-money";
 
 /**
- * Reads for Birdwing Books. Every function opens with requireTool(GRANT):
- * the 0116 policies gate SELECT too. Books reads nothing outside itself
- * but the shared surfaces — `vendors` and `profiles` for names — and ONE
- * view of Stays, `birdwing_occupancy_facts`: rooms occupied and guests in
- * the house per day, counts only (STATUS.md's contract table).
+ * Every function opens with requireTool(GRANT): the 0116 policies gate SELECT too. Reads nothing
+ * outside Books but `vendors` and `profiles` (names) and ONE Stays view,
+ * `birdwing_occupancy_facts` (counts only, STATUS.md contract table).
  */
 
 const fail = (context: string, error: { message: string }): never =>
@@ -37,10 +36,6 @@ const fail = (context: string, error: { message: string }): never =>
 type Client = Awaited<ReturnType<typeof createClient>>;
 
 const monthEnd = (month: string) => shiftMonth(month, 1) + "-01";
-
-// ---------------------------------------------------------------------
-// Masters
-// ---------------------------------------------------------------------
 
 export type HeadRow = {
   id: string;
@@ -127,10 +122,6 @@ export async function listPayRules(): Promise<PayRuleRow[]> {
   }));
 }
 
-// ---------------------------------------------------------------------
-// Welcome
-// ---------------------------------------------------------------------
-
 export async function getWelcomeCounts(): Promise<{
   linesThisMonth: number;
   withoutBill: number;
@@ -184,10 +175,6 @@ export async function getWelcomeCounts(): Promise<{
     salariesToConfirm: (staff.data ?? []).filter((person) => !confirmed.has(person.id)).length,
   };
 }
-
-// ---------------------------------------------------------------------
-// Expenses
-// ---------------------------------------------------------------------
 
 export type ExpenseRow = {
   id: string;
@@ -286,13 +273,12 @@ export async function listExpenses(
   return {
     rows,
     byHead: [...sums.entries()]
-      .map(([name, amount]) => ({ name, amount: Math.round(amount * 100) / 100 }))
+      .map(([name, amount]) => ({ name, amount: roundPaise(amount) }))
       .sort((a, b) => b.amount - a.amount),
-    total: Math.round(total * 100) / 100,
+    total: roundPaise(total),
   };
 }
 
-/** Which of these repeat-upload keys are already in the books. */
 export async function existingSourceKeys(keys: string[]): Promise<Set<string>> {
   await requireTool(GRANT);
   const supabase = await createClient();
@@ -308,10 +294,6 @@ export async function existingSourceKeys(keys: string[]): Promise<Set<string>> {
   return found;
 }
 
-// ---------------------------------------------------------------------
-// Attendance
-// ---------------------------------------------------------------------
-
 export type AttendanceRecord = {
   status: AttendanceStatus;
   inAt: string | null;
@@ -322,7 +304,6 @@ export type AttendanceRecord = {
 
 export type AttendanceMonth = {
   staff: StaffRow[];
-  /** staff id → date → record */
   records: Map<string, Map<string, AttendanceRecord>>;
   /** Staff whose salary for this month is confirmed — their month is closed. */
   closed: Set<string>;
@@ -367,10 +348,6 @@ export async function getAttendanceMonth(month: string): Promise<AttendanceMonth
   };
 }
 
-// ---------------------------------------------------------------------
-// Salaries
-// ---------------------------------------------------------------------
-
 export type SalaryRun = {
   id: string;
   base: number;
@@ -394,11 +371,7 @@ export type SalaryCard = {
   preview: SalaryPreview | null;
   daysRecorded: number;
   run: SalaryRun | null;
-  /**
-   * Salary already in Expenses for this person and month that no run
-   * wrote — the old sheet's, or typed by hand. Confirming on top of it
-   * would pay the month twice, so the screen and the action refuse.
-   */
+  /** Salary already in Expenses that no run wrote (the old sheet's, or typed by hand). Confirming on top would pay the month twice, so the screen and action refuse. */
   recordedElsewhere: number;
 };
 
@@ -430,7 +403,6 @@ async function occupancyFor(supabase: Client, first: string): Promise<Map<string
   );
 }
 
-/** Every person's month: their rule, the worked-out preview, or the confirmed run. */
 export async function getSalaryBoard(month: string): Promise<SalaryCard[]> {
   await requireTool(GRANT);
   const supabase = await createClient();
@@ -505,7 +477,6 @@ export async function getSalaryBoard(month: string): Promise<SalaryCard[]> {
   });
 }
 
-/** One person's preview, for the confirm action to recompute on the server. */
 export async function getSalaryPreview(
   staffId: string,
   month: string,

@@ -7,42 +7,24 @@ import { readFailed } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
 import type { MaterialDef } from "./calc";
 
-/**
- * Shared constants, helpers and reads used by more than one band of the
- * Estimator — split across mixes-actions.ts, works-actions.ts,
- * estimate-actions.ts, mixes-queries.ts, works-queries.ts and
- * estimate-queries.ts. Anything used by only one of those stayed there
- * instead of moving here.
- */
-
 export const GRANT = "/estimator";
 export { NAME_LIMIT, TEXT_LIMIT, UOM_LIMIT } from "./limits";
 
 export const fail = (context: string, error: { message: string }): never =>
   readFailed("estimator", context, error);
 
-// Units of measure moved to Masters on 2026-08-20 (0082): one list for
-// the whole toolbox, managed at /masters/uoms. The 0075 private master
-// (estimator_uoms) is retired in place — the table stays, nothing
-// reads it, and this tool's pickers read the shared list.
-
-/** Active unit names in picker order — since 0082 the ONE Masters list,
- * not the tool's own (estimator_uoms is retired in place; the table
- * stays, nothing reads it). Managing the list lives in Masters. */
+/** Active unit names in picker order: the ONE Masters list (0082). */
 export async function listUomNames(): Promise<string[]> {
   await requireTool(GRANT);
   return listActiveUomNames();
 }
 
-/** A master item wearing its material hat: the rate is Masters'
- * indicative price, the unit is how stock moves. Since 0086 (founder:
- * "materials are exactly the same as in the items master") this is the
- * whole material vocabulary — there is no separate list to maintain. */
+/** A master item wearing its material hat (0086): the rate is its indicative price, the unit is how stock moves. */
 export type MaterialItemRow = {
   id: string;
   name: string;
   uom: string;
-  /** items.indicative_price — null = nobody has priced it in Masters. */
+  /** items.indicative_price; null = unpriced in Masters. */
   rate: number | null;
   isActive: boolean;
 };
@@ -76,8 +58,6 @@ export async function listMaterialItems(): Promise<MaterialItemRow[]> {
   }));
 }
 
-/** MaterialDefs for exactly the referenced items — the recipe book and
- * the mix/work screens resolve components through this. */
 export async function itemDefsByIds(
   supabase: Awaited<ReturnType<typeof createClient>>,
   ids: string[],
@@ -96,12 +76,5 @@ export async function itemDefsByIds(
   );
 }
 
-/**
- * A recipe row from before 0086 names a retired estimator_materials row
- * and no item. The table stays (additive only) but nothing reads it any
- * more: such a row counts for nothing and shows under this label, with a
- * Remove button, so it can be cleared and re-added from Masters. Only
- * staging's practice data ever had one — production had no estimator
- * rows when 0086 landed.
- */
+/** A pre-0086 recipe row names a retired estimator_materials row and no item. It counts for nothing and shows under this label with a Remove button. */
 export const OLDER_ROW_LABEL = "An older material row — no longer counted";

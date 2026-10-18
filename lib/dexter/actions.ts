@@ -1,7 +1,6 @@
 "use server";
 
-// Type-only import, never re-exported from a "use server" file — the
-// 2026-08-03 outage rule, enforced by npm run check:actions.
+// Type-only; never re-exported from a "use server" file (BUGCATCHER #5).
 import type { ActionState } from "@/lib/action-state";
 import { requireTool } from "@/lib/auth/access";
 import { dbErrorMessage } from "@/lib/db-error";
@@ -14,42 +13,23 @@ import { createClient } from "@/lib/supabase/server";
 import { unzipSync } from "fflate";
 import { revalidatePath } from "next/cache";
 
-/**
- * Writes for Dexter: projects (a named folder), decks (an uploaded HTML
- * page or zip, and the standalone link it gets), and the file itself in
- * the `dexter` bucket. Every action opens with requireTool and ends by
- * revalidating the layout — an exact-path call would leave the welcome
- * counts stale while the moved list refreshes (the exact-path trap in
- * CLAUDE.md).
- *
- * There is no file table here — `dexter_decks` carries only a summary
- * (entry_path, file_count, total_bytes) and Storage is the list of what
- * actually exists under decks/<id>/. That is why replace and delete both
- * have to list the folder rather than read known paths from a row, the
- * one real difference from lib/design-management/files-actions.ts.
- */
+// Every action opens with requireTool and revalidates the layout (an exact path leaves the welcome
+// counts stale). No file table: Storage is the list of what exists under decks/<id>/, so replace
+// and delete list the folder.
 
-// The server-action body cap (next.config.ts), stated again here so a
-// file that slips past this check is still refused, not silently
-// truncated.
+// Mirrors the server-action body cap (next.config.ts), so a file past it is refused, not truncated.
 const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 
 const PROJECT_NAME_LIMIT = 120;
 const CLIENT_NAME_LIMIT = 120;
 const DECK_TITLE_LIMIT = 120;
 
-// Storage pages a folder listing at 100 entries; batches removal the
-// same way so neither call is handed an unbounded array.
+// Storage lists 100 at a time; removal batches the same way.
 const STORAGE_PAGE_SIZE = 100;
-// Six uploads in flight at once — the drawings/uploadDrawingRevisionFile
-// precedent, sized for a Vercel function rather than for raw throughput.
+// Sized for a Vercel function, not raw throughput.
 const UPLOAD_CONCURRENCY = 6;
 
 type DexterClient = Awaited<ReturnType<typeof createClient>>;
-
-// ---------------------------------------------------------------------
-// Projects
-// ---------------------------------------------------------------------
 
 export async function createProject(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireTool(GRANT);
@@ -113,8 +93,7 @@ export async function renameProject(
   return undefined;
 }
 
-/** Refuses in plain English when the project still holds decks — the FK
- *  (RESTRICT) refuses too, but this is the sentence a person reads. */
+// The RESTRICT FK refuses too, but this is the sentence a person reads.
 export async function deleteProject(projectId: string): Promise<ActionState> {
   await requireTool(GRANT);
   const supabase = await createClient();
@@ -139,10 +118,6 @@ export async function deleteProject(projectId: string): Promise<ActionState> {
   return undefined;
 }
 
-// ---------------------------------------------------------------------
-// Upload validation and planning — shared by uploadDeck and replaceDeckFile
-// ---------------------------------------------------------------------
-
 type ValidatedUpload = { kind: "html"; file: File } | { kind: "zip"; file: File };
 
 function validateUploadFile(value: FormDataEntryValue | null): ValidatedUpload | { error: string } {
@@ -153,9 +128,7 @@ function validateUploadFile(value: FormDataEntryValue | null): ValidatedUpload |
 
   const name = value.name.toLowerCase();
   const isHtml = value.type === "text/html" || name.endsWith(".html") || name.endsWith(".htm");
-  // Browsers disagree on what MIME type a zip gets (application/zip,
-  // application/x-zip-compressed, or a bare application/octet-stream),
-  // so the name is what actually decides it.
+  // Browsers disagree on a zip's MIME type, so the name decides.
   const isZip = name.endsWith(".zip");
 
   if (isHtml) return { kind: "html", file: value };
@@ -179,17 +152,10 @@ async function buildUploadPlan(
 
   const zipBytes = new Uint8Array(await validated.file.arrayBuffer());
 
-  // TWO PASSES, AND THE ORDER IS THE ZIP-BOMB GUARD. The first reads only
-  // the central directory — names and DECLARED sizes — and inflates
-  // nothing (the filter says no to every file). planZip enforces the
-  // 500-file / 40 MB limits on those declared sizes. Only then does the
-  // second pass inflate, and only the planned files. fflate inflates
-  // each file into a buffer of exactly its declared size and never grows
-  // it (inflt: `resize` is false when an output buffer is supplied), so a
-  // zip that lies about its sizes fails to read rather than exhausting
-  // the function's memory. Inflating first and checking afterwards —
-  // the obvious order — lets a 4 MB upload unpack to gigabytes before
-  // any limit is consulted.
+  // Two passes, and the order is the zip-bomb guard: first read only names and DECLARED sizes
+  // (inflating nothing) so planZip can enforce the 500-file / 40 MB limits. Then inflate only
+  // planned files into buffers of exactly the declared size (fflate never grows them), so a zip
+  // that lies about its sizes fails instead of exhausting memory.
   const entries: ZipEntry[] = [];
   let unzipped: Record<string, Uint8Array>;
   try {
@@ -232,12 +198,8 @@ async function buildUploadPlan(
   };
 }
 
-/**
- * Uploads every planned file into `folder`, at most UPLOAD_CONCURRENCY
- * at a time. On the first failure, every object already written by this
- * call is removed before returning — a `Blob`, never a raw `Buffer`
- * (BUGCATCHER #1), same as lib/design-management/files-actions.ts.
- */
+// On the first failure every object this call wrote is removed. A Blob, never a raw Buffer
+// (BUGCATCHER #1).
 async function uploadPlannedFiles(
   supabase: DexterClient,
   folder: string,
@@ -251,13 +213,8 @@ async function uploadPlannedFiles(
     while (index < files.length && !failure) {
       const file = files[index++];
       const path = `${folder}/${file.deckPath}`;
-      // A BLOB, NOT THE RAW bytes array, AND THIS IS NOT STYLE —
-      // BUGCATCHER #1's rule for supabase-js. `new Uint8Array(file.bytes)`
-      // also settles a type mismatch: fflate and `arrayBuffer()` hand
-      // back a `Uint8Array<ArrayBufferLike>`, which a `SharedArrayBuffer`
-      // could back, and DOM's `BlobPart` only accepts one backed by a
-      // concrete `ArrayBuffer` — copying through the constructor gives
-      // one of those.
+      // A Blob, not raw bytes (BUGCATCHER #1); copying through Uint8Array also gives BlobPart a
+      // concrete ArrayBuffer.
       const blob = new Blob([new Uint8Array(file.bytes)], { type: file.contentType });
       const { error } = await supabase.storage
         .from(DEXTER_BUCKET)
@@ -288,24 +245,22 @@ async function uploadPlannedFiles(
   return {};
 }
 
-/** Confirms the entry file landed at the size it was sent — the same
- *  read-back check uploadDrawingRevisionFile makes, for the same reason:
- *  a silent binary corruption is invisible until a client opens the link. */
+// Read-back check: a silent binary corruption is invisible until a client opens the link.
 async function verifyEntrySize(
   supabase: DexterClient,
   folder: string,
   entryPath: string,
   expectedBytes: number,
 ): Promise<{ error?: string }> {
-  const { data: stored } = await supabase.storage
+  const { data: stored, error } = await supabase.storage
     .from(DEXTER_BUCKET)
     .list(folder, { search: entryPath });
-  // `search` is a substring match, and the entry always sits at the top
-  // of the folder beside every other root file — a zip carrying both
-  // `index.html` and `print-index.html` would otherwise have its size
-  // compared against whichever came back first, and a good upload rolled
-  // back for it. Match the exact name; the drawings precedent could take
-  // `[0]` because it searched for a UUID.
+  if (error) {
+    console.error("verifyEntrySize list failed:", error);
+    return { error: "The deck did not save correctly. Try again." };
+  }
+  // Match the exact name: `search` is a substring match, so index.html and print-index.html would
+  // be confused and a good upload rolled back.
   const storedSize = stored?.find((object) => object.name === entryPath)?.metadata?.size as
     number | undefined;
 
@@ -315,12 +270,7 @@ async function verifyEntrySize(
   return {};
 }
 
-/**
- * Every object under `folder`, recursively — Storage's `list` only
- * returns one level, and a deck's assets sit in subfolders, so a
- * "folder" entry (`id: null`) is walked into rather than treated as a
- * file. Pages at 100, the Storage API's own cap.
- */
+// Storage's `list` returns one level, so "folder" entries (id: null) are walked into. Pages at 100.
 async function listFolderPaths(supabase: DexterClient, folder: string): Promise<string[]> {
   const paths: string[] = [];
   const stack = [folder];
@@ -349,7 +299,6 @@ async function listFolderPaths(supabase: DexterClient, folder: string): Promise<
   return paths;
 }
 
-/** Removes every path, in batches of 100 — the same cap `list` pages at. */
 async function removePaths(supabase: DexterClient, paths: string[]): Promise<void> {
   for (let i = 0; i < paths.length; i += STORAGE_PAGE_SIZE) {
     const batch = paths.slice(i, i + STORAGE_PAGE_SIZE);
@@ -358,15 +307,8 @@ async function removePaths(supabase: DexterClient, paths: string[]): Promise<voi
   }
 }
 
-// ---------------------------------------------------------------------
-// Decks
-// ---------------------------------------------------------------------
-
-/**
- * Row first, with a freshly minted id and share token, then the objects
- * — a failed upload deletes both the objects that landed and the row,
- * rather than leaving a deck that points at nothing.
- */
+// Row first, then objects; a failed upload deletes both rather than leave a deck pointing at
+// nothing.
 export async function uploadDeck(projectId: string, formData: FormData): Promise<ActionState> {
   const user = await requireTool(GRANT);
 
@@ -406,7 +348,8 @@ export async function uploadDeck(projectId: string, formData: FormData): Promise
 
   const uploadResult = await uploadPlannedFiles(supabase, folder, plan.files);
   if (uploadResult.error) {
-    await supabase.from("dexter_decks").delete().eq("id", deckId);
+    const { error: cleanupError } = await supabase.from("dexter_decks").delete().eq("id", deckId);
+    if (cleanupError) console.error("uploadDeck cleanup failed:", cleanupError);
     return { error: uploadResult.error };
   }
 
@@ -417,7 +360,8 @@ export async function uploadDeck(projectId: string, formData: FormData): Promise
       supabase,
       plan.files.map((file) => `${folder}/${file.deckPath}`),
     );
-    await supabase.from("dexter_decks").delete().eq("id", deckId);
+    const { error: cleanupError } = await supabase.from("dexter_decks").delete().eq("id", deckId);
+    if (cleanupError) console.error("uploadDeck cleanup failed:", cleanupError);
     return { error: sizeCheck.error };
   }
 
@@ -425,13 +369,8 @@ export async function uploadDeck(projectId: string, formData: FormData): Promise
   return undefined;
 }
 
-/**
- * Replaces a deck's file in place — same id, same link. The existing
- * objects are removed BEFORE the new ones are written (there is no file
- * table to diff against, only the folder itself), so a failure partway
- * through leaves the row pointing at whatever landed; the error says so
- * rather than pretending the old file is still there.
- */
+// Same id, same link. Old objects go BEFORE the new ones are written, so a failure partway leaves
+// the row pointing at whatever landed; the error says so.
 export async function replaceDeckFile(deckId: string, formData: FormData): Promise<ActionState> {
   const user = await requireTool(GRANT);
 
@@ -575,9 +514,8 @@ export async function clearDeckAnswers(deckId: string): Promise<ActionState> {
   return undefined;
 }
 
-/** Row first, then the objects — the reverse of upload, same reasoning.
- *  A cleanup failure is logged, not surfaced: the deck is already gone
- *  from every screen and every link, which is what the person asked for. */
+// Row first, then objects. A cleanup failure is logged, not surfaced: the deck is already gone from
+// every link.
 export async function deleteDeck(deckId: string): Promise<ActionState> {
   await requireTool(GRANT);
   const supabase = await createClient();

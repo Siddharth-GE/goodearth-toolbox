@@ -3,26 +3,18 @@
 import { FormMessage } from "@/components/ui/form-message";
 import { Button } from "@/components/ui/button";
 import { startFirstRevision } from "@/lib/selections/actions";
-import { useState, useTransition } from "react";
+import { useActionRunner } from "@/lib/hooks/use-action-runner";
 
 export function StartRevisionButton({ unitId }: { unitId: string }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string>();
+  const { pending, error, run } = useActionRunner();
 
   return (
     <div className="space-y-1">
       <Button
         variant="secondary"
-        // Disabled while in flight: the database enforces one draft per
-        // unit, so a double-click would otherwise surface as a duplicate
-        // key error rather than doing nothing.
+        // Disabled in flight: one draft per unit is a DB rule, so a double-click would surface as a duplicate-key error.
         disabled={pending}
-        onClick={() =>
-          startTransition(async () => {
-            const result = await startFirstRevision(unitId);
-            if (result?.error) setError(result.error);
-          })
-        }
+        onClick={() => run(() => startFirstRevision(unitId))}
       >
         {pending ? "Starting…" : "Start R0"}
       </Button>

@@ -1,22 +1,14 @@
 /**
- * Store batches (0108), as pure rules.
- *
- * A batch is a store receipt line. Its name is derived — the receipt's
- * reference and the line's place on it, GRN/SAA/012-1 — never stored.
- * `planBatches` is the screen's preview of what `allocate_batches()` in
- * the database will do with an issue: the chosen batch first, then the
- * oldest; whatever no batch covers is stock from before batches ("no
- * batch", no rate). The database decides; this only lets the store-keeper
- * see it before pressing Save. Keep the two orders identical.
+ * Store batches (0108): a batch is a store receipt line, named by derivation (GRN/SAA/012-1), never stored.
+ * `planBatches` previews the database's allocate_batches(); keep the two orders identical.
  */
 
 export type Batch = {
   receiptLineId: string;
-  /** e.g. "GRN/SAA/012-1". */
   label: string;
   receivedAt: string;
   quantity: number;
-  /** From goods_receipt_line_rates; null for an /inventory-less reader or no rate. */
+  /** From goods_receipt_line_rates; null if the reader lacks /inventory or there is no rate. */
   rate: number | null;
 };
 
@@ -32,7 +24,6 @@ export type BatchDraw = {
   rate: number | null;
 };
 
-/** What an issue of `quantity` takes, batch by batch, in the database's order. */
 export function planBatches(
   batches: Batch[],
   quantity: number,
@@ -67,7 +58,7 @@ export function planBatches(
   return draws;
 }
 
-/** What an issue is worth: each draw at its batch's rate. Null if any part has no rate. */
+/** Each draw at its batch's rate; null if any part has no rate. */
 export function issueValue(draws: BatchDraw[]): number | null {
   let total = 0;
   for (const draw of draws) {
@@ -77,12 +68,7 @@ export function issueValue(draws: BatchDraw[]): number | null {
   return total;
 }
 
-/**
- * What an issue line actually drew, read back from the batch movements the
- * database recorded for it. Whatever no batch covered came from stock older
- * than batches, and is shown as "No batch" — the same tail `planBatches`
- * previews.
- */
+/** What an issue line drew, read back from the database's batch movements; the uncovered tail is "No batch". */
 export function recordedDraws(
   quantity: number,
   drawn: { receiptLineId: string; label: string; quantity: number; rate: number | null }[],
@@ -94,11 +80,7 @@ export function recordedDraws(
   return draws;
 }
 
-/**
- * Each receipt line's 0-based place on its receipt, given the lines in the
- * receipt's own order (created_at, then id — the order the delivery note
- * lists them). The place is half of a batch's name.
- */
+/** Each receipt line's 0-based place on its receipt (created_at, then id): half of a batch's name. */
 export function placesOnReceipts(lines: { id: string; receiptId: string }[]): Map<string, number> {
   const counted = new Map<string, number>();
   const places = new Map<string, number>();
@@ -110,7 +92,6 @@ export function placesOnReceipts(lines: { id: string; receiptId: string }[]): Ma
   return places;
 }
 
-/** A receipt line's money, as goods_receipt_line_rates holds it. */
 export type LineRate = {
   rate: number | null;
   gstPct: number | null;
@@ -126,15 +107,13 @@ export function differsFromPo(line: LineRate): boolean {
 
 export type Amount = { taxable: number | null; gst: number | null; total: number | null };
 
-/** Quantity × rate, and the GST on it. An unknown rate or GST is an unknown
- * amount — never ₹0 (BUGCATCHER #13). */
+/** An unknown rate or GST is an unknown amount, never ₹0 (BUGCATCHER #13). */
 export function lineAmount(quantity: number, rate: number | null, gstPct: number | null): Amount {
   const taxable = rate === null ? null : quantity * rate;
   const gst = taxable === null || gstPct === null ? null : (taxable * gstPct) / 100;
   return { taxable, gst, total: taxable === null || gst === null ? null : taxable + gst };
 }
 
-/** Column totals: each one unknown if any line's is. */
 export function sumAmounts(amounts: Amount[]): Amount {
   const sum = (pick: (amount: Amount) => number | null) =>
     amounts.reduce<number | null>((total, amount) => {

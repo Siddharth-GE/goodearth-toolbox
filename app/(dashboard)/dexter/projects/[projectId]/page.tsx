@@ -19,8 +19,7 @@ import { DeckAnswers } from "./_components/deck-answers";
 import { ProjectHeaderActions } from "./_components/project-actions";
 import { UploadDeckDialog } from "./_components/upload-deck-dialog";
 
-/** KB/MB, not lib/format.ts — that module is for money, quantities and
- *  dates; a file size is neither. */
+// Not lib/format.ts, which is for money, quantities and dates.
 function formatDeckSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;

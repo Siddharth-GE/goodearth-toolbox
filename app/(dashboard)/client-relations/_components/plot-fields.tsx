@@ -19,26 +19,20 @@ import {
   ORIGINAL_WITH,
   REGISTRATION_STAGES,
 } from "@/lib/client-relations/stages";
-import { formatDate } from "@/lib/format";
+import { formatDate, todayInIndia } from "@/lib/format";
 import type { ProgressStageRow } from "@/lib/masters/progress-stages";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useState, useTransition, type ReactNode } from "react";
 
 import { Avatar } from "@/components/ui/avatar";
-import { useBoard, useToast } from "./board-context";
+import { useBoard } from "./board-context";
+import { useUndoBar } from "@/components/ui/undo-bar";
 import { SideIcon } from "./side-mark";
 
-/**
- * A plot's record as the tracker's drawer laid it out — Construction, Sale
- * deed, Construction agreement, Build progress, Interior, Context — every choice a
- * row of chips that saves when tapped, every box saving when you leave it
- * (root plan.md, seventh piece). The chip shows the new value at once and
- * goes back if the save is refused, with the reason at the foot of the
- * screen.
- */
+/** A plot's record as the tracker's drawer laid it out: chips save when tapped, boxes when you leave them. A refused save reverts the chip and says why. */
 
-/** Only what the cards edit — the page sends this, not the whole plot record. */
+/** Only what the cards edit, not the whole plot record. */
 export type PlotFields = Pick<
   EngagementDetail,
   | "id"
@@ -74,7 +68,7 @@ export type PlotFields = Pick<
 type Person = { id: string; name: string };
 
 function useSavePlot(engagementId: string) {
-  const toast = useToast();
+  const toast = useUndoBar();
   const [, startTransition] = useTransition();
   return (patch: PlotPatch, revert?: () => void, message?: string) =>
     startTransition(async () => {
@@ -100,7 +94,6 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   );
 }
 
-/** Chips for one column, saved on tap. */
 function SavedChoice<T extends string>({
   engagementId,
   label,
@@ -140,7 +133,6 @@ function SavedChoice<T extends string>({
   );
 }
 
-/** A text or date box, saved when you leave it. */
 function SavedText({
   engagementId,
   label,
@@ -208,8 +200,7 @@ function SavedText({
 
 function peopleOptions(team: Person[], current: string | null, currentName: string | null) {
   const people = [...team];
-  // Someone who owned the plot before they left the team still shows, so
-  // nothing is silently dropped — tap another name to hand it on.
+  // A former team member who still owns the plot is shown, so nothing is silently dropped.
   if (current && !people.some((p) => p.id === current)) {
     people.push({ id: current, name: currentName ?? "Someone no longer on the team" });
   }
@@ -224,12 +215,8 @@ function peopleOptions(team: Person[], current: string | null, currentName: stri
   }));
 }
 
-// ---------------------------------------------------------------------
-// The header — the plot's number large, the client's name in place
-// ---------------------------------------------------------------------
-
 export function ClientNameField({ clientId, name }: { clientId: string; name: string }) {
-  const toast = useToast();
+  const toast = useUndoBar();
   const [, startTransition] = useTransition();
   const [saved, setSaved] = useState(name);
   return (
@@ -263,11 +250,6 @@ export function ClientNameField({ clientId, name }: { clientId: string; name: st
   );
 }
 
-// ---------------------------------------------------------------------
-// The cards
-// ---------------------------------------------------------------------
-
-/** The plot's Construction side: its owner, bottleneck and registration (the tracker's Sales). */
 export function ConstructionCard({ engagement }: { engagement: PlotFields }) {
   const { team } = useBoard();
   return (
@@ -458,7 +440,7 @@ function DesignChecks({ engagement }: { engagement: PlotFields }) {
           if (!changed) return;
           const turnOn = next.includes(changed.key);
           const before = on;
-          setOn({ ...on, [changed.key]: turnOn ? new Date().toISOString().slice(0, 10) : null });
+          setOn({ ...on, [changed.key]: turnOn ? todayInIndia() : null });
           save({ [changed.key]: turnOn }, () => setOn(before));
         }}
       />
@@ -466,7 +448,6 @@ function DesignChecks({ engagement }: { engagement: PlotFields }) {
   );
 }
 
-/** ◀ stage ▶ and a segment per Masters stage — tap one to jump. */
 export function BuildCard({
   engagement,
   stages,
@@ -475,7 +456,7 @@ export function BuildCard({
   stages: ProgressStageRow[];
 }) {
   const save = useSavePlot(engagement.id);
-  const toast = useToast();
+  const toast = useUndoBar();
   const [stageId, setStageId] = useState<string | null>(engagement.progressStageId);
   // The active list, plus the plot's own stage if Masters has since switched it off.
   const shown = stages.filter((stage) => stage.is_active || stage.id === stageId);
@@ -558,7 +539,7 @@ export function BuildCard({
   );
 }
 
-/** The plot's Interior side: its stage, its owner and its note (stored as kaadal_*, stages.ts). */
+/** Stored as kaadal_* (stages.ts). */
 export function InteriorCard({ engagement }: { engagement: PlotFields }) {
   const { team } = useBoard();
   return (

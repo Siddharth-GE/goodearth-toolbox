@@ -16,15 +16,7 @@ import { Label } from "@/components/ui/label";
 import { createPlan } from "@/lib/business-planning/actions";
 import { useActionState, useState } from "react";
 
-/**
- * Two fields and nothing else. Everything about the model is edited on
- * the plan itself, live — asking for assumptions in a dialog before you
- * can see a single number is how a "quick plan" stops being quick.
- *
- * This is not RecordFormDialog: that one closes itself on success, and
- * a successful create here REDIRECTS into the new plan instead. The
- * dialog unmounts with the page, so it has nothing to close.
- */
+/** Two fields only; the model is edited live on the plan itself. Not RecordFormDialog: a successful create redirects into the new plan, so there is nothing to close. */
 export function NewPlanDialog() {
   const [open, setOpen] = useState(false);
 
@@ -37,8 +29,7 @@ export function NewPlanDialog() {
         <DialogHeader>
           <DialogTitle>New plan</DialogTitle>
         </DialogHeader>
-        {/* Inside DialogContent, which Radix unmounts on close, so every
-            open starts with a clean form and no stale error. */}
+        {/* Radix unmounts DialogContent on close, so every open starts clean. */}
         <NewPlanForm />
       </DialogContent>
     </Dialog>

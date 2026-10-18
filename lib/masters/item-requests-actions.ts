@@ -5,11 +5,6 @@ import { requireTool } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
-/**
- * Accepts the provisional item into the catalogue as it stands.
- * An optional code lets Masters give it the catalogue's own convention
- * (4-letter sub-type prefix + number) at the same moment.
- */
 export async function approveItemRequest(
   requestId: string,
   provisionalItemId: string,
@@ -43,13 +38,8 @@ export async function approveItemRequest(
 }
 
 /**
- * Records the provisional item as a duplicate of an existing one.
- *
- * The provisional row is NOT deleted and selection lines are NOT
- * repointed — issued revisions referencing it are immutable, and quietly
- * rewriting them would break the guarantee the whole revision design
- * rests on. It survives as an alias: flagged, pointed at its replacement,
- * and hidden from the picker so nobody picks it again.
+ * Not deleted and lines not repointed: issued revisions are immutable.
+ * The row survives as a flagged alias, hidden from the picker.
  */
 export async function mergeItemRequest(
   requestId: string,
@@ -95,7 +85,6 @@ export async function mergeItemRequest(
   return undefined;
 }
 
-/** Rejects the request and retires the provisional item from the picker. */
 export async function rejectItemRequest(
   requestId: string,
   provisionalItemId: string,
@@ -103,8 +92,7 @@ export async function rejectItemRequest(
   const user = await requireTool("/masters");
   const supabase = await createClient();
 
-  // Deactivated rather than deleted: selection lines may already point at
-  // it, and those lines are the record of what was specified.
+  // Deactivated, not deleted: selection lines may point at it.
   const { error: itemError } = await supabase
     .from("items")
     .update({ is_active: false, updated_by: user.id })
