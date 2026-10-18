@@ -5,7 +5,6 @@ import { arrangeTools } from "@/lib/nav/arrange";
 import { getToolArrangement } from "@/lib/nav/queries";
 import { visibleTools } from "@/lib/tools";
 import { Suspense } from "react";
-import { MarathonLiveCard } from "./_components/marathon-live-card";
 import { OperationsPipeline } from "./_components/operations-pipeline";
 import { PeopleOverview } from "./_components/people-overview";
 import { ToolGrid } from "./_components/tool-grid";
@@ -48,26 +47,15 @@ export default async function DashboardHome() {
           <OperationsPipeline />
         </Suspense>
 
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-          <Suspense
-            fallback={
-              <div className="bg-surface flex h-[158px] items-center justify-center rounded-2xl">
-                <Spinner />
-              </div>
-            }
-          >
-            <PeopleOverview />
-          </Suspense>
-          <Suspense
-            fallback={
-              <div className="bg-surface flex h-[164px] items-center justify-center rounded-2xl">
-                <Spinner />
-              </div>
-            }
-          >
-            <MarathonLiveCard />
-          </Suspense>
-        </div>
+        <Suspense
+          fallback={
+            <div className="bg-surface flex h-[158px] items-center justify-center rounded-2xl">
+              <Spinner />
+            </div>
+          }
+        >
+          <PeopleOverview />
+        </Suspense>
       </div>
     </div>
   );

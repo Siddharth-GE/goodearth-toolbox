@@ -40,8 +40,6 @@ Both palettes live in `app/globals.css` only. Dark comes from `data-theme="dark"
 ### The other colour systems
 
 - **`lib/color-hash.ts`** — seven colours picked by hashing a name (avatars, item thumbnails, placeholder tiles), a plain array, not tokens. One set has to sit on white and near-black, so `item-thumb.tsx` passes it as a `--thumb` custom property and lets the mode pick the tint weight; any new surface painting with a hash colour needs the same, checked in both modes.
-- **Marathon's category badges** — a third palette keyed on a colour name stored in the database, a static class lookup (`category-badge.tsx`, `bib-card.tsx`).
-- **`--gradient-hero-*`** — decorative, behind Marathon's hero number; still a variable, not a hex.
 - **The chart palette**, `--chart-1` … `--chart-8`, assigned by `lib/charts/palette.ts`. **The slot order is a measured accessibility mechanism** (colour-blind separation and dark-mode contrast), never re-ordered by eye. Single-series charts use `--accent`; eight series is the ceiling, the tail folds into "Other"; status colours are never series colours; **no pie or donut, ever** — part-to-whole is a stacked bar, two slices is a meter.
 
 **Charts:** screens use `components/ui/chart/*` and never import Recharts (the wrappers pass colours as CSS variables, so light/dark swap in one file). Thin bars with 4px rounded data-ends from the baseline, gaps between bars and segments, 2px lines with gaps at nulls (a missing value is never drawn as zero), hairline grid in `--border`, axis labels in `--muted`, tooltip on `surface-raised`. Every Reporter chart sits beside its own table, so colour never carries a value alone.
@@ -70,7 +68,6 @@ The **Section Label** is the one label style — sidebar groups, table headers, 
 - Cards, tables, the figure band, empty states: `rounded-2xl`. Dialogs and the phone drawer `rounded-3xl`; menus `rounded-xl`; icon chips `rounded-lg`/`rounded-xl`; pills and avatars `rounded-full`.
 - Page: `mx-auto max-w-6xl px-5 py-6 md:px-10 md:py-10` (`app/(dashboard)/layout.tsx`). Rhythm: `space-y-4` on most screens and in forms, `space-y-8` between the home page's blocks, `space-y-2`/`2.5` between list rows.
 - Card padding `p-5`; the welcome card `p-6 md:p-8`; an empty state `p-10`.
-- A genuine single-device kiosk uses Marathon's widths: `max-w-[480px]` shell, `max-w-[220px]` PIN pad.
 
 ## Material — hairlines at rest, float only when floating
 
@@ -92,13 +89,13 @@ Defined once in `app/globals.css`, used through the primitives. Nothing else mov
 
 Easing `ease-out-quint` (`ease-spring` is reserved); 150–280ms, nothing slower than 300ms. Every keyframe is a `--animate-*` utility, and **every custom shadow, ease and animate name is listed in `lib/utils.ts`**, or `tailwind-merge` keeps both of two conflicting classes (`lib/utils.test.ts` pins it). A new word needs the argument written here first.
 
-- **Relay is the one stated exception**: moving a baton is the product, so it has four namespaced keyframes confined to `app/(dashboard)/relay/`. A stuck trail **breathes rather than blinks** — unmissable and calm. Marathon keeps its bib card's entrance on its own kiosk.
+- **Relay is the one stated exception**: moving a baton is the product, so it has four namespaced keyframes confined to `app/(dashboard)/relay/`. A stuck trail **breathes rather than blinks** — unmissable and calm.
 - **`prefers-reduced-motion` is honoured globally.** Dialogs simply appear; confetti and floats are skipped; the toast still shows. The one opt-out is `Spinner` (`spinner-keeps-turning`) — a stopped spinner looks broken.
 - **The theme switch is a view transition, never a global `transition` on colours** — that would fade every hover and focus ring in the app as well. A component's own `transition-colors` on hover is fine. And `::view-transition-*` pseudo-elements are outside `*`, so the reduced-motion block names them again and the switch checks reduced-motion in JavaScript too.
 
 ## Loading states
 
-`Spinner` (`components/ui/spinner.tsx`) is the one loading indicator: the fade on a wrapper, the spin on the ring (two animations on one element made the fade loop forever). **Every route gets a `loading.tsx`** rendering `PageLoading` (`tall` for kiosk routes); a widget that fetches its own data inside a fast page wraps in `<Suspense fallback={<Spinner />}>`. An inline spinner is sized by `className` (`size-4 border-2`), never a different icon.
+`Spinner` (`components/ui/spinner.tsx`) is the one loading indicator: the fade on a wrapper, the spin on the ring (two animations on one element made the fade loop forever). **Every route gets a `loading.tsx`** rendering `PageLoading`; a widget that fetches its own data inside a fast page wraps in `<Suspense fallback={<Spinner />}>`. An inline spinner is sized by `className` (`size-4 border-2`), never a different icon.
 
 ## Icons
 
@@ -108,9 +105,9 @@ Easing `ease-out-quint` (`ease-spring` is reserved); 150–280ms, nothing slower
 
 - **Built** (`components/ui/`): `attribution` (who did it — every line edit shows its person), `avatar` (`letters={2}` where a small team shares initials), `badge`, `button`, `card` (+ `interactive`), `checkbox`, `choice-chips` (one tap picks from a short fixed list instead of a dropdown — a chosen chip is ink, a `good` one green; Birdwing attendance, Relay's department picker and Reporter's builder still hand-roll theirs and move onto it when next touched), `confirm-dialog` (the one "are you sure", asking why when the record needs a reason), `dialog`, `dropdown-menu`, `empty-state`, `figure` (+ `FigureBand`, `ResultPanel`), `form-message`, `icon-button`, `input`, `label`, `list-toolbar` (the one search / filter / date-range bar every list shares — a plain GET form, params made safe by `lib/list-params.ts`), `logo`, `page-loading`, `page-title`, `pagination`, `pill` (a plot, a date, a person, a status — small, rounded, the trigger of every chip menu; + `PlotChip`, `PersonName`, `Faces`), `practice-banner` (the strip on every non-production deployment — loud on purpose), `search-select` (one choice out of a long list, found by typing), `section` (+ `FieldRow`), `select`, `spinner`, `table` (+ `TableFoot`/`TableTotalCell`: a totals row over every matched row, never the page), `tabs` (+ `NavTabs`), `textarea`, `theme-toggle`, `tool-nav` (the one tab strip every tool's screens share), `undo-bar` (the line at the foot of the screen after an everyday change, with Undo for five seconds, instead of an "are you sure" before it; Relay and Client Relations still hold their own copies and move onto it when next touched), `upload-button` (a photo or PDF, shrunk in the browser first — `lib/uploads/`), and the `chart/` family.
 - **`Dialog`, `DropdownMenu`, `Tabs`** wrap Radix for focus-trapping, Escape and ARIA. `Tabs` switches panels on one page; route navigation in pills is `NavTabs`.
-- **`PageTitle`** is the h1/description/back-link every dashboard screen starts with; **`PageHeader`** (`app/marathon/_components/`) is the kiosk's sticky bar. Don't hand-roll either.
+- **`PageTitle`** is the h1/description/back-link every dashboard screen starts with. Don't hand-roll it.
 - **`Figure`** (`size`: `sm`/`lg`/`hero` — a screen where every number is the same size never says which is the answer) and **`Section`** exist because a label-over-a-number block had been hand-written thirteen times in four label styles; convert an old copy when next in that screen, not as a sweep.
 - **Shared domain components** (`components/masters/`): `item-thumb`, `product-link`, `project-picker`, `site-picker`, `catalogue-picker`, `record-form-dialog`.
 - **The sidebar** (`components/layout/sidebar.tsx`): Overview pinned, then each team as a closed row — chevron, name, a muted count. The team holding the page opens by itself; open tools hang under a hairline beneath the chevron. Opening is instant, never animated. The home page's `tool-grid` shows the same teams, all open.
-- **Shell compositions** (`app/(dashboard)/_components/`): `tool-welcome`, `tool-grid` (the same `visibleTools` rule as the sidebar), `operations-pipeline`, `people-overview`, `marathon-live-card`, `coming-soon`. **The home page shows only what is real** — a panel returns when a tool can feed it through a money-free read in `lib/overview/queries.ts`.
+- **Shell compositions** (`app/(dashboard)/_components/`): `tool-welcome`, `tool-grid` (the same `visibleTools` rule as the sidebar), `operations-pipeline`, `people-overview`, `coming-soon`. **The home page shows only what is real** — a panel returns when a tool can feed it through a money-free read in `lib/overview/queries.ts`.
 - **Not built until a real tool needs it:** radio, popover, tooltip (a native `title` does), a responsive table, a notice banner, a sidebar search. **Build the third copy into a shared component, not the first** — four speculative components were deleted with zero importers.

@@ -1,6 +1,5 @@
 import "server-only";
 
-import { getMarathonHome } from "@/lib/marathon/queries";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -155,18 +154,4 @@ export async function countPeople(): Promise<{ people: number; departments: numb
   ]);
 
   return { people: people.count ?? 0, departments: departments.count ?? 0 };
-}
-
-/**
- * The only window into Marathon (the service-role client stays in lib/marathon).
- * Returns null, not a throw, so a missing env key cannot take down the home page.
- */
-export async function getMarathonPulse() {
-  try {
-    const { eventName, totalEntries, groupCount, runCounts } = await getMarathonHome();
-    return { eventName, totalEntries, groupCount, runCounts };
-  } catch (error) {
-    console.error("getMarathonPulse failed — hiding the live card:", error);
-    return null;
-  }
 }

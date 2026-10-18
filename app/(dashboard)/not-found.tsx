@@ -2,7 +2,7 @@ import { LinkButton } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FileQuestion } from "lucide-react";
 
-/** The dashboard's 404 (it can't serve /marathon). Says "or you don't have access": a shared link to a tool you lack is the likeliest cause. */
+/** The dashboard's 404. Says "or you don't have access": a shared link to a tool you lack is the likeliest cause. */
 export default function DashboardNotFound() {
   return (
     <EmptyState

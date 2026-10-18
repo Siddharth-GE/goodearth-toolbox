@@ -25,7 +25,6 @@ Production is `toolbox.goodearthkannur.org` (from `master`); staging is `staging
 
 Production unless marked. Each tool's rules are its `PLAN.md` (Google Chat door: `lib/google-chat/PLAN.md`).
 
-- **Marathon** — race-day kiosk: PIN login, entries, bibs, admin. Own auth and service-role client — the one kiosk, not a pattern.
 - **Masters** — the shared reference data every tool reads: projects, plots, units, clients, vendors, stores, items (catalogue and materials), categories, brands, GST rates, construction stages, units of measure, works, item requests (on staging: companies, terms templates, a material rate that rises with POs, and build progress beside construction stages). Reads ungated, writes need `/masters`.
 - **Settings** — people, grants, roles, approver lists (on staging: the sidebar's teams, and a team lead tick beside a scoped grant). Admin only.
 - **Selections** — what design specifies per room; revisions immutable once issued. Tiles and lines show the item's picture, description and product link (catalogue pictures on staging).
@@ -63,7 +62,7 @@ The chain runs end to end: design → price → indent → PO → goods in / sto
 | Inventory            | `po_facts`, `po_line_facts`, `estimate_takeoff_facts`, `issue_requests`, `indent_lines`, `indents` (what a delivery line was bought for)                                                        |
 | Selections           | `indents`, `indent_lines`, `po_line_facts`                                                                                                                                                      |
 | Masters              | `po_facts`, `bill_facts`, `approved_budgets`, `indents`, `selections`, `selection_lines`                                                                                                        |
-| Overview (home page) | `indents`, `indent_lines`, `po_facts`, `bill_facts`, `goods_receipts`, `staff_departments` (counts only) + `lib/marathon/queries`                                                               |
+| Overview (home page) | `indents`, `indent_lines`, `po_facts`, `bill_facts`, `goods_receipts`, `staff_departments` (counts only)                                                                                        |
 | Relay                | nothing outside the shared surfaces                                                                                                                                                             |
 | Google Chat door     | Relay's `pusher_*` tables and `pusher_chain_state`, read through the admin client; Relay's writes made as the person through `act-as.ts` (`SECURITY.md`)                                        |
 | Client Relations     | `pusher_chain_state`, `selections`; who holds its grant, names only, through `client_relations_team()` (`0120`)                                                                                 |

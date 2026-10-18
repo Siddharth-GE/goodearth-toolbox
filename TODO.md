@@ -86,5 +86,4 @@ Each checklist is in `plan.md`, under the heading named.
 
 - Should a supervisor see only their own plots? Today every supervisor sees every villa, and the same answer decides who sees which villa's drawings. The mechanism exists since `0122` (a `scoped` tool with team leads); Supervisors would first need to record which supervisor is on which villa.
 - The construction budget screens no longer feed Indents. Retire them?
-- Is Marathon finished? If the race is over, its 2,400 lines and 7 tables can go.
 - Does the Training stub stay, or go until there is a plan for it?

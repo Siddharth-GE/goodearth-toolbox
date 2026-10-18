@@ -44,5 +44,5 @@ Every issued revision of a unit's design gets its own budget, and **`line_key` i
 
 - **Drift reads must throw, not fall through** — every lookup feeding `classifyDesignDrift` returns good news when empty.
 - **It reads other tools' tables directly, never their query modules** (the STATUS.md contract row).
-- **Line pulls insert row by row, deliberately** (settled 2026-08-17) — `addDirectLines`, `addBudgetPullLines`, `addEstimatePullLines` and Purchase Orders' `addPoolLines`. The quantity guard refuses per line with that item's own figure; a batch would discard nine good lines for one bad one. Each reports partial success honestly ("Added 3, then stopped: …"). If atomicity is ever needed, the shape is one database function returning a per-row summary (Marathon's `marathon_create_entry`).
+- **Line pulls insert row by row, deliberately** (settled 2026-08-17) — `addDirectLines`, `addBudgetPullLines`, `addEstimatePullLines` and Purchase Orders' `addPoolLines`. The quantity guard refuses per line with that item's own figure; a batch would discard nine good lines for one bad one. Each reports partial success honestly ("Added 3, then stopped: …"). If atomicity is ever needed, the shape is one database function returning a per-row summary.
 - **Approvers are a named list** (`indent_approvers`) managed from Settings; admins always may; the tick doesn't grant the app.

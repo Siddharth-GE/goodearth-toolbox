@@ -71,18 +71,9 @@
   --info: #2563eb;
   --info-foreground: #ffffff;
 
-  /* Decorative only — the "one moment of delight" gradient used for a
-     tool's hero number (see Marathon's HeroCounter). Not a brand or
-     semantic color, so it's kept separate from the tokens above; still
-     a single place to change if the gradient itself ever needs to. */
-  --gradient-hero-from: #0071e3;
-  --gradient-hero-via: #af52de;
-  --gradient-hero-to: #ff2d55;
-
-  /* The chart palette — the FOURTH deliberate colour system, alongside
-     the semantic status colours above, lib/color-hash.ts's identity
-     palette, and the hero gradient. Categorical series only, in slot
-     order, assigned by lib/charts/palette.ts.
+  /* The chart palette, beside the status colours above and lib/color-hash.ts's
+     identity palette. Categorical series only, in slot order, assigned by
+     lib/charts/palette.ts.
 
      THE ORDER IS THE ACCESSIBILITY MECHANISM, NOT A TASTE CHOICE.
      Validated against this app's real chart surfaces (#ffffff light,
@@ -251,19 +242,6 @@ body {
 ::view-transition-new(root) {
   animation-duration: 220ms;
   animation-timing-function: ease;
-}
-
-/* One deliberate moment of delight: the bib card's entrance after a
-   successful save — the payoff of the whole registration flow. */
-@keyframes card-in {
-  from {
-    opacity: 0;
-    transform: scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
 }
 
 /* ---------------------------------------------------------------------

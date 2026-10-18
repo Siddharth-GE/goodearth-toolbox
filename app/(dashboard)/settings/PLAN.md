@@ -58,6 +58,5 @@ A role names a job (Site Engineer, Purchase, Accounts) and bundles apps plus app
 
 ## Known gaps
 
-- **Granting `/marathon` does nothing** — the kiosk has its own PIN auth.
 - **Object-level permissions in one tool only** — Client Relations shows each person their own plots and actions (`0123`). Elsewhere anyone with `/selections` opens any unit, anyone with `/budgets` any budget. A tool joins by being made `scoped` with its own migration — first it has to record who is assigned to what (Supervisors does not, yet).
 - **A tool nobody is granted is invisible to all but admins** — grant it after shipping.

@@ -31,12 +31,6 @@ function strippedHeaders(request: NextRequest) {
 }
 
 export async function updateSession(request: NextRequest) {
-  // The kiosk has its own PIN login, so no Supabase work here. Identity headers are
-  // still stripped: skipping auth must never mean forwarding a claimed identity.
-  if (request.nextUrl.pathname.startsWith("/marathon")) {
-    return NextResponse.next({ request: { headers: strippedHeaders(request) } });
-  }
-
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(

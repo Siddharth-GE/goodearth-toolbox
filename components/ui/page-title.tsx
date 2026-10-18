@@ -3,7 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-/** The static heading a dashboard page starts with. Not PageHeader (app/marathon/_components), the sticky bar for kiosk screens. */
+/** The static heading a dashboard page starts with. */
 export function PageTitle({
   title,
   description,

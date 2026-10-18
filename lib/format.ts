@@ -115,7 +115,7 @@ export function formatShortDate(value: string | Date | null | undefined): string
   return date.toLocaleDateString(LOCALE, { day: "numeric", month: "short" });
 }
 
-/** `4:05 pm` — Marathon's entry lists, where only the time of day matters. */
+/** `4:05 pm`, for where only the time of day matters. */
 export function formatTime(value: string | Date | null | undefined): string {
   if (!value) return "—";
   const date = value instanceof Date ? value : new Date(value);
