@@ -3,6 +3,7 @@ import "server-only";
 import { requireTool } from "@/lib/auth/access";
 import { profileNames } from "@/lib/masters/names";
 import { fetchAll } from "@/lib/supabase/fetch-all";
+import { assertRead } from "@/lib/supabase/read-failed";
 import { createClient } from "@/lib/supabase/server";
 import { cache } from "react";
 import { parsePlanInputs, SCENARIOS, type PlanInputs } from "./inputs";
@@ -93,10 +94,7 @@ export const getPlan = cache(async (planId: string): Promise<PlanDetail | null> 
     .eq("id", planId)
     .maybeSingle();
 
-  if (error) {
-    console.error("getPlan failed:", error);
-    return null;
-  }
+  assertRead("business-planning", "the plan", error);
   if (!data) return null;
 
   const names = await profileNames(supabase, [data.updated_by]);
