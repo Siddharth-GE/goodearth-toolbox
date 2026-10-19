@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-// What the Android app (a Trusted Web Activity, android/README.md) and "Add to home screen" read.
+// What the Android app (a Trusted Web Activity, android/PLAN.md) and "Add to home screen" read.
 // Public in lib/supabase/proxy.ts, with its icons: Chrome and Play fetch them without a session.
 export default function manifest(): MetadataRoute.Manifest {
   return {
