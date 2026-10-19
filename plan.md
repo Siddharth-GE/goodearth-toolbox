@@ -1,3 +1,70 @@
+# Native apps on iPhone and Android
+
+**Approved by the founder 2026-10-18 ("everything looks good"). Build Android first:** A1, A2 and A4 on Android, then the founder's Android vet; the iPhone (A3) after. Work on `feature/native-apps`, branched from `feature/android-app` (PR #112, the website's half it needs), in its own worktree. **The founder waived Fable's reviews for this build** (2026-10-18: "waive all the fable reviews i trust you"), so Opus takes each `[Fable]` step and says so beside it. Every new package is a release at least two weeks old (Capacitor 8.5.3 was days old on 2026-10-18).
+
+The founder's choices (2026-10-18): **one shared app in both stores**, built with Capacitor 8, showing today's Toolbox screens and adding **push notifications, Face ID / fingerprint, and camera and scanning**. iPhone on the **public App Store**; no Mac, so iPhone builds run on GitHub's free macOS machines (the repo is public). Same ID on both: `com.kaadalgroup.toolbox`.
+
+Why this shape: every tool works on day one, a website fix still reaches both apps with no store release, and the native features are what Apple's "more than a website" rule (4.2) asks for. The Android version replaces the Play wrapper (`android/PLAN.md`) as an ordinary update: same package, same upload key. Version 1 of the wrapper ships first, so staff have an app meanwhile.
+
+## The risks, said once
+
+- **Capacitor calls loading the live site "not intended for production".** Many apps ship it; the cost is review risk when the network drops. So the app carries its own "No connection — try again" screen (`server.errorPath`) and never shows a blank page.
+- **Apple may say a staff-only app belongs in Apple Business Manager** (guideline 3.2), as it has for others. The fallback is the same build sent as a private Custom App: a setting in App Store Connect, not a rebuild.
+- **Google refuses to sign in inside an app's web view.** "Sign in with Google" must open in a browser tab and come back to the app (step A4). Apple's demo reviewer needs that path, as Play's does.
+- **Apple's login rule (4.8)** exempts apps that sign in with an existing company account, which ours is; the review notes say so.
+
+## Founder first
+
+- [ ] [Founder] Apple Developer Program as an **Organization** (in progress), then App Store Connect: create the app `com.kaadalgroup.toolbox`, and an **App Store Connect API key** (Users and Access → Integrations) for the build machine.
+- [ ] [Founder] Send version 1 of the Android wrapper to Play (`android/PLAN.md`), so staff are not waiting on this.
+- [ ] [Founder] A **Firebase** project (free) for Android push, and an **APNs key** (.p8) from the Apple account for iPhone push. Needed from phase C.
+- [ ] [Founder] An iPhone with **TestFlight** and an Android phone, for trying each phase.
+
+## A. The shell, both stores
+
+- [x] [Opus] `mobile/`: a Capacitor 8 project with its own `package.json` (the web app's dependencies untouched), pointed at `https://toolbox.kaadalgroup.com`, the offline screen, and the Kaadal K icon and splash. Android only so far; the iPhone's icon comes with A3. Two things Chrome did for the wrapper are now the app's own: prints and exports go through Android's downloader (`mobile/PLAN.md`), and the back button through `@capacitor/app`.
+- [x] [Opus] Android: built on this PC, signed with the existing upload key, version code 2: `kaadal-toolbox-2.0.0.aab` and `-test-install.apk` in `C:\Users\goodearth\Documents\kaadal-android-release`. Capacitor 8 needs **Java 21**, added beside the wrapper's 17 (`mobile/PLAN.md`, _Building a new version_). Seen on an Android 16 emulator: the K launch screen, the live sign-in page, the "No connection" screen in flight mode, Try again, the back button. Not yet seen: anything after sign-in, Print, and the keyboard.
+- [ ] [Founder] **Try version 2 on an Android phone** (install `kaadal-toolbox-2.0.0-test-install.apk`; it updates the wrapper in place if that is on the phone):
+  1. Open it: the K on cream, then the burgundy sign-in page, with no address bar.
+  2. Sign in with email and password; switch to the mail app for the code and back. Tick "trust this device", close the app, reopen: still signed in.
+  3. Open a few tools from different teams; the phone's back button steps back through pages.
+  4. **Print** an indent or a PO: "Opening …" appears, then the PDF opens in the phone's viewer.
+  5. Tap into a form field: the keyboard doesn't cover it.
+  6. Attach a picture somewhere (an expense bill or a drawing): the phone's picker opens.
+  7. Flight mode on, open a page: "No connection". Flight mode off, **Try again**.
+  8. **Continue with Google** opens Google in a burgundy tab over the app. It finishes signing in only once the two steps below A4 are done.
+- [ ] [Opus] iPhone: a manually-run GitHub workflow on a macOS machine that builds, signs and uploads to TestFlight with the App Store Connect key held as GitHub secrets. Never runs on pull requests, so a fork can't reach the secrets.
+- [x] [Fable → Opus] **Google sign-in out of the web view.** The founder waived Fable's review (2026-10-18: "waive all the fable reviews i trust you"), so Opus designed it, more simply than first drafted here: Google returns to the app's own address, `com.kaadalgroup.toolbox://auth/callback`, rather than a verified web link, so **no new public path** (no `apple-app-site-association`) and the iPhone uses the same address. The code alone is worthless without the PKCE cookie in the app's web view. The rule is in `SECURITY.md`, the mechanics in `mobile/PLAN.md`.
+- [x] [Opus] Built: `lib/native/app.ts` reads the user agent's mark on the server (pure and tested, no new web dependency); `signInWithGoogle` picks the return address; on Android, other sites open in a Chrome tab over the app and the return is finished in the web view. Seen on the emulator: Google's page in a burgundy tab over the app, its close button back to the app, and a return carrying a made-up code finished on the site and refused, with the app open and from cold.
+- [ ] **Before the round trip works**, two things outside the code:
+  - [ ] [Founder] Add `com.kaadalgroup.toolbox://auth/callback` to staging's Supabase redirect list: Authentication → URL Configuration → Redirect URLs (Opus's attempt through the management API was blocked by the session's safety check). Staging's settings become production's at the switch, so this is the only time; the new practice project needs it too.
+  - [ ] [Founder] Merge the website's half to staging (PR #112, then this branch's website change), so `toolbox.kaadalgroup.com` answers the app.
+- [ ] [Founder] Vet on TestFlight and Play's internal track: sign in all three ways, open every team's tools, turn on flight mode and see the offline screen.
+
+## B. Face ID and fingerprint
+
+- [ ] [Fable] Approve the design. Recommended: after a full sign-in in the app, offer "Use Face ID next time"; the email and password go into the phone's Keychain / Keystore, released only by the face or finger; next time the app signs in through **today's password path**, and the trusted device (30 days) skips the code as it does now. No new door into the server. The stronger alternative (a device key the server checks) is a new sign-in path and waits for a reason.
+- [ ] [Opus] Build it with a maintained biometric plugin (chosen at build time, a release at least two weeks old); "Forget this phone" in the profile menu clears it.
+- [ ] [Founder] Vet: sign in once, close the app, open it with your face; change your password elsewhere and see it ask again.
+
+## C. Push notifications
+
+- [ ] [Fable] The migration: a `push_devices` table (a person's own devices only; RLS on; write revokes), and how a server action may send to **someone else's** devices — the sanctioned admin-client use, or a definer function checking the sender's grant — written into `SECURITY.md` first.
+- [ ] [Opus] `lib/push/` sends through Firebase (Android) and APNs (iPhone) after the write has succeeded, never inside it: a failed push never fails an indent.
+- [ ] [Sonnet] The first three: an **indent approved** (to its raiser), a **Relay baton waiting** (to the department's holders), a **design stage handed over** (to the person put on it). A tap opens that page.
+- [ ] [Founder] Vet each one on both phones, and turn notifications off in the phone's settings to see nothing break.
+
+## D. Camera and scanning
+
+- [ ] [Opus] Photos: the shared upload button offers the camera inside the app; check every upload screen on both phones.
+- [ ] [Founder] **Question: what gets scanned?** Items and bins carry no barcodes today, so scanning first needs labels — for example a QR sticker per item or rack printed from Inventory. Scanning is planned once that is decided.
+
+## E. The stores
+
+- [ ] [Opus] Draft the App Store listing, privacy labels and review notes (the reviewer Gmail with Google sign-in, the 4.8 exemption, the native features to try); screenshots from TestFlight.
+- [ ] [Founder] Submit to the App Store; send the Android update to Play.
+- [ ] [Fable] Approval pass over the full diff before each merge, as `MODELS.md` says.
+
 # The refactor before production — done
 
 Approved 2026-10-17 ("the refactor must happen"); built and merged to staging on 2026-10-18 (#106 for Phase 0, #107 for Phases 1–6, with Marathon and the construction budgets removed), with `0127`–`0129` applied there; the founder vetted it on staging the same day: "all looks good". Its rules now live in CLAUDE.md, SECURITY.md and BUGCATCHER.md, and its checks in CI. The full plan, every step ticked, is `git show ec86aaf:plan.md`.

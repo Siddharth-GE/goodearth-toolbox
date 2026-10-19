@@ -13,6 +13,7 @@ import {
   setTrustedDevice,
   setVerified,
 } from "@/lib/auth/verified-session";
+import { APP_AUTH_CALLBACK, isPhoneApp } from "@/lib/native/app";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import { createClient as createBareClient } from "@supabase/supabase-js";
@@ -197,11 +198,13 @@ export async function resendLoginCode(): Promise<VerifyState> {
  * comes back with a session; /auth/callback finishes it.
  */
 export async function signInWithGoogle() {
+  // In the phone app, Google returns to the app, which finishes on this site's callback.
+  const inApp = isPhoneApp((await headers()).get("user-agent"));
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${await requestOrigin()}/auth/callback`,
+      redirectTo: inApp ? APP_AUTH_CALLBACK : `${await requestOrigin()}/auth/callback`,
       // Always ask: a shared site phone must not reuse the last person's Google.
       queryParams: { prompt: "select_account" },
     },

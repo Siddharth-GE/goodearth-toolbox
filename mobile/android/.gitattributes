@@ -1,0 +1,2 @@
+# Windows runs these through cmd, which needs CRLF line endings.
+*.bat text eol=crlf

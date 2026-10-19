@@ -41,6 +41,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // The phone app's own project: Gradle output and Capacitor's copied scripts (mobile/PLAN.md).
+    "mobile/**",
     // Assistant tooling, gitignored: local warnings there would bury real ones.
     ".claude/**",
     ".impeccable/**",

@@ -1,0 +1,16 @@
+{
+  "name": "kaadal-toolbox-mobile",
+  "private": true,
+  "description": "The Kaadal Toolbox phone app: a Capacitor shell around toolbox.kaadalgroup.com (mobile/PLAN.md).",
+  "scripts": {
+    "sync": "cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.2",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.5.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.2"
+  }
+}

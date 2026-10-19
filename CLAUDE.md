@@ -12,7 +12,7 @@ Every conversation starts the same way: the founder says **"read CLAUDE.md"**, a
 2. **`MODELS.md`** — which model does what. Know which model you are and stay in its lane.
 3. **`STATUS.md`** — what exists and works, including the cross-tool read contract table. The table IS the contract: a column in it can't be renamed or dropped without checking every tool in its row.
 4. **`TODO.md`** — what is next, and nothing else. Finished work moves to `STATUS.md`, settled trade-offs to the owning tool's `PLAN.md`.
-5. **Before touching a tool** — that tool's `PLAN.md` (the Google Chat door's is `lib/google-chat/PLAN.md`). **Before styling** — `DESIGN.md`.
+5. **Before touching a tool** — that tool's `PLAN.md` (the Google Chat door's is `lib/google-chat/PLAN.md`, the phone apps' `android/PLAN.md`: its keys, build tools and Play answers carry over to the Capacitor app). **Before styling** — `DESIGN.md`.
 6. **Before touching auth, permissions, RLS, a view, money, the line chain, or any cross-tool read/write** — `SECURITY.md`.
 7. **Before a migration, a merge, a deploy, or anything environmental** — `SHIPPING.md`: the two databases, the staging protocol, the gates.
 8. **Before merging** anything touching a database read, a file upload, a permission or a colour — `BUGCATCHER.md`, what a green build does not prove. When something breaks that CI said was fine, add it there.
@@ -24,7 +24,7 @@ Every conversation starts the same way: the founder says **"read CLAUDE.md"**, a
 
 ## The one principle
 
-**It's a toolbox.** Each tool is a self-contained instrument. Adding one touches only its own folders plus a registry entry; breaking one must not take the others down. Tools connect through exactly three threads: the shell (auth, `lib/tools.ts`, per-user grants and team leads, the sidebar's teams in `lib/nav/`), the shared database (including the line chain), and shared UI/utilities (`components/ui/*`, `components/masters/*`, `lib/masters/`, `lib/hooks/`, `lib/format.ts`, `lib/pdf/`, `lib/charts/`, `lib/design-views/`, `lib/drawings/`, `lib/uploads/`).
+**It's a toolbox.** Each tool is a self-contained instrument. Adding one touches only its own folders plus a registry entry; breaking one must not take the others down. Tools connect through exactly three threads: the shell (auth, `lib/tools.ts`, per-user grants and team leads, the sidebar's teams in `lib/nav/`), the shared database (including the line chain), and shared UI/utilities (`components/ui/*`, `components/masters/*`, `lib/masters/`, `lib/hooks/`, `lib/format.ts`, `lib/pdf/`, `lib/charts/`, `lib/design-views/`, `lib/drawings/`, `lib/uploads/`, `lib/native/`).
 
 **One tool never imports another tool's code, and shared code never imports a tool's.** When two tools want the same read, the answer is a shared module, not an import. `lib/overview/` is the shell's home, not a tool — the **one** module allowed to import other tools' queries (reads only, each call wrapped so one tool's failure can't take down the home page).
 

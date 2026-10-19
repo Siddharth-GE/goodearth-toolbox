@@ -1,0 +1,14 @@
+{
+  "appId": "com.kaadalgroup.toolbox",
+  "appName": "Toolbox",
+  "webDir": "www",
+  "server": {
+    "url": "https://toolbox.kaadalgroup.com",
+    "errorPath": "index.html"
+  },
+  "backgroundColor": "#f4f2ee",
+  "appendUserAgent": "KaadalToolboxApp",
+  "plugins": {
+    "SystemBars": { "insetsHandling": "native", "style": "DARK" }
+  }
+}
