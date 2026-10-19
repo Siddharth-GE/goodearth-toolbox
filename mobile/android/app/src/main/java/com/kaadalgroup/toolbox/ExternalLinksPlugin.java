@@ -28,6 +28,13 @@ public class ExternalLinksPlugin extends Plugin {
             .build();
         try {
             tab.launchUrl(getActivity(), url);
+            // Sign-in hands over to Google by leaving the page, which never happens here; the page
+            // is left waiting, so it reloads when the person comes back (MainActivity.onResume).
+            String page = getBridge().getWebView().getUrl();
+            String path = page == null ? null : Uri.parse(page).getPath();
+            if (path != null && path.startsWith("/login")) {
+                ((MainActivity) getActivity()).reloadOnReturn();
+            }
             return true;
         } catch (ActivityNotFoundException e) {
             return null; // no browser at all: Capacitor's own handling says so its way

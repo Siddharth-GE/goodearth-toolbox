@@ -66,7 +66,25 @@ public class MainActivity extends BridgeActivity {
         }
         String query = data.getEncodedQuery();
         String callback = bridge.getServerUrl() + "/auth/callback" + (query == null ? "" : "?" + query);
+        reloadOnReturn = false;
         bridge.getWebView().loadUrl(callback);
+    }
+
+    private boolean reloadOnReturn = false;
+
+    void reloadOnReturn() {
+        reloadOnReturn = true;
+    }
+
+    // Back from Google's tab without signing in (closed, or Google refused): the sign-in page
+    // was left waiting for a hand-over that never came, so it starts fresh.
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (reloadOnReturn) {
+            reloadOnReturn = false;
+            bridge.getWebView().reload();
+        }
     }
 
     @Override
