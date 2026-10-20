@@ -1,6 +1,6 @@
 # Native apps on iPhone and Android
 
-**Approved by the founder 2026-10-18 ("everything looks good"). Build Android first.** A1, A2 and A4 are on staging (#112, #113); B is built on `feature/native-apps`. **Next, in this order unless the founder says otherwise: D (the camera), C (push, once the Firebase project exists)**, then the iPhone (A3). Work on `feature/native-apps` in its own worktree (`C:\Users\goodearth\Documents\Code\toolbox-native`), brought level with `staging` first; Opus may not merge to `staging` from a session, so each piece ends in a pull request the founder merges. **The founder waived Fable's reviews for this build** (2026-10-18: "waive all the fable reviews i trust you"), so Opus takes each `[Fable]` step and says so beside it. Every new package is a release at least two weeks old (Capacitor 8.5.3 was days old on 2026-10-18).
+**Approved by the founder 2026-10-18 ("everything looks good"). Build Android first.** A1, A2, A4 and B are on staging (#112, #113, #115); D's camera is built on `feature/native-apps`. **Next, unless the founder says otherwise: C (push; the Firebase project exists)**, then the iPhone (A3). Work on `feature/native-apps` in its own worktree (`C:\Users\goodearth\Documents\Code\kaadal-toolbox\toolbox-native`, beside the main folder), brought level with `staging` first; each piece ends in a pull request, merged only on the founder's word. **The founder waived Fable's reviews for this build** (2026-10-18: "waive all the fable reviews i trust you"), so Opus takes each `[Fable]` step and says so beside it. Every new package is a release at least two weeks old (Capacitor 8.5.3 was days old on 2026-10-18).
 
 The founder's choices (2026-10-18): **one shared app in both stores**, built with Capacitor 8, showing today's Toolbox screens and adding **push notifications, Face ID / fingerprint, and camera and scanning**. iPhone on the **public App Store**; no Mac, so iPhone builds run on GitHub's free macOS machines (the repo is public). Same ID on both: `com.kaadalgroup.toolbox`.
 
@@ -17,13 +17,14 @@ Why this shape: every tool works on day one, a website fix still reaches both ap
 
 - [ ] [Founder] Apple Developer Program as an **Organization** (in progress), then App Store Connect: create the app `com.kaadalgroup.toolbox`, and an **App Store Connect API key** (Users and Access → Integrations) for the build machine.
 - [ ] [Founder] Send version 1 of the Android wrapper to Play (`android/PLAN.md`), so staff are not waiting on this.
-- [ ] [Founder] A **Firebase** project (free) for Android push, and an **APNs key** (.p8) from the Apple account for iPhone push. Needed from phase C.
+- [x] [Founder] A **Firebase** project (free) for Android push: `kaadal-toolbox`, under `admin@kaadal.co.in`, done 2026-10-20; its two files are in `android-signing` (`android/PLAN.md`).
+- [ ] [Founder] An **APNs key** (.p8) from the Apple account for iPhone push.
 - [ ] [Founder] An iPhone with **TestFlight** and an Android phone, for trying each phase.
 
 ## A. The shell, both stores
 
 - [x] [Opus] `mobile/`: a Capacitor 8 project with its own `package.json` (the web app's dependencies untouched), pointed at `https://toolbox.kaadalgroup.com`, the offline screen, and the Kaadal K icon and splash. Android only so far; the iPhone's icon comes with A3. Two things Chrome did for the wrapper are now the app's own: prints and exports go through Android's downloader (`mobile/PLAN.md`), and the back button through `@capacitor/app`.
-- [x] [Opus] Android: built on this PC, signed with the existing upload key, version code 2: `kaadal-toolbox-2.0.0.aab` and `-test-install.apk` in `C:\Users\goodearth\Documents\kaadal-android-release`. Capacitor 8 needs **Java 21**, added beside the wrapper's 17 (`mobile/PLAN.md`, _Building a new version_). Seen on an Android 16 emulator: the K launch screen, the live sign-in page, the "No connection" screen in flight mode, Try again, the back button. Not yet seen: anything after sign-in, Print, and the keyboard.
+- [x] [Opus] Android: built on this PC, signed with the existing upload key, version code 2: `kaadal-toolbox-2.0.0.aab` and `-test-install.apk` in `android-release` (`android/PLAN.md`). Capacitor 8 needs **Java 21**, added beside the wrapper's 17 (`mobile/PLAN.md`, _Building a new version_). Seen on an Android 16 emulator: the K launch screen, the live sign-in page, the "No connection" screen in flight mode, Try again, the back button. Not yet seen: anything after sign-in, Print, and the keyboard.
 - [ ] [Founder] **Try version 2 on an Android phone** (install `kaadal-toolbox-2.0.0-test-install.apk`; it updates the wrapper in place if that is on the phone). Step 2 confirmed on the founder's phone 2026-10-19; the rest still to try:
   1. Open it: the K on cream, then the burgundy sign-in page, with no address bar.
   2. Sign in with email and password; switch to the mail app for the code and back. Tick "trust this device", close the app, reopen: still signed in.
@@ -56,7 +57,8 @@ Why this shape: every tool works on day one, a website fix still reaches both ap
 
 ## D. Camera and scanning
 
-- [ ] [Opus] Photos: the shared upload button offers the camera inside the app; check every upload screen on both phones.
+- [x] [Opus] Photos: built in the app, not the website, as version 2.2.0 (code 4). Chrome and the iPhone already offer the camera on a picture field; the Android app now does too (`CameraFileChooser`), so every photo upload has it at once: Birdwing documents and expense bills, Directory photos, Selections views. Seen on the Android 16 emulator: Camera beside Files on a picture field, a shot reaching the page as a readable JPEG, Files choosing a picture, cancelling in the camera or the picker, the picker opening again after, and a spreadsheet field going straight to Files.
+- [ ] [Founder] Vet with version 2.2.0 on the phone (`kaadal-toolbox-2.2.0-test-install.apk`): on Birdwing Books → Expenses, a row's **Bill** button offers **Camera**; take a photo of a paper bill and it uploads; the same button's other choice still picks a PDF; your Directory photo from the camera. iPhone: checked when A3 builds it.
 - [ ] [Founder] **Question: what gets scanned?** Items and bins carry no barcodes today, so scanning first needs labels — for example a QR sticker per item or rack printed from Inventory. Scanning is planned once that is decided.
 
 ## E. The stores

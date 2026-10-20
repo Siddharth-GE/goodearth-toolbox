@@ -48,6 +48,7 @@ public class MainActivity extends BridgeActivity {
             new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
             ContextCompat.RECEIVER_EXPORTED
         );
+        bridge.getWebView().setWebChromeClient(new CameraFileChooser(bridge));
         bridge.getWebView().setDownloadListener((url, userAgent, contentDisposition, mimeType, contentLength) ->
             startDownload(url, userAgent, contentDisposition, mimeType)
         );

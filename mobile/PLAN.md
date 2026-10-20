@@ -13,7 +13,7 @@ Kaadal Toolbox for Android (and later iPhone), `com.kaadalgroup.toolbox`: a **Ca
 - **Back button:** `@capacitor/app` steps back through the site's history, and leaves the app from the first page.
 - **Prints and exports** (`lib/pdf/`, `lib/csv.ts`): a web view can't show a PDF, so `MainActivity` hands every download to Android's DownloadManager with the session's cookies, then opens it in the phone's PDF viewer or spreadsheet app. Files live in the app's own storage (no permission asked); the same print downloaded again replaces the old copy.
 - **Links to other sites** (Google's sign-in, Zoho WorkDrive, product pages) open in a Chrome tab over the app (`ExternalLinksPlugin`), and closing it returns to the page the person was on.
-- **Pictures** go through the phone's normal picker, as on the website.
+- **Pictures:** a field that takes a picture offers **Camera** beside the phone's picker, as Chrome does (`CameraFileChooser`); other files get the picker alone. The phone's own camera app takes the shot into the app's cache, so no camera permission is asked, and each shot is dropped when the next is taken. The iPhone's web view offers the camera by itself.
 
 ## Building a new version
 
