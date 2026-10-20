@@ -14,7 +14,10 @@ It is a **Trusted Web Activity**: a thin Android shell that opens `https://toolb
 
 ## The keys
 
-- **Upload key:** `C:\Users\goodearth\Documents\kaadal-android-signing\upload.keystore`, its password in the `README.txt` beside it. Never in the repo. Losing it is recoverable (Play Console → Test and release → App integrity → request an upload key reset), but slow. The founder keeps a backup.
+Everything for the phone apps that must stay off GitHub sits beside the main folder, never inside it, in `C:\Users\goodearth\Documents\Code\kaadal-toolbox\`: `android-signing` holds the keys, `android-release` the built apps and store graphics.
+
+- **Upload key:** `android-signing\upload.keystore`, its password in the `README.txt` beside it. Never in the repo. Losing it is recoverable (Play Console → Test and release → App integrity → request an upload key reset), but slow. The founder keeps a backup.
+- **Firebase** (push, project `kaadal-toolbox` under `admin@kaadal.co.in`): `android-signing\google-services.json`, and the service-account key `kaadal-toolbox-firebase-adminsdk-*.json`, which is a password and lives only there and in Vercel's settings.
 - **App signing key:** held by Google (Play App Signing). Its SHA-256 is on Play Console → App integrity → App signing, and goes into `assetlinks.json` and `twa-manifest.json`'s `fingerprints`.
 
 ## Building a new version
@@ -54,7 +57,7 @@ Drafted for the founder; the founder submits them.
   >
   > You need a Toolbox account from the company to sign in. Each person sees only the tools they have been given.
 
-- **Graphics:** the 512 px icon and the 1024×500 feature graphic were generated from the Kaadal K (`C:\Users\goodearth\Documents\kaadal-android-release`). At least two phone screenshots: taken on a phone, from screens with no client names, phone numbers or money.
+- **Graphics:** the 512 px icon and the 1024×500 feature graphic were generated from the Kaadal K (`android-release`). At least two phone screenshots: taken on a phone, from screens with no client names, phone numbers or money.
 
 ## Launch steps
 

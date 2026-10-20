@@ -17,7 +17,7 @@
   "maskableIconUrl": "https://toolbox.kaadalgroup.com/icon-maskable-512.png",
   "splashScreenFadeOutDuration": 300,
   "signingKey": {
-    "path": "C:\\Users\\goodearth\\Documents\\kaadal-android-signing\\upload.keystore",
+    "path": "C:\\Users\\goodearth\\Documents\\Code\\kaadal-toolbox\\android-signing\\upload.keystore",
     "alias": "upload"
   },
   "appVersionName": "1.0.0",
