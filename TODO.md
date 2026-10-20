@@ -4,9 +4,9 @@ Only what is next. What exists is `STATUS.md`, the rules are `CLAUDE.md`, histor
 
 ## Native apps on iPhone and Android — next build
 
-- **Now: the Capacitor app, Android first.** Approved 2026-10-18; the build is the top section of `plan.md`, starting at phase A.
+- **Now: the Capacitor app's native features, Android first.** The shell and Google sign-in are on staging; next are B (Face ID and fingerprint), D (the camera) and C (push), the top section of `plan.md`.
 - **Meanwhile: the Play wrapper's version 1.** Built and signed; the founder's steps (Play Console, the reviewer account, the screenshots) and the fingerprint still to add are the launch steps in `android/PLAN.md`. The Capacitor app replaces it later as an update.
-- **Waiting on the founder:** Apple's Organization enrolment; what staff would scan (phase D).
+- **Waiting on the founder:** `com.kaadalgroup.toolbox://auth/callback` on staging's Supabase redirect list (Google sign-in in the app needs it); a Firebase project (phase C); Apple's Organization enrolment; what staff would scan (phase D).
 
 ## The switch: staging's database becomes production
 

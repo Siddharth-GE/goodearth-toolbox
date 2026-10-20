@@ -1,6 +1,6 @@
 # Native apps on iPhone and Android
 
-**Approved by the founder 2026-10-18 ("everything looks good"). Build Android first:** A1, A2 and A4 on Android, then the founder's Android vet; the iPhone (A3) after. Work on `feature/native-apps`, branched from `feature/android-app` (PR #112, the website's half it needs), in its own worktree. **The founder waived Fable's reviews for this build** (2026-10-18: "waive all the fable reviews i trust you"), so Opus takes each `[Fable]` step and says so beside it. Every new package is a release at least two weeks old (Capacitor 8.5.3 was days old on 2026-10-18).
+**Approved by the founder 2026-10-18 ("everything looks good"). Build Android first.** A1, A2 and A4 are on staging (#112, #113). **Next, in this order unless the founder says otherwise: B (Face ID and fingerprint), D (the camera), C (push, once the Firebase project exists)**, then the iPhone (A3). Work on `feature/native-apps` in its own worktree (`C:\Users\goodearth\Documents\Code\toolbox-native`), brought level with `staging` first; Opus may not merge to `staging` from a session, so each piece ends in a pull request the founder merges. **The founder waived Fable's reviews for this build** (2026-10-18: "waive all the fable reviews i trust you"), so Opus takes each `[Fable]` step and says so beside it. Every new package is a release at least two weeks old (Capacitor 8.5.3 was days old on 2026-10-18).
 
 The founder's choices (2026-10-18): **one shared app in both stores**, built with Capacitor 8, showing today's Toolbox screens and adding **push notifications, Face ID / fingerprint, and camera and scanning**. iPhone on the **public App Store**; no Mac, so iPhone builds run on GitHub's free macOS machines (the repo is public). Same ID on both: `com.kaadalgroup.toolbox`.
 
@@ -24,7 +24,7 @@ Why this shape: every tool works on day one, a website fix still reaches both ap
 
 - [x] [Opus] `mobile/`: a Capacitor 8 project with its own `package.json` (the web app's dependencies untouched), pointed at `https://toolbox.kaadalgroup.com`, the offline screen, and the Kaadal K icon and splash. Android only so far; the iPhone's icon comes with A3. Two things Chrome did for the wrapper are now the app's own: prints and exports go through Android's downloader (`mobile/PLAN.md`), and the back button through `@capacitor/app`.
 - [x] [Opus] Android: built on this PC, signed with the existing upload key, version code 2: `kaadal-toolbox-2.0.0.aab` and `-test-install.apk` in `C:\Users\goodearth\Documents\kaadal-android-release`. Capacitor 8 needs **Java 21**, added beside the wrapper's 17 (`mobile/PLAN.md`, _Building a new version_). Seen on an Android 16 emulator: the K launch screen, the live sign-in page, the "No connection" screen in flight mode, Try again, the back button. Not yet seen: anything after sign-in, Print, and the keyboard.
-- [ ] [Founder] **Try version 2 on an Android phone** (install `kaadal-toolbox-2.0.0-test-install.apk`; it updates the wrapper in place if that is on the phone):
+- [ ] [Founder] **Try version 2 on an Android phone** (install `kaadal-toolbox-2.0.0-test-install.apk`; it updates the wrapper in place if that is on the phone). Step 2 confirmed on the founder's phone 2026-10-19; the rest still to try:
   1. Open it: the K on cream, then the burgundy sign-in page, with no address bar.
   2. Sign in with email and password; switch to the mail app for the code and back. Tick "trust this device", close the app, reopen: still signed in.
   3. Open a few tools from different teams; the phone's back button steps back through pages.
@@ -38,12 +38,12 @@ Why this shape: every tool works on day one, a website fix still reaches both ap
 - [x] [Opus] Built: `lib/native/app.ts` reads the user agent's mark on the server (pure and tested, no new web dependency); `signInWithGoogle` picks the return address; on Android, other sites open in a Chrome tab over the app and the return is finished in the web view. Seen on the emulator: Google's page in a burgundy tab over the app, its close button back to the app, and a return carrying a made-up code finished on the site and refused, with the app open and from cold.
 - [ ] **Before the round trip works**, two things outside the code:
   - [ ] [Founder] Add `com.kaadalgroup.toolbox://auth/callback` to staging's Supabase redirect list: Authentication → URL Configuration → Redirect URLs (Opus's attempt through the management API was blocked by the session's safety check). Staging's settings become production's at the switch, so this is the only time; the new practice project needs it too.
-  - [ ] [Founder] Merge the website's half to staging (PR #112, then this branch's website change), so `toolbox.kaadalgroup.com` answers the app.
+  - [x] [Founder] Merge the website's half to staging: #112 and #113, merged 2026-10-19.
 - [ ] [Founder] Vet on TestFlight and Play's internal track: sign in all three ways, open every team's tools, turn on flight mode and see the offline screen.
 
 ## B. Face ID and fingerprint
 
-- [ ] [Fable] Approve the design. Recommended: after a full sign-in in the app, offer "Use Face ID next time"; the email and password go into the phone's Keychain / Keystore, released only by the face or finger; next time the app signs in through **today's password path**, and the trusted device (30 days) skips the code as it does now. No new door into the server. The stronger alternative (a device key the server checks) is a new sign-in path and waits for a reason.
+- [ ] [Fable → Opus, waived] Settle the design. Recommended: after a full sign-in in the app, offer "Use Face ID next time"; the email and password go into the phone's Keychain / Keystore, released only by the face or finger; next time the app signs in through **today's password path**, and the trusted device (30 days) skips the code as it does now. No new door into the server. The stronger alternative (a device key the server checks) is a new sign-in path and waits for a reason.
 - [ ] [Opus] Build it with a maintained biometric plugin (chosen at build time, a release at least two weeks old); "Forget this phone" in the profile menu clears it.
 - [ ] [Founder] Vet: sign in once, close the app, open it with your face; change your password elsewhere and see it ask again.
 
